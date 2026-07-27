@@ -9,6 +9,7 @@ Disk Manager — ディスク容量管理の統一モジュール
 """
 
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import List, Optional, Union
@@ -19,7 +20,12 @@ logger = logging.getLogger(__name__)
 try:
     from safe_io import VAULT_OUTPUTS_DIR
 except ImportError:
-    VAULT_OUTPUTS_DIR = Path(__file__).resolve().parent.parent / "vault-outputs"
+    # safe_io を import できない経路でも同じ環境変数を見る。
+    # ここが素通りすると、import 失敗時だけ旧パスを向く分岐が残る。
+    VAULT_OUTPUTS_DIR = Path(
+        os.environ.get("ANTIGRAVITY_VAULT_OUTPUTS")
+        or (Path(__file__).resolve().parent.parent / "vault-outputs")
+    )
 
 
 # 削除対象の中間ディレクトリ（優先度順: 効果の大きいものから）
