@@ -1,0 +1,7 @@
+{
+  "message": "Phase 30 / bug_hunter タスク #1 (対象: plugins/retention_map_plugin.py) の不具合修正完了。video_id/video_pathの型検証およびvideo_path実在確認のバリデーション追加、最大動画長制限（86400秒）検証追加、Broad exceptのRetentionMapErrorラップ修正、テスト17件PASS、および全体フィットネス125件PASSを確認。",
+  "changed_files": [
+    "backend/plugins/retention_map_plugin.py",
+    "backend/tests/test_retention_map_plugin.py"
+  ]
+}

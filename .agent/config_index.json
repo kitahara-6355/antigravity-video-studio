@@ -1,0 +1,34 @@
+{
+  "_description": "Antigravity 設定ファイル参照マップ — 各設定ファイルの所在と用途を一元管理",
+  "_updated": "2026-04-19",
+  "model_governance": {
+    "path": "backend/model_config.json",
+    "purpose": "3層モデルガバナンス (Premium/Standard/Batch)",
+    "update_frequency": "四半期"
+  },
+  "usage_tracking": {
+    "path": "backend/usage_tracker/free_tier_config.json",
+    "purpose": "無料枠管理・API使用量追跡",
+    "update_frequency": "月次"
+  },
+  "constitution": {
+    "path": "backend/branding/constitution.json",
+    "purpose": "ブランド憲法・プロジェクト設計原則",
+    "update_frequency": "年次"
+  },
+  "dream_state": {
+    "path": "backend/agents/memory/dream_state.json",
+    "purpose": "DreamEngineサイクル状態 (自動管理)",
+    "update_frequency": "自動"
+  },
+  "verified_facts": {
+    "path": "backend/agents/memory/verified_facts_index.json",
+    "purpose": "確定事実インデックス (DreamEngine管理)",
+    "update_frequency": "自動"
+  },
+  "evolution_log": {
+    "path": "backend/branding/evolution_log.json",
+    "purpose": "フック改善履歴・品質進化ログ",
+    "update_frequency": "自動"
+  }
+}

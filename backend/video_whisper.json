@@ -1,0 +1,11 @@
+{
+  "video": "video.mp4",
+  "model": "medium",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 1.0,
+      "text": "音声認識に失敗しました（ファイル未検出）: [Errno 2] No such file or directory: 'video.mp4'"
+    }
+  ]
+}

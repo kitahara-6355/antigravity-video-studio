@@ -1,0 +1,600 @@
+{
+  "ux_id": "O-5",
+  "name": "構成微調整",
+  "description": "Ownerはカット候補ビューアでセグメントの除外/復帰/並替え/undo/redoを行い、微調整結果を確定できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "カット候補ビューアが表示される",
+      "linked_items": [
+        "O5-L1-01",
+        "O5-L1-02"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "セグメントがID/テキスト/尺付きで一覧表示される",
+      "linked_items": [
+        "O5-L1-03",
+        "O5-L2-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "セグメントをドラッグ&ドロップで順序変更できる",
+      "linked_items": [
+        "O5-L3-01"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "ドラッグ中にプレースホルダーが表示される",
+      "linked_items": [
+        "O5-L4-04"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "セグメントの除外ボタンで個別除外できる",
+      "linked_items": [
+        "O5-L1-04",
+        "O5-L3-02"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "除外セグメントがグレーアウト+取消線で表示される",
+      "linked_items": [
+        "O5-L2-02"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "除外セグメントの復帰ボタンで元に戻せる",
+      "linked_items": [
+        "O5-L1-05",
+        "O5-L3-03"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "AI推奨構成との差分がハイライト表示される",
+      "linked_items": [
+        "O5-L1-08",
+        "O5-L2-03"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "差分の理由が表示される",
+      "linked_items": [
+        "O5-L2-04"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "undoボタンで直前の操作を取り消せる",
+      "linked_items": [
+        "O5-L1-06",
+        "O5-L3-04"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "redoボタンで取り消した操作を復元できる",
+      "linked_items": [
+        "O5-L1-07",
+        "O5-L3-05"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "undo/redo不可時はdisabledになる",
+      "linked_items": [
+        "O5-L2-07",
+        "O5-L4-02"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "変更がリアルタイムでローカル状態に反映される",
+      "linked_items": [
+        "O5-L4-09"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "変更のたびに合計尺がリアルタイム更新される",
+      "linked_items": [
+        "O5-L1-09",
+        "O5-L2-06"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "変更回数カウンターが表示される",
+      "linked_items": [
+        "O5-L1-10",
+        "O5-L2-05"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "全セグメント除外時にエラーが表示される",
+      "linked_items": [
+        "O5-L2-08",
+        "O5-L4-03"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "微調整結果を確定ボタンで確定する",
+      "linked_items": [
+        "O5-L1-11",
+        "O5-L3-08"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "確定前にAI差分サマリーが表示される",
+      "linked_items": [
+        "O5-L2-09"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "確定後に次のパイプラインステップに遷移する",
+      "linked_items": [
+        "O5-L4-05"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "全微調整操作がevolution_logに記録される",
+      "linked_items": [
+        "O5-L2-10",
+        "O5-L4-10"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "セグメント選択でプレビューが該当箇所にジャンプする",
+      "linked_items": [
+        "O5-L3-09",
+        "O5-L4-07"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "Ctrl+Z/Ctrl+Yでundo/redoできる",
+      "linked_items": [
+        "O5-L3-06",
+        "O5-L3-07"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O5-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "SmartCut初期化APIが正常応答を返す",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "全候補APIが正常応答を返す",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "候補レスポンスにhighlights配列が存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-04",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "固定APIが正常応答しlocked_segmentsが返る",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-05",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "固定解除APIが正常応答しlocked_segmentsが更新される",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-06",
+      "layer": 1,
+      "story_scene": "S10",
+      "description": "推奨APIで再計算が可能(undo相当)",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-07",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "再度同一パラメータで推奨取得が可能(redo相当)",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-08",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "候補レスポンスにchapters配列が存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-09",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "推奨レスポンスにestimated_output_strが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-10",
+      "layer": 1,
+      "story_scene": "S15",
+      "description": "推奨レスポンスにrecommended_segments配列が存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L1-11",
+      "layer": 1,
+      "story_scene": "S17",
+      "description": "確定APIが正常応答を返す",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O5-L2-01",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "候補にtext_snippet/timestamp/typeが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-02",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "固定/解除でlocked_segments数が変動する",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-03",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "ハイライトとチャプターが区別可能",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-04",
+      "layer": 2,
+      "story_scene": "S9",
+      "description": "固定セグメントにtitle/start_time/end_timeが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-05",
+      "layer": 2,
+      "story_scene": "S15",
+      "description": "推奨セグメント数が正の整数で返される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-06",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "estimated_output_strが分:秒形式で表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-07",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "推奨APIが目標尺を反映した結果を返す",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-08",
+      "layer": 2,
+      "story_scene": "S16",
+      "description": "未初期化でAPIを呼ぶと400エラーが返る",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-09",
+      "layer": 2,
+      "story_scene": "S18",
+      "description": "確定レスポンスにfinalizedデータが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L2-10",
+      "layer": 2,
+      "story_scene": "S20",
+      "description": "確定レスポンスにselected_segments配列が含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O5-L3-01",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "固定→解除で順序変更に相当する操作が可能",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-02",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "固定APIでセグメントを除外相当として固定できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-03",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "固定解除APIで復帰できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-04",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "推奨APIで異なる尺を指定しundo相当の操作ができる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-05",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "同一尺で再度推奨APIを呼びredo相当の操作ができる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-06",
+      "layer": 3,
+      "story_scene": "S22",
+      "description": "パラメータ変更→再計算で構成を復元できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-07",
+      "layer": 3,
+      "story_scene": "S22",
+      "description": "元パラメータで再計算しredo相当の動作を確認する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-08",
+      "layer": 3,
+      "story_scene": "S17",
+      "description": "確定APIを呼び出しfinalizedが返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-09",
+      "layer": 3,
+      "story_scene": "S21",
+      "description": "候補のtimestampからプレビュー位置を計算できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-10",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "複数シーン固定で除外相当を複数回実行できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-11",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "複数シーン解除で復帰を複数回実行できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-12",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "ハイライト候補数とチャプター候補数を取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-13",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "目標尺変更で合計尺が更新される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L3-14",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "候補タイプ(highlights/chapters)を切替えて取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O5-L4-01",
+      "layer": 4,
+      "story_scene": "S5",
+      "description": "固定→解除→再固定のサイクルが正常に動作する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-02",
+      "layer": 4,
+      "story_scene": "S12",
+      "description": "推奨API連続呼出で結果が一貫する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-03",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "未初期化でlock呼出時に400エラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-04",
+      "layer": 4,
+      "story_scene": "S4",
+      "description": "固定→推奨でlocked_segmentsが推奨に影響する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-05",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "確定後にfinalized.success=trueが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-06",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "未初期化でunlock呼出時に400エラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-07",
+      "layer": 4,
+      "story_scene": "S21",
+      "description": "候補取得→固定→解除で状態が正しく遷移する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-08",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "尺15→30→45分と変更するたびにestimated_output_secondsが変化する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-09",
+      "layer": 4,
+      "story_scene": "S13",
+      "description": "推奨API呼出後に即座にestimated_output_strが更新される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L4-10",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "確定レスポンスにevolution_log記録用データが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O5-L5-01",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "除外→復帰→確定の完走(固定→解除→finalize)",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-02",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "undo→redo→確定の完走(尺変更→戻す→再度→確定)",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-03",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "AI差分確認→手動調整→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-04",
+      "layer": 5,
+      "story_scene": "S14",
+      "description": "全セグメント操作→合計尺確認→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-05",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "エラー(未初期化)→初期化→正常操作→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-06",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "パラメータ変更→復帰→再変更→確定の混在操作完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-07",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "プレビュー連動(timestamp確認)→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-08",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "操作ログ→学習記録確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-09",
+      "layer": 5,
+      "story_scene": "S2",
+      "description": "大量候補操作→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O5-L5-10",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "確定→次ステップ遷移(finalize成功)の完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "migration_v1_to_v2",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

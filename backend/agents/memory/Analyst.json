@@ -1,0 +1,30 @@
+{
+  "stats": {
+    "debates": 3,
+    "wins": 0,
+    "losses": 0
+  },
+  "bias_weight": 1.01,
+  "history": [
+    {
+      "session_id": "efac96bf-f1d2-43c9-9b0d-30f50b031333",
+      "timestamp": 1766813865.2919042,
+      "stance": "DISAGREE",
+      "outcome": "APPROVE"
+    },
+    {
+      "session_id": "3850352e-5635-46c7-8311-0960816fa409",
+      "timestamp": 1779406443.1173627,
+      "stance": "DISAGREE",
+      "outcome": "APPROVE",
+      "feedback": null
+    },
+    {
+      "session_id": "af75c3b6-52f2-458e-802e-d29bb958e08d",
+      "timestamp": 1780029697.5958314,
+      "stance": "DISAGREE",
+      "outcome": "APPROVE",
+      "feedback": null
+    }
+  ]
+}

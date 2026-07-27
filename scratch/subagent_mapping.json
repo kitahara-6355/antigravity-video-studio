@@ -1,0 +1,17 @@
+{
+  "batch_id": "batch_8b2dd3",
+  "mappings": [
+    {
+      "task_id": "T-batch_8b2dd3-bug_hunter-000-split2",
+      "target_module": "agents/orchestration/run_session_end.py",
+      "conversation_id": "b2914762-fb70-4704-b321-5eb6d1ca5c79",
+      "status": "running"
+    },
+    {
+      "task_id": "T-batch_8b2dd3-bug_hunter-001-split2",
+      "target_module": "tests/_e2e_cycle3.py",
+      "conversation_id": "29a3049b-d632-4fc5-a18d-3402e8a4646a",
+      "status": "running"
+    }
+  ]
+}

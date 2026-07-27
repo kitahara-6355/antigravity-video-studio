@@ -1,0 +1,4 @@
+---
+name: task-diary-distiller
+description: フェーズ完了時などの節目に発動し、一時的なコンテキストやメトリクスログから改善の教訓（Lessons Learned）を抽出し、永続資産へと複利的に統合するスキル。
+---

@@ -1,0 +1,57 @@
+{
+    "$schema": "video_constraints",
+    "version": "1.0.0",
+    "description": "長時間動画対応制約条件 - PROJECT_CONSTITUTION準拠",
+    "raw_video": {
+        "max_duration_minutes": 180,
+        "max_files_per_project": 10,
+        "max_total_size_gb": 50,
+        "supported_formats": [
+            "mp4",
+            "mov",
+            "avi",
+            "mkv"
+        ]
+    },
+    "output_video": {
+        "max_duration_minutes": 60,
+        "min_duration_minutes": 5,
+        "recommended_duration_minutes": 15,
+        "format": "mp4",
+        "codec": "h264"
+    },
+    "processing": {
+        "stage1_lightweight": {
+            "description": "RAW全体の軽量スキャン",
+            "max_segments": 6000,
+            "highlight_candidates": 50,
+            "chapter_candidates": 30,
+            "timeout_minutes": 15
+        },
+        "stage2_user_decision": {
+            "description": "ユーザーによるカット編集判断",
+            "requires_approval": true,
+            "progressive_review_enabled": true
+        },
+        "stage3_deep": {
+            "description": "採用セグメントの深層分析",
+            "max_segments": 2000,
+            "max_chapters": 15,
+            "max_tags": 20,
+            "max_highlights": 10,
+            "timeout_minutes": 10
+        }
+    },
+    "memory": {
+        "segment_batch_size": 500,
+        "gc_trigger_threshold_mb": 1024,
+        "max_concurrent_processes": 2
+    },
+    "youtube_optimization": {
+        "hook_analysis_seconds": 5,
+        "thumbnail_candidates": 3,
+        "title_candidates": 5,
+        "ctr_range_min": 2.0,
+        "ctr_range_max": 7.0
+    }
+}

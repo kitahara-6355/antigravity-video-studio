@@ -1,0 +1,43 @@
+# カバレッジ計測設定
+#
+# 2026-07-25: テストコード自身が分母に含まれ、カバレッジを過大に見せていた。
+#   テストコード込み : 46.4%  (40,604 / 87,600)
+#   テストコード除外 : 30.2%  (18,404 / 60,892)
+# テストファイルは実行されるため 83% という高いカバー率を持ち、全体を押し上げる。
+# 「本番コードのどれだけが検証されているか」を測るのが目的なので、除外する。
+#
+# 過去に記録された 44% / 72% も同じ理由で膨らんでいた可能性が高い。
+# Gate Keeper の 70% 基準は、この設定で測った値に対して適用する。
+
+[run]
+source = backend
+branch = False
+
+omit =
+    # テストコード（分母から除外）
+    */tests/*
+    */test_*.py
+    */conftest.py
+    # 過去バージョンのスナップショット
+    */antigravity_phase18_stable_v1/*
+    */antigravity_phase19_experimental_v1/*
+    */archives/*
+    */migration_backups/*
+    # 依存関係・生成物
+    */node_modules/*
+    */.venv/*
+    */venv/*
+    */site-packages/*
+    */__pycache__/*
+
+[report]
+# 完全に到達不能な行はノイズになるため除外する
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    raise NotImplementedError
+    @abstractmethod
+
+skip_empty = True
+precision = 1

@@ -1,0 +1,558 @@
+{
+  "ux_id": "O-10",
+  "name": "テーマ選択",
+  "description": "Ownerはテンプレートを選び、テーマで雰囲気を微調整し、パイプラインに適用できる",
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "session_9",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1
+    ],
+    "complexity_by_step": {
+      "1": "basic"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": [],
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "ヘルスチェック",
+      "linked_items": [
+        "O10-L1-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "テンプレート一覧表示",
+      "linked_items": [
+        "O10-L1-02",
+        "O10-L2-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "テンプレート詳細表示",
+      "linked_items": [
+        "O10-L1-03",
+        "O10-L2-02",
+        "O10-L3-10",
+        "O10-L3-12"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "テーマ一覧表示",
+      "linked_items": [
+        "O10-L1-04",
+        "O10-L2-03"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "テーマ詳細表示",
+      "linked_items": [
+        "O10-L1-05",
+        "O10-L2-04",
+        "O10-L3-09"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "テンプレート×テーマ適用",
+      "linked_items": [
+        "O10-L1-06",
+        "O10-L3-01",
+        "O10-L3-07",
+        "O10-L3-08"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "適用結果確認",
+      "linked_items": [
+        "O10-L2-05",
+        "O10-L2-06"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "現在設定取得",
+      "linked_items": [
+        "O10-L1-07",
+        "O10-L3-02"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "選択統計表示",
+      "linked_items": [
+        "O10-L1-08",
+        "O10-L2-07",
+        "O10-L3-11"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "AI推奨テンプレート",
+      "linked_items": [
+        "O10-L1-09",
+        "O10-L3-03"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "オーバーライド適用",
+      "linked_items": [
+        "O10-L1-10",
+        "O10-L3-04"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "テーマ切替カラー変更",
+      "linked_items": [
+        "O10-L3-05",
+        "O10-L2-08"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "テンプレート切替品質変更",
+      "linked_items": [
+        "O10-L3-06",
+        "O10-L2-09"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "不正テンプレートID",
+      "linked_items": [
+        "O10-L4-01",
+        "O10-L4-08"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "不正テーマID",
+      "linked_items": [
+        "O10-L4-02",
+        "O10-L4-09"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "適用前後設定遷移",
+      "linked_items": [
+        "O10-L4-03",
+        "O10-L4-04"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "推奨テーマ整合性",
+      "linked_items": [
+        "O10-L4-05",
+        "O10-L2-10"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "統計記録更新",
+      "linked_items": [
+        "O10-L4-06",
+        "O10-L4-07",
+        "O10-L4-10"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "テンプレ→テーマ→確認完走",
+      "linked_items": [
+        "O10-L5-01",
+        "O10-L5-02",
+        "O10-L5-03"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "推奨→適用→統計→切替完走",
+      "linked_items": [
+        "O10-L5-04",
+        "O10-L5-05",
+        "O10-L5-06",
+        "O10-L5-07",
+        "O10-L5-08"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O10-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ヘルスチェックAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-02",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "テンプレート一覧API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-03",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "テンプレート詳細API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-04",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "テーマ一覧API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-05",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "テーマ詳細API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-06",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "適用API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-07",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "現在設定取得API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-08",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "統計API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-09",
+      "layer": 1,
+      "story_scene": "S10",
+      "description": "推奨API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L1-10",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "オーバーライドAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O10-L2-01",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "テンプレート数4以上",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-02",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "reference/target_genre含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-03",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "テーマ数4以上",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-04",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "color_palette/typography/motion含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-05",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "template/theme/quality_standards含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-06",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "pipeline_connected=true",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-07",
+      "layer": 2,
+      "story_scene": "S9",
+      "description": "total_selections数値含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-08",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "main/sub/accent含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-09",
+      "layer": 2,
+      "story_scene": "S13",
+      "description": "subtitle_rules/engagement_rules含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L2-10",
+      "layer": 2,
+      "story_scene": "S17",
+      "description": "推奨テーマ配列紐付き",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O10-L3-01",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "NHK×warm適用",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-02",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "適用後設定取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-03",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "推奨テンプレート取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-04",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "オーバーライド字幕サイズ変更",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-05",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "cool→energetic切替",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-06",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "NHK→MrBeast切替",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-07",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "HIKAKIN×energetic適用",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-08",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "ASMR×calm適用",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-09",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "全4テーマ詳細取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-10",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "全4テンプレート詳細取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-11",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "適用後統計更新",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L3-12",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "available_themes含む",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O10-L4-01",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "不正テンプレートIDでerror",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-02",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "不正テーマIDでerror",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-03",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "null→設定済み遷移",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-04",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "design_tokens_updated非空",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-05",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "推奨テーマCOMBOS一致",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-06",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "evolution_log記録",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-07",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "by_template更新",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-08",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "available一覧返却",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-09",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "available一覧返却",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L4-10",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "未選択オーバーライドエラー",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O10-L5-01",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "一覧→詳細→選択→適用完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O10-L5-02",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "適用→確認→切替→再確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O10-L5-03",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "全テンプレート適用→統計完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O10-L5-04",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "推奨→適用→確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O10-L5-05",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "適用→オーバーライド→確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O10-L5-06",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "不正ID→正常適用完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O10-L5-07",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "全組合せ適用完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O10-L5-08",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "推奨→統計→切替→確認完走",
+      "test_method": "e2e"
+    }
+  ]
+}

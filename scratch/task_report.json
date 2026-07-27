@@ -1,0 +1,7 @@
+{
+  "message": "評議会ファクトベース合意形成 (DS-021) の three_point_check 項目 (input_guardrail, safety_fallback, quantitative_mapping) の検証およびエッジケース・境界値テスト追加 (18テストPASS, 27テストPASS) が完了しました。",
+  "changed_files": [
+    "backend/agents/orchestration/design_stock.json",
+    "backend/tests/test_council_decision_extractor.py"
+  ]
+}

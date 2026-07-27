@@ -1,0 +1,603 @@
+{
+  "ux_id": "O-12",
+  "name": "学習・進化",
+  "description": "Ownerのチャンネルはアナリティクス同期・進化ログ・哲学深化を通じて自律的に成長する",
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "session_9",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1
+    ],
+    "complexity_by_step": {
+      "1": "basic"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": [],
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "Trinityステータス取得",
+      "linked_items": [
+        "O12-L1-01",
+        "O12-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "アナリティクス同期",
+      "linked_items": [
+        "O12-L1-02",
+        "O12-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "アナリティクスシミュレート",
+      "linked_items": [
+        "O12-L1-03",
+        "O12-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "ランク/XP表示",
+      "linked_items": [
+        "O12-L2-02",
+        "O12-L2-03"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "進化ログ取得",
+      "linked_items": [
+        "O12-L1-04",
+        "O12-L2-04"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "進化同期実行",
+      "linked_items": [
+        "O12-L1-05",
+        "O12-L3-03"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "進化ステータス取得",
+      "linked_items": [
+        "O12-L1-06",
+        "O12-L2-05"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "哲学エントリ表示",
+      "linked_items": [
+        "O12-L2-06",
+        "O12-L2-07"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "意思決定同期",
+      "linked_items": [
+        "O12-L3-04",
+        "O12-L2-08"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "constitution更新",
+      "linked_items": [
+        "O12-L3-05",
+        "O12-L2-09"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "シミュレート→ランク変動",
+      "linked_items": [
+        "O12-L3-06",
+        "O12-L4-01"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "XP加算前後の差分",
+      "linked_items": [
+        "O12-L4-02",
+        "O12-L4-03"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "ランク閾値遷移",
+      "linked_items": [
+        "O12-L4-04",
+        "O12-L3-07"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "sync冪等性確認",
+      "linked_items": [
+        "O12-L4-05",
+        "O12-L3-08"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "evolution_entries増加",
+      "linked_items": [
+        "O12-L4-06",
+        "O12-L3-09"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "philosophies増加",
+      "linked_items": [
+        "O12-L4-07",
+        "O12-L3-10"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "decision_count増加",
+      "linked_items": [
+        "O12-L4-08",
+        "O12-L2-10"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "last_sync更新",
+      "linked_items": [
+        "O12-L4-09",
+        "O12-L2-11"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "模擬視聴→同期→ランク完走",
+      "linked_items": [
+        "O12-L5-01",
+        "O12-L5-02",
+        "O12-L5-03"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "進化同期→哲学→ログ完走",
+      "linked_items": [
+        "O12-L5-04",
+        "O12-L5-05",
+        "O12-L5-06"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "全進化サイクル完走",
+      "linked_items": [
+        "O12-L5-07",
+        "O12-L5-08",
+        "O12-L3-11"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "ステータス最終確認",
+      "linked_items": [
+        "O12-L5-09",
+        "O12-L5-10",
+        "O12-L3-12"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O12-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "statusAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-02",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "analytics/syncAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-03",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "analytics/simulateAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-04",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "evolutionAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-05",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "evolution/syncAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-06",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "evolution/statusAPI正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-07",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "user_modelオブジェクト含む",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-08",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "result含む",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-09",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "simulation含む",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-10",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "entries配列含む",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L1-11",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "evolution_entries含む",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O12-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ランク情報含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-02",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "XP数値含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-03",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "ランク名含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-04",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "進化ログエントリ含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-05",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "evolution_entries数値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-06",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "philosophies配列含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-07",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "哲学エントリ数0以上",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-08",
+      "layer": 2,
+      "story_scene": "S9",
+      "description": "decisions_synced数値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-09",
+      "layer": 2,
+      "story_scene": "S10",
+      "description": "constitution_updates数値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-10",
+      "layer": 2,
+      "story_scene": "S17",
+      "description": "decision_count数値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L2-11",
+      "layer": 2,
+      "story_scene": "S18",
+      "description": "last_sync値含む",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O12-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "analytics同期実行→結果取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "1000views模擬→結果取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-03",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "evolution同期実行→結果取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-04",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "意思決定同期→synced数取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-05",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "constitution更新→updates数取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-06",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "大量views模擬→ランク変動確認",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-07",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "ランク閾値超え→昇格確認",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-08",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "2回sync→結果安定確認",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-09",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "evolution同期→entries増加確認",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-10",
+      "layer": 3,
+      "story_scene": "S16",
+      "description": "evolution同期→philosophies確認",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-11",
+      "layer": 3,
+      "story_scene": "S21",
+      "description": "全サイクル2周回完走",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L3-12",
+      "layer": 3,
+      "story_scene": "S22",
+      "description": "最終ステータス全フィールド確認",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O12-L4-01",
+      "layer": 4,
+      "story_scene": "S11",
+      "description": "シミュレート前後のviews差分",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-02",
+      "layer": 4,
+      "story_scene": "S12",
+      "description": "XP加算前後の差分正",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-03",
+      "layer": 4,
+      "story_scene": "S12",
+      "description": "sync結果のupdates>=0",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-04",
+      "layer": 4,
+      "story_scene": "S13",
+      "description": "Novice→次ランクの閾値遷移",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-05",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "2回sync結果が同一",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-06",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "sync後entries数>=sync前",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-07",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "sync後philosophies数>=sync前",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-08",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "sync後decision_count>=sync前",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-09",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "sync後last_sync非null",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-10",
+      "layer": 4,
+      "story_scene": "S11",
+      "description": "simulation.sync両方success",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L4-11",
+      "layer": 4,
+      "story_scene": "S13",
+      "description": "ランク変動時XP閾値超過",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O12-L5-01",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "模擬1000views→同期→ステータス確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-02",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "模擬→同期→ランク確認→進化ログ完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-03",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "模擬→同期→哲学確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-04",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "evolution同期→哲生成→ログ確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-05",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "意思決定同期→constitution→最終確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-06",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "全sync→ステータス→進化ログ完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-07",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "2サイクル完走→entries単調増加",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-08",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "全進化→最終ステータス確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "ステータス→進化→同期→最終確認完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O12-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "全フロー→最終ステータス整合性完走",
+      "test_method": "e2e"
+    }
+  ]
+}

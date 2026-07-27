@@ -1,0 +1,11 @@
+{
+  "directive_id": null,
+  "issued_at": null,
+  "issued_by": null,
+  "priorities": {},
+  "phase_advance": false,
+  "focus_modules": [],
+  "blacklist_override": [],
+  "resume": true,
+  "notes": ""
+}

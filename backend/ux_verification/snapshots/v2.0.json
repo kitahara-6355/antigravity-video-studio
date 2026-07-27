@@ -1,0 +1,686 @@
+{
+  "version": "v2.0",
+  "timestamp": "2026-04-29T23:18:40.881499",
+  "items": [
+    {
+      "id": "O2-L1-01",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "Whisperモデルセレクトボックスが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L1-02",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "推奨モデルバッジが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L1-03",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "進捗バーが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L1-04",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "進捗テキスト(%)が存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L1-05",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "経過時間表示が存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L1-06",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "セグメント一覧コンテナが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L1-07",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "セグメントが3件以上表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L2-01",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "モデル名にVRAMと推奨テキストが含まれる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L2-02",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "進捗テキストが0〜100の数値を表示する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L2-03",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "経過時間がm:ss形式で表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L2-04",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "セグメントにタイムスタンプがm:ss - m:ss形式で表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L2-05",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "話者IDが色分けされている",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L2-06",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "エラー時に赤色背景メッセージが表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L3-01",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S1",
+      "description": "モデルをsmallに変更しAPI応答でselectの値が変わる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L3-02",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S1",
+      "description": "モデルをlarge-v3に変更できる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L3-03",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "セグメントテキストクリックで編集モードに入る",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L3-04",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "編集中にテキスト変更し保存で確定できる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L3-05",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "編集中にEscキーでキャンセルできる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L3-06",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "編集中にEnterキーで確定できる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L3-07",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "複数セグメントを連続編集できる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L4-01",
+      "ux_story": "O-2",
+      "layer": 4,
+      "story_scene": "S3",
+      "description": "idle→running: 進捗が0%から表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L4-02",
+      "ux_story": "O-2",
+      "layer": 4,
+      "story_scene": "S3",
+      "description": "running→completed: 進捗100%+完了テキスト",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L4-03",
+      "ux_story": "O-2",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "running→error: エラーメッセージが表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L4-04",
+      "ux_story": "O-2",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "不正モデル設定時にAPIが400を返す",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L4-05",
+      "ux_story": "O-2",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "セグメント0件時に適切なメッセージが表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L5-01",
+      "ux_story": "O-2",
+      "layer": 5,
+      "story_scene": "S5",
+      "description": "モデル選択→セグメント表示→編集→保存の完走",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L5-02",
+      "ux_story": "O-2",
+      "layer": 5,
+      "story_scene": "S5",
+      "description": "全セグメント順番編集→全テキスト反映",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L5-03",
+      "ux_story": "O-2",
+      "layer": 5,
+      "story_scene": "S3",
+      "description": "進捗0%→100%遷移中にセグメントが増加表示",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L5-04",
+      "ux_story": "O-2",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "エラー状態から復帰→再度セグメント表示",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-L5-05",
+      "ux_story": "O-2",
+      "layer": 5,
+      "story_scene": "S1",
+      "description": "モデル変更→再取得→セグメント更新",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-01",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "校閲ステージパネルが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-02",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "diffコンテナが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-03",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "差分マーク要素が存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-04",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "比較ビューコンテナが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-05",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "個別承認ボタンが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-06",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "個別却下ボタンが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-07",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "全承認ボタンが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-08",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "全却下ボタンが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-09",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "辞書パネルが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-10",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "校閲進捗バーが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-11",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "SRTエクスポートボタンが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-12",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "TXTエクスポートボタンが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L1-13",
+      "ux_story": "O-3",
+      "layer": 1,
+      "story_scene": "S10",
+      "description": "スキップトグルが存在する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-01",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "diffマークに修正種別が色分け表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-02",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "replace/insert/deleteの3種別が区別可能",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-03",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "修正前テキストが表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-04",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "修正後テキストが表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-05",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "承認/却下/保留のステータスバッジが表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-06",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "18文字超過時に警告テキストが表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-07",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "超過行の文字数が表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L2-08",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "承認数/却下数/保留数が表示される",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-01",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "承認ボタンクリックでステータスが承認に変わる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-02",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "却下ボタンクリックでステータスが却下に変わる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-03",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "承認済みの承認ボタンがdisabledになる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-04",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "全承認ボタンで全セグメントが承認になる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-05",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "全却下ボタンで全セグメントが却下になる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-06",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "辞書エントリを追加できる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-07",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "辞書エントリを削除できる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-08",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "辞書エントリを更新できる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-09",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "SRTエクスポートで-->フォーマットが返る",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L3-10",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "スキップトグルON/OFFで状態が切り替わる",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L4-01",
+      "ux_story": "O-3",
+      "layer": 4,
+      "story_scene": "S1",
+      "description": "校閲結果APIがsegments/changes構造を返す",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L4-02",
+      "ux_story": "O-3",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "校閲進捗APIがstatus/progress/total_segmentsを返す",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L4-03",
+      "ux_story": "O-3",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "スキップON時にステータスAPIがskip=trueを返す",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L4-04",
+      "ux_story": "O-3",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "辞書追加後にカウントが増加する",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L4-05",
+      "ux_story": "O-3",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "18文字超過セグメントが識別可能",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L4-06",
+      "ux_story": "O-3",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "TXTエクスポートが非空コンテンツを返す",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L5-01",
+      "ux_story": "O-3",
+      "layer": 5,
+      "story_scene": "S2",
+      "description": "diff表示→比較ビュー→承認→ステータス更新の完走",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L5-02",
+      "ux_story": "O-3",
+      "layer": 5,
+      "story_scene": "S4",
+      "description": "全セグメントを個別レビュー→承認/却下混在→集計一致",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L5-03",
+      "ux_story": "O-3",
+      "layer": 5,
+      "story_scene": "S5",
+      "description": "一括却下→個別承認→再度一括承認の3段階操作",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L5-04",
+      "ux_story": "O-3",
+      "layer": 5,
+      "story_scene": "S6",
+      "description": "辞書追加→校閲結果確認→エクスポートの完走",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L5-05",
+      "ux_story": "O-3",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "スキップON→確認→OFF→校閲結果表示の復帰",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-L5-06",
+      "ux_story": "O-3",
+      "layer": 5,
+      "story_scene": "S9",
+      "description": "SRT+TXT両フォーマットエクスポート→内容検証",
+      "passed": null,
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    }
+  ],
+  "total_items": 73,
+  "pass_items": 0,
+  "fail_items": 0,
+  "skip_items": 73,
+  "fulfillment_rate": 0.0,
+  "correlation_rate": 100.0,
+  "story_scenes_total": 18,
+  "story_scenes_covered": 18,
+  "items_per_story": {
+    "O-2": 30,
+    "O-3": 43
+  },
+  "pass_per_story": {
+    "O-2": 30,
+    "O-3": 43
+  },
+  "layer_distribution": {
+    "L1": 20,
+    "L2": 14,
+    "L3": 17,
+    "L4": 11,
+    "L5": 11
+  }
+}

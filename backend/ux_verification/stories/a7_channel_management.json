@@ -1,0 +1,630 @@
+{
+  "ux_id": "A-7",
+  "name": "チャンネル主ダッシュボード管理",
+  "description": "管理者はチャンネル管理ダッシュボードからチャンネル一覧・チャンネル詳細・効果サマリー・制作効率・品質向上度・CTR改善率・維持率改善・ROI計算・チャンネル比較・最適化推奨・テンプレ推奨・投稿スケジュール・ペース分析・コメント分析・競合ベンチ・成長予測・アラート設定・レポート生成・Owner向けビュー・権限管理・連携設定を管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "チャンネル管理ダッシュボードが表示される",
+      "linked_items": [
+        "A7-L1-01",
+        "A7-L1-02",
+        "A7-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "管理対象チャンネルの一覧が表示される",
+      "linked_items": [
+        "A7-L1-03",
+        "A7-L2-02",
+        "A7-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "各チャンネルのKPI/設定/実績が表示される",
+      "linked_items": [
+        "A7-L1-04",
+        "A7-L2-03",
+        "A7-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "Antigravity導入前後の効果比較が表示される",
+      "linked_items": [
+        "A7-L1-05",
+        "A7-L2-04"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "制作時間の短縮率(AI自動化による)が表示される",
+      "linked_items": [
+        "A7-L1-06",
+        "A7-L3-03"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "品質スコアの平均向上率が表示される",
+      "linked_items": [
+        "A7-L3-04",
+        "A7-L4-01"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "AI最適化によるCTR改善率が表示される",
+      "linked_items": [
+        "A7-L3-05",
+        "A7-L4-02"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "SmartCut/品質ゲートによる維持率改善が表示される",
+      "linked_items": [
+        "A7-L1-07",
+        "A7-L3-06"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "API費用 vs 効果のROI計算が表示される",
+      "linked_items": [
+        "A7-L3-07",
+        "A7-L4-03"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "複数チャンネル間のパフォーマンス比較が表示される",
+      "linked_items": [
+        "A7-L3-08",
+        "A7-L4-04"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "チャンネル固有の最適化推奨が表示される",
+      "linked_items": [
+        "A7-L1-08",
+        "A7-L2-05",
+        "A7-L3-09"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "チャンネルジャンルに最適なテンプレートが推奨される",
+      "linked_items": [
+        "A7-L2-06",
+        "A7-L3-10"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "各チャンネルの投稿スケジュール管理ができる",
+      "linked_items": [
+        "A7-L1-09",
+        "A7-L2-07",
+        "A7-L3-11"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "投稿ペース(週2目標等)の達成度が表示される",
+      "linked_items": [
+        "A7-L1-10",
+        "A7-L2-08",
+        "A7-L3-12"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "コメントのセンチメント/リクエスト分析が表示される",
+      "linked_items": [
+        "A7-L3-13",
+        "A7-L4-05"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "同ジャンル競合チャンネルとのベンチマークが表示される",
+      "linked_items": [
+        "A7-L4-06",
+        "A7-L5-01"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "チャンネル成長予測(登録者/再生数)が表示される",
+      "linked_items": [
+        "A7-L4-07",
+        "A7-L5-02"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "KPI低下時のアラート閾値が設定できる",
+      "linked_items": [
+        "A7-L4-08",
+        "A7-L5-03"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "チャンネル別の月次レポートを自動生成できる",
+      "linked_items": [
+        "A7-L4-09",
+        "A7-L5-04",
+        "A7-L5-05"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "チャンネル主が見られる簡易ダッシュボードが設定できる",
+      "linked_items": [
+        "A7-L4-10",
+        "A7-L5-06"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "チャンネル主ごとの閲覧/操作権限が設定できる",
+      "linked_items": [
+        "A7-L1-11",
+        "A7-L2-09",
+        "A7-L5-07",
+        "A7-L5-08"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "YouTube API接続/チャンネルID連携が設定できる",
+      "linked_items": [
+        "A7-L1-12",
+        "A7-L2-10",
+        "A7-L5-09",
+        "A7-L5-10"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A7-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "チャンネル管理ダッシュボードAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "channel-dashboard"
+    },
+    {
+      "id": "A7-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにsectionsフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "channel-dashboard-sections"
+    },
+    {
+      "id": "A7-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "チャンネル一覧APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "channel-list"
+    },
+    {
+      "id": "A7-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "チャンネル詳細APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "channel-detail"
+    },
+    {
+      "id": "A7-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "効果サマリーAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "effect-summary"
+    },
+    {
+      "id": "A7-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "制作効率APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "production-efficiency"
+    },
+    {
+      "id": "A7-L1-07",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "維持率改善APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "retention-improvement"
+    },
+    {
+      "id": "A7-L1-08",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "最適化推奨APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "optimization-recommendations"
+    },
+    {
+      "id": "A7-L1-09",
+      "layer": 1,
+      "story_scene": "S13",
+      "description": "投稿スケジュールAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "post-schedule"
+    },
+    {
+      "id": "A7-L1-10",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "投稿ペース分析APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "posting-pace"
+    },
+    {
+      "id": "A7-L1-11",
+      "layer": 1,
+      "story_scene": "S21",
+      "description": "権限管理APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "permissions"
+    },
+    {
+      "id": "A7-L1-12",
+      "layer": 1,
+      "story_scene": "S22",
+      "description": "YouTube API連携設定APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "youtube-connection"
+    },
+    {
+      "id": "A7-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/status/summaryフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "チャンネル一覧にchannels配列とtotalが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "チャンネル詳細にname/kpi/settings/performanceが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "効果サマリーにbefore/after/improvement_pctが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-05",
+      "layer": 2,
+      "story_scene": "S11",
+      "description": "最適化推奨にrecommendations配列とprioritized_countが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-06",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "テンプレ推奨にtemplates配列とgenre_matchが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-07",
+      "layer": 2,
+      "story_scene": "S13",
+      "description": "投稿スケジュールにschedule配列とnext_postが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-08",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "ペース分析にtarget/actual/achievement_pctが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-09",
+      "layer": 2,
+      "story_scene": "S21",
+      "description": "権限管理にroles配列とusersが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L2-10",
+      "layer": 2,
+      "story_scene": "S22",
+      "description": "YouTube連携にconnected/channel_id/api_keyが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A7-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "チャンネル一覧の各チャンネルにid/name/statusが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "チャンネル詳細のKPIにsubscribers/views/watch_timeが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "制作効率のreduction_pctが0-100の範囲で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-04",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "品質向上度APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "CTR改善率APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-06",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "維持率改善にsmartcut_impact/quality_gate_impactが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-07",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "ROI計算APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-08",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "チャンネル比較APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-09",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "最適化推奨の各項目にpriority/titleが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-10",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "テンプレ推奨APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-11",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "投稿スケジュール更新APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-12",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "ペース分析のachievement_pctが0以上の数値である",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L3-13",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "コメント分析APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A7-L4-01",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "品質向上度にaverage_improvement/trend/detailsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-02",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "CTR改善率にimprovement_pct/before/afterが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-03",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "ROI計算にroi_ratio/cost/benefitが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-04",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "チャンネル比較にcomparisons配列とmetricsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-05",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "コメント分析にsentiment/requests/top_topicsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-06",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "競合ベンチマークAPIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-07",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "成長予測APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-08",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "アラート設定APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-09",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "レポート生成APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L4-10",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "Owner向けビュー設定APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A7-L5-01",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "ダッシュボード→チャンネル一覧→詳細→競合ベンチの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-02",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "効果サマリー→CTR改善→成長予測の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-03",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "制作効率→品質向上→ROI→アラート設定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-04",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "コメント分析→最適化推奨→レポート生成の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-05",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "投稿スケジュール→ペース分析→テンプレ推奨の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-06",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "全GETエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-07",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "権限管理→Owner向けビュー→YouTube連携の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-08",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "チャンネル比較→維持率改善→ROI計算の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "YouTube連携にconnected状態が反映される",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A7-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "無効なチャンネルID指定で404エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-02",
+    "created_by": "sprint_3.3.7",
+    "activated_at": "2026-05-02",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

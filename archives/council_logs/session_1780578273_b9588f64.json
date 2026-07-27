@@ -1,0 +1,35 @@
+{
+  "session_id": "b9588f64-f453-4c78-b674-ffd473412355",
+  "timestamp": 1780578273.7483537,
+  "datetime": "2026-06-04T22:04:33.748356",
+  "topic": "Why is my channel growing so slowly?",
+  "debate_flow": [
+    {
+      "agent": "Strategist",
+      "role": "Brand Guardian",
+      "color": "#EF4444",
+      "timestamp": 1780578273.7483242,
+      "stance": "NEUTRAL",
+      "summary": "Identity is missing.",
+      "detail": "Growth is slow because your 'Constitution' is currently undefined. Without a specific Target Audience or Tone, post-production decisions—like pacing and effects—lack a strategic objective to convert casual viewers into loyal subscribers.",
+      "glossary": [
+        {
+          "term": "Value Proposition",
+          "def": "The unique reason why a viewer should choose your content over millions of other options."
+        },
+        {
+          "term": "Retention Rate",
+          "def": "The percentage of a video that viewers watch; a key metric for algorithmic promotion."
+        }
+      ]
+    }
+  ],
+  "synthesis": {
+    "type": "SYNTHESIS",
+    "proposal": "Nexusは非推奨です。ADK版CouncilSupervisorを使用してください。",
+    "options": [
+      "Approve",
+      "Reject"
+    ]
+  }
+}

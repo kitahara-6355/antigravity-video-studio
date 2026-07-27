@@ -1,0 +1,420 @@
+{
+  "ux_id": "O-6",
+  "name": "品質チェック",
+  "description": "Ownerは動画の品質を多角的にチェックし、合格基準との比較ができる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "品質チェック画面が表示される",
+      "linked_items": [
+        "O6-L1-01",
+        "O6-L1-02"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "総合品質スコアが表示される",
+      "linked_items": [
+        "O6-L1-03",
+        "O6-L2-01",
+        "O6-L2-02"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "音声/映像/字幕/構成の4カテゴリ別スコアが表示される",
+      "linked_items": [
+        "O6-L1-04",
+        "O6-L1-05",
+        "O6-L2-03",
+        "O6-L2-04",
+        "O6-L3-01"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "スコアが色分けやゲージで視覚的に表現される",
+      "linked_items": [
+        "O6-L2-05",
+        "O6-L2-06",
+        "O6-L2-07"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "カテゴリをクリックするとドリルダウン詳細が表示される",
+      "linked_items": [
+        "O6-L1-06",
+        "O6-L3-02",
+        "O6-L3-03",
+        "O6-L4-01"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "AI改善提案が表示される",
+      "linked_items": [
+        "O6-L1-07",
+        "O6-L3-04",
+        "O6-L2-08"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "閾値(90点)との比較で合格/不合格が判定される",
+      "linked_items": [
+        "O6-L1-08",
+        "O6-L4-02",
+        "O6-L4-03"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "合格/不合格のステータスが明確に表示される",
+      "linked_items": [
+        "O6-L4-04",
+        "O6-L4-05"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "品質スコアの改善履歴が確認できる",
+      "linked_items": [
+        "O6-L1-09",
+        "O6-L1-10",
+        "O6-L3-05"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "不合格時に強制レンダリングへの導線がある",
+      "linked_items": [
+        "O6-L3-06",
+        "O6-L5-01",
+        "O6-L5-02",
+        "O6-L5-03",
+        "O6-L5-04",
+        "O6-L5-05"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O6-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "品質ゲートステータスAPIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "statusフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "overall_scoreフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "カテゴリ別スコアAPIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-05",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "4カテゴリ(audio/video/subtitle/structure)が存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "ドリルダウンAPIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-07",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "AI改善提案APIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-08",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "thresholdフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-09",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "履歴APIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L1-10",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "履歴にhistory配列が存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O6-L2-01",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "overall_scoreが0-100の数値である",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "thresholdが90である",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "各カテゴリにscore/weight/nameが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L2-04",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "重み付きスコアが正しく計算されている",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L2-05",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "pass/warning/failのステータスが区別可能",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L2-06",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "各詳細項目にdescriptionが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L2-07",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "warningカウントが正しい",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L2-08",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "改善提案にpriority/estimated_improvementが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O6-L3-01",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "スコアAPIを呼び出しカテゴリ一覧を取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L3-02",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "audioカテゴリのドリルダウンを取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "videoカテゴリのドリルダウンを取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L3-04",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "カテゴリ指定でAI改善提案を取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L3-05",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "履歴からinitial_scoreとcurrent_scoreが取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L3-06",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "品質チェック実行APIを呼び出せる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L4-01",
+      "layer": 4,
+      "story_scene": "S5",
+      "description": "存在しないカテゴリで404が返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O6-L4-02",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "スコア<閾値でpassedがfalseになる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O6-L4-03",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "品質チェック実行後にstatusがpassed/failedに変わる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O6-L4-04",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "合格時にstatusがpassedである",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O6-L4-05",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "不合格時にoverall_score<thresholdである",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O6-L5-01",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "ステータス→スコア→ドリルダウン→改善提案の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O6-L5-02",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "品質チェック実行→全カテゴリスコア確認→履歴更新の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O6-L5-03",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "4カテゴリ全ドリルダウン→詳細項目確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O6-L5-04",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "AI改善提案取得→優先順位確認→スコア影響の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O6-L5-05",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "不合格判定→改善提案→履歴確認→強制レンダリング導線の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O6-L3-07",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "subtitleカテゴリのドリルダウンを取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L3-08",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "structureカテゴリのドリルダウンを取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O6-L4-06",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "品質チェック実行でchecked_atが更新される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O6-L5-06",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "subtitleドリルダウン→字幕品質確認→改善提案の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O6-L5-07",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "structureドリルダウン→構成品質確認→改善提案の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O6-L5-08",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "チェック実行→ステータス変化→スコア→改善→履歴の全ステップ完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "migration_v1_to_v2",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

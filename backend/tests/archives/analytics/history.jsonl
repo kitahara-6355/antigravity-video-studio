@@ -1,0 +1,20 @@
+{"timestamp": 1777166809.2826805, "iso_time": "2026-04-26T01:26:49Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_APPROVAL", "approved": true, "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777166809.2922661, "iso_time": "2026-04-26T01:26:49Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_REJECTION", "approved": false, "feedback": "もっとエモくしてください", "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777184261.2455726, "iso_time": "2026-04-26T06:17:41Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_APPROVAL", "approved": true, "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777184261.2540805, "iso_time": "2026-04-26T06:17:41Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_REJECTION", "approved": false, "feedback": "もっとエモくしてください", "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777185650.3826811, "iso_time": "2026-04-26T06:40:50Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_APPROVAL", "approved": true, "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777185650.3904183, "iso_time": "2026-04-26T06:40:50Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_REJECTION", "approved": false, "feedback": "もっとエモくしてください", "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777452169.9772637, "iso_time": "2026-04-29T08:42:49Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_APPROVAL", "approved": true, "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777452169.98473, "iso_time": "2026-04-29T08:42:49Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_REJECTION", "approved": false, "feedback": "もっとエモくしてください", "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1777452189.3804889, "iso_time": "2026-04-29T08:43:09Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.5, "level": "Editor (Intermediate)"}}
+{"timestamp": 1777452189.385297, "iso_time": "2026-04-29T08:43:09Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.1, "level": "Director (Master)"}}
+{"timestamp": 1777452189.399211, "iso_time": "2026-04-29T08:43:09Z", "type": "SYSTEM_EVENT", "data": {"event": "CONSTITUTION_AUTO_EVOLUTION", "changes": ["content_policy: +'過度な装飾'"], "source": "decision_logger"}}
+{"timestamp": 1777452189.4036193, "iso_time": "2026-04-29T08:43:09Z", "type": "SYSTEM_EVENT", "data": {"event": "CONSTITUTION_AUTO_EVOLUTION", "changes": ["keywords: +'シンプル'"], "source": "decision_logger"}}
+{"timestamp": 1778622530.810968, "iso_time": "2026-05-12T21:48:50Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.5, "level": "Editor (Intermediate)"}}
+{"timestamp": 1778622530.8175633, "iso_time": "2026-05-12T21:48:50Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.1, "level": "Director (Master)"}}
+{"timestamp": 1778622703.413654, "iso_time": "2026-05-12T21:51:43Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.5, "level": "Editor (Intermediate)"}}
+{"timestamp": 1778622703.4180133, "iso_time": "2026-05-12T21:51:43Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.1, "level": "Director (Master)"}}
+{"timestamp": 1778991113.7825909, "iso_time": "2026-05-17T04:11:53Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_APPROVAL", "approved": true, "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1778991113.789515, "iso_time": "2026-05-17T04:11:53Z", "type": "USER_INTERACTION", "data": {"type": "DASHBOARD_REJECTION", "approved": false, "feedback": "もっとエモくしてください", "timestamp": "2026-01-11T12:00:00"}}
+{"timestamp": 1778991152.7485769, "iso_time": "2026-05-17T04:12:32Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.5, "level": "Editor (Intermediate)"}}
+{"timestamp": 1778991152.7532551, "iso_time": "2026-05-17T04:12:32Z", "type": "SYSTEM_EVENT", "data": {"event": "AUTOMATION_LEVEL_UPDATE", "old_ratio": 0.9, "new_ratio": 0.1, "level": "Director (Master)"}}

@@ -1,0 +1,630 @@
+{
+  "ux_id": "A-8",
+  "name": "クロスメディア統合分析",
+  "description": "管理者はクロスメディア統合分析ダッシュボードから、YouTube、TikTok、Twitter、Instagram等の各メディアの分析、視聴者重複、流入ファネル、エンゲージメント、CTR相乗効果、流入維持率改善、ROI計算、メディア別比較、導線最適化推奨、コンテンツ展開テンプレ推奨、一括投稿スケジュール、投稿タイミング同調ペース、コメント感情分析、競合ベンチマーク、統合成長予測、アラート設定、月次統合レポート生成、共有ビュー、権限管理、SNS API連携を管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "クロスメディア統合分析ダッシュボードが表示される",
+      "linked_items": [
+        "A8-L1-01",
+        "A8-L1-02",
+        "A8-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "連携するメディア（YouTube, TikTok, Twitter, Instagram）の一覧が表示される",
+      "linked_items": [
+        "A8-L1-03",
+        "A8-L2-02",
+        "A8-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "各メディアのインサイトデータがリアルタイム同期される",
+      "linked_items": [
+        "A8-L1-04",
+        "A8-L2-03",
+        "A8-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "メディアをまたいだ視聴者属性の重複率（オーバーラップ分析）が表示される",
+      "linked_items": [
+        "A8-L1-05",
+        "A8-L2-04"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "メディア別のインプレッションから動画再生、SNSエンゲージメントへの移行ファネルが表示される",
+      "linked_items": [
+        "A8-L1-06",
+        "A8-L3-03"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "メディア横断でのエンゲージメント向上率が表示される",
+      "linked_items": [
+        "A8-L3-04",
+        "A8-L4-01"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "クロスメディア効果によるCTR相乗効果分析が表示される",
+      "linked_items": [
+        "A8-L3-05",
+        "A8-L4-02"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "短尺動画（TikTok/Shorts）から長尺動画（YouTube）への流入維持率改善が表示される",
+      "linked_items": [
+        "A8-L1-07",
+        "A8-L3-06"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "クロスメディア広告費用 vs 自然流入のROI計算が表示される",
+      "linked_items": [
+        "A8-L3-07",
+        "A8-L4-03"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "メディア別（YouTube vs SNS）のパフォーマンス比較が表示される",
+      "linked_items": [
+        "A8-L3-08",
+        "A8-L4-04"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "メディア間の導線最適化推奨が表示される",
+      "linked_items": [
+        "A8-L1-08",
+        "A8-L2-05",
+        "A8-L3-09"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "メディアの特性に合わせたコンテンツ展開テンプレートが推奨される",
+      "linked_items": [
+        "A8-L2-06",
+        "A8-L3-10"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "メディアをまたいだ一括投稿スケジュール管理ができる",
+      "linked_items": [
+        "A8-L1-09",
+        "A8-L2-07",
+        "A8-L3-11"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "投稿タイミングの同調率（各メディア同時公開など）の達成度が表示される",
+      "linked_items": [
+        "A8-L1-10",
+        "A8-L2-08",
+        "A8-L3-12"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "メディアごとのコメント感情分析が統合表示される",
+      "linked_items": [
+        "A8-L3-13",
+        "A8-L4-05"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "他のクロスメディア展開競合とのベンチマークが表示される",
+      "linked_items": [
+        "A8-L4-06",
+        "A8-L5-01"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "チャネル全体の統合成長予測が表示される",
+      "linked_items": [
+        "A8-L4-07",
+        "A8-L5-02"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "KPI低下時のメディア別アラート閾値が設定できる",
+      "linked_items": [
+        "A8-L4-08",
+        "A8-L5-03"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "クロスメディア月次統合レポートを自動生成できる",
+      "linked_items": [
+        "A8-L4-09",
+        "A8-L5-04",
+        "A8-L5-05"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "クライアント/スポンサー向け共有ビューが設定できる",
+      "linked_items": [
+        "A8-L4-10",
+        "A8-L5-06"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "メンバーごとの閲覧/操作権限が設定できる",
+      "linked_items": [
+        "A8-L1-11",
+        "A8-L2-09",
+        "A8-L5-07",
+        "A8-L5-08"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "各SNS API（TikTok API等）との連携設定ができる",
+      "linked_items": [
+        "A8-L1-12",
+        "A8-L2-10",
+        "A8-L5-09",
+        "A8-L5-10"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A8-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "クロスメディアダッシュボードAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "cross-media-dashboard"
+    },
+    {
+      "id": "A8-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにplatformsフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "cross-media-platforms"
+    },
+    {
+      "id": "A8-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "連携プラットフォーム一覧APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "platform-list"
+    },
+    {
+      "id": "A8-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "インサイト同期APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "insights-sync"
+    },
+    {
+      "id": "A8-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "オーバーラップ分析APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "audience-overlap"
+    },
+    {
+      "id": "A8-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "移行ファネルAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "conversion-funnel"
+    },
+    {
+      "id": "A8-L1-07",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "流入維持率改善APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "cross-retention"
+    },
+    {
+      "id": "A8-L1-08",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "導線最適化推奨APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "funnel-recommendations"
+    },
+    {
+      "id": "A8-L1-09",
+      "layer": 1,
+      "story_scene": "S13",
+      "description": "一括投稿スケジュールAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "cross-schedule"
+    },
+    {
+      "id": "A8-L1-10",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "投稿タイミング同調APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "posting-sync-pace"
+    },
+    {
+      "id": "A8-L1-11",
+      "layer": 1,
+      "story_scene": "S21",
+      "description": "閲覧操作権限APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "cross-permissions"
+    },
+    {
+      "id": "A8-L1-12",
+      "layer": 1,
+      "story_scene": "S22",
+      "description": "各SNS API連携設定APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "sns-connection"
+    },
+    {
+      "id": "A8-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/status/summaryフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "プラットフォーム一覧にplatforms配列とconnected_countが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "インサイト同期にsync_time/status/records_updatedが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "オーバーラップ分析にoverlap_matrixとoverlap_percentageが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-05",
+      "layer": 2,
+      "story_scene": "S11",
+      "description": "導線最適化推奨にrecommendations配列とestimated_impactが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-06",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "コンテンツ展開テンプレ推奨にtemplates配列とplatform_matchが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-07",
+      "layer": 2,
+      "story_scene": "S13",
+      "description": "一括投稿スケジュールにschedule配列とnext_postが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-08",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "同調率にtarget/actual/synchronicity_pctが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-09",
+      "layer": 2,
+      "story_scene": "S21",
+      "description": "閲覧操作権限にroles配列とusersが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L2-10",
+      "layer": 2,
+      "story_scene": "S22",
+      "description": "SNS API連携にconnected/platforms_configured/api_statusが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A8-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "プラットフォーム一覧の各SNSにid/name/statusが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "同期されたインサイトデータにviews/engagement_rate/followersが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "移行ファネルのconversion_rateが0-100の範囲で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-04",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "エンゲージメント向上率APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "CTR相乗効果分析APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-06",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "流入維持率にshort_to_long_impact/cross_platform_impactが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-07",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "ROI計算APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-08",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "メディア別比較APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-09",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "導線最適化推奨の各項目にpriority/titleが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-10",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "展開テンプレ推奨APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-11",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "一括投稿スケジュール更新APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-12",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "同調率のsynchronicity_pctが0以上の数値である",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L3-13",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "統合コメント感情分析APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A8-L4-01",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "エンゲージメント向上率にaverage_improvement/trend/detailsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-02",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "CTR相乗効果にimprovement_pct/before/afterが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-03",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "ROI計算にroi_ratio/cost/benefitが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-04",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "メディア別比較にcomparisons配列とmetricsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-05",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "統合コメント感情分析にsentiment/requests/top_topicsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-06",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "競合ベンチマークAPIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-07",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "統合成長予測APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-08",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "メディア別アラート設定APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-09",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "月次統合レポート生成APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L4-10",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "共有ビュー設定APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A8-L5-01",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "ダッシュボード→プラットフォーム一覧→詳細→競合ベンチの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-02",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "移行ファネル→CTR相乗効果→統合成長予測の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-03",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "エンゲージメント向上率→ROI→アラート設定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-04",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "統合感情分析→導線最適化推奨→レポート生成の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-05",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "一括投稿スケジュール→同調率→展開テンプレ推奨の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-06",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "全GETエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-07",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "閲覧操作権限→共有ビュー→SNS連携の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-08",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "メディア別比較→流入維持率→ROI計算の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "SNS連携にconnected状態が反映される",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A8-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "無効なプラットフォームID指定で404エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-21",
+    "created_by": "sprint_4.3.4",
+    "activated_at": "2026-05-21",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

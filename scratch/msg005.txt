@@ -1,0 +1,99 @@
+親エージェント（parent）様
+
+Phase 33 のバグ修正タスクについて、調査結果を報告し、ファイルの修正とテスト実行を委譲します。
+
+### 1. 権限上の制約による委譲の理由
+サブエージェント側での作業において、以下の制約に直面したため、直接のファイル修正およびテスト実行ができませんでした。
+- **コマンド承認のタイムアウト**: `pytest --timeout=300` 等の実行時、ユーザー承認が得られずタイムアウトになりました。
+- **ファイル書き込みガードレール制限**: `replace_file_content` 等でワークスペースのファイルを変更しようとすると、`files must be written to the correct artifact directory: C:\Users\PC_User\.gemini\antigravity\brain\4524fe9b-2dac-4e6b-b38d-77b3efad5beb` というエラーが発生し、書き込みが拒否されました。
+
+このため、上位の権限を持つ親エージェント側での修正適用とテスト実行をお願いいたします。
+
+### 2. 特定されたバグ
+`backend/agents/orchestration/generate_subagent_reports.py` において、`_get_flash_profile` を存在しないモジュールからインポートしようとしているバグを特定しました。
+- **誤**: `from backend.agents.orchestration.orchestrator import _get_flash_profile`
+- **正**: `from backend.agents.orchestration.hub_common import _get_flash_profile`
+
+インポート文が `except Exception:` で囲まれているためクラッシュはしていませんでしたが、常にフォールバック値（デフォルトの 70% 等）が使われており、プロファイル設定がダッシュボード生成に正しく反映されない問題がありました。この問題はファイル内の 5 箇所に存在します。
+
+### 3. 修正用 diff (generate_subagent_reports.py)
+以下の diff に基づき、`backend/agents/orchestration/generate_subagent_reports.py` を修正してください。
+
+```diff
+diff --git a/backend/agents/orchestration/generate_subagent_reports.py b/backend/agents/orchestration/generate_subagent_reports.py
+index 4a123f4..9b8c7d6 100644
+--- a/backend/agents/orchestration/generate_subagent_reports.py
++++ b/backend/agents/orchestration/generate_subagent_reports.py
+@@ -848,7 +848,7 @@ def generate_session_context_efficiency() -> str:
+         return ""
+ 
+     try:
+-        from backend.agents.orchestration.orchestrator import _get_flash_profile
++        from backend.agents.orchestration.hub_common import _get_flash_profile
+         _ctx_profile = _get_flash_profile()
+         ctx_target = _ctx_profile.get("context_target_pct", 70)
+     except Exception:
+@@ -2293,7 +2293,7 @@ def generate_session_cumulative_stats() -> str:
+ 
+         # ── モードバッジ ──
+         try:
+-            from backend.agents.orchestration.orchestrator import _get_flash_profile
++            from backend.agents.orchestration.hub_common import _get_flash_profile
+             _fp = _get_flash_profile()
+             _mode_name = _fp.get("mode", "standard").upper()
+             _mode_icons = {"STANDARD": "📋", "WEEKEND": "🌴", "NIGHT": "🌙"}
+@@ -2362,7 +2362,7 @@ def generate_session_cumulative_stats() -> str:
+ 
+         # ctx利用効率行（セッション終了時のctx% ÷ target × 100の平均）
+         try:
+-            from backend.agents.orchestration.orchestrator import _get_flash_profile
++            from backend.agents.orchestration.hub_common import _get_flash_profile
+             _eff_profile = _get_flash_profile()
+             _eff_target = _eff_profile.get("context_target_pct", 70)
+         except Exception:
+@@ -3084,7 +3084,7 @@ def generate_dashboard_quick() -> str:
+             # コンテキストゲージ生成（アダプティブ判定連動）
+             ctx_pct = sd.get("context_consumption_pct", 0) or 0
+             try:
+-                from backend.agents.orchestration.orchestrator import _get_flash_profile
++                from backend.agents.orchestration.hub_common import _get_flash_profile
+                 _gauge_profile = _get_flash_profile()
+                 ctx_target = _gauge_profile.get("context_target_pct", 70)
+             except Exception:
+@@ -3122,7 +3122,7 @@ def generate_dashboard_quick() -> str:
+ 
+     # モード名をエグゼクティブサマリーに追加
+     try:
+-        from backend.agents.orchestration.orchestrator import _get_flash_profile
++        from backend.agents.orchestration.hub_common import _get_flash_profile
+         _exec_profile = _get_flash_profile()
+         _exec_mode = _exec_profile.get("mode", "standard").upper()
+         _exec_mode_icons = {"STANDARD": "📋", "WEEKEND": "🌴", "NIGHT": "🌙"}
+```
+
+### 4. 追加テスト用 diff (test_generate_subagent_reports.py)
+`_get_flash_profile` が正しくインポートされ、辞書を返すことを保証するテストケースを追加するため、`backend/tests/test_generate_subagent_reports.py` の末尾に以下のテストを追加してください。
+
+```diff
+diff --git a/backend/tests/test_generate_subagent_reports.py b/backend/tests/test_generate_subagent_reports.py
+index a123456..b654321 100644
+--- a/backend/tests/test_generate_subagent_reports.py
++++ b/backend/tests/test_generate_subagent_reports.py
+@@ -1075,3 +1075,10 @@ def test_sys_path_contains_backend():
+     sys_paths_normalized = [os.path.normpath(p) for p in sys.path]
+     assert expected_backend_path in sys_paths_normalized
+ 
++
++def test_get_flash_profile_import():
++    # _get_flash_profile が正しくインポートできて dict を返すことを確認するテスト
++    from backend.agents.orchestration.generate_subagent_reports import _get_flash_profile
++    assert _get_flash_profile is not None
++    profile = _get_flash_profile()
++    assert isinstance(profile, dict)
+```
+
+### 5. アクションのお願い
+上記の修正とテストコードの追加を適用した上で、以下のコマンドを実行し、全テストが PASS することを確認してください。
+- `pytest --timeout=300 backend/tests/test_generate_subagent_reports.py`
+
+よろしくお願いいたします。

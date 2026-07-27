@@ -1,0 +1,20 @@
+{
+  "scenes": [
+    {
+      "name": "オープニング",
+      "description": "挨拶"
+    },
+    {
+      "name": "本編",
+      "description": "メインコンテンツ"
+    },
+    {
+      "name": "エンディング",
+      "description": "まとめ"
+    }
+  ],
+  "audioConfig": {
+    "name": "Corporate Vision",
+    "style": "Trustworthy"
+  }
+}

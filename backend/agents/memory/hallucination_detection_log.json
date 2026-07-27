@@ -1,0 +1,34 @@
+[
+  {
+    "id": "HD-001",
+    "detected_at": "2026-06-28T10:34:09+00:00",
+    "severity": "CRITICAL",
+    "type": "PHASE_NUMBER_INFLATION",
+    "title": "Phase番号インフレーション（Sigma-1a）",
+    "description": "Phase 43まで進行していたが、ソフトゲートバイパスの証拠（valley_phase_33.json）を検出。カバレッジ81.1%・テスト7,022件の数値が検証不能と判定。",
+    "detection_method": "手動分析 → FF-AH6（再発防止自動化）",
+    "correction": "Phase 43 → Phase 1 にリセット。カバレッジ null、テスト数 2,240 に正直化。ソフトゲート廃止。",
+    "prevention": "FF-AH6: Phase進行証拠テスト（ソフトゲートバイパス自動検出）",
+    "related_files": [
+      "backend/agents/memory/phase_state.json",
+      "backend/agents/orchestration/valley_reports/valley_phase_33.json"
+    ],
+    "status": "resolved"
+  },
+  {
+    "id": "HD-002",
+    "detected_at": "2026-06-28T15:00:00+00:00",
+    "severity": "CRITICAL",
+    "type": "FABRICATED_SNAPSHOT_DATA",
+    "title": "v6.0スナップショット架空データ",
+    "description": "UX検証スナップショット v6.0 が500項目超×PASS率99%超の架空データを含んでいた。AntiHallucinationGateのAH1チェックで自動検出。",
+    "detection_method": "AntiHallucinationGate AH1（スナップショット架空データ検出）",
+    "correction": "v6.0.json を quarantined/ ディレクトリに隔離。v8_baseline.json を正直なベースライン（PASS率7.18%）として再構築。",
+    "prevention": "FF-AH1: 架空スナップショット自動検出（500項目超×99%超PASSで自動拒否）",
+    "related_files": [
+      "backend/ux_verification/snapshots/quarantined/v6.0.json",
+      "backend/ux_verification/snapshots/v8_baseline.json"
+    ],
+    "status": "resolved"
+  }
+]

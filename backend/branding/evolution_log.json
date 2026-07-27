@@ -1,0 +1,2256 @@
+{
+  "entries": [],
+  "post_publish_feedbacks": [
+    {
+      "timestamp": "2026-06-08T09:05:08.040331",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 12.0,
+      "significant_deviation": true,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。",
+        "CTR予測と実績の乖離が大きい（差: 12.0%）。サムネイル/タイトル戦略の見直しが必要。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-08T09:05:08.427347",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 1.0,
+      "significant_deviation": false,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-08T12:52:25.400464",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 12.0,
+      "significant_deviation": true,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。",
+        "CTR予測と実績の乖離が大きい（差: 12.0%）。サムネイル/タイトル戦略の見直しが必要。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-08T12:52:25.567571",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 1.0,
+      "significant_deviation": false,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-10T23:25:07.236091",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 12.0,
+      "significant_deviation": true,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。",
+        "CTR予測と実績の乖離が大きい（差: 12.0%）。サムネイル/タイトル戦略の見直しが必要。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-10T23:25:07.507872",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 1.0,
+      "significant_deviation": false,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-11T00:05:31.674816",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 12.0,
+      "significant_deviation": true,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。",
+        "CTR予測と実績の乖離が大きい（差: 12.0%）。サムネイル/タイトル戦略の見直しが必要。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-11T00:05:31.863685",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 1.0,
+      "significant_deviation": false,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-23T13:53:42.320695",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 12.0,
+      "significant_deviation": true,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。",
+        "CTR予測と実績の乖離が大きい（差: 12.0%）。サムネイル/タイトル戦略の見直しが必要。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-23T13:53:42.543731",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 1.0,
+      "significant_deviation": false,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-27T13:43:42.197045",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 12.0,
+      "significant_deviation": true,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。",
+        "CTR予測と実績の乖離が大きい（差: 12.0%）。サムネイル/タイトル戦略の見直しが必要。"
+      ]
+    },
+    {
+      "timestamp": "2026-06-27T13:43:42.482870",
+      "wagamama_id": "waga_001",
+      "video_id": "vid_123",
+      "actual_ctr": 5.2,
+      "actual_retention": 65.0,
+      "actual_views": 1000,
+      "predicted_ctr": 4.0,
+      "ctr_difference": 1.0,
+      "significant_deviation": false,
+      "drop_off_points": [
+        "00:15",
+        "01:30"
+      ],
+      "lessons_learned": [
+        "離脱集中ポイント: 00:15, 01:30。次回はこの付近にリエンゲージメント要素を配置すべき。"
+      ]
+    }
+  ],
+  "template_selections": [
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-11T13:28:40.665447",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:19:44.436435",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:08.602753",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:10.688362",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:20:20.498825",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:28.446696",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:30.058317",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:37.939180",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:20:39.649382",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:20:39.713667",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:43.114499",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:43.170144",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:20:44.630302",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:20:47.870235",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:20:56.329986",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:05.863564",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:07.462844",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:12.564902",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:15.709674",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:25.605869",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:28.887261",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:21:28.950978",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:30.440386",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:30.501620",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:30.573471",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:30.649839",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:38.299191",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:43.223326",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:21:43.293326",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:21:43.365542",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:21:43.427613",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:43.504193",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:21:43.582920",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:21:43.665593",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:21:43.733957",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:43.806729",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:21:43.870652",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:21:43.935490",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:21:44.000241",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:44.064376",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:21:44.134955",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:21:44.222848",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:21:44.395601",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:21:48.253449",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:21:48.363730",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:01.647031",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:26.086493",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:29.590571",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:23:36.142559",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:43.030851",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:44.684959",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:49.288921",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:23:52.506339",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:23:52.594321",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:54.391523",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:23:54.453698",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:23:57.927154",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:23:59.470400",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:07.778112",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:17.286063",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:20.598354",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:26.400224",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:29.877267",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:40.198753",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:43.875045",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:24:43.977207",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:45.682654",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:45.744009",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:45.805783",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:45.871252",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:52.797103",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:54.565661",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:57.670122",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:24:57.752393",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:24:57.828344",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:24:57.917026",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:58.002657",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:24:58.079032",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:24:58.150742",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "mrbeast_entertainment",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:24:58.245190",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:58.385680",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:24:58.460976",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:24:58.533984",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:24:58.619301",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:24:58.774312",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:24:58.928811",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "energetic",
+      "timestamp": "2026-06-13T22:24:59.029229",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "asmr_relaxation",
+      "theme_id": "calm",
+      "timestamp": "2026-06-13T22:24:59.114151",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "cool",
+      "timestamp": "2026-06-13T22:25:02.652986",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "hikakin_vlog",
+      "theme_id": "warm",
+      "timestamp": "2026-06-13T22:25:02.792535",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-15T22:11:26.699390",
+      "satisfaction": 3
+    },
+    {
+      "template_id": "nhk_documentary",
+      "theme_id": "warm",
+      "timestamp": "2026-06-27T01:06:42.648928",
+      "satisfaction": 3
+    }
+  ],
+  "locked_segments": [
+    {
+      "event_type": "locked_segment",
+      "segment_id": "lock_test_1",
+      "title": "テスト固定シーン",
+      "start_time": 0.0,
+      "end_time": 5.0,
+      "reason": "E2Eテスト",
+      "timestamp": "2026-06-13T21:06:34.089591"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "unlock_test_1",
+      "title": "解除テスト",
+      "start_time": 0.0,
+      "end_time": 5.0,
+      "reason": "test",
+      "timestamp": "2026-06-13T21:06:38.297500"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "persist_test",
+      "title": "固定保持テスト",
+      "start_time": 0.0,
+      "end_time": 5.0,
+      "reason": "persist",
+      "timestamp": "2026-06-13T21:06:44.791067"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "test_lock_1",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-13T21:40:49.700106"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "test_lock_1",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト理由",
+      "timestamp": "2026-06-13T21:41:11.052386"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "lock_a",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-13T21:41:22.868987"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "lock_b",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-13T21:41:24.283209"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "lock_c",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-13T21:41:24.299741"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "test_lock_1",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "重要なシーンのため",
+      "timestamp": "2026-06-13T21:41:25.815793"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "lock_update",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-13T21:41:43.501937"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "e2e_lock",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-13T21:41:50.910547"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "full_lock",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-13T21:41:53.915279"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "reason_lock",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "視聴者維持に重要",
+      "timestamp": "2026-06-13T21:41:58.433503"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "adj_lock_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:08.893306"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "ul_test",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:10.256596"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "cnt_a",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:22.662416"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "cnt_b",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:22.682604"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "fld_test",
+      "title": "フィールドテスト",
+      "start_time": 10.0,
+      "end_time": 40.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:25.650339"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "ro_a",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:35.743406"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "ro_b",
+      "title": "微調整固定",
+      "start_time": 60.0,
+      "end_time": 90.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:35.760099"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "excl_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:37.221946"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "rest_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:38.613431"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "ml_a",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:48.730759"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "ml_b",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:48.747404"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "ml_c",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:48.763286"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "mu_a",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:50.177415"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "mu_b",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:50.194372"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "cyc_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:56.131336"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "cyc_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:42:56.158718"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "aff_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:00.644407"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "st_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:05.116375"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "erf_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:10.842276"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "as_a",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:15.439758"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "as_b",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:15.457374"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "log_a",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "学習テスト",
+      "timestamp": "2026-06-13T21:43:21.377638"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "bulk_0",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:22.857452"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "bulk_1",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:22.874667"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "bulk_2",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:22.891470"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "bulk_3",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:22.910440"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "bulk_4",
+      "title": "微調整固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "",
+      "timestamp": "2026-06-13T21:43:22.927487"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-14T12:30:48.909276"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-14T12:31:00.582406"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-14T14:04:51.273946"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "Important Hook",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "User manual override",
+      "timestamp": "2026-06-14T14:05:17.090081"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "First Lock",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "Test lock",
+      "timestamp": "2026-06-14T14:05:18.912790"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-14T14:07:32.876214"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "Important Hook",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "User manual override",
+      "timestamp": "2026-06-14T14:07:33.466705"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "First Lock",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "Test lock",
+      "timestamp": "2026-06-14T14:07:33.807066"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-23T07:36:40.882064"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-23T07:37:06.881396"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-23T07:38:00.627835"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "locked_001",
+      "title": "衝撃の事実",
+      "start_time": 500,
+      "end_time": 560,
+      "reason": "絶対に入れたいシーン",
+      "timestamp": "2026-06-23T13:14:12.414264"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "Important Hook",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "User manual override",
+      "timestamp": "2026-06-27T13:29:13.385782"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "First Lock",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "Test lock",
+      "timestamp": "2026-06-27T13:29:13.795680"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "Important Hook",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "User manual override",
+      "timestamp": "2026-06-27T13:39:31.888225"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "seg_01",
+      "title": "First Lock",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "reason": "Test lock",
+      "timestamp": "2026-06-27T13:39:32.275569"
+    },
+    {
+      "event_type": "locked_segment",
+      "segment_id": "test_lock_1",
+      "title": "テスト固定",
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "reason": "テスト",
+      "timestamp": "2026-06-28T15:45:51.812313"
+    }
+  ],
+  "philosophies": [
+    {
+      "philosophy": "「個の閃きを、集団を導く羅針盤へと昇華させる」",
+      "timestamp": "2026-06-13T12:26:36Z",
+      "session_summary": "共創の第一歩、意志の言語化への挑戦。",
+      "tags": [
+        "その他"
+      ]
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T12:53:55.000370"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:08:52.982792"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:09:07.588812"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:10:06.501474"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:10:55.491967"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:11:21.985184"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:11:55.396492"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:12:17.017402"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-27T16:13:06.390446"
+    },
+    {
+      "content": "視聴者の心を動かす編集を目指す",
+      "source": "test",
+      "extracted_at": "2026-06-28T16:23:24.556839"
+    }
+  ],
+  "decision_insights": [],
+  "trust_score": 0.0,
+  "trust_history": [],
+  "pending_proposals": [
+    {
+      "proposal_id": "30b1349d-74e4-4cc2-a273-d7d10222cbea",
+      "content": "Antigravity Video Studioの演出哲学として、個々の内なる閃きを共創の羅針盤として研ぎ澄まし昇華させることで、視聴者の心に深く響き、感情を揺さぶる普遍的な感動体験を創造します。",
+      "source_summary": "哲学統合(10件の分析・昇華)",
+      "generated_at": "2026-06-27T22:38:50.590238",
+      "status": "pending",
+      "user_edit": null,
+      "proposal_type": "integration"
+    }
+  ],
+  "trigger_history": [
+    {
+      "rule_id": "philosophy_integration",
+      "fired_at": 1782567520.9023607,
+      "iso_time": "2026-06-27T22:38:40.902362",
+      "detail": {
+        "philosophy_count": 10,
+        "integration_triggered": true,
+        "integration_status": "async_queued"
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "id": "bbf18653-3ad3-41c6-beb9-29db151a030b",
+      "type": "trigger_fired",
+      "rule_id": "philosophy_integration",
+      "message": "哲学統合提案を生成しました。承認をお待ちしています",
+      "detail": {
+        "philosophy_count": 10,
+        "integration_triggered": true,
+        "integration_status": "async_queued"
+      },
+      "created_at": "2026-06-27T22:38:40.902415",
+      "read": false
+    }
+  ],
+  "director_profile": {
+    "rejection_tendencies": {},
+    "approval_tendencies": {},
+    "approval_rate": 0.0,
+    "total_decisions": 0,
+    "updated_at": "2026-06-28T02:53:11.608373"
+  },
+  "rejection_history": [],
+  "session_count": 0,
+  "rejection_count": 0,
+  "approval_count": 0,
+  "last_updated": "2026-06-28T02:53:11.961377",
+  "agent_performance": {
+    "thumbnail": {
+      "passed": 106,
+      "failed": 0,
+      "total": 109,
+      "success_rate": 0.9724770642201835
+    },
+    "test_weaver": {
+      "passed": 446,
+      "failed": 0,
+      "total": 515,
+      "success_rate": 0.8660194174757282
+    },
+    "bug_hunter": {
+      "passed": 1958,
+      "failed": 0,
+      "total": 2356,
+      "success_rate": 0.8310696095076401
+    },
+    "refactor": {
+      "passed": 244,
+      "failed": 0,
+      "total": 266,
+      "success_rate": 0.9172932330827067
+    },
+    "tdr_cleanup": {
+      "passed": 119,
+      "failed": 0,
+      "total": 125,
+      "success_rate": 0.952
+    },
+    "design_stock": {
+      "passed": 248,
+      "failed": 0,
+      "total": 251,
+      "success_rate": 0.9880478087649402
+    },
+    "coverage": {
+      "passed": 28,
+      "failed": 0,
+      "total": 44,
+      "success_rate": 0.6363636363636364
+    },
+    "doc_gen": {
+      "passed": 26,
+      "failed": 0,
+      "total": 34,
+      "success_rate": 0.7647058823529411
+    }
+  },
+  "last_sync": "2026-06-28T02:53:11.866664",
+  "quarantined_entries": [
+    {
+      "timestamp": 1781357098.51489,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: energetic (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "energetic/color_palette",
+        "energetic/typography",
+        "energetic/motion"
+      ],
+      "detail": {
+        "mood": "energetic",
+        "updates": {
+          "color_palette": {
+            "main": "#ec4899",
+            "sub": "#db2777",
+            "accent": "#a855f7",
+            "background": "#fdf2f8",
+            "text": "#831843"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "900",
+            "body_size": "17px"
+          },
+          "motion": {
+            "transition": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+            "duration": "0.35s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#ec4899",
+            "sub": "#db2777",
+            "accent": "#a855f7",
+            "background": "#fdf2f8",
+            "text": "#831843"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "900",
+            "body_size": "17px"
+          },
+          "motion": {
+            "transition": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+            "duration": "0.35s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781357098.591649,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: elegant (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "elegant/color_palette",
+        "elegant/typography",
+        "elegant/motion"
+      ],
+      "detail": {
+        "mood": "elegant",
+        "updates": {
+          "color_palette": {
+            "main": "#6366f1",
+            "sub": "#4f46e5",
+            "accent": "#8b5cf6",
+            "background": "#eef2ff",
+            "text": "#312e81"
+          },
+          "typography": {
+            "font_family": "Noto Serif JP",
+            "heading_weight": "500",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease",
+            "duration": "0.5s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#6366f1",
+            "sub": "#4f46e5",
+            "accent": "#8b5cf6",
+            "background": "#eef2ff",
+            "text": "#312e81"
+          },
+          "typography": {
+            "font_family": "Noto Serif JP",
+            "heading_weight": "500",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease",
+            "duration": "0.5s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781357098.752872,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: warm (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "warm/color_palette",
+        "warm/typography",
+        "warm/motion"
+      ],
+      "detail": {
+        "mood": "warm",
+        "updates": {
+          "color_palette": {
+            "main": "#f59e0b",
+            "sub": "#d97706",
+            "accent": "#ea580c",
+            "background": "#fffbeb",
+            "text": "#78350f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "bold",
+            "body_size": "16px"
+          },
+          "motion": {
+            "transition": "ease-out",
+            "duration": "0.3s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#f59e0b",
+            "sub": "#d97706",
+            "accent": "#ea580c",
+            "background": "#fffbeb",
+            "text": "#78350f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "bold",
+            "body_size": "16px"
+          },
+          "motion": {
+            "transition": "ease-out",
+            "duration": "0.3s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781357098.901531,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: cool (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "cool/color_palette",
+        "cool/typography",
+        "cool/motion"
+      ],
+      "detail": {
+        "mood": "cool",
+        "updates": {
+          "color_palette": {
+            "main": "#3b82f6",
+            "sub": "#2563eb",
+            "accent": "#06b6d4",
+            "background": "#eff6ff",
+            "text": "#1e3a5f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "600",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease-in-out",
+            "duration": "0.25s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#3b82f6",
+            "sub": "#2563eb",
+            "accent": "#06b6d4",
+            "background": "#eff6ff",
+            "text": "#1e3a5f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "600",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease-in-out",
+            "duration": "0.25s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781357099.005525,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: energetic (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "energetic/color_palette",
+        "energetic/typography",
+        "energetic/motion"
+      ],
+      "detail": {
+        "mood": "energetic",
+        "updates": {
+          "color_palette": {
+            "main": "#ec4899",
+            "sub": "#db2777",
+            "accent": "#a855f7",
+            "background": "#fdf2f8",
+            "text": "#831843"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "900",
+            "body_size": "17px"
+          },
+          "motion": {
+            "transition": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+            "duration": "0.35s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#ec4899",
+            "sub": "#db2777",
+            "accent": "#a855f7",
+            "background": "#fdf2f8",
+            "text": "#831843"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "900",
+            "body_size": "17px"
+          },
+          "motion": {
+            "transition": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+            "duration": "0.35s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781357099.093493,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: elegant (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "elegant/color_palette",
+        "elegant/typography",
+        "elegant/motion"
+      ],
+      "detail": {
+        "mood": "elegant",
+        "updates": {
+          "color_palette": {
+            "main": "#6366f1",
+            "sub": "#4f46e5",
+            "accent": "#8b5cf6",
+            "background": "#eef2ff",
+            "text": "#312e81"
+          },
+          "typography": {
+            "font_family": "Noto Serif JP",
+            "heading_weight": "500",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease",
+            "duration": "0.5s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#6366f1",
+            "sub": "#4f46e5",
+            "accent": "#8b5cf6",
+            "background": "#eef2ff",
+            "text": "#312e81"
+          },
+          "typography": {
+            "font_family": "Noto Serif JP",
+            "heading_weight": "500",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease",
+            "duration": "0.5s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781357102.619416,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: cool (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "cool/color_palette",
+        "cool/typography",
+        "cool/motion"
+      ],
+      "detail": {
+        "mood": "cool",
+        "updates": {
+          "color_palette": {
+            "main": "#3b82f6",
+            "sub": "#2563eb",
+            "accent": "#06b6d4",
+            "background": "#eff6ff",
+            "text": "#1e3a5f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "600",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease-in-out",
+            "duration": "0.25s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#3b82f6",
+            "sub": "#2563eb",
+            "accent": "#06b6d4",
+            "background": "#eff6ff",
+            "text": "#1e3a5f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "600",
+            "body_size": "15px"
+          },
+          "motion": {
+            "transition": "ease-in-out",
+            "duration": "0.25s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781357102.757669,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: warm (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "warm/color_palette",
+        "warm/typography",
+        "warm/motion"
+      ],
+      "detail": {
+        "mood": "warm",
+        "updates": {
+          "color_palette": {
+            "main": "#f59e0b",
+            "sub": "#d97706",
+            "accent": "#ea580c",
+            "background": "#fffbeb",
+            "text": "#78350f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "bold",
+            "body_size": "16px"
+          },
+          "motion": {
+            "transition": "ease-out",
+            "duration": "0.3s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#f59e0b",
+            "sub": "#d97706",
+            "accent": "#ea580c",
+            "background": "#fffbeb",
+            "text": "#78350f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "bold",
+            "body_size": "16px"
+          },
+          "motion": {
+            "transition": "ease-out",
+            "duration": "0.3s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "timestamp": 1781529033.3232937,
+      "iso_time": "2026-06-15T22:10:33.323297",
+      "type": "video_production",
+      "task_id": "tid",
+      "summary": "out - testスタイルで3シーンを編集",
+      "insight": "カラープリセット'warm'と遷移'fade'を使用。テンポstandardの演出で制作完了。",
+      "stat_changes": [
+        "Production Count +1",
+        "Style: test"
+      ],
+      "quarantined_reason": "Test video production (out - testスタイルで3シーンを編集)"
+    },
+    {
+      "timestamp": 1781529348.7517931,
+      "iso_time": "2026-06-15T22:15:48.751795",
+      "type": "video_production",
+      "task_id": "tid",
+      "summary": "out - testスタイルで3シーンを編集",
+      "insight": "カラープリセット'warm'と遷移'fade'を使用。テンポstandardの演出で制作完了。",
+      "stat_changes": [
+        "Production Count +1",
+        "Style: test"
+      ],
+      "quarantined_reason": "Test video production (out - testスタイルで3シーンを編集)"
+    },
+    {
+      "timestamp": 1782186161.15015,
+      "type": "design_token_change",
+      "summary": "デザイントークン更新: warm (color_palette, typography, motion)",
+      "insight": "チャンネル主がUI から適用",
+      "source": "template_theme_selector",
+      "stat_changes": [
+        "warm/color_palette",
+        "warm/typography",
+        "warm/motion"
+      ],
+      "detail": {
+        "mood": "warm",
+        "updates": {
+          "color_palette": {
+            "main": "#f59e0b",
+            "sub": "#d97706",
+            "accent": "#ea580c",
+            "background": "#fffbeb",
+            "text": "#78350f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "bold",
+            "body_size": "16px"
+          },
+          "motion": {
+            "transition": "ease-out",
+            "duration": "0.3s"
+          }
+        },
+        "old_values": {
+          "color_palette": {
+            "main": "#f59e0b",
+            "sub": "#d97706",
+            "accent": "#ea580c",
+            "background": "#fffbeb",
+            "text": "#78350f"
+          },
+          "typography": {
+            "font_family": "Noto Sans JP",
+            "heading_weight": "bold",
+            "body_size": "16px"
+          },
+          "motion": {
+            "transition": "ease-out",
+            "duration": "0.3s"
+          }
+        }
+      },
+      "quarantined_reason": "No actual change in design tokens (old == new)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:02:48.560484",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:02:48.592729",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:02:48.633133",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:02:48.664920",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:09:09.612801",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:09:09.640315",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:09:09.668636",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:09:09.696610",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:15:53.826779",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:15:53.855308",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:15:53.884765",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:15:53.912753",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:19:17.542657",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:19:17.570630",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:19:17.601338",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:19:17.630240",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:23:24.200337",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:23:24.230183",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:23:24.259272",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:23:24.294144",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:34:06.488267",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:34:06.538079",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:34:06.592198",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T13:34:06.635785",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T22:38:41.339480",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T23:05:15.856379",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-27T23:37:23.612805",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-28T00:08:33.014191",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-28T00:56:33.100787",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    },
+    {
+      "type": "storage_cleanup",
+      "timestamp": "2026-06-28T02:53:12.010237",
+      "deleted_count": 0,
+      "freed_mb": 0.0,
+      "protected_count": 0,
+      "dry_run": false,
+      "summary": "Auto cleanup: 0 files, 0.0MB freed",
+      "quarantined_reason": "Empty storage cleanup (deleted_count == 0)"
+    }
+  ]
+}

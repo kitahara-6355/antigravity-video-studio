@@ -1,0 +1,17 @@
+{
+  "stats": {
+    "debates": 1,
+    "wins": 1,
+    "losses": 0
+  },
+  "bias_weight": 1.0,
+  "history": [
+    {
+      "session_id": "session_123",
+      "timestamp": 1779844299.2600434,
+      "stance": "AGREE",
+      "outcome": "APPROVE",
+      "feedback": null
+    }
+  ]
+}

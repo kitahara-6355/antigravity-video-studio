@@ -1,0 +1,47 @@
+{
+  "step": 2,
+  "persona_id": "step_002_misaki",
+  "name": "佐藤美咲",
+  "subtitle": "Vlogger / 日常・ライフスタイル発信",
+  "schema_version": "1.0",
+  "profile": {
+    "age": 30,
+    "occupation": "カフェ店員・フリーランスデザイナー",
+    "tech_level": "中級（Canvaでお洒落なロゴを作ったり、SNS投稿を使いこなす。プログラミングは未経験）",
+    "video_experience": "初心者（スマホアプリで日常動画を数本のレベル）",
+    "motivation": "旅行や趣味のVlogをお洒落に発信したい。完全全自動では自分のこだわりが反映できないので、お気に入りのBGMを選び、自動カットの残り尺を軽くチェックしつつ、字幕の簡単な誤字を直接テキスト修正して投稿したい",
+    "frustration_points": [
+      "AIに動画を丸投げするだけだと、たまに変な箇所がカットされてしまったり、思ったのと違う字幕になっていて直せない",
+      "自分で選んだお気に入りのBGMと、話し声の音量のバランス調整がいつも難しく感じる",
+      "タイムライン上の複雑な映像トラック編集は難しくてわからないが、テンプレートやテーマは自分で選択して切り替えたい"
+    ]
+  },
+  "ux_principles": [
+    "AI自動編集の結果をプレビューし、必要に応じて「簡単なテキスト編集」で字幕を微修正できること",
+    "自分でアップロードしたBGMとお喋りの音声に対して、自動でダッキング（お喋り中にBGMが自動で下がる効果）が効くこと",
+    "Vlog風やエンタメ風などのテンプレートと、お洒落なカラーテーマを自分で選択・切替できること",
+    "複雑なレイアウト編集は行わないが、タイムライン上の大まかなカットの削除・結合が直感的に行えること"
+  ],
+  "maturity_dimensions": {
+    "D1_activity": {"score": 4, "description": "活動量（パイプライン実行回数）"},
+    "D2_judgment": {"score": 2, "description": "判断品質（承認/却下パターン）"},
+    "D3_philosophy": {"score": 3, "description": "哲学深度（Soul Narrativeの豊かさ）"},
+    "D4_youtube": {"score": 2, "description": "YouTube成果（CTR/維持率）"},
+    "D5_proficiency": {"score": 2, "description": "操作習熟度（機能利用パターン）"}
+  },
+  "step_thresholds": {
+    "advance_to_step_3": {
+      "D1_min": 10,
+      "D2_min": 4,
+      "D4_required": false,
+      "note": "10回以上のパイプライン実行 + 5回以上の手動レビュー承認"
+    }
+  },
+  "inherits_from": ["step_001_mirei"],
+  "ux_stories": [
+    "O-1", "O-2", "O-3", "O-4", "O-5", "O-6", "O-7",
+    "O-8", "O-9", "O-10", "O-11", "O-12"
+  ],
+  "constitution_ref": "§7.3 UX最低保証規定",
+  "evolution_log_ref": "soul_narrative/evolution_log.json"
+}

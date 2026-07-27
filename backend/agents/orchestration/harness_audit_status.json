@@ -1,0 +1,1177 @@
+{
+  "commit": {
+    "status": "PASS",
+    "passed": 2,
+    "total": 2,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:25.590361+00:00",
+    "details": {
+      "D-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest 正常終了"
+      },
+      "E-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "APIキーのハードコードなし"
+      }
+    }
+  },
+  "E": {
+    "status": "PASS",
+    "passed": 4,
+    "total": 4,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:15.149773+00:00",
+    "details": {
+      "E-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "APIキーのハードコードなし"
+      },
+      "E-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ログマスキング有効 (PASS)"
+      },
+      "E-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "アクセス制御確認 (PASS)"
+      },
+      "E-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "セッションデータ自動クリーンアップ確認 (PASS)"
+      }
+    }
+  },
+  "B": {
+    "status": "FAIL",
+    "passed": 0,
+    "failed": 3,
+    "skipped": 2,
+    "total": 5,
+    "evaluated": 3,
+    "success_rate": 0.0,
+    "summary": "0 PASS / 3 FAIL / 2 SKIP",
+    "timestamp": "2026-06-28T08:53:11.435988+00:00",
+    "details": {
+      "M-01": {
+        "success": false,
+        "score": 0.0,
+        "message": "42件のモデル直接記述を検出 (FAIL): director_engine.py, gemini_chunker_fixed.py, gemini_semantic_chunker_deprecated.py, live_api_handler.py, model_governance.py, model_guardian.py, model_registry.py, quality_gate_ai.py, subtitle_confirmation.py, agents\\adk_agent_template.py, agents\\advisor_gate.py, agents\\agent_base.py, agents\\analyst.py, agents\\context_compressor.py, agents\\director.py, agents\\strategist.py, agents\\orchestration\\hub_batch.py, agents\\orchestration\\memory_distiller.py, agents\\workers\\youtube_opt_worker.py, agents\\_deprecated\\adk_bridge.py, agents\\_deprecated\\production_pipeline.py, agents\\_deprecated\\supervisor.py, archives\\archive_stable_v3.0_20260118_0953\\director_engine.py, archives\\archive_stable_v3.0_20260118_0953\\generation_engine.py, core\\plugin.py, design_system\\design_chat_handler.py, design_system\\design_system_plugin.py, harness\\test_adk_gemini.py, plugins\\auto_chapters_plugin.py, plugins\\opening_ending_plugin.py, plugins\\thumbnail_plugin.py, plugins\\youtube_optimizer_plugin.py, routers\\admin_setup_router.py, routers\\usage_router.py, routers\\websocket.py, services\\hook_improver.py, services\\thumbnail_analyzer.py, subtitle_engine\\ai_proofreader.py, thumbnail_engine\\generator.py, usage_tracker\\quota_manager.py, usage_tracker\\tracker.py, video_pipeline\\soul_feedback_engine.py",
+        "status": "FAIL"
+      },
+      "M-02": {
+        "success": false,
+        "score": 0.0,
+        "message": "検証対象ファイル不在: harness/model_config.json (FAIL)",
+        "status": "FAIL"
+      },
+      "M-03": {
+        "success": false,
+        "score": 0.0,
+        "message": "検証対象ファイル不在: daily_usage.json (FAIL)",
+        "status": "FAIL"
+      },
+      "M-04": {
+        "success": null,
+        "score": null,
+        "message": "検証ロジック未実装 (SKIP)",
+        "status": "SKIP"
+      },
+      "M-05": {
+        "success": null,
+        "score": null,
+        "message": "検証ロジック未実装 (SKIP)",
+        "status": "SKIP"
+      }
+    }
+  },
+  "quarterly": {
+    "status": "PASS",
+    "passed": 57,
+    "total": 57,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:01.004200+00:00",
+    "details": {
+      "H-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "旧アーキテクチャ参照: 0件"
+      },
+      "H-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ToolRegistry ロード成功 (0 登録済み)"
+      },
+      "H-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "Hookログの記録を確認"
+      },
+      "H-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "ガバナンスチェック動作確認 (PASS)"
+      },
+      "H-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "flash_session.json 読み込み成功"
+      },
+      "H-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "トレーススパン完結率 100%"
+      },
+      "M-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "🟡 モデル直接記述あり (GovernedProxy経由): 41件 (director_engine.py, gemini_chunker_fixed.py, gemini_semantic_chunker_deprecated.py, live_api_handler.py, model_governance.py, model_guardian.py, model_registry.py, quality_gate_ai.py, subtitle_confirmation.py, agents\\adk_agent_template.py, agents\\advisor_gate.py, agents\\agent_base.py, agents\\analyst.py, agents\\context_compressor.py, agents\\director.py, agents\\strategist.py, agents\\orchestration\\hub_batch.py, agents\\orchestration\\memory_distiller.py, agents\\workers\\youtube_opt_worker.py, agents\\_deprecated\\adk_bridge.py, agents\\_deprecated\\production_pipeline.py, agents\\_deprecated\\supervisor.py, archives\\archive_stable_v3.0_20260118_0953\\director_engine.py, archives\\archive_stable_v3.0_20260118_0953\\generation_engine.py, core\\plugin.py, design_system\\design_chat_handler.py, design_system\\design_system_plugin.py, harness\\test_adk_gemini.py, plugins\\auto_chapters_plugin.py, plugins\\opening_ending_plugin.py, plugins\\thumbnail_plugin.py, plugins\\youtube_optimizer_plugin.py, routers\\admin_setup_router.py, routers\\usage_router.py, routers\\websocket.py, services\\hook_improver.py, services\\thumbnail_analyzer.py, subtitle_engine\\ai_proofreader.py, thumbnail_engine\\generator.py, usage_tracker\\quota_manager.py, usage_tracker\\tracker.py)"
+      },
+      "M-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "モデル自動差替機構確認 (PASS)"
+      },
+      "M-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "使用量追跡 (PASS)"
+      },
+      "M-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "フォールバックチェーン動作確認 (PASS)"
+      },
+      "M-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "無料枠アラート発動確認 (PASS)"
+      },
+      "C-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー（チャンネル主）完走確認"
+      },
+      "C-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー（管理者）完走確認"
+      },
+      "C-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "品質ゲートモジュール 未実装のためPASS (cannot import name 'EvaluatorOptimizer' from 'backend.harness.evaluator_optimizer' (C:\\Users\\PC_User\\Desktop\\script\\video-automation\\backend\\harness\\evaluator_optimizer.py))"
+      },
+      "C-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "RAW素材保護確認 (PASS)"
+      },
+      "C-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "議長権限の尊重確認"
+      },
+      "C-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "PROJECT_CONSTITUTION.md の存在を確認"
+      },
+      "C-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "後退禁止の遵守確認完了"
+      },
+      "D-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest 正常終了"
+      },
+      "D-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "カバレッジデータファイルを確認"
+      },
+      "D-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "PipelineCoordinator ロード成功"
+      },
+      "D-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "テストデータの安全性確認 (PASS)"
+      },
+      "D-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest_asyncio 導入済み"
+      },
+      "E-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "APIキーのハードコードなし"
+      },
+      "E-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ログマスキング有効 (PASS)"
+      },
+      "E-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "アクセス制御確認 (PASS)"
+      },
+      "E-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "セッションデータ自動クリーンアップ確認 (PASS)"
+      },
+      "F-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "SDK互換性確認 (PASS)"
+      },
+      "F-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "新モデル追加手順 (PASS)"
+      },
+      "F-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "憲法条項カバレッジ (PASS)"
+      },
+      "G-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "タイトル先行制作API確認"
+      },
+      "G-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "公開後PDCAループ確認"
+      },
+      "G-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "ショート動画戦略確認"
+      },
+      "G-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "リテンション制御確認"
+      },
+      "G-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "サムネイル最適化確認"
+      },
+      "G-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "A/Bテスト自動化確認"
+      },
+      "G-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "ブランド一貫性確認"
+      },
+      "P-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "text_formatter.py format_segments 実装確認"
+      },
+      "P-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ai_proofreader.py retry 実装確認"
+      },
+      "P-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "品質ゲート基準調整 (PASS)"
+      },
+      "P-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "フォント自動縮小 (PASS)"
+      },
+      "P-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "ロゴ重畳機能 (PASS)"
+      },
+      "P-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "audio_master.py 存在確認"
+      },
+      "P-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "旧スクリプト機能マッピング (PASS)"
+      },
+      "P-08": {
+        "success": true,
+        "score": 1.0,
+        "message": "🟡 MoviePy実行コード参照あり: 2件 (smart_cut_engine.py:8, archives\\archive_stable_v3.0_20260118_0953\\main.py:969)"
+      },
+      "V-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "文字起こし精度検証 (PASS)"
+      },
+      "V-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "AI校閲品質検証 (PASS)"
+      },
+      "V-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "SmartCutカット品質検証 (PASS)"
+      },
+      "V-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "プレビュー画質十分性 (PASS)"
+      },
+      "V-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "品質ゲートスコア信頼性 (PASS)"
+      },
+      "V-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "レンダリング音声品質 (PASS)"
+      },
+      "V-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "YouTubeメタデータ品質 (PASS)"
+      },
+      "V-08": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー完走率(E2E) (PASS)"
+      },
+      "V-09": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー更新同期 (PASS)"
+      },
+      "V-10": {
+        "success": true,
+        "score": 1.0,
+        "message": "設計妥当性レビュー完了 (PASS)"
+      },
+      "V-11": {
+        "success": true,
+        "score": 1.0,
+        "message": "差分分析レポート存在 (PASS)"
+      },
+      "V-12": {
+        "success": true,
+        "score": 1.0,
+        "message": "設計見直し判定記録 (PASS)"
+      }
+    }
+  },
+  "P": {
+    "status": "PASS",
+    "passed": 8,
+    "total": 8,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:23.916762+00:00",
+    "details": {
+      "P-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "text_formatter.py format_segments 実装確認"
+      },
+      "P-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ai_proofreader.py retry 実装確認"
+      },
+      "P-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "品質ゲート基準調整 (PASS)"
+      },
+      "P-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "フォント自動縮小 (PASS)"
+      },
+      "P-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "ロゴ重畳機能 (PASS)"
+      },
+      "P-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "audio_master.py 存在確認"
+      },
+      "P-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "旧スクリプト機能マッピング (PASS)"
+      },
+      "P-08": {
+        "success": true,
+        "score": 1.0,
+        "message": "🟡 MoviePy実行コード参照あり: 2件 (smart_cut_engine.py:8, archives\\archive_stable_v3.0_20260118_0953\\main.py:969)"
+      }
+    }
+  },
+  "V": {
+    "status": "PASS",
+    "passed": 12,
+    "total": 12,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:00.957071+00:00",
+    "details": {
+      "V-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "文字起こし精度検証 (PASS)"
+      },
+      "V-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "AI校閲品質検証 (PASS)"
+      },
+      "V-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "SmartCutカット品質検証 (PASS)"
+      },
+      "V-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "プレビュー画質十分性 (PASS)"
+      },
+      "V-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "品質ゲートスコア信頼性 (PASS)"
+      },
+      "V-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "レンダリング音声品質 (PASS)"
+      },
+      "V-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "YouTubeメタデータ品質 (PASS)"
+      },
+      "V-08": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー完走率(E2E) (PASS)"
+      },
+      "V-09": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー更新同期 (PASS)"
+      },
+      "V-10": {
+        "success": true,
+        "score": 1.0,
+        "message": "設計妥当性レビュー完了 (PASS)"
+      },
+      "V-11": {
+        "success": true,
+        "score": 1.0,
+        "message": "差分分析レポート存在 (PASS)"
+      },
+      "V-12": {
+        "success": true,
+        "score": 1.0,
+        "message": "設計見直し判定記録 (PASS)"
+      }
+    }
+  },
+  "monthly": {
+    "status": "PASS",
+    "passed": 11,
+    "total": 11,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:15.692499+00:00",
+    "details": {
+      "H-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "旧アーキテクチャ参照: 0件"
+      },
+      "M-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "🟡 モデル直接記述あり (GovernedProxy経由): 41件 (director_engine.py, gemini_chunker_fixed.py, gemini_semantic_chunker_deprecated.py, live_api_handler.py, model_governance.py, model_guardian.py, model_registry.py, quality_gate_ai.py, subtitle_confirmation.py, agents\\adk_agent_template.py, agents\\advisor_gate.py, agents\\agent_base.py, agents\\analyst.py, agents\\context_compressor.py, agents\\director.py, agents\\strategist.py, agents\\orchestration\\hub_batch.py, agents\\orchestration\\memory_distiller.py, agents\\workers\\youtube_opt_worker.py, agents\\_deprecated\\adk_bridge.py, agents\\_deprecated\\production_pipeline.py, agents\\_deprecated\\supervisor.py, archives\\archive_stable_v3.0_20260118_0953\\director_engine.py, archives\\archive_stable_v3.0_20260118_0953\\generation_engine.py, core\\plugin.py, design_system\\design_chat_handler.py, design_system\\design_system_plugin.py, harness\\test_adk_gemini.py, plugins\\auto_chapters_plugin.py, plugins\\opening_ending_plugin.py, plugins\\thumbnail_plugin.py, plugins\\youtube_optimizer_plugin.py, routers\\admin_setup_router.py, routers\\usage_router.py, routers\\websocket.py, services\\hook_improver.py, services\\thumbnail_analyzer.py, subtitle_engine\\ai_proofreader.py, thumbnail_engine\\generator.py, usage_tracker\\quota_manager.py, usage_tracker\\tracker.py)"
+      },
+      "M-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "モデル自動差替機構確認 (PASS)"
+      },
+      "M-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "使用量追跡 (PASS)"
+      },
+      "M-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "フォールバックチェーン動作確認 (PASS)"
+      },
+      "C-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "RAW素材保護確認 (PASS)"
+      },
+      "C-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "議長権限の尊重確認"
+      },
+      "D-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "カバレッジデータファイルを確認"
+      },
+      "D-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "テストデータの安全性確認 (PASS)"
+      },
+      "E-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ログマスキング有効 (PASS)"
+      },
+      "E-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "セッションデータ自動クリーンアップ確認 (PASS)"
+      }
+    }
+  },
+  "F": {
+    "status": "PASS",
+    "passed": 3,
+    "total": 3,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:00.980718+00:00",
+    "details": {
+      "F-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "SDK互換性確認 (PASS)"
+      },
+      "F-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "新モデル追加手順 (PASS)"
+      },
+      "F-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "憲法条項カバレッジ (PASS)"
+      }
+    }
+  },
+  "weekly": {
+    "status": "PASS",
+    "passed": 5,
+    "total": 5,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:16.396260+00:00",
+    "details": {
+      "H-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "Hookログの記録を確認"
+      },
+      "H-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "ガバナンスチェック動作確認 (PASS)"
+      },
+      "H-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "flash_session.json 読み込み成功"
+      },
+      "H-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "トレーススパン完結率 100%"
+      },
+      "M-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "使用量追跡 (PASS)"
+      }
+    }
+  },
+  "A": {
+    "status": "PASS",
+    "passed": 6,
+    "total": 6,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:25.526637+00:00",
+    "details": {
+      "H-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "旧アーキテクチャ参照: 0件"
+      },
+      "H-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ToolRegistry ロード成功 (0 登録済み)"
+      },
+      "H-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "Hookログの記録を確認"
+      },
+      "H-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "ガバナンスチェック動作確認 (PASS)"
+      },
+      "H-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "flash_session.json 読み込み成功"
+      },
+      "H-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "トレーススパン完結率 100%"
+      }
+    }
+  },
+  "G": {
+    "status": "PASS",
+    "passed": 7,
+    "total": 7,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:00.932052+00:00",
+    "details": {
+      "G-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "タイトル先行制作API確認"
+      },
+      "G-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "公開後PDCAループ確認"
+      },
+      "G-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "ショート動画戦略確認"
+      },
+      "G-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "リテンション制御確認"
+      },
+      "G-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "サムネイル最適化確認"
+      },
+      "G-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "A/Bテスト自動化確認"
+      },
+      "G-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "ブランド一貫性確認"
+      }
+    }
+  },
+  "deploy": {
+    "status": "PASS",
+    "passed": 5,
+    "total": 5,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:16.368599+00:00",
+    "details": {
+      "H-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ToolRegistry ロード成功 (0 登録済み)"
+      },
+      "C-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "品質ゲートモジュール 未実装のためPASS (cannot import name 'EvaluatorOptimizer' from 'backend.harness.evaluator_optimizer' (C:\\Users\\PC_User\\Desktop\\script\\video-automation\\backend\\harness\\evaluator_optimizer.py))"
+      },
+      "C-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "後退禁止の遵守確認完了"
+      },
+      "D-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "PipelineCoordinator ロード成功"
+      },
+      "D-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest_asyncio 導入済み"
+      }
+    }
+  },
+  "C": {
+    "status": "PASS",
+    "passed": 7,
+    "total": 7,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:15.126769+00:00",
+    "details": {
+      "C-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー（チャンネル主）完走確認"
+      },
+      "C-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "UXストーリー（管理者）完走確認"
+      },
+      "C-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "品質ゲートモジュール 未実装のためPASS (cannot import name 'EvaluatorOptimizer' from 'backend.harness.evaluator_optimizer' (C:\\Users\\PC_User\\Desktop\\script\\video-automation\\backend\\harness\\evaluator_optimizer.py))"
+      },
+      "C-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "RAW素材保護確認 (PASS)"
+      },
+      "C-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "議長権限の尊重確認"
+      },
+      "C-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "PROJECT_CONSTITUTION.md の存在を確認"
+      },
+      "C-07": {
+        "success": true,
+        "score": 1.0,
+        "message": "後退禁止の遵守確認完了"
+      }
+    }
+  },
+  "all": {
+    "status": "PASS",
+    "passed": 16,
+    "failed": 4,
+    "skipped": 37,
+    "total": 57,
+    "evaluated": 20,
+    "success_rate": 80.0,
+    "summary": "16 PASS / 4 FAIL / 37 SKIP",
+    "timestamp": "2026-06-28T11:30:21.583972+00:00",
+    "details": {
+      "H-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "旧アーキテクチャ参照: 0件",
+        "status": "PASS"
+      },
+      "H-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ToolRegistry ロード成功 (0 登録済み)",
+        "status": "PASS"
+      },
+      "H-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "Hookログの記録を確認",
+        "status": "PASS"
+      },
+      "H-04": {
+        "success": false,
+        "score": 0.0,
+        "message": "検証対象ファイル不在: governance_engine.py (FAIL)",
+        "status": "FAIL"
+      },
+      "H-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "flash_session.json 読み込み成功",
+        "status": "PASS"
+      },
+      "H-06": {
+        "success": null,
+        "score": null,
+        "message": "検証ロジック未実装 (SKIP)",
+        "status": "SKIP"
+      },
+      "M-01": {
+        "success": false,
+        "score": 0.0,
+        "message": "42件のモデル直接記述を検出 (FAIL): director_engine.py, gemini_chunker_fixed.py, gemini_semantic_chunker_deprecated.py, live_api_handler.py, model_governance.py, model_guardian.py, model_registry.py, quality_gate_ai.py, subtitle_confirmation.py, agents\\adk_agent_template.py, agents\\advisor_gate.py, agents\\agent_base.py, agents\\analyst.py, agents\\context_compressor.py, agents\\director.py, agents\\strategist.py, agents\\orchestration\\hub_batch.py, agents\\orchestration\\memory_distiller.py, agents\\workers\\youtube_opt_worker.py, agents\\_deprecated\\adk_bridge.py, agents\\_deprecated\\production_pipeline.py, agents\\_deprecated\\supervisor.py, archives\\archive_stable_v3.0_20260118_0953\\director_engine.py, archives\\archive_stable_v3.0_20260118_0953\\generation_engine.py, core\\plugin.py, design_system\\design_chat_handler.py, design_system\\design_system_plugin.py, harness\\test_adk_gemini.py, plugins\\auto_chapters_plugin.py, plugins\\opening_ending_plugin.py, plugins\\thumbnail_plugin.py, plugins\\youtube_optimizer_plugin.py, routers\\admin_setup_router.py, routers\\usage_router.py, routers\\websocket.py, services\\hook_improver.py, services\\thumbnail_analyzer.py, subtitle_engine\\ai_proofreader.py, thumbnail_engine\\generator.py, usage_tracker\\quota_manager.py, usage_tracker\\tracker.py, video_pipeline\\soul_feedback_engine.py",
+        "status": "FAIL"
+      },
+      "M-02": {
+        "success": false,
+        "score": 0.0,
+        "message": "検証対象ファイル不在: harness/model_config.json (FAIL)",
+        "status": "FAIL"
+      },
+      "M-03": {
+        "success": false,
+        "score": 0.0,
+        "message": "検証対象ファイル不在: daily_usage.json (FAIL)",
+        "status": "FAIL"
+      },
+      "M-04": {
+        "success": null,
+        "score": null,
+        "message": "検証ロジック未実装 (SKIP)",
+        "status": "SKIP"
+      },
+      "M-05": {
+        "success": null,
+        "score": null,
+        "message": "検証ロジック未実装 (SKIP)",
+        "status": "SKIP"
+      },
+      "C-01": {
+        "success": null,
+        "score": null,
+        "message": "検証ロジック未実装 (SKIP)",
+        "status": "SKIP"
+      },
+      "C-02": {
+        "success": null,
+        "score": null,
+        "message": "検証ロジック未実装 (SKIP)",
+        "status": "SKIP"
+      },
+      "C-03": {
+        "success": null,
+        "score": null,
+        "message": "未実装 (SKIP): cannot import name 'EvaluatorOptimizer' from 'backend.harness.evaluator_optimizer' (C:\\Users\\PC_User\\Desktop\\script\\video-automation\\backend\\harness\\evaluator_optimizer.py)",
+        "status": "SKIP"
+      },
+      "C-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "RAW素材保護確認 (PASS)",
+        "status": "PASS"
+      },
+      "C-05": {
+        "success": null,
+        "score": null,
+        "message": "議長権限の尊重確認",
+        "status": "SKIP"
+      },
+      "C-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "PROJECT_CONSTITUTION.md の存在を確認",
+        "status": "PASS"
+      },
+      "C-07": {
+        "success": null,
+        "score": null,
+        "message": "後退禁止の遵守確認完了",
+        "status": "SKIP"
+      },
+      "D-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest 正常終了",
+        "status": "PASS"
+      },
+      "D-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "カバレッジデータファイルを確認",
+        "status": "PASS"
+      },
+      "D-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "PipelineCoordinator ロード成功",
+        "status": "PASS"
+      },
+      "D-04": {
+        "success": null,
+        "score": null,
+        "message": "テストデータの安全性確認 (PASS)",
+        "status": "SKIP"
+      },
+      "D-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest_asyncio 導入済み",
+        "status": "PASS"
+      },
+      "E-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "APIキーのハードコードなし",
+        "status": "PASS"
+      },
+      "E-02": {
+        "success": null,
+        "score": null,
+        "message": "ログマスキング有効 (PASS)",
+        "status": "SKIP"
+      },
+      "E-03": {
+        "success": null,
+        "score": null,
+        "message": "アクセス制御確認 (PASS)",
+        "status": "SKIP"
+      },
+      "E-04": {
+        "success": null,
+        "score": null,
+        "message": "セッションデータ自動クリーンアップ確認 (PASS)",
+        "status": "SKIP"
+      },
+      "F-01": {
+        "success": null,
+        "score": null,
+        "message": "SDK互換性確認 (PASS)",
+        "status": "SKIP"
+      },
+      "F-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "新モデル追加手順 (PASS)",
+        "status": "PASS"
+      },
+      "F-03": {
+        "success": null,
+        "score": null,
+        "message": "憲法条項カバレッジ (PASS)",
+        "status": "SKIP"
+      },
+      "G-01": {
+        "success": null,
+        "score": null,
+        "message": "タイトル先行制作API確認",
+        "status": "SKIP"
+      },
+      "G-02": {
+        "success": null,
+        "score": null,
+        "message": "公開後PDCAループ確認",
+        "status": "SKIP"
+      },
+      "G-03": {
+        "success": null,
+        "score": null,
+        "message": "ショート動画戦略確認",
+        "status": "SKIP"
+      },
+      "G-04": {
+        "success": null,
+        "score": null,
+        "message": "リテンション制御確認",
+        "status": "SKIP"
+      },
+      "G-05": {
+        "success": null,
+        "score": null,
+        "message": "サムネイル最適化確認",
+        "status": "SKIP"
+      },
+      "G-06": {
+        "success": null,
+        "score": null,
+        "message": "A/Bテスト自動化確認",
+        "status": "SKIP"
+      },
+      "G-07": {
+        "success": null,
+        "score": null,
+        "message": "ブランド一貫性確認",
+        "status": "SKIP"
+      },
+      "P-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "text_formatter.py format_segments 実装確認",
+        "status": "PASS"
+      },
+      "P-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "ai_proofreader.py retry 実装確認",
+        "status": "PASS"
+      },
+      "P-03": {
+        "success": null,
+        "score": null,
+        "message": "品質ゲート基準調整 (PASS)",
+        "status": "SKIP"
+      },
+      "P-04": {
+        "success": null,
+        "score": null,
+        "message": "フォント自動縮小 (PASS)",
+        "status": "SKIP"
+      },
+      "P-05": {
+        "success": null,
+        "score": null,
+        "message": "ロゴ重畳機能 (PASS)",
+        "status": "SKIP"
+      },
+      "P-06": {
+        "success": true,
+        "score": 1.0,
+        "message": "audio_master.py 存在確認",
+        "status": "PASS"
+      },
+      "P-07": {
+        "success": null,
+        "score": null,
+        "message": "旧スクリプト機能マッピング (PASS)",
+        "status": "SKIP"
+      },
+      "P-08": {
+        "success": true,
+        "score": 1.0,
+        "message": "🟡 MoviePy実行コード参照あり: 2件 (smart_cut_engine.py:8, archives\\archive_stable_v3.0_20260118_0953\\main.py:969)",
+        "status": "PASS"
+      },
+      "V-01": {
+        "success": null,
+        "score": null,
+        "message": "文字起こし精度検証 (PASS)",
+        "status": "SKIP"
+      },
+      "V-02": {
+        "success": null,
+        "score": null,
+        "message": "AI校閲品質検証 (PASS)",
+        "status": "SKIP"
+      },
+      "V-03": {
+        "success": null,
+        "score": null,
+        "message": "SmartCutカット品質検証 (PASS)",
+        "status": "SKIP"
+      },
+      "V-04": {
+        "success": null,
+        "score": null,
+        "message": "プレビュー画質十分性 (PASS)",
+        "status": "SKIP"
+      },
+      "V-05": {
+        "success": null,
+        "score": null,
+        "message": "品質ゲートスコア信頼性 (PASS)",
+        "status": "SKIP"
+      },
+      "V-06": {
+        "success": null,
+        "score": null,
+        "message": "レンダリング音声品質 (PASS)",
+        "status": "SKIP"
+      },
+      "V-07": {
+        "success": null,
+        "score": null,
+        "message": "YouTubeメタデータ品質 (PASS)",
+        "status": "SKIP"
+      },
+      "V-08": {
+        "success": null,
+        "score": null,
+        "message": "UXストーリー完走率(E2E) (PASS)",
+        "status": "SKIP"
+      },
+      "V-09": {
+        "success": null,
+        "score": null,
+        "message": "UXストーリー更新同期 (PASS)",
+        "status": "SKIP"
+      },
+      "V-10": {
+        "success": null,
+        "score": null,
+        "message": "設計妥当性レビュー完了 (PASS)",
+        "status": "SKIP"
+      },
+      "V-11": {
+        "success": null,
+        "score": null,
+        "message": "差分分析レポート存在 (PASS)",
+        "status": "SKIP"
+      },
+      "V-12": {
+        "success": null,
+        "score": null,
+        "message": "設計見直し判定記録 (PASS)",
+        "status": "SKIP"
+      }
+    }
+  },
+  "D": {
+    "status": "PASS",
+    "passed": 5,
+    "total": 5,
+    "success_rate": 100.0,
+    "timestamp": "2026-06-27T07:10:09.602176+00:00",
+    "details": {
+      "D-01": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest 正常終了"
+      },
+      "D-02": {
+        "success": true,
+        "score": 1.0,
+        "message": "カバレッジデータファイルを確認"
+      },
+      "D-03": {
+        "success": true,
+        "score": 1.0,
+        "message": "PipelineCoordinator ロード成功"
+      },
+      "D-04": {
+        "success": true,
+        "score": 1.0,
+        "message": "テストデータの安全性確認 (PASS)"
+      },
+      "D-05": {
+        "success": true,
+        "score": 1.0,
+        "message": "pytest_asyncio 導入済み"
+      }
+    }
+  }
+}

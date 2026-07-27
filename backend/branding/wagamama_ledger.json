@@ -1,0 +1,368 @@
+{
+  "version": "1.0",
+  "name": "Wagamama Ledger",
+  "description": "Multi-user story management registry for tracking Evolution (Admin) and Experience (Channel Owner) narratives.",
+  "records": [
+    {
+      "wagamama_id": "W-001",
+      "feature_id": "subtitle_master",
+      "lanes": {
+        "evolution": {
+          "pain": "外部サービスと動画編集ソフトの往復による開発工程の分断",
+          "reason": "Whisperによる文字起こしとFFmpegの連携を単一機能として統合すべき",
+          "solution": "Subtitle Master の誕生（Whisper + FFmpeg統合）",
+          "architect_note": "Phase 1: Words First の基盤機能",
+          "resolved_at": "2025-12-01"
+        },
+        "experience": {
+          "pain": "テロップ入れだけで数時間…音声を何度も聞き直し、タイピングし、タイミングを合わせる。この無益な繰り返しはなんだ？",
+          "magic": "フォントサイズが大きくなり、NHK基準を満たしたため承認",
+          "emotion": "満足",
+          "resolved_at": "2026-06-07T20:27:06.166980"
+        }
+      },
+      "manual_section": "§4.1 字幕生成",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-002",
+      "feature_id": "smart_cut_engine",
+      "lanes": {
+        "evolution": {
+          "pain": "無音判定アルゴリズムの静的閾値による精度低下",
+          "reason": "動画ごとに環境音が違うため、動的閾値調整とオーディオ波形解析が必要",
+          "solution": "Smart Cut Engine の実装"
+        },
+        "experience": {
+          "pain": "無音カットに人生を浪費している。「あー」「えー」を探してチマチマ切る作業。",
+          "magic": "スライダーを動かすだけで、無音やフィラーが自動的に消え去り、最適な尺になる。",
+          "emotion": "爽快"
+        }
+      },
+      "manual_section": "§4.2 無音カット",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-003",
+      "feature_id": "ai_assistant_nexus",
+      "lanes": {
+        "evolution": {
+          "pain": "多機能化に伴うUIの複雑化",
+          "reason": "コマンドボタンではなく、自然言語によるIntent Parsingルーティングが必要",
+          "solution": "Nexus (Semantic Dispatcher) と AI Assistantパネル"
+        },
+        "experience": {
+          "pain": "画面に向かって一人ぼっち。操作方法を調べるのも疲れた。",
+          "magic": "やりたいことを言葉にするだけで、AIが最適な機能を選んで実行してくれる。",
+          "emotion": "安心感"
+        }
+      },
+      "manual_section": "§7 AI改善案",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-004",
+      "feature_id": "async_queue_system",
+      "lanes": {
+        "evolution": {
+          "pain": "重い動画処理によるFastAPIのブロッキング",
+          "reason": "CeleryやRedis等によるバックグラウンド処理が必要",
+          "solution": "AsyncTaskQueueとWebSocket進捗通知の実装"
+        },
+        "experience": {
+          "pain": "処理の待ち時間が長すぎて、画面の前で何もできずにやる気が削がれる。",
+          "magic": "処理は裏で進み、どれくらいで終わるかプログレスバーで教えてくれる。",
+          "emotion": "信頼感"
+        }
+      },
+      "manual_section": "§9 トラブルシューティング",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-005",
+      "feature_id": "global_style_lock",
+      "lanes": {
+        "evolution": {
+          "pain": "デザインの一貫性担保の難しさ",
+          "reason": "プロジェクト全体で参照するdesign_tokensの発行と強制適用が必要",
+          "solution": "design_token_managerによるCentralized Design Governance"
+        },
+        "experience": {
+          "pain": "AIに任せたら、シーンごとに絵柄やテロップのフォントがバラバラになってしまった。",
+          "magic": "一度ブランドトーンを決めれば、すべてのシーンで美しい統一感が保たれる。",
+          "emotion": "プロフェッショナル"
+        }
+      },
+      "manual_section": null,
+      "quality_gap": true,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-006",
+      "feature_id": "snapshot_version_control",
+      "lanes": {
+        "evolution": {
+          "pain": "破壊的変更時のロールバック手段の欠如",
+          "reason": "変更前にプロジェクト状態のディープコピー（スナップショット）を取るべき",
+          "solution": "Take管理システム"
+        },
+        "experience": {
+          "pain": "「前の方が良かったかも…」と後悔しても、もう元に戻せない。",
+          "magic": "いつでも過去の「Take」に戻れる。失敗を恐れずに大胆な編集が試せる。",
+          "emotion": "安心"
+        }
+      },
+      "manual_section": "§8.3 バージョン管理",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-007",
+      "feature_id": "youtube_optimizer",
+      "lanes": {
+        "evolution": {
+          "pain": "動画本体の品質とメタデータ品質の乖離",
+          "reason": "レンダリングと同時にSEO最適化情報を生成するパイプラインが必要",
+          "solution": "YouTube Optimizer Pluginの実装"
+        },
+        "experience": {
+          "pain": "せっかく作ったのに、どんなタイトルやサムネイルにすれば伸びるかわからない。",
+          "magic": "動画の中身を分析して、クリック率の高いサムネイルとSEO最強のタイトルを自動提案してくれる。",
+          "emotion": "期待"
+        }
+      },
+      "manual_section": "§5 YouTube最適化",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-008",
+      "feature_id": "one_tap_feedback",
+      "lanes": {
+        "evolution": {
+          "pain": "非エンジニアユーザーのGUI操作学習コスト",
+          "reason": "複雑なパラメータ調整を隠蔽し、RLHFライクな直感的フィードバックにすべき",
+          "solution": "One-tap Feedback UI (Writer's Desk / Director's Desk)"
+        },
+        "experience": {
+          "pain": "パラメーターとか専門用語とか、操作を覚えるのが大変すぎる。",
+          "magic": "AIの提案に対して「好き」「嫌い」を選ぶだけ。それだけで動画が完成に近づいていく。",
+          "emotion": "直感的"
+        }
+      },
+      "manual_section": "§1 はじめに",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-009",
+      "feature_id": "quality_gate_agent",
+      "lanes": {
+        "evolution": {
+          "pain": "レンダリング後の手戻りコストの高さ",
+          "reason": "最終出力前に静的解析およびルールベースチェックを強制するゲートキーパーが必要",
+          "solution": "Quality Gate Agent"
+        },
+        "experience": {
+          "pain": "何時間もかけて書き出した後で、テロップの誤字や音声のズレに気づいて絶望する。",
+          "magic": "出力前にシステムが厳しいチェックを行い、問題があれば書き出しを止めて教えてくれる。",
+          "emotion": "無敵感"
+        }
+      },
+      "manual_section": "§8.1 品質ゲート",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-010",
+      "feature_id": "project_journaling",
+      "lanes": {
+        "evolution": {
+          "pain": "過去の開発文脈や決定事項の喪失",
+          "reason": "Session単位での変更履歴の構造化ロギングが必要",
+          "solution": "Project Journaling (evolution_log entries)"
+        },
+        "experience": {
+          "pain": "昨日、この動画のトーンをどう決めたっけ？思い出せない。",
+          "magic": "プロジェクトに「日誌」がついており、いつ誰がどういう意図で変更したかがすぐわかる。",
+          "emotion": "記憶の拡張"
+        }
+      },
+      "manual_section": "用語集",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-011",
+      "feature_id": "progressive_preview",
+      "lanes": {
+        "evolution": {
+          "pain": "LLM生成物の不確実性によるリソース浪費",
+          "reason": "動画の全編生成は高コスト。まず数秒のプレビューか静止画で確認するイテレーションが必要",
+          "solution": "Screenshot-First / Progressive Preview Protocol"
+        },
+        "experience": {
+          "pain": "AIに数分間の動画アレンジを任せたけど、全然思ってたのと違った時の時間の無駄感。",
+          "magic": "まずは静止画、次に5秒動画…というように、素早いプレビューを見ながら方向修正できる。",
+          "emotion": "コントロール感"
+        }
+      },
+      "manual_section": "§4.3 プレビュー確認",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-012",
+      "feature_id": "storage_governance",
+      "lanes": {
+        "evolution": {
+          "pain": "中間ファイルによるストレージのパンク",
+          "reason": "不要な一時ファイルの自動クリーンアップと、生素材の保護を両立するマネージャーが必要",
+          "solution": "cleanup_manager.py と Vault分離戦略"
+        },
+        "experience": {
+          "pain": "気づいたらCドライブがいっぱいになってPCが動かなくなる恐怖。",
+          "magic": "ゴミは自動で捨てられ、大切な素材だけは絶対に守られる。容量を気にせず作業できる。",
+          "emotion": "安心"
+        }
+      },
+      "manual_section": "§9 大容量ファイル",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-013",
+      "feature_id": "decision_memory",
+      "lanes": {
+        "evolution": {
+          "pain": "AIへのプロンプト再入力の手間",
+          "reason": "ユーザーの却下理由や好みを学習し、次回以降の提案ベースラインを上げる必要がある",
+          "solution": "Decision Logger / Learning Loop"
+        },
+        "experience": {
+          "pain": "「このフォントは嫌い」って昨日もAIに言ったのに、また最初から説明しないといけないの？",
+          "magic": "AIがあなたの好みを記憶している。「いつもの感じで」と言うだけで完璧なドラフトが出てくる。",
+          "emotion": "成長の共有"
+        }
+      },
+      "manual_section": "用語集",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-014",
+      "feature_id": "task_progress_visualization",
+      "lanes": {
+        "evolution": {
+          "pain": "処理のブラックボックス化によるUX低下",
+          "reason": "フロントエンドに対してリアルタイムかつ詳細なステータスイベントを送信すべき",
+          "solution": "WebSocket Progress Events"
+        },
+        "experience": {
+          "pain": "60分待たされた挙句、最後に「エラーで処理できませんでした」と言われる絶望。",
+          "magic": "どこで何が行われているか、1秒単位で可視化。もし問題が起きてもすぐに対処できる。",
+          "emotion": "透明性"
+        }
+      },
+      "manual_section": "§9 トラブルシューティング",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-015",
+      "feature_id": "statestore_persistence",
+      "lanes": {
+        "evolution": {
+          "pain": "長時間処理中にブラウザが切断されると状態が失われる",
+          "reason": "WebSocketは揮発性。永続化層が必要",
+          "solution": "Redis + StateStore二重化"
+        },
+        "experience": {
+          "pain": "PCの電源を消したりブラウザを閉じたら、作業が全部台無しになるのでは…",
+          "magic": "もう大丈夫。タブを閉じても処理は続き、戻ってきたら途中から完璧に再開できる。",
+          "emotion": "絶対的な安心"
+        }
+      },
+      "manual_section": null,
+      "quality_gap": true,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-016",
+      "feature_id": "multi_agent_orchestration",
+      "lanes": {
+        "evolution": {
+          "pain": "単一LLMのコンテキストウィンドウ限界と専門性の欠如",
+          "reason": "役割を分担させ、相互にレビューさせるMixture of Expertsパラダイムが必要",
+          "solution": "Multi-Agent Trinity (Strategist, Director, Analyst)"
+        },
+        "experience": {
+          "pain": "細かい指示を出すのが面倒。丸投げしたいけど、クオリティは落としたくない。",
+          "magic": "3人の専門家チームが、あなたの動画について勝手に議論し、最高の形に仕上げて持ってくる。",
+          "emotion": "王様気分"
+        }
+      },
+      "manual_section": "用語集",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-017",
+      "feature_id": "soul_narrative_core",
+      "lanes": {
+        "evolution": {
+          "pain": "ソフトウェアが単なるツールに留まり、人間との共鳴が起きない",
+          "reason": "ユーザーの決断を定量的なパラメータではなく、定性的な「哲学」としてシステムの中核に据える必要がある",
+          "solution": "Soul Narrative Integration"
+        },
+        "experience": {
+          "pain": "動画編集ソフトは便利だけど、私の「想い」や「こだわり」までは分かってくれない。",
+          "magic": "AIがあなたとの対話から「演出哲学」を抽出し、共に成長する最高の相棒になる。",
+          "emotion": "感動・愛着"
+        }
+      },
+      "manual_section": "用語集",
+      "quality_gap": false,
+      "status": "resolved"
+    },
+    {
+      "wagamama_id": "W-018",
+      "feature_id": "NHK基準",
+      "youtube_video_id": "",
+      "lanes": {
+        "experience": {
+          "pain": "字幕の色が背景と同化して見づらい、NHK基準に違反",
+          "pain_detected_by": "decision_logger",
+          "pain_timestamp": "2026-05-22T08:45:27.353017",
+          "council": {
+            "session_id": "session-999",
+            "log_file": "archives/council_logs\\session_1780831607_session-.json",
+            "synthesis": "フォントサイズを32px以上に修正することで合意"
+          }
+        }
+      },
+      "manual_section": null,
+      "quality_gap": true,
+      "status": "in_debate"
+    },
+    {
+      "wagamama_id": "W-019",
+      "feature_id": "NHK基準",
+      "youtube_video_id": "",
+      "lanes": {
+        "experience": {
+          "pain": "字幕の色が背景と同化して見づらい、NHK基準に違反",
+          "pain_detected_by": "decision_logger",
+          "pain_timestamp": "2026-06-07T20:27:05.613437"
+        }
+      },
+      "manual_section": null,
+      "quality_gap": true,
+      "status": "investigating"
+    }
+  ]
+}

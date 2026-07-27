@@ -1,0 +1,43 @@
+{
+  "videos": {
+    "v_invalid_stats": {
+      "video_id": "v_invalid_stats",
+      "title": "Title",
+      "views": 0,
+      "impressions": 100,
+      "ctr": 5.0,
+      "avg_view_duration": 120.0,
+      "avg_view_percentage": 50.0,
+      "likes": 0,
+      "comments": 0,
+      "shares": 10,
+      "subscribers_gained": 5,
+      "fetched_at": "2026-06-27T00:56:17.272559"
+    },
+    "v_invalid_analytics": {
+      "video_id": "v_invalid_analytics",
+      "title": "Title",
+      "views": 10,
+      "impressions": 0,
+      "ctr": 0.0,
+      "avg_view_duration": 0.0,
+      "avg_view_percentage": 0.0,
+      "likes": 0,
+      "comments": 0,
+      "shares": 0,
+      "subscribers_gained": 0,
+      "fetched_at": "2026-06-27T00:56:17.278488"
+    }
+  },
+  "channel": {
+    "avg_ctr": 0.0,
+    "avg_view_duration": 0.0,
+    "avg_view_percentage": 0.0,
+    "total_views": 0,
+    "total_subscribers": 0,
+    "top_performing_videos": [],
+    "worst_performing_videos": [],
+    "ctr_trend": []
+  },
+  "last_updated": "2026-06-27T13:43:41.468637"
+}

@@ -1,0 +1,67 @@
+{
+  "version": "2.0",
+  "last_scan": "2026-06-28T16:23:30.154365",
+  "assets": [
+    {
+      "id": "asset_0000",
+      "path": "channel_owner\\thumbnail_sample_01.png",
+      "filename": "thumbnail_sample_01.png",
+      "type": "photo",
+      "category": "channel_owner",
+      "labels": [],
+      "style_tags": [],
+      "colors": [],
+      "mood": "neutral",
+      "usage_for": [],
+      "usage_count": 0,
+      "file_hash": "3b6e780f662931105a7656b64e641184",
+      "indexed_at": "2026-01-17T20:09:37.055398"
+    },
+    {
+      "id": "asset_0001",
+      "path": "channel_owner\\thumbnail_sample_02.png",
+      "filename": "thumbnail_sample_02.png",
+      "type": "photo",
+      "category": "channel_owner",
+      "labels": [],
+      "style_tags": [],
+      "colors": [],
+      "mood": "neutral",
+      "usage_for": [],
+      "usage_count": 0,
+      "file_hash": "d41322ddf4dad6a8ceae75383396e668",
+      "indexed_at": "2026-01-17T20:09:37.067007"
+    },
+    {
+      "id": "asset_0002",
+      "path": "templates\\calligraphy_bg_01.png",
+      "filename": "calligraphy_bg_01.png",
+      "type": "photo",
+      "category": "template",
+      "labels": [],
+      "style_tags": [],
+      "colors": [],
+      "mood": "neutral",
+      "usage_for": [],
+      "usage_count": 0,
+      "file_hash": "0750e2ddf255da29a1c94dddf00ef34f",
+      "indexed_at": "2026-01-17T20:09:37.078801"
+    },
+    {
+      "id": "asset_0003",
+      "path": "templates\\calligraphy_bg_02.png",
+      "filename": "calligraphy_bg_02.png",
+      "type": "photo",
+      "category": "template",
+      "labels": [],
+      "style_tags": [],
+      "colors": [],
+      "mood": "neutral",
+      "usage_for": [],
+      "usage_count": 0,
+      "file_hash": "001640c012e42423589e32c1b03e2f7a",
+      "indexed_at": "2026-01-17T20:09:37.089759"
+    }
+  ],
+  "guests": {}
+}

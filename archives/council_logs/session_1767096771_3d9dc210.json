@@ -1,0 +1,15 @@
+{
+  "session_id": "3d9dc210-2565-4556-9daa-db85cc31387b",
+  "timestamp": 1767096771.4711518,
+  "datetime": "2025-12-30T21:12:51.471154",
+  "topic": "[object Object]",
+  "debate_flow": [],
+  "synthesis": {
+    "type": "SYNTHESIS",
+    "proposal": "Based on the debate, X is recommended.",
+    "options": [
+      "Approve",
+      "Reject"
+    ]
+  }
+}

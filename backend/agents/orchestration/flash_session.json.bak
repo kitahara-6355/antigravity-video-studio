@@ -1,0 +1,83 @@
+{
+  "session_started_at": "2026-07-14T22:31:20+00:00",
+  "session_ended_at": null,
+  "exit_reason": null,
+  "last_heartbeat": "2026-07-17T13:13:02+00:00",
+  "status": "running",
+  "batches_in_session": 7,
+  "tasks_completed_in_session": 65,
+  "current_activity": "executing",
+  "current_step": "バッチ batch_a85b00: 6タスク実行開始",
+  "current_batch_id": "batch_a85b00",
+  "current_task_group": null,
+  "progress_pct": 5,
+  "subagents_running": 6,
+  "subagents_completed": 0,
+  "recent_errors": [
+    {
+      "timestamp": "2026-07-15T22:21:46+00:00",
+      "error": "タスク T-batch_4c2aea-refactor-000 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": "improved_themes.py"
+    },
+    {
+      "timestamp": "2026-07-15T22:21:51+00:00",
+      "error": "タスク T-batch_4c2aea-design_stock-000 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": "subtitle_engine/whisper_transcriber.py"
+    },
+    {
+      "timestamp": "2026-07-15T22:21:56+00:00",
+      "error": "タスク T-batch_4c2aea-test_weaver-000 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": "agents/orchestration/auto_mock_generator.py"
+    },
+    {
+      "timestamp": "2026-07-15T22:22:00+00:00",
+      "error": "タスク T-batch_4c2aea-test_weaver-001 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": "agents/orchestration/ast_test_generator.py"
+    },
+    {
+      "timestamp": "2026-07-17T12:48:33+00:00",
+      "error": "タスク T-batch_96ce78-ds-ds-cov-p2-coverage-80a5 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": null
+    },
+    {
+      "timestamp": "2026-07-17T12:48:41+00:00",
+      "error": "タスク T-batch_96ce78-ds-ds-cov-p2-test_weaver-4ac2 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": null
+    },
+    {
+      "timestamp": "2026-07-17T12:48:48+00:00",
+      "error": "タスク T-batch_96ce78-ds-ds-cov-p2-coverage-28fc FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": null
+    },
+    {
+      "timestamp": "2026-07-17T12:48:55+00:00",
+      "error": "タスク T-batch_96ce78-bug_hunter-000 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": "harness/hooks.py"
+    },
+    {
+      "timestamp": "2026-07-17T12:49:08+00:00",
+      "error": "タスク T-batch_96ce78-refactor-000 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": "decision_logger.py"
+    },
+    {
+      "timestamp": "2026-07-17T12:49:14+00:00",
+      "error": "タスク T-batch_96ce78-design_stock-000 FAIL: SERVER_RESTART_AND_API_QUOTA_EXHAUSTED",
+      "module": "subtitle_engine/whisper_transcriber.py"
+    }
+  ],
+  "stall_count": 0,
+  "context_consumption_pct": 24,
+  "context_pct_history": [
+    0,
+    4,
+    8,
+    12,
+    16,
+    20,
+    24
+  ],
+  "archive_urgency": "warn",
+  "auto_stop_reason": null,
+  "resource_throttled": false,
+  "resource_throttle_level": "CAUTION"
+}

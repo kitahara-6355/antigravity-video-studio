@@ -1,0 +1,337 @@
+{
+  "ux_id": "O-2",
+  "name": "文字起こし",
+  "description": "Ownerは動画から文字起こしを行い、結果を確認・編集できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "Ownerは動画ファイルを選択した後、Whisperモデルを選択できる",
+      "linked_items": [
+        "O2-L1-01",
+        "O2-L1-02",
+        "O2-L3-01",
+        "O2-L3-02"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "VRAM容量に基づいて推奨モデルが自動選択される",
+      "linked_items": [
+        "O2-L1-02",
+        "O2-L2-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "文字起こしの進捗がリアルタイムで表示される",
+      "linked_items": [
+        "O2-L1-03",
+        "O2-L1-04",
+        "O2-L2-02",
+        "O2-L4-01",
+        "O2-L4-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "完了後、タイムスタンプ付きのセグメント一覧が表示される",
+      "linked_items": [
+        "O2-L1-06",
+        "O2-L1-07",
+        "O2-L2-04"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "各セグメントのテキストをインラインで編集できる",
+      "linked_items": [
+        "O2-L3-03",
+        "O2-L3-04",
+        "O2-L3-05",
+        "O2-L3-06",
+        "O2-L3-07"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "話者ごとに色分けされた表示で識別できる",
+      "linked_items": [
+        "O2-L2-05"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "処理にかかった時間が表示される",
+      "linked_items": [
+        "O2-L1-05",
+        "O2-L2-03"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "エラー時は原因が分かるメッセージが表示される",
+      "linked_items": [
+        "O2-L2-06",
+        "O2-L4-03",
+        "O2-L4-04",
+        "O2-L4-05"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O2-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "Whisperモデルセレクトボックスが存在する",
+      "test_method": "dom_exists",
+      "testid": "whisper-model-select"
+    },
+    {
+      "id": "O2-L1-02",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "推奨モデルバッジが存在する",
+      "test_method": "dom_exists",
+      "testid": "whisper-recommended"
+    },
+    {
+      "id": "O2-L1-03",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "進捗バーが存在する",
+      "test_method": "dom_exists",
+      "testid": "transcription-progress-bar"
+    },
+    {
+      "id": "O2-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "進捗テキスト(%)が存在する",
+      "test_method": "dom_exists",
+      "testid": "transcription-progress-text"
+    },
+    {
+      "id": "O2-L1-05",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "経過時間表示が存在する",
+      "test_method": "dom_exists",
+      "testid": "transcription-elapsed"
+    },
+    {
+      "id": "O2-L1-06",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "セグメント一覧コンテナが存在する",
+      "test_method": "dom_exists",
+      "testid": "segment-list"
+    },
+    {
+      "id": "O2-L1-07",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "セグメントが3件以上表示される",
+      "test_method": "dom_exists",
+      "testid": "segment-item-*"
+    },
+    {
+      "id": "O2-L2-01",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "モデル名にVRAMと推奨テキストが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O2-L2-02",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "進捗テキストが0〜100の数値を表示する",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O2-L2-03",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "経過時間がm:ss形式で表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O2-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "セグメントにタイムスタンプがm:ss - m:ss形式で表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O2-L2-05",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "話者IDが色分けされている",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O2-L2-06",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "エラー時に赤色背景メッセージが表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O2-L3-01",
+      "layer": 3,
+      "story_scene": "S1",
+      "description": "モデルをsmallに変更しAPI応答でselectの値が変わる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O2-L3-02",
+      "layer": 3,
+      "story_scene": "S1",
+      "description": "モデルをlarge-v3に変更できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O2-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "セグメントテキストクリックで編集モードに入る",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O2-L3-04",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "編集中にテキスト変更し保存で確定できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O2-L3-05",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "編集中にEscキーでキャンセルできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O2-L3-06",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "編集中にEnterキーで確定できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O2-L3-07",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "複数セグメントを連続編集できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O2-L4-01",
+      "layer": 4,
+      "story_scene": "S3",
+      "description": "idle→running: 進捗が0%から表示される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O2-L4-02",
+      "layer": 4,
+      "story_scene": "S3",
+      "description": "running→completed: 進捗100%+完了テキスト",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O2-L4-03",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "running→error: エラーメッセージが表示される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O2-L4-04",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "不正モデル設定時にAPIが400を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O2-L4-05",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "セグメント0件時に適切なメッセージが表示される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O2-L5-01",
+      "layer": 5,
+      "story_scene": "S5",
+      "description": "モデル選択→セグメント表示→編集→保存の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O2-L5-02",
+      "layer": 5,
+      "story_scene": "S5",
+      "description": "全セグメント順番編集→全テキスト反映",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O2-L5-03",
+      "layer": 5,
+      "story_scene": "S3",
+      "description": "進捗0%→100%遷移中にセグメントが増加表示",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O2-L5-04",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "エラー状態から復帰→再度セグメント表示",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O2-L5-05",
+      "layer": 5,
+      "story_scene": "S1",
+      "description": "モデル変更→再取得→セグメント更新",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "migration_v1_to_v2",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

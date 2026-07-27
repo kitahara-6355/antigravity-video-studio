@@ -1,0 +1,457 @@
+{
+  "ux_id": "O-3",
+  "name": "AI校閲",
+  "description": "OwnerはAI校閲の結果をレビューし、修正を承認/却下/辞書管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "文字起こし結果に対してAIが自動で誤字脱字・表現を校閲する",
+      "linked_items": [
+        "O3-L1-01",
+        "O3-L4-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "修正箇所が赤マークのdiffで明示される",
+      "linked_items": [
+        "O3-L1-02",
+        "O3-L1-03",
+        "O3-L2-01",
+        "O3-L2-02"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "修正前と修正後を左右に並べて比較できる",
+      "linked_items": [
+        "O3-L1-04",
+        "O3-L2-03",
+        "O3-L2-04"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "各修正箇所を個別に承認または却下できる",
+      "linked_items": [
+        "O3-L1-05",
+        "O3-L1-06",
+        "O3-L3-01",
+        "O3-L3-02",
+        "O3-L3-03",
+        "O3-L2-05"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "全修正を一括で承認/却下できる",
+      "linked_items": [
+        "O3-L1-07",
+        "O3-L1-08",
+        "O3-L3-04",
+        "O3-L3-05"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "固有名詞辞書を管理してAI校閲の精度を向上できる",
+      "linked_items": [
+        "O3-L1-09",
+        "O3-L3-06",
+        "O3-L3-07",
+        "O3-L3-08",
+        "O3-L4-04"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "18文字を超える行は字幕として長すぎるため警告が表示される",
+      "linked_items": [
+        "O3-L2-06",
+        "O3-L2-07",
+        "O3-L4-05"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "校閲の進捗がリアルタイムで表示される",
+      "linked_items": [
+        "O3-L1-10",
+        "O3-L2-08",
+        "O3-L4-02"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "校閲結果をSRTまたはTXTファイルとしてエクスポートできる",
+      "linked_items": [
+        "O3-L1-11",
+        "O3-L1-12",
+        "O3-L3-09",
+        "O3-L4-06"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "校閲をスキップしてパイプラインを進められる",
+      "linked_items": [
+        "O3-L1-13",
+        "O3-L3-10",
+        "O3-L4-03"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O3-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "校閲ステージパネルが存在する",
+      "test_method": "dom_exists",
+      "testid": "proofreading-stage-panel"
+    },
+    {
+      "id": "O3-L1-02",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "diffコンテナが存在する",
+      "test_method": "dom_exists",
+      "testid": "proofreading-diff"
+    },
+    {
+      "id": "O3-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "差分マーク要素が存在する",
+      "test_method": "dom_exists",
+      "testid": "diff-mark-*"
+    },
+    {
+      "id": "O3-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "比較ビューコンテナが存在する",
+      "test_method": "dom_exists",
+      "testid": "proofreading-comparison"
+    },
+    {
+      "id": "O3-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "個別承認ボタンが存在する",
+      "test_method": "dom_exists",
+      "testid": "segment-approve-btn-*"
+    },
+    {
+      "id": "O3-L1-06",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "個別却下ボタンが存在する",
+      "test_method": "dom_exists",
+      "testid": "segment-reject-btn-*"
+    },
+    {
+      "id": "O3-L1-07",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "全承認ボタンが存在する",
+      "test_method": "dom_exists",
+      "testid": "approve-all-btn"
+    },
+    {
+      "id": "O3-L1-08",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "全却下ボタンが存在する",
+      "test_method": "dom_exists",
+      "testid": "reject-all-btn"
+    },
+    {
+      "id": "O3-L1-09",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "辞書パネルが存在する",
+      "test_method": "dom_exists",
+      "testid": "dictionary-panel"
+    },
+    {
+      "id": "O3-L1-10",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "校閲進捗バーが存在する",
+      "test_method": "dom_exists",
+      "testid": "proofreading-progress"
+    },
+    {
+      "id": "O3-L1-11",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "SRTエクスポートボタンが存在する",
+      "test_method": "dom_exists",
+      "testid": "export-srt-btn"
+    },
+    {
+      "id": "O3-L1-12",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "TXTエクスポートボタンが存在する",
+      "test_method": "dom_exists",
+      "testid": "export-txt-btn"
+    },
+    {
+      "id": "O3-L1-13",
+      "layer": 1,
+      "story_scene": "S10",
+      "description": "スキップトグルが存在する",
+      "test_method": "dom_exists",
+      "testid": "skip-proofreading-toggle"
+    },
+    {
+      "id": "O3-L2-01",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "diffマークに修正種別が色分け表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "replace/insert/deleteの3種別が区別可能",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "修正前テキストが表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L2-04",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "修正後テキストが表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L2-05",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "承認/却下/保留のステータスバッジが表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L2-06",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "18文字超過時に警告テキストが表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L2-07",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "超過行の文字数が表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L2-08",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "承認数/却下数/保留数が表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O3-L3-01",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "承認ボタンクリックでステータスが承認に変わる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-02",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "却下ボタンクリックでステータスが却下に変わる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-03",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "承認済みの承認ボタンがdisabledになる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-04",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "全承認ボタンで全セグメントが承認になる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-05",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "全却下ボタンで全セグメントが却下になる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-06",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "辞書エントリを追加できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-07",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "辞書エントリを削除できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-08",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "辞書エントリを更新できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-09",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "SRTエクスポートで-->フォーマットが返る",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L3-10",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "スキップトグルON/OFFで状態が切り替わる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O3-L4-01",
+      "layer": 4,
+      "story_scene": "S1",
+      "description": "校閲結果APIがsegments/changes構造を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O3-L4-02",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "校閲進捗APIがstatus/progress/total_segmentsを返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O3-L4-03",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "スキップON時にステータスAPIがskip=trueを返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O3-L4-04",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "辞書追加後にカウントが増加する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O3-L4-05",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "18文字超過セグメントが識別可能",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O3-L4-06",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "TXTエクスポートが非空コンテンツを返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O3-L5-01",
+      "layer": 5,
+      "story_scene": "S2",
+      "description": "diff表示→比較ビュー→承認→ステータス更新の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O3-L5-02",
+      "layer": 5,
+      "story_scene": "S4",
+      "description": "全セグメントを個別レビュー→承認/却下混在→集計一致",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O3-L5-03",
+      "layer": 5,
+      "story_scene": "S5",
+      "description": "一括却下→個別承認→再度一括承認の3段階操作",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O3-L5-04",
+      "layer": 5,
+      "story_scene": "S6",
+      "description": "辞書追加→校閲結果確認→エクスポートの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O3-L5-05",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "スキップON→確認→OFF→校閲結果表示の復帰",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O3-L5-06",
+      "layer": 5,
+      "story_scene": "S9",
+      "description": "SRT+TXT両フォーマットエクスポート→内容検証",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "migration_v1_to_v2",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

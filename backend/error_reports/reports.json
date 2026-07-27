@@ -1,0 +1,542 @@
+[
+  {
+    "id": "fc58cd9b",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-23T17:59:40.675338",
+    "resolved": true,
+    "resolution": "Checked host config."
+  },
+  {
+    "id": "93fdb327",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-23T17:59:40.739337",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "8c56e037",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-23T17:59:40.789442",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "85313015",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-23T18:34:01.303221",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "d47df461",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-23T18:34:01.371050",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "3f59bcae",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-23T18:34:01.413750",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "b98db1eb",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-23T18:42:56.834325",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "ef5a0803",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-23T18:42:56.899311",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "92bc8408",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-23T18:42:56.939186",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "5fa2a15e",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T00:23:54.413216",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "925f8bc1",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T00:23:54.481031",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "2a133633",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T00:23:54.529390",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "ccde4849",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T00:38:04.010292",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "559196ca",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T00:38:04.074591",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "b9b74699",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T00:38:04.117935",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "9cb13fae",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T00:50:12.891278",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "68dca7c6",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T00:50:12.966783",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "e71baa8d",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T00:50:13.032694",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "c7a98cdf",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T01:03:15.366599",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "f7a9b526",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T01:03:15.432914",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "77e2a0fb",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T01:03:15.473951",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "97d405a5",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T01:34:40.489049",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "25bd3761",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T01:34:40.539726",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "f395f567",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T01:34:40.572012",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "c1f7c53c",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T01:56:15.595470",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "210263f3",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T01:56:15.668599",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "e0685ab3",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T01:56:15.708064",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "85256a07",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T02:14:35.388405",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "b7209834",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T02:14:35.471554",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "20efa7ba",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T02:14:35.515395",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "06b5fa1d",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T02:29:20.219279",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "a5d7242e",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T02:29:20.266772",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "4a8d023a",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T02:29:20.315622",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "29820dcc",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T02:49:01.941246",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "5523beed",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T02:49:02.090309",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "2d2a7ad9",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T02:49:02.276631",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "ec34eaca",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T13:17:47.004147",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "2526008d",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T13:17:47.111547",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "ec20a100",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T13:17:47.177288",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "9e75bdfa",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T14:09:53.663614",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "6a9f521e",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T14:09:53.734576",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "da8975f4",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T14:09:53.778509",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "e9d439a1",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-27T14:57:09.869388",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "3ee03167",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T14:57:09.940884",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "46a93095",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-27T14:57:09.980988",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "70dfe039",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-28T16:00:23.713173",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "d4e90612",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-28T16:00:23.909384",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "caab0cde",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-28T16:00:24.030856",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "ec6a9c25",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-28T16:34:22.485765",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "fff89d10",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-28T16:34:22.592891",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "6762bed2",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-28T16:34:22.656656",
+    "resolved": true,
+    "resolution": "Resolved"
+  },
+  {
+    "id": "c604ecc4",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "some stack trace",
+    "context": {},
+    "timestamp": "2026-06-28T19:49:49.292116",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "c70e9b2f",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-28T19:49:49.495980",
+    "resolved": false,
+    "resolution": ""
+  },
+  {
+    "id": "fb6efeb2",
+    "error_type": "ConnectionError",
+    "message": "Connection refused by host",
+    "stack_trace": "",
+    "context": {},
+    "timestamp": "2026-06-28T19:49:49.587628",
+    "resolved": true,
+    "resolution": "Resolved"
+  }
+]

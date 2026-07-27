@@ -1,0 +1,38 @@
+{
+    "current_phase": "Phase 1: Awareness (認知獲得)",
+    "roadmap": {
+        "Phase 1: Awareness": {
+            "goal": "Get noticed by the algorithm",
+            "kpi": "CTR > 8%, Retention > 40%",
+            "tactics": [
+                "High-contrast thumbnails",
+                "Cold open (3s rule)",
+                "Short & punchy titles"
+            ]
+        },
+        "Phase 2: Engagement (ファン化)": {
+            "goal": "Build trust and community",
+            "kpi": "Comments > 10 per video, Return Viewers > 20%",
+            "tactics": [
+                "Ask questions",
+                "Reply to all comments",
+                "Consistent branding"
+            ]
+        },
+        "Phase 3: Monetization (収益化)": {
+            "goal": "Drive revenue",
+            "kpi": "Revenue > $1000/mo",
+            "tactics": [
+                "Sponsorships",
+                "Affiliate links",
+                "Merch"
+            ]
+        }
+    },
+    "current_mission": {
+        "focus": "Click Through Rate (CTR)",
+        "target_value": "8.0%",
+        "advice": "Focus on thumbnails and titles. Make them impossible to ignore."
+    },
+    "decision_log": []
+}

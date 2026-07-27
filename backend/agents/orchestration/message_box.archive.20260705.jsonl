@@ -1,0 +1,1 @@
+{"id": "M-791a7c29", "from": "flash", "to": "opus", "priority": "urgent", "content": "⚠️ agents/orchestration/flash_assign_subagents_7.py を自動ブラックリスト化（連続4回FAIL）", "timestamp": "2026-06-05T11:19:02+00:00", "ack": false}

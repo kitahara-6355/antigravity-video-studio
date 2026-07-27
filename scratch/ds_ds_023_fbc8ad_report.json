@@ -1,0 +1,8 @@
+{
+  "message": "Phase 30 / 設計ストック DS-023: 評議会タイムアウト自律リカバリの three_point_check 項目解消完了。design_stock.jsonにて DS-023 に対する quantitative_mapping, safety_fallback, input_guardrail をすべて true に更新。TDR登録・警告クリア、単体テスト28件PASS、全体フィットネス125件PASSを確認。",
+  "changed_files": [
+    "backend/agents/orchestration/design_stock.json",
+    "backend/agents/memory/technical_debt_index.json",
+    "backend/TECHNICAL_DEBT_REGISTRY.md"
+  ]
+}

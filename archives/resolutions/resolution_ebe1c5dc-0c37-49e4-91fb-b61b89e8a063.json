@@ -1,0 +1,17 @@
+{
+  "id": "ebe1c5dc-0c37-49e4-91fb-b61b89e8a063",
+  "title": "セッション 98358b74 の知見",
+  "description": "mock synthesis",
+  "proposed_changes": {
+    "type": "council_synthesis",
+    "insights": [],
+    "synthesis": "mock synthesis"
+  },
+  "session_id": "98358b74-c519-48a5-9cee-2c2d793e4c20",
+  "status": "debate",
+  "votes": {},
+  "created_at": 1781422281.2820518,
+  "updated_at": 1781422281.2857409,
+  "gavel_decision": null,
+  "progress": 0.5
+}

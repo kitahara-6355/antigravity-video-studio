@@ -1,0 +1,612 @@
+{
+  "ux_id": "O-9",
+  "name": "YouTube最適化",
+  "description": "OwnerはYouTube最適化パネルでタイトル/タグ/チャプター/サムネイル/SEOを調整し、投稿準備を完了できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "YouTube最適化パネルが表示される",
+      "linked_items": [
+        "O9-L1-01",
+        "O9-L1-02"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "タブを切り替えられる",
+      "linked_items": [
+        "O9-L3-09",
+        "O9-L3-10",
+        "O9-L3-11",
+        "O9-L3-12"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "AI生成タイトル5候補が表示される",
+      "linked_items": [
+        "O9-L1-03",
+        "O9-L2-01"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "タイトル候補をクリックして選択できる",
+      "linked_items": [
+        "O9-L3-01"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "各タイトルに文字数が表示される",
+      "linked_items": [
+        "O9-L2-02"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "AI生成タグが表示される",
+      "linked_items": [
+        "O9-L1-04",
+        "O9-L2-03"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "手動でタグを追加できる",
+      "linked_items": [
+        "O9-L3-02"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "不要なタグを削除できる",
+      "linked_items": [
+        "O9-L3-03"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "重複タグが自動排除される",
+      "linked_items": [
+        "O9-L4-04"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "チャプター表示",
+      "linked_items": [
+        "O9-L1-05",
+        "O9-L2-04"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "チャプター編集",
+      "linked_items": [
+        "O9-L3-04"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "サムネイル候補表示",
+      "linked_items": [
+        "O9-L1-06",
+        "O9-L2-05"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "サムネイル選択",
+      "linked_items": [
+        "O9-L3-05"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "SEOスコア表示",
+      "linked_items": [
+        "O9-L1-07",
+        "O9-L2-06"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "SEO改善提案表示",
+      "linked_items": [
+        "O9-L2-07"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "説明文テンプレート表示",
+      "linked_items": [
+        "O9-L1-08",
+        "O9-L2-08"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "説明文手動編集",
+      "linked_items": [
+        "O9-L3-06"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "メタデータエクスポート",
+      "linked_items": [
+        "O9-L3-07"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "API障害フォールバック",
+      "linked_items": [
+        "O9-L4-01"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "ハッシュタグ提案",
+      "linked_items": [
+        "O9-L1-09",
+        "O9-L2-09"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "CTR予測スコア表示",
+      "linked_items": [
+        "O9-L1-10",
+        "O9-L2-10"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "投稿準備完了ステータス",
+      "linked_items": [
+        "O9-L1-11",
+        "O9-L2-11"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O9-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ヘルスチェックAPIが正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "最適化APIが正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-03",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "タイトル候補リストが存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-04",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "タグリストが存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-05",
+      "layer": 1,
+      "story_scene": "S10",
+      "description": "チャプターリストが存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-06",
+      "layer": 1,
+      "story_scene": "S12",
+      "description": "サムネイル候補が存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-07",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "SEOスコアが存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-08",
+      "layer": 1,
+      "story_scene": "S16",
+      "description": "説明文エリアが存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-09",
+      "layer": 1,
+      "story_scene": "S20",
+      "description": "ハッシュタグが存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-10",
+      "layer": 1,
+      "story_scene": "S21",
+      "description": "CTR予測が存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-11",
+      "layer": 1,
+      "story_scene": "S22",
+      "description": "投稿準備バッジが存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L1-12",
+      "layer": 1,
+      "story_scene": "S18",
+      "description": "エクスポートAPIが正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O9-L2-01",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "タイトル文字数が30-60文字推奨表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-02",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "各タイトルに文字数表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-03",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "タグ個数が表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-04",
+      "layer": 2,
+      "story_scene": "S10",
+      "description": "チャプター時刻がHH:MM:SS形式",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-05",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "サムネイルプレビュー画像表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-06",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "SEO数値0-100表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-07",
+      "layer": 2,
+      "story_scene": "S15",
+      "description": "改善提案テキスト表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-08",
+      "layer": 2,
+      "story_scene": "S16",
+      "description": "説明文テキスト表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-09",
+      "layer": 2,
+      "story_scene": "S20",
+      "description": "ハッシュタグテキスト表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-10",
+      "layer": 2,
+      "story_scene": "S21",
+      "description": "CTR予測%表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L2-11",
+      "layer": 2,
+      "story_scene": "S22",
+      "description": "投稿準備ステータス表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O9-L3-01",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "タイトル選択操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-02",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "タグ追加操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-03",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "タグ削除操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-04",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "チャプター編集操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-05",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "サムネイル選択操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-06",
+      "layer": 3,
+      "story_scene": "S17",
+      "description": "説明文編集操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-07",
+      "layer": 3,
+      "story_scene": "S18",
+      "description": "エクスポート操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-08",
+      "layer": 3,
+      "story_scene": "S20",
+      "description": "ハッシュタグ追加操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-09",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "フックタブ切替",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-10",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "サムネイルタブ切替",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-11",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "SEOタブ切替",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-12",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "ハイライトタブ切替",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-13",
+      "layer": 3,
+      "story_scene": "S21",
+      "description": "CTR再計算操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L3-14",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "SEO改善適用操作",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O9-L4-01",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "API障害->フォールバック",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-02",
+      "layer": 4,
+      "story_scene": "S3",
+      "description": "空セグメント->安全処理",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-03",
+      "layer": 4,
+      "story_scene": "S5",
+      "description": "タイトル60文字超過->警告",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-04",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "タグ重複->自動排除",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-05",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "チャプター時刻不正->バリデーション",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-06",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "SEOスコア低->改善提案",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-07",
+      "layer": 4,
+      "story_scene": "S12",
+      "description": "サムネイル生成失敗->プレースホルダー",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-08",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "エクスポート->クリップボード確認",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-09",
+      "layer": 4,
+      "story_scene": "S22",
+      "description": "全項目完了->投稿準備",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L4-10",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "フォールバック->手動編集->完了",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O9-L5-01",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "タイトル->タグ->チャプター->エクスポート完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-02",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "API障害->フォールバック->手動編集->完了",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-03",
+      "layer": 5,
+      "story_scene": "S2",
+      "description": "4タブ全巡回->最終確認",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-04",
+      "layer": 5,
+      "story_scene": "S14",
+      "description": "SEO確認->改善->再計測->目標達成",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-05",
+      "layer": 5,
+      "story_scene": "S13",
+      "description": "サムネイル選択->CTR確認->タイトル調整",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-06",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "全メタデータ生成->エクスポート->投稿準備",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-07",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "ハッシュタグ->SEO->タイトル最適化完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-08",
+      "layer": 5,
+      "story_scene": "S11",
+      "description": "チャプター編集->時刻確認->保存",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-09",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "説明文->SEOキーワード->最終確認",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O9-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "フォールバック状態->全手動->投稿準備完了",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "session_8_o9",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

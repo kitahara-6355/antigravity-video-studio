@@ -1,0 +1,45 @@
+{
+  "version": "4.7.1",
+  "created_at": "2026-05-20T12:04:19.901568",
+  "summary": {
+    "total": 649,
+    "by_status": {
+      "open": 520,
+      "fixed": 122,
+      "accepted": 7
+    },
+    "by_category": {
+      "CRITICAL_ROUTER": {
+        "total": 141,
+        "open": 19,
+        "fixed": 122
+      },
+      "CRITICAL_PHASE4": {
+        "total": 37,
+        "open": 37,
+        "fixed": 0
+      },
+      "IMPORTANT_SERVICE": {
+        "total": 93,
+        "open": 93,
+        "fixed": 0
+      },
+      "MINOR_INFRA": {
+        "total": 371,
+        "open": 371,
+        "fixed": 0
+      },
+      "ACCEPTED_SAFETY": {
+        "total": 7,
+        "open": 0,
+        "fixed": 0
+      }
+    },
+    "critical_open": 56,
+    "last_updated": "2026-05-20T12:04:19.901638",
+    "recurring_patterns": [
+      "DP-02"
+    ]
+  },
+  "critical_open": 56
+}

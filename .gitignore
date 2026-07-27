@@ -1,0 +1,108 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Secrets & API Keys
+.env
+.env.local
+*.key
+*.pem
+api_keys.json
+credentials.json
+
+# Large Media Files (RAW素材は聖域として保護されるが、Gitには含めない)
+raw_videos/
+final_output/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.flv
+*.wmv
+
+# Temporary & Draft Files
+drafts/
+previews/
+graded_previews/
+backend/graded_previews/
+output/
+temp/
+tmp/
+*.tmp
+e2e_work/
+backend/tests/e2e_data/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Node.js (Next.js UI用)
+node_modules/
+.next/
+out/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Vault
+vault-outputs/
+
+# Dead Code Archives (Phase 6 で除外決定)
+backend/archives/
+
+# Session files (auto-generated)
+backend/data/sessions/*.json
+
+# Claude Code (local only)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# 環境ファイルのテキストコピー（実キー混入の再発防止）
+*.env.txt

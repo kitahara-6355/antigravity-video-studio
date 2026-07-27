@@ -1,0 +1,103 @@
+> import re
+> from pathlib import Path
+  
+> class PrefixMapper:
+>     def __init__(self, prefixes=None):
+>         if prefixes is None:
+>             self.prefixes = [
+>                 "O1-", "O2-", "O3-", "O4-", "O5-", "O6-", "O7-", "O8-", "O9-", "O10-", "O11-", "O12-",
+>                 "A1-", "A2-", "A3-", "A4-", "A5-", "A6-", "A7-", "A8-", "A9-"
+>             ]
+>         else:
+>             self.prefixes = prefixes
+  
+>     def parse_classes(self, content):
+>         class_blocks = []
+>         current_class = None
+>         current_block = []
+  
+>         lines = content.splitlines()
+>         for line in lines:
+>             m = re.match(r"^class\s+(\w+)", line)
+>             if m:
+>                 if current_class:
+>                     class_blocks.append((current_class, "\n".join(current_block)))
+>                 current_class = m.group(1)
+>                 current_block = [line]
+>             else:
+>                 if current_class:
+>                     stripped = line.strip()
+>                     is_empty_or_comment = (stripped == "" or stripped.startswith("#"))
+>                     is_indented = line.startswith(" ") or line.startswith("\t")
+>                     if not is_indented and not is_empty_or_comment:
+>                         class_blocks.append((current_class, "\n".join(current_block)))
+>                         current_class = None
+>                         current_block = []
+>                     else:
+>                         current_block.append(line)
+>         if current_class:
+>             class_blocks.append((current_class, "\n".join(current_block)))
+>         return class_blocks
+  
+>     def find_prefixes(self, block):
+>         found_prefixes = []
+>         for pref in self.prefixes:
+>             if pref in block or pref.replace("-", "_") in block:
+>                 found_prefixes.append(pref)
+>         return found_prefixes
+  
+>     def find_hints(self, block):
+>         hints = []
+>         for pref in self.prefixes:
+>             simple_pref = pref.replace("-", "")
+>             escaped = re.escape(simple_pref)
+>             pattern = r'\b' + escaped if re.match(r'^\w', simple_pref) else escaped
+>             pattern = pattern + r'\b' if re.search(r'\w$', simple_pref) else pattern
+>             if re.search(pattern, block):
+>                 hints.append(simple_pref)
+>         return hints
+  
+> def scan_file(filepath, prefixes=None):
+>     path = Path(filepath)
+>     if not path.exists():
+>         raise FileNotFoundError(f"File not found: {filepath}")
+>     if not path.is_file():
+>         raise ValueError(f"Path is not a file: {filepath}")
+  
+>     mapper = PrefixMapper(prefixes)
+>     with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+>         content = f.read()
+  
+>     class_blocks = mapper.parse_classes(content)
+>     results = {}
+>     for name, block in class_blocks:
+>         found_prefixes = mapper.find_prefixes(block)
+>         if found_prefixes:
+>             results[name] = {
+>                 "prefixes": found_prefixes,
+>                 "hints": []
+>             }
+>         else:
+>             hints = mapper.find_hints(block)
+>             results[name] = {
+>                 "prefixes": [],
+>                 "hints": hints
+>             }
+>     return results
+  
+- if __name__ == "__main__":  # pragma: no cover
+-     path = r"c:\Users\PC_User\Desktop\script\video-automation\backend\tests\e2e\archives\test_e2e_browser_m36.py"
+-     try:
+-         results = scan_file(path)
+-         print(f"Total classes found: {len(results)}")
+-         for name, info in results.items():
+-             if info["prefixes"]:
+-                 print(f"{name:35s}: {info['prefixes']}")
+>             else:
+-                 print(f"{name:35s}: No dash prefix. Hints: {info['hints']}")
+-     except FileNotFoundError as e:
+-         print(f"File not found error: {e}")
+-     except ValueError as e:
+-         print(f"Validation error: {e}")
+-     except PermissionError as e:
+-         print(f"Permission error: {e}")

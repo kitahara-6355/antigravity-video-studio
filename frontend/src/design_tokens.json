@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$version": "1.0.0",
+  "$description": "Antigravity Design System v2.0 — みらい議会インスピレーション",
+  "themes": {
+    "light": {
+      "color": {
+        "bg": {
+          "primary": "#FAFAF9",
+          "secondary": "#ffffff",
+          "panel": "#ffffff",
+          "hover": "#f8fafc",
+          "active": "#f3f0ff"
+        },
+        "text": {
+          "primary": "#1e293b",
+          "secondary": "#64748b",
+          "light": "#94a3b8",
+          "accent": "#7C3AED"
+        },
+        "accent": {
+          "primary": "#7C3AED",
+          "success": "#10B981",
+          "danger": "#EF4444",
+          "warning": "#fbbf24",
+          "muted": "#64748B",
+          "info": "#3b82f6"
+        },
+        "border": {
+          "default": "rgba(0, 0, 0, 0.06)",
+          "active": "rgba(124, 58, 237, 0.3)"
+        },
+        "semantic": {
+          "rank-s": "#7C3AED",
+          "rank-a": "#10B981",
+          "rank-b": "#3b82f6",
+          "rank-c": "#64748B",
+          "approve": "#10B981",
+          "reject": "#EF4444",
+          "skip": "#fbbf24",
+          "stage-active": "#7C3AED",
+          "stage-complete": "#10B981",
+          "stage-pending": "#d97706",
+          "youtube-primary": "#ff0050",
+          "youtube-accent": "#00f2ea",
+          "youtube-dark-bg": "#0f0f23",
+          "chart-1": "#7C3AED",
+          "chart-2": "#10B981",
+          "chart-3": "#3b82f6",
+          "chart-4": "#EF4444",
+          "chart-5": "#fbbf24",
+          "slider-track": "#e2e8f0",
+          "slider-fill": "#7C3AED",
+          "theme-indigo": "#6366f1",
+          "theme-indigo-light": "#a5b4fc",
+          "theme-indigo-bg": "#eef2ff",
+          "theme-indigo-dark": "#4338ca"
+        }
+      },
+      "typography": {
+        "font-heading": "'Outfit', 'Noto Sans JP', sans-serif",
+        "font-body": "'Noto Sans JP', 'Inter', sans-serif",
+        "font-serif": "'Noto Serif JP', serif",
+        "size-h1": "1.8rem",
+        "size-h2": "1.3rem",
+        "size-h3": "1.1rem",
+        "size-body": "1rem",
+        "size-small": "0.85rem",
+        "size-xs": "0.78rem",
+        "weight-bold": "800",
+        "weight-semibold": "700",
+        "weight-medium": "600",
+        "weight-normal": "400",
+        "letter-spacing-tight": "-0.02em",
+        "letter-spacing-wide": "0.04em",
+        "line-height-body": "1.7"
+      },
+      "shadow": {
+        "sm": "0 1px 3px rgba(0, 0, 0, 0.04)",
+        "md": "0 2px 8px rgba(0, 0, 0, 0.06)",
+        "lg": "0 8px 30px rgba(0, 0, 0, 0.1)",
+        "glow": "0 4px 16px rgba(124, 58, 237, 0.15)",
+        "card-hover": "0 4px 16px rgba(124, 58, 237, 0.12)",
+        "success-glow": "0 2px 12px rgba(16, 185, 129, 0.3)",
+        "danger-glow": "0 4px 6px rgba(239, 68, 68, 0.3)"
+      },
+      "radius": {
+        "sm": "8px",
+        "md": "12px",
+        "lg": "16px",
+        "pill": "100px"
+      },
+      "motion": {
+        "duration-fast": "0.15s",
+        "duration-normal": "0.2s",
+        "duration-slow": "0.3s",
+        "easing-default": "ease",
+        "easing-bounce": "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        "easing-smooth": "ease-in-out"
+      }
+    },
+    "dark": {
+      "color": {
+        "bg": {
+          "primary": "#0d0d0f",
+          "secondary": "#1a1a1e",
+          "panel": "#1a1a1e",
+          "hover": "#25252d",
+          "active": "#2a1f3d"
+        },
+        "text": {
+          "primary": "#f3f4f6",
+          "secondary": "#9ca3af",
+          "light": "#6b7280",
+          "accent": "#a78bfa"
+        },
+        "accent": {
+          "primary": "#a78bfa",
+          "success": "#34d399",
+          "danger": "#f87171",
+          "warning": "#fcd34d",
+          "muted": "#9ca3af",
+          "info": "#60a5fa"
+        },
+        "border": {
+          "default": "#2e2e34",
+          "active": "rgba(167, 139, 250, 0.3)"
+        },
+        "semantic": {
+          "rank-s": "#a78bfa",
+          "rank-a": "#34d399",
+          "rank-b": "#60a5fa",
+          "rank-c": "#9ca3af",
+          "approve": "#34d399",
+          "reject": "#f87171",
+          "skip": "#fcd34d",
+          "stage-active": "#a78bfa",
+          "stage-complete": "#34d399",
+          "stage-pending": "#f59e0b",
+          "youtube-primary": "#ff3370",
+          "youtube-accent": "#22d3ee",
+          "youtube-dark-bg": "#0a0a1a",
+          "chart-1": "#a78bfa",
+          "chart-2": "#34d399",
+          "chart-3": "#60a5fa",
+          "chart-4": "#f87171",
+          "chart-5": "#fcd34d",
+          "slider-track": "#374151",
+          "slider-fill": "#a78bfa",
+          "theme-indigo": "#818cf8",
+          "theme-indigo-light": "#c7d2fe",
+          "theme-indigo-bg": "#1e1b4b",
+          "theme-indigo-dark": "#6366f1"
+        }
+      },
+      "typography": {
+        "font-heading": "'Outfit', 'Noto Sans JP', sans-serif",
+        "font-body": "'Noto Sans JP', 'Inter', sans-serif",
+        "font-serif": "'Noto Serif JP', serif",
+        "size-h1": "1.8rem",
+        "size-h2": "1.3rem",
+        "size-h3": "1.1rem",
+        "size-body": "1rem",
+        "size-small": "0.85rem",
+        "size-xs": "0.78rem",
+        "weight-bold": "800",
+        "weight-semibold": "700",
+        "weight-medium": "600",
+        "weight-normal": "400",
+        "letter-spacing-tight": "-0.02em",
+        "letter-spacing-wide": "0.04em",
+        "line-height-body": "1.7"
+      },
+      "shadow": {
+        "sm": "0 1px 3px rgba(0, 0, 0, 0.2)",
+        "md": "0 2px 8px rgba(0, 0, 0, 0.3)",
+        "lg": "0 8px 30px rgba(0, 0, 0, 0.4)",
+        "glow": "0 4px 16px rgba(167, 139, 250, 0.2)",
+        "card-hover": "0 4px 16px rgba(167, 139, 250, 0.15)",
+        "success-glow": "0 2px 12px rgba(52, 211, 153, 0.3)",
+        "danger-glow": "0 4px 6px rgba(248, 113, 113, 0.3)"
+      },
+      "radius": {
+        "sm": "8px",
+        "md": "12px",
+        "lg": "16px",
+        "pill": "100px"
+      },
+      "motion": {
+        "duration-fast": "0.15s",
+        "duration-normal": "0.2s",
+        "duration-slow": "0.3s",
+        "easing-default": "ease",
+        "easing-bounce": "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        "easing-smooth": "ease-in-out"
+      }
+    }
+  }
+}

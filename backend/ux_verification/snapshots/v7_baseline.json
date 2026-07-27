@@ -1,0 +1,141 @@
+{
+  "timestamp": "2026-06-28T15:53:27.263862",
+  "metrics": {
+    "total_pass_items": 74.0,
+    "story_completion_rate": 0.0,
+    "component_integration_count": 91.0,
+    "e2e_visual_coverage": 6.87
+  },
+  "pass_count": 74,
+  "fail_count": 17,
+  "skip_count": 954,
+  "pass_rate": 7.08,
+  "story_summary": {
+    "A-1": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-2": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-3": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-4": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-5": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-6": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-7": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-8": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "A-9": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "O-10": {
+      "total": 50,
+      "pass": 0,
+      "fail": 0,
+      "skip": 50
+    },
+    "O-11": {
+      "total": 50,
+      "pass": 0,
+      "fail": 0,
+      "skip": 50
+    },
+    "O-12": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "O-1": {
+      "total": 30,
+      "pass": 10,
+      "fail": 14,
+      "skip": 6
+    },
+    "O-2": {
+      "total": 30,
+      "pass": 29,
+      "fail": 1,
+      "skip": 0
+    },
+    "O-3": {
+      "total": 43,
+      "pass": 35,
+      "fail": 0,
+      "skip": 8
+    },
+    "O-4": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "O-5": {
+      "total": 55,
+      "pass": 0,
+      "fail": 0,
+      "skip": 55
+    },
+    "O-6": {
+      "total": 40,
+      "pass": 0,
+      "fail": 0,
+      "skip": 40
+    },
+    "O-7": {
+      "total": 30,
+      "pass": 0,
+      "fail": 0,
+      "skip": 30
+    },
+    "O-8": {
+      "total": 55,
+      "pass": 0,
+      "fail": 2,
+      "skip": 53
+    },
+    "O-9": {
+      "total": 57,
+      "pass": 0,
+      "fail": 0,
+      "skip": 57
+    }
+  }
+}

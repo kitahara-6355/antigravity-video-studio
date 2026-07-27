@@ -1,0 +1,20 @@
+{
+  "directive_id": "D-remedy-quality-41",
+  "priority_distribution": {
+    "test_weaver": 40,
+    "bug_hunter": 20,
+    "refactor": 15,
+    "coverage": 15,
+    "doc_gen": 10
+  },
+  "assigned_modules": [
+    "integration_test.py",
+    "verify_full_system.py",
+    "harness/pipeline_tools.py",
+    "services/vector_search.py",
+    "agents/resolution_tracker.py"
+  ],
+  "blacklist_override": [],
+  "strategy_notes": "品質の空洞化に対する是正指示。自動ブラックリスト化された難所モジュールのテスト追加とカバレッジ向上を最優先でアサインし、空洞化を解消せよ。",
+  "generated_at": "2026-06-27T08:00:27.148883+00:00"
+}

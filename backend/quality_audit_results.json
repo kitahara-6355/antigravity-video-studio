@@ -1,0 +1,299 @@
+{
+  "score": 9.5,
+  "trigger": "all",
+  "timestamp": "2026-06-27T13:35:17.595464",
+  "total_items": 57,
+  "passed": 54,
+  "failed": 3,
+  "skipped": 0,
+  "critical_fail": 2,
+  "major_fail": 1,
+  "minor_fail": 0,
+  "details": {
+    "H-01": {
+      "status": "FAIL",
+      "remarks": "Scan completed with read errors: Could not read ab_test_tracker.py: Mocked OSError; Could not read admin_analytics_router.py: Mocked OSError; Could not read admin_channel_router.py: Mocked OSError",
+      "severity": "🟡"
+    },
+    "H-02": {
+      "status": "FAIL",
+      "remarks": "Failed to load ToolRegistry or register tools.",
+      "severity": "🔴"
+    },
+    "H-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "H-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "H-05": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "H-06": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "M-01": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "M-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "M-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "M-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "M-05": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "C-01": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "C-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "C-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "C-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "C-05": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "C-06": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "C-07": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "D-01": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "D-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "D-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "D-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "D-05": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "E-01": {
+      "status": "FAIL",
+      "remarks": "API key pattern 'AIzaSy' found in production code.",
+      "severity": "🔴"
+    },
+    "E-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "E-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "E-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "F-01": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "F-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "F-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "G-01": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "G-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "G-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "G-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "G-05": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "G-06": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "G-07": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-01": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-05": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-06": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-07": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "P-08": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-01": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-02": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-03": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-04": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-05": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-06": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-07": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-08": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-09": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-10": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-11": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    },
+    "V-12": {
+      "status": "PASS",
+      "remarks": "Verified successfully.",
+      "severity": "🟢"
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "evolution_vision": "{}\n- Success: keyword - val",
+  "design_tokens": {
+    "warm": {
+      "color_palette": {
+        "main": "#f59e0b",
+        "sub": "#d97706",
+        "accent": "#ea580c",
+        "background": "#fffbeb",
+        "text": "#78350f"
+      },
+      "typography": {
+        "font_family": "Noto Sans JP",
+        "heading_weight": "bold",
+        "body_size": "16px"
+      },
+      "motion": {
+        "transition": "ease-out",
+        "duration": "0.3s"
+      }
+    },
+    "energetic": {
+      "color_palette": {
+        "main": "#ec4899",
+        "sub": "#db2777",
+        "accent": "#a855f7",
+        "background": "#fdf2f8",
+        "text": "#831843"
+      },
+      "typography": {
+        "font_family": "Noto Sans JP",
+        "heading_weight": "900",
+        "body_size": "17px"
+      },
+      "motion": {
+        "transition": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "duration": "0.35s"
+      }
+    },
+    "cool": {
+      "color_palette": {
+        "main": "#3b82f6",
+        "sub": "#2563eb",
+        "accent": "#06b6d4",
+        "background": "#eff6ff",
+        "text": "#1e3a5f"
+      },
+      "typography": {
+        "font_family": "Noto Sans JP",
+        "heading_weight": "600",
+        "body_size": "15px"
+      },
+      "motion": {
+        "transition": "ease-in-out",
+        "duration": "0.25s"
+      }
+    },
+    "elegant": {
+      "color_palette": {
+        "main": "#6366f1",
+        "sub": "#4f46e5",
+        "accent": "#8b5cf6",
+        "background": "#eef2ff",
+        "text": "#312e81"
+      },
+      "typography": {
+        "font_family": "Noto Serif JP",
+        "heading_weight": "500",
+        "body_size": "15px"
+      },
+      "motion": {
+        "transition": "ease",
+        "duration": "0.5s"
+      }
+    }
+  },
+  "video_source_name": "test_upload.mp4",
+  "brand_personality": {
+    "keywords": [
+      "telopで「テスト」スタイルを標準化"
+    ]
+  }
+}

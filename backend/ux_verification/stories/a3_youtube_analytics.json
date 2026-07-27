@@ -1,0 +1,630 @@
+{
+  "ux_id": "A-3",
+  "name": "YouTube Analytics連携・効果分析",
+  "description": "管理者はYouTube Analytics APIと連携し、CTR推移・視聴維持率・動画別実績・ベンチマーク比較・テンプレ/SmartCut/AI提案の効果分析・KPI管理・成長予測を行える",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "YouTube Analytics連携ダッシュボードが表示される",
+      "linked_items": [
+        "A3-L1-01",
+        "A3-L1-02",
+        "A3-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "過去30日間のCTR推移グラフが表示される",
+      "linked_items": [
+        "A3-L1-03",
+        "A3-L2-02",
+        "A3-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "過去30日間の視聴維持率推移グラフが表示される",
+      "linked_items": [
+        "A3-L1-04",
+        "A3-L2-03",
+        "A3-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "動画別のCTR/維持率/再生数の比較テーブルが表示される",
+      "linked_items": [
+        "A3-L1-05",
+        "A3-L2-04",
+        "A3-L3-03"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "業界平均(CTR3.5%/維持率40%)との比較が表示される",
+      "linked_items": [
+        "A3-L1-06",
+        "A3-L2-05"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "テンプレート別の効果分析(CTR/維持率)が表示される",
+      "linked_items": [
+        "A3-L1-07",
+        "A3-L2-06",
+        "A3-L3-04"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "SmartCut設定別の維持率効果分析が表示される",
+      "linked_items": [
+        "A3-L1-08",
+        "A3-L2-07"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "AI提案採用/却下別のパフォーマンス比較が表示される",
+      "linked_items": [
+        "A3-L3-05",
+        "A3-L4-01"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "チャプター有無による視聴行動の差分が表示される",
+      "linked_items": [
+        "A3-L3-06",
+        "A3-L4-02"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "サムネイル選択とCTRの相関が表示される",
+      "linked_items": [
+        "A3-L3-07",
+        "A3-L4-03"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "データ駆動の改善提案一覧が表示される",
+      "linked_items": [
+        "A3-L1-09",
+        "A3-L2-08",
+        "A3-L3-08"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "改善提案をパイプライン設定に適用できる",
+      "linked_items": [
+        "A3-L3-09",
+        "A3-L4-04"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "チャンネルKPI(目標CTR/目標維持率)を設定できる",
+      "linked_items": [
+        "A3-L3-10",
+        "A3-L3-11",
+        "A3-L4-05"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "KPI達成度のゲージ/グラフが表示される",
+      "linked_items": [
+        "A3-L1-10",
+        "A3-L2-09",
+        "A3-L4-06"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "視聴者の興味トレンドが分析・表示される",
+      "linked_items": [
+        "A3-L3-12",
+        "A3-L4-07"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "類似チャンネルとのパフォーマンス比較が表示される",
+      "linked_items": [
+        "A3-L3-13",
+        "A3-L4-08"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "月次/週次パフォーマンスレポートを自動生成できる",
+      "linked_items": [
+        "A3-L4-09",
+        "A3-L5-01"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "YouTube Analytics API接続状態/更新頻度が設定できる",
+      "linked_items": [
+        "A3-L1-11",
+        "A3-L2-10",
+        "A3-L4-10"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "API未接続時のキャッシュ/フォールバック状態が表示される",
+      "linked_items": [
+        "A3-L5-02",
+        "A3-L5-03"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "チャンネル主向けの効果要約ダッシュボードが表示される",
+      "linked_items": [
+        "A3-L5-04",
+        "A3-L5-05"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "任意2期間の比較分析ができる",
+      "linked_items": [
+        "A3-L5-06",
+        "A3-L5-07",
+        "A3-L5-08"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "チャンネル成長予測(登録者/再生数)が表示される",
+      "linked_items": [
+        "A3-L1-12",
+        "A3-L5-09",
+        "A3-L5-10"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A3-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "YouTube Analytics連携ダッシュボードAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "analytics-dashboard"
+    },
+    {
+      "id": "A3-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにsectionsフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "analytics-dashboard-sections"
+    },
+    {
+      "id": "A3-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "CTR推移APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "ctr-trend"
+    },
+    {
+      "id": "A3-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "視聴維持率推移APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "retention-trend"
+    },
+    {
+      "id": "A3-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "動画別実績APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "video-performance"
+    },
+    {
+      "id": "A3-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "ベンチマークAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "benchmark"
+    },
+    {
+      "id": "A3-L1-07",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "テンプレート効果APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "template-effect"
+    },
+    {
+      "id": "A3-L1-08",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "SmartCut効果APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "smartcut-effect"
+    },
+    {
+      "id": "A3-L1-09",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "改善提案APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "improvement-suggestions"
+    },
+    {
+      "id": "A3-L1-10",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "KPI達成度APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "kpi-achievement"
+    },
+    {
+      "id": "A3-L1-11",
+      "layer": 1,
+      "story_scene": "S18",
+      "description": "API接続管理APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "api-connection"
+    },
+    {
+      "id": "A3-L1-12",
+      "layer": 1,
+      "story_scene": "S22",
+      "description": "成長予測APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "growth-forecast"
+    },
+    {
+      "id": "A3-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/status/kpi_summaryフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "CTR推移にhistory配列とperiod_daysが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "維持率推移にhistory配列とperiod_daysが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "動画別実績にvideos配列とtotalが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-05",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "ベンチマークにindustry_avg/channel_avg/comparisonが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-06",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "テンプレート効果にtemplates配列が含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-07",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "SmartCut効果にsettings配列が含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-08",
+      "layer": 2,
+      "story_scene": "S11",
+      "description": "改善提案にsuggestions配列とtotalが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-09",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "KPI達成度にtarget/actual/achievement_rateが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L2-10",
+      "layer": 2,
+      "story_scene": "S18",
+      "description": "API接続管理にconnected/update_intervalフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A3-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "CTR推移の30日間データが配列で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "維持率推移の30日間データが配列で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-03",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "動画別実績の各エントリにtitle/ctr/retentionが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-04",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "テンプレート効果の各項目にname/avg_ctr/avg_retentionが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-05",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "AI提案効果APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-06",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "チャプター効果APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-07",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "サムネイル効果APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-08",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "改善提案の各項目にcategory/impact/descriptionが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-09",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "改善提案適用APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-10",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "KPI設定APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-11",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "KPI設定後に新しい値が反映される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-12",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "トレンド分析APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L3-13",
+      "layer": 3,
+      "story_scene": "S16",
+      "description": "競合分析APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A3-L4-01",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "AI提案効果にadopted/rejected/impact_diffが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-02",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "チャプター効果にwith_chapters/without_chaptersフィールドが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-03",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "サムネイル効果にthumbnails配列とcorrelation_scoreが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-04",
+      "layer": 4,
+      "story_scene": "S12",
+      "description": "無効な提案ID指定で適切なエラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-05",
+      "layer": 4,
+      "story_scene": "S13",
+      "description": "無効なKPI値(負数)で適切なエラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-06",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "KPI達成度が0-100%の範囲で返される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-07",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "トレンド分析にtrends配列が含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-08",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "競合分析にcompetitors配列が含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-09",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "レポート生成APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L4-10",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "API接続設定の更新が反映される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A3-L5-01",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "ダッシュボード→CTR確認→ベンチマーク→レポート生成の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-02",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "API接続確認→キャッシュ状態→フォールバック確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-03",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "動画別実績→テンプレ効果→SmartCut効果→改善提案の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-04",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "効果要約ダッシュボード→KPI確認→成長予測の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-05",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "KPI設定→達成度確認→改善提案→適用の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-06",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "期間比較→トレンド分析→競合分析の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-07",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "全GETエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-08",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "AI提案効果→チャプター効果→サムネイル効果の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "成長予測にforecast_subscribers/forecast_viewsが含まれる",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A3-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "無効なKPI設定(負数)で400エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-01",
+    "created_by": "sprint_3.3.3",
+    "activated_at": "2026-05-01",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

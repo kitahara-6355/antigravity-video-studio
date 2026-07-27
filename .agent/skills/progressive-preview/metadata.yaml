@@ -1,0 +1,4 @@
+---
+name: progressive-preview
+description: 動画編集などの重い処理を実行する前に、一時停止してBefore/Afterのプレビューを目視確認するためのスキル。
+---

@@ -1,0 +1,7 @@
+{
+  "nudge_at": "2026-06-23T10:35:17.040560+00:00",
+  "reason": "heartbeat_stale_24min",
+  "conversation_id": "457c82a1-5313-4128-b7c6-e40352f3cb52",
+  "message": "心拍が古くなっています。以下を実行してください: 1) 残りのサブエージェントの完了状況を確認 2) 完了済みのタスクは結果を反映 3) 未完了のタスクは300秒のタイマーを設定して待機 4) hub.flash_update_heartbeat() で心拍を更新",
+  "nudge_count": 2
+}

@@ -1,0 +1,9 @@
+{
+  "message": "Phase 30 / 設計ストック DS-024: 自動進化レジストリ同期の実装完了。evolution_sync_service.pyに各エージェント成功率を集計・同期するsync_agent_performanceを追加。generate_flash_prompt.pyにて成功率メタデータをプロンプト重みに自動反映するロジックを実装。TDR登録、単体・結合テスト、全体フィットネス125件PASSを確認。",
+  "changed_files": [
+    "backend/services/evolution_sync_service.py",
+    "backend/agents/orchestration/generate_flash_prompt.py",
+    "backend/tests/test_services/test_evolution_sync_performance.py",
+    "backend/tests/test_generate_flash_prompt.py"
+  ]
+}

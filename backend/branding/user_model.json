@@ -1,0 +1,57 @@
+{
+  "collaborative_settings": {
+    "auto_pilot_ratio": 0.5
+  },
+  "profiles": {
+    "admin": {
+      "ranks": {
+        "tech_rank": {
+          "level": "Editor (Intermediate)",
+          "xp": 185
+        }
+      }
+    },
+    "owner": {
+      "ranks": {
+        "biz_rank": {
+          "xp": 45
+        }
+      }
+    }
+  },
+  "external_status": {
+    "youtube": {
+      "subscribers": 150,
+      "total_views": 4500,
+      "videos": 12,
+      "last_updated": "2026-06-28T02:53:11.581892"
+    },
+    "rivals": {
+      "nemesis": {
+        "name": "TechStarter",
+        "subs": 180,
+        "views": 5000,
+        "genre": "Tech"
+      },
+      "benchmark": {
+        "name": "TechMastery",
+        "subs": 15000,
+        "views": 1500000,
+        "genre": "Tech"
+      }
+    },
+    "quests": [
+      {
+        "type": "NEMESIS_BATTLE",
+        "target_name": "TechStarter",
+        "target_val": 180,
+        "current_val": 150,
+        "gap": 30,
+        "reward_xp": 100
+      }
+    ]
+  },
+  "interaction_history": {
+    "collaborative_notes": "[2026-06-05 23:59:14] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:08:57] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:09:12] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:10:11] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:11:00] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:11:26] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:12:00] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:12:21] ADMIN: Optimized legacy endpoints for performance\n[2026-06-27 16:13:11] ADMIN: Optimized legacy endpoints for performance\n[2026-06-28 16:23:29] ADMIN: Optimized legacy endpoints for performance"
+  }
+}

@@ -1,0 +1,468 @@
+{
+  "stats": {
+    "debates": 38,
+    "wins": 0,
+    "losses": 38
+  },
+  "bias_weight": 0.8,
+  "history": [
+    {
+      "session_id": "test_1766818235",
+      "timestamp": 1766818235.6238723,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779378672",
+      "timestamp": 1779378672.9910395,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779378721",
+      "timestamp": 1779378721.057055,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779419786",
+      "timestamp": 1779419786.008474,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779419787",
+      "timestamp": 1779419787.0275214,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779632727",
+      "timestamp": 1779632727.7058246,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779632737",
+      "timestamp": 1779632737.263102,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779632767",
+      "timestamp": 1779632767.8358316,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779632776",
+      "timestamp": 1779632776.2356074,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779632804",
+      "timestamp": 1779632804.3085375,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779686946",
+      "timestamp": 1779686946.9198701,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779686955",
+      "timestamp": 1779686955.1511502,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687440",
+      "timestamp": 1779687440.2469711,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687448",
+      "timestamp": 1779687448.6662347,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687487",
+      "timestamp": 1779687487.4911304,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687494",
+      "timestamp": 1779687494.9923785,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687502",
+      "timestamp": 1779687502.932257,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687530",
+      "timestamp": 1779687530.8141541,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687541",
+      "timestamp": 1779687541.107954,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687574",
+      "timestamp": 1779687574.3431222,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687584",
+      "timestamp": 1779687584.945993,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779687593",
+      "timestamp": 1779687593.1688335,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779699202",
+      "timestamp": 1779699202.6629512,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779699205",
+      "timestamp": 1779699205.397501,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779699207",
+      "timestamp": 1779699207.9816465,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779699266",
+      "timestamp": 1779699266.4099748,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779699268",
+      "timestamp": 1779699268.8995607,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779699271",
+      "timestamp": 1779699271.3081894,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779701224",
+      "timestamp": 1779701224.8176665,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779701227",
+      "timestamp": 1779701227.3016288,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779701229",
+      "timestamp": 1779701229.7283792,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779765595",
+      "timestamp": 1779765595.0721467,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779765613",
+      "timestamp": 1779765613.4966414,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779765658",
+      "timestamp": 1779765658.0095963,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779765659",
+      "timestamp": 1779765659.1089237,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779765686",
+      "timestamp": 1779765686.9920597,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779765688",
+      "timestamp": 1779765688.0658424,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    },
+    {
+      "session_id": "test_1779765688",
+      "timestamp": 1779765688.5807068,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "I hate jump cuts. Never use them."
+    }
+  ],
+  "lessons": [
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1766818235.6238723,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779378672.9910395,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779378721.057055,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779419786.008474,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779419787.0275214,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779632727.7058246,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779632737.263102,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779632767.8358316,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779632776.2356074,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779632804.3085375,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779686946.9198701,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779686955.1511502,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687440.2469711,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687448.6662347,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687487.4911304,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687494.9923785,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687502.932257,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687530.8141541,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687541.107954,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687574.3431222,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687584.945993,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779687593.1688335,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779699202.6629512,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779699205.397501,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779699207.9816465,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779699266.4099748,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779699268.8995607,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779699271.3081894,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779701224.8176665,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779701227.3016288,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779701229.7283792,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779765595.0721467,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779765613.4966414,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779765658.0095963,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779765659.1089237,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779765686.9920597,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779765688.0658424,
+      "weight": 1.0
+    },
+    {
+      "text": "Avoid proposal that caused: I hate jump cuts. Never use them.",
+      "created_at": 1779765688.5807068,
+      "weight": 1.0
+    }
+  ]
+}

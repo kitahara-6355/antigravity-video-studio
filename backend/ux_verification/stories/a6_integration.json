@@ -1,0 +1,630 @@
+{
+  "ux_id": "A-6",
+  "name": "MCP外部連携・ツール統合",
+  "description": "管理者はMCP外部連携・ツール統合ダッシュボードからMCP接続状態・ツール一覧・get_pipeline_status・get_quality_score・get_evolution_log・Claude Desktop連携・HTTP/MCPデュアルモード・ツール追加・ツール権限管理・Webhook設定・外部通知連携(Slack/Discord)・APIバージョニング・RESTドキュメント(Swagger)・WebSocket監視・レート制限設定・CORS設定・認証トークン管理・APIログ・外部アプリ登録・OAuth管理・SDKダウンロード・API使用統計を管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "MCP外部連携ダッシュボードが表示される",
+      "linked_items": [
+        "A6-L1-01",
+        "A6-L1-02",
+        "A6-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "登録済みMCPツールの一覧が表示される",
+      "linked_items": [
+        "A6-L1-03",
+        "A6-L2-02",
+        "A6-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "get_pipeline_statusツールの動作状態が表示される",
+      "linked_items": [
+        "A6-L1-04",
+        "A6-L2-03",
+        "A6-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "get_quality_scoreツールの動作状態が表示される",
+      "linked_items": [
+        "A6-L1-05",
+        "A6-L2-04"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "get_evolution_logツールの動作状態が表示される",
+      "linked_items": [
+        "A6-L1-06",
+        "A6-L3-03"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "Claude Desktop連携の接続状態が表示される",
+      "linked_items": [
+        "A6-L3-04",
+        "A6-L4-01"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "HTTP/MCPデュアルモードの切替状態が表示される",
+      "linked_items": [
+        "A6-L3-05",
+        "A6-L4-02"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "新しいMCPツールを追加登録できる",
+      "linked_items": [
+        "A6-L1-07",
+        "A6-L3-06"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "ツールごとのアクセス権限が設定できる",
+      "linked_items": [
+        "A6-L3-07",
+        "A6-L4-03"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "Webhook URLの設定・テストができる",
+      "linked_items": [
+        "A6-L3-08",
+        "A6-L4-04"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "Slack/Discord通知の連携設定ができる",
+      "linked_items": [
+        "A6-L1-08",
+        "A6-L2-05",
+        "A6-L3-09"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "APIバージョン(v1/v2)の切替設定が表示される",
+      "linked_items": [
+        "A6-L2-06",
+        "A6-L3-10"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "Swagger UIへのリンクとAPIドキュメントが表示される",
+      "linked_items": [
+        "A6-L1-09",
+        "A6-L2-07",
+        "A6-L3-11"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "WebSocket接続のリアルタイム監視が表示される",
+      "linked_items": [
+        "A6-L1-10",
+        "A6-L2-08",
+        "A6-L3-12"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "APIレート制限の設定が変更できる",
+      "linked_items": [
+        "A6-L3-13",
+        "A6-L4-05"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "CORS許可オリジンの設定が変更できる",
+      "linked_items": [
+        "A6-L4-06",
+        "A6-L5-01"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "認証トークンの生成・失効管理ができる",
+      "linked_items": [
+        "A6-L1-11",
+        "A6-L2-09",
+        "A6-L4-07"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "API呼出しログが時系列で表示される",
+      "linked_items": [
+        "A6-L4-08",
+        "A6-L5-02"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "外部アプリケーションの登録・管理ができる",
+      "linked_items": [
+        "A6-L4-09",
+        "A6-L5-03"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "OAuth認可フローの設定が管理できる",
+      "linked_items": [
+        "A6-L4-10",
+        "A6-L5-04",
+        "A6-L5-05"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "クライアントSDKのダウンロードリンクが表示される",
+      "linked_items": [
+        "A6-L1-12",
+        "A6-L2-10",
+        "A6-L5-06"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "API使用統計(エンドポイント別)が表示される",
+      "linked_items": [
+        "A6-L5-07",
+        "A6-L5-08",
+        "A6-L5-09",
+        "A6-L5-10"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A6-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "MCP外部連携ダッシュボードAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "integration-dashboard"
+    },
+    {
+      "id": "A6-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにsectionsフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "integration-dashboard-sections"
+    },
+    {
+      "id": "A6-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "MCPツール一覧APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "mcp-tools"
+    },
+    {
+      "id": "A6-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "パイプラインステータスツールAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "tool-pipeline-status"
+    },
+    {
+      "id": "A6-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "品質スコアツールAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "tool-quality-score"
+    },
+    {
+      "id": "A6-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "進化ログツールAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "tool-evolution-log"
+    },
+    {
+      "id": "A6-L1-07",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "ツール追加APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "tool-register"
+    },
+    {
+      "id": "A6-L1-08",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "外部通知設定APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "notifications"
+    },
+    {
+      "id": "A6-L1-09",
+      "layer": 1,
+      "story_scene": "S13",
+      "description": "APIドキュメント情報APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "api-docs"
+    },
+    {
+      "id": "A6-L1-10",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "WebSocket監視APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "websocket-monitor"
+    },
+    {
+      "id": "A6-L1-11",
+      "layer": 1,
+      "story_scene": "S17",
+      "description": "認証トークン管理APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "auth-tokens"
+    },
+    {
+      "id": "A6-L1-12",
+      "layer": 1,
+      "story_scene": "S21",
+      "description": "SDK情報APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "sdk-info"
+    },
+    {
+      "id": "A6-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/status/summaryフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "ツール一覧にtools配列とtotalが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "パイプラインステータスにstatus/stages/session_idが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "品質スコアにscore/rank/categoriesが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-05",
+      "layer": 2,
+      "story_scene": "S11",
+      "description": "通知設定にchannels配列とenabledが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-06",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "APIバージョンにcurrent/available/deprecatedが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-07",
+      "layer": 2,
+      "story_scene": "S13",
+      "description": "APIドキュメントにswagger_url/endpointsが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-08",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "WebSocket監視にactive_connections/messagesが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-09",
+      "layer": 2,
+      "story_scene": "S17",
+      "description": "認証トークンにtokens配列とactive_countが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L2-10",
+      "layer": 2,
+      "story_scene": "S21",
+      "description": "SDK情報にversions配列とdownload_linksが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A6-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "ツール一覧の各ツールにname/status/descriptionが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "パイプラインステータスのstagesが配列で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "進化ログのentriesが配列で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-04",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "Claude Desktop接続状態APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "デュアルモード状態APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-06",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "ツール追加APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-07",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "ツール権限設定APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-08",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "Webhook設定APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-09",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "通知設定の更新がPOSTで反映される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-10",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "APIバージョン切替APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-11",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "APIドキュメントのendpointsが10以上含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-12",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "WebSocket接続数が0以上の数値である",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L3-13",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "レート制限設定APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A6-L4-01",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "Claude Desktop接続にconnected/version/capabilitiesが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-02",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "デュアルモードにhttp_enabled/mcp_enabled/active_modeが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-03",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "権限設定後に各ツールのpermissionsが更新される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-04",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "Webhookテスト送信が正常に完了する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-05",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "レート制限にrpm/burst/windowが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-06",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "CORS設定APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-07",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "トークン生成後にtoken/expires_atが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-08",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "APIログにlogs配列とtotalが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-09",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "外部アプリ登録APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L4-10",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "OAuth設定APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A6-L5-01",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "ダッシュボード→MCP接続→ツール一覧→CORS設定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-02",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "ツール追加→権限設定→APIログ確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-03",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "外部アプリ登録→OAuth設定→トークン生成の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-04",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "Webhook設定→通知テスト→Slack/Discord連携の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-05",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "APIバージョン→Swagger→レート制限の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-06",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "全GETエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-07",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "API使用統計にendpoints配列とtotal_requestsが含まれる",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-08",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "WebSocket監視→接続状態→メッセージ統計の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "認証トークン→失効→再生成の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A6-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "無効なツールID指定で404エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-02",
+    "created_by": "sprint_3.3.6",
+    "activated_at": "2026-05-02",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

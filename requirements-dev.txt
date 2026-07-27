@@ -1,0 +1,27 @@
+# テスト実行にのみ必要な依存。本番の requirements.txt とは分離する。
+#
+# 2026-07-25: CI を実効化した初回実行で、これらが未導入のため6ファイルが
+# 収集エラーになった（ModuleNotFoundError: google.api_core / requests_mock）。
+# ローカル venv には入っていたが宣言されていなかったため、CI でのみ露見した。
+
+-r requirements.txt
+
+pytest
+pytest-asyncio
+pytest-cov
+pytest-mock
+pytest-timeout
+
+# google-genai の一部経路が google.api_core を要求する
+google-api-core
+google-auth
+
+httpx
+requests-mock
+psutil
+
+# CI で ModuleNotFoundError になったため追加（ベクトルDB）
+chromadb
+
+# CI で ModuleNotFoundError になったため追加（音声認識）
+faster-whisper

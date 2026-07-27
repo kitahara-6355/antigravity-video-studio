@@ -1,0 +1,24 @@
+{
+  "stats": {
+    "debates": 1,
+    "wins": 0,
+    "losses": 1
+  },
+  "bias_weight": 0.9,
+  "history": [
+    {
+      "session_id": "session_123",
+      "timestamp": 1779844299.2632704,
+      "stance": "AGREE",
+      "outcome": "REJECT",
+      "feedback": "poor logic"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "Avoid proposal that caused: poor logic",
+      "created_at": 1779844299.2632704,
+      "weight": 1.0
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "session_id": "3a772f29-5796-445a-8b1a-075706b0aacc",
+  "timestamp": 1767096636.2450256,
+  "datetime": "2025-12-30T21:10:36.245033",
+  "topic": "[object Object]",
+  "debate_flow": [
+    {
+      "agent": "Analyst",
+      "role": "Data Scientist",
+      "color": "#F59E0B",
+      "timestamp": 1767096623.9745321,
+      "stance": "DISAGREE",
+      "summary": "Data Analysis Complete",
+      "detail": "Your Nemesis 'TechStarter' is ahead by 29 subs. Analysis shows they post 2x more frequently.",
+      "data": {
+        "my_stats": {
+          "subscribers": 151,
+          "total_views": 4650,
+          "videos": 12,
+          "last_updated": "2025-12-30T21:10:12.649326"
+        },
+        "rivals": {
+          "nemesis": {
+            "name": "TechStarter",
+            "subs": 180,
+            "views": 5000,
+            "genre": "Tech"
+          },
+          "benchmark": {
+            "name": "TechMastery",
+            "subs": 15000,
+            "views": 1500000,
+            "genre": "Tech"
+          }
+        }
+      },
+      "glossary": [
+        {
+          "term": "Nemesis",
+          "def": "A rival channel with slightly higher stats (your immediate target)."
+        },
+        {
+          "term": "Velocity",
+          "def": "The rate of subscriber growth per day."
+        }
+      ]
+    },
+    {
+      "agent": "Strategist",
+      "role": "Brand Guardian",
+      "color": "#EF4444",
+      "timestamp": 1767096629.9845326,
+      "stance": "NEUTRAL",
+      "summary": "No proposal received.",
+      "detail": "A proposal is required for analysis. Please provide a specific proposal to evaluate its alignment with the brand constitution and business logic.",
+      "glossary": []
+    },
+    {
+      "agent": "Director",
+      "role": "Creative Director",
+      "color": "#3B82F6",
+      "timestamp": 1767096636.237173,
+      "stance": "NEUTRAL",
+      "summary": "No proposal was provided for creative analysis.",
+      "detail": "Without a specific proposal, I cannot provide detailed creative advice. Please provide a proposal focusing on the viewer experience. Once you provide the proposal, I can analyze it and offer suggestions on how to make it more engaging, clear, and visually appealing within the Antigravity Channel's cyberpunk aesthetic.",
+      "glossary": []
+    }
+  ],
+  "synthesis": {
+    "type": "SYNTHESIS",
+    "proposal": "Based on the debate, X is recommended.",
+    "options": [
+      "Approve",
+      "Reject"
+    ]
+  }
+}

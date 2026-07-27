@@ -1,0 +1,4 @@
+---
+name: tdd-orchestrator
+description: 新機能の実装やコード変更時に、Red-Green-Refactorの極小サイクルを強制し「正直なテスト」と「リファクタリング」を担保するスキル。
+---

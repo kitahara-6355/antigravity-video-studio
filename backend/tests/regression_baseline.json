@@ -1,0 +1,105 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-05-16T23:26:00+09:00",
+  "created_by": "ebvp_phase2",
+  "description": "EBVP Phase 2 初回ベースライン — xfail 73件管理移行後の安定状態",
+  "test_results": {
+    "unit": {
+      "passed": 3274,
+      "failed": 0,
+      "skipped": 9,
+      "xfailed": 6,
+      "total": 3276,
+      "execution_time_seconds": 185
+    },
+    "fitness_functions": {
+      "passed": 42,
+      "failed": 0,
+      "total": 42,
+      "execution_time_seconds": 15
+    },
+    "e2e": {
+      "note": "ライブサーバー依存のため本ベースラインには含まず。xfail 67件で管理",
+      "xfailed_count": 67
+    }
+  },
+  "known_failures": {
+    "xfail_unit": [
+      {
+        "test": "test_shared/test_batch12_gen_legacy_branding.py::TestBrandingManagerAdvanced::test_bm_06_sync_decisions_no_logger",
+        "reason": "Sprint 4.2.1: sync_decisions_to_constitutionがEvolutionTriggerServiceに委譲後、decision_logger=Noneパスのレスポンス形式変更",
+        "tdr_id": "TD-634"
+      },
+      {
+        "test": "test_shared/test_batch12_gen_legacy_branding.py::TestBrandingManagerAdvanced::test_bm_07_sync_decisions_rejection_pattern",
+        "reason": "Sprint 4.2.1: sync_decisions_to_constitutionがEvolutionTriggerServiceに委譲後、却下パターン直接処理が廃止",
+        "tdr_id": "TD-634"
+      },
+      {
+        "test": "test_shared/test_batch12_gen_legacy_branding.py::TestBrandingManagerAdvanced::test_bm_08_sync_decisions_approval_pattern",
+        "reason": "Sprint 4.2.1: sync_decisions_to_constitutionがEvolutionTriggerServiceに委譲後、承認パターン直接処理が廃止",
+        "tdr_id": "TD-634"
+      },
+      {
+        "test": "test_shared/test_batch8_pipeline_asset_director.py::TestPipelineRouterDeep::test_pr_d10_record_force_render_new_log",
+        "reason": "Sprint 4.3.2: _record_force_renderのPath解決ロジック変更",
+        "tdr_id": "TD-635"
+      },
+      {
+        "test": "test_shared/test_branding_manager.py::TestBrandingManager::test_sync_decisions_no_logger",
+        "reason": "Sprint 4.2.1: sync_decisions_to_constitutionがEvolutionTriggerServiceに委譲後、decision_logger=Noneパスのレスポンス形式変更",
+        "tdr_id": "TD-636"
+      },
+      {
+        "test": "test_shared/test_branding_manager.py::TestBrandingManager::test_sync_decisions_with_patterns",
+        "reason": "Sprint 4.2.1: sync_decisions_to_constitutionがEvolutionTriggerServiceに委譲後、get_director_preferences直接呼出が廃止",
+        "tdr_id": "TD-636"
+      }
+    ],
+    "xfail_e2e": {
+      "theme_router_50": {
+        "file": "tests/e2e/test_e2e_10_theme.py",
+        "count": 50,
+        "reason": "DS-12: theme_router未登録 — main.pyにtheme_routerのinclude_router未追加",
+        "tdr_id": "TD-629"
+      },
+      "soul_evolution_10": {
+        "file": "tests/e2e/test_e2e_12_soul_evolution.py",
+        "count": 10,
+        "reason": "M4.2: evolution_sync_service/evolution_trigger_serviceリファクタリング後のAPI応答構造変更",
+        "tdr_id": "TD-630"
+      },
+      "smartcut_finalize_3": {
+        "file": "tests/e2e/test_e2e_04_smartcut.py",
+        "count": 3,
+        "reason": "M4.1: smartcut_strategy_service導入後、finalize APIフォーマット変更",
+        "tdr_id": "TD-631"
+      },
+      "adjustment_finalize_3": {
+        "file": "tests/e2e/test_e2e_05_adjustment.py",
+        "count": 3,
+        "reason": "M4.1: SmartCut finalize依存の応答構造変更",
+        "tdr_id": "TD-632"
+      },
+      "preproduction_recommend_1": {
+        "file": "tests/e2e/test_e2e_11_preproduction.py",
+        "count": 1,
+        "reason": "Phase 3 M3.3: テンプレート推薦ロジック応答構造変更",
+        "tdr_id": "TD-633"
+      }
+    }
+  },
+  "coverage_snapshot": {
+    "service_container": {
+      "before": "57%",
+      "after": "85%",
+      "target": "75%",
+      "status": "EXCEEDED"
+    },
+    "batch_b_summary": {
+      "pipeline_router": {"before": "84%", "after": "91%", "target": "90%", "status": "EXCEEDED"},
+      "branding_manager": {"before": "77%", "after": "91%", "target": "88%", "status": "EXCEEDED"},
+      "model_governance": {"before": "80%", "after": "97%", "target": "88%", "status": "EXCEEDED"}
+    }
+  }
+}

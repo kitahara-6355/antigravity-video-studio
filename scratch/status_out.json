@@ -1,0 +1,633 @@
+{
+  "status": {
+    "phase": 30,
+    "milestone": "M30.1",
+    "batch_id": "batch_b981d0",
+    "batch_total": 10,
+    "batch_completed": 10,
+    "batch_running": 0,
+    "batch_passed": 10,
+    "batch_failed": 0,
+    "dispatched": 10,
+    "subagents_running": 0,
+    "success_rate": 100,
+    "session_tasks": 10,
+    "session_batches": 4,
+    "uptime": "9h 3m",
+    "uptime_hours": 9.05,
+    "global_tasks": 382,
+    "global_passed": 344,
+    "global_failed": 22,
+    "remaining_tasks": "498",
+    "remaining_batches": "49",
+    "batch_size": 10,
+    "context_pct": 16,
+    "archive_suggestion": "⚠️ アーカイブ推奨（ハードキャップ: 6時間経過）。完遂プロトコル準備を開始してください",
+    "archive_urgency": "warn",
+    "wait_info": "",
+    "hang_warnings": [],
+    "has_hang": false,
+    "formatted": "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📡 Flash System Status — Batch batch_b981d0\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📍 Phase 30 / M30.1\n🔄 バッチ batch_b981d0: 10/10 タスク完了\n👥 サブエージェント: 0/0 稼働中\n📊 成功率: 10/10 (100%)\n\n📈 セッション累計:\n   タスク: 10件 / 4バッチ\n   稼働時間: 9h 3m\n   通算: 382件（全セッション累計）\n\n⏳ セッション寿命:\n   推定残バッチ: 49（Phase 30 残タスク 498 / batch_size 10）\n   コンテキスト消費: ~16%（推定）\n   💡 ⚠️ アーカイブ推奨（ハードキャップ: 6時間経過）。完遂プロトコル準備を開始してください\n\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  },
+  "queue_status": {
+    "batch_id": "batch_b981d0",
+    "phase": 30,
+    "milestone": "M30.1",
+    "total_tasks": 10,
+    "status_counts": {
+      "pass": 10
+    },
+    "blacklisted_modules": [
+      "archives/",
+      "tests/scratch/scan_reverse_ids.py",
+      "agents/orchestration/flash_status_current.py",
+      "backend/archives/",
+      "agents/orchestration/flash_assign_subagents_10.py",
+      "branding/history_manager.py",
+      "services/hook_preview_generator.py",
+      "subtitle_preview.py",
+      "agents/self_healing_tool.py",
+      "progressive_preview_report.py",
+      "agents/orchestration/mark_tasks_p27_multi4.py",
+      "agents/orchestration/flash_assign_subagents_7.py",
+      "backend/services/auth.py",
+      "video_processor.py",
+      "tests/_debug_dashboard.py"
+    ]
+  },
+  "phase_state": {
+    "schema_version": "1.2",
+    "orchestration_enabled": true,
+    "current_phase": 30,
+    "current_milestone": "M30.1",
+    "phase_started_at": "2026-06-05T03:50:46+00:00",
+    "last_batch_id": "batch_b981d0",
+    "flash_batches_completed": 59,
+    "flash_tasks_total": 382,
+    "flash_tasks_passed": 344,
+    "flash_tasks_failed": 22,
+    "flash_consecutive_failures": 0,
+    "blacklisted_modules": [
+      "tests/scratch/scan_reverse_ids.py",
+      "agents/orchestration/flash_assign_subagents_7.py",
+      "agents/orchestration/mark_tasks_p27_multi4.py",
+      "video_processor.py",
+      "services/hook_preview_generator.py",
+      "tests/_debug_dashboard.py",
+      "backend/services/auth.py",
+      "agents/orchestration/flash_assign_subagents_10.py",
+      "branding/history_manager.py",
+      "agents/self_healing_tool.py"
+    ],
+    "opus_reviews_this_week": 2,
+    "opus_hours_used_this_week": 0.8,
+    "opus_week_start": "2026-05-19T00:00:00Z",
+    "metrics": {
+      "coverage_pct": 55,
+      "test_count": 105,
+      "critical_debt": 1
+    },
+    "gate_checklist": {},
+    "last_opus_review": "2026-05-24T12:35:00Z",
+    "awaiting_opus": false,
+    "emergency_stop": false,
+    "stop_reason": null,
+    "throttled": false,
+    "history": [],
+    "roadmap_max_phase": 40,
+    "next_milestones": [
+      {
+        "phase": 30,
+        "title": "共通処理機構 知的進化 & God Class分割",
+        "milestones": [
+          "M30.1",
+          "M30.2"
+        ],
+        "gate_conditions": {
+          "M30.1": "学習エンジン・分解エンジンのorchestrator統合完了",
+          "M30.2": "orchestrator.py 5モジュール分割完了 + テスト全PASS"
+        }
+      },
+      {
+        "phase": 31,
+        "title": "カバレッジ体系的改善 & テスト品質向上",
+        "milestones": [
+          "M31.1",
+          "M31.2"
+        ],
+        "gate_conditions": {
+          "M31.1": "Branch Coverage 50%達成（現行26.4%から）",
+          "M31.2": "CRITICAL技術負債 0件達成"
+        }
+      },
+      {
+        "phase": 32,
+        "title": "E2Eパイプライン統合テスト & 監査自動化",
+        "milestones": [
+          "M32.1",
+          "M32.2"
+        ],
+        "gate_conditions": {
+          "M32.1": "E2Eテスト10シナリオ PASS",
+          "M32.2": "監査57項目の自動実行基盤稼働"
+        }
+      },
+      {
+        "phase": 33,
+        "title": "自己修復エンジン & リトライ自動化",
+        "milestones": [
+          "M33.1",
+          "M33.2"
+        ],
+        "gate_conditions": {
+          "M33.1": "エラー判定・分類エンジン稼働",
+          "M33.2": "自動リトライフォールバック3パターン実装"
+        }
+      },
+      {
+        "phase": 34,
+        "title": "自律テスト生成 & モック自動生成",
+        "milestones": [
+          "M34.1",
+          "M34.2"
+        ],
+        "gate_conditions": {
+          "M34.1": "AST解析からのテスト自動生成5モジュール",
+          "M34.2": "モック自動生成 + Coverage 60%達成"
+        }
+      },
+      {
+        "phase": 35,
+        "title": "Nexus-Council 3.0 & 評議会高度化",
+        "milestones": [
+          "M35.1",
+          "M35.2"
+        ],
+        "gate_conditions": {
+          "M35.1": "ファクトベース合意形成メカニズム実装",
+          "M35.2": "タイムアウト自律リカバリ + 3エージェント協調テスト"
+        }
+      },
+      {
+        "phase": 36,
+        "title": "Admin Suite UI完成 & CTRベンチマーク統合",
+        "milestones": [
+          "M36.1",
+          "M36.2"
+        ],
+        "gate_conditions": {
+          "M36.1": "A-1〜A-7ダッシュボード画面実装",
+          "M36.2": "YouTuber CTRベンチマークUI統合"
+        }
+      },
+      {
+        "phase": 37,
+        "title": "演出哲学還流 & NHK字幕品質強化",
+        "milestones": [
+          "M37.1",
+          "M37.2"
+        ],
+        "gate_conditions": {
+          "M37.1": "演出哲学還流エンジン稼働",
+          "M37.2": "NHK字幕品質スコア自動測定 80点以上"
+        }
+      },
+      {
+        "phase": 38,
+        "title": "プロセスデーモン化 & 24時間無停止運用",
+        "milestones": [
+          "M38.1"
+        ],
+        "gate_conditions": {
+          "M38.1": "デーモンプロセス24h無停止稼働テストPASS"
+        }
+      },
+      {
+        "phase": 39,
+        "title": "パイプライン統合 & 動画生成E2E",
+        "milestones": [
+          "M39.1",
+          "M39.2"
+        ],
+        "gate_conditions": {
+          "M39.1": "RAW動画→最終動画の自動パイプライン1本完走",
+          "M39.2": "品質スコア80点以上の動画自動生成"
+        }
+      },
+      {
+        "phase": 40,
+        "title": "完全自律運用 & 品質保証ゲート",
+        "milestones": [
+          "M40.1"
+        ],
+        "gate_conditions": {
+          "M40.1": "ユーザー介入0で24h運用テストPASS + Coverage 70%"
+        }
+      }
+    ],
+    "last_updated": "2026-06-05T04:10:28.425556+00:00",
+    "auto_blacklist_expiry": {
+      "branding/history_manager.py": 3,
+      "agents/self_healing_tool.py": 3,
+      "verify_evolution.py": 3,
+      "routers/legacy_production_router.py": 3,
+      "progressive_preview_report.py": 3,
+      "subtitle_engine/text_formatter.py": 3,
+      "tests/phase2_validator.py": 3,
+      "tests/_check_quota.py": 3,
+      "agents/stage_bound_agent.py": 3,
+      "services/preview_report_generator.py": 3,
+      "silence_trimmer.py": 3,
+      "agents/_deprecated/pipeline_coordinator.py": 3,
+      "branding_manager.py": 3,
+      "routers/pipeline_router.py": 3,
+      "gcp_cost_monitor.py": 3,
+      "rebuild_with_s04_telop.py": 3,
+      "hybrid_pipeline.py": 3,
+      "routers/quality.py": 3,
+      "preview_system.py": 3,
+      "routers/render.py": 3,
+      "agents/orchestration/generate_flash_prompt.py": 3,
+      "verify_analytics.py": 3,
+      "director_engine.py": 3,
+      "combined_overlay.py": 3,
+      "ux_verification/scratch/update_user_manual_5stages.py": 3,
+      "integrated_preview.py": 3,
+      "routers/admin_quota_router.py": 3,
+      "routers/ab_test_tracker.py": 3,
+      "tests/phase2_10run.py": 3,
+      "proper_noun_dict.py": 3,
+      "verify_quality_gate.py": 3,
+      "whisper_fixed.py": 3,
+      "gen_telops.py": 3,
+      "agents/workers/youtube_opt_worker.py": 3,
+      "self_review_engine.py": 3,
+      "agents/context_resolver.py": 3,
+      "scratch/submit_batch_a620d7_weaver.py": 3,
+      "agents/workers/render_worker.py": 3,
+      "agents/dream_engine.py": 3,
+      "quick_check.py": 3,
+      "subtitle_preview.py": 3,
+      "aligned_preview_generator.py": 3,
+      "routers/legacy_management_router.py": 3,
+      "services/shorts_generator.py": 3,
+      "agents/supervisor.py": 3,
+      "routers/review_router.py": 3,
+      "agents/orchestration/directive_applicator.py": 3,
+      "agents/context_compressor.py": 3,
+      "plugins/opening_ending_plugin.py": 3,
+      "subtitle_engine/speaker_diarizer.py": 3,
+      "agents/memory/technical_debt.py": 3,
+      "api_versioning.py": 3,
+      "add_premium_branding.py": 3,
+      "tests/fixtures/mock_pipeline.py": 3,
+      "corrected_preview_generator.py": 3,
+      "agents/pipeline_types.py": 3,
+      "routers/admin_incident_router.py": 3,
+      "services/philosophy_proposal_service.py": 3,
+      "interactive_preview.py": 3,
+      "disk_manager.py": 3,
+      "preview_engine.py": 3,
+      "services/hook_evolution_service.py": 3,
+      "wagamama_manager.py": 3,
+      "services/cross_media_service.py": 3,
+      "services/thumbnail_analyzer.py": 3,
+      "routers/preview.py": 3,
+      "services/youtube_ab_test.py": 3,
+      "scratch/mark_task_c48ea3_003_done.py": 3,
+      "scratch/mark_task_f076d6_005_done.py": 3,
+      "scratch/remove_old_worktrees.py": 3,
+      "scratch/find_worktrees.py": 3,
+      "scratch/check_worktree_git.py": 3,
+      "services/audio_master.py": 3,
+      "scratch/debug_mapping.py": 3,
+      "scratch/find_tdr.py": 3,
+      "scratch/merge_branches.py": 3,
+      "agents/orchestration/flash_status_current.py": 3,
+      "scratch/mark_task_27_done.py": 3,
+      "agents/orchestration/submit_and_next.py": 3
+    },
+    "module_cooldown": {
+      "branding_manager.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/pipeline_router.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/context_resolver.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "ux_verification/scratch/update_user_manual_5stages.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/stage_bound_agent.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "rebuild_with_s04_telop.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/legacy_production_router.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/pipeline_types.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "whisper_fixed.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "services/shorts_generator.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "wagamama_manager.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/legacy_management_router.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/orchestration/directive_applicator.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "hybrid_pipeline.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "proper_noun_dict.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/admin_incident_router.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/dream_engine.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "tests/_check_quota.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/supervisor.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "subtitle_engine/text_formatter.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "services/preview_report_generator.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "interactive_preview.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "gen_telops.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "quick_check.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "branding/history_manager.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/self_healing_tool.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "verify_evolution.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "progressive_preview_report.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "tests/phase2_validator.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "silence_trimmer.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/_deprecated/pipeline_coordinator.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "gcp_cost_monitor.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/quality.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "preview_system.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/render.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/orchestration/generate_flash_prompt.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "verify_analytics.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "director_engine.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "combined_overlay.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "integrated_preview.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/admin_quota_router.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/ab_test_tracker.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "verify_quality_gate.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/workers/youtube_opt_worker.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "self_review_engine.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/submit_batch_a620d7_weaver.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/workers/render_worker.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "subtitle_preview.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "aligned_preview_generator.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/review_router.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/context_compressor.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "plugins/opening_ending_plugin.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/memory/technical_debt.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "api_versioning.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "add_premium_branding.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "tests/fixtures/mock_pipeline.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "corrected_preview_generator.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "preview_engine.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "services/hook_evolution_service.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "services/thumbnail_analyzer.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "routers/preview.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "services/youtube_ab_test.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/mark_task_c48ea3_003_done.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/mark_task_f076d6_005_done.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/remove_old_worktrees.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/find_worktrees.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "services/audio_master.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/debug_mapping.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/find_tdr.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/merge_branches.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "agents/orchestration/flash_status_current.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "scratch/mark_task_27_done.py": {
+        "consecutive_bl_count": 5,
+        "cooldown_until_batch": 93
+      },
+      "tests/phase2_10run.py": {
+        "consecutive_bl_count": 4,
+        "cooldown_until_batch": 79
+      },
+      "subtitle_engine/speaker_diarizer.py": {
+        "consecutive_bl_count": 4,
+        "cooldown_until_batch": 79
+      },
+      "services/philosophy_proposal_service.py": {
+        "consecutive_bl_count": 4,
+        "cooldown_until_batch": 79
+      },
+      "disk_manager.py": {
+        "consecutive_bl_count": 4,
+        "cooldown_until_batch": 79
+      },
+      "services/cross_media_service.py": {
+        "consecutive_bl_count": 4,
+        "cooldown_until_batch": 79
+      },
+      "scratch/check_worktree_git.py": {
+        "consecutive_bl_count": 4,
+        "cooldown_until_batch": 79
+      },
+      "agents/orchestration/submit_and_next.py": {
+        "consecutive_bl_count": 4,
+        "cooldown_until_batch": 79
+      }
+    },
+    "gate_conditions": {
+      "M30.1": "学習エンジン・分解エンジンのorchestrator統合完了",
+      "M30.2": "orchestrator.py 5モジュール分割完了 + テスト全PASS"
+    }
+  }
+}

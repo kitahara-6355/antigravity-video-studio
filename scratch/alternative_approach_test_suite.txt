@@ -1,0 +1,25 @@
+【代替アプローチ指示書 - non_existent_test.py】
+テストスイート「non_existent_test.py」の検証が失敗し、すべての自動リトライおよび個別回復処理が上限に達しました。
+開発中のコードは前回の正常なコミット状態にロールバックされました。
+
+■ 発生した最終エラー
+No explicit error message
+
+■ テスト出力（一部）
+DEBUG CONFTEST RATCHET PATH: C:\Users\PC_User\Desktop\script\video-automation\backend\ux_verification\ratchet.py
+
+no tests ran in 0.00s
+
+ERROR: file or directory not found: non_existent_test.py
+
+
+
+■ 推薦される代替アプローチ（安全弁）
+一般的な解決方法:
+- 変更対象モジュールのロジックを見直し、インポートエラーや型エラーが発生していないか確認してください。
+- 必要に応じて、モック設定が正しいか検証してください。
+
+■ 次のステップ
+1. ワークスペースのコードは自動ロールバックによりクリーンな状態に復旧しています。
+2. 上記のエラー内容を参考に、設計または実装の別アプローチを検討してください。
+3. 必要に応じて、テストパターンをローカルで手動実行し、修正を行ってください。

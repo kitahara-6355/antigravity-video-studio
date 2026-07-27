@@ -1,0 +1,13 @@
+# Phase D: moviepy 廃止 → FFmpeg + NVENC
+# Phase E: openai-whisper 廃止 → faster-whisper (backend/requirements.txt で管理)
+pydub
+torch
+numpy
+fastapi
+uvicorn
+python-dotenv
+google-genai
+requests
+pillow
+websockets
+python-multipart

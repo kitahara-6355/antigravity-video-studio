@@ -1,0 +1,48 @@
+{
+  "step": 3,
+  "persona_id": "step_003_satoshi",
+  "name": "小林聡",
+  "subtitle": "ビジネス系コーチ / 実用的な集客動画制作",
+  "schema_version": "1.0",
+  "profile": {
+    "age": 42,
+    "occupation": "ビジネスコーチ・個人コンサルタント",
+    "tech_level": "標準的（Excel, Zoom, PowerPointは日常的に使用するがプログラミングなどは未経験）",
+    "video_experience": "スマートフォンで撮影した動画を簡単なアプリでトリミングする程度",
+    "motivation": "ビジネスの集客・信頼獲得のためにYouTubeで解説動画を発信したい。派手な演出は不要だが、見苦しくない水準（クリアな音声、標準的な字幕、解説スライドの差し込み）の動画を安定して制作する",
+    "frustration_points": [
+      "プロ用編集ソフトは機能が多すぎて操作方法を覚えるだけで挫折した",
+      "「えー」「あのー」といった不要なつなぎ言葉はカットしたいが、機械的にすべて消すと不自然になる",
+      "プレゼンテーション用のスライド画像を、動画の適切なタイミングに簡単に追加したい"
+    ]
+  },
+  "ux_principles": [
+    "マニュアルを読まなくてもビジネス解説動画が完成すること",
+    "SmartCut実行時、声の不自然なぶつ切りを防ぎ、「適切な間（400ms）」をあえて残す調整が行えること",
+    "タイムライン上でドラッグ＆ドロップにより、解説スライド（Bロール画像）をタイムリーに挿入できること",
+    "ビジネスに合致する「クール」や「静寂」などの落ち着いたテーマをワンタップで適用できること",
+    "マイクのノイズが自動抑制され、視聴者が講義内容に集中できるクリアな音声になること"
+  ],
+  "maturity_dimensions": {
+    "D1_activity": {"score": 6, "description": "活動量（パイプライン実行回数）"},
+    "D2_judgment": {"score": 3, "description": "判断品質（承認/却下パターン）"},
+    "D3_philosophy": {"score": 5, "description": "哲学深度（Soul Narrativeの豊かさ）"},
+    "D4_youtube": {"score": 4, "description": "YouTube成果（CTR/維持率）"},
+    "D5_proficiency": {"score": 4, "description": "操作習熟度（機能利用パターン）"}
+  },
+  "step_thresholds": {
+    "advance_to_step_5": {
+      "D1_min": 20,
+      "D2_min": 8,
+      "D4_required": false,
+      "note": "20回以上のパイプライン実行 + 中級演出承認8回以上"
+    }
+  },
+  "inherits_from": ["step_002_misaki"],
+  "ux_stories": [
+    "O-1", "O-2", "O-3", "O-4", "O-5", "O-6", "O-7",
+    "O-8", "O-9", "O-10", "O-11", "O-12"
+  ],
+  "constitution_ref": "§7.3 UX最低保証規定",
+  "evolution_log_ref": "soul_narrative/evolution_log.json"
+}

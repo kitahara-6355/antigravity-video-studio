@@ -1,0 +1,10 @@
+{
+  "message": "Phase 30 / 設計ストック DS-026: 大規模変更タスクのマイクロタスク細分化完了。テスト不具合（実キャッシュ読込みによる一時スキャンバイパス、実Git差分によるファイル数制限警告、CRITICAL負債数でのフェーズ移行ブロック）を、MODULE_INDEX_PATH定数導入、validate_batch_qualityのモック、および_MEMORY_DIR差し替えパッチ追加により修正。単体テスト26件PASS、全体フィットネス125件PASSを確認。",
+  "changed_files": [
+    "backend/agents/orchestration/design_stock.json",
+    "backend/agents/orchestration/ds_task_decomposer.py",
+    "backend/agents/orchestration/orchestrator.py",
+    "tests/test_orchestrator.py",
+    "backend/tests/test_ds_task_decomposer.py"
+  ]
+}

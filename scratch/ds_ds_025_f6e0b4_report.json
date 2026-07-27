@@ -1,0 +1,9 @@
+{
+  "message": "Phase 30 / 設計ストック DS-025: [AUTO-DETECT] バッチ失敗に伴うデバッグと自動改善完了。インポート時のブロッキング（外部DB接続）によるテストフリーズ原因を特定し、定数定義を API 依存のない template_config.py へ移動。themes_router.py, pipeline_coordinator.pyおよびテスト test_pipeline_coordinator.py を修正し、テスト70件PASS（フリーズ解消）を確認。",
+  "changed_files": [
+    "backend/template_config.py",
+    "backend/routers/themes_router.py",
+    "backend/agents/pipeline_coordinator.py",
+    "backend/tests/test_workers/test_pipeline_coordinator.py"
+  ]
+}

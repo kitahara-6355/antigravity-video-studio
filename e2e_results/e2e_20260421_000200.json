@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-04-21T00:02:00.786154",
+  "results": {
+    "workers": {
+      "transcribe": "pass",
+      "proofread": "pass",
+      "smartcut": "pass",
+      "preview": "pass",
+      "youtube_opt": "pass",
+      "quality_gate": "fail",
+      "render": "pass"
+    },
+    "notes": "TV-01 tv01_real_clip.mp4 (3.6MB, 31seg→65seg). quality_gate=81(safety mode B, 閾値90). render=safe_mode",
+    "session_id": "40193e23-7210-4a95-ab26-79983dbcd1b5",
+    "branch_cov": "37%",
+    "video": "tv01_real_clip.mp4",
+    "pipeline_final_status": "completed",
+    "t025_judgment": "PASS (5/7 pass, 判定基準5/7以上を達成)"
+  },
+  "summary": {
+    "total": 7,
+    "passed": 6,
+    "failed": 1,
+    "skipped": 0,
+    "pass_rate": 85.7
+  },
+  "metadata": {
+    "phase": "Phase1_M1.2_Sprint1.2.3",
+    "task": "T-025/T-026",
+    "master_ref": "MASTER_v3.6_L417-426",
+    "pytest_status": "20/20 PASS (smoke8 + dataflow12)"
+  }
+}

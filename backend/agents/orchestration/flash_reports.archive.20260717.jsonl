@@ -1,0 +1,8 @@
+{"type": "convergence_loop_event", "task_id": "T-G1", "retry_count": 2, "result": "retry_exhausted", "error_msg": "Perm failure", "target_module": "", "timestamp": "2026-06-07T00:43:06+00:00"}
+{"type": "convergence_loop_event", "task_id": "T-G1", "retry_count": 1, "result": "retry_fail", "error_msg": "Perm failure", "target_module": "", "timestamp": "2026-06-07T00:43:24+00:00"}
+{"type": "convergence_loop_event", "task_id": "T-G1", "retry_count": 2, "result": "retry_fail", "error_msg": "Perm failure", "target_module": "", "timestamp": "2026-06-07T00:43:24+00:00"}
+{"type": "convergence_loop_event", "task_id": "T-G1", "retry_count": 2, "result": "retry_exhausted", "error_msg": "Perm failure", "target_module": "", "timestamp": "2026-06-07T00:43:24+00:00"}
+{"type": "convergence_loop_event", "task_id": "T-G2", "retry_count": 1, "result": "retry_fail", "error_msg": "Simulated Crash!", "target_module": "", "timestamp": "2026-06-07T00:43:24+00:00"}
+{"type": "convergence_loop_event", "task_id": "T-G2", "retry_count": 1, "result": "retry_exhausted", "error_msg": "Simulated Crash!", "target_module": "", "timestamp": "2026-06-07T00:43:24+00:00"}
+{"type": "convergence_loop_event", "task_id": "T-G1", "retry_count": 1, "result": "retry_fail", "error_msg": "Perm failure", "target_module": "", "timestamp": "2026-06-07T00:43:35+00:00"}
+{"type": "convergence_loop_event", "task_id": "T-G1", "retry_count": 2, "result": "retry_fail", "error_msg": "Perm failure", "target_module": "", "timestamp": "2026-06-07T00:43:35+00:00"}

@@ -1,0 +1,47 @@
+{
+  "version": "m22_3_tdr_cleanup",
+  "created_at": "2026-05-23T13:55:23.843884",
+  "summary": {
+    "total": 732,
+    "by_status": {
+      "open": 508,
+      "fixed": 194,
+      "accepted": 30
+    },
+    "by_category": {
+      "CRITICAL_ROUTER": {
+        "total": 153,
+        "open": 5,
+        "fixed": 136
+      },
+      "CRITICAL_PHASE4": {
+        "total": 37,
+        "open": 14,
+        "fixed": 23
+      },
+      "IMPORTANT_SERVICE": {
+        "total": 130,
+        "open": 121,
+        "fixed": 6
+      },
+      "MINOR_INFRA": {
+        "total": 393,
+        "open": 357,
+        "fixed": 29
+      },
+      "ACCEPTED_SAFETY": {
+        "total": 19,
+        "open": 11,
+        "fixed": 0
+      }
+    },
+    "critical_open": 19,
+    "last_updated": "2026-05-23T13:55:23.844459",
+    "recurring_patterns": [
+      "DP-02",
+      "DP-06",
+      "DP-01"
+    ]
+  },
+  "critical_open": 19
+}

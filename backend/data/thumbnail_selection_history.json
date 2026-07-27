@@ -1,0 +1,2559 @@
+[
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-01-22T06:42:53.262999",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-23T23:07:25.677881",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-24T13:00:44.429922",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-25T23:22:34.221633",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T01:39:04.707705",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T06:49:07.797060",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T07:19:09.718203",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T07:24:47.276463",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T07:30:22.248727",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T07:35:51.291856",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T12:21:55.829124",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T12:26:32.491829",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T12:43:42.568944",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T12:49:18.853818",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T14:44:10.528889",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T14:49:18.953122",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T15:00:18.264570",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T15:07:14.120502",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T15:13:00.648026",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T15:34:56.171929",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T15:41:45.820112",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T15:47:35.724876",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-28T18:29:45.684916",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-04-30T07:19:03.066517",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T17:54:06.287819",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": 5.0,
+    "feedback_at": "2026-05-05T17:54:06.306788",
+    "impressions": 1000,
+    "clicks": 50,
+    "prediction_error": 0.0
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T17:54:50.995949",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "feedback_test",
+    "selected_at": "2026-05-05T17:54:51.014435",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": 4.5,
+    "feedback_at": "2026-05-05T17:54:51.027599",
+    "impressions": 1000,
+    "clicks": 45,
+    "prediction_error": 0.5
+  },
+  {
+    "video_id": "feedback_test",
+    "selected_at": "2026-05-05T17:55:04.614567",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": 4.5,
+    "feedback_at": "2026-05-05T17:55:04.629765",
+    "impressions": 1000,
+    "clicks": 45,
+    "prediction_error": 0.5
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T17:55:47.518174",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:11:21.112634",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:12:18.802106",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:15:03.245616",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:17:31.415125",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:28:09.375399",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:30:21.655624",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:40:31.362322",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-05T22:42:52.680853",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:05:17.966083",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:13:31.484984",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:16:02.276756",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:32:55.583548",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:35:25.218847",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:42:54.318440",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:48:08.196597",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:51:52.768828",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T08:55:49.428945",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T09:12:11.967067",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T09:15:51.428452",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T09:19:16.153842",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T09:23:19.241909",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T13:06:56.263225",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T13:13:29.675978",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T13:16:07.721943",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T13:19:17.747228",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T14:55:27.364885",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T15:00:14.436109",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T23:27:04.859997",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T23:37:56.528814",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-06T23:42:35.373018",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-07T06:29:19.455884",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-09T21:49:24.211428",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-09T21:53:43.660519",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-09T21:57:34.859636",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-09T22:07:38.059323",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-09T22:23:52.569476",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T02:48:40.732412",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T02:51:23.124169",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T08:53:31.195463",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T09:07:58.112003",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T09:20:57.300705",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T10:09:43.491300",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T10:13:37.173599",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T10:16:43.676587",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T16:25:16.355419",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T16:48:24.200898",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T18:53:38.006379",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T18:55:01.648037",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T19:02:40.997091",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-10T19:38:48.840046",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-12T18:59:55.102491",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-12T19:10:03.782088",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-12T19:33:16.080010",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-12T20:36:05.689989",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-12T20:52:00.858571",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-12T21:28:24.887506",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T00:09:27.362036",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T06:48:54.116949",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T06:51:46.572767",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T06:53:39.259375",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T06:55:44.965838",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T07:14:36.412796",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T12:34:50.813863",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T12:37:59.234026",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T12:41:13.734390",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T12:44:28.397010",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T17:15:14.973468",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T17:49:50.529330",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T17:52:45.749207",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T17:57:20.965639",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T18:01:26.911913",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T18:04:24.733301",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-13T22:30:44.452226",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-13T22:45:56.489060",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T23:22:13.825122",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T23:26:49.252222",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-13T23:29:38.728667",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-16T22:25:37.977703",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-16T23:06:11.831601",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-16T23:23:31.978517",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T03:07:07.097906",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T03:23:31.266870",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T03:27:07.251256",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T03:41:56.004675",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T12:12:57.257568",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T12:15:14.191566",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T13:12:35.563070",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T17:48:08.229503",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-17T21:54:40.654734",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-17T22:20:59.569262",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-17T23:13:23.518116",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-18T08:33:49.649901",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-18T08:50:05.299776",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-18T14:01:29.901084",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-19T01:58:31.959584",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-19T06:54:31.592794",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-19T06:57:47.703475",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-19T07:24:48.639728",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-19T07:30:04.184750",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-19T07:57:34.395539",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-19T08:13:06.735021",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-19T08:13:51.428142",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-19T12:00:52.709409",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-19T12:01:50.529047",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-21T15:51:03.730892",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-21T16:22:04.398405",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_video_001",
+    "selected_at": "2026-05-21T17:48:22.325530",
+    "selected_index": 0,
+    "selected_concept": "テストコンセプト",
+    "predicted_ctr": 4.5,
+    "all_predicted_ctrs": [
+      4.5,
+      4.0,
+      3.8
+    ],
+    "reason": "テスト選択"
+  },
+  {
+    "video_id": "test_sel",
+    "selected_at": "2026-05-22T00:05:02.362301",
+    "selected_index": 0,
+    "selected_concept": "好奇心喚起型",
+    "predicted_ctr": 4.0,
+    "all_predicted_ctrs": [
+      4.0,
+      3.8,
+      3.6
+    ],
+    "all_concepts": [
+      "好奇心喚起型",
+      "驚き・インパクト型",
+      "ベネフィット訴求型"
+    ],
+    "reason": "sel_class_test",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "rec_test",
+    "selected_at": "2026-05-22T00:05:08.849562",
+    "selected_index": 0,
+    "selected_concept": "好奇心喚起型",
+    "predicted_ctr": 4.0,
+    "all_predicted_ctrs": [
+      4.0,
+      3.8,
+      3.6
+    ],
+    "all_concepts": [
+      "好奇心喚起型",
+      "驚き・インパクト型",
+      "ベネフィット訴求型"
+    ],
+    "reason": "record_test",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_sel",
+    "selected_at": "2026-05-22T01:11:36.726056",
+    "selected_index": 0,
+    "selected_concept": "好奇心喚起型",
+    "predicted_ctr": 4.0,
+    "all_predicted_ctrs": [
+      4.0,
+      3.8,
+      3.6
+    ],
+    "all_concepts": [
+      "好奇心喚起型",
+      "驚き・インパクト型",
+      "ベネフィット訴求型"
+    ],
+    "reason": "sel_class_test",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "rec_test",
+    "selected_at": "2026-05-22T01:11:43.240798",
+    "selected_index": 0,
+    "selected_concept": "好奇心喚起型",
+    "predicted_ctr": 4.0,
+    "all_predicted_ctrs": [
+      4.0,
+      3.8,
+      3.6
+    ],
+    "all_concepts": [
+      "好奇心喚起型",
+      "驚き・インパクト型",
+      "ベネフィット訴求型"
+    ],
+    "reason": "record_test",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T08:29:12.409737",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T08:29:33.376249",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T08:29:57.082773",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T08:30:45.533947",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T08:31:17.411551",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T08:32:17.783719",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T12:11:58.569103",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-22T12:21:56.910982",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-25T18:08:49.764703",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_vid",
+    "selected_at": "2026-05-26T12:54:02.236665",
+    "selected_index": 0,
+    "selected_concept": "concept_a",
+    "predicted_ctr": 5.0,
+    "all_predicted_ctrs": [
+      5.0,
+      3.0
+    ],
+    "all_concepts": [
+      "concept_a",
+      "concept_b"
+    ],
+    "reason": "",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "test_sel",
+    "selected_at": "2026-06-13T21:15:32.733993",
+    "selected_index": 0,
+    "selected_concept": "好奇心喚起型",
+    "predicted_ctr": 4.0,
+    "all_predicted_ctrs": [
+      4.0,
+      3.8,
+      3.6
+    ],
+    "all_concepts": [
+      "好奇心喚起型",
+      "驚き・インパクト型",
+      "ベネフィット訴求型"
+    ],
+    "reason": "sel_class_test",
+    "actual_ctr": null,
+    "feedback_at": null
+  },
+  {
+    "video_id": "rec_test",
+    "selected_at": "2026-06-13T21:15:41.387762",
+    "selected_index": 0,
+    "selected_concept": "好奇心喚起型",
+    "predicted_ctr": 4.0,
+    "all_predicted_ctrs": [
+      4.0,
+      3.8,
+      3.6
+    ],
+    "all_concepts": [
+      "好奇心喚起型",
+      "驚き・インパクト型",
+      "ベネフィット訴求型"
+    ],
+    "reason": "record_test",
+    "actual_ctr": null,
+    "feedback_at": null
+  }
+]

@@ -1,0 +1,608 @@
+{
+  "ux_id": "O-4",
+  "name": "SmartCut構成",
+  "description": "OwnerはSmartCutパネルで動画の目標尺を設定し、AI推奨構成を確認・調整して最終構成を確定できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "SmartCutパネルが表示される",
+      "linked_items": [
+        "O4-L1-01",
+        "O4-L1-02"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "現在の動画の総尺が表示される",
+      "linked_items": [
+        "O4-L1-03",
+        "O4-L2-10"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "目標尺スライダー(5-90分)が表示される",
+      "linked_items": [
+        "O4-L1-04",
+        "O4-L2-01"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "スライダーをドラッグして目標尺を変更する",
+      "linked_items": [
+        "O4-L3-01",
+        "O4-L4-02"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "ドラッグ中はローカル更新のみ、離した瞬間にAI再計算",
+      "linked_items": [
+        "O4-L4-03"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "プリセットボタン(15/30/45/60分)が表示される",
+      "linked_items": [
+        "O4-L1-05",
+        "O4-L2-02"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "プリセットを選択すると目標尺が自動設定される",
+      "linked_items": [
+        "O4-L3-02",
+        "O4-L3-03",
+        "O4-L3-04",
+        "O4-L3-05",
+        "O4-L4-08"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "シーン一覧に固定ボタンが表示される",
+      "linked_items": [
+        "O4-L1-06"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "固定ボタンで特定シーンを保護区間に設定する",
+      "linked_items": [
+        "O4-L3-06",
+        "O4-L4-07"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "固定理由テキストを入力しevolution_logに記録",
+      "linked_items": [
+        "O4-L3-08",
+        "O4-L2-08"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "固定シーンの解除ボタンで保護を解除する",
+      "linked_items": [
+        "O4-L3-07"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "AI推奨の最適構成が表示される",
+      "linked_items": [
+        "O4-L1-07",
+        "O4-L2-07"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "AI推奨の根拠が表示される",
+      "linked_items": [
+        "O4-L1-10"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "カット対象セグメントの一覧が表示される",
+      "linked_items": [
+        "O4-L1-08",
+        "O4-L3-11"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "カット候補のタイムスタンプでプレビュー再生",
+      "linked_items": [
+        "O4-L1-12",
+        "O4-L3-12"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "カット結果の統計が表示される",
+      "linked_items": [
+        "O4-L1-09",
+        "O4-L2-03",
+        "O4-L2-04",
+        "O4-L2-05"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "テキスト密度スコアが表示される",
+      "linked_items": [
+        "O4-L1-11",
+        "O4-L2-06"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "確定ボタンで構成をロックする",
+      "linked_items": [
+        "O4-L3-09",
+        "O4-L4-10"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "不正時にエラーメッセージが表示される",
+      "linked_items": [
+        "O4-L2-09",
+        "O4-L4-05",
+        "O4-L4-06"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "エラーからパラメータ変更で復帰できる",
+      "linked_items": [
+        "O4-L3-10",
+        "O4-L4-09"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "確定した構成が次ステップに渡される",
+      "linked_items": [
+        "O4-L4-01",
+        "O4-L3-13"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "構成決定がevolution_logに記録される",
+      "linked_items": [
+        "O4-L4-04"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O4-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "SmartCut初期化APIが正常応答を返す",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "SmartCutヘルスチェックAPIが正常応答を返す",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "推奨レスポンスにestimated_output_secondsが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "推奨APIが目標尺パラメータを受け付ける",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-05",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "4種プリセット(15/30/45/60分)でAPIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-06",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "シーン固定APIが正常応答を返す",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-07",
+      "layer": 1,
+      "story_scene": "S12",
+      "description": "推奨レスポンスにrecommended_segmentsが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-08",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "全候補APIが正常応答を返す",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-09",
+      "layer": 1,
+      "story_scene": "S16",
+      "description": "推奨レスポンスにestimated_output_strが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-10",
+      "layer": 1,
+      "story_scene": "S13",
+      "description": "推奨セグメントにscoreフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-11",
+      "layer": 1,
+      "story_scene": "S17",
+      "description": "候補にtypeフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L1-12",
+      "layer": 1,
+      "story_scene": "S15",
+      "description": "候補にtimestampフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O4-L2-01",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "推奨APIが指定した目標尺を反映する",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-02",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "各プリセットでestimated_output_secondsが変化する",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-03",
+      "layer": 2,
+      "story_scene": "S16",
+      "description": "estimated_output_strが分:秒形式で表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-04",
+      "layer": 2,
+      "story_scene": "S16",
+      "description": "セグメント数が正の整数で返される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-05",
+      "layer": 2,
+      "story_scene": "S16",
+      "description": "推奨セグメントにstart_time/durationが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-06",
+      "layer": 2,
+      "story_scene": "S17",
+      "description": "候補にtext_snippetが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-07",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "推奨セグメントにtitleが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-08",
+      "layer": 2,
+      "story_scene": "S10",
+      "description": "固定レスポンスにlocked_segmentsが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-09",
+      "layer": 2,
+      "story_scene": "S19",
+      "description": "未初期化時に400エラーが返される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L2-10",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "推奨レスポンスにopening/ending_durationが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O4-L3-01",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "目標尺30分で推奨APIを呼び出し正常応答を得る",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-02",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "プリセット15分でAPIを呼び出す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-03",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "プリセット30分でAPIを呼び出す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-04",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "プリセット45分でAPIを呼び出す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "プリセット60分でAPIを呼び出す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-06",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "シーン固定APIを呼び出し固定リストが増加する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-07",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "固定解除APIを呼び出し固定リストが減少する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-08",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "固定時にreasonフィールドを送信できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-09",
+      "layer": 3,
+      "story_scene": "S18",
+      "description": "確定APIを呼び出し最終構成が返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-10",
+      "layer": 3,
+      "story_scene": "S20",
+      "description": "エラー後にパラメータ変更で復帰できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-11",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "全候補APIからハイライト/チャプター候補を取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-12",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "候補のtimestampからプレビュー位置を計算できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L3-13",
+      "layer": 3,
+      "story_scene": "S21",
+      "description": "確定レスポンスにselected_segmentsが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O4-L4-01",
+      "layer": 4,
+      "story_scene": "S21",
+      "description": "初期化→推奨→確定のステート遷移が正常に完了する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-02",
+      "layer": 4,
+      "story_scene": "S4",
+      "description": "異なる目標尺で推奨結果が変化する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-03",
+      "layer": 4,
+      "story_scene": "S5",
+      "description": "推奨API呼出後に結果が即時反映される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-04",
+      "layer": 4,
+      "story_scene": "S22",
+      "description": "確定レスポンスにevolution_log記録用データが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-05",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "未初期化でrecommend呼出時に400が返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-06",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "未初期化でfinalize呼出時に400が返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-07",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "固定後にrecommendation内容が更新される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-08",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "プリセット切替でestimated_output_secondsが変化する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-09",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "エラー状態から正常パラメータで復帰できる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L4-10",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "確定APIの応答にsuccess=trueが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O4-L5-01",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "初期化→スライダー変更→プリセット切替→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-02",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "固定→カット→保持率確認→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-03",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "エラー→パラメータ変更→成功→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-04",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "全ステップ連携完走(init→recommend→lock→candidates→finalize)",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-05",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "AI推奨→手動調整→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-06",
+      "layer": 5,
+      "story_scene": "S15",
+      "description": "候補取得→タイムスタンプ確認→確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-07",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "固定理由付き固定→確定→学習記録の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-08",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "候補タイプ確認→構成調整→統計確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-09",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "統計確認→最終確定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O4-L5-10",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "パイプライン連携→次ステップ到達確認の完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "migration_v1_to_v2",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

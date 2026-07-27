@@ -1,0 +1,33 @@
+{
+    "scene01_part1": {
+        "display_name": "シーン01_前編",
+        "video_file": "シーン01_前編.mp4",
+        "subtitle_file": "シーン01_前編_official.srt",
+        "timestamps": [
+            "00:00:05",
+            "00:01:00",
+            "00:05:00",
+            "00:10:00"
+        ]
+    },
+    "scene03_part2a": {
+        "display_name": "シーン03_後編01",
+        "video_file": "シーン03_後編01.mp4",
+        "subtitle_file": "シーン03_後編01_official.srt",
+        "timestamps": [
+            "00:00:05",
+            "00:02:00",
+            "00:04:00"
+        ]
+    },
+    "scene04_part2b": {
+        "display_name": "シーン04_後編02",
+        "video_file": "シーン04_後編02.mp4",
+        "subtitle_file": "シーン04_後編02_official.srt",
+        "timestamps": [
+            "00:00:05",
+            "00:02:00",
+            "00:04:00"
+        ]
+    }
+}

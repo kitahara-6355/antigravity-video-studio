@@ -1,0 +1,48 @@
+{
+  "step": 5,
+  "persona_id": "step_005_ryo",
+  "name": "吉川涼",
+  "subtitle": "テック・ビジネス系クリエイター / 一流YouTuber基準の追求",
+  "schema_version": "1.0",
+  "profile": {
+    "age": 28,
+    "occupation": "テック系ガジェットクリエイター（ベンチャー企業経営）",
+    "tech_level": "ITスキルは極めて高い（Pythonスクリプト作成、Adobe Premiere Pro使用経験あり）",
+    "video_experience": "中級者（過去に数十本の動画を手動編集でYouTubeへ投稿）",
+    "motivation": "動画制作の生産性を10倍にしつつ、NHK品質の字幕や映画レベルの音響マスタリングで圧倒的高品質な動画を届ける",
+    "frustration_points": [
+      "無音カットやテロップ配置などのルーチン編集に週数十時間も奪われる",
+      "自動テロップが顔と被ったり、文字が長すぎて画面からはみ出たりする",
+      "BGMと声のミキシングや、YouTube推奨のラウドネス基準（-14 LUFS）の調整が煩雑"
+    ]
+  },
+  "ux_principles": [
+    "ワンクリックで30品質基準（W01〜W30）に適合した高度自動編集が行えること",
+    "YOLO顔検出により、テロップと人物の顔が絶対に被らない動的な位置調整を行うこと",
+    "NHK準拠の字幕ルール（1行13文字以下、読点での自然な改行）を遵守すること",
+    "音声はラウドネス規格（-14 LUFS / -1 dBTP）へ自動でマスタリングされること",
+    "BPM同期型スマートジャンプカットにより、視聴維持率を最大化するテンポ感を作ること"
+  ],
+  "maturity_dimensions": {
+    "D1_activity": {"score": 10, "description": "活動量（パイプライン実行回数）"},
+    "D2_judgment": {"score": 5, "description": "判断品質（承認/却下パターン）"},
+    "D3_philosophy": {"score": 8, "description": "哲学深度（Soul Narrative of Ryo）"},
+    "D4_youtube": {"score": 6, "description": "YouTube成果（CTR/維持率）"},
+    "D5_proficiency": {"score": 7, "description": "操作習熟度（機能利用パターン）"}
+  },
+  "step_thresholds": {
+    "advance_to_step_6": {
+      "D1_min": 30,
+      "D2_min": 15,
+      "D4_required": true,
+      "note": "30回以上のパイプライン実行 + 高度な演出承認15回以上 + YouTube Analytics API連携"
+    }
+  },
+  "inherits_from": ["step_004_ken"],
+  "ux_stories": [
+    "O-1", "O-2", "O-3", "O-4", "O-5", "O-6", "O-7",
+    "O-8", "O-9", "O-10", "O-11", "O-12"
+  ],
+  "constitution_ref": "§7.3 UX最低保証規定",
+  "evolution_log_ref": "soul_narrative/evolution_log.json"
+}

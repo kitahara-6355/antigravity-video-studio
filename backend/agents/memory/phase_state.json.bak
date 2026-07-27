@@ -1,0 +1,761 @@
+{
+  "schema_version": "1.2",
+  "orchestration_enabled": true,
+  "current_phase": 2,
+  "current_milestone": "M2.1",
+  "phase_started_at": "2026-07-07T12:12:09+00:00",
+  "last_batch_id": "batch_d87953",
+  "flash_batches_completed": 9,
+  "flash_tasks_total": 114,
+  "flash_tasks_passed": 52,
+  "flash_tasks_failed": 48,
+  "flash_consecutive_failures": 1,
+  "blacklisted_modules": [
+    "agents/resolution_tracker.py",
+    "cleanup_manager.py",
+    "agents/orchestration/mark_tasks_p27_multi5.py",
+    "agents/orchestration/flash_assign_subagents_17.py",
+    "agents/council_graph.py",
+    "services/quality_feedback_trigger.py",
+    "routers/segments.py",
+    "agents/workers/quality_gate_worker.py",
+    "clean_rebuild.py",
+    "scratch/mark_task_29_done.py",
+    "agents/orchestration/mark_tasks_p27_batch_d21647.py",
+    "agents/orchestration/mark_tasks_p27_bug_hunter_b88.py",
+    "scratch/get_next_batch.py",
+    "harness/governance.py",
+    "verify_full_system.py",
+    "agents/orchestration/flash_status_update.py",
+    "routers/smartcut.py",
+    "agents/orchestration/learning_integration.py",
+    "self_improvement_engine.py",
+    "comprehensive_preview.py",
+    "agents/orchestration/mark_tasks_p27_weaver1_new.py",
+    "services/post_publish_collector.py",
+    "tests/e2e_stability.py",
+    "generate_inspection_screenshots.py",
+    "agents/orchestration/dispatch_next_batch.py",
+    "agents/orchestration/flash_assign_subagents_5.py",
+    "plugins/auto_chapters_plugin.py",
+    "agents/advisor_gate.py",
+    "archives/unified/video_unified.py",
+    "plugins/music_layer_plugin.py"
+  ],
+  "opus_reviews_this_week": 3,
+  "opus_hours_used_this_week": 1.0277777777777777,
+  "opus_week_start": "2026-07-27T10:36:18+00:00",
+  "metrics": {
+    "coverage_pct": 44.0,
+    "test_count": 2240,
+    "critical_debt": 0,
+    "coverage_verified": true,
+    "coverage_source": "pytest --cov=backend (no -x flag) @ 2026-07-14T13:41:19.292669+00:00",
+    "coverage_log_path": "C:\\Users\\PC_User\\Desktop\\script\\video-automation\\logs\\coverage_measured_20260714_223014.txt",
+    "coverage_measured_at": "2026-07-14T13:41:19.292669+00:00",
+    "tests_passed": 2134,
+    "tests_failed": 87
+  },
+  "gate_checklist": {},
+  "last_opus_review": "2026-07-27T10:36:39+00:00",
+  "awaiting_opus": true,
+  "emergency_stop": false,
+  "stop_reason": null,
+  "throttled": false,
+  "history": [],
+  "roadmap_max_phase": 45,
+  "next_milestones": [
+    {
+      "phase": 30,
+      "title": "共通処理機構 知的進化 & God Class分割",
+      "milestones": [
+        "M30.1",
+        "M30.2"
+      ],
+      "gate_conditions": {
+        "M30.1": "学習エンジン・分解エンジンのorchestrator統合完了",
+        "M30.2": "orchestrator.py 5モジュール分割完了 + テスト全PASS"
+      }
+    },
+    {
+      "phase": 31,
+      "title": "カバレッジ体系的改善 & テスト品質向上",
+      "milestones": [
+        "M31.1",
+        "M31.2"
+      ],
+      "gate_conditions": {
+        "M31.1": "Branch Coverage 50%達成（現行26.4%から） + Tri-Agent Council による合格証明提出",
+        "M31.2": "CRITICAL技術負債 0件達成 + Tri-Agent Council による検証PASS"
+      }
+    },
+    {
+      "phase": 32,
+      "title": "E2Eパイプライン統合テスト & 監査自動化",
+      "milestones": [
+        "M32.1",
+        "M32.2"
+      ],
+      "gate_conditions": {
+        "M32.1": "E2Eテスト10シナリオ PASS",
+        "M32.2": "監査57項目の自動実行基盤稼働"
+      }
+    },
+    {
+      "phase": 33,
+      "title": "自己修復エンジン & リトライ自動化",
+      "milestones": [
+        "M33.1",
+        "M33.2"
+      ],
+      "gate_conditions": {
+        "M33.1": "エラー判定・分類エンジン稼働",
+        "M33.2": "自動リトライフォールバック3パターン実装"
+      }
+    },
+    {
+      "phase": 34,
+      "title": "自律テスト生成 & モック自動生成",
+      "milestones": [
+        "M34.1",
+        "M34.2"
+      ],
+      "gate_conditions": {
+        "M34.1": "AST解析からのテスト自動生成5モジュール",
+        "M34.2": "モック自動生成 + Coverage 60%達成"
+      }
+    },
+    {
+      "phase": 35,
+      "title": "Nexus-Council 3.0 & 評議会高度化",
+      "milestones": [
+        "M35.1",
+        "M35.2"
+      ],
+      "gate_conditions": {
+        "M35.1": "ファクトベース合意形成メカニズム実装",
+        "M35.2": "タイムアウト自律リカバリ + 3エージェント協調テスト"
+      }
+    },
+    {
+      "phase": 36,
+      "title": "Admin Suite UI完成 & CTRベンチマーク統合",
+      "milestones": [
+        "M36.1",
+        "M36.2"
+      ],
+      "gate_conditions": {
+        "M36.1": "A-1〜A-7ダッシュボード画面実装",
+        "M36.2": "YouTuber CTRベンチマークUI統合"
+      }
+    },
+    {
+      "phase": 37,
+      "title": "演出哲学還流 & NHK字幕品質強化",
+      "milestones": [
+        "M37.1",
+        "M37.2"
+      ],
+      "gate_conditions": {
+        "M37.1": "演出哲学還流エンジン稼働",
+        "M37.2": "NHK字幕品質スコア自動測定 80点以上"
+      }
+    },
+    {
+      "phase": 38,
+      "title": "プロセスデーモン化 & 24時間無停止運用",
+      "milestones": [
+        "M38.1"
+      ],
+      "gate_conditions": {
+        "M38.1": "デーモンプロセス24h無停止稼働テストPASS"
+      }
+    },
+    {
+      "phase": 39,
+      "title": "パイプライン統合 & 動画生成E2E",
+      "milestones": [
+        "M39.1",
+        "M39.2"
+      ],
+      "gate_conditions": {
+        "M39.1": "RAW動画→最終動画の自動パイプライン1本完走",
+        "M39.2": "品質スコア80点以上の動画自動生成"
+      }
+    },
+    {
+      "phase": 40,
+      "title": "完全自律運用 & 品質保証ゲート",
+      "milestones": [
+        "M40.1"
+      ],
+      "gate_conditions": {
+        "M40.1": "ユーザー介入0で24h運用テストPASS + Coverage 70%"
+      }
+    }
+  ],
+  "last_updated": "2026-06-10T13:10:23Z",
+  "auto_blacklist_expiry": {
+    "comprehensive_preview.py": 3,
+    "agents/resolution_tracker.py": 3,
+    "agents/orchestration/dispatch_next_batch.py": 3,
+    "agents/orchestration/mark_tasks_p27_multi14.py": 3,
+    "plugins/smart_cut_plugin.py": 3,
+    "verify_council.py": 3,
+    "service_container.py": 3,
+    "self_improvement_engine.py": 3,
+    "agents/orchestration/flash_status_update.py": 3,
+    "dispatch_enhancer.py": 3,
+    "services/quality_feedback_trigger.py": 3,
+    "agents/orchestration/mark_tasks_p27_multi5.py": 3,
+    "agents/orchestration/flash_assign_subagents_5.py": 3,
+    "plugins/music_layer_plugin.py": 3,
+    "agents/workers/proofread_worker.py": 3,
+    "routers/segments.py": 3,
+    "tests/e2e_stability.py": 3,
+    "agents/orchestration/flash_assign_subagents_8.py": 3,
+    "philosophy_manager.py": 3,
+    "scripts/measure_branches.py": 3,
+    "services/embedding_service.py": 3,
+    "routers/smartcut.py": 3,
+    "routers/youtube_upload.py": 3,
+    "scratch/mark_task_29_done.py": 3,
+    "agents/council_graph.py": 3,
+    "plugins/report_generator_plugin.py": 3,
+    "harness/pipeline_tools.py": 3,
+    "agents/orchestration/flash_assign_subagents_17.py": 3,
+    "clean_rebuild.py": 3,
+    "services/post_publish_collector.py": 3,
+    "verify_thumbnail_gen.py": 3,
+    "agents/workers/quality_gate_worker.py": 3,
+    "agents/orchestration/mark_tasks_p27_batch_d21647.py": 3,
+    "agents/orchestration/mark_tasks_p27_bug_hunter_b88.py": 3,
+    "cleanup_manager.py": 3,
+    "agents/orchestration/mark_tasks_p27_weaver1_new.py": 3,
+    "metadata_generator.py": 3,
+    "plugins/auto_chapters_plugin.py": 3,
+    "agents/advisor_gate.py": 3,
+    "harness/governance.py": 3,
+    "agents/orchestration/generate_subagent_reports.py": 3,
+    "scratch/get_next_batch.py": 3,
+    "verify_full_system.py": 3,
+    "agents/orchestration/learning_integration.py": 3,
+    "generate_inspection_screenshots.py": 3,
+    "archives/unified/video_unified.py": 3,
+    "color_grading.py": 3,
+    "verify_image_gen.py": 3,
+    "verify_collaboration_api.py": 3,
+    "agents/memory/council_decision_extractor.py": 3,
+    "tests/_screenshot_dashboard.py": 3,
+    "agents/orchestration/cleanup_disk.py": 3,
+    "agents/orchestration/hub_batch.py": 3,
+    "agents/orchestration/flash_runner_next_batch.py": 3,
+    "minimal_telop_generator.py": 3,
+    "safe_io.py": 3,
+    "routers/pipeline_report.py": 3,
+    "antigravity_pipeline.py": 3,
+    "agents/orchestration/mark_tasks_p27_batch_4ab330.py": 3,
+    "add_scene04_telop.py": 3,
+    "agents/orchestration/run_session_end.py": 3,
+    "routers/themes_router.py": 3,
+    "agents/orchestration/wave_scheduler.py": 3,
+    "verify_council_v2.py": 3,
+    "error_reporter.py": 3,
+    "agents/director.py": 3,
+    "agents/orchestration/check_subagents_loop.py": 3,
+    "scratch/dispatch_next_batch.py": 3,
+    "preview_system.py": 3,
+    "agents/orchestration/dynamic_workflow_engine.py": 3,
+    "redis_config.py": 3,
+    "scripts/gen_session9.py": 3,
+    "generation_engine.py": 3,
+    "aligned_preview_generator.py": 3,
+    "scratch/submit_batch.py": 3,
+    "archives/archive_stable_v3.0_20260118_0953/antigravity_pipeline.py": 3,
+    "agents/orchestration/inline_coverage_extender.py": 3,
+    "agents/orchestration/mark_tasks_p27_refactor_b88.py": 3,
+    "services/hook_improver.py": 3,
+    "agents/dream_engine.py": 3,
+    "subtitle_engine/text_formatter.py": 3,
+    "services/youtube_ab_test.py": 3,
+    "services/hook_evolution_service.py": 3,
+    "agents/orchestration/get_batch.py": 3,
+    "integrated_preview.py": 3,
+    "apply_full_premium_telop.py": 3,
+    "agents/self_healing_tool.py": 3,
+    "agents/orchestration/mark_tasks_p27_thumb1.py": 3,
+    "design_system/design_token_manager.py": 3,
+    "services/smartcut_strategy_service.py": 3,
+    "routers/admin_quota_router.py": 3,
+    "routers/pipeline_router.py": 3,
+    "services/publish_scheduler.py": 3,
+    "agents/orchestration/mark_fail_batch_6d239c_agent4.py": 3,
+    "agents/orchestration/init_check.py": 3,
+    "routers/usage_router.py": 3,
+    "video_processor.py": 3,
+    "video_pipeline/subtitle_generator.py": 3,
+    "routers/render.py": 3,
+    "agents/orchestration/hub_session.py": 3,
+    "model_governance.py": 3
+  },
+  "module_cooldown": {
+    "comprehensive_preview.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/resolution_tracker.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/dispatch_next_batch.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_multi14.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "plugins/smart_cut_plugin.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "verify_council.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "service_container.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "self_improvement_engine.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "integration_test.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/flash_status_update.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "dispatch_enhancer.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/quality_feedback_trigger.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_multi5.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/flash_assign_subagents_5.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "plugins/music_layer_plugin.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/copy_artifacts.py": {
+      "consecutive_bl_count": 3,
+      "cooldown_until_batch": 31
+    },
+    "agents/workers/proofread_worker.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/segments.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "tests/e2e_stability.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/flash_assign_subagents_8.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "philosophy_manager.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "scripts/measure_branches.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/embedding_service.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/smartcut.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/youtube_upload.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "scratch/mark_task_29_done.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/council_graph.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "plugins/report_generator_plugin.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "harness/pipeline_tools.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/flash_assign_subagents_17.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "clean_rebuild.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/post_publish_collector.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "verify_thumbnail_gen.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/workers/quality_gate_worker.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_batch_d21647.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_bug_hunter_b88.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "cleanup_manager.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_weaver1_new.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "metadata_generator.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "plugins/auto_chapters_plugin.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/advisor_gate.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "harness/governance.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/generate_subagent_reports.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "scratch/get_next_batch.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "verify_full_system.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/learning_integration.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "generate_inspection_screenshots.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "archives/unified/video_unified.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "color_grading.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "verify_image_gen.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "verify_collaboration_api.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/memory/council_decision_extractor.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "tests/_screenshot_dashboard.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/cleanup_disk.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/hub_batch.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/flash_runner_next_batch.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "minimal_telop_generator.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "safe_io.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/pipeline_report.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "antigravity_pipeline.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_batch_4ab330.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "add_scene04_telop.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/run_session_end.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/themes_router.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/wave_scheduler.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "verify_council_v2.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "error_reporter.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/director.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/check_subagents_loop.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "scratch/dispatch_next_batch.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "preview_system.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/dynamic_workflow_engine.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "redis_config.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "scripts/gen_session9.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "generation_engine.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "aligned_preview_generator.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "scratch/submit_batch.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "archives/archive_stable_v3.0_20260118_0953/antigravity_pipeline.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/inline_coverage_extender.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_refactor_b88.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/hook_improver.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/dream_engine.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "subtitle_engine/text_formatter.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/youtube_ab_test.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/hook_evolution_service.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/get_batch.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "integrated_preview.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "apply_full_premium_telop.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/self_healing_tool.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_tasks_p27_thumb1.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "design_system/design_token_manager.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/smartcut_strategy_service.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/admin_quota_router.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/pipeline_router.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "services/publish_scheduler.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/mark_fail_batch_6d239c_agent4.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/init_check.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/usage_router.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "video_processor.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "video_pipeline/subtitle_generator.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "routers/render.py": {
+      "consecutive_bl_count": 4,
+      "cooldown_until_batch": 55
+    },
+    "agents/orchestration/hub_session.py": {
+      "consecutive_bl_count": 2,
+      "cooldown_until_batch": 35
+    },
+    "model_governance.py": {
+      "consecutive_bl_count": 2,
+      "cooldown_until_batch": 35
+    }
+  },
+  "gate_conditions": {},
+  "reset_audit": {
+    "reset_at": "2026-06-28T10:34:09.123943+00:00",
+    "reset_reason": "Sigma-1a: Phase number inflation detected. Soft gate bypass evidence in valley_phase_33.json. Metrics (coverage 81.1%%, test_count 7022) unverifiable.",
+    "old_phase": 43,
+    "old_coverage_pct": 81.1,
+    "old_test_count": 7022,
+    "old_values_archived": true
+  },
+  "last_gate_passed": {
+    "phase": 1,
+    "passed_at": "2026-07-07T12:12:09+00:00",
+    "conditions": {
+      "no_emergency_stop": true,
+      "coverage_pct": true,
+      "test_count": true,
+      "critical_debt": true,
+      "changed_line_coverage": true,
+      "ux_ratchet_pass": true
+    }
+  },
+  "evolution_phase": "C",
+  "evolution_phase_name": "AI高機能化",
+  "phase_transition_log": [
+    {
+      "from": "Phase A (品質基盤の確立)",
+      "to": "Phase B (OSSエンジン統合)",
+      "at": "2026-07-18T14:15:11.190518+00:00",
+      "reason": "OSS導入による開発サイクル2-3倍加速の戦略判断（ユーザー承認済）",
+      "rollback_tag": "v2.0-pre-oss-integration"
+    },
+    {
+      "from": "Phase B (OSSエンジン統合)",
+      "to": "Phase C (AI高機能化)",
+      "at": "2026-07-21T22:17:27.213267+00:00",
+      "reason": "Phase B全マイルストーン完了 (B-1~B-4 PASS / FF143 PASS / 回帰なし)",
+      "rollback_tag": "v2.1-oss-integration-complete"
+    },
+    {
+      "from": "Phase C (AI高機能化)",
+      "to": "Phase C 完了",
+      "at": "2026-07-25T12:51:52.453365+00:00",
+      "reason": "Phase C全マイルストーン完了 (C-1~C-5 PASS / FF163 PASS / 回帰なし)",
+      "completed_tag": "v3.0-ai-enhanced"
+    }
+  ]
+}

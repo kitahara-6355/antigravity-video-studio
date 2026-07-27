@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "reference_duration_minutes": 5,
+  "total_budget_seconds": 570,
+  "worker_budgets": {
+    "文字起こし": {"budget_seconds": 120, "priority": "critical"},
+    "AI校閲": {"budget_seconds": 60, "priority": "critical"},
+    "SmartCut構成": {"budget_seconds": 30, "priority": "critical"},
+    "プレビュー生成": {"budget_seconds": 90, "priority": "degradable"},
+    "YouTube最適化": {"budget_seconds": 60, "priority": "degradable"},
+    "品質チェック": {"budget_seconds": 30, "priority": "critical"},
+    "最終レンダリング": {"budget_seconds": 180, "priority": "critical"}
+  },
+  "degradation_rules": [
+    {"worker": "YouTube最適化", "action": "cache_first", "savings_percent": 40},
+    {"worker": "プレビュー生成", "action": "lower_resolution", "savings_percent": 30}
+  ]
+}
+

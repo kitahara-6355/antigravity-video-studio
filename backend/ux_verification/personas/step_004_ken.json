@@ -1,0 +1,47 @@
+{
+  "step": 4,
+  "persona_id": "step_004_ken",
+  "name": "田中ケン",
+  "subtitle": "ガジェット紹介クリエイター / 中上級YouTube発信",
+  "schema_version": "1.0",
+  "profile": {
+    "age": 35,
+    "occupation": "テックブログ運営・個人事業主",
+    "tech_level": "上級（PC自作、コマンドライン操作、スクリプト実行などを理解）",
+    "video_experience": "中級（Premiere Pro を半年以上使用、基本的なタイムライン操作を理解）",
+    "motivation": "ガジェット紹介動画などの視聴維持率を最大化したい。AIの『BPM同期スマートカット』や、テロップが自分の顔に被るのを動的に避ける『顔衝突回避機能』などの高度な演出機能を積極的に使いたい。ただし、タイトル先行制作のCTR予測やラウドネスの厳密なマスタリングといった、最高峰の分析・規格プロセスは涼（Step 5）の領域としておまかせにしたい",
+    "frustration_points": [
+      "ジャンプカットしたときに、シーンのつなぎ目が不自然にぶつぶつ切れるのが気になる",
+      "テロップと自分の表情（リアクション）が重なってしまい、手動で位置を微調整する手間が面倒",
+      "BGMのテンポと映像の切り替わりが一致していないと、見ていて心地よさが足りないと感じる"
+    ]
+  },
+  "ux_principles": [
+    "BGMの拍子（ビート）に合わせた『BPM同期ジャンプカット』が自動で綺麗に機能すること",
+    "YOLOv8顔検出により、テロップが表情（目・鼻・口）と衝突しないよう自動でSafe Areaへ微調整されること",
+    "MrBeast風などのアップテンポなプリセットテンプレートとテーマを使いこなせること",
+    "複雑なラウドネスの書き出し仕様などは自動で最適なプロ仕様に処理されること"
+  ],
+  "maturity_dimensions": {
+    "D1_activity": {"score": 8, "description": "活動量（パイプライン実行回数）"},
+    "D2_judgment": {"score": 6, "description": "判断品質（承認/却下パターン）"},
+    "D3_philosophy": {"score": 5, "description": "哲学深度（Soul Narrativeの豊かさ）"},
+    "D4_youtube": {"score": 5, "description": "YouTube成果（CTR/維持率）"},
+    "D5_proficiency": {"score": 6, "description": "操作習熟度（機能利用パターン）"}
+  },
+  "step_thresholds": {
+    "advance_to_step_5": {
+      "D1_min": 25,
+      "D2_min": 10,
+      "D4_required": true,
+      "note": "25回以上のパイプライン実行 + 高度な演出承認10回以上 + CTR平均値5.5%以上達成"
+    }
+  },
+  "inherits_from": ["step_003_satoshi"],
+  "ux_stories": [
+    "O-1", "O-2", "O-3", "O-4", "O-5", "O-6", "O-7",
+    "O-8", "O-9", "O-10", "O-11", "O-12"
+  ],
+  "constitution_ref": "§7.3 UX最低保証規定",
+  "evolution_log_ref": "soul_narrative/evolution_log.json"
+}

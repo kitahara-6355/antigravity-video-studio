@@ -1,0 +1,69 @@
+{
+  "batch_id": "batch_1ec60a",
+  "phase": 33,
+  "milestone": "M33.1",
+  "tasks": {
+    "T-batch_1ec60a-bug_hunter-000": {
+      "task_id": "T-batch_1ec60a-bug_hunter-000",
+      "group": "bug_hunter",
+      "target_module": "agents/orchestration/flash_assign_subagents_8.py",
+      "instruction": "Phase 33 / bug_hunter タスク #1 — 対象: agents/orchestration/flash_assign_subagents_8.py\n\n【作業指示】対象モジュールで pytest --timeout=300 を実行し FAIL/Warning を検出せよ。原因を特定し修正。テスト追加必須。変更は3ファイル以内（L2）。except Exception の改善、エラーハンドリング強化を優先。⠀⚠️ pytest実行時は必ず --timeout=300 を付与すること（ハング防止）。",
+      "status": "running",
+      "subagent_id": "443a4ef9-bf1e-4df0-95cc-507ad0962cc7",
+      "result": null,
+      "report": null
+    },
+    "T-batch_1ec60a-bug_hunter-001": {
+      "task_id": "T-batch_1ec60a-bug_hunter-001",
+      "group": "bug_hunter",
+      "target_module": "error_reporter.py",
+      "instruction": "Phase 33 / bug_hunter タスク #2 — 対象: error_reporter.py\n\n【作業指示】対象モジュールで pytest --timeout=300 を実行し FAIL/Warning を検出せよ。原因を特定し修正。テスト追加必須。変更は3ファイル以内（L2）。except Exception の改善、エラーハンドリング強化を優先。⠀⚠️ pytest実行時は必ず --timeout=300 を付与すること（ハング防止）。",
+      "status": "running",
+      "subagent_id": "6899e643-b550-4220-a014-16d9ee022ae5",
+      "result": null,
+      "report": null
+    },
+    "T-batch_1ec60a-bug_hunter-002": {
+      "task_id": "T-batch_1ec60a-bug_hunter-002",
+      "group": "bug_hunter",
+      "target_module": "agents/orchestration/learning_integration.py",
+      "instruction": "Phase 33 / bug_hunter タスク #3 — 対象: agents/orchestration/learning_integration.py\n\n【作業指示】対象モジュールで pytest --timeout=300 を実行し FAIL/Warning を検出せよ。原因を特定し修正。テスト追加必須。変更は3ファイル以内（L2）。except Exception の改善、エラーハンドリング強化を優先。⠀⚠️ pytest実行時は必ず --timeout=300 を付与すること（ハング防止）。",
+      "status": "running",
+      "subagent_id": "d887fa4d-3127-4f34-bc1f-f9e62ea1de22",
+      "result": null,
+      "report": null
+    },
+    "T-batch_1ec60a-bug_hunter-003": {
+      "task_id": "T-batch_1ec60a-bug_hunter-003",
+      "group": "bug_hunter",
+      "target_module": "agents/orchestration/wave_scheduler.py",
+      "instruction": "Phase 33 / bug_hunter タスク #4 — 対象: agents/orchestration/wave_scheduler.py\n\n【作業指示】対象モジュールで pytest --timeout=300 を実行し FAIL/Warning を検出せよ。原因を特定し修正。テスト追加必須。変更は3ファイル以内（L2）。except Exception の改善、エラーハンドリング強化を優先。⠀⚠️ pytest実行時は必ず --timeout=300 を付与すること（ハング防止）。",
+      "status": "running",
+      "subagent_id": "65414d4b-8e69-4523-a956-a1632b53b713",
+      "result": null,
+      "report": null
+    },
+    "T-batch_1ec60a-bug_hunter-004": {
+      "task_id": "T-batch_1ec60a-bug_hunter-004",
+      "group": "bug_hunter",
+      "target_module": "agents/council_graph.py",
+      "instruction": "Phase 33 / bug_hunter タスク #5 — 対象: agents/council_graph.py\n\n【作業指示】対象モジュールで pytest --timeout=300 を実行し FAIL/Warning を検出せよ。原因を特定し修正。テスト追加必須。変更は3ファイル以内（L2）。except Exception の改善、エラーハンドリング強化を優先。⠀⚠️ pytest実行時は必ず --timeout=300 を付与すること（ハング防止）。",
+      "status": "running",
+      "subagent_id": "f9918046-01cc-495c-82b7-d3fde031591e",
+      "result": null,
+      "report": null
+    },
+    "T-batch_1ec60a-bug_hunter-005": {
+      "task_id": "T-batch_1ec60a-bug_hunter-005",
+      "group": "bug_hunter",
+      "target_module": "agents/orchestration/mark_tasks_p27_batch_449dfb.py",
+      "instruction": "Phase 33 / bug_hunter タスク #6 — 対象: agents/orchestration/mark_tasks_p27_batch_449dfb.py\n\n【作業指示】対象モジュールで pytest --timeout=300 を実行し FAIL/Warning を検出せよ。原因を特定し修正。テスト追加必須。変更は3ファイル以内（L2）。except Exception の改善、エラーハンドリング強化を優先。⠀⚠️ pytest実行時は必ず --timeout=300 を付与すること（ハング防止）。",
+      "status": "running",
+      "subagent_id": "77db9624-6f27-435a-8525-2b590935d856",
+      "result": null,
+      "report": null
+    }
+  },
+  "completed_tasks_count": 0,
+  "total_tasks_count": 6
+}

@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "patterns": {
+    "test": {
+      "category": "test",
+      "preferred": [
+        "テスト承認"
+      ],
+      "avoided": [],
+      "confidence": 0.2,
+      "sample_count": 2
+    }
+  }
+}

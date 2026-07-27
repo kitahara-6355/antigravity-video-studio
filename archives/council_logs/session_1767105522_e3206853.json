@@ -1,0 +1,67 @@
+{
+  "session_id": "e3206853-18b3-4c2a-aa74-e2925b9334a0",
+  "timestamp": 1767105522.817145,
+  "datetime": "2025-12-30T23:38:42.817150",
+  "topic": "[object Object]",
+  "debate_flow": [
+    {
+      "agent": "Analyst",
+      "role": "Data Scientist",
+      "color": "#F59E0B",
+      "timestamp": 1767105514.7289174,
+      "stance": "DISAGREE",
+      "summary": "Data Analysis Complete",
+      "detail": "Your Nemesis 'TechStarter' is ahead by 29 subs. Analysis shows they post 2x more frequently.",
+      "data": {
+        "my_stats": {
+          "subscribers": 151,
+          "total_views": 4650,
+          "videos": 12,
+          "last_updated": "2025-12-30T23:15:24.500301"
+        },
+        "rivals": {
+          "nemesis": {
+            "name": "TechStarter",
+            "subs": 180,
+            "views": 5000,
+            "genre": "Tech"
+          },
+          "benchmark": {
+            "name": "TechMastery",
+            "subs": 15000,
+            "views": 1500000,
+            "genre": "Tech"
+          }
+        }
+      },
+      "glossary": [
+        {
+          "term": "Nemesis",
+          "def": "A rival channel with slightly higher stats (your immediate target)."
+        },
+        {
+          "term": "Velocity",
+          "def": "The rate of subscriber growth per day."
+        }
+      ]
+    },
+    {
+      "agent": "Strategist",
+      "role": "Brand Guardian",
+      "color": "#EF4444",
+      "timestamp": 1767105522.8092918,
+      "stance": "NEUTRAL",
+      "summary": "Awaiting proposal.",
+      "detail": "I need a proposal to evaluate. Please provide the content you'd like me to analyze so I can determine if it aligns with the Antigravity Channel's brand and business objectives.",
+      "glossary": []
+    }
+  ],
+  "synthesis": {
+    "type": "SYNTHESIS",
+    "proposal": "Based on the debate, X is recommended.",
+    "options": [
+      "Approve",
+      "Reject"
+    ]
+  }
+}

@@ -1,0 +1,628 @@
+{
+  "ux_id": "A-1",
+  "name": "システムセットアップ・環境管理",
+  "description": "管理者はシステムのセットアップ状態・環境・接続・GPU情報を一元的に確認・管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "AdminセットアップDashboardが表示される",
+      "linked_items": [
+        "A1-L1-01",
+        "A1-L1-02",
+        "A1-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "バックエンド/フロントエンド/DB/GPUの接続ステータスが表示される",
+      "linked_items": [
+        "A1-L1-03",
+        "A1-L2-02",
+        "A1-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "APIキー(Gemini/YouTube)の設定状態が表示される",
+      "linked_items": [
+        "A1-L1-04",
+        "A1-L2-03",
+        "A1-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "APIキーを安全に設定/更新できる",
+      "linked_items": [
+        "A1-L3-03",
+        "A1-L3-04",
+        "A1-L4-01"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "4ミドルウェア(Hooks/Session/Governance/ToolRegistry)の初期化状態が表示される",
+      "linked_items": [
+        "A1-L1-05",
+        "A1-L2-04"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "ServiceContainerの遅延初期化状態が表示される",
+      "linked_items": [
+        "A1-L1-06",
+        "A1-L2-05"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "GPU型番/VRAM/ドライババージョンが表示される",
+      "linked_items": [
+        "A1-L1-07",
+        "A1-L2-06",
+        "A1-L3-05"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "model_config.jsonの現在設定が表示される",
+      "linked_items": [
+        "A1-L1-08",
+        "A1-L2-07"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "モデル割当(Premium/Standard/Batch)を変更できる",
+      "linked_items": [
+        "A1-L3-06",
+        "A1-L3-07",
+        "A1-L4-02"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "3段階フォールバックチェーンの設定が表示される",
+      "linked_items": [
+        "A1-L1-09",
+        "A1-L2-08"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "/health/deepエンドポイントの結果が表示される",
+      "linked_items": [
+        "A1-L1-10",
+        "A1-L3-08",
+        "A1-L4-03"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "起動時の自動診断結果(全コンポーネント)が表示される",
+      "linked_items": [
+        "A1-L1-11",
+        "A1-L2-09"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "ログレベル/出力先の設定が変更できる",
+      "linked_items": [
+        "A1-L3-09",
+        "A1-L4-04"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "vault-assets/outputsのディスク使用量が表示される",
+      "linked_items": [
+        "A1-L1-12",
+        "A1-L2-10"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "ディスク残量が閾値以下で警告が表示される",
+      "linked_items": [
+        "A1-L3-10",
+        "A1-L4-05"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "古い一時ファイルの自動/手動クリーンアップができる",
+      "linked_items": [
+        "A1-L3-11",
+        "A1-L4-06"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "システムバージョン/依存パッケージバージョンが表示される",
+      "linked_items": [
+        "A1-L4-07",
+        "A1-L5-01"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "現在の設定をJSON/YAMLでエクスポートできる",
+      "linked_items": [
+        "A1-L3-12",
+        "A1-L4-08"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "設定ファイルをインポートして一括適用できる",
+      "linked_items": [
+        "A1-L3-13",
+        "A1-L4-09"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "コンポーネントの個別再起動ができる",
+      "linked_items": [
+        "A1-L4-10",
+        "A1-L5-02"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "直近エラーログの一覧が表示される",
+      "linked_items": [
+        "A1-L5-03",
+        "A1-L5-04",
+        "A1-L5-05"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "障害時の通知先(Slack/Email)が設定できる",
+      "linked_items": [
+        "A1-L5-06",
+        "A1-L5-07",
+        "A1-L5-08"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A1-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "Admin Setup APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "admin-setup-dashboard"
+    },
+    {
+      "id": "A1-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにsectionsフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "admin-setup-sections"
+    },
+    {
+      "id": "A1-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "環境ステータスAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "environment-status"
+    },
+    {
+      "id": "A1-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "APIキー管理APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "api-keys-status"
+    },
+    {
+      "id": "A1-L1-05",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "ハーネス状態APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "harness-status"
+    },
+    {
+      "id": "A1-L1-06",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "DI状態APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "di-container-status"
+    },
+    {
+      "id": "A1-L1-07",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "GPU情報APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "gpu-info"
+    },
+    {
+      "id": "A1-L1-08",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "モデル設定APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "model-config"
+    },
+    {
+      "id": "A1-L1-09",
+      "layer": 1,
+      "story_scene": "S10",
+      "description": "フォールバックチェーンAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "fallback-chain"
+    },
+    {
+      "id": "A1-L1-10",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "ヘルスチェックAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "health-deep"
+    },
+    {
+      "id": "A1-L1-11",
+      "layer": 1,
+      "story_scene": "S12",
+      "description": "自動診断APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "diagnostics"
+    },
+    {
+      "id": "A1-L1-12",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "ストレージ使用量APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "storage-usage"
+    },
+    {
+      "id": "A1-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/statusフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "環境ステータスにbackend/frontend/gpu状態が含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "APIキー状態にgemini/youtube設定フラグが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-04",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "ハーネス状態に4コンポーネントのステータスが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-05",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "DI状態にinitialized/servicesフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-06",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "GPU情報にmodel/vram/driverフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-07",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "モデル設定にtask_model_mappingが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-08",
+      "layer": 2,
+      "story_scene": "S10",
+      "description": "フォールバックチェーンにprimary/secondary/tertiaryが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-09",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "自動診断結果にall_checks配列が含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L2-10",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "ストレージ使用量にfree_gb/total_gb/usage_percentが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A1-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "環境ステータスの各コンポーネント詳細を取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "APIキー状態の検証チェックを実行できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-03",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "APIキー更新APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-04",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "APIキー更新後に設定が反映される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "GPU情報の更新チェックを実行できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-06",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "モデル割当変更APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-07",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "モデル割当変更後にtask_model_mappingが更新される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-08",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "ヘルスチェック実行結果が返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-09",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "ログレベル変更APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-10",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "ストレージ警告閾値を設定できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-11",
+      "layer": 3,
+      "story_scene": "S16",
+      "description": "クリーンアップ実行APIが正常応答する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-12",
+      "layer": 3,
+      "story_scene": "S18",
+      "description": "設定エクスポートAPIが正常応答する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L3-13",
+      "layer": 3,
+      "story_scene": "S19",
+      "description": "設定インポートAPIが正常応答する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A1-L4-01",
+      "layer": 4,
+      "story_scene": "S4",
+      "description": "無効なAPIキーで適切なエラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-02",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "無効なモデル名で適切なエラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-03",
+      "layer": 4,
+      "story_scene": "S11",
+      "description": "ヘルスチェック結果にFFmpeg/Gemini/Disk/Whisperが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-04",
+      "layer": 4,
+      "story_scene": "S13",
+      "description": "無効なログレベルで適切なエラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-05",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "ストレージ使用量のwarningフラグが閾値に連動する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-06",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "クリーンアップ後にストレージ使用量が変化する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-07",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "バージョン情報にpython/fastapi/whisperが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-08",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "エクスポートされたJSONが有効な設定構造を持つ",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-09",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "不正なJSONインポートで適切なエラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L4-10",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "コンポーネント再起動APIが正常応答する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A1-L5-01",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "ダッシュボード→環境確認→GPU情報→バージョンの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-02",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "ヘルスチェック→異常検出→診断→コンポーネント再起動の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-03",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "エラーログ取得→フィルタリング→詳細表示の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-04",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "モデル設定確認→変更→フォールバック確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-05",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "ストレージ確認→警告確認→クリーンアップ→再確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-06",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "設定エクスポート→変更→インポート→検証の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-07",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "APIキー確認→ハーネス確認→DI確認→全体診断の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-08",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "通知設定→ログ設定→エラーログ確認→通知テストの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-09",
+      "layer": 5,
+      "story_scene": "S1",
+      "description": "全APIエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A1-L5-10",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "無効コンポーネント再起動で400エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-01",
+    "created_by": "sprint_3.3.1",
+    "activated_at": "2026-05-01",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

@@ -1,0 +1,630 @@
+{
+  "ux_id": "A-9",
+  "name": "YouTuber成功パターンの資産化・成長ログアセット化",
+  "description": "管理者は成功パターン資産化ダッシュボードから、過去のバズ動画アセット一覧、再現性スコア、類似度比較、成功要素抽出効率、視聴者維持率の平均向上率、CTR改善予測、中だるみ防止率、制作コスト削減ROI、異なるパターン比較、ターゲット最適化推奨、構成テンプレート自動生成、蓄積スケジュール管理、ログ記録ペース分析、コメントから成功要素抽出、競合成功パターン分析、将来的な登録者・再生数予測、アラート設定、成長ログ生成、構成アセット共有ビュー、アセット編集権限管理、外部台本共有連携を管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "成功パターン資産化ダッシュボードが表示される",
+      "linked_items": [
+        "A9-L1-01",
+        "A9-L1-02",
+        "A9-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "過去のバズ動画・成功パターンのアセット一覧が表示される",
+      "linked_items": [
+        "A9-L1-03",
+        "A9-L2-02",
+        "A9-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "各アセットの再現性スコア・メタデータが表示される",
+      "linked_items": [
+        "A9-L1-04",
+        "A9-L2-03",
+        "A9-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "過去動画と新規企画の構成要素の類似度比較が表示される",
+      "linked_items": [
+        "A9-L1-05",
+        "A9-L2-04"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "成功要素（導入、フック、展開、オチ）の抽出効率が表示される",
+      "linked_items": [
+        "A9-L1-06",
+        "A9-L3-03"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "成功パターン適用後の視聴者維持率の平均向上率が表示される",
+      "linked_items": [
+        "A9-L3-04",
+        "A9-L4-01"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "成功要素の組み合わせ最適化によるCTR改善予測が表示される",
+      "linked_items": [
+        "A9-L3-05",
+        "A9-L4-02"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "SmartCutと成功ログの連動による中だるみ防止率が表示される",
+      "linked_items": [
+        "A9-L1-07",
+        "A9-L3-06"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "資産化された構成案を再利用した際の制作コスト削減ROIが表示される",
+      "linked_items": [
+        "A9-L3-07",
+        "A9-L4-03"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "異なる成功パターン（企画A vs 企画B）のパフォーマンス比較が表示される",
+      "linked_items": [
+        "A9-L3-08",
+        "A9-L4-04"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "ターゲット層に刺さる成功パターンの最適化推奨が表示される",
+      "linked_items": [
+        "A9-L1-08",
+        "A9-L2-05",
+        "A9-L3-09"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "成功パターンに基づく動画構成テンプレートが自動生成・推奨される",
+      "linked_items": [
+        "A9-L2-06",
+        "A9-L3-10"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "成功パターンの蓄積・分類スケジュール管理ができる",
+      "linked_items": [
+        "A9-L1-09",
+        "A9-L2-07",
+        "A9-L3-11"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "成長ログの記録頻度とパターン更新ペースが表示される",
+      "linked_items": [
+        "A9-L1-10",
+        "A9-L2-08",
+        "A9-L3-12"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "コメントからの成功要素（ファンの反応）抽出分析が表示される",
+      "linked_items": [
+        "A9-L3-13",
+        "A9-L4-05"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "競合YouTuberの成功パターン分析ベンチマークが表示される",
+      "linked_items": [
+        "A9-L4-06",
+        "A9-L5-01"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "成功パターン適用による将来的な登録者・再生数成長予測が表示される",
+      "linked_items": [
+        "A9-L4-07",
+        "A9-L5-02"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "成功パターンの再現スコア低下時のアラート閾値が設定できる",
+      "linked_items": [
+        "A9-L4-08",
+        "A9-L5-03"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "チャンネルの成長ログ（マイルストーン歴史）を自動生成できる",
+      "linked_items": [
+        "A9-L4-09",
+        "A9-L5-04",
+        "A9-L5-05"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "外部制作チーム向けの構成アセット共有ビューが設定できる",
+      "linked_items": [
+        "A9-L4-10",
+        "A9-L5-06"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "制作メンバーごとのアセット編集権限が設定できる",
+      "linked_items": [
+        "A9-L1-11",
+        "A9-L2-09",
+        "A9-L5-07",
+        "A9-L5-08"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "外部のスクリプト管理ツールや構成台本共有連携が設定できる",
+      "linked_items": [
+        "A9-L1-12",
+        "A9-L2-10",
+        "A9-L5-09",
+        "A9-L5-10"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A9-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "成功パターン資産化ダッシュボードAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "asset-dashboard"
+    },
+    {
+      "id": "A9-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにassets_metaフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "asset-meta"
+    },
+    {
+      "id": "A9-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "アセット一覧APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "asset-list"
+    },
+    {
+      "id": "A9-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "再現性スコアAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "replicability-score"
+    },
+    {
+      "id": "A9-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "構成要素類似度比較APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "structure-similarity"
+    },
+    {
+      "id": "A9-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "成功要素抽出効率APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "extraction-efficiency"
+    },
+    {
+      "id": "A9-L1-07",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "中だるみ防止率APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "slack-prevention"
+    },
+    {
+      "id": "A9-L1-08",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "成功パターン最適化推奨APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "pattern-optimization"
+    },
+    {
+      "id": "A9-L1-09",
+      "layer": 1,
+      "story_scene": "S13",
+      "description": "蓄積分類スケジュールAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "asset-schedule"
+    },
+    {
+      "id": "A9-L1-10",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "成長ログ記録ペースAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "logging-pace"
+    },
+    {
+      "id": "A9-L1-11",
+      "layer": 1,
+      "story_scene": "S21",
+      "description": "アセット編集権限APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "asset-permissions"
+    },
+    {
+      "id": "A9-L1-12",
+      "layer": 1,
+      "story_scene": "S22",
+      "description": "構成台本共有連携APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "script-connection"
+    },
+    {
+      "id": "A9-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/status/summaryフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "アセット一覧にassets配列とtotal_countが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "再現性スコアにscore/factors/confidenceが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "構成要素類似度にsimilarity_indexとdiff_pointsが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-05",
+      "layer": 2,
+      "story_scene": "S11",
+      "description": "成功パターン最適化推奨にrecommendations配列とestimated_viewsが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-06",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "構成テンプレート推奨にtemplates配列とsuccess_fitが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-07",
+      "layer": 2,
+      "story_scene": "S13",
+      "description": "蓄積分類スケジュールにschedule配列とnext_auditが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-08",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "ログ記録ペースにtarget/actual/completion_pctが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-09",
+      "layer": 2,
+      "story_scene": "S21",
+      "description": "アセット編集権限にroles配列とusersが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L2-10",
+      "layer": 2,
+      "story_scene": "S22",
+      "description": "構成台本共有連携にconnected/script_status/sync_logが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A9-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "アセット一覧の各項目にid/pattern_name/statusが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "再現性スコアにmetrics/historical_retentionが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "成功要素抽出効率のefficiency_pctが0-100の範囲で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-04",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "視聴者維持率の平均向上率APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "CTR改善予測APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-06",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "中だるみ防止率にprevented_drops/smartcut_overlapが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-07",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "制作コスト削減ROI APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-08",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "異なるパターン比較APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-09",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "最適化推奨の各項目にpriority/titleが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-10",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "構成テンプレート推奨APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-11",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "蓄積分類スケジュール更新APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-12",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "ログ記録ペースのcompletion_pctが0以上の数値である",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L3-13",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "コメントから成功要素抽出APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A9-L4-01",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "視聴者維持率平均向上にaverage_improvement/trend/detailsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-02",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "CTR改善予測にpredicted_improvement_pct/before/afterが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-03",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "制作コスト削減ROIにroi_ratio/cost/benefitが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-04",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "パターン比較にcomparisons配列とmetricsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-05",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "コメント成功要素抽出にsentiment/extracted_words/top_patternsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-06",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "競合成功パターン分析APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-07",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "将来成長予測APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-08",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "再現スコア低下アラート設定APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-09",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "成長ログ生成APIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L4-10",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "構成アセット共有ビュー設定APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A9-L5-01",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "ダッシュボード→アセット一覧→詳細→競合成功パターンの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-02",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "構成要素類似度→CTR改善予測→将来成長予測の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-03",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "維持率平均向上率→ROI→アラート設定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-04",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "コメント成功要素→最適化推奨→成長ログ生成の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-05",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "蓄積分類スケジュール→記録ペース→構成テンプレート推奨の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-06",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "全GETエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-07",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "アセット編集権限→共有ビュー→台本連携の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-08",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "パターン比較→中だるみ防止→ROI計算の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "台本連携にconnected状態が反映される",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A9-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "無効な台本連携ID指定で404エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-21",
+    "created_by": "sprint_4.3.4",
+    "activated_at": "2026-05-21",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

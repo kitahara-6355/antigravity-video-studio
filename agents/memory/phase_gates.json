@@ -1,0 +1,66 @@
+{
+  "5": {
+    "min_coverage": 35,
+    "max_critical_debt": 10
+  },
+  "6": {
+    "min_coverage": 45,
+    "max_critical_debt": 5
+  },
+  "7": {
+    "min_coverage": 55,
+    "max_critical_debt": 3
+  },
+  "8": {
+    "min_coverage": 60,
+    "max_critical_debt": 2
+  },
+  "9": {
+    "min_coverage": 65,
+    "max_critical_debt": 1
+  },
+  "10": {
+    "min_coverage": 70,
+    "max_critical_debt": 0
+  },
+  "11": {
+    "min_coverage": 72,
+    "max_critical_debt": 0
+  },
+  "12": {
+    "min_coverage": 75,
+    "max_critical_debt": 0
+  },
+  "13": {
+    "min_coverage": 77,
+    "max_critical_debt": 0
+  },
+  "14": {
+    "min_coverage": 80,
+    "max_critical_debt": 0
+  },
+  "15": {
+    "min_coverage": 82,
+    "max_critical_debt": 0
+  },
+  "16": {
+    "min_coverage": 83,
+    "max_critical_debt": 0
+  },
+  "17": {
+    "min_coverage": 85,
+    "max_critical_debt": 0
+  },
+  "18": {
+    "min_coverage": 85,
+    "max_critical_debt": 0
+  },
+  "19": {
+    "min_coverage": 85,
+    "max_critical_debt": 0
+  },
+  "20": {
+    "min_coverage": 85,
+    "max_critical_debt": 0
+  }
+}

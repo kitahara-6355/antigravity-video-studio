@@ -1,0 +1,445 @@
+/* ============================================
+   ProductionPipeline.css
+   IMP-D05: コーヒータイム制作パイプライン UI
+   ============================================ */
+
+.pipeline-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pipeline-fadein 0.3s ease;
+}
+
+@keyframes pipeline-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pipeline-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  width: min(920px, 90vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+  animation: pipeline-slidein 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pipeline-slidein {
+  from { transform: translateY(30px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* Header */
+.pipeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pipeline-header h2 {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pipeline-close-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.pipeline-close-btn:hover {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
+}
+
+/* Body */
+.pipeline-body {
+  padding: 24px 28px;
+}
+
+/* Video Selector */
+.pipeline-video-selector {
+  margin-bottom: 24px;
+}
+
+.pipeline-video-selector h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipeline-video-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.pipeline-video-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pipeline-video-item:last-child {
+  border-bottom: none;
+}
+
+.pipeline-video-item:hover {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.pipeline-video-item.selected {
+  background: rgba(139, 92, 246, 0.12);
+  border-left: 3px solid var(--accent-primary);
+}
+
+.pipeline-video-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.pipeline-video-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.pipeline-video-folder {
+  background: var(--bg-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+}
+
+/* Controls */
+.pipeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.pipeline-target-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.pipeline-target-input input {
+  width: 60px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.pipeline-start-btn {
+  background: linear-gradient(135deg, var(--accent-primary), var(--color-accent-primary));
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.pipeline-start-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.pipeline-start-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Stages Timeline */
+.pipeline-stages {
+  margin-bottom: 24px;
+}
+
+.pipeline-stages h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.pipeline-stage {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 0;
+  position: relative;
+}
+
+.pipeline-stage:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 40px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--border-color);
+}
+
+.pipeline-stage.completed:not(:last-child)::before {
+  background: linear-gradient(to bottom, var(--color-accent-success), var(--border-color));
+}
+
+.pipeline-stage-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  border: 2px solid var(--border-color);
+  background: var(--bg-primary);
+  transition: all 0.3s;
+  z-index: 1;
+}
+
+.pipeline-stage.completed .pipeline-stage-icon {
+  border-color: var(--color-accent-success);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.pipeline-stage.running .pipeline-stage-icon {
+  border-color: var(--accent-primary);
+  background: rgba(139, 92, 246, 0.1);
+  animation: pipeline-pulse 1.5s ease-in-out infinite;
+}
+
+.pipeline-stage.error .pipeline-stage-icon {
+  border-color: var(--accent-danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+@keyframes pipeline-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+}
+
+.pipeline-stage-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.pipeline-stage-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
+}
+
+.pipeline-stage.pending .pipeline-stage-name {
+  color: var(--text-light);
+}
+
+.pipeline-stage-detail {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.pipeline-stage.running .pipeline-stage-detail {
+  color: var(--accent-primary);
+}
+
+.pipeline-stage.completed .pipeline-stage-detail {
+  color: var(--color-accent-success);
+}
+
+.pipeline-stage.error .pipeline-stage-detail {
+  color: var(--accent-danger);
+}
+
+/* Progress Bar */
+.pipeline-progress-bar-container {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.pipeline-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--color-accent-primary), var(--color-semantic-stage-active));
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.pipeline-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: progress-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.pipeline-progress-text {
+  position: absolute;
+  right: 0;
+  top: -18px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Result */
+.pipeline-result {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.pipeline-result h3 {
+  font-size: 1rem;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipeline-result-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  font-size: 0.85rem;
+}
+
+.pipeline-result-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Loading spinner */
+.pipeline-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(139, 92, 246, 0.2);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: pipeline-spin 0.8s linear infinite;
+}
+
+@keyframes pipeline-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Status Badge */
+.pipeline-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.pipeline-status-badge.running {
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--accent-primary);
+}
+
+.pipeline-status-badge.completed {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-accent-success);
+}
+
+.pipeline-status-badge.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--accent-danger);
+}
+
+/* ━━━ UX-6: テンプレート未選択ガイドバナー ━━━ */
+.pipeline-template-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  margin: 0 28px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 10px;
+  animation: guide-fadein 0.5s ease;
+}
+
+.pipeline-template-guide > span {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.pipeline-template-guide strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--color-semantic-stage-pending);
+  margin-bottom: 4px;
+}
+
+.pipeline-template-guide p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+@keyframes guide-fadein {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

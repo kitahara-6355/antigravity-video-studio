@@ -1,0 +1,630 @@
+{
+  "ux_id": "A-5",
+  "name": "異常検知・自動復旧",
+  "description": "管理者は異常検知・自動復旧ダッシュボードからAPI枠超過検知・パイプライン障害検知・品質低下検知・自動リトライ・手動介入・アラート管理・インシデント履歴・根本原因分析・復旧手順ガイド・SLA監視・障害レポート・エスカレーション・復旧確認・パフォーマンス監視・メモリ/CPU監視・Worker障害分離・セルフヒーリング発動・障害パターン学習・予防保守提案・ダウンタイム計測・ステータスページ・障害対応ログを管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "異常検知・自動復旧ダッシュボードが表示される",
+      "linked_items": [
+        "A5-L1-01",
+        "A5-L1-02",
+        "A5-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "API枠超過が検知されアラートが表示される",
+      "linked_items": [
+        "A5-L1-03",
+        "A5-L2-02",
+        "A5-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "パイプライン障害が検知されステータスが表示される",
+      "linked_items": [
+        "A5-L1-04",
+        "A5-L2-03",
+        "A5-L3-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "品質低下(score<90)が検知され警告が表示される",
+      "linked_items": [
+        "A5-L1-05",
+        "A5-L2-04"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "障害発生時に自動リトライが実行される",
+      "linked_items": [
+        "A5-L1-06",
+        "A5-L3-03",
+        "A5-L3-04"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "自動復旧失敗時に手動介入UIが表示される",
+      "linked_items": [
+        "A5-L3-05",
+        "A5-L4-01"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "アクティブアラートの一覧が表示される",
+      "linked_items": [
+        "A5-L1-07",
+        "A5-L2-05",
+        "A5-L3-06"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "インシデント履歴が時系列で表示される",
+      "linked_items": [
+        "A5-L1-08",
+        "A5-L2-06",
+        "A5-L3-07"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "根本原因分析(RCA)レポートが表示される",
+      "linked_items": [
+        "A5-L3-08",
+        "A5-L4-02"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "復旧手順ガイドが障害タイプに応じて表示される",
+      "linked_items": [
+        "A5-L3-09",
+        "A5-L4-03"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "SLA準拠率とアップタイムが表示される",
+      "linked_items": [
+        "A5-L1-09",
+        "A5-L2-07",
+        "A5-L3-10"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "障害レポートをPDF/HTMLで出力できる",
+      "linked_items": [
+        "A5-L3-11",
+        "A5-L4-04"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "重大障害時にエスカレーション通知が送信される",
+      "linked_items": [
+        "A5-L3-12",
+        "A5-L4-05"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "復旧確認チェックリストが表示される",
+      "linked_items": [
+        "A5-L3-13",
+        "A5-L4-06"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "CPU/メモリ/ディスクの使用率がリアルタイム表示される",
+      "linked_items": [
+        "A5-L1-10",
+        "A5-L2-08"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "Worker別の障害分離状態が表示される",
+      "linked_items": [
+        "A5-L1-11",
+        "A5-L2-09",
+        "A5-L4-07"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "セルフヒーリングが自動発動し結果が記録される",
+      "linked_items": [
+        "A5-L4-08",
+        "A5-L5-01",
+        "A5-L5-02"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "過去の障害パターンが学習・分類されている",
+      "linked_items": [
+        "A5-L4-09",
+        "A5-L5-03"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "予防保守の提案一覧が表示される",
+      "linked_items": [
+        "A5-L4-10",
+        "A5-L5-04"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "ダウンタイムの累計時間とMTTRが表示される",
+      "linked_items": [
+        "A5-L1-12",
+        "A5-L2-10",
+        "A5-L5-05"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "公開ステータスページの現在状態が表示される",
+      "linked_items": [
+        "A5-L5-06",
+        "A5-L5-07",
+        "A5-L5-08"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "障害対応ログ(タイムライン)が表示される",
+      "linked_items": [
+        "A5-L5-09",
+        "A5-L5-10"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A5-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "異常検知・自動復旧ダッシュボードAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "incident-dashboard"
+    },
+    {
+      "id": "A5-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにsectionsフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "incident-dashboard-sections"
+    },
+    {
+      "id": "A5-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "API枠超過検知APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "quota-breach"
+    },
+    {
+      "id": "A5-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "パイプライン障害検知APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "pipeline-failures"
+    },
+    {
+      "id": "A5-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "品質低下検知APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "quality-degradation"
+    },
+    {
+      "id": "A5-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "自動リトライ状態APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "auto-retry"
+    },
+    {
+      "id": "A5-L1-07",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "アラート一覧APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "alerts"
+    },
+    {
+      "id": "A5-L1-08",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "インシデント履歴APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "incident-history"
+    },
+    {
+      "id": "A5-L1-09",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "SLA監視APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "sla-status"
+    },
+    {
+      "id": "A5-L1-10",
+      "layer": 1,
+      "story_scene": "S15",
+      "description": "パフォーマンス監視APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "performance"
+    },
+    {
+      "id": "A5-L1-11",
+      "layer": 1,
+      "story_scene": "S16",
+      "description": "Worker障害分離APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "worker-isolation"
+    },
+    {
+      "id": "A5-L1-12",
+      "layer": 1,
+      "story_scene": "S20",
+      "description": "ダウンタイム計測APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "downtime"
+    },
+    {
+      "id": "A5-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/status/summaryフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "API枠超過にlevel/message/thresholdが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "パイプライン障害にfailures配列とtotalが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "品質低下にcurrent_score/threshold/degraded_workersが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-05",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "アラート一覧にalerts配列とactive_countが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-06",
+      "layer": 2,
+      "story_scene": "S8",
+      "description": "インシデント履歴にincidents配列とtotalが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-07",
+      "layer": 2,
+      "story_scene": "S11",
+      "description": "SLA監視にuptime_pct/target_pct/mttrが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-08",
+      "layer": 2,
+      "story_scene": "S15",
+      "description": "パフォーマンスにcpu_pct/memory_pct/disk_pctが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-09",
+      "layer": 2,
+      "story_scene": "S16",
+      "description": "Worker分離にworkers配列と各Worker状態が含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L2-10",
+      "layer": 2,
+      "story_scene": "S20",
+      "description": "ダウンタイムにtotal_minutes/mttr_minutes/incidentsが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A5-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "API枠超過のlevelがNORMAL/WARNING/CRITICALのいずれかである",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-02",
+      "layer": 3,
+      "story_scene": "S3",
+      "description": "パイプライン障害の各failureにworker/error/timestampが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "自動リトライにretry_count/max_retries/statusが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-04",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "リトライ実行APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-05",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "手動介入APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-06",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "アラートのack(確認)APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-07",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "インシデント詳細APIがincident_idで正常応答する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-08",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "根本原因分析APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-09",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "復旧手順ガイドAPIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-10",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "SLAのuptime_pctが0-100の範囲で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-11",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "障害レポート生成APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-12",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "エスカレーションAPIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L3-13",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "復旧確認APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A5-L4-01",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "手動介入の結果にstatus/action_taken/timestampが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-02",
+      "layer": 4,
+      "story_scene": "S9",
+      "description": "RCAにroot_cause/category/recommendationsが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-03",
+      "layer": 4,
+      "story_scene": "S10",
+      "description": "復旧手順にsteps配列とincident_typeが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-04",
+      "layer": 4,
+      "story_scene": "S12",
+      "description": "障害レポート生成後にdownload_urlが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-05",
+      "layer": 4,
+      "story_scene": "S13",
+      "description": "エスカレーション後にnotified_channels配列が含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-06",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "復旧確認にchecklist配列とall_passedが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-07",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "Worker分離でisolated=trueのWorkerがfallbackで動作する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-08",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "セルフヒーリングにtrigger/action/resultが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-09",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "障害パターンにpatterns配列とtotal_learnedが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L4-10",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "予防保守提案にsuggestions配列とprioritized_countが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A5-L5-01",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "ダッシュボード→障害検知→自動リトライ→復旧確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-02",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "障害検知→セルフヒーリング→Worker分離→復旧の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-03",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "インシデント履歴→RCA→障害パターン学習の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-04",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "パフォーマンス監視→品質低下検知→予防保守提案の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-05",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "SLA監視→ダウンタイム計測→障害レポートの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-06",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "全GETエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-07",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "アラート→エスカレーション→ステータスページ更新の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-08",
+      "layer": 5,
+      "story_scene": "S21",
+      "description": "手動介入→復旧確認→障害クローズの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "障害対応ログのタイムライン表示が正常応答する",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A5-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "無効なincident_id指定で404エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-02",
+    "created_by": "sprint_3.3.5",
+    "activated_at": "2026-05-02",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

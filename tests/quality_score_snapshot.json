@@ -1,0 +1,46 @@
+{
+  "test_short_15s.mp4": {
+    "total_score": 91.7,
+    "visual_score": 100.0,
+    "visual_contrib": 42.86,
+    "audio_score": 73.2,
+    "audio_contrib": 20.91,
+    "encoding_score": 97.6,
+    "encoding_contrib": 27.89,
+    "subtitle_score": null,
+    "subtitle_contrib": 0.0
+  },
+  "test_medium_30s.mp4": {
+    "total_score": 96.5,
+    "visual_score": 100.0,
+    "visual_contrib": 42.86,
+    "audio_score": 90.4,
+    "audio_contrib": 25.83,
+    "encoding_score": 97.4,
+    "encoding_contrib": 27.83,
+    "subtitle_score": null,
+    "subtitle_contrib": 0.0
+  },
+  "test_long_60s.mp4": {
+    "total_score": 86.3,
+    "visual_score": 100.0,
+    "visual_contrib": 42.86,
+    "audio_score": 55.0,
+    "audio_contrib": 15.71,
+    "encoding_score": 97.1,
+    "encoding_contrib": 27.74,
+    "subtitle_score": null,
+    "subtitle_contrib": 0.0
+  },
+  "test_short_15s.mp4_with_subtitles": {
+    "total_score": 94.2,
+    "visual_score": 100.0,
+    "visual_contrib": 30.0,
+    "audio_score": 73.2,
+    "audio_contrib": 14.64,
+    "encoding_score": 97.6,
+    "encoding_contrib": 19.52,
+    "subtitle_score": 100.0,
+    "subtitle_contrib": 30.0
+  }
+}

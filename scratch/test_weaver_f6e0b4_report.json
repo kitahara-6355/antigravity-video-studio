@@ -1,0 +1,6 @@
+{
+  "message": "Phase 30 / test_weaver タスク #1 (対象: scratch/check_new_subagents.py) のカバレッジ向上テスト完了。test_check_new_subagents.pyに環境変数空値、JSON異常値、ログ境界条件、空IDリストのエッジケーステストを追加し、テスト10件PASS、対象カバレッジ100%を確認。",
+  "changed_files": [
+    "backend/tests/test_check_new_subagents.py"
+  ]
+}

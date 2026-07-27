@@ -1,0 +1,77 @@
+{
+  "session_id": "b8305be9-1109-4738-89ec-9aa675f67186",
+  "timestamp": 1767101067.9305174,
+  "datetime": "2025-12-30T22:24:27.930522",
+  "topic": "[object Object]",
+  "debate_flow": [
+    {
+      "agent": "Analyst",
+      "role": "Data Scientist",
+      "color": "#F59E0B",
+      "timestamp": 1767101055.9567397,
+      "stance": "DISAGREE",
+      "summary": "Data Analysis Complete",
+      "detail": "Your Nemesis 'TechStarter' is ahead by 29 subs. Analysis shows they post 2x more frequently.",
+      "data": {
+        "my_stats": {
+          "subscribers": 151,
+          "total_views": 4650,
+          "videos": 12,
+          "last_updated": "2025-12-30T22:24:05.735859"
+        },
+        "rivals": {
+          "nemesis": {
+            "name": "TechStarter",
+            "subs": 180,
+            "views": 5000,
+            "genre": "Tech"
+          },
+          "benchmark": {
+            "name": "TechMastery",
+            "subs": 15000,
+            "views": 1500000,
+            "genre": "Tech"
+          }
+        }
+      },
+      "glossary": [
+        {
+          "term": "Nemesis",
+          "def": "A rival channel with slightly higher stats (your immediate target)."
+        },
+        {
+          "term": "Velocity",
+          "def": "The rate of subscriber growth per day."
+        }
+      ]
+    },
+    {
+      "agent": "Strategist",
+      "role": "Brand Guardian",
+      "color": "#EF4444",
+      "timestamp": 1767101061.734716,
+      "stance": "NEUTRAL",
+      "summary": "No proposal to evaluate.",
+      "detail": "Without a specific proposal, I cannot assess its alignment with the Antigravity Channel's brand constitution. Please provide a proposal for evaluation.",
+      "glossary": []
+    },
+    {
+      "agent": "Director",
+      "role": "Creative Director",
+      "color": "#3B82F6",
+      "timestamp": 1767101067.9230406,
+      "stance": "NEUTRAL",
+      "summary": "No proposal was provided, so I cannot assess the viewer experience.",
+      "detail": "Since there's no content to review, I can't offer specific creative advice. Please provide a proposal or outline for me to analyze its viewer experience.",
+      "glossary": []
+    }
+  ],
+  "synthesis": {
+    "type": "SYNTHESIS",
+    "proposal": "Based on the debate, X is recommended.",
+    "options": [
+      "Approve",
+      "Reject"
+    ]
+  }
+}

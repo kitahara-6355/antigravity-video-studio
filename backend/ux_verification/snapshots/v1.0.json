@@ -1,0 +1,128 @@
+{
+  "version": "v1.0",
+  "timestamp": "2026-04-29T18:00:00",
+  "items": [
+    {
+      "id": "O2-CF-01",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S1",
+      "passed": null,
+      "description": "モデル選択UI",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-CF-02",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S3",
+      "passed": null,
+      "description": "進捗表示",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-CF-03",
+      "ux_story": "O-2",
+      "layer": 1,
+      "story_scene": "S4",
+      "passed": null,
+      "description": "結果一覧",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-CF-04",
+      "ux_story": "O-2",
+      "layer": 3,
+      "story_scene": "S5",
+      "passed": null,
+      "description": "編集",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-CF-05",
+      "ux_story": "O-2",
+      "layer": 2,
+      "story_scene": "S7",
+      "passed": null,
+      "description": "時間表示",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O2-CF-06",
+      "ux_story": "O-2",
+      "layer": 5,
+      "story_scene": "S5",
+      "passed": null,
+      "description": "E2E一気通貫",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-CF-01",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S2",
+      "passed": null,
+      "description": "diff表示",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-CF-02",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S3",
+      "passed": null,
+      "description": "比較ビュー",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-CF-03",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S4",
+      "passed": null,
+      "description": "承認/却下",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-CF-04",
+      "ux_story": "O-3",
+      "layer": 3,
+      "story_scene": "S6",
+      "passed": null,
+      "description": "辞書管理",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-CF-05",
+      "ux_story": "O-3",
+      "layer": 2,
+      "story_scene": "S7",
+      "passed": null,
+      "description": "行分割",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-CF-06",
+      "ux_story": "O-3",
+      "layer": 4,
+      "story_scene": "S8",
+      "passed": null,
+      "description": "進捗",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    },
+    {
+      "id": "O3-CF-07",
+      "ux_story": "O-3",
+      "layer": 5,
+      "story_scene": "S9",
+      "passed": null,
+      "description": "E2Eエクスポート+スキップ",
+      "evidence": "[Honestifier Refused] 過去のスナップショットでエビデンス不足のため未合格にリセットされました (Original was empty or dummy)."
+    }
+  ],
+  "total_items": 13,
+  "pass_items": 0,
+  "fail_items": 0,
+  "skip_items": 13,
+  "fulfillment_rate": 0.0
+}

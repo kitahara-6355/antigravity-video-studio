@@ -1,0 +1,77 @@
+{
+  "schema_version": "3.0",
+  "timezone": "Asia/Tokyo",
+  "note": "平日: 定期6回+任意3回/日(70%遵守率)。休日: 9-23時の間1時間に1回チェック可能。",
+  "weekday": {
+    "reliability_pct": 70,
+    "adhoc_checks_per_day": 3,
+    "windows": [
+      {"start": "06:30", "end": "07:10", "type": "regular", "label": "朝チェック"},
+      {"start": "08:50", "end": "09:00", "type": "regular", "label": "午前短窓"},
+      {"start": "12:00", "end": "12:30", "type": "regular", "label": "昼チェック"},
+      {"start": "15:00", "end": "15:15", "type": "regular", "label": "午後短窓"},
+      {"start": "17:50", "end": "18:00", "type": "regular", "label": "夕方短窓"},
+      {"start": "21:30", "end": "22:00", "type": "regular", "label": "夜チェック"}
+    ]
+  },
+  "weekend": {
+    "reliability_pct": 90,
+    "adhoc_checks_per_day": 14,
+    "windows": [
+      {"start": "09:00", "end": "23:00", "type": "continuous", "label": "終日対応"}
+    ]
+  },
+  "mode_schedule": {
+    "night_start": "22:00",
+    "night_end": "06:30"
+  },
+  "flash_profiles": {
+    "standard": {
+      "mode_name": "STANDARD（平日日中）",
+      "batch_size": 6,
+      "timer_seconds": 300,
+      "archive_batches": 30,
+      "archive_hours": 5,
+      "context_target_pct": 70,
+      "context_warn_pct": 60,
+      "status_verbosity": "full",
+      "subagent_timeout": 600,
+      "batch_timeout": 900,
+      "context_pct_per_batch": 4
+    },
+    "weekend": {
+      "mode_name": "WEEKEND（休日日中）",
+      "batch_size": 10,
+      "timer_seconds": 300,
+      "archive_batches": 35,
+      "archive_hours": 6,
+      "context_target_pct": 70,
+      "context_warn_pct": 60,
+      "status_verbosity": "full",
+      "subagent_timeout": 600,
+      "batch_timeout": 900,
+      "context_pct_per_batch": 4
+    },
+    "night": {
+      "mode_name": "NIGHT（夜間自律）",
+      "batch_size": 12,
+      "timer_seconds": 360,
+      "archive_batches": 40,
+      "archive_hours": 8,
+      "context_target_pct": 70,
+      "context_warn_pct": 60,
+      "status_verbosity": "minimal",
+      "subagent_timeout": 720,
+      "batch_timeout": 1200,
+      "context_pct_per_batch": 4
+    }
+  },
+  "resource_governor": {
+    "caution_cpu": 50.0,
+    "caution_mem": 63.0,
+    "critical_cpu": 70.0,
+    "critical_mem": 75.0,
+    "warmup_batch_size": 2,
+    "warmup_interval_seconds": 30
+  }
+}

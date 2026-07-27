@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "created_at": "2026-05-10T19:33:01.106484",
+  "summary": {
+    "total": 599,
+    "by_status": {
+      "open": 466,
+      "fixed": 126,
+      "accepted": 7
+    },
+    "by_category": {
+      "CRITICAL_ROUTER": {
+        "total": 141,
+        "open": 15,
+        "fixed": 126
+      },
+      "CRITICAL_PHASE4": {
+        "total": 37,
+        "open": 37,
+        "fixed": 0
+      },
+      "IMPORTANT_SERVICE": {
+        "total": 75,
+        "open": 75,
+        "fixed": 0
+      },
+      "MINOR_INFRA": {
+        "total": 339,
+        "open": 339,
+        "fixed": 0
+      },
+      "ACCEPTED_SAFETY": {
+        "total": 7,
+        "open": 0,
+        "fixed": 0
+      }
+    },
+    "critical_open": 52,
+    "last_updated": "2026-05-10T19:33:01.106586"
+  },
+  "critical_open": 52
+}

@@ -1,0 +1,294 @@
+/* ============================================================
+   StepReview.css — 段階的レビュー（U-10）
+   ============================================================ */
+
+.step-review-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.step-review-panel {
+    width: 95%;
+    max-width: 640px;
+    max-height: 90vh;
+    background: linear-gradient(145deg, #1a1a2e, #16213e);
+    border-radius: 20px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ヘッダー */
+.step-review-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 24px;
+    background: linear-gradient(90deg, var(--color-semantic-theme-indigo), var(--color-semantic-slider-fill));
+    color: white;
+    gap: 12px;
+}
+
+.step-review-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    flex: 1;
+}
+
+.header-progress {
+    font-size: 13px;
+    opacity: 0.85;
+    background: rgba(255,255,255,0.15);
+    padding: 4px 12px;
+    border-radius: 12px;
+}
+
+.step-review-header .close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.step-review-header .close-btn:hover {
+    opacity: 1;
+}
+
+/* ステージインジケーター */
+.stage-indicator {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.stage-dot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.stage-dot.current {
+    border-color: var(--color-semantic-slider-fill);
+    color: var(--color-semantic-slider-fill);
+    background: rgba(139, 92, 246, 0.1);
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+.stage-dot.completed {
+    border-color: var(--color-accent-success);
+    color: var(--color-accent-success);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.stage-dot .check-mark {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    background: var(--color-accent-success);
+    color: white;
+    border-radius: 50%;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* ステージコンテンツ */
+.stage-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    color: white;
+}
+
+.stage-title-section {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.stage-icon {
+    color: var(--color-semantic-slider-fill);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.stage-title-section h3 {
+    margin: 0 0 4px;
+    font-size: 1.2rem;
+}
+
+.stage-desc {
+    margin: 0;
+    font-size: 13px;
+    opacity: 0.6;
+}
+
+/* チェックリスト */
+.check-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.check-item:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.check-item.checked {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.check-item input[type="checkbox"] {
+    accent-color: var(--color-accent-success);
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.check-text {
+    font-size: 14px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.85);
+}
+
+.check-item.checked .check-text {
+    color: rgba(255,255,255,0.5);
+    text-decoration: line-through;
+}
+
+/* メモ */
+.stage-notes textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: white;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.stage-notes textarea:focus {
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.stage-notes textarea::placeholder {
+    color: rgba(255,255,255,0.3);
+}
+
+/* フッター */
+.step-review-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: rgba(0,0,0,0.3);
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.btn-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-nav:hover:not(:disabled) {
+    background: rgba(255,255,255,0.15);
+}
+
+.btn-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.btn-nav.primary {
+    background: rgba(99, 102, 241, 0.3);
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.btn-nav.primary:hover:not(:disabled) {
+    background: rgba(99, 102, 241, 0.5);
+}
+
+.footer-center {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+}
+
+.btn-approve {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: linear-gradient(90deg, var(--color-accent-success), #059669);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-approve:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+}
+
+.btn-approve:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}

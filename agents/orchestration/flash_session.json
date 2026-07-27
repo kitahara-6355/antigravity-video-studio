@@ -1,0 +1,8 @@
+{
+  "session_started_at": null,
+  "session_ended_at": null,
+  "exit_reason": null,
+  "last_heartbeat": null,
+  "status": "not_started",
+  "batches_in_session": 0
+}

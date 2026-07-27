@@ -1,0 +1,234 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.6, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\PC_User\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\PC_User\Desktop\script\video-automation\backend\tests
+configfile: pytest.ini
+plugins: anyio-4.12.1, langsmith-0.3.45, asyncio-1.3.0, base-url-2.1.0, cov-7.1.0, httpx-0.35.0, playwright-0.7.2, timeout-2.4.0, requests-mock-1.12.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+timeout: 60.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 171 items
+
+test_shared/test_evolution_trigger_service.py::TestTriggerRejectionThreshold::test_trigger_rejection_threshold PASSED [  0%]
+test_shared/test_evolution_trigger_service.py::TestTriggerRejectionThreshold::test_rejection_below_threshold_not_fired PASSED [  1%]
+test_shared/test_evolution_trigger_service.py::TestTriggerApprovalThreshold::test_trigger_approval_threshold PASSED [  1%]
+test_shared/test_evolution_trigger_service.py::TestTriggerApprovalThreshold::test_approval_below_threshold_not_fired PASSED [  2%]
+test_shared/test_evolution_trigger_service.py::TestTriggerPhilosophyIntegration::test_trigger_philosophy_integration PASSED [  2%]
+test_shared/test_evolution_trigger_service.py::TestTriggerPhilosophyIntegration::test_philosophy_below_threshold_not_fired PASSED [  3%]
+test_shared/test_evolution_trigger_service.py::TestTriggerTrustUpgrade::test_trigger_trust_upgrade PASSED [  4%]
+test_shared/test_evolution_trigger_service.py::TestTriggerTrustUpgrade::test_trust_upgrade_detail PASSED [  4%]
+test_shared/test_evolution_trigger_service.py::TestTriggerMaxDeltaGuard::test_max_delta_guard_trust_upgrade PASSED [  5%]
+test_shared/test_evolution_trigger_service.py::TestTriggerMaxDeltaGuard::test_trust_score_max_cap PASSED [  5%]
+test_shared/test_evolution_trigger_service.py::TestTriggerMaxDeltaGuard::test_trust_score_already_max PASSED [  6%]
+test_shared/test_evolution_trigger_service.py::TestTriggerStatusApi::test_trigger_status_api_returns_all_rules PASSED [  7%]
+test_shared/test_evolution_trigger_service.py::TestTriggerStatusApi::test_trigger_status_contains_threshold_and_current PASSED [  7%]
+test_shared/test_evolution_trigger_service.py::TestTriggerStatusApi::test_trigger_status_trust_upgrade_threshold_is_5 PASSED [  8%]
+test_shared/test_evolution_trigger_service.py::TestTriggerStatusApi::test_trigger_status_reject_policy_threshold_is_3 PASSED [  8%]
+test_shared/test_evolution_trigger_service.py::TestTriggerStatusApi::test_trigger_status_philosophy_integration_threshold_is_10 PASSED [  9%]
+test_shared/test_evolution_trigger_service.py::TestTriggerNoDuplicate::test_trigger_no_duplicate_within_cooldown PASSED [  9%]
+test_shared/test_evolution_trigger_service.py::TestTriggerNoDuplicate::test_trigger_fires_after_cooldown_expired PASSED [ 10%]
+test_shared/test_evolution_trigger_service.py::TestTriggerAppendOnly::test_content_policy_not_deleted PASSED [ 11%]
+test_shared/test_evolution_trigger_service.py::TestTriggerAppendOnly::test_keywords_not_deleted PASSED [ 11%]
+test_shared/test_evolution_trigger_service.py::TestTriggerAppendOnly::test_existing_policy_not_duplicated PASSED [ 12%]
+test_shared/test_evolution_trigger_service.py::TestTriggerAppendOnly::test_evolution_log_existing_fields_preserved PASSED [ 12%]
+test_shared/test_philosophy_proposal_service.py::TestProposalGeneration::test_proposal_generation PASSED [ 13%]
+test_shared/test_philosophy_proposal_service.py::TestProposalGeneration::test_proposal_generation_uses_get_model PASSED [ 14%]
+test_shared/test_philosophy_proposal_service.py::TestProposalTimeout::test_proposal_timeout PASSED [ 14%]
+test_shared/test_philosophy_proposal_service.py::TestProposalTimeout::test_proposal_gemini_error_returns_none PASSED [ 15%]
+test_shared/test_philosophy_proposal_service.py::TestProposalApprove::test_proposal_approve PASSED [ 15%]
+test_shared/test_philosophy_proposal_service.py::TestProposalApprove::test_proposal_approve_nonexistent_returns_false PASSED [ 16%]
+test_shared/test_philosophy_proposal_service.py::TestProposalApproveWithEdit::test_proposal_approve_with_edit PASSED [ 16%]
+test_shared/test_philosophy_proposal_service.py::TestProposalReject::test_proposal_reject PASSED [ 17%]
+test_shared/test_philosophy_proposal_service.py::TestProposalReject::test_proposal_reject_nonexistent_returns_false PASSED [ 18%]
+test_shared/test_philosophy_proposal_service.py::TestProposalReject::test_proposal_reject_preserves_philosophies PASSED [ 18%]
+test_shared/test_philosophy_proposal_service.py::TestProposalListApi::test_proposal_list_api PASSED [ 19%]
+test_shared/test_philosophy_proposal_service.py::TestProposalListApi::test_proposal_list_empty PASSED [ 19%]
+test_shared/test_philosophy_proposal_service.py::TestProposalListApi::test_proposal_list_api_endpoint PASSED [ 20%]
+test_shared/test_philosophy_proposal_service.py::TestProposalApproveApi::test_proposal_approve_api PASSED [ 21%]
+test_shared/test_philosophy_proposal_service.py::TestProposalApproveApi::test_proposal_reject_api PASSED [ 21%]
+test_shared/test_philosophy_proposal_service.py::TestProposalPersistence::test_proposal_persistence PASSED [ 22%]
+test_shared/test_philosophy_proposal_service.py::TestProposalPersistence::test_proposal_persistence_survives_reload PASSED [ 22%]
+test_shared/test_philosophy_proposal_service.py::TestProposalPersistence::test_proposal_approve_persists_philosophy PASSED [ 23%]
+test_shared/test_philosophy_proposal_service.py::TestProposalPersistence::test_existing_fields_preserved_after_persistence PASSED [ 23%]
+test_shared/test_evolution_sync_service.py::TestEvolutionSyncAll::test_sync_all_success PASSED [ 24%]
+test_shared/test_evolution_sync_service.py::TestEvolutionSyncAll::test_sync_all_no_insights PASSED [ 25%]
+test_shared/test_evolution_sync_service.py::TestEvolutionSyncAll::test_sync_all_decision_logger_fails PASSED [ 25%]
+test_shared/test_evolution_sync_service.py::TestEvolutionSyncAll::test_sync_all_branding_manager_fails PASSED [ 26%]
+test_shared/test_evolution_sync_service.py::TestRecordStrategy::test_record_strategy_basic PASSED [ 26%]
+test_shared/test_evolution_sync_service.py::TestRecordStrategy::test_record_strategy_without_finalize PASSED [ 27%]
+test_shared/test_evolution_sync_service.py::TestRecordStrategy::test_record_strategy_appends_to_existing PASSED [ 28%]
+test_shared/test_evolution_sync_service.py::TestRecordStrategy::test_record_strategy_error_returns_false PASSED [ 28%]
+test_shared/test_evolution_sync_service.py::TestTrinityEvolutionSyncEndpoint::test_evolution_sync_endpoint PASSED [ 29%]
+test_shared/test_evolution_sync_service.py::TestTrinityEvolutionStatusEndpoint::test_evolution_status_endpoint PASSED [ 29%]
+test_shared/test_evolution_sync_service.py::TestGetEvolutionStatus::test_status_with_data PASSED [ 30%]
+test_shared/test_evolution_sync_service.py::TestGetEvolutionStatus::test_status_no_log_file PASSED [ 30%]
+test_shared/test_evolution_sync_service.py::TestGetEvolutionStatus::test_status_decision_logger_fails PASSED [ 31%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_create_returns_session_instance PASSED [ 32%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_session_has_plugin_instance PASSED [ 32%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_session_initial_context_is_none PASSED [ 33%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_session_count_increments PASSED [ 33%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_same_id_returns_existing_session PASSED [ 34%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_touch_updates_last_accessed PASSED [ 35%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_get_plugin_returns_plugin_directly PASSED [ 35%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_get_session_returns_none_for_unknown PASSED [ 36%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_get_session_returns_existing PASSED [ 36%]
+test_shared/test_smartcut_strategy_service.py::TestSessionCreate::test_strategy_slot_initially_none PASSED [ 37%]
+test_shared/test_smartcut_strategy_service.py::TestSessionIsolation::test_plugins_are_independent_instances PASSED [ 38%]
+test_shared/test_smartcut_strategy_service.py::TestSessionIsolation::test_context_mutation_does_not_leak PASSED [ 38%]
+test_shared/test_smartcut_strategy_service.py::TestSessionIsolation::test_lock_segment_isolated PASSED [ 39%]
+test_shared/test_smartcut_strategy_service.py::TestSessionIsolation::test_recommendation_update_isolated PASSED [ 39%]
+test_shared/test_smartcut_strategy_service.py::TestSessionIsolation::test_context_setter_isolated PASSED [ 40%]
+test_shared/test_smartcut_strategy_service.py::TestSessionLRUEviction::test_eviction_at_max_sessions PASSED [ 40%]
+test_shared/test_smartcut_strategy_service.py::TestSessionLRUEviction::test_eviction_respects_access_order PASSED [ 41%]
+test_shared/test_smartcut_strategy_service.py::TestSessionLRUEviction::test_eviction_cascading PASSED [ 42%]
+test_shared/test_smartcut_strategy_service.py::TestSessionLRUEviction::test_remove_session_explicit PASSED [ 42%]
+test_shared/test_smartcut_strategy_service.py::TestSessionLRUEviction::test_remove_nonexistent_session PASSED [ 43%]
+test_shared/test_smartcut_strategy_service.py::TestSessionLRUEviction::test_max_sessions_property PASSED [ 43%]
+test_shared/test_smartcut_strategy_service.py::TestSessionLRUEviction::test_eviction_with_max_sessions_one PASSED [ 44%]
+test_shared/test_smartcut_strategy_service.py::TestStrategistMVP::test_strategist_timeout PASSED [ 45%]
+test_shared/test_smartcut_strategy_service.py::TestStrategistMVP::test_strategist_philosophy_injection PASSED [ 45%]
+test_shared/test_smartcut_strategy_service.py::TestStrategistMVP::test_strategist_brand_alignment PASSED [ 46%]
+test_shared/test_smartcut_strategy_service.py::TestStrategistMVP::test_strategist_default_strategy PASSED [ 46%]
+test_shared/test_smartcut_strategy_service.py::TestStrategistMVP::test_strategist_model_registry PASSED [ 47%]
+test_shared/test_smartcut_strategy_service.py::TestStrategistMVP::test_strategy_weight_injection PASSED [ 47%]
+test_shared/test_smartcut_strategy_service.py::TestStrategistMVP::test_strategist_invalid_json PASSED [ 48%]
+test_shared/test_storage_cleanup.py::TestS432_01_PipelineCompletionTriggersCleanup::test_pipeline_router_contains_auto_cleanup_call PASSED [ 49%]
+test_shared/test_storage_cleanup.py::TestS432_01_PipelineCompletionTriggersCleanup::test_auto_cleanup_called_after_sync_all PASSED [ 49%]
+test_shared/test_storage_cleanup.py::TestS432_01_PipelineCompletionTriggersCleanup::test_auto_cleanup_method_exists PASSED [ 50%]
+test_shared/test_storage_cleanup.py::TestS432_02_CleanupProtectsRawAndFinal::test_cleanup_skips_protected_categories PASSED [ 50%]
+test_shared/test_storage_cleanup.py::TestS432_02_CleanupProtectsRawAndFinal::test_cleanup_does_not_delete_protected_files PASSED [ 51%]
+test_shared/test_storage_cleanup.py::TestS432_02_CleanupProtectsRawAndFinal::test_raw_retention_is_permanent PASSED [ 52%]
+test_shared/test_storage_cleanup.py::TestS432_02_CleanupProtectsRawAndFinal::test_final_retention_is_permanent PASSED [ 52%]
+test_shared/test_storage_cleanup.py::TestS432_02_CleanupProtectsRawAndFinal::test_retention_days_match_spec PASSED [ 53%]
+test_shared/test_storage_cleanup.py::TestS432_03_CleanupReportInEvolutionLog::test_report_to_evolution_log_method_exists PASSED [ 53%]
+test_shared/test_storage_cleanup.py::TestS432_03_CleanupReportInEvolutionLog::test_report_appends_to_evolution_log PASSED [ 54%]
+test_shared/test_storage_cleanup.py::TestS432_03_CleanupReportInEvolutionLog::test_auto_cleanup_calls_report PASSED [ 54%]
+test_shared/test_storage_cleanup.py::TestS432_04_StorageApiEndpoints::test_get_storage_stats PASSED [ 55%]
+test_shared/test_storage_cleanup.py::TestS432_04_StorageApiEndpoints::test_post_storage_cleanup_dry_run PASSED [ 56%]
+test_shared/test_storage_cleanup.py::TestS432_04_StorageApiEndpoints::test_post_storage_cleanup_execute PASSED [ 56%]
+test_shared/test_storage_cleanup.py::TestS432_04_StorageApiEndpoints::test_storage_stats_endpoint_exists PASSED [ 57%]
+test_shared/test_storage_cleanup.py::TestS432_04_StorageApiEndpoints::test_storage_cleanup_endpoint_exists PASSED [ 57%]
+test_shared/test_evolution_correction.py::test_philosophy_integration_generates_proposal PASSED [ 58%]
+test_shared/test_evolution_correction.py::test_philosophy_integration_gemini_timeout PASSED [ 59%]
+test_shared/test_evolution_correction.py::test_rejection_auto_generates_philosophy PASSED [ 59%]
+test_shared/test_evolution_correction.py::test_decision_logger_real_path PASSED [ 60%]
+test_shared/test_evolution_correction.py::test_decision_logger_fallback_path PASSED [ 60%]
+test_shared/test_evolution_correction.py::test_pipeline_completion_triggers_sync PASSED [ 61%]
+test_shared/test_evolution_correction.py::test_filelock_concurrent_write PASSED [ 61%]
+test_shared/test_evolution_correction.py::test_filelock_read_during_write PASSED [ 62%]
+test_shared/test_evolution_dashboard.py::TestTrustScoreAutoUpgrade::test_trust_score_auto_upgrade PASSED [ 63%]
+test_shared/test_evolution_dashboard.py::TestTrustScoreMaxCap::test_trust_score_max_cap PASSED [ 63%]
+test_shared/test_evolution_dashboard.py::TestTrustScorePersistence::test_trust_score_persistence PASSED [ 64%]
+test_shared/test_evolution_dashboard.py::TestWeightClampWithUpgradedTrust::test_weight_clamp_with_upgraded_trust PASSED [ 64%]
+test_shared/test_evolution_dashboard.py::TestDashboardApi::test_dashboard_api PASSED [ 65%]
+test_shared/test_evolution_dashboard.py::TestDashboardPhilosophyTimeline::test_dashboard_philosophy_timeline PASSED [ 66%]
+test_shared/test_evolution_dashboard.py::TestEvolutionHistory::test_evolution_history PASSED [ 66%]
+test_shared/test_evolution_dashboard.py::TestFullEvolutionCycle::test_full_evolution_cycle PASSED [ 67%]
+test_shared/test_evolution_medium_fixes.py::TestS425_01_TriggerNotificationEmitted::test_trigger_notification_emitted PASSED [ 67%]
+test_shared/test_evolution_medium_fixes.py::TestS425_02_NotificationIncludesRuleDetail::test_notification_includes_rule_detail PASSED [ 68%]
+test_shared/test_evolution_medium_fixes.py::TestS425_03_DashboardReturnsUnreadNotifications::test_dashboard_returns_unread_notifications PASSED [ 69%]
+test_shared/test_evolution_medium_fixes.py::TestS425_04_DirectorProfileGenerated::test_director_profile_generated PASSED [ 69%]
+test_shared/test_evolution_medium_fixes.py::TestS425_05_DirectorProfileHasTendencies::test_director_profile_has_tendencies PASSED [ 70%]
+test_shared/test_evolution_medium_fixes.py::TestS425_06_ProposalConflictDetection::test_proposal_conflict_detection PASSED [ 70%]
+test_shared/test_evolution_medium_fixes.py::TestS425_06_ProposalConflictDetection::test_no_conflict_when_compatible PASSED [ 71%]
+test_shared/test_evolution_medium_fixes.py::TestS425_07_DashboardO12Compatible::test_dashboard_o12_compatible PASSED [ 71%]
+test_shared/test_evolution_medium_fixes.py::TestS425_08_TriggersEndpointHttp::test_triggers_endpoint_http PASSED [ 72%]
+test_shared/test_evolution_medium_fixes.py::TestS425_09_ProposalAvoidsPastRejection::test_proposal_avoids_past_rejection PASSED [ 73%]
+test_shared/test_evolution_medium_fixes.py::TestS425_10_RejectionHistoryRecorded::test_rejection_history_recorded PASSED [ 73%]
+test_shared/test_video_processor.py::TestMoodSettings::test_all_moods_defined PASSED [ 74%]
+test_shared/test_video_processor.py::TestMoodSettings::test_mood_settings_attributes PASSED [ 74%]
+test_shared/test_video_processor.py::TestMoodSettings::test_get_mood_settings_valid PASSED [ 75%]
+test_shared/test_video_processor.py::TestMoodSettings::test_get_mood_settings_default PASSED [ 76%]
+test_shared/test_video_processor.py::TestMoodSettings::test_get_mood_settings_case_insensitive PASSED [ 76%]
+test_shared/test_video_processor.py::TestTaskManagement::test_create_task PASSED [ 77%]
+test_shared/test_video_processor.py::TestTaskManagement::test_create_task_with_assets PASSED [ 77%]
+test_shared/test_video_processor.py::TestTaskManagement::test_get_task_existing PASSED [ 78%]
+test_shared/test_video_processor.py::TestTaskManagement::test_get_task_not_found PASSED [ 78%]
+test_shared/test_video_processor.py::TestColorFilter::test_warm_filter PASSED [ 79%]
+test_shared/test_video_processor.py::TestColorFilter::test_vibrant_filter PASSED [ 80%]
+test_shared/test_video_processor.py::TestColorFilter::test_cinematic_filter PASSED [ 80%]
+test_shared/test_video_processor.py::TestColorFilter::test_unknown_preset PASSED [ 81%]
+test_shared/test_video_processor.py::TestProgressCallback::test_set_and_notify PASSED [ 81%]
+test_shared/test_video_processor.py::TestProgressCallback::test_notify_without_callback PASSED [ 82%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutInit::test_init_success PASSED [ 83%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutInit::test_init_scan_exception PASSED [ 83%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutRecommend::test_recommend_success PASSED [ 84%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutRecommend::test_recommend_not_initialized PASSED [ 84%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutRecommend::test_recommend_exception PASSED [ 85%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutRecommend::test_recommend_http_exception_relay PASSED [ 85%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutLock::test_lock_success PASSED [ 86%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutLock::test_lock_not_initialized PASSED [ 87%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutLock::test_lock_exception PASSED [ 87%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutUnlock::test_unlock_success PASSED [ 88%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutUnlock::test_unlock_not_initialized PASSED [ 88%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutUnlock::test_unlock_exception PASSED [ 89%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutFinalize::test_finalize_success PASSED [ 90%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutFinalize::test_finalize_not_initialized PASSED [ 90%]
+test_shared/test_cov_smartcut_trinity.py::TestSmartCutFinalize::test_finalize_exception PASSED [ 91%]
+test_shared/test_cov_smartcut_trinity.py::TestTrinityRouter::test_get_trinity_status PASSED [ 91%]
+test_shared/test_cov_smartcut_trinity.py::TestTrinityRouter::test_sync_analytics PASSED [ 92%]
+test_shared/test_cov_smartcut_trinity.py::TestTrinityRouter::test_simulate_analytics PASSED [ 92%]
+test_shared/test_cov_smartcut_trinity.py::TestTrinityRouter::test_get_models PASSED [ 93%]
+test_shared/test_cov_smartcut_trinity.py::TestTrinityRouter::test_evolution_sync PASSED [ 94%]
+test_shared/test_cov_smartcut_trinity.py::TestTrinityRouter::test_get_evolution_status_with_log PASSED [ 94%]
+test_shared/test_cov_smartcut_trinity.py::TestTrinityRouter::test_get_evolution_status_no_log PASSED [ 95%]
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_process_video_full_success PASSED [ 95%]
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_process_video_no_valid_paths_no_demo PASSED [ 96%]
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_process_video_with_demo_fallback PASSED [ 97%]
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_process_video_exception PASSED [ 97%]
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_merge_scenes_single PASSED [ 98%]
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_merge_scenes_failure_fallback PASSED [ 98%]
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_apply_branding_no_logo PASSED [ 99%]
+python : C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\coverage\inorout.py:561: CoverageWa
+rning: Module ../services/evolution_trigger_service was never imported. (module-not-imported); see https://coverage.rea
+dthedocs.io/en/7.13.5/messages.html#warning-module-not-imported
+At line:1 char:1
++ python _measure_cov_batch_a.py 2>&1 | Out-File -FilePath ../_cov_batc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\PC_Use...le-not-imported:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  self.warn(f"Module {pkg} was never imported.", slug="module-not-imported")
+C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\coverage\inorout.py:561: CoverageWarning: Mo
+dule ../services/philosophy_proposal_service was never imported. (module-not-imported); see https://coverage.readthedoc
+s.io/en/7.13.5/messages.html#warning-module-not-imported
+  self.warn(f"Module {pkg} was never imported.", slug="module-not-imported")
+C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\coverage\inorout.py:561: CoverageWarning: Mo
+dule ../services/evolution_sync_service was never imported. (module-not-imported); see https://coverage.readthedocs.io/
+en/7.13.5/messages.html#warning-module-not-imported
+  self.warn(f"Module {pkg} was never imported.", slug="module-not-imported")
+C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\coverage\inorout.py:561: CoverageWarning: Mo
+dule ../services/smartcut_strategy_service was never imported. (module-not-imported); see https://coverage.readthedocs.
+io/en/7.13.5/messages.html#warning-module-not-imported
+  self.warn(f"Module {pkg} was never imported.", slug="module-not-imported")
+C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\coverage\inorout.py:561: CoverageWarning: Mo
+dule ../cleanup_manager was never imported. (module-not-imported); see https://coverage.readthedocs.io/en/7.13.5/messag
+es.html#warning-module-not-imported
+  self.warn(f"Module {pkg} was never imported.", slug="module-not-imported")
+C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\coverage\inorout.py:561: CoverageWarning: Mo
+dule ../video_processor was never imported. (module-not-imported); see https://coverage.readthedocs.io/en/7.13.5/messag
+es.html#warning-module-not-imported
+  self.warn(f"Module {pkg} was never imported.", slug="module-not-imported")
+C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\coverage\control.py:958: CoverageWarning: No
+ data was collected. (no-data-collected); see https://coverage.readthedocs.io/en/7.13.5/messages.html#warning-no-data-c
+ollected
+  self._warn("No data was collected.", slug="no-data-collected")
+C:\Users\PC_User\AppData\Local\Programs\Python\Python313\Lib\site-packages\pytest_cov\plugin.py:366: CovReportWarning: 
+Failed to generate report: No data to report.
+
+  warnings.warn(CovReportWarning(message), stacklevel=1)
+test_shared/test_cov_smartcut_trinity.py::TestVideoProcessor::test_apply_branding_ffmpeg_failure PASSED [100%]
+WARNING: Failed to generate report: No data to report.
+
+
+
+============================== warnings summary ===============================
+test_shared/test_evolution_trigger_service.py::TestTriggerPhilosophyIntegration::test_trigger_philosophy_integration
+  C:\Users\PC_User\Desktop\script\video-automation\backend\services\evolution_trigger_service.py:425: DeprecationWarning: There is no current event loop
+    loop = asyncio.get_event_loop()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 171 passed, 1 warning in 60.33s (0:01:00) ==================
+Running: C:\Users\PC_User\AppData\Local\Programs\Python\Python313\python.exe -m pytest test_shared/test_evolution_trigger_service.py test_shared/test_philosophy_proposal_service.py...
+Test files: 10

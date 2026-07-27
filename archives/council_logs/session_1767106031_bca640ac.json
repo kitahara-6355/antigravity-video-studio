@@ -1,0 +1,77 @@
+{
+  "session_id": "bca640ac-9f8e-4265-8da6-8d9aaa2c958c",
+  "timestamp": 1767106031.3341484,
+  "datetime": "2025-12-30T23:47:11.334152",
+  "topic": "[object Object]",
+  "debate_flow": [
+    {
+      "agent": "Analyst",
+      "role": "Data Scientist",
+      "color": "#F59E0B",
+      "timestamp": 1767106018.9848242,
+      "stance": "DISAGREE",
+      "summary": "Data Analysis Complete",
+      "detail": "Your Nemesis 'TechStarter' is ahead by 28 subs. Analysis shows they post 2x more frequently.",
+      "data": {
+        "my_stats": {
+          "subscribers": 152,
+          "total_views": 4800,
+          "videos": 12,
+          "last_updated": "2025-12-30T23:15:24.500301"
+        },
+        "rivals": {
+          "nemesis": {
+            "name": "TechStarter",
+            "subs": 180,
+            "views": 5000,
+            "genre": "Tech"
+          },
+          "benchmark": {
+            "name": "TechMastery",
+            "subs": 15000,
+            "views": 1500000,
+            "genre": "Tech"
+          }
+        }
+      },
+      "glossary": [
+        {
+          "term": "Nemesis",
+          "def": "A rival channel with slightly higher stats (your immediate target)."
+        },
+        {
+          "term": "Velocity",
+          "def": "The rate of subscriber growth per day."
+        }
+      ]
+    },
+    {
+      "agent": "Strategist",
+      "role": "Brand Guardian",
+      "color": "#EF4444",
+      "timestamp": 1767106024.8020973,
+      "stance": "NEUTRAL",
+      "summary": "Awaiting proposal.",
+      "detail": "I need a proposal to evaluate. Please provide the content you want me to analyze so I can determine if it aligns with the Antigravity Channel's brand and business objectives.",
+      "glossary": []
+    },
+    {
+      "agent": "Director",
+      "role": "Creative Director",
+      "color": "#3B82F6",
+      "timestamp": 1767106031.328378,
+      "stance": "NEUTRAL",
+      "summary": "No proposal was provided for analysis, so I cannot provide specific creative advice.",
+      "detail": "Without a proposal, I can only reiterate the channel's brand visuals and style preferences. Remember to maintain a Cyberpunk aesthetic with organic flow, neon lights, high contrast, and 8k resolution. The futuristic workspace should have a premium feel and evoke spiritual connectivity. Avoid jump cuts. Ensure the tone remains soulful, strategic, and collaborative.",
+      "glossary": []
+    }
+  ],
+  "synthesis": {
+    "type": "SYNTHESIS",
+    "proposal": "Based on the debate, X is recommended.",
+    "options": [
+      "Approve",
+      "Reject"
+    ]
+  }
+}

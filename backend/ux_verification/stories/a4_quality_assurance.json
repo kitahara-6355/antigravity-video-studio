@@ -1,0 +1,630 @@
+{
+  "ux_id": "A-4",
+  "name": "CI/CD・品質保証",
+  "description": "管理者はCI/CD品質保証ダッシュボードからpytestテスト結果・カバレッジ推移・Fitness Functions・ラチェット検証・FV検証・E2Eテスト・品質ゲート(A/B/C/D)・vision-gap・品質トレンド・失敗分析・手動実行・レポート・リント・セキュリティ・デプロイ・ロールバック・変更ログ・品質基準設定・通知・ワンクリック修復を管理できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "CI/CD品質保証ダッシュボードが表示される",
+      "linked_items": [
+        "A4-L1-01",
+        "A4-L1-02",
+        "A4-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "最新pytestの結果(passed/failed/skipped)が表示される",
+      "linked_items": [
+        "A4-L1-03",
+        "A4-L2-02",
+        "A4-L3-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "現在のブランチカバレッジ(%)が表示される",
+      "linked_items": [
+        "A4-L1-04",
+        "A4-L2-03"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "カバレッジの時系列推移グラフが表示される",
+      "linked_items": [
+        "A4-L1-05",
+        "A4-L2-04",
+        "A4-L3-02"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "Fitness Functions(26/26)の結果が表示される",
+      "linked_items": [
+        "A4-L1-06",
+        "A4-L2-05",
+        "A4-L3-03"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "UXラチェット検証の結果が表示される",
+      "linked_items": [
+        "A4-L1-07",
+        "A4-L2-06",
+        "A4-L3-04"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "FV(機能実効性)検証の結果が表示される",
+      "linked_items": [
+        "A4-L1-08",
+        "A4-L3-05"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "Playwright E2Eテストの結果が表示される",
+      "linked_items": [
+        "A4-L1-09",
+        "A4-L3-06"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "ゲートA/B/C/Dの通過状態が表示される",
+      "linked_items": [
+        "A4-L1-10",
+        "A4-L2-07",
+        "A4-L3-07"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "/vision-gap-audit の最新スコアが表示される",
+      "linked_items": [
+        "A4-L2-08",
+        "A4-L3-08"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "品質スコアの時系列推移が表示される",
+      "linked_items": [
+        "A4-L3-09",
+        "A4-L4-01"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "失敗テストの原因分類(regression/flaky/new)が表示される",
+      "linked_items": [
+        "A4-L3-10",
+        "A4-L4-02"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "テストスイートを手動で実行できる",
+      "linked_items": [
+        "A4-L3-11",
+        "A4-L4-03"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "テストレポートをHTML/PDFで出力できる",
+      "linked_items": [
+        "A4-L3-12",
+        "A4-L4-04"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "コードリント(ruff/mypy)の結果が表示される",
+      "linked_items": [
+        "A4-L3-13",
+        "A4-L4-05"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "セキュリティスキャン(bandit)の結果が表示される",
+      "linked_items": [
+        "A4-L4-06",
+        "A4-L5-01"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "最新デプロイのバージョン/時刻が表示される",
+      "linked_items": [
+        "A4-L1-11",
+        "A4-L2-09"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "前バージョンへのロールバックができる",
+      "linked_items": [
+        "A4-L4-07",
+        "A4-L5-02"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "最近のコード変更(git log)が表示される",
+      "linked_items": [
+        "A4-L4-08",
+        "A4-L5-03"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "カバレッジ閾値/テスト必須化の設定が変更できる",
+      "linked_items": [
+        "A4-L4-09",
+        "A4-L5-04",
+        "A4-L5-05"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "テスト失敗時の通知先が設定できる",
+      "linked_items": [
+        "A4-L1-12",
+        "A4-L2-10",
+        "A4-L4-10"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "既知の修復パターンをワンクリックで適用できる",
+      "linked_items": [
+        "A4-L5-06",
+        "A4-L5-07",
+        "A4-L5-08",
+        "A4-L5-09",
+        "A4-L5-10"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "A4-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "CI/CD品質保証ダッシュボードAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "quality-dashboard"
+    },
+    {
+      "id": "A4-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ダッシュボードにsectionsフィールドが存在する",
+      "test_method": "dom_exists",
+      "testid": "quality-dashboard-sections"
+    },
+    {
+      "id": "A4-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "テスト結果APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "test-results"
+    },
+    {
+      "id": "A4-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "カバレッジAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "coverage"
+    },
+    {
+      "id": "A4-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "カバレッジ推移APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "coverage-trend"
+    },
+    {
+      "id": "A4-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "Fitness Functions結果APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "fitness-results"
+    },
+    {
+      "id": "A4-L1-07",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "ラチェット結果APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "ratchet-results"
+    },
+    {
+      "id": "A4-L1-08",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "FV検証結果APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "fv-results"
+    },
+    {
+      "id": "A4-L1-09",
+      "layer": 1,
+      "story_scene": "S8",
+      "description": "E2Eテスト結果APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "e2e-results"
+    },
+    {
+      "id": "A4-L1-10",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "品質ゲート状態APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "quality-gates"
+    },
+    {
+      "id": "A4-L1-11",
+      "layer": 1,
+      "story_scene": "S17",
+      "description": "デプロイ状態APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "deploy-status"
+    },
+    {
+      "id": "A4-L1-12",
+      "layer": 1,
+      "story_scene": "S21",
+      "description": "通知設定APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "notification-settings"
+    },
+    {
+      "id": "A4-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "ダッシュボードにtitle/status/summaryフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "テスト結果にpassed/failed/skipped/totalが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-03",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "カバレッジにbranch_pct/line_pctが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-04",
+      "layer": 2,
+      "story_scene": "S4",
+      "description": "カバレッジ推移にhistory配列とperiod_daysが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-05",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "Fitness結果にpassed/total/functionsが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-06",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "ラチェット結果にvalid/total_items/pass_itemsが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-07",
+      "layer": 2,
+      "story_scene": "S9",
+      "description": "品質ゲートにgate_a/gate_b/gate_c/gate_dが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-08",
+      "layer": 2,
+      "story_scene": "S10",
+      "description": "vision-gapにscore/axes/weightedが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-09",
+      "layer": 2,
+      "story_scene": "S17",
+      "description": "デプロイ状態にversion/deployed_at/statusが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L2-10",
+      "layer": 2,
+      "story_scene": "S21",
+      "description": "通知設定にchannels配列とenabledが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "A4-L3-01",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "テスト結果のpassedが0以上の数値である",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-02",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "カバレッジ推移の30日間データが配列で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "Fitness Functionsの各項目にname/passed/descriptionが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-04",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "ラチェット結果のtotal_itemsが0以上の数値である",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "FV検証結果にcategories配列が含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-06",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "E2Eテスト結果にsuites配列が含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-07",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "品質ゲートの各ゲートにstatus/conditionsが含まれる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-08",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "vision-gapのscoreが0-100の範囲で返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-09",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "品質トレンドAPIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-10",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "失敗分析APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-11",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "テスト手動実行APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-12",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "レポート生成APIにPOSTできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L3-13",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "リント結果APIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "A4-L4-01",
+      "layer": 4,
+      "story_scene": "S11",
+      "description": "品質トレンドにhistory配列が含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-02",
+      "layer": 4,
+      "story_scene": "S12",
+      "description": "失敗分析にfailures配列とcategoriesが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-03",
+      "layer": 4,
+      "story_scene": "S13",
+      "description": "無効なテストスイート指定で適切なエラーが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-04",
+      "layer": 4,
+      "story_scene": "S14",
+      "description": "レポート生成後にdownload_urlが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-05",
+      "layer": 4,
+      "story_scene": "S15",
+      "description": "リント結果にissues配列とtotalが含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-06",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "セキュリティスキャン結果APIが正常応答を返す",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-07",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "ロールバックAPIにPOSTできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-08",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "変更ログにcommits配列が含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-09",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "品質基準設定の更新がPOSTで反映される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L4-10",
+      "layer": 4,
+      "story_scene": "S21",
+      "description": "通知設定の更新がPOSTで反映される",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "A4-L5-01",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "ダッシュボード→テスト結果→カバレッジ→セキュリティの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-02",
+      "layer": 5,
+      "story_scene": "S18",
+      "description": "デプロイ状態→ロールバック→変更ログの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-03",
+      "layer": 5,
+      "story_scene": "S19",
+      "description": "Fitness→ラチェット→FV→E2E→品質ゲートの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-04",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "品質基準設定→閾値変更→確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-05",
+      "layer": 5,
+      "story_scene": "S20",
+      "description": "vision-gap→品質トレンド→失敗分析の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-06",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "全GETエンドポイント疎通確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-07",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "手動実行→レポート生成→ダウンロードの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-08",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "リント→セキュリティ→ワンクリック修復の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-09",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "通知設定→テスト失敗→通知確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "A4-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "無効なテストスイート指定で400エラーの完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-05-01",
+    "created_by": "sprint_3.3.4",
+    "activated_at": "2026-05-01",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

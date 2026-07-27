@@ -1,0 +1,17 @@
+{
+  "id": "35dc28cb-831f-45a5-88fc-b052104e1914",
+  "title": "セッション bc597c3a の知見",
+  "description": "mock synthesis",
+  "proposed_changes": {
+    "type": "council_synthesis",
+    "insights": [],
+    "synthesis": "mock synthesis"
+  },
+  "session_id": "bc597c3a-a97c-41cf-a5a3-ae61661ffa1c",
+  "status": "debate",
+  "votes": {},
+  "created_at": 1780831171.0641162,
+  "updated_at": 1780831171.0666466,
+  "gavel_decision": null,
+  "progress": 0.5
+}

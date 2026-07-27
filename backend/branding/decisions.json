@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "decisions": [
+    {
+      "id": "dec_00000",
+      "timestamp": "2026-01-17T17:12:03.842768",
+      "type": "test",
+      "content": {
+        "type": "test",
+        "text": "テスト承認"
+      },
+      "decision": "approved",
+      "approval_type": "this_time_only",
+      "reason": "",
+      "tags": [
+        "test"
+      ],
+      "context": {}
+    },
+    {
+      "id": "dec_00001",
+      "timestamp": "2026-06-06T07:10:59.281598",
+      "type": "test",
+      "content": {
+        "type": "test",
+        "text": "テスト承認"
+      },
+      "decision": "approved",
+      "approval_type": "this_time_only",
+      "reason": "",
+      "tags": [
+        "test"
+      ],
+      "context": {}
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "session_id": "76ae5d30-4dfa-471b-8d3c-cdb1395a9c43",
+  "total_duration": 21.15,
+  "total_budget": 570.0,
+  "over_budget": false,
+  "workers": [
+    {
+      "worker_name": "文字起こし",
+      "duration_seconds": 0.03,
+      "budget_seconds": 120.0,
+      "over_budget": false
+    },
+    {
+      "worker_name": "AI校閲",
+      "duration_seconds": 0.01,
+      "budget_seconds": 60.0,
+      "over_budget": false
+    },
+    {
+      "worker_name": "SmartCut構成",
+      "duration_seconds": 0.0,
+      "budget_seconds": 30.0,
+      "over_budget": false
+    },
+    {
+      "worker_name": "プレビュー生成",
+      "duration_seconds": 11.14,
+      "budget_seconds": 90.0,
+      "over_budget": false
+    },
+    {
+      "worker_name": "YouTube最適化",
+      "duration_seconds": 0.0,
+      "budget_seconds": 60.0,
+      "over_budget": false
+    },
+    {
+      "worker_name": "品質チェック",
+      "duration_seconds": 4.43,
+      "budget_seconds": 30.0,
+      "over_budget": false
+    },
+    {
+      "worker_name": "最終レンダリング",
+      "duration_seconds": 5.54,
+      "budget_seconds": 180.0,
+      "over_budget": false
+    }
+  ],
+  "degradation_applied": [],
+  "timestamp": "2026-05-27T22:31:44.052160"
+}

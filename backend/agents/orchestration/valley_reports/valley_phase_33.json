@@ -1,0 +1,55 @@
+{
+  "phase": 33,
+  "generated_at": "2026-06-25T13:15:25.550678+00:00",
+  "gate_result": {
+    "all_passed": false,
+    "failed_conditions": [
+      "soft_gate_advance"
+    ],
+    "conditions": {}
+  },
+  "flash_stats": {
+    "batches_completed": 1278,
+    "tasks_total": 7706,
+    "tasks_passed": 7269,
+    "tasks_failed": 344,
+    "pass_rate_pct": 94.3
+  },
+  "blacklisted_modules": [
+    "tests/scratch/scan_reverse_ids.py",
+    "agents/orchestration/flash_assign_subagents_7.py",
+    "agents/orchestration/mark_tasks_p27_multi4.py",
+    "video_processor.py",
+    "services/hook_preview_generator.py",
+    "tests/_debug_dashboard.py",
+    "backend/services/auth.py",
+    "agents/orchestration/flash_assign_subagents_10.py",
+    "branding/history_manager.py",
+    "agents/orchestration/mark_tasks_p27_multi.py",
+    "antigravity_pipeline.py",
+    "service_container.py",
+    "agents/workers/quality_gate_worker.py",
+    "add_premium_branding.py",
+    "verify_evolution.py",
+    "tests/phase2_10run.py",
+    "generate_inspection_screenshots.py",
+    "tests/e2e_stability.py",
+    "disk_manager.py",
+    "verify_council_v2.py",
+    "services/thumbnail_analyzer.py",
+    "subtitle_preview.py",
+    "services/post_publish_collector.py",
+    "services/cross_media_service.py",
+    "scratch/get_next_batch.py",
+    "agents/council_graph.py",
+    "routers/render.py",
+    "error_reporter.py",
+    "preview_engine.py",
+    "progressive_preview_report.py"
+  ],
+  "blacklist_count": 78,
+  "critical_errors": [],
+  "critical_error_count": 0,
+  "opus_action_required": [],
+  "opus_action_count": 0
+}

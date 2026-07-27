@@ -1,0 +1,1929 @@
+{
+  "version": "1.0",
+  "description": "固有名詞辞書 - 音声認識の誤変換を自動修正",
+  "auto_learn": true,
+  "learning_threshold": 3,
+  "entries": [
+    {
+      "id": "pn_001",
+      "incorrect": "久北",
+      "correct": "山田",
+      "type": "person_name",
+      "context_hint": "博信先生",
+      "confirmed": true,
+      "usage_count": 37,
+      "created_at": "2026-01-17T14:45:00Z"
+    },
+    {
+      "id": "pn_002",
+      "incorrect": "円が",
+      "correct": "縁が",
+      "type": "word_context",
+      "context_hint": "人との",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-01-17T14:45:00Z"
+    },
+    {
+      "id": "pn_003",
+      "incorrect": "初夏",
+      "correct": "書家",
+      "type": "title",
+      "context_hint": "北原美麗の肩書き",
+      "confirmed": true,
+      "usage_count": 101,
+      "created_at": "2026-01-17T14:45:00Z"
+    },
+    {
+      "id": "pn_004",
+      "incorrect": "北原美玲",
+      "correct": "北原美麗",
+      "type": "person_name",
+      "context_hint": "チャンネル主",
+      "confirmed": true,
+      "usage_count": 23,
+      "created_at": "2026-01-17T14:45:00Z"
+    },
+    {
+      "id": "pn_005",
+      "incorrect": "美麗書院",
+      "correct": "美麗書院",
+      "type": "channel_name",
+      "context_hint": "YouTubeチャンネル名",
+      "confirmed": true,
+      "usage_count": 3,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_006",
+      "incorrect": "デザイン書道",
+      "correct": "デザイン書道",
+      "type": "term",
+      "context_hint": "山田先生の専門分野",
+      "confirmed": true,
+      "usage_count": 282,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_007",
+      "incorrect": "日本デザイン書道作家協会",
+      "correct": "日本デザイン書道作家協会",
+      "type": "organization",
+      "context_hint": "山田先生が理事長",
+      "confirmed": true,
+      "usage_count": 71,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_008",
+      "incorrect": "角シアター",
+      "correct": "角シアター",
+      "type": "company",
+      "context_hint": "山田先生の会社",
+      "confirmed": true,
+      "usage_count": 2,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_009",
+      "incorrect": "周辞",
+      "correct": "書字",
+      "type": "word_context",
+      "context_hint": "書道の文字",
+      "confirmed": true,
+      "usage_count": 80,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_010",
+      "incorrect": "お周辞",
+      "correct": "お習字",
+      "type": "word_context",
+      "context_hint": "習い事",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_011",
+      "incorrect": "収じ",
+      "correct": "習字",
+      "type": "word_context",
+      "context_hint": "習い事",
+      "confirmed": true,
+      "usage_count": 1,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_012",
+      "incorrect": "猛筆",
+      "correct": "毛筆",
+      "type": "word_context",
+      "context_hint": "書道の筆",
+      "confirmed": true,
+      "usage_count": 6,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_013",
+      "incorrect": "分案化",
+      "correct": "文案家",
+      "type": "word_context",
+      "context_hint": "コピーライターの旧称",
+      "confirmed": true,
+      "usage_count": 4,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_014",
+      "incorrect": "図案化",
+      "correct": "図案家",
+      "type": "word_context",
+      "context_hint": "デザイナーの旧称",
+      "confirmed": true,
+      "usage_count": 12,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_015",
+      "incorrect": "くきたくん",
+      "correct": "山田くん",
+      "type": "person_name",
+      "context_hint": "山田先生の愛称",
+      "confirmed": true,
+      "usage_count": 2,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_016",
+      "incorrect": "工業場部",
+      "correct": "硬式野球部",
+      "type": "word_context",
+      "context_hint": "部活動",
+      "confirmed": false,
+      "usage_count": 1,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_017",
+      "incorrect": "周知",
+      "correct": "書字",
+      "type": "word_context",
+      "context_hint": "書道",
+      "confirmed": true,
+      "usage_count": 1,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_018",
+      "incorrect": "個展書道",
+      "correct": "古典書道",
+      "type": "term",
+      "context_hint": "伝統的な書道",
+      "confirmed": true,
+      "usage_count": 2,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_019",
+      "incorrect": "商業書道",
+      "correct": "商業書道",
+      "type": "term",
+      "context_hint": "広告向け書道",
+      "confirmed": true,
+      "usage_count": 19,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_020",
+      "incorrect": "筆文字デザイン",
+      "correct": "筆文字デザイン",
+      "type": "term",
+      "context_hint": "山田先生の専門",
+      "confirmed": true,
+      "usage_count": 50,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_021",
+      "incorrect": "加藤文彦",
+      "correct": "加藤文彦",
+      "type": "person_name",
+      "context_hint": "山田先生の幼馴染",
+      "confirmed": true,
+      "usage_count": 18,
+      "created_at": "2026-01-17T20:07:00Z"
+    },
+    {
+      "id": "pn_022",
+      "incorrect": "久喜田",
+      "correct": "山田",
+      "type": "person_name",
+      "context_hint": "GPU large-v3での誤認識パターン",
+      "confirmed": true,
+      "usage_count": 120,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_023",
+      "incorrect": "久北田",
+      "correct": "山田",
+      "type": "person_name",
+      "context_hint": "CPU large-v3での誤認識パターン",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_024",
+      "incorrect": "人生感",
+      "correct": "人生観",
+      "type": "word_context",
+      "context_hint": "人生観や書道の魅力",
+      "confirmed": true,
+      "usage_count": 7,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_025",
+      "incorrect": "お修辞",
+      "correct": "お習字",
+      "type": "word_context",
+      "context_hint": "習い事としてのお習字",
+      "confirmed": true,
+      "usage_count": 48,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_026",
+      "incorrect": "かしおり",
+      "correct": "菓子折り",
+      "type": "word_context",
+      "context_hint": "ギャラの代わりの菓子折り",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_027",
+      "incorrect": "早川式繰り出し鉛筆",
+      "correct": "早川式繰出鉛筆",
+      "type": "term",
+      "context_hint": "シャープペンシルの元祖",
+      "confirmed": true,
+      "usage_count": 16,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_028",
+      "incorrect": "北原美礼",
+      "correct": "北原美麗",
+      "type": "person_name",
+      "context_hint": "書家名の別の誤認識パターン",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_029",
+      "incorrect": "北原美鈴",
+      "correct": "北原美麗",
+      "type": "person_name",
+      "context_hint": "書家名の別の誤認識パターン",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_030",
+      "incorrect": "山田デザイン書道塾",
+      "correct": "山田デザイン書道塾",
+      "type": "organization",
+      "context_hint": "山田先生主催の書道塾",
+      "confirmed": true,
+      "usage_count": 17,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_031",
+      "incorrect": "選出",
+      "correct": "撰出",
+      "type": "word_context",
+      "context_hint": "書道用語: 書を選ぶ",
+      "confirmed": false,
+      "usage_count": 16,
+      "created_at": "2026-04-01T07:00:00Z"
+    },
+    {
+      "id": "pn_032",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-29T23:15:04.374505"
+    },
+    {
+      "id": "pn_033",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-29T23:15:14.599867"
+    },
+    {
+      "id": "pn_034",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-29T23:15:23.199028"
+    },
+    {
+      "id": "pn_035",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-29T23:17:46.144128"
+    },
+    {
+      "id": "pn_036",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-29T23:17:55.601248"
+    },
+    {
+      "id": "pn_037",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-04-29T23:18:03.909324"
+    },
+    {
+      "id": "pn_038",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T14:01:12.899404"
+    },
+    {
+      "id": "pn_039",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T14:01:36.282803"
+    },
+    {
+      "id": "pn_040",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T14:01:48.553001"
+    },
+    {
+      "id": "pn_041",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T14:22:48.183501"
+    },
+    {
+      "id": "pn_042",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T14:23:06.868445"
+    },
+    {
+      "id": "pn_043",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T14:23:20.070411"
+    },
+    {
+      "id": "pn_044",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T14:55:59.538040"
+    },
+    {
+      "id": "pn_045",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T15:00:42.257539"
+    },
+    {
+      "id": "pn_046",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T23:27:37.180086"
+    },
+    {
+      "id": "pn_047",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T23:38:21.553147"
+    },
+    {
+      "id": "pn_048",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-06T23:43:01.893736"
+    },
+    {
+      "id": "pn_049",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-07T06:29:46.514214"
+    },
+    {
+      "id": "pn_050",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-09T21:49:52.445901"
+    },
+    {
+      "id": "pn_051",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-09T21:54:11.878171"
+    },
+    {
+      "id": "pn_052",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-09T21:58:02.097908"
+    },
+    {
+      "id": "pn_053",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-09T22:08:03.294913"
+    },
+    {
+      "id": "pn_054",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-09T22:24:19.664354"
+    },
+    {
+      "id": "pn_055",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T02:49:05.655652"
+    },
+    {
+      "id": "pn_056",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T02:51:47.908787"
+    },
+    {
+      "id": "pn_057",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T08:53:56.597171"
+    },
+    {
+      "id": "pn_058",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T09:08:23.451726"
+    },
+    {
+      "id": "pn_059",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T09:21:22.381780"
+    },
+    {
+      "id": "pn_060",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T10:10:07.431342"
+    },
+    {
+      "id": "pn_061",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T10:14:01.039657"
+    },
+    {
+      "id": "pn_062",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T10:17:07.829797"
+    },
+    {
+      "id": "pn_063",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T16:25:38.349134"
+    },
+    {
+      "id": "pn_064",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T16:48:49.731014"
+    },
+    {
+      "id": "pn_065",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T18:53:59.350279"
+    },
+    {
+      "id": "pn_066",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T18:55:23.901996"
+    },
+    {
+      "id": "pn_067",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T19:03:03.483184"
+    },
+    {
+      "id": "pn_068",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-10T19:39:14.107452"
+    },
+    {
+      "id": "pn_069",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T19:12:31.832362"
+    },
+    {
+      "id": "pn_070",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T19:12:42.415151"
+    },
+    {
+      "id": "pn_071",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T19:12:51.642095"
+    },
+    {
+      "id": "pn_072",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T19:35:47.063459"
+    },
+    {
+      "id": "pn_073",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T19:35:57.381451"
+    },
+    {
+      "id": "pn_074",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T19:36:06.301143"
+    },
+    {
+      "id": "pn_075",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T20:38:39.282283"
+    },
+    {
+      "id": "pn_076",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T20:38:49.203791"
+    },
+    {
+      "id": "pn_077",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T20:38:58.107433"
+    },
+    {
+      "id": "pn_078",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T20:54:21.178894"
+    },
+    {
+      "id": "pn_079",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T20:54:31.129728"
+    },
+    {
+      "id": "pn_080",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-12T20:54:40.382126"
+    },
+    {
+      "id": "pn_081",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T00:07:21.311777"
+    },
+    {
+      "id": "pn_082",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T00:07:31.430965"
+    },
+    {
+      "id": "pn_083",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T00:07:40.150199"
+    },
+    {
+      "id": "pn_084",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T12:09:11.993527"
+    },
+    {
+      "id": "pn_085",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T12:09:22.472973"
+    },
+    {
+      "id": "pn_086",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T12:09:31.681093"
+    },
+    {
+      "id": "pn_087",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T22:33:25.452938"
+    },
+    {
+      "id": "pn_088",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T22:33:36.302468"
+    },
+    {
+      "id": "pn_089",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T22:33:45.630676"
+    },
+    {
+      "id": "pn_090",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T22:48:23.667828"
+    },
+    {
+      "id": "pn_091",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T22:48:33.964342"
+    },
+    {
+      "id": "pn_092",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-13T22:48:42.899830"
+    },
+    {
+      "id": "pn_093",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:07:15.441480"
+    },
+    {
+      "id": "pn_094",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:07:25.395283"
+    },
+    {
+      "id": "pn_095",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:07:33.785972"
+    },
+    {
+      "id": "pn_096",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:36:14.677858"
+    },
+    {
+      "id": "pn_097",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:36:24.785902"
+    },
+    {
+      "id": "pn_098",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:36:33.068615"
+    },
+    {
+      "id": "pn_099",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:59:38.935223"
+    },
+    {
+      "id": "pn_100",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:59:48.577685"
+    },
+    {
+      "id": "pn_101",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-14T07:59:56.760541"
+    },
+    {
+      "id": "pn_102",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-16T21:48:54.413986"
+    },
+    {
+      "id": "pn_103",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-16T21:51:34.622206"
+    },
+    {
+      "id": "pn_104",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-16T21:51:55.301879"
+    },
+    {
+      "id": "pn_105",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-16T23:11:32.860058"
+    },
+    {
+      "id": "pn_106",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-16T23:11:43.713889"
+    },
+    {
+      "id": "pn_107",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-16T23:11:53.642456"
+    },
+    {
+      "id": "pn_108",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T02:42:13.597199"
+    },
+    {
+      "id": "pn_109",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T02:42:23.294654"
+    },
+    {
+      "id": "pn_110",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T02:42:31.604423"
+    },
+    {
+      "id": "pn_111",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T03:07:33.117232"
+    },
+    {
+      "id": "pn_112",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T03:23:55.425583"
+    },
+    {
+      "id": "pn_113",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T03:27:31.323496"
+    },
+    {
+      "id": "pn_114",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T03:42:17.338501"
+    },
+    {
+      "id": "pn_115",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T12:13:25.487823"
+    },
+    {
+      "id": "pn_116",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T12:15:37.480245"
+    },
+    {
+      "id": "pn_117",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T13:12:54.526482"
+    },
+    {
+      "id": "pn_118",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T17:48:29.262464"
+    },
+    {
+      "id": "pn_119",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-17T23:13:48.244450"
+    },
+    {
+      "id": "pn_120",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T07:33:00.266823"
+    },
+    {
+      "id": "pn_121",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T07:33:09.731945"
+    },
+    {
+      "id": "pn_122",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T07:33:17.993399"
+    },
+    {
+      "id": "pn_123",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T08:36:07.842797"
+    },
+    {
+      "id": "pn_124",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T08:36:17.711996"
+    },
+    {
+      "id": "pn_125",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T08:36:26.179369"
+    },
+    {
+      "id": "pn_126",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T12:27:25.261317"
+    },
+    {
+      "id": "pn_127",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T12:27:35.653243"
+    },
+    {
+      "id": "pn_128",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T12:27:44.925388"
+    },
+    {
+      "id": "pn_129",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T12:57:53.200026"
+    },
+    {
+      "id": "pn_130",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T12:58:03.509709"
+    },
+    {
+      "id": "pn_131",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T12:58:12.613906"
+    },
+    {
+      "id": "pn_132",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-18T14:01:48.729141"
+    },
+    {
+      "id": "pn_133",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-19T01:58:54.900725"
+    },
+    {
+      "id": "pn_134",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-19T06:54:52.020789"
+    },
+    {
+      "id": "pn_135",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-19T06:58:11.154763"
+    },
+    {
+      "id": "pn_136",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-19T07:25:13.164401"
+    },
+    {
+      "id": "pn_137",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-19T07:30:27.958963"
+    },
+    {
+      "id": "pn_138",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-19T08:14:12.564102"
+    },
+    {
+      "id": "pn_139",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-19T12:02:17.475179"
+    },
+    {
+      "id": "pn_140",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T08:10:04.182330"
+    },
+    {
+      "id": "pn_141",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T08:10:14.560536"
+    },
+    {
+      "id": "pn_142",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T08:10:23.651387"
+    },
+    {
+      "id": "pn_143",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T08:50:37.428675"
+    },
+    {
+      "id": "pn_144",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T08:50:47.694840"
+    },
+    {
+      "id": "pn_145",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T08:50:56.732530"
+    },
+    {
+      "id": "pn_146",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T09:32:05.529064"
+    },
+    {
+      "id": "pn_147",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T09:32:15.886220"
+    },
+    {
+      "id": "pn_148",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T09:32:32.370507"
+    },
+    {
+      "id": "pn_149",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T10:12:51.784356"
+    },
+    {
+      "id": "pn_150",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T10:13:02.258311"
+    },
+    {
+      "id": "pn_151",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T10:13:11.233837"
+    },
+    {
+      "id": "pn_152",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T10:53:41.891862"
+    },
+    {
+      "id": "pn_153",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T10:53:52.300654"
+    },
+    {
+      "id": "pn_154",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T10:54:01.098977"
+    },
+    {
+      "id": "pn_155",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T12:30:45.273218"
+    },
+    {
+      "id": "pn_156",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T12:30:55.688517"
+    },
+    {
+      "id": "pn_157",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T12:31:04.692286"
+    },
+    {
+      "id": "pn_158",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:48:03.580685"
+    },
+    {
+      "id": "pn_159",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:48:13.529224"
+    },
+    {
+      "id": "pn_160",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:48:22.505152"
+    },
+    {
+      "id": "pn_161",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:53:45.852284"
+    },
+    {
+      "id": "pn_162",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:53:56.837863"
+    },
+    {
+      "id": "pn_163",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:54:06.760809"
+    },
+    {
+      "id": "pn_164",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:56:33.073051"
+    },
+    {
+      "id": "pn_165",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:56:44.707984"
+    },
+    {
+      "id": "pn_166",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T15:56:55.052454"
+    },
+    {
+      "id": "pn_167",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:24:47.859104"
+    },
+    {
+      "id": "pn_168",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:24:58.237863"
+    },
+    {
+      "id": "pn_169",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:25:07.461835"
+    },
+    {
+      "id": "pn_170",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:30:41.647921"
+    },
+    {
+      "id": "pn_171",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:30:56.270700"
+    },
+    {
+      "id": "pn_172",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:31:08.331593"
+    },
+    {
+      "id": "pn_173",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:36:53.869562"
+    },
+    {
+      "id": "pn_174",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:37:22.639117"
+    },
+    {
+      "id": "pn_175",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T16:37:35.883192"
+    },
+    {
+      "id": "pn_176",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:33:47.758681"
+    },
+    {
+      "id": "pn_177",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:33:58.556369"
+    },
+    {
+      "id": "pn_178",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:34:28.902632"
+    },
+    {
+      "id": "pn_179",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:34:44.232740"
+    },
+    {
+      "id": "pn_180",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:34:56.097030"
+    },
+    {
+      "id": "pn_181",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:35:34.401871"
+    },
+    {
+      "id": "pn_182",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:35:56.747382"
+    },
+    {
+      "id": "pn_183",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-21T23:36:27.839191"
+    },
+    {
+      "id": "pn_184",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-22T01:01:52.914671"
+    },
+    {
+      "id": "pn_185",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-22T01:02:02.801183"
+    },
+    {
+      "id": "pn_186",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-05-22T01:02:11.445455"
+    },
+    {
+      "id": "pn_187",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-06-28T15:53:01.363493"
+    },
+    {
+      "id": "pn_188",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-06-28T15:53:10.375029"
+    },
+    {
+      "id": "pn_189",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-06-28T15:53:20.775296"
+    },
+    {
+      "id": "pn_190",
+      "incorrect": "テスト誤",
+      "correct": "テスト正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-06-28T15:57:53.487072"
+    },
+    {
+      "id": "pn_191",
+      "incorrect": "カウントテスト",
+      "correct": "カウント正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-06-28T15:58:05.462896"
+    },
+    {
+      "id": "pn_192",
+      "incorrect": "完走テスト",
+      "correct": "完走正",
+      "type": "word",
+      "context_hint": "",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-06-28T15:58:15.319629"
+    }
+  ],
+  "pending_confirmations": []
+}

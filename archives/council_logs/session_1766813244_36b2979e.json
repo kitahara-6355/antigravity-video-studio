@@ -1,0 +1,87 @@
+{
+  "session_id": "36b2979e-198a-4d5f-be8f-308e1c6af6e2",
+  "timestamp": 1766813244.8818836,
+  "datetime": "2025-12-27T14:27:24.881884",
+  "topic": "Why is my channel growing so slowly?",
+  "debate_flow": [
+    {
+      "agent": "Analyst",
+      "role": "Data Scientist",
+      "color": "#F59E0B",
+      "timestamp": 1766813244.8810177,
+      "stance": "DISAGREE",
+      "summary": "Data Analysis Complete",
+      "detail": "Your Nemesis 'TechStarter' is ahead by 25 subs. Analysis shows they post 2x more frequently.",
+      "data": {
+        "my_stats": {
+          "subscribers": 155,
+          "total_views": 5000,
+          "videos": 12,
+          "last_updated": "2025-12-27T14:27:24.880601"
+        },
+        "rivals": {
+          "nemesis": {
+            "name": "TechStarter",
+            "subs": 180,
+            "views": 5000,
+            "genre": "Tech"
+          },
+          "benchmark": {
+            "name": "TechMastery",
+            "subs": 15000,
+            "views": 1500000,
+            "genre": "Tech"
+          }
+        }
+      },
+      "glossary": [
+        {
+          "term": "Nemesis",
+          "def": "A rival channel with slightly higher stats (your immediate target)."
+        },
+        {
+          "term": "Velocity",
+          "def": "The rate of subscriber growth per day."
+        }
+      ]
+    },
+    {
+      "agent": "Strategist",
+      "role": "Brand Guardian",
+      "color": "#EF4444",
+      "timestamp": 1766813244.8812644,
+      "stance": "NEUTRAL",
+      "summary": "Brand Check Passed",
+      "detail": "No violations of Brand Constitution detected. Proceed with caution regarding tone.",
+      "glossary": [
+        {
+          "term": "Brand Constitution",
+          "def": "The set of absolute rules defining your channel's identity."
+        }
+      ]
+    },
+    {
+      "agent": "Director",
+      "role": "Creative Director",
+      "color": "#3B82F6",
+      "timestamp": 1766813244.8815079,
+      "stance": "AGREE",
+      "summary": "Creative Direction Ready",
+      "detail": "Visual style is consistent with the 'Cyberpunk' theme. Recommended cut pace: Fast.",
+      "glossary": [
+        {
+          "term": "Cut Pace",
+          "def": "The speed at which scenes transition (Fast = High Energy)."
+        }
+      ]
+    }
+  ],
+  "synthesis": {
+    "type": "SYNTHESIS",
+    "proposal": "Based on the debate, X is recommended.",
+    "options": [
+      "Approve",
+      "Reject"
+    ]
+  }
+}

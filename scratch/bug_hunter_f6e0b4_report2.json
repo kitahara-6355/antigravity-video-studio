@@ -1,0 +1,7 @@
+{
+  "message": "Phase 30 / bug_hunter タスク #1 (対象: cleanup_manager.py) の不具合修正完了。is_protected内での pathlib.Path.relative_to 比較時のValueError（ドライブレターケース、相対・絶対、区切り文字混在による不一致）を、 normcase と abspath によるパス正規化で解決。except Exceptionへの exc_info=True 付与、TDR TD-410解消、単体テスト35件PASS・カバレッジ100%維持、全体フィットネス125件PASSを確認。",
+  "changed_files": [
+    "backend/cleanup_manager.py",
+    "backend/tests/test_cleanup_manager.py"
+  ]
+}

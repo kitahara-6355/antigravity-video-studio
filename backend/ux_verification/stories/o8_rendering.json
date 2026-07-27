@@ -1,0 +1,598 @@
+{
+  "ux_id": "O-8",
+  "name": "レンダリング",
+  "description": "Ownerはレンダリング画面でエンコーダ/BGM/LUFS/ロゴ/字幕を設定し、レンダリングを実行して完成動画をダウンロードできる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "レンダリング進捗画面が表示される",
+      "linked_items": [
+        "O8-L1-01",
+        "O8-L1-02"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "GPU/CPUの選択状態が表示される",
+      "linked_items": [
+        "O8-L1-03",
+        "O8-L2-01"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "GPU利用可能時にNVENCが自動選択される",
+      "linked_items": [
+        "O8-L4-02"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "GPU障害時にCPUへ自動フォールバックする",
+      "linked_items": [
+        "O8-L4-03"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "BGMダッキング設定が表示される",
+      "linked_items": [
+        "O8-L1-04",
+        "O8-L2-02"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "BGM音量を調整できる",
+      "linked_items": [
+        "O8-L3-03"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "LUFS設定が表示される",
+      "linked_items": [
+        "O8-L1-05",
+        "O8-L2-03"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "LUFSターゲット値を変更できる",
+      "linked_items": [
+        "O8-L3-04"
+      ]
+    },
+    {
+      "id": "S9",
+      "text": "ロゴ設定できる",
+      "linked_items": [
+        "O8-L1-06",
+        "O8-L2-04"
+      ]
+    },
+    {
+      "id": "S10",
+      "text": "字幕設定できる",
+      "linked_items": [
+        "O8-L1-07",
+        "O8-L2-05"
+      ]
+    },
+    {
+      "id": "S11",
+      "text": "レンダリング開始",
+      "linked_items": [
+        "O8-L1-08",
+        "O8-L3-01"
+      ]
+    },
+    {
+      "id": "S12",
+      "text": "進捗リアルタイム更新",
+      "linked_items": [
+        "O8-L2-06",
+        "O8-L3-07"
+      ]
+    },
+    {
+      "id": "S13",
+      "text": "ステージ進捗表示",
+      "linked_items": [
+        "O8-L1-09",
+        "O8-L2-07"
+      ]
+    },
+    {
+      "id": "S14",
+      "text": "完了ファイル情報表示",
+      "linked_items": [
+        "O8-L1-10",
+        "O8-L2-08"
+      ]
+    },
+    {
+      "id": "S15",
+      "text": "ダウンロードリンク表示",
+      "linked_items": [
+        "O8-L1-11",
+        "O8-L3-08"
+      ]
+    },
+    {
+      "id": "S16",
+      "text": "強制書出で続行",
+      "linked_items": [
+        "O8-L3-02",
+        "O8-L4-08"
+      ]
+    },
+    {
+      "id": "S17",
+      "text": "品質ブロック",
+      "linked_items": [
+        "O8-L4-06"
+      ]
+    },
+    {
+      "id": "S18",
+      "text": "タイムアウト停止",
+      "linked_items": [
+        "O8-L4-04"
+      ]
+    },
+    {
+      "id": "S19",
+      "text": "BGM欠損スキップ",
+      "linked_items": [
+        "O8-L4-05"
+      ]
+    },
+    {
+      "id": "S20",
+      "text": "ロゴ欠損スキップ",
+      "linked_items": [
+        "O8-L4-09"
+      ]
+    },
+    {
+      "id": "S21",
+      "text": "tempクリーンアップ",
+      "linked_items": [
+        "O8-L4-10"
+      ]
+    },
+    {
+      "id": "S22",
+      "text": "完了通知",
+      "linked_items": [
+        "O8-L1-12",
+        "O8-L2-09"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O8-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "ヘルスチェックAPIが正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "設定取得APIが正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "GPU検出APIが正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-04",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "BGM設定が含まれる",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-05",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "LUFS設定が含まれる",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-06",
+      "layer": 1,
+      "story_scene": "S9",
+      "description": "ロゴ設定が含まれる",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-07",
+      "layer": 1,
+      "story_scene": "S10",
+      "description": "字幕設定が含まれる",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-08",
+      "layer": 1,
+      "story_scene": "S11",
+      "description": "開始APIが正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-09",
+      "layer": 1,
+      "story_scene": "S13",
+      "description": "stagesフィールド存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-10",
+      "layer": 1,
+      "story_scene": "S14",
+      "description": "output_file存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-11",
+      "layer": 1,
+      "story_scene": "S15",
+      "description": "download_url存在",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L1-12",
+      "layer": 1,
+      "story_scene": "S22",
+      "description": "完了通知API正常応答",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O8-L2-01",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "recommended_encoderが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-02",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "BGM音量が0-100数値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-03",
+      "layer": 2,
+      "story_scene": "S7",
+      "description": "LUFS値がマイナスdB値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-04",
+      "layer": 2,
+      "story_scene": "S9",
+      "description": "ロゴ位置/透明度が設定値通り",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-05",
+      "layer": 2,
+      "story_scene": "S10",
+      "description": "字幕フォント/サイズが設定値通り",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-06",
+      "layer": 2,
+      "story_scene": "S12",
+      "description": "進捗が0-100数値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-07",
+      "layer": 2,
+      "story_scene": "S13",
+      "description": "4ステージ名が表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-08",
+      "layer": 2,
+      "story_scene": "S14",
+      "description": "サイズ/コーデック/解像度表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-09",
+      "layer": 2,
+      "story_scene": "S22",
+      "description": "completed表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L2-10",
+      "layer": 2,
+      "story_scene": "S18",
+      "description": "タイムアウトメッセージ表示",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O8-L3-01",
+      "layer": 3,
+      "story_scene": "S11",
+      "description": "開始APIでjob_id取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-02",
+      "layer": 3,
+      "story_scene": "S16",
+      "description": "強制レンダリングAPI呼出",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-03",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "BGM音量変更反映",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-04",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "LUFS値変更反映",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-05",
+      "layer": 3,
+      "story_scene": "S9",
+      "description": "ロゴ設定変更反映",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-06",
+      "layer": 3,
+      "story_scene": "S10",
+      "description": "字幕ON/OFF切替",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-07",
+      "layer": 3,
+      "story_scene": "S12",
+      "description": "ステータスAPI進捗取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-08",
+      "layer": 3,
+      "story_scene": "S15",
+      "description": "DL APIファイル情報取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-09",
+      "layer": 3,
+      "story_scene": "S14",
+      "description": "完了API呼出",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-10",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "GPU検出エンコーダ推奨取得",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-11",
+      "layer": 3,
+      "story_scene": "S13",
+      "description": "ステージ進捗個別確認",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L3-12",
+      "layer": 3,
+      "story_scene": "S6",
+      "description": "設定変更後レンダリング開始",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O8-L4-01",
+      "layer": 4,
+      "story_scene": "S11",
+      "description": "idle->rendering->completed遷移",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-02",
+      "layer": 4,
+      "story_scene": "S3",
+      "description": "fallback_encoder含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-03",
+      "layer": 4,
+      "story_scene": "S4",
+      "description": "GPU未検出時libx264自動選択",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-04",
+      "layer": 4,
+      "story_scene": "S18",
+      "description": "タイムアウト検出反映",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-05",
+      "layer": 4,
+      "story_scene": "S19",
+      "description": "BGMなしでも開始可能",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-06",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "品質>=90で通過",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-07",
+      "layer": 4,
+      "story_scene": "S17",
+      "description": "設定変更リアルタイム反映",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-08",
+      "layer": 4,
+      "story_scene": "S16",
+      "description": "強制書出時警告含む",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-09",
+      "layer": 4,
+      "story_scene": "S20",
+      "description": "ロゴ無効でも開始可能",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-10",
+      "layer": 4,
+      "story_scene": "S21",
+      "description": "temp_files_cleanedがtrue",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L4-11",
+      "layer": 4,
+      "story_scene": "S22",
+      "description": "完了時output_file含む",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O8-L5-01",
+      "layer": 5,
+      "story_scene": "S15",
+      "description": "開始->進捗->完了->DL完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-02",
+      "layer": 5,
+      "story_scene": "S4",
+      "description": "GPU検出->フォールバック->完了",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-03",
+      "layer": 5,
+      "story_scene": "S10",
+      "description": "全オプション->レンダリング->出力",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-04",
+      "layer": 5,
+      "story_scene": "S17",
+      "description": "品質チェック->合格->開始",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-05",
+      "layer": 5,
+      "story_scene": "S16",
+      "description": "強制レンダリング->完了->記録",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-06",
+      "layer": 5,
+      "story_scene": "S6",
+      "description": "BGM/LUFS設定->完了",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-07",
+      "layer": 5,
+      "story_scene": "S9",
+      "description": "ロゴ+字幕->レンダリング->出力",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-08",
+      "layer": 5,
+      "story_scene": "S13",
+      "description": "全ステージ進捗->完了通知",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-09",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "パラメータ変更->完了->DL",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O8-L5-10",
+      "layer": 5,
+      "story_scene": "S22",
+      "description": "完了通知->ファイル確認->DL",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "session_8_o8",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

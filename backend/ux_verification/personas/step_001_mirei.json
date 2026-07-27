@@ -1,0 +1,48 @@
+{
+  "step": 1,
+  "persona_id": "step_001_mirei",
+  "name": "北原美麗",
+  "subtitle": "書道家・初めてのYouTube投稿",
+  "schema_version": "1.0",
+  "profile": {
+    "age": 60,
+    "occupation": "書道家（美麗書院）",
+    "tech_level": "スマホは使える、PCは苦手",
+    "video_experience": "ゼロ（撮影は息子が担当）",
+    "motivation": "書道の美しさを映像で世界に届けたい",
+    "frustration_points": [
+      "専門用語がわからない",
+      "選択肢が多いと迷う",
+      "失敗が怖い（取り返しがつかないと思う）"
+    ]
+  },
+  "ux_principles": [
+    "選択肢は最大3つ",
+    "AIが最適解をデフォルト提示",
+    "失敗してもUndoで必ず戻れる",
+    "専門用語を使わない",
+    "エラーメッセージは「何をすれば直るか」を明示"
+  ],
+  "maturity_dimensions": {
+    "D1_activity": {"score": 0, "description": "活動量（パイプライン実行回数）"},
+    "D2_judgment": {"score": 0, "description": "判断品質（承認/却下パターン）"},
+    "D3_philosophy": {"score": 0, "description": "哲学深度（Soul Narrativeの豊かさ）"},
+    "D4_youtube": {"score": 0, "description": "YouTube成果（CTR/維持率）"},
+    "D5_proficiency": {"score": 0, "description": "操作習熟度（機能利用パターン）"}
+  },
+  "step_thresholds": {
+    "advance_to_step_5": {
+      "D1_min": 10,
+      "D2_min": 3,
+      "D4_required": false,
+      "note": "10回以上のパイプライン実行 + 判断パターン3回以上"
+    }
+  },
+  "inherits_from": [],
+  "ux_stories": [
+    "O-1", "O-2", "O-3", "O-4", "O-5", "O-6", "O-7",
+    "O-8", "O-9", "O-10", "O-11", "O-12"
+  ],
+  "constitution_ref": "§7.3 UX最低保証規定",
+  "evolution_log_ref": "soul_narrative/evolution_log.json"
+}

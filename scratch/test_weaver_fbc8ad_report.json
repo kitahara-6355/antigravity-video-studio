@@ -1,0 +1,6 @@
+{
+  "message": "Phase 30 / test_weaver タスク #1 (対象: agents/orchestration/flash_assign_subagents_7.py) のカバレッジ向上テストが完了。テストファイル test_flash_assign_subagents_7.py を新規作成し、アサイン成功・失敗・空タスク・直接実行（runpy）をカバーするテスト4件が正常にPASSし、カバレッジ100%を達成。",
+  "changed_files": [
+    "backend/tests/test_flash_assign_subagents_7.py"
+  ]
+}

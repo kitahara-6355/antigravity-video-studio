@@ -1,0 +1,6 @@
+{
+  "message": "Phase 30 / refactor タスク #1 (対象: scratch/dispatch_tasks.py) のリファクタリングが正常に完了。run_dispatch関数の分割（_parse_arguments, _resolve_phase_and_milestone, _validate_batch_size, _fetch_next_batch）、命名改善（state -> phase_state）、および26件のテストPASS・カバレッジ100%維持を確認。",
+  "changed_files": [
+    "backend/scratch/dispatch_tasks.py"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "daily": {
+    "2026-06-13": {
+      "total": 480,
+      "sources": {
+        "test_trigger": 480
+      }
+    }
+  },
+  "limit": 500
+}

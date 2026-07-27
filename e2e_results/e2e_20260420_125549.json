@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-04-20T12:55:49.476293",
+  "results": {
+    "workers": {
+      "transcribe": "pass",
+      "smartcut": "pass"
+    }
+  },
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "pass_rate": 100.0
+  },
+  "metadata": {}
+}

@@ -1,0 +1,341 @@
+{
+  "ux_id": "O-1",
+  "name": "素材選択",
+  "description": "Ownerは動画素材を選択し、パイプラインに投入できる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "Ownerはファイルブラウザで動画一覧を確認できる",
+      "linked_items": [
+        "O1-L1-01",
+        "O1-L1-02",
+        "O1-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "動画のメタデータ(コーデック/解像度/尺)が表示される",
+      "linked_items": [
+        "O1-L1-03",
+        "O1-L2-02",
+        "O1-L2-03",
+        "O1-L3-02"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "対応拡張子(mp4/mov/mkv/avi)のみがリストされる",
+      "linked_items": [
+        "O1-L1-04",
+        "O1-L2-04",
+        "O1-L4-01"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "ドラッグ&ドロップで素材を追加できる",
+      "linked_items": [
+        "O1-L1-05",
+        "O1-L3-03"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "動画を選択し、選択状態が視覚的に表示される",
+      "linked_items": [
+        "O1-L3-01",
+        "O1-L3-04",
+        "O1-L2-05"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "不正ファイル(0バイト/破損)がバリデーションで検出される",
+      "linked_items": [
+        "O1-L1-06",
+        "O1-L2-06",
+        "O1-L4-02",
+        "O1-L4-03"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "最近使用した素材の履歴が保存・表示される",
+      "linked_items": [
+        "O1-L1-07",
+        "O1-L3-05",
+        "O1-L4-04"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "選択完了後、パイプラインを開始できる",
+      "linked_items": [
+        "O1-L3-06",
+        "O1-L3-07",
+        "O1-L4-05",
+        "O1-L5-01",
+        "O1-L5-02",
+        "O1-L5-03",
+        "O1-L5-04",
+        "O1-L5-05"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O1-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "動画一覧APIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "video-file-browser"
+    },
+    {
+      "id": "O1-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "動画一覧にvideos配列が存在する",
+      "test_method": "dom_exists",
+      "testid": "video-list"
+    },
+    {
+      "id": "O1-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "メタデータAPIが必須フィールドを返す",
+      "test_method": "dom_exists",
+      "testid": "video-metadata"
+    },
+    {
+      "id": "O1-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "動画リストに対応拡張子のみ含まれる",
+      "test_method": "dom_exists",
+      "testid": "extension-filter"
+    },
+    {
+      "id": "O1-L1-05",
+      "layer": 1,
+      "story_scene": "S4",
+      "description": "ドロップゾーン要素が存在する",
+      "test_method": "dom_exists",
+      "testid": "pipeline-drop-zone"
+    },
+    {
+      "id": "O1-L1-06",
+      "layer": 1,
+      "story_scene": "S6",
+      "description": "バリデーションAPIが正常応答を返す",
+      "test_method": "dom_exists",
+      "testid": "validation-api"
+    },
+    {
+      "id": "O1-L1-07",
+      "layer": 1,
+      "story_scene": "S7",
+      "description": "localStorageに履歴キーが存在する",
+      "test_method": "dom_exists",
+      "testid": "recent-history"
+    },
+    {
+      "id": "O1-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "動画リストにcount/videosフィールドが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O1-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "メタデータにsize_mb/nameが表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O1-L2-03",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "FFprobe成功時にduration/resolution/codecが表示される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O1-L2-04",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "拡張子がmp4/mov/mkv/aviのいずれかである",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O1-L2-05",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "選択された動画にselectedクラスが付与される",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O1-L2-06",
+      "layer": 2,
+      "story_scene": "S6",
+      "description": "バリデーションエラーに具体的メッセージが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O1-L3-01",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "フォルダを展開して子要素が表示される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O1-L3-02",
+      "layer": 3,
+      "story_scene": "S2",
+      "description": "動画選択後にメタデータAPIを呼び出せる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O1-L3-03",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "ドロップゾーンがUI上で表示される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O1-L3-04",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "動画クリックで選択状態が切り替わる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O1-L3-05",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "localStorageに履歴を保存・読み込みできる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O1-L3-06",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "パイプライン開始ボタンが表示される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O1-L3-07",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "パイプラインステータスAPIが正常応答を返す",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O1-L4-01",
+      "layer": 4,
+      "story_scene": "S3",
+      "description": "APIレスポンスが5秒以内に返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O1-L4-02",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "存在しないファイルでinvalid=1が返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O1-L4-03",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "バリデーション結果にerrors配列が含まれる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O1-L4-04",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "履歴JSONが正しい構造でパースできる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O1-L4-05",
+      "layer": 4,
+      "story_scene": "S8",
+      "description": "ステータスAPIにstatus/stagesフィールドが存在する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O1-L5-01",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "動画一覧→メタデータ取得→バリデーション→開始判定の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O1-L5-02",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "不正ファイル検出→正常ファイル選択→パイプライン開始の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O1-L5-03",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "履歴保存→再読み込み→メタデータ確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O1-L5-04",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "フィルタ確認→選択→ステータスAPIの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O1-L5-05",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "空ディレクトリ確認→動画一覧→パフォーマンス確認の完走",
+      "test_method": "e2e"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "migration_v1_to_v2",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

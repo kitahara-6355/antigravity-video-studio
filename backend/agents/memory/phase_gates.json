@@ -1,0 +1,620 @@
+{
+  "schema_version": "1.0",
+  "description": "Phase A(完了): 品質基盤確立。Phase B(次期): OSSエンジン統合。Phase C(将来): AI高機能化。Phase 1-4は旧体系（空想リスクゼロ計画）、Phase 5-20は従来ロードマップ。",
+  "phases": {
+    "1": {
+      "name": "基盤品質確立",
+      "description": "空想リスク排除後の正直な出発点",
+      "conditions": [
+        {
+          "name": "coverage_pct",
+          "operator": ">=",
+          "value": 1.0,
+          "description": "実測カバレッジ1%以上"
+        },
+        {
+          "name": "test_count",
+          "operator": ">=",
+          "value": 2000,
+          "description": "テスト総数2000以上"
+        },
+        {
+          "name": "critical_debt",
+          "operator": "==",
+          "value": 0,
+          "description": "CRITICAL技術負債ゼロ"
+        }
+      ]
+    },
+    "2": {
+      "name": "UX L1-L2 検証",
+      "description": "ユニット+統合レベルのUXストーリー検証",
+      "conditions": [
+        {
+          "name": "coverage_pct",
+          "operator": ">=",
+          "value": 50,
+          "description": "カバレッジ50%以上"
+        },
+        {
+          "name": "ux_story_pass",
+          "operator": ">=",
+          "value": 300,
+          "description": "UX PASS 300/1045 (30%)"
+        },
+        {
+          "name": "fitness_all_pass",
+          "operator": "==",
+          "value": true,
+          "description": "FF全PASS"
+        },
+        {
+          "name": "hallucination_score",
+          "operator": "==",
+          "value": 0.0,
+          "description": "ゲートスコア0.0"
+        }
+      ]
+    },
+    "3": {
+      "name": "UX L3 ブラウザE2E",
+      "description": "ブラウザDOM検証によるUI存在確認",
+      "conditions": [
+        {
+          "name": "coverage_pct",
+          "operator": ">=",
+          "value": 55,
+          "description": "カバレッジ55%以上"
+        },
+        {
+          "name": "ux_story_pass",
+          "operator": ">=",
+          "value": 520,
+          "description": "UX PASS 520/1045 (50%)"
+        },
+        {
+          "name": "fitness_all_pass",
+          "operator": "==",
+          "value": true,
+          "description": "FF全PASS"
+        },
+        {
+          "name": "hallucination_score",
+          "operator": "==",
+          "value": 0.0,
+          "description": "ゲートスコア0.0"
+        }
+      ]
+    },
+    "4": {
+      "name": "UX L4 実稼働検証",
+      "description": "動画パイプライン実行による完全検証",
+      "conditions": [
+        {
+          "name": "coverage_pct",
+          "operator": ">=",
+          "value": 60,
+          "description": "カバレッジ60%以上"
+        },
+        {
+          "name": "ux_story_pass",
+          "operator": ">=",
+          "value": 780,
+          "description": "UX PASS 780/1045 (75%)"
+        },
+        {
+          "name": "e2e_raw_stages",
+          "operator": ">=",
+          "value": 1,
+          "description": "動画1本完走"
+        },
+        {
+          "name": "fitness_all_pass",
+          "operator": "==",
+          "value": true,
+          "description": "FF全PASS"
+        },
+        {
+          "name": "hallucination_score",
+          "operator": "==",
+          "value": 0.0,
+          "description": "ゲートスコア0.0"
+        }
+      ]
+    },
+    "5": {
+      "name": "卓越",
+      "conditions": [
+        {
+          "name": "test_count",
+          "operator": ">=",
+          "value": 5000,
+          "description": "テスト総数5000以上"
+        },
+        {
+          "name": "coverage_branch_pct",
+          "operator": ">=",
+          "value": 95.0,
+          "description": "ブランチカバレッジ95%以上"
+        },
+        {
+          "name": "fitness_all_pass",
+          "operator": "==",
+          "value": true,
+          "description": "Fitness全PASS"
+        },
+        {
+          "name": "e2e_raw_stages",
+          "operator": ">=",
+          "value": 7,
+          "description": "本番RAW 7/7ステージ完走"
+        },
+        {
+          "name": "ux_story_pass",
+          "operator": ">=",
+          "value": 180,
+          "description": "UXストーリーE2E 180/180 PASS"
+        },
+        {
+          "name": "fv_pass",
+          "operator": ">=",
+          "value": 100,
+          "description": "FV 100/100 PASS"
+        },
+        {
+          "name": "critical_debt",
+          "operator": "==",
+          "value": 0,
+          "description": "CRITICAL技術的負債ゼロ"
+        },
+        {
+          "name": "legacy_code_removed",
+          "operator": "==",
+          "value": true,
+          "description": "レガシーコード除去完了"
+        }
+      ]
+    },
+    "6": {
+      "name": "本番検証",
+      "conditions": [
+        {
+          "name": "e2e_raw_4files_pass",
+          "operator": "==",
+          "value": true,
+          "description": "本番RAW 4本連結で全7ステージ完走"
+        },
+        {
+          "name": "quality_score_avg",
+          "operator": ">=",
+          "value": 90,
+          "description": "品質スコア平均90以上"
+        },
+        {
+          "name": "processing_time_minutes",
+          "operator": "<=",
+          "value": 10,
+          "description": "処理時間10分以内"
+        },
+        {
+          "name": "recovery_test_pass",
+          "operator": "==",
+          "value": true,
+          "description": "異常系リカバリテスト全PASS"
+        }
+      ]
+    },
+    "7": {
+      "name": "堅牢化",
+      "conditions": [
+        {
+          "name": "long_run_24h_pass",
+          "operator": "==",
+          "value": true,
+          "description": "24時間連続稼働テスト合格"
+        },
+        {
+          "name": "chaos_test_pass",
+          "operator": "==",
+          "value": true,
+          "description": "障害注入テスト全PASS"
+        },
+        {
+          "name": "security_audit_pass",
+          "operator": "==",
+          "value": true,
+          "description": "セキュリティ監査合格"
+        },
+        {
+          "name": "load_test_concurrent",
+          "operator": ">=",
+          "value": 5,
+          "description": "並行セッション5以上"
+        }
+      ]
+    },
+    "8": {
+      "name": "デプロイメント基盤",
+      "conditions": [
+        {
+          "name": "docker_build_pass",
+          "operator": "==",
+          "value": true,
+          "description": "Docker完全コンテナ化"
+        },
+        {
+          "name": "cicd_pipeline_pass",
+          "operator": "==",
+          "value": true,
+          "description": "CI/CD自動デプロイ動作"
+        },
+        {
+          "name": "rollback_test_pass",
+          "operator": "==",
+          "value": true,
+          "description": "ロールバック検証済み"
+        },
+        {
+          "name": "iac_complete",
+          "operator": "==",
+          "value": true,
+          "description": "Infrastructure as Code完了"
+        }
+      ]
+    },
+    "9": {
+      "name": "監視+オブザーバビリティ",
+      "conditions": [
+        {
+          "name": "dashboard_running",
+          "operator": "==",
+          "value": true,
+          "description": "リアルタイムダッシュボード稼働"
+        },
+        {
+          "name": "alert_test_pass",
+          "operator": "==",
+          "value": true,
+          "description": "アラート発報テスト済み"
+        },
+        {
+          "name": "slo_defined",
+          "operator": "==",
+          "value": true,
+          "description": "SLO定義完了"
+        },
+        {
+          "name": "incident_automation",
+          "operator": "==",
+          "value": true,
+          "description": "インシデント自動対応稼働"
+        }
+      ]
+    },
+    "10": {
+      "name": "データ基盤+永続化",
+      "conditions": [
+        {
+          "name": "db_migration_complete",
+          "operator": "==",
+          "value": true,
+          "description": "PostgreSQL移行完了"
+        },
+        {
+          "name": "backup_restore_test",
+          "operator": "==",
+          "value": true,
+          "description": "バックアップ復元テスト済み"
+        },
+        {
+          "name": "data_migration_zero_loss",
+          "operator": "==",
+          "value": true,
+          "description": "データ移行ゼロロス"
+        }
+      ]
+    },
+    "11": {
+      "name": "Trinity完全体",
+      "conditions": [
+        {
+          "name": "trinity_3agent_running",
+          "operator": "==",
+          "value": true,
+          "description": "3エージェント完全協調動作"
+        },
+        {
+          "name": "proposal_quality_score",
+          "operator": ">=",
+          "value": 80,
+          "description": "提案品質スコア80%以上"
+        },
+        {
+          "name": "user_satisfaction",
+          "operator": ">=",
+          "value": 90,
+          "description": "ユーザー満足度90%以上"
+        }
+      ]
+    },
+    "12": {
+      "name": "予測最適化エンジン",
+      "conditions": [
+        {
+          "name": "ctr_prediction_accuracy",
+          "operator": ">=",
+          "value": 70,
+          "description": "CTR予測精度70%以上"
+        },
+        {
+          "name": "retention_prediction_error",
+          "operator": "<=",
+          "value": 15,
+          "description": "リテンション予測誤差15%以下"
+        },
+        {
+          "name": "ab_test_auto_winner",
+          "operator": "==",
+          "value": true,
+          "description": "A/B自動勝者選定動作"
+        }
+      ]
+    },
+    "13": {
+      "name": "学習ループ完全体",
+      "conditions": [
+        {
+          "name": "learning_cycles_completed",
+          "operator": ">=",
+          "value": 10,
+          "description": "自動学習サイクル10回以上完走"
+        },
+        {
+          "name": "quality_auto_improvement_pct",
+          "operator": ">=",
+          "value": 5,
+          "description": "品質スコア自動改善5%以上"
+        },
+        {
+          "name": "philosophy_integrations",
+          "operator": ">=",
+          "value": 20,
+          "description": "哲学統合20件以上"
+        }
+      ]
+    },
+    "14": {
+      "name": "マルチユーザー対応",
+      "conditions": [
+        {
+          "name": "concurrent_users_test",
+          "operator": ">=",
+          "value": 3,
+          "description": "3ユーザー同時稼働テスト"
+        },
+        {
+          "name": "data_isolation_pass",
+          "operator": "==",
+          "value": true,
+          "description": "データ完全分離"
+        },
+        {
+          "name": "rbac_implemented",
+          "operator": "==",
+          "value": true,
+          "description": "権限管理実装"
+        }
+      ]
+    },
+    "15": {
+      "name": "API公開+SDK",
+      "conditions": [
+        {
+          "name": "openapi_spec_published",
+          "operator": "==",
+          "value": true,
+          "description": "OpenAPI仕様公開"
+        },
+        {
+          "name": "sdk_python_published",
+          "operator": "==",
+          "value": true,
+          "description": "Python SDK公開"
+        },
+        {
+          "name": "sdk_js_published",
+          "operator": "==",
+          "value": true,
+          "description": "JavaScript SDK公開"
+        }
+      ]
+    },
+    "16": {
+      "name": "プラグインマーケット",
+      "conditions": [
+        {
+          "name": "third_party_plugins",
+          "operator": ">=",
+          "value": 3,
+          "description": "サードパーティプラグイン3つ以上動作"
+        },
+        {
+          "name": "marketplace_ui_running",
+          "operator": "==",
+          "value": true,
+          "description": "マーケットUI稼働"
+        },
+        {
+          "name": "review_process_active",
+          "operator": "==",
+          "value": true,
+          "description": "審査プロセス稼働"
+        }
+      ]
+    },
+    "17": {
+      "name": "自己改善エンジン",
+      "conditions": [
+        {
+          "name": "auto_refactor_proposals",
+          "operator": ">=",
+          "value": 10,
+          "description": "自動リファクタリング提案10件以上"
+        },
+        {
+          "name": "auto_test_generation",
+          "operator": "==",
+          "value": true,
+          "description": "自動テスト生成動作"
+        },
+        {
+          "name": "code_quality_auto_improvement",
+          "operator": "==",
+          "value": true,
+          "description": "コード品質自動改善実績あり"
+        }
+      ]
+    },
+    "18": {
+      "name": "品質自動昇格",
+      "conditions": [
+        {
+          "name": "quality_gate_auto_calibration",
+          "operator": "==",
+          "value": true,
+          "description": "品質ゲート自動校正"
+        },
+        {
+          "name": "benchmark_auto_update",
+          "operator": "==",
+          "value": true,
+          "description": "ベンチマーク自動更新"
+        },
+        {
+          "name": "nhk_auto_verification",
+          "operator": "==",
+          "value": true,
+          "description": "NHK基準自動検証"
+        }
+      ]
+    },
+    "19": {
+      "name": "AIアーキテクト",
+      "conditions": [
+        {
+          "name": "arch_auto_proposals",
+          "operator": ">=",
+          "value": 5,
+          "description": "アーキテクチャ自律提案5件以上"
+        },
+        {
+          "name": "tech_selection_auto",
+          "operator": "==",
+          "value": true,
+          "description": "技術選定自律判断"
+        },
+        {
+          "name": "design_doc_auto_update",
+          "operator": "==",
+          "value": true,
+          "description": "設計文書自動更新"
+        }
+      ]
+    },
+    "20": {
+      "name": "エコシステム確立",
+      "conditions": [
+        {
+          "name": "community_members",
+          "operator": ">=",
+          "value": 10,
+          "description": "コミュニティ10人以上"
+        },
+        {
+          "name": "monthly_productions",
+          "operator": ">=",
+          "value": 100,
+          "description": "月間制作数100以上"
+        },
+        {
+          "name": "revenue_model_active",
+          "operator": "==",
+          "value": true,
+          "description": "持続可能な収益モデル稼働"
+        }
+      ]
+    }
+  },
+  "evolution_roadmap": {
+    "schema_version": "2.0",
+    "created_at": "2026-07-18T14:15:11.186330+00:00",
+    "decision_tag": "v2.0-pre-oss-integration",
+    "phases": {
+      "A": {
+        "name": "品質基盤の確立",
+        "status": "completed",
+        "completed_at": "2026-07-18T14:14:00+00:00",
+        "achievements": [
+          "カバレッジ 44%",
+          "テスト 2,240件",
+          "空想リスクゼロ（正直化完了）",
+          "CRITICAL技術負債ゼロ",
+          "独自品質エンジン群 FULL実装（NHK字幕/Soul/QualityGate）",
+          "動画パイプライン全12モジュール FULL実装（246KB）"
+        ]
+      },
+      "B": {
+        "name": "OSSエンジン統合",
+        "status": "planned",
+        "milestones": [
+          {
+            "id": "B-1",
+            "name": "Auto-Editor CLIラッパー作成・統合テスト",
+            "status": "pending"
+          },
+          {
+            "id": "B-2",
+            "name": "stable-ts / Aeneas 字幕同期エンジン統合",
+            "status": "pending"
+          },
+          {
+            "id": "B-3",
+            "name": "smart_cut_plugin.py → Auto-Editor基盤への移行",
+            "status": "pending"
+          },
+          {
+            "id": "B-4",
+            "name": "E2E動画テスト（Real Raw動画1本の完走）",
+            "status": "pending"
+          }
+        ]
+      },
+      "C": {
+        "name": "AI高機能化（本システムの真の差別化）",
+        "status": "planned",
+        "milestones": [
+          {
+            "id": "C-1",
+            "name": "LLM文脈カットエンジン（Whisper + LLMの統合）",
+            "status": "planned"
+          },
+          {
+            "id": "C-2",
+            "name": "NHK字幕レイアウト自動最適化",
+            "status": "planned"
+          },
+          {
+            "id": "C-3",
+            "name": "SoulEngine ↔ Auto-Editor 連携",
+            "status": "planned"
+          },
+          {
+            "id": "C-4",
+            "name": "動画品質スコアの自動計測と改善ループ",
+            "status": "planned"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+# 改行コードを git の設定（core.autocrlf）ではなくリポジトリ側で決める。
+# 開発機(Windows)と CI(Linux) で生成物の改行が変わると、ダッシュボード等の
+# 自動生成ファイルが全行差分になる。
+* text=auto
+
+# 自動生成されるレポート・ダッシュボードは常に LF で保存する
+*.md text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Windows 専用スクリプトは CRLF のまま
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# バイナリは変換しない
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.pdf binary

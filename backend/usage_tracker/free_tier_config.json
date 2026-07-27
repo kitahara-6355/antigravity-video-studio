@@ -1,0 +1,93 @@
+{
+    "version": "3.0.0-DEPRECATED",
+    "last_updated": "2026-04-11",
+    "description": "【廃止】このファイルは参照されません。SSoT は model_config.json の free_tier_limits です。",
+    "_deprecated_note": "tracker.py / quota_manager.py は model_config.json を直接参照するよう v5.0.0 で移行済み",
+    "text_models": {
+        "gemini-3-pro": {
+            "rpm": 10,
+            "rpd": 100,
+            "tpm": 250000,
+            "tier": "premium",
+            "description": "上：最高品質（品質ゲート専用）"
+        },
+        "gemini-3-flash": {
+            "rpm": 15,
+            "rpd": 500,
+            "tpm": 250000,
+            "tier": "standard",
+            "description": "中：高速処理（字幕、テロップ）"
+        },
+        "gemini-2.5-flash": {
+            "rpm": 15,
+            "rpd": 1000,
+            "tpm": 250000,
+            "tier": "batch",
+            "description": "下：大量バッチ処理向け"
+        }
+    },
+    "image_models": {
+        "imagen-4.0-ultra-generate-001": {
+            "rpm": 2,
+            "rpd": 20,
+            "tier": "premium",
+            "description": "上：4K最高品質サムネイル"
+        },
+        "imagen-4.0-generate-001": {
+            "rpm": 2,
+            "rpd": 50,
+            "tier": "standard",
+            "description": "中：通常サムネイル"
+        },
+        "imagen-4.0-fast-generate-001": {
+            "rpm": 5,
+            "rpd": 100,
+            "tier": "batch",
+            "description": "下：プレビュー・バリエーション"
+        }
+    },
+    "video_models": {
+        "veo-3.1": {
+            "rpm": 1,
+            "rpd": 10,
+            "monthly_credits": 100,
+            "tier": "premium",
+            "description": "上：最高品質動画（有料）"
+        },
+        "veo-3.1-fast": {
+            "rpm": 2,
+            "rpd": 20,
+            "tier": "standard",
+            "description": "中：高速動画（有料）"
+        },
+        "veo-3.0": {
+            "rpm": 2,
+            "rpd": 30,
+            "tier": "batch",
+            "description": "下：プレビュー動画"
+        }
+    },
+    "alert_thresholds": {
+        "info": 0.6,
+        "warning": 0.8,
+        "block": 0.95,
+        "critical": 1.0
+    },
+    "monthly_video_targets": {
+        "conservative": 4,
+        "standard": 8,
+        "aggressive": 12,
+        "maximum": 20
+    },
+    "requests_per_video": {
+        "gemini-3-pro": 10,
+        "gemini-3-flash": 50,
+        "gemini-2.5-flash": 100,
+        "imagen-4.0-ultra-generate-001": 1,
+        "imagen-4.0-generate-001": 3,
+        "imagen-4.0-fast-generate-001": 10,
+        "veo-3.1": 1,
+        "veo-3.1-fast": 2,
+        "veo-3.0": 5
+    }
+}

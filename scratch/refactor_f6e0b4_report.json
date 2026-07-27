@@ -1,0 +1,7 @@
+{
+  "message": "Phase 30 / refactor タスク #1 (対象: combine_srt.py) のリファクタリング完了。SRTブロックのパース処理を _parse_and_shift_block メソッドに分割、main関数内シーンごとの処理を SCENE_CONFIGS を用いたループへ一般化。命名改善・デッドコード除去、単体テスト追加（計15件PASS、カバレッジ100%維持）、全体フィットネス125件PASSを確認。",
+  "changed_files": [
+    "backend/combine_srt.py",
+    "backend/tests/test_combine_srt.py"
+  ]
+}

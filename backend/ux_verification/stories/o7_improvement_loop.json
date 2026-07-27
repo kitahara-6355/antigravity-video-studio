@@ -1,0 +1,331 @@
+{
+  "ux_id": "O-7",
+  "name": "品質改善ループ",
+  "description": "Ownerは品質チェック結果に基づいて改善アクションを実行し、スコアを向上させられる",
+  "scenes": [
+    {
+      "id": "S1",
+      "text": "改善ループの状態が表示される",
+      "linked_items": [
+        "O7-L1-01",
+        "O7-L1-02",
+        "O7-L2-01"
+      ]
+    },
+    {
+      "id": "S2",
+      "text": "反復回数と最大回数が表示される",
+      "linked_items": [
+        "O7-L1-03",
+        "O7-L2-02",
+        "O7-L2-03"
+      ]
+    },
+    {
+      "id": "S3",
+      "text": "改善アクション一覧が表示される",
+      "linked_items": [
+        "O7-L1-04",
+        "O7-L1-05",
+        "O7-L2-04",
+        "O7-L2-05"
+      ]
+    },
+    {
+      "id": "S4",
+      "text": "アクションを適用してスコアを改善できる",
+      "linked_items": [
+        "O7-L3-01",
+        "O7-L3-02",
+        "O7-L4-01"
+      ]
+    },
+    {
+      "id": "S5",
+      "text": "スコア変化の推移が確認できる",
+      "linked_items": [
+        "O7-L1-06",
+        "O7-L2-06",
+        "O7-L3-03"
+      ]
+    },
+    {
+      "id": "S6",
+      "text": "改善完了後の最終スコアが確認できる",
+      "linked_items": [
+        "O7-L4-02",
+        "O7-L4-03"
+      ]
+    },
+    {
+      "id": "S7",
+      "text": "改善ループを中止できる",
+      "linked_items": [
+        "O7-L3-04",
+        "O7-L4-04",
+        "O7-L4-05"
+      ]
+    },
+    {
+      "id": "S8",
+      "text": "改善前後のスコアを比較できる",
+      "linked_items": [
+        "O7-L3-05",
+        "O7-L5-01",
+        "O7-L5-02",
+        "O7-L5-03",
+        "O7-L5-04",
+        "O7-L5-05"
+      ]
+    }
+  ],
+  "verification_items": [
+    {
+      "id": "O7-L1-01",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "改善ループステータスAPIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O7-L1-02",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "statusフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O7-L1-03",
+      "layer": 1,
+      "story_scene": "S2",
+      "description": "iteration/max_iterationsフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O7-L1-04",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "アクション一覧APIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O7-L1-05",
+      "layer": 1,
+      "story_scene": "S3",
+      "description": "actions配列が存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O7-L1-06",
+      "layer": 1,
+      "story_scene": "S5",
+      "description": "スコア変化APIが正常応答する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O7-L2-01",
+      "layer": 2,
+      "story_scene": "S1",
+      "description": "initial_score/current_scoreが0-100の数値",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O7-L2-02",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "iterationが0以上の整数",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O7-L2-03",
+      "layer": 2,
+      "story_scene": "S2",
+      "description": "max_iterationsが正の整数",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O7-L2-04",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "各アクションにid/name/statusが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O7-L2-05",
+      "layer": 2,
+      "story_scene": "S3",
+      "description": "completed/pending/skippedのステータスが区別可能",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O7-L2-06",
+      "layer": 2,
+      "story_scene": "S5",
+      "description": "score_historyに反復ごとのスコアが含まれる",
+      "test_method": "visual_check"
+    },
+    {
+      "id": "O7-L3-01",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "pendingアクションを適用してスコアが上昇する",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O7-L3-02",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "適用済みアクションの再適用で400が返る",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O7-L3-03",
+      "layer": 3,
+      "story_scene": "S5",
+      "description": "スコア変化APIでtotal_improvementが取得できる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O7-L3-04",
+      "layer": 3,
+      "story_scene": "S7",
+      "description": "中止APIでstatusがabortedに変わる",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O7-L3-05",
+      "layer": 3,
+      "story_scene": "S8",
+      "description": "リセットAPIでstatusがidleに戻る",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O7-L4-01",
+      "layer": 4,
+      "story_scene": "S4",
+      "description": "存在しないアクションIDで404が返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O7-L4-02",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "全アクション適用後にcurrent_score>initial_score",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O7-L4-03",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "アクション適用でiterationが増加する",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O7-L4-04",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "中止後にpendingアクションがskippedに変わる",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O7-L4-05",
+      "layer": 4,
+      "story_scene": "S7",
+      "description": "二重中止で既中止メッセージが返る",
+      "test_method": "state_transition"
+    },
+    {
+      "id": "O7-L5-01",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "リセット→アクション適用→スコア確認→履歴確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O7-L5-02",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "全アクション適用→完了スコア→初期スコアとの差分確認の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O7-L5-03",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "アクション適用→中止→スキップ確認→リセットの完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O7-L5-04",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "ステータス確認→アクション一覧→スコア変化の3API連携の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O7-L5-05",
+      "layer": 5,
+      "story_scene": "S8",
+      "description": "リセット→複数アクション順次適用→スコア単調増加の完走",
+      "test_method": "e2e"
+    },
+    {
+      "id": "O7-L1-07",
+      "layer": 1,
+      "story_scene": "S1",
+      "description": "total_actions/completed_actionsフィールドが存在する",
+      "test_method": "dom_exists"
+    },
+    {
+      "id": "O7-L3-06",
+      "layer": 3,
+      "story_scene": "S4",
+      "description": "アクション適用後のscore_afterが返される",
+      "test_method": "interaction"
+    },
+    {
+      "id": "O7-L4-06",
+      "layer": 4,
+      "story_scene": "S6",
+      "description": "リセット後にcurrent_scoreがinitial_scoreと一致する",
+      "test_method": "state_transition"
+    }
+  ],
+  "$schema_version": "2.0",
+  "lifecycle": {
+    "status": "active",
+    "created_at": "2026-04-30",
+    "created_by": "migration_v1_to_v2",
+    "activated_at": "2026-04-30",
+    "last_extended_at": null,
+    "superseded_at": null,
+    "superseded_by": null
+  },
+  "persona_context": {
+    "origin_step": 1,
+    "origin_persona": "step_001_mirei",
+    "required_by_steps": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "complexity_by_step": {
+      "1": "basic",
+      "2": "basic_plus",
+      "3": "intermediate",
+      "4": "intermediate_plus",
+      "5": "advanced"
+    }
+  },
+  "data_requirements": [],
+  "inheritance": {
+    "mode": "inherit",
+    "parent_step": null,
+    "override_policy": "extend_only"
+  },
+  "philosophy_derived_edges": [],
+  "analytics_derived_edges": [],
+  "major_update_refs": []
+}

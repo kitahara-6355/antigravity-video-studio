@@ -1,0 +1,180 @@
+name: Antigravity CI — 品質ゲート
+
+# 2026-07-25 改訂:
+#   旧設定は on.push.branches が [main, develop] のみで feature/* では発火せず、
+#   実行履歴は 2026-01-29 の1件だけだった（その間に約2,120コミット）。
+#   さらに `|| true` と `continue-on-error` により発火しても必ず緑になっていた。
+#   ゲートとして機能するよう、発火条件を広げ、握り潰しを除去した。
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'cc/**'
+  pull_request:
+    branches: [main]
+
+env:
+  # テスト中の自動 Git コミットを抑止する。
+  # submit_batch_report の自動計装は `git add -A` + `git commit` を実行するため、
+  # 抑止しないと CI が勝手にコミットする（2026-07-25 にローカルで3件発生）。
+  ANTIGRAVITY_DISABLE_AUTO_COMMIT: "1"
+
+jobs:
+  test:
+    name: Python テストスイート
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13"]
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python ${{ matrix.python-version }} セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # 2026-07-25: CI 初回実行で判明した不足。ローカル(Windows)では既に導入済み
+      # だったため、CI を回して初めて露見した。
+      #   - ffmpeg: 動画処理テスト（FileNotFoundError: 'ffmpeg'）
+      #   - フォント: テロップ描画テスト（OSError: Failed to load any premium fonts）
+      - name: システム依存インストール
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg fonts-noto-cjk fonts-noto-cjk-extra fonts-dejavu-core
+
+      - name: 依存関係インストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: 構文チェック（全 .py ファイル）
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          errors = []
+          for root in ("backend", "tests"):
+              for f in pathlib.Path(root).rglob("*.py"):
+                  try:
+                      ast.parse(f.read_text(encoding="utf-8"))
+                  except SyntaxError as e:
+                      errors.append(f"{f}: {e}")
+          if errors:
+              print("Syntax Errors:")
+              for e in errors:
+                  print(f"  {e}")
+              sys.exit(1)
+          print("All files passed syntax check")
+          PY
+
+      # testpaths を広げるたびに踏むため機械化した。
+      # ディレクトリ単独では通り、全体実行のときだけ壊れるので気付きにくい。
+      - name: テストモジュール名の衝突チェック
+        run: python scripts/check_test_module_collisions.py
+
+      # 1プロセスで約10,000テストを走らせるとランナーのメモリを使い切り、
+      # 全体の20%地点で OOM Killer に殺された（exit 137）。
+      # バッチごとに別プロセスで実行してメモリを解放する。
+      # カバレッジは --cov-append で積算し、JUnit XML は結合するため判定材料は同じ。
+      #
+      # 分割数は 8。4 だと最初のバッチ（約2,150件）がまだメモリで落ち、そのバッチ分の
+      # カバレッジが丸ごと欠けて 64.9% と実態より低く出た（テストの失敗は 0 件）。
+      # 手元(Windows)で 8 にすると一時ファイルの掴み合いで PermissionError が出るため、
+      # ローカル実行は既定の 4 のままでよい（scripts/run_test_batches.py の既定値）。
+      - name: テストスイート実行（pytest.ini の testpaths / バッチ分割）
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+          PYTHONPATH: ./backend
+        run: |
+          python scripts/run_test_batches.py --batches 8 \
+            --junit test-results.xml \
+            --coverage coverage.json
+
+      # CI(Linux) でのみ失敗するテストの原因特定用。ローカル(Windows)では
+      # 再現できないため、実際の解決先・実ログを Linux 上で出力させる。
+      # 原因が出揃ったら、このステップとスクリプトは削除してよい。
+      - name: Linux 固有失敗の診断
+        if: always()
+        continue-on-error: true
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+          PYTHONPATH: ./backend
+        run: python scripts/diagnose_linux_failures.py
+
+      # 診断で「Linux でも patch は正常に効く」ことが判明したため、
+      # chaos の失敗はプラットフォーム差ではなくテスト間汚染の疑いが強い。
+      # 単独実行して切り分ける（単独で通れば汚染、落ちれば真の環境差）。
+      # 単独実行では 56 passed、全体実行でのみ10件失敗することを確認済み。
+      # → プラットフォーム差ではなくテスト間汚染。汚染源を CI 上で二分探索する。
+      - name: chaos 汚染源の二分探索
+        if: always()
+        continue-on-error: true
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+          PYTHONPATH: ./backend
+        run: python scripts/bisect_chaos_pollution.py
+
+      - name: テスト結果アップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: |
+            test-results.xml
+            coverage.json
+          retention-days: 30
+
+      # main へのマージ可否は「マージするとき」に判定する。
+      # 作業ブランチへの push では参考表示にとどめ、PR では必須ゲートにする。
+      - name: main マージゲート判定
+        if: always()
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
+        run: |
+          python scripts/check_merge_gate.py \
+            --junit test-results.xml \
+            --coverage coverage.json
+
+  lint:
+    name: コード品質ラチェット
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: リンターインストール
+        run: pip install ruff
+
+      # 一括ゼロ化は非現実的（2026-07-25 実測 28,987件、うち 27,526 件は W293）。
+      # 既存の UX ラチェット / TDR ラチェットと同じ方式で「増やさない」ことを保証する。
+      - name: Ruff ラチェット（違反数の非増加を保証）
+        run: python .github/scripts/ruff_ratchet.py
+
+  security:
+    name: シークレットスキャン
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # 旧実装は *.py のみを走査していたため、実際に混入していた GitHub PAT
+      # （.ps1 2ファイル + .git/config 2箇所）を検出できなかった。
+      # 全テキストファイルを対象にし、検出時は警告ではなく失敗させる。
+      - name: 全ファイル走査
+        run: python .github/scripts/secret_scan.py
