@@ -50,7 +50,11 @@ PROJECT_ROOT = BACKEND_DIR.parent
 
 BRANDING_DIR = BACKEND_DIR / "branding"
 
-VAULT_OUTPUTS_DIR = PROJECT_ROOT / "vault-outputs"
+# 保存先は ANTIGRAVITY_VAULT_OUTPUTS で差し替えられる。
+# Drive のマウント先や CI の作業領域へ、参照元を直さずに移すための1点。
+VAULT_OUTPUTS_DIR = Path(
+    os.environ.get("ANTIGRAVITY_VAULT_OUTPUTS") or (PROJECT_ROOT / "vault-outputs")
+)
 
 ASSETS_DIR = PROJECT_ROOT / "assets"
 

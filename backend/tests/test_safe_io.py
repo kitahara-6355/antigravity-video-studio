@@ -466,3 +466,47 @@ def test_safe_json_store_unlink_os_error_ignored(tmp_path):
         with pytest.raises(OSError, match="Replace error"):
             store.save({"test": 1})
         assert mock_unlink.called
+
+
+# --- Vault の保存先を環境変数で差し替えられること ---
+# 保存先をローカル固定にしていると、Drive や CI へ移すときに
+# 参照元（worker・disk_manager 等）を個別に直すことになる。
+# 解決を1点に集約し、環境変数ひとつで差し替えられる状態を保つ。
+
+def test_vault_outputs_dir_defaults_to_project_root(monkeypatch):
+    """環境変数が無ければ従来どおり PROJECT_ROOT/vault-outputs を指す"""
+    monkeypatch.delenv("ANTIGRAVITY_VAULT_OUTPUTS", raising=False)
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    assert safe_io.VAULT_OUTPUTS_DIR == safe_io.PROJECT_ROOT / "vault-outputs"
+
+
+def test_vault_outputs_dir_honors_env(monkeypatch, tmp_path):
+    """環境変数があればそちらを指す（Drive のマウント先などに差し替える用）"""
+    target = tmp_path / "drive" / "vault-outputs"
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(target))
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    assert safe_io.VAULT_OUTPUTS_DIR == target
+    monkeypatch.delenv("ANTIGRAVITY_VAULT_OUTPUTS", raising=False)
+    importlib.reload(safe_io)
+
+
+def test_disk_manager_fallback_honors_env(monkeypatch, tmp_path):
+    """safe_io の import に失敗する経路でも同じ環境変数を見ること。
+
+    disk_manager は safe_io から VAULT_OUTPUTS_DIR を取れないとき自前で
+    フォールバック定義を持つ。ここが環境変数を見ないと、import 失敗時だけ
+    旧パスを向くという分岐が残る。
+    """
+    target = tmp_path / "drive" / "vault-outputs"
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(target))
+    import importlib
+    import disk_manager
+    with patch.dict(sys.modules, {"safe_io": None}):
+        importlib.reload(disk_manager)
+        assert disk_manager.VAULT_OUTPUTS_DIR == target
+    monkeypatch.delenv("ANTIGRAVITY_VAULT_OUTPUTS", raising=False)
+    importlib.reload(disk_manager)
