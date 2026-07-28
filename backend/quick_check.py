@@ -1,7 +1,8 @@
 import subprocess
 import os
-from pathlib import Path
 
+# パスの起点は path_resolver が返す。モジュール冒頭で Path を import すると、
+# 関数内の `from pathlib import Path` が「未使用の再定義」(F811) になる。
 from path_resolver import brain_dir, project_root
 
 BASE_DIR = project_root()

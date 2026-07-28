@@ -30,14 +30,26 @@ class TestLegacyRouterAllEndpoints:
         # Invalid path format
         with pytest.raises(ValueError):
             validate_video_path("")
-        # Non-existent file
-        with pytest.raises(FileNotFoundError):
-            validate_video_path("C:/Users/PC_User/Desktop/script/video-automation/nonexistent.mp4")
+        # Non-existent file（許可ルート内だが実在しない）
+        from routers.legacy_production_router import ALLOWED_VIDEO_DIR
 
-    def test_lp_02_validate_outside_dir(self):
+        with pytest.raises(FileNotFoundError):
+            validate_video_path(str(ALLOWED_VIDEO_DIR / "nonexistent.mp4"))
+
+    def test_lp_02_validate_outside_dir(self, tmp_path):
+        """許可ルートの外にあるパスが弾かれること。
+
+        以前は "C:/Windows/System32/test.mp4" を「外側」として使っていたが、
+        これは Windows でしか絶対パスにならない。Linux では相対パスとして
+        cwd 起点に解決され、リポジトリ配下＝許可ルート内になってしまうため、
+        Access denied ではなく FileNotFoundError で落ちていた。
+        tmp_path はどの OS でもリポジトリの外にあるので、両方で成立する。
+        """
         from routers.legacy_production_router import validate_video_path
+
+        outside = tmp_path / "test.mp4"
         with pytest.raises(ValueError, match="Access denied"):
-            validate_video_path("C:/Windows/System32/test.mp4")
+            validate_video_path(str(outside))
 
     def test_lp_03_validate_bad_ext(self, tmp_path):
         from routers.legacy_production_router import validate_video_path
