@@ -37,6 +37,17 @@ venv.bak/
 api_keys.json
 credentials.json
 
+# OAuth のクライアント秘密とユーザートークン
+# `credentials.json` だけでは backend/data/youtube_analytics/oauth_credentials.json を
+# 拾えていなかった（2026-07-28 時点で追跡はされていなかったが、
+# 一度でも認証すれば refresh token が commit 可能な状態だった）。
+# このリポジトリは Public なので名前ではなく後方一致で塞ぐ。
+*credentials.json
+*client_secret*.json
+token.json
+*_token.json
+oauth_token*.json
+
 # Large Media Files (RAW素材は聖域として保護されるが、Gitには含めない)
 raw_videos/
 final_output/
