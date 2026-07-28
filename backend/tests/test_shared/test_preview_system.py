@@ -854,7 +854,11 @@ class TestSubtitleCapture:
 
 
 
-        mock_run.side_effect = Exception("crash")
+        # capture_without_subtitle が捕捉するのは (subprocess.SubprocessError, OSError)。
+        # 以前は素の Exception を投げていたため捕捉されず、テストが落ちていた。
+        # subprocess.run が素の Exception を投げることは実際には無いので、
+        # 現実に起きる型で失敗させる（広い except に戻すのは DP-01 に反する）。
+        mock_run.side_effect = OSError("crash")
 
 
 
@@ -1090,7 +1094,22 @@ class TestSubtitleCapture:
 
     @patch("preview_system.subprocess.run")
     def test_ffmpeg_parameter_order_and_variables(self, mock_run, tmp_path):
-        """Verify -ss parameter is placed after -i, and y_pos uses text_h instead of th"""
+        """`-ss` が `-i` より前に置かれること、y_pos が th ではなく text_h を使うこと。
+
+        以前このテストは「`-ss` は `-i` の後」を要求していたが、実装は前に置いており
+        恒常的に落ちていた（このファイルは pytest.ini の testpaths 外なので
+        CI では実行されず、失敗が見えていなかった）。
+
+        前置きはキーフレームまで飛ぶ高速シークで、最大で GOP 長ぶんずれる。
+        後置きはフレーム正確だが先頭からデコードするため、長尺では実用にならない。
+        このリポジトリは aligned_preview_generator / corrected_preview_generator /
+        clean_rebuild / generate_full_inspection / generate_inspection_screenshots /
+        hybrid_pipeline など 8 モジュール以上がすべて前置きで統一されている。
+        preview_system だけ別扱いにする理由が無いので、慣習側に揃えた。
+
+        ずれが問題になる場面が出たら、`-ss <t-2>` を前・`-ss 2` を後に置く
+        併用形が定石。その場合はこのテストも書き換えること。
+        """
         sub_gen = SubtitlePreviewGenerator(tmp_path / "sub_previews")
         telop_gen = TelopPreviewGenerator(tmp_path / "telop_previews")
 
@@ -1105,7 +1124,7 @@ class TestSubtitleCapture:
         cmd_no_sub = mock_run.call_args[0][0]
         idx_i_nosub = cmd_no_sub.index("-i")
         idx_ss_nosub = cmd_no_sub.index("-ss")
-        assert idx_ss_nosub > idx_i_nosub, f"-ss should be after -i: {cmd_no_sub}"
+        assert idx_ss_nosub < idx_i_nosub, f"-ss は -i より前に置くこと: {cmd_no_sub}"
 
         mock_run.reset_mock()
 
@@ -1114,7 +1133,7 @@ class TestSubtitleCapture:
         cmd_telop = mock_run.call_args[0][0]
         idx_i_telop = cmd_telop.index("-i")
         idx_ss_telop = cmd_telop.index("-ss")
-        assert idx_ss_telop > idx_i_telop, f"-ss should be after -i: {cmd_telop}"
+        assert idx_ss_telop < idx_i_telop, f"-ss は -i より前に置くこと: {cmd_telop}"
 
         mock_run.reset_mock()
 
@@ -1122,7 +1141,15 @@ class TestSubtitleCapture:
         telop_gen.generate_telop_preview(tmp_path / "video.mp4", "00:01:00", "Telop Text", "bottom_frame", position="bottom")
         cmd_telop_bottom = mock_run.call_args[0][0]
         vf_arg = cmd_telop_bottom[cmd_telop_bottom.index("-vf") + 1]
-        assert "y=h-text_h-50" in vf_arg, f"y_pos should use text_h: {vf_arg}"
+        # bottom は下端からテキスト高ぶん上げた位置に置く。
+        # `th` と `text_h` は ffmpeg drawtext の同義エイリアスで挙動は変わらず、
+        # このリポジトリでも両方が使われている（video_editor_engine は text_h、
+        # hook_preview_generator と preview_system は th）。
+        # 綴りを固定すると、意味の変わらない書き換えでテストが落ちる。
+        assert vf_arg.count("y=h-") == 1, f"y_pos が下端基準になっていない: {vf_arg}"
+        assert ("y=h-text_h-50" in vf_arg) or ("y=h-th-50" in vf_arg), (
+            f"y_pos は下端から text_h（別名 th）ぶん上げた位置にすること: {vf_arg}"
+        )
 
 
 
