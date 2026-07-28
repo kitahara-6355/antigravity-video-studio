@@ -165,8 +165,12 @@ jobs:
         run: python .github/scripts/ruff_ratchet.py
 
       # 集約モジュール（path_resolver / font_resolver）を作るだけでは新規流入は
-      # 止まらない。font_resolver 導入後も C:\Windows\Fonts の直書きは残り続けた。
-      # 本番コードは 0 件まで落としたので、そこから増やさないことを機械的に保証する。
+      # 止まらない。font_resolver を 2026-07-25 に作った後も C:\Windows\Fonts の
+      # 直書きは減らず、2026-07-28 時点で 159 行残っていた。
+      #
+      # ユーザーホーム配下（本番 0 件）とフォントディレクトリ（本番 136 件）は
+      # 別の分類として数える。合計だけを見ていると、片方を減らしたぶんで
+      # もう片方の増加を相殺できてしまう。
       - name: 絶対パス直書きラチェット（増加を許さない）
         run: python .github/scripts/abspath_ratchet.py
 
