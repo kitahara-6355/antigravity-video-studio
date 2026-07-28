@@ -8,6 +8,8 @@ from pathlib import Path
 import logging
 import shutil
 
+from path_resolver import raw_videos_dir
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -123,8 +125,8 @@ def create_integrated_preview_with_subtitle(
 
 
 def main():
-    input_video = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4"
-    subtitle_file = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02_whisper_semantic.srt"
+    input_video = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4")
+    subtitle_file = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02_whisper_semantic.srt")
     
     if Path(input_video).exists() and Path(subtitle_file).exists():
         # B案（控えめ）で統合プレビュー

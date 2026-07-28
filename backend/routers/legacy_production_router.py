@@ -44,6 +44,7 @@ from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, UploadFi
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 
+from path_resolver import project_root, raw_videos_dir
 from video_processor import video_processor, MOOD_SETTINGS
 from websocket_handler import broadcaster
 
@@ -58,7 +59,10 @@ VIDEO_PATH = os.path.join(SRC_DIR, "sample_raw.mp4")
 
 # --- Security & Limits ---
 MAX_VIDEO_SIZE_MB = 500
-ALLOWED_VIDEO_DIR = Path("C:/Users/PC_User/Desktop/script/video-automation").resolve()
+# パストラバーサル防止の許可ルート。旧リポジトリの絶対パスが直書きされており、
+# リポジトリを作り直した時点で「実在しない場所」を指していた。
+# それはこの検査が常に不許可を返すことを意味する（安全側だが機能しない）。
+ALLOWED_VIDEO_DIR = project_root().resolve()
 ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv", ".mp3", ".wav"]
 preview_semaphore = asyncio.Semaphore(2)
 
@@ -498,7 +502,7 @@ async def list_available_videos():
     videos = []
     raw_dirs = [
         Path("raw_videos/AI Studio アップロード用動画"),
-        Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画"),
+        raw_videos_dir() / "AI Studio アップロード用動画",
         Path("../raw_videos/AI Studio アップロード用動画"),
     ]
     for raw_dir in raw_dirs:

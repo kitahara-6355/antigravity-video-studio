@@ -6,12 +6,13 @@ import sys
 import json
 from pathlib import Path
 
-sys.path.insert(0, r"C:\Users\PC_User\Desktop\script\video-automation\backend")
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 
+from path_resolver import raw_videos_dir
 from subtitle_engine.ai_proofreader import proofread_segments
 
 # 設定
-RAW_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画")
+RAW_DIR = raw_videos_dir() / "AI Studio アップロード用動画"
 
 # 既存のWhisper字幕ファイル（_regenerated.srt）
 FILES = [

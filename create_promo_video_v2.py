@@ -8,10 +8,15 @@
 """
 import subprocess
 import os
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+
+from path_resolver import project_root
+
 # パス設定
-BASE_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+BASE_DIR = project_root()
 RAW_DIR = BASE_DIR / "raw_videos" / "AI Studio アップロード用動画"
 ASSET_DIR = BASE_DIR / "raw_videos" / "スライド用素材" / "特選"
 OUTPUT_DIR = BASE_DIR / "output" / "promo"

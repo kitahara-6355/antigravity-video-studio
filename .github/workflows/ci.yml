@@ -164,6 +164,12 @@ jobs:
       - name: Ruff ラチェット（違反数の非増加を保証）
         run: python .github/scripts/ruff_ratchet.py
 
+      # 集約モジュール（path_resolver / font_resolver）を作るだけでは新規流入は
+      # 止まらない。font_resolver 導入後も C:\Windows\Fonts の直書きは残り続けた。
+      # 本番コードは 0 件まで落としたので、そこから増やさないことを機械的に保証する。
+      - name: 絶対パス直書きラチェット（増加を許さない）
+        run: python .github/scripts/abspath_ratchet.py
+
   security:
     name: シークレットスキャン
     runs-on: ubuntu-latest

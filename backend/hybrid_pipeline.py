@@ -19,6 +19,8 @@ import time
 import shutil
 import logging
 
+from path_resolver import project_root
+
 logger = logging.getLogger(__name__)
 
 # Progressive Preview System (憲法 9.1 視覚確認プロトコル)
@@ -66,7 +68,7 @@ def create_theme_telop(text, output_path, include_logo=True):
     text_height = 45
     
     if include_logo:
-        base = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+        base = project_root()
         logo_path = base / "backend" / "branding" / "logos" / "brand_logo.png"
         
         # ロゴを読み込み、透過を正しく処理
@@ -123,7 +125,7 @@ def run_ffmpeg(cmd, description, timeout=600):
         return False
 
 def hybrid_pipeline():
-    base = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+    base = project_root()
     raw_dir = base / "raw_videos" / "AI Studio アップロード用動画"
     
     # ディレクトリ構成

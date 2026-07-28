@@ -1,15 +1,28 @@
 import shutil
 import os
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from backend.path_resolver import brain_dir, project_root
+
 
 def copy_artifacts(src_base=None, dest_base=None) -> bool:
     """
     成果物ファイルをコピーする。
     """
     if src_base is None:
-        src_base = os.environ.get("SRC_BASE", r"C:\Users\PC_User\.gemini\antigravity\brain\129a8bf8-e9c8-40c2-bb9c-e7f79fcc4096\.system_generated\worktrees\subagent-pipeline-tools-py------self-6be1122a")
+        # 会話 UUID は当時のもの。親（brain/）を解決に通しておく。
+        default_src = (
+            brain_dir()
+            / "129a8bf8-e9c8-40c2-bb9c-e7f79fcc4096"
+            / ".system_generated"
+            / "worktrees"
+            / "subagent-pipeline-tools-py------self-6be1122a"
+        )
+        src_base = os.environ.get("SRC_BASE", str(default_src))
     if dest_base is None:
-        dest_base = os.environ.get("DEST_BASE", r"c:\Users\PC_User\Desktop\script\video-automation")
+        dest_base = os.environ.get("DEST_BASE", str(project_root()))
 
     success = True
     

@@ -20,6 +20,8 @@ from theme_telop import ThemeTelopGenerator
 from progressive_preview import ProgressivePreview
 from services.preview_report_generator import PreviewReportGenerator
 
+from path_resolver import raw_videos_dir
+
 logger = logging.getLogger(__name__)
 
 
@@ -293,7 +295,7 @@ if __name__ == "__main__":
     overlay = CombinedOverlay()
     
     # シーン04でプレビューテスト
-    input_video = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4"
+    input_video = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4")
     output_preview = "backend/temp/preview_with_brand.mp4"
     
     if Path(input_video).exists():

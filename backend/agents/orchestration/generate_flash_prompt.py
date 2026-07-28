@@ -21,6 +21,7 @@ sys.path.insert(0, WORKSPACE_DIR)
 sys.path.insert(0, os.path.join(WORKSPACE_DIR, "backend"))
 
 from datetime import datetime, timezone, timedelta
+from path_resolver import project_root
 from backend.agents.orchestration.atomic_io import safe_read_json, atomic_write_json
 
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
@@ -437,7 +438,7 @@ send_message(
 
 ## 1. 動作環境と原則
 
-- **プロジェクトパス**: `c:\\Users\\PC_User\\Desktop\\script\\video-automation`
+- **プロジェクトパス**: `{project_root()}`
 - **最優先ルール**: プロジェクトルートの `GEMINI.md` に必ず従うこと
 - **言語設定**: 生成するアーティファクトおよびエージェントとの対話は日本語で行うこと
 

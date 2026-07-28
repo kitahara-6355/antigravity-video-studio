@@ -3,13 +3,19 @@
 """
 from faster_whisper import WhisperModel
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+
+from path_resolver import raw_videos_dir
 
 # モデルロード
 print("Loading Whisper model (CPU mode)...")
 model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 
 # 動画ディレクトリ
-video_dir = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画"
+video_dir = str(raw_videos_dir() / "AI Studio アップロード用動画")
 
 # 処理対象（シーン01は完了済みなのでスキップ）
 videos = [

@@ -15,6 +15,8 @@ import json
 import asyncio
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter, ImageOps, UnidentifiedImageError
 
+from path_resolver import brain_dir, raw_videos_dir
+
 class PreviewValidationError(ValueError):
     """プレビュー検証の基本エラークラス"""
     pass
@@ -687,8 +689,8 @@ def _export_screenshots(
 
 
 def create_verified_preview(
-    input_video: str = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4",
-    output_dir: str = "C:/Users/PC_User/.gemini/antigravity/brain/638e528a-ad1b-4885-ad73-5d9f60dc2799",
+    input_video: str = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4"),
+    output_dir: str = str(brain_dir() / "638e528a-ad1b-4885-ad73-5d9f60dc2799"),
     logo_path: str = "backend/branding/logos/brand_logo.png",
     temp_dir: str = "backend/temp/verified_preview"
 ) -> str:

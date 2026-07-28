@@ -9,6 +9,8 @@ from datetime import datetime
 import uuid
 import json
 
+from path_resolver import project_root
+
 # 高品質リサンプリングフィルタの取得
 def _get_lanczos_filter(img_module=Image):
     try:
@@ -31,7 +33,7 @@ LANCZOS = _get_lanczos_filter()
 
 def _resolve_branding_paths(base_path: Path | None) -> tuple[Path, Path]:
     """ベースパスからロゴおよび出力先のパスを解決し、出力先ディレクトリを作成する"""
-    base = Path(base_path) if base_path is not None else Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+    base = Path(base_path) if base_path is not None else project_root()
     logo_path = base / "backend" / "branding" / "logos" / "brand_logo.png"
     output_path = base / "backend" / "branding" / "final_branding.png"
 
@@ -156,7 +158,7 @@ def create_combined_branding(target_height=45, base_path=None):
 
 def add_branding_to_video():
     """ロゴ + テロップを動画に追加"""
-    base = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+    base = project_root()
     input_video = base / "soul_narrative_FINAL_EDITED.mp4"
     output_video = base / "soul_narrative_YOUTUBE_READY.mp4"
     
@@ -664,6 +666,6 @@ if __name__ == "__main__":
         print("\n🚀 Ready for YouTube Upload!")
         print("\nFiles:")
         print(f"  Video: {video_path}")
-        print(f"  SRT: C:\\Users\\PC_User\\Desktop\\script\\video-automation\\soul_narrative_combined.srt")
+        print(f"  SRT: {project_root() / 'soul_narrative_combined.srt'}")
     else:
         print("\n❌ Failed")

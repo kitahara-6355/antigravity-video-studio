@@ -347,37 +347,41 @@ def test_generate_telops_fallback_to_default_font(capsys):
     assert "✅ テロップ生成完了" in captured.out
 
 
-def test_base_dir_env_variable(monkeypatch):
-    # 環境変数 VIDEO_AUTOMATION_BASE_DIR が指定されている場合を検証
-    monkeypatch.setenv("VIDEO_AUTOMATION_BASE_DIR", r"C:\fake\base\dir")
+def test_base_dir_env_variable(monkeypatch, tmp_path):
+    # 環境変数 VIDEO_AUTOMATION_BASE_DIR が指定されている場合を検証。
+    # ANTIGRAVITY_BASE_DIR のほうが優先されるので、明示的に外しておく
+    # （他のテストが設定したまま残っていると、こちらが効かない）。
+    monkeypatch.delenv("ANTIGRAVITY_BASE_DIR", raising=False)
+    monkeypatch.setenv("VIDEO_AUTOMATION_BASE_DIR", str(tmp_path / "fake_base_dir"))
     import importlib
     import gen_telops
     importlib.reload(gen_telops)
-    assert gen_telops.BASE_DIR == Path(r"C:\fake\base\dir")
+    assert gen_telops.BASE_DIR == tmp_path / "fake_base_dir"
     # 元に戻す
     monkeypatch.delenv("VIDEO_AUTOMATION_BASE_DIR", raising=False)
     importlib.reload(gen_telops)
 
 
 def test_base_dir_fallback(monkeypatch):
-    # 環境変数なし、かつデフォルトディレクトリにbackendがない場合のフォールバックを検証
+    """環境変数が無いときは、モジュールの位置からルートを算出すること。
+
+    以前はここに `C:\\Users\\PC_User\\Desktop\\script\\video-automation` という
+    絶対パスの最終フォールバックがあり、このテストはその値を固定していた。
+    リポジトリ名が変わった時点でその値は既に実在しないパスになっていて、
+    「テストは通るが指す先は無い」状態だった。フォールバックごと外し、
+    算出結果と一致することを見る形に改めた。
+    """
     monkeypatch.delenv("VIDEO_AUTOMATION_BASE_DIR", raising=False)
-    
-    # Path.exists をモックして、backend ディレクトリが存在しないように見せる
-    original_exists = Path.exists
-    def mock_exists(self):
-        if self.name == "backend":
-            return False
-        return original_exists(self)
-        
-    with patch("pathlib.Path.exists", mock_exists):
-        import importlib
-        import gen_telops
-        importlib.reload(gen_telops)
-        assert gen_telops.BASE_DIR == Path(r"C:\Users\PC_User\Desktop\script\video-automation")
-        
-    # 元に戻す
+    monkeypatch.delenv("ANTIGRAVITY_BASE_DIR", raising=False)
+
+    import importlib
+    import gen_telops
     importlib.reload(gen_telops)
+
+    assert gen_telops.BASE_DIR == Path(gen_telops.__file__).resolve().parent.parent
+    assert "PC_User" not in str(gen_telops.BASE_DIR) or str(
+        gen_telops.BASE_DIR
+    ).startswith(str(Path.home()))
 
 
 def test_generate_telops_logo_resize_failure():

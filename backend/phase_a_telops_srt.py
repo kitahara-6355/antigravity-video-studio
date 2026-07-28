@@ -7,6 +7,8 @@ from PIL import Image, ImageDraw, ImageFont
 import re
 from datetime import timedelta
 
+from path_resolver import project_root
+
 # --- 共有定数定義 ---
 # テーマテキストとタイミング（カット後の時間に調整）
 THEMES = [
@@ -139,7 +141,7 @@ def _register_ffmpeg_tdr_debt(exception):
 
 def add_dynamic_telops():
     """テーマテロップを動的に切り替えながら動画に追加"""
-    base = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+    base = project_root()
     input_video = base / "soul_narrative_FINAL_EDITED.mp4"
     output_video = base / "soul_narrative_WITH_TELOPS.mp4"
     
@@ -247,7 +249,7 @@ def _load_and_filter_srt(srt_path, shift_seconds, max_seconds=None):
 
 def create_combined_srt():
     """統合字幕SRTを作成（カット後の時間に調整）"""
-    base = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+    base = project_root()
     raw_dir = base / "raw_videos" / "AI Studio アップロード用動画"
     output_srt = base / "soul_narrative_subtitles.srt"
     

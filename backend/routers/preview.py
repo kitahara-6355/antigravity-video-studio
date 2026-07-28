@@ -8,6 +8,8 @@ from typing import Optional, List
 from pathlib import Path
 import asyncio
 
+from path_resolver import project_root
+
 router = APIRouter(prefix="/api", tags=["preview"])
 
 
@@ -28,8 +30,9 @@ class PreviewRequest(BaseModel):
 # 同時実行制限
 preview_semaphore = asyncio.Semaphore(2)
 
-# 許可されたディレクトリ
-ALLOWED_VIDEO_DIR = Path("C:/Users/PC_User/Desktop/script/video-automation").resolve()
+# 許可されたディレクトリ。
+# 旧リポジトリの絶対パスが直書きされており、実在しない場所を指していた。
+ALLOWED_VIDEO_DIR = project_root().resolve()
 ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv", ".mp3", ".wav"]
 
 

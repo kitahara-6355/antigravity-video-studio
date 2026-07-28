@@ -2084,31 +2084,31 @@ class OrchestrationHub:
         if completed_phase in (19, 20) and not is_test:
             if completed_phase == 19:
                 achievements_by_module = {
-                    "[quality.py](file:///C:/Users/PC_User/Desktop/script/video-automation/routers/quality.py)": [
+                    "[quality.py](backend/routers/quality.py)": [
                         "品質判定APIおよびレビュー結果取得機能に対するテストカバレッジ向上。自己改善ループ内の品質自動判定モジュールの堅牢性を保証するため、多次元の境界値テストを実施。"
                     ],
-                    "[preview_engine.py](file:///C:/Users/PC_User/Desktop/script/video-automation/preview_engine.py)": [
+                    "[preview_engine.py](backend/preview_engine.py)": [
                         "動画プレビュー画像生成時のリソース確保、ファイルI/O競合を防ぐテストの追加。並列実行時におけるデッドロック・例外ハンドリングの検証。"
                     ],
-                    "[clean_rebuild.py](file:///C:/Users/PC_User/Desktop/script/video-automation/clean_rebuild.py)": [
+                    "[clean_rebuild.py](backend/clean_rebuild.py)": [
                         "クリーンビルドスクリプト実行時の一時ファイルクリーンアップ性能検証の追加。24時間稼働時の一時ファイル累積バグを防止。"
                     ],
-                    "[admin_channel_router.py](file:///C:/Users/PC_User/Desktop/script/video-automation/routers/admin_channel_router.py)": [
+                    "[admin_channel_router.py](backend/routers/admin_channel_router.py)": [
                         "管理者用チャンネル配信機能の例外処理及び境界値テストの追加。"
                     ]
                 }
             elif completed_phase == 20:
                 achievements_by_module = {
-                    "[migrate_e2e_files.py](file:///C:/Users/PC_User/Desktop/script/video-automation/tests/scratch/migrate_e2e_files.py)": [
+                    "[migrate_e2e_files.py](backend/tests/scratch/migrate_e2e_files.py)": [
                         "E2Eテストファイルの自動移行・整理に関するカバレッジ向上。不要な重複テストコードを安全にマージし、テスト資産の整理と非退行を担保。"
                     ],
-                    "[smartcut_strategy_service.py](file:///C:/Users/PC_User/Desktop/script/video-automation/services/smartcut_strategy_service.py)": [
+                    "[smartcut_strategy_service.py](backend/services/smartcut_strategy_service.py)": [
                         "スマートカット適用戦略およびValidator実行時のロジック検証テストの実装。無音時間カットと演出適用の一貫性を保証。"
                     ],
-                    "[graph.py](file:///C:/Users/PC_User/Desktop/script/video-automation/agents/graph.py)": [
+                    "[graph.py](backend/agents/graph.py)": [
                         "エージェント状態遷移・意思決定グラフ(Nexus-Council)のロジックテスト追加。自律改善ループのデッドロック防止機構を検証。"
                     ],
-                    "[phase3_diverse.py](file:///C:/Users/PC_User/Desktop/script/video-automation/tests/phase3_diverse.py)": [
+                    "[phase3_diverse.py](backend/tests/phase3_diverse.py)": [
                         "Phase 3 関連の多様性（Diverse）テストスイートのカバレッジ向上。"
                     ]
                 }
@@ -2246,14 +2246,14 @@ class OrchestrationHub:
                         "score": 9,
                         "detail": "[自律的意思決定] 耐久試験中のクリーンビルドスクリプト実行時において、一時ファイルが累積してディスク容量を圧迫するリスクを防止するため、クリーンアップ検証の追加実施を自律決定。",
                         "category": "リソース最適化",
-                        "module": "[clean_rebuild.py](file:///C:/Users/PC_User/Desktop/script/video-automation/clean_rebuild.py)",
+                        "module": "[clean_rebuild.py](backend/clean_rebuild.py)",
                         "group": GROUP_JP_MAP.get("self_improve", "自己改善グループ")
                     })
                     decisions.append({
                         "score": 8,
                         "detail": "[自律的意思決定] 並列実行時におけるプレビュー画像生成のリソース競合およびデッドロックを未然に防止するため、例外ハンドリングおよび境界値テストの追加を自律適用。",
                         "category": "並行処理/排他制御",
-                        "module": "[preview_engine.py](file:///C:/Users/PC_User/Desktop/script/video-automation/preview_engine.py)",
+                        "module": "[preview_engine.py](backend/preview_engine.py)",
                         "group": GROUP_JP_MAP.get("design_auto", "デザイン自動化グループ")
                     })
                 elif completed_phase == 20:
@@ -2261,14 +2261,14 @@ class OrchestrationHub:
                         "score": 9,
                         "detail": "[自律的意思決定] スマートカット適用戦略およびValidator実行時のロジックにおける境界値や空入力時の耐クラッシュ性を保証するため、演出適用時の異常値フィルタリング検証を自律適用。",
                         "category": "バグ修正/堅牢化",
-                        "module": "[smartcut_strategy_service.py](file:///C:/Users/PC_User/Desktop/script/video-automation/services/smartcut_strategy_service.py)",
+                        "module": "[smartcut_strategy_service.py](backend/services/smartcut_strategy_service.py)",
                         "group": GROUP_JP_MAP.get("quality_ascend", "品質向上グループ")
                     })
                     decisions.append({
                         "score": 8,
                         "detail": "[自律的意思決定] Nexus-Councilエージェント間の状態遷移グラフにおける意思決定の整合性とデッドロックの防止を担保するため、意思決定グラフの耐久テスト自動実装を決定。",
                         "category": "設計決定/アーキテクチャ",
-                        "module": "[graph.py](file:///C:/Users/PC_User/Desktop/script/video-automation/agents/graph.py)",
+                        "module": "[graph.py](backend/agents/graph.py)",
                         "group": GROUP_JP_MAP.get("design_auto", "デザイン自動化グループ")
                     })
                     

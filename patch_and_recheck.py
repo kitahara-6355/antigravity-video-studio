@@ -2,9 +2,15 @@ import sys
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
-src_file = r"C:\Users\PC_User\.gemini\antigravity\brain\432d8506-5ff4-46ae-8b90-2469a0dd7aed\test_mark_tasks_001.py"
-dest_file = r"c:\Users\PC_User\Desktop\script\video-automation\backend\tests\test_mark_tasks_001.py"
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+
+from path_resolver import backend_dir, brain_dir, project_root
+
+# 会話 UUID は当時のもの。親（brain/）は解決に通してある。
+src_file = str(brain_dir() / "432d8506-5ff4-46ae-8b90-2469a0dd7aed" / "test_mark_tasks_001.py")
+dest_file = str(backend_dir() / "tests" / "test_mark_tasks_001.py")
 
 try:
     # 1. ファイルの上書きコピー
@@ -19,7 +25,7 @@ try:
     # Windowsなので shell=True を使用して python コマンドを呼び出す
     print("Running scripts/measure_coverage.py...")
     # カレントディレクトリの設定
-    cwd = r"c:\Users\PC_User\Desktop\script\video-automation"
+    cwd = str(project_root())
     # PYTHONPATH の設定
     env = os.environ.copy()
     env["PYTHONPATH"] = os.path.join(cwd, "backend") + os.pathsep + env.get("PYTHONPATH", "")

@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw
 from unittest.mock import patch, MagicMock
+from path_resolver import project_root
 from backend.add_simple_branding import (
     _get_lanczos_filter,
     _resolve_branding_paths,
@@ -59,8 +60,12 @@ def test_resolve_branding_paths(tmp_path):
     assert output_path == tmp_path / "backend" / "branding" / "final_branding.png"
     assert output_path.parent.exists()
 
+    # base_path 未指定なら project_root() 配下に落ちること。
+    # 以前は "video-automation" という旧リポジトリ名が含まれることを見ていたが、
+    # それは直書きされた絶対パスの一部を見ていただけで、リポジトリ名が
+    # 変わった時点で「たまたま通っている」状態になっていた。
     logo_path_none, output_path_none = _resolve_branding_paths(None)
-    assert "video-automation" in str(logo_path_none)
+    assert logo_path_none == project_root() / "backend" / "branding" / "logos" / "brand_logo.png"
 
 
 def test_load_and_resize_logo(tmp_path):

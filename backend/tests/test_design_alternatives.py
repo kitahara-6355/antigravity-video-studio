@@ -261,11 +261,21 @@ def test_technical_debt_registration_on_exception(mock_debt_store, mock_combined
     with pytest.raises(DesignAlternativesError, match="Design alternatives generation failed: unexpected division by zero"):
         generate_design_alternatives(str(input_video), str(tmp_path / "output"))
         
-    # TechnicalDebtStore.register_debt が正しく呼ばれたことを検証
+    # TechnicalDebtStore.register_debt が正しく呼ばれたことを検証。
+    # line_number は traceback から実行時に取る値なので、期待値も
+    # ソースから引く。数値を直書きすると、上に 1 行足しただけで落ちる。
+    import backend.design_alternatives as da_mod
+
+    source_lines = Path(da_mod.__file__).read_text(encoding="utf-8").splitlines()
+    expected_line = next(
+        i for i, line in enumerate(source_lines, 1)
+        if "subprocess.run(extract_cmd" in line
+    )
+
     mock_store_instance.register_debt.assert_called_once_with(
         category="MINOR_INFRA",
         file_path="backend/design_alternatives.py",
-        line_number=59,
+        line_number=expected_line,
         pattern="except Exception as e:",
         cause_pattern="DP-01",
         fix_pattern="具体的な例外の個別キャッチ",

@@ -12,6 +12,8 @@ import json
 import logging
 import os
 
+from path_resolver import brain_dir, raw_videos_dir
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -174,7 +176,7 @@ def create_corrected_preview(output_dir=None, input_video=None):
     base_dir = Path(__file__).resolve().parent.parent
     
     if output_dir is None:
-        default_output_dir = Path("C:/Users/PC_User/.gemini/antigravity/brain/638e528a-ad1b-4885-ad73-5d9f60dc2799")
+        default_output_dir = brain_dir() / "638e528a-ad1b-4885-ad73-5d9f60dc2799"
         if default_output_dir.exists() and default_output_dir.is_dir():
             output_dir = default_output_dir
         else:
@@ -192,7 +194,7 @@ def create_corrected_preview(output_dir=None, input_video=None):
         raise
 
     if input_video is None:
-        default_input_video = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4")
+        default_input_video = raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4"
         if default_input_video.exists():
             input_video = default_input_video
         else:

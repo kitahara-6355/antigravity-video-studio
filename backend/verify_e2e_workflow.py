@@ -4,12 +4,14 @@ import os
 import sys
 from pathlib import Path
 
+from path_resolver import raw_videos_dir
+
 # Config
 def get_base_url():
     return os.environ.get("BASE_URL", "http://localhost:8000")
 
 def get_video_path():
-    return os.environ.get("VIDEO_PATH", r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン01_前編.mp4")
+    return os.environ.get("VIDEO_PATH", str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン01_前編.mp4"))
 
 def step_1_upload():
     video_path = get_video_path()

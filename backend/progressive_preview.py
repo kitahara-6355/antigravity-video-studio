@@ -15,6 +15,8 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 
+from path_resolver import project_root
+
 logger = logging.getLogger(__name__)
 
 
@@ -787,7 +789,7 @@ if __name__ == "__main__":
     preview = ProgressivePreview(session_id="test_session")
     
     # ダミーテスト（実際の動画パスを指定）
-    test_video = r"C:\Users\PC_User\Desktop\script\video-automation\test_10sec.mp4"
+    test_video = str(project_root() / "test_10sec.mp4")
     
     if Path(test_video).exists():
         # 同じ動画でBefore/Afterテスト（実際は処理後動画を指定）

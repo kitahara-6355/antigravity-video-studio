@@ -239,7 +239,19 @@ def test_copy_artifacts_module_variables(clean_sys_modules):
         
     expected_root = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
     assert module.dest_base == expected_root
-    assert module.src_agent_0 == r"C:\Users\PC_User\.gemini\antigravity\brain\f9a7ff51-0cc8-4692-aa10-04feec4ee3ce\.system_generated\worktrees\subagent-bug-hunter-Agent-0-self-6de64ebe"
+    # コピー元は brain_dir() から導出される。会話 UUID 以下は当時のまま。
+    # 以前は Windows の絶対パスを書き写していたため、CI(Linux) では
+    # /home/runner/... と一致せず落ちていた。
+    from path_resolver import brain_dir
+
+    expected_src = str(
+        brain_dir()
+        / "f9a7ff51-0cc8-4692-aa10-04feec4ee3ce"
+        / ".system_generated"
+        / "worktrees"
+        / "subagent-bug-hunter-Agent-0-self-6de64ebe"
+    )
+    assert module.src_agent_0 == expected_src
     assert len(module.copy_targets) == 2
     assert module.copy_targets[0] == (
         module.src_agent_0,

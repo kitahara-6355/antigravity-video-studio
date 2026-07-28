@@ -1,10 +1,15 @@
 import subprocess
 import os
-from pathlib import Path
 
-BASE_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+# パスの起点は path_resolver が返す。モジュール冒頭で Path を import すると、
+# 関数内の `from pathlib import Path` が「未使用の再定義」(F811) になる。
+from path_resolver import brain_dir, project_root
+
+BASE_DIR = project_root()
 RAW_DIR = BASE_DIR / "raw_videos" / "AI Studio アップロード用動画"
-OUT_DIR = Path(r"C:\Users\PC_User\.gemini\antigravity\brain\638e528a-ad1b-4885-ad73-5d9f60dc2799")
+# 出力先は特定の会話 UUID 配下。UUID 自体は当時の会話のもので他マシンには無いが、
+# 親（brain/）を解決に通しておけば ANTIGRAVITY_APP_DATA_DIR で丸ごと差し替えられる。
+OUT_DIR = brain_dir() / "638e528a-ad1b-4885-ad73-5d9f60dc2799"
 TELOP_DIR = BASE_DIR / "backend" / "temp" / "final_build"
 
 # Windows用のパスエスケープ関数

@@ -103,9 +103,11 @@ class TestLegacyProductionRouter:
 
     def test_lpr_09_validate_path_not_exists(self):
         """validate_video_path — 存在しないファイル"""
-        from routers.legacy_production_router import validate_video_path
-        # ALLOWED_VIDEO_DIR 内だが存在しない
-        fake_path = str(Path("C:/Users/PC_User/Desktop/script/video-automation/nonexistent.mp4"))
+        from routers.legacy_production_router import validate_video_path, ALLOWED_VIDEO_DIR
+        # ALLOWED_VIDEO_DIR 内だが存在しない。
+        # 以前は許可ルートの値を絶対パスで書き写していたため、
+        # 許可ルート側が変わると「許可外」で落ちて意図した経路を通らなかった。
+        fake_path = str(ALLOWED_VIDEO_DIR / "nonexistent.mp4")
         with pytest.raises(FileNotFoundError):
             validate_video_path(fake_path)
 
@@ -1254,16 +1256,17 @@ class TestShortsRouter:
 
     @pytest.mark.asyncio
     async def test_sh_13_generate_shorts_exception(self):
-        """generate_shorts — 一般例外は500"""
+        """generate_shorts — 実行時エラー(RuntimeError)は500に変換され、原因が detail に載る"""
         from routers.shorts import generate_shorts, GenerateShortsRequest
         from fastapi import HTTPException
         req = GenerateShortsRequest(video_path="v.mp4", highlights=[])
         mock_sg = AsyncMock()
-        mock_sg.generate_from_highlights.side_effect = Exception("fatal error")
+        mock_sg.generate_from_highlights.side_effect = RuntimeError("fatal error")
         with patch.dict("sys.modules", {"services.shorts_generator": MagicMock(shorts_generator=mock_sg)}):
             with pytest.raises(HTTPException) as exc_info:
                 await generate_shorts(req)
             assert exc_info.value.status_code == 500
+            assert "fatal error" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_sh_14_list_shorts_success(self):
@@ -1329,16 +1332,17 @@ class TestShortsRouter:
 
     @pytest.mark.asyncio
     async def test_sh_19_export_shorts_exception(self):
-        """export_shorts — 一般例外は500"""
+        """export_shorts — 実行時エラー(RuntimeError)は500に変換され、原因が detail に載る"""
         from routers.shorts import export_shorts, ExportShortsRequest
         from fastapi import HTTPException
         req = ExportShortsRequest(clip_ids=["c1"])
         mock_sg = MagicMock()
-        mock_sg.get_clip_list.side_effect = Exception("export error")
+        mock_sg.get_clip_list.side_effect = RuntimeError("export error")
         with patch.dict("sys.modules", {"services.shorts_generator": MagicMock(shorts_generator=mock_sg)}):
             with pytest.raises(HTTPException) as exc_info:
                 await export_shorts(req)
             assert exc_info.value.status_code == 500
+            assert "export error" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_sh_20_render_short_success_with_output_filename(self, tmp_path):
@@ -1559,6 +1563,41 @@ class TestShortsRouter:
                 await generate_thumbnail_api(req)
             assert exc_info.value.status_code == 500
             assert "Resolution must be at least 1280x720" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_sh_28_bare_exception_is_not_swallowed(self):
+        """shorts ルーターは想定済みの例外型だけを 500 に変換する契約。
+
+        素の Exception は捕捉せず伝播させる。これは意図した設計であって不具合ではない:
+        GEMINI.md「技術負債台帳規約」必須ルール1 により、新規 `except Exception` の追加は
+        register_debt() 登録なしには禁止されている。routers/shorts.py はそのため
+        (ValueError, TypeError, KeyError) → 400、(ImportError, RuntimeError, ...) → 500
+        と型を列挙する形をとっている。
+        services/shorts_generator.py は raise 文を1つも持たず独自例外も定義しないため、
+        素の Exception は実運用のどの経路からも発生しない。
+        捕捉漏れは FastAPI 既定のハンドラが 500 として処理する。
+        """
+        from routers.shorts import (
+            generate_shorts, GenerateShortsRequest,
+            export_shorts, ExportShortsRequest,
+        )
+        from fastapi import HTTPException
+
+        mock_gen = AsyncMock()
+        mock_gen.generate_from_highlights.side_effect = Exception("unclassified failure")
+        with patch.dict("sys.modules", {"services.shorts_generator": MagicMock(shorts_generator=mock_gen)}):
+            with pytest.raises(Exception) as exc_info:
+                await generate_shorts(GenerateShortsRequest(video_path="v.mp4", highlights=[]))
+            assert not isinstance(exc_info.value, HTTPException)
+            assert str(exc_info.value) == "unclassified failure"
+
+        mock_exp = MagicMock()
+        mock_exp.get_clip_list.side_effect = Exception("unclassified failure")
+        with patch.dict("sys.modules", {"services.shorts_generator": MagicMock(shorts_generator=mock_exp)}):
+            with pytest.raises(Exception) as exc_info:
+                await export_shorts(ExportShortsRequest(clip_ids=["c1"]))
+            assert not isinstance(exc_info.value, HTTPException)
+            assert str(exc_info.value) == "unclassified failure"
 
 
 

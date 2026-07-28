@@ -9,12 +9,14 @@ from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 import sys
 import io
 
+from path_resolver import brain_dir, raw_videos_dir
+
 # sys.stdout setup moved to main block
 
 
 def create_topleft_clean_preview(
-    input_video=r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4",
-    output_dir=Path("C:/Users/PC_User/.gemini/antigravity/brain/638e528a-ad1b-4885-ad73-5d9f60dc2799"),
+    input_video=str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4"),
+    output_dir=brain_dir() / "638e528a-ad1b-4885-ad73-5d9f60dc2799",
     logo_path=Path("backend/branding/logos/brand_logo.png"),
     temp_dir=Path("backend/temp/topleft_clean")
 ):

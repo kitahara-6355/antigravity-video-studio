@@ -7,9 +7,11 @@ import re
 import sys
 from pathlib import Path
 
+from path_resolver import project_root
+
 # ワークツリー内、または元のホストパスから、存在するものを優先して使用する
 _tree_path = Path(__file__).resolve().parent.parent.parent / "docs" / "USER_MANUAL.md"
-_host_path = Path("C:/Users/PC_User/Desktop/script/video-automation/docs/USER_MANUAL.md")
+_host_path = project_root() / "docs" / "USER_MANUAL.md"
 MANUAL_PATH = _tree_path if _tree_path.exists() else _host_path
 
 def decode_line(line_bytes):

@@ -2,6 +2,11 @@ import json
 import os
 import sys
 import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from path_resolver import project_root
+
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
@@ -21,7 +26,7 @@ def check_safety_guard(workspace_dir=None):
 def query_system_status(base_dir=None, paths=None):
     if paths is None:
         if base_dir is None:
-            base_dir = r"c:\Users\PC_User\Desktop\script\video-automation"
+            base_dir = str(project_root())
         paths = {
             "flash_session": os.path.join(base_dir, "backend", "agents", "orchestration", "flash_session.json"),
             "task_queue": os.path.join(base_dir, "backend", "agents", "orchestration", "task_queue.json"),
