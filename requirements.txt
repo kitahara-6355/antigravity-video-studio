@@ -7,6 +7,11 @@ fastapi
 uvicorn
 python-dotenv
 google-genai
+# Drive / Sheets 連携 (backend/services/workspace_sync.py)。
+# google-adk 経由で入ることがあるため未宣言でも動く場合があるが、
+# それに依存すると adk の依存が変わった日に黙って壊れる。
+google-api-python-client
+google-auth-oauthlib
 requests
 pillow
 websockets
