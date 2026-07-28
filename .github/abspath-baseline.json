@@ -1,7 +1,9 @@
 {
-  "total": 432,
+  "total": 591,
   "by_category": {
     "archives": 3,
+    "fonts:production": 136,
+    "fonts:tests": 23,
     "scratch": 351,
     "tests": 78
   }
