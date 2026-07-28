@@ -15,6 +15,8 @@ import time
 import json
 from datetime import datetime
 
+from path_resolver import project_root
+
 # ショートパス変換（Phase 0からコピー）
 # ショートパス変換は Windows API。Linux では使えないので None のままにする
 # （import 時に無条件で呼ぶと、このモジュールが Linux で import すらできない）
@@ -108,7 +110,7 @@ def phase1_full_processing():
     print(f"Start time: {datetime.now().strftime('%H:%M:%S')}")
     print("="*70)
     
-    base_dir = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+    base_dir = project_root()
     raw_dir = base_dir / "raw_videos" / "AI Studio アップロード用動画"
     output_dir = base_dir / "backend" / "temp" / "phase1_final"
     output_dir.mkdir(parents=True, exist_ok=True)

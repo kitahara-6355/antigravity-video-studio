@@ -8,9 +8,10 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from backend.agents.orchestration import OrchestrationHub
+from backend.path_resolver import app_scratch_dir
 
 def main():
-    scratch_dir = Path(r"C:\Users\PC_User\.gemini\antigravity\scratch")
+    scratch_dir = app_scratch_dir()
     cooldown_file = scratch_dir / "cooldown_start.json"
     
     hub = OrchestrationHub()

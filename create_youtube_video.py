@@ -16,11 +16,16 @@
 
 import subprocess
 import os
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+
+from path_resolver import project_root, raw_videos_dir
+
 # パス設定
-RAW_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画")
-OUTPUT_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation\output")
+RAW_DIR = raw_videos_dir() / "AI Studio アップロード用動画"
+OUTPUT_DIR = project_root() / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # 素材ファイル

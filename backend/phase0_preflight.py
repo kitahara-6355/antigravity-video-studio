@@ -14,6 +14,8 @@ except (ImportError, ValueError):
 import time
 import json
 
+from path_resolver import project_root
+
 # ========================================
 # ユーティリティ: ショートパス変換
 # ========================================
@@ -95,7 +97,8 @@ def run_ffmpeg_with_retry(cmd, description, max_retries=3, timeout_sec=300):
 # ========================================
 # Phase 0: プレフライトチェック - 設定定数
 # ========================================
-DEFAULT_FALLBACK_BASE_DIR = r"C:\Users\PC_User\Desktop\script\video-automation"
+# 環境変数が無いときに使われる既定のルート（path_resolver が算出する）
+DEFAULT_FALLBACK_BASE_DIR = str(project_root())
 RAW_VIDEOS_SUBDIR = Path("raw_videos") / "AI Studio アップロード用動画"
 OUTPUT_SUBDIR = Path("backend") / "temp" / "phase0_check"
 INPUT_VIDEO_NAME = "シーン01_前編.mp4"
@@ -115,12 +118,10 @@ CHUNK_MIN_FILE_SIZE_BYTE = 500000
 
 def _resolve_paths():
     """プレフライトチェックで使用するパス（入力動画、出力ディレクトリ）を解決する"""
-    base_dir_env = os.environ.get("VIDEO_AUTOMATION_BASE_DIR")
-    if base_dir_env:
-        base_dir = Path(base_dir_env)
-    else:
-        base_dir = Path(DEFAULT_FALLBACK_BASE_DIR)
-    
+    # 環境変数（VIDEO_AUTOMATION_BASE_DIR / ANTIGRAVITY_BASE_DIR）と
+    # スクリプト位置からの算出を path_resolver に一本化している
+    base_dir = project_root()
+
     raw_dir = base_dir / RAW_VIDEOS_SUBDIR
     output_dir = base_dir / OUTPUT_SUBDIR
     input_video = raw_dir / INPUT_VIDEO_NAME

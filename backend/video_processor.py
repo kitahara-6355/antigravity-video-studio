@@ -14,6 +14,8 @@ from typing import List, Dict, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
+from path_resolver import raw_videos_dir
+
 logger = logging.getLogger(__name__)
 
 class ProcessingPhase(Enum):
@@ -226,7 +228,7 @@ class VideoProcessor:
                 # デモ用：既存の動画を使用（複数パス候補）
                 demo_dirs = [
                     Path("raw_videos/AI Studio アップロード用動画"),
-                    Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画"),
+                    raw_videos_dir() / "AI Studio アップロード用動画",
                     Path("../raw_videos/AI Studio アップロード用動画"),
                 ]
                 for demo_dir in demo_dirs:

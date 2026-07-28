@@ -11,6 +11,8 @@ import io
 import logging
 from typing import Optional
 
+from path_resolver import brain_dir, raw_videos_dir
+
 logger = logging.getLogger("tight_layout_generator")
 
 
@@ -63,7 +65,7 @@ def create_tight_layout_preview(
     
     # 入力ビデオ
     if not input_video:
-        input_video = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4"
+        input_video = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4")
     
     input_video_path = Path(input_video)
     if not input_video_path.exists():
@@ -82,7 +84,7 @@ def create_tight_layout_preview(
         
     # 出力ディレクトリ
     if not output_dir:
-        output_dir = Path("C:/Users/PC_User/.gemini/antigravity/brain/638e528a-ad1b-4885-ad73-5d9f60dc2799")
+        output_dir = brain_dir() / "638e528a-ad1b-4885-ad73-5d9f60dc2799"
     else:
         output_dir = Path(output_dir)
         

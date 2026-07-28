@@ -7,9 +7,17 @@ sys.path.insert(0, root_path)
 sys.path.insert(0, os.path.join(root_path, "backend"))
 
 from backend.agents.orchestration import OrchestrationHub
+from backend.path_resolver import brain_dir
 
 dest_base = root_path
-src_agent_0 = r"C:\Users\PC_User\.gemini\antigravity\brain\f9a7ff51-0cc8-4692-aa10-04feec4ee3ce\.system_generated\worktrees\subagent-bug-hunter-Agent-0-self-6de64ebe"
+# 会話 UUID は当時のもの。親（brain/）を解決に通しておく。
+src_agent_0 = str(
+    brain_dir()
+    / "f9a7ff51-0cc8-4692-aa10-04feec4ee3ce"
+    / ".system_generated"
+    / "worktrees"
+    / "subagent-bug-hunter-Agent-0-self-6de64ebe"
+)
 
 copy_targets = [
     (src_agent_0, "backend/agents/orchestration/flash_runner_control.py", "backend/agents/orchestration/flash_runner_control.py"),

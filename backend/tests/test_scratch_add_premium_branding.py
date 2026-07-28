@@ -8,9 +8,12 @@ from PIL import Image, ImageFont
 
 # テスト前に環境変数をセットして一時的なディレクトリを使用するようにする
 @pytest.fixture(autouse=True)
-def setup_env(tmp_path):
-    os.environ["ANTIGRAVITY_BASE_DIR"] = str(tmp_path)
-    
+def setup_env(tmp_path, monkeypatch):
+    # os.environ を直接書くと後始末されず、後続のテストに漏れる。
+    # 実際 gen_telops のテストが VIDEO_AUTOMATION_BASE_DIR を設定しても
+    # 漏れた ANTIGRAVITY_BASE_DIR のほうが優先されて落ちていた。
+    monkeypatch.setenv("ANTIGRAVITY_BASE_DIR", str(tmp_path))
+
     # 必要なディレクトリ構造を作成
     logo_dir = tmp_path / "backend" / "branding" / "logos"
     logo_dir.mkdir(parents=True, exist_ok=True)
@@ -74,8 +77,15 @@ def test_create_premium_branding_font_fallback(setup_env):
         assert res.exists()
 
     # 4. 全て失敗 (すべてのフォントで例外)
-    with mock.patch("PIL.ImageFont.truetype", side_effect=make_mock_truetype(fail_yugothb=True, fail_meiryo=True, fail_msgothic=True)):
-        with pytest.raises(Exception):
+    # 個別のフォント名で失敗させる方式は使えない。create_premium_branding は
+    # font_resolver.candidate_paths() を辿るようになっており（2026-07-25）、
+    # Windows の3件のほかに macOS/Linux の候補も含む。名前指定で3件だけ
+    # 失敗させても残りが成功してしまい、「全滅」を再現できていなかった。
+    def fail_every_font(font_path, size):
+        raise OSError(f"Mock failure: {font_path}")
+
+    with mock.patch("PIL.ImageFont.truetype", side_effect=fail_every_font):
+        with pytest.raises(OSError, match="Failed to load any premium fonts"):
             apb.create_premium_branding()
 
 def test_add_premium_branding_success(setup_env):

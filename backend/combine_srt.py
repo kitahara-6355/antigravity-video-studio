@@ -3,6 +3,8 @@ from pathlib import Path
 from datetime import timedelta
 import sys
 
+from path_resolver import project_root, raw_videos_dir
+
 # シーンごとの字幕統合設定
 SCENE_CONFIGS = [
     {
@@ -125,8 +127,8 @@ def write_combined_srt(srt_entries, output_path):
             f.write(f"{text}\n\n")
 
 def main():
-    base_dir = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画")
-    output_path = Path(r"C:\Users\PC_User\Desktop\script\video-automation\soul_narrative_combined.srt")
+    base_dir = raw_videos_dir() / "AI Studio アップロード用動画"
+    output_path = project_root() / "soul_narrative_combined.srt"
     
     all_entries = []
     

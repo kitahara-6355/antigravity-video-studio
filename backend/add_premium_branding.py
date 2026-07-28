@@ -6,7 +6,10 @@ import subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-BASE_DIR = Path(os.getenv("ANTIGRAVITY_BASE_DIR", r"C:\Users\PC_User\Desktop\script\video-automation"))
+from path_resolver import project_root
+
+# ANTIGRAVITY_BASE_DIR による差し替えは project_root() の中で行う
+BASE_DIR = project_root()
 
 def create_premium_branding():
     """ロゴ + プレミアムフォントのテロップを作成"""
@@ -679,7 +682,7 @@ if __name__ == "__main__":
         print("\n🚀 Premium Version Ready for YouTube Upload!")
         print("\nFiles:")
         print(f"  Video: {video_path}")
-        print(f"  SRT: C:\\Users\\PC_User\\Desktop\\script\\video-automation\\soul_narrative_combined.srt")
+        print(f"  SRT: {BASE_DIR / 'soul_narrative_combined.srt'}")
         print("\nFont Specs:")
         print("  Font: Yu Gothic Bold")
         print("  Size: 20px")

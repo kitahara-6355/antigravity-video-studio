@@ -12,6 +12,8 @@ from combined_overlay import CombinedOverlay
 from logo_overlay import LogoOverlay
 from logo_manager import LogoManager
 
+from path_resolver import raw_videos_dir
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -243,7 +245,7 @@ def generate_design_alternatives(
 
 
 if __name__ == "__main__":  # pragma: no cover
-    input_video = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4"
+    input_video = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4")
     
     if Path(input_video).exists():
         alternatives = generate_design_alternatives(input_video)

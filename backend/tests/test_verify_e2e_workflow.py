@@ -4,6 +4,7 @@ import os
 from unittest.mock import patch, MagicMock, mock_open
 import runpy
 
+from path_resolver import raw_videos_dir
 import verify_e2e_workflow
 
 # 1. step_1_upload のテスト
@@ -297,4 +298,12 @@ def test_environment_variables_override():
             del os.environ["VIDEO_PATH"]
             
     assert verify_e2e_workflow.get_base_url() == (orig_base_url if orig_base_url is not None else "http://localhost:8000")
-    assert verify_e2e_workflow.get_video_path() == (orig_video_path if orig_video_path is not None else r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン01_前編.mp4")
+    # 既定値は raw_videos_dir() から導出される。
+    # 以前は解決結果を絶対パスで書き写していたため、リポジトリを作り直した時点で
+    # 期待値のほうが実在しない場所を指していた。
+    expected_default = str(
+        raw_videos_dir() / "AI Studio アップロード用動画" / "シーン01_前編.mp4"
+    )
+    assert verify_e2e_workflow.get_video_path() == (
+        orig_video_path if orig_video_path is not None else expected_default
+    )

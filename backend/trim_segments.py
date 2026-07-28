@@ -7,6 +7,8 @@ trim_segments.py - 動画の指定セグメントのカット・結合編集モ�
 import subprocess
 from pathlib import Path
 
+from path_resolver import project_root
+
 def cut_segments(base_dir=None):
     """指定されたディレクトリ内の動画ファイルをカットおよび結合します。
 
@@ -21,7 +23,7 @@ def cut_segments(base_dir=None):
     """
     try:
         if base_dir is None:
-            base = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+            base = project_root()
         else:
             base = Path(base_dir)
             

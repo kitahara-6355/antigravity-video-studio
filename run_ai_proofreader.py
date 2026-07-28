@@ -2,17 +2,19 @@
 AI Proofreaderを使用して全字幕ファイルを自動修正
 """
 import sys
-sys.path.insert(0, r"C:\Users\PC_User\Desktop\script\video-automation\backend")
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 
 import json
 import logging
-from pathlib import Path
+from path_resolver import raw_videos_dir
 from subtitle_engine.ai_proofreader import proofread_segments
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # 字幕ファイル
-SRT_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画")
+SRT_DIR = raw_videos_dir() / "AI Studio アップロード用動画"
 FILES = [
     "シーン01_前編_regenerated.srt",
     "シーン03_後編01_regenerated.srt",

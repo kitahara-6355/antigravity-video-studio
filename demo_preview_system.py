@@ -7,14 +7,16 @@ import asyncio
 import sys
 from pathlib import Path
 
-sys.path.insert(0, r"C:\Users\PC_User\Desktop\script\video-automation\backend")
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 
+from path_resolver import brain_dir, raw_videos_dir
 from preview_system import SubtitlePreviewGenerator, TelopPreviewGenerator, PreviewReportGenerator, PreviewReport, ScenePreview
 from subtitle_confirmation import SubtitleConfirmationChecker, ConfirmationReportGenerator
 
 # パス設定
-RAW_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画")
-ARTIFACT_DIR = Path(r"C:\Users\PC_User\.gemini\antigravity\brain\0cc79527-362f-4816-aa0a-27c9f69dbaa5")
+RAW_DIR = raw_videos_dir() / "AI Studio アップロード用動画"
+# 会話 UUID は当時のもの。親（brain/）は解決に通してある。
+ARTIFACT_DIR = brain_dir() / "0cc79527-362f-4816-aa0a-27c9f69dbaa5"
 PREVIEWS_DIR = ARTIFACT_DIR / "previews"
 
 # シーン定義

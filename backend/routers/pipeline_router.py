@@ -32,6 +32,8 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from path_resolver import backend_dir, vault_assets_dir
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
@@ -422,7 +424,7 @@ class PipelineStartRequest(BaseModel):
 @router.get("/videos")
 async def list_videos():
     """vault-assets 内の動画ファイルをリスト化"""
-    vault_assets = Path(r"C:\Users\PC_User\Desktop\script\vault-assets\raw_videos")
+    vault_assets = vault_assets_dir() / "raw_videos"
     
     if not vault_assets.exists():
         return {"videos": [], "error": "vault-assets not found"}
@@ -1426,7 +1428,7 @@ async def get_quality_improvement(req: QualityImproveRequest):
     try:
         from backend.video_pipeline.soul_feedback_engine import SoulFeedbackEngine, ProductionContext
         srt_content = ""
-        job_dir = Path("C:/Users/PC_User/Desktop/script/video-automation/backend/work")
+        job_dir = backend_dir() / "work"
         srts = list(job_dir.glob("**/subtitles.srt"))
         if srts:
             try:

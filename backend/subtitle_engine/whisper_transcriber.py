@@ -11,6 +11,8 @@ import time
 import subprocess
 import json as _json
 
+from path_resolver import vault_environments_dir
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,7 +33,7 @@ class WhisperTranscriber:
         import os, sys
         _nvidia_search_paths = [
             Path(sys.executable).parent.parent / "Lib" / "site-packages" / "nvidia",
-            Path(r"C:\Users\PC_User\Desktop\script\vault-environments\.venv\Lib\site-packages\nvidia"),
+            vault_environments_dir() / ".venv" / "Lib" / "site-packages" / "nvidia",
         ]
         for site_packages in _nvidia_search_paths:
             if site_packages.exists():

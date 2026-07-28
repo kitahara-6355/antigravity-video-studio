@@ -9,6 +9,8 @@ import logging
 import json
 from PIL import Image, ImageFilter, UnidentifiedImageError
 
+from path_resolver import raw_videos_dir
+
 
 logger = logging.getLogger(__name__)
 
@@ -433,8 +435,8 @@ class ProductionPreviewManager:
 
 def main():
     # シーン04で実行
-    input_v = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4"
-    subtitle = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02_whisper_semantic.srt"
+    input_v = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4")
+    subtitle = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02_whisper_semantic.srt")
     
     # 改善されたテーマ
     theme = "コリンスキー筆の真実"

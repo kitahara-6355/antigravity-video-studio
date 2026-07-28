@@ -1,11 +1,17 @@
 """Start pipeline with pre-merged video (skip merge step)"""
 import requests
 import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+
+from path_resolver import vault_outputs_dir
 
 API_BASE = "http://localhost:8000"
 
 # 既に結合済みの動画を直接使用（結合ステップをスキップ）
-merged_video = r"C:\Users\PC_User\Desktop\script\video-automation\vault-outputs\merged\merged_20260405_202804.mp4"
+merged_video = str(vault_outputs_dir() / "merged" / "merged_20260405_202804.mp4")
 
 payload = {
     "video_path": merged_video,  # 単一動画として渡す（結合スキップ）

@@ -8,17 +8,14 @@ import os
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-# スクリプトの位置から相対的にプロジェクトルートを特定
-DEFAULT_BASE_DIR = Path(__file__).resolve().parent.parent
+from path_resolver import project_root
 
-# 環境変数があればそれを優先し、なければ自動計算、最後に元の絶対パス
-env_base = os.environ.get("VIDEO_AUTOMATION_BASE_DIR")
-if env_base:
-    BASE_DIR = Path(env_base)
-elif DEFAULT_BASE_DIR.joinpath("backend").exists():
-    BASE_DIR = DEFAULT_BASE_DIR
-else:
-    BASE_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+# 環境変数（VIDEO_AUTOMATION_BASE_DIR / ANTIGRAVITY_BASE_DIR）があればそちら、
+# なければスクリプトの位置から算出する。
+# 以前はここに絶対パスの最終フォールバックがあったが、
+# 「backend/ が見つからない」ときに特定マシンのパスを指しても直らないため外した。
+DEFAULT_BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = project_root()
 
 TEMP_DIR = BASE_DIR / "backend" / "temp" / "final_build"
 LOGO_PATH = BASE_DIR / "backend" / "branding" / "logos" / "brand_logo.png"

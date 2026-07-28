@@ -22,8 +22,10 @@ from silence_trimmer import detect_silence, trim_silence_and_srt
 from template_config import template_config
 from subtitle_engine.text_formatter import format_segments
 
+from path_resolver import project_root
+
 # パス設定
-BASE_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation")
+BASE_DIR = project_root()
 RAW_DIR = BASE_DIR / "vault-assets" / "raw_videos" / "本番RAW01  対談_山田"
 if not RAW_DIR.exists():
     # フォルダ名スペースの揺らぎ対応

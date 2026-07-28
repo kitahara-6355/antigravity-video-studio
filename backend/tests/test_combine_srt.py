@@ -8,6 +8,28 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import combine_srt
 
+
+@pytest.fixture
+def project_dir(monkeypatch, tmp_path):
+    """combine_srt.main() の入出力先を tmp_path に向ける。
+
+    以前は `combine_srt.Path` を差し替え、
+    `C:\\Users\\PC_User\\Desktop\\script\\video-automation\\...` との
+    文字列一致で分岐させていた。パス解決を path_resolver に集約したことで
+    環境変数ひとつで済むようになり、テストが実際の解決経路を通る。
+    """
+    monkeypatch.setenv("ANTIGRAVITY_BASE_DIR", str(tmp_path))
+    raw_dir = tmp_path / "raw_videos" / "AI Studio アップロード用動画"
+    raw_dir.mkdir(parents=True)
+
+    class _Dirs:
+        root = tmp_path
+        base = raw_dir
+        output = tmp_path / "soul_narrative_combined.srt"
+
+    return _Dirs()
+
+
 def test_parse_srt_time():
     # 正常系
     assert combine_srt.parse_srt_time("01:23:45,678") == timedelta(hours=1, minutes=23, seconds=45, milliseconds=678)
@@ -93,90 +115,41 @@ def test_write_combined_srt(tmp_path):
     )
     assert content == expected
 
-def test_main_all_files_exist(monkeypatch, tmp_path):
-    mock_base = tmp_path / "raw_videos" / "AI Studio アップロード用動画"
-    mock_base.mkdir(parents=True)
-    mock_output = tmp_path / "soul_narrative_combined.srt"
-    
+def test_main_all_files_exist(project_dir):
     # 各シーン用のダミーSRTファイルを用意
     dummy_srt = (
         "1\n"
         "00:00:10,000 --> 00:00:15,000\n"
         "Test Subtitle\n"
     )
-    (mock_base / "シーン01_前編_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
-    (mock_base / "シーン03_後編01_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
-    (mock_base / "シーン04_後編02_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
-    
-    # Path クラスの差し替えモック
-    def mock_path(*args):
-        if not args:
-            return Path()
-        path_str = str(args[0])
-        if path_str == r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画":
-            return mock_base
-        elif path_str == r"C:\Users\PC_User\Desktop\script\video-automation\soul_narrative_combined.srt":
-            return mock_output
-        return Path(*args)
-        
-    monkeypatch.setattr(combine_srt, "Path", mock_path)
-    
+    (project_dir.base / "シーン01_前編_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
+    (project_dir.base / "シーン03_後編01_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
+    (project_dir.base / "シーン04_後編02_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
+
     # 実行
     combine_srt.main()
-    
-    assert mock_output.exists()
-    content = mock_output.read_text(encoding="utf-8")
+
+    assert project_dir.output.exists()
+    content = project_dir.output.read_text(encoding="utf-8")
     assert "Test Subtitle" in content
 
-def test_main_no_files_exist(monkeypatch, tmp_path):
-    mock_base = tmp_path / "raw_videos" / "AI Studio アップロード用動画"
-    mock_base.mkdir(parents=True)
-    mock_output = tmp_path / "soul_narrative_combined.srt"
-    
-    # ファイルを置かずに Path をモック
-    def mock_path(*args):
-        if not args:
-            return Path()
-        path_str = str(args[0])
-        if path_str == r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画":
-            return mock_base
-        elif path_str == r"C:\Users\PC_User\Desktop\script\video-automation\soul_narrative_combined.srt":
-            return mock_output
-        return Path(*args)
-        
-    monkeypatch.setattr(combine_srt, "Path", mock_path)
-    
-    # 実行
+def test_main_no_files_exist(project_dir):
+    # ファイルを置かずに実行する
     combine_srt.main()
-    
-    assert mock_output.exists()
-    content = mock_output.read_text(encoding="utf-8")
+
+    assert project_dir.output.exists()
+    content = project_dir.output.read_text(encoding="utf-8")
     # 読み込み対象がないため、空ファイルが出力されるはず
     assert content == ""
 
-def test_main_as_script(tmp_path):
+def test_main_as_script(project_dir):
     import runpy
-    from unittest.mock import patch
-    mock_base = tmp_path / "raw_videos" / "AI Studio アップロード用動画"
-    mock_base.mkdir(parents=True)
-    mock_output = tmp_path / "soul_narrative_combined.srt"
-    
-    def mock_path(*args):
-        if not args:
-            return Path()
-        path_str = str(args[0])
-        if path_str == r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画":
-            return mock_base
-        elif path_str == r"C:\Users\PC_User\Desktop\script\video-automation\soul_narrative_combined.srt":
-            return mock_output
-        return Path(*args)
-        
+
     # 実行スクリプトのパスを取得して __main__ として実行
     script_path = str(Path(combine_srt.__file__).resolve())
-    with patch("pathlib.Path", side_effect=mock_path):
-        runpy.run_path(script_path, run_name="__main__")
-    
-    assert mock_output.exists()
+    runpy.run_path(script_path, run_name="__main__")
+
+    assert project_dir.output.exists()
 
 def test_shift_srt_crlf(tmp_path):
     # CRLF (\r\n) の改行コードを持つSRTファイルを作成
@@ -289,37 +262,21 @@ def test_write_combined_srt_edge_cases(tmp_path):
     assert b"\r\n" not in content_bytes
     assert b"\n" in content_bytes
 
-def test_main_partial_files(monkeypatch, tmp_path):
-    mock_base = tmp_path / "raw_videos" / "AI Studio アップロード用動画"
-    mock_base.mkdir(parents=True)
-    mock_output = tmp_path / "soul_narrative_combined.srt"
-    
+def test_main_partial_files(project_dir):
     dummy_srt = (
         "1\n"
         "00:00:10,000 --> 00:00:15,000\n"
         "Scene Subtitle\n"
     )
-    
+
     # シーン01 と シーン04 は存在するが、シーン03 は存在しない
-    (mock_base / "シーン01_前編_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
-    (mock_base / "シーン04_後編02_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
-    
-    def mock_path(*args):
-        if not args:
-            return Path()
-        path_str = str(args[0])
-        if path_str == r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画":
-            return mock_base
-        elif path_str == r"C:\Users\PC_User\Desktop\script\video-automation\soul_narrative_combined.srt":
-            return mock_output
-        return Path(*args)
-        
-    monkeypatch.setattr(combine_srt, "Path", mock_path)
-    
+    (project_dir.base / "シーン01_前編_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
+    (project_dir.base / "シーン04_後編02_whisper_semantic.srt").write_text(dummy_srt, encoding="utf-8-sig")
+
     combine_srt.main()
-    
-    assert mock_output.exists()
-    content = mock_output.read_text(encoding="utf-8")
+
+    assert project_dir.output.exists()
+    content = project_dir.output.read_text(encoding="utf-8")
     assert "00:00:10,000 --> 00:00:15,000" in content
     assert "00:38:04,000 --> 00:38:09,000" in content
     assert "Scene Subtitle" in content
@@ -399,25 +356,10 @@ def test_write_combined_srt_creates_directory(tmp_path):
     assert "Nested Hello" in content
 
 
-def test_main_value_error_exit(monkeypatch, tmp_path):
-    mock_base = tmp_path / "raw_videos" / "AI Studio アップロード用動画"
-    mock_base.mkdir(parents=True)
-    
+def test_main_value_error_exit(monkeypatch, project_dir):
     # ファイルを置いておく
-    (mock_base / "シーン01_前編_whisper_semantic.srt").write_text("dummy", encoding="utf-8-sig")
-    
-    def mock_path(*args):
-        if not args:
-            return Path()
-        path_str = str(args[0])
-        if path_str == r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画":
-            return mock_base
-        elif path_str == r"C:\Users\PC_User\Desktop\script\video-automation\soul_narrative_combined.srt":
-            return tmp_path / "soul_narrative_combined.srt"
-        return Path(*args)
-        
-    monkeypatch.setattr(combine_srt, "Path", mock_path)
-    
+    (project_dir.base / "シーン01_前編_whisper_semantic.srt").write_text("dummy", encoding="utf-8-sig")
+
     # shift_srt が ValueError を投げるようにモックする
     def mock_shift_srt(*args, **kwargs):
         raise ValueError("Mocked parse error")

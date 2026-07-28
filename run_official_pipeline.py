@@ -8,12 +8,13 @@ import json
 from pathlib import Path
 
 # バックエンドモジュールのパスを追加
-sys.path.insert(0, r"C:\Users\PC_User\Desktop\script\video-automation\backend")
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 
+from path_resolver import raw_videos_dir
 from subtitle_engine.whisper_transcriber import WhisperTranscriber
 
 # 設定
-RAW_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画")
+RAW_DIR = raw_videos_dir() / "AI Studio アップロード用動画"
 OUTPUT_DIR = RAW_DIR  # 同じディレクトリに出力
 
 # 処理対象

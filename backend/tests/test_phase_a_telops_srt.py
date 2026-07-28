@@ -58,12 +58,8 @@ def test_add_dynamic_telops_success(tmp_path):
         mock.stderr = ""
         return mock
         
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect),          patch("subprocess.run", side_effect=mock_run) as mock_subprocess:
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock),          patch("subprocess.run", side_effect=mock_run) as mock_subprocess:
         
         result = add_dynamic_telops()
         
@@ -76,12 +72,8 @@ def test_add_dynamic_telops_failure(tmp_path):
     (base_mock / "backend" / "branding" / "logos").mkdir(parents=True, exist_ok=True)
     (base_mock / "backend" / "branding" / "logos" / "brand_logo.png").touch()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect),          patch("subprocess.run", return_value=MagicMock(returncode=1, stderr="FFmpeg failed")):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock),          patch("subprocess.run", return_value=MagicMock(returncode=1, stderr="FFmpeg failed")):
         
         result = add_dynamic_telops()
         assert result is None
@@ -122,12 +114,8 @@ def test_create_combined_srt_success(tmp_path):
     
     output_srt = base_mock / "soul_narrative_subtitles.srt"
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         
         assert result == str(output_srt)
@@ -154,12 +142,8 @@ def test_create_combined_srt_missing_files(tmp_path):
     
     output_srt = base_mock / "soul_narrative_subtitles.srt"
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         
         assert result == str(output_srt)
@@ -199,10 +183,6 @@ def test_create_combined_srt_io_error(tmp_path):
     (raw_dir / "シーン03_後編01_whisper_semantic.srt").touch()
     (raw_dir / "シーン04_後編02_whisper_semantic.srt").touch()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
     
     # 全てのシーンファイルで OSError を発生させる
     def mock_read_text(self, *args, **kwargs):
@@ -210,7 +190,7 @@ def test_create_combined_srt_io_error(tmp_path):
             raise OSError("Read error")
         return ""
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect), \
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock), \
          patch.object(RealPath, "read_text", mock_read_text):
          
          # 各シーンでOSErrorが発生しても、処理全体はクラッシュせず
@@ -244,12 +224,8 @@ def test_create_combined_srt_invalid_blocks(tmp_path):
     
     (raw_dir / "シーン01_前編_whisper_semantic.srt").write_text(srt_content, encoding="utf-8-sig")
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         
         output_srt = base_mock / "soul_narrative_subtitles.srt"
@@ -275,12 +251,8 @@ def test_create_combined_srt_missing_scene01(tmp_path):
     )
     (raw_dir / "シーン03_後編01_whisper_semantic.srt").write_text(srt_content_3, encoding="utf-8-sig")
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         
         output_srt = base_mock / "soul_narrative_subtitles.srt"
@@ -338,12 +310,8 @@ def test_create_combined_srt_boundary_values(tmp_path):
     
     output_srt = base_mock / "soul_narrative_subtitles.srt"
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         
         assert result == str(output_srt)
@@ -371,12 +339,8 @@ def test_create_combined_srt_encoding_variations(tmp_path):
     
     output_srt = base_mock / "soul_narrative_subtitles.srt"
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         content = output_srt.read_text(encoding="utf-8")
         assert "BOMなしUTF8エントリ" in content
@@ -387,17 +351,13 @@ def test_add_dynamic_telops_subprocess_stderr_coverage(tmp_path):
     (base_mock / "backend" / "branding" / "logos").mkdir(parents=True, exist_ok=True)
     (base_mock / "backend" / "branding" / "logos" / "brand_logo.png").touch()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
     # subprocess.run が失敗して、かつ stderr が存在する場合の出力検証
     mock_run = MagicMock()
     mock_run.returncode = 1
     mock_run.stderr = "FFmpeg error message which is long enough to verify the slicing log output."
     
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect), \
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock), \
          patch("subprocess.run", return_value=mock_run):
         
         result = add_dynamic_telops()
@@ -417,12 +377,8 @@ def test_add_dynamic_telops_file_not_found_error(tmp_path):
     (base_mock / "backend" / "branding" / "logos").mkdir(parents=True, exist_ok=True)
     (base_mock / "backend" / "branding" / "logos" / "brand_logo.png").touch()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect),          patch("subprocess.run", side_effect=FileNotFoundError("ffmpeg not found")):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock),          patch("subprocess.run", side_effect=FileNotFoundError("ffmpeg not found")):
         
         result = add_dynamic_telops()
         assert result is None
@@ -433,14 +389,10 @@ def test_add_dynamic_telops_unexpected_exception_tdr(tmp_path):
     (base_mock / "backend" / "branding" / "logos").mkdir(parents=True, exist_ok=True)
     (base_mock / "backend" / "branding" / "logos" / "brand_logo.png").touch()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
     mock_store = MagicMock()
     
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect), \
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock), \
          patch("subprocess.run", side_effect=OSError("Subprocess failed abnormally")), \
          patch("agents.memory.technical_debt.technical_debt_store.register_debt", mock_store.register_debt):
         
@@ -465,12 +417,8 @@ def test_create_combined_srt_encoding_cp932(tmp_path):
     
     output_srt = base_mock / "soul_narrative_subtitles.srt"
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         assert result == str(output_srt)
         assert output_srt.exists()
@@ -490,12 +438,8 @@ def test_parse_srt_time_invalid_format(tmp_path):
     )
     (raw_dir / "シーン01_前編_whisper_semantic.srt").write_text(srt_content, encoding="utf-8-sig")
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         output_srt = base_mock / "soul_narrative_subtitles.srt"
         assert result == str(output_srt)
@@ -516,12 +460,8 @@ def test_create_combined_srt_shift_srt_os_error(tmp_path):
     srt_04 = raw_dir / "シーン04_後編02_whisper_semantic.srt"
     srt_04.mkdir()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect):
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock):
         result = create_combined_srt()
         output_srt = base_mock / "soul_narrative_subtitles.srt"
         assert result == str(output_srt)
@@ -534,12 +474,8 @@ def test_add_dynamic_telops_image_generation_error(tmp_path):
     (base_mock / "backend" / "branding" / "logos").mkdir(parents=True, exist_ok=True)
     (base_mock / "backend" / "branding" / "logos" / "brand_logo.png").touch()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect), \
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock), \
          patch("phase_a_telops_srt.create_theme_telop", side_effect=OSError("Disk full or permission denied")):
          
          result = add_dynamic_telops()
@@ -554,10 +490,6 @@ def test_create_combined_srt_write_error(tmp_path):
     # 正常なダミーファイルを作成
     (raw_dir / "シーン01_前編_whisper_semantic.srt").touch()
     
-    def path_mock_side_effect(*args, **kwargs):
-        if args and args[0] == "C:\\Users\\PC_User\\Desktop\\script\\video-automation":
-            return base_mock
-        return RealPath(*args, **kwargs)
         
     # builtins.open が書き込みモードで開かれた時に OSError を投げるようにする
     original_open = open
@@ -566,7 +498,7 @@ def test_create_combined_srt_write_error(tmp_path):
             raise OSError("Write permission denied")
         return original_open(file, mode, *args, **kwargs)
         
-    with patch("phase_a_telops_srt.Path", side_effect=path_mock_side_effect), \
+    with patch("phase_a_telops_srt.project_root", return_value=base_mock), \
          patch("builtins.open", mock_open):
          
          result = create_combined_srt()

@@ -40,6 +40,8 @@ import re
 import subprocess
 from datetime import datetime, timezone, timedelta
 
+from path_resolver import brain_dir
+
 # パスの定義（デフォルトは相対パス）
 WORKSPACE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if WORKSPACE_DIR not in sys.path:
@@ -59,7 +61,7 @@ BULLETIN_REPORT_DIR = os.path.join(REPORT_BASE_DIR, "速報")
 RANKING_REPORT_DIR = os.path.join(REPORT_BASE_DIR, "活動ランキング")
 
 # Brainディレクトリのパス（デフォルト）
-BRAIN_REPORT_PATH = r"C:\Users\PC_User\.gemini\antigravity\brain\ecf8e7d2-8173-4818-8ac8-0b410cd129a0\daily_report_20260522.md"
+BRAIN_REPORT_PATH = str(brain_dir() / "ecf8e7d2-8173-4818-8ac8-0b410cd129a0" / "daily_report_20260522.md")
 
 def find_latest_brain_report():
     """brainディレクトリから最新 of daily_report_*.md を自動検出する"""

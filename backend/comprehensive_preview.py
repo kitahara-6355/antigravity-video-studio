@@ -17,6 +17,8 @@ from PIL.Image import DecompressionBombError
 import shutil
 import os
 
+from path_resolver import raw_videos_dir
+
 # ピクセル数の安全な最大制限値を設定 (デフォルトの89,478,485ピクセルから拡張して DecompressionBombError を極力防止)
 try:
     Image.MAX_IMAGE_PIXELS = 256 * 1024 * 1024  # 256MPまで許容
@@ -1197,7 +1199,7 @@ def create_comprehensive_preview(
 
 if __name__ == "__main__":  # pragma: no cover
     # シーン04でテスト
-    input_video = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4"
+    input_video = str(raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4")
     
     if not Path(input_video).exists():
         print(f"❌ Video not found: {input_video}")

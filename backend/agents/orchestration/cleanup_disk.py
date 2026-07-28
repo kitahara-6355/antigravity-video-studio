@@ -3,6 +3,9 @@ import shutil
 import time
 import stat
 
+# 引数名 brain_dir と衝突するので別名で受ける
+from path_resolver import brain_dir as _default_brain_dir
+
 def _handle_remove_readonly(func, path, exc):
     """Handler for shutil.rmtree to resolve read-only files on Windows."""
     try:
@@ -16,7 +19,7 @@ def _handle_remove_readonly(func, path, exc):
 
 def main(brain_dir=None, active_ids=None, keep_days=1):
     if brain_dir is None:
-        brain_dir = r"C:\Users\PC_User\.gemini\antigravity\brain"
+        brain_dir = str(_default_brain_dir())
         
     if not os.path.exists(brain_dir):
         print(f"Directory not found: {brain_dir}")

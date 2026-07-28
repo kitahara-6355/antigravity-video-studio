@@ -1177,8 +1177,13 @@ def create_comprehensive_preview(
 
 
 if __name__ == "__main__":  # pragma: no cover
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+    from path_resolver import raw_videos_dir
+
     # シーン04でテスト
-    input_video = r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画\シーン04_後編02.mp4"
+    input_video = str(
+        raw_videos_dir() / "AI Studio アップロード用動画" / "シーン04_後編02.mp4"
+    )
     
     if not Path(input_video).exists():
         print(f"❌ Video not found: {input_video}")

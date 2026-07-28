@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from PIL import Image
 
+from path_resolver import vault_assets_dir, vault_outputs_dir
+
 def inspect_thumbnail(path, label="Thumbnail"):
     """
     サムネイル画像の品質要件を検証する。
@@ -136,7 +138,7 @@ def inspect_video(path, label):
 
 def main():
     # Final
-    final = r'C:\Users\PC_User\Desktop\script\video-automation\vault-outputs\final\final_20260519_125938.mp4'
+    final = str(vault_outputs_dir() / "final" / "final_20260519_125938.mp4")
     d_final = 0.0
     try:
         d_final = inspect_video(final, "Final Output")
@@ -144,7 +146,7 @@ def main():
         print(f"Skipping Final Output: {e}")
     
     # Preview
-    preview = r'C:\Users\PC_User\Desktop\script\video-automation\vault-outputs\preview\preview_20260519_125345.mp4'
+    preview = str(vault_outputs_dir() / "preview" / "preview_20260519_125345.mp4")
     d_preview = 0.0
     try:
         d_preview = inspect_video(preview, "Preview")
@@ -152,7 +154,7 @@ def main():
         print(f"Skipping Preview: {e}")
     
     # Merged
-    merged_files = glob.glob(r'C:\Users\PC_User\Desktop\script\video-automation\vault-outputs\merged\merged_*.mp4')
+    merged_files = glob.glob(str(vault_outputs_dir() / "merged" / "merged_*.mp4"))
     for mf in merged_files:
         try:
             inspect_video(mf, f"Merged: {mf.split(chr(92))[-1]}")
@@ -161,7 +163,7 @@ def main():
     
     # Raw files
     import os
-    raw_dir = r'C:\Users\PC_User\Desktop\script\vault-assets\raw_videos\本番RAW01 対談_山田'
+    raw_dir = str(vault_assets_dir() / "raw_videos" / "本番RAW01 対談_山田")
     if os.path.exists(raw_dir):
         print("\n=== Raw Files ===")
         total_raw = 0

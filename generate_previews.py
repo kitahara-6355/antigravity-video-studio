@@ -6,11 +6,17 @@
 """
 
 import subprocess
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+
+from path_resolver import brain_dir, raw_videos_dir
+
 # パス設定
-RAW_DIR = Path(r"C:\Users\PC_User\Desktop\script\video-automation\raw_videos\AI Studio アップロード用動画")
-PREVIEW_DIR = Path(r"C:\Users\PC_User\.gemini\antigravity\brain\0cc79527-362f-4816-aa0a-27c9f69dbaa5\previews")
+RAW_DIR = raw_videos_dir() / "AI Studio アップロード用動画"
+# 会話 UUID は当時のもの。親（brain/）は解決に通してある。
+PREVIEW_DIR = brain_dir() / "0cc79527-362f-4816-aa0a-27c9f69dbaa5" / "previews"
 PREVIEW_DIR.mkdir(exist_ok=True)
 
 # 素材ファイル
