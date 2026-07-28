@@ -656,8 +656,28 @@ class TestFF25IDRLinkageValidator:
         return BACKEND_DIR.parent / "Human01_Official Artifact"
 
     def _get_latest_transition_table(self) -> Path:
-        """最新の開発推移表ファイルを取得（日付最大）"""
+        """最新の開発推移表ファイルを取得（日付最大）
+
+        Human01_Official Artifact/ 自体が無い場合は skip する。
+        公開リポジトリ (kitahara-6355/antigravity-video-studio) では、このディレクトリが
+        会話ログ・セッションレポートを含むため意図的に除去されている。
+        索引対象の .resolved も 0 件なので、ここで FF-25 を走らせても検証は空虚になる。
+        原本 (.resolved 272件 + 推移表) は private の
+        kitahara-6355/antigravity-video-studio-archive にあり、FF-25 はそちらで機能する。
+        経緯: CLAUDE.md §旧リポジトリから持ち込まなかったもの /
+              docs/CC_HANDOVER_TRACE_20260725.md
+
+        ディレクトリはあるのに推移表だけが無い場合は、除去ではなく本物の退行なので
+        従来どおり fail させる。
+        """
         artifact_dir = self._get_artifact_dir()
+        if not artifact_dir.exists():
+            pytest.skip(
+                "Human01_Official Artifact/ が存在しないため FF-25 をスキップします。"
+                "公開リポジトリでは意図的に除去されています（検証対象の .resolved も 0 件）。"
+                "推移表の検証は原本のある private リポジトリ側で行ってください。"
+            )
+
         tables = list(artifact_dir.rglob("開発推移表_*.md"))
         if not tables:
             pytest.fail(
@@ -1139,8 +1159,26 @@ class TestFF27DashboardLinkageValidator:
     """
 
     def _get_dashboard_path(self) -> Path:
-        """ダッシュボード README.md のパスを取得"""
-        return BACKEND_DIR.parent / "Human01_Official Artifact" / "サブエージェント体制報告" / "README.md"
+        """ダッシュボード README.md のパスを取得（不在なら skip）
+
+        このダッシュボードは Antigravity のエージェントループが
+        generate_subagent_reports.py で生成する運用アーティファクトで、
+        Human01_Official Artifact/ 配下にある。公開リポジトリでは同ディレクトリごと
+        意図的に除去されており、生成元のループも回らないため検証対象が存在しない。
+        経緯と原本の所在は FF-25 の _get_latest_transition_table() を参照。
+
+        get_rel_link() のようにダッシュボード実体を必要としない検証は
+        このヘルパーを経由しないので、公開リポジトリでも従来どおり実行される。
+        """
+        path = BACKEND_DIR.parent / "Human01_Official Artifact" / "サブエージェント体制報告" / "README.md"
+        if not path.exists():
+            pytest.skip(
+                "ダッシュボード (Human01_Official Artifact/サブエージェント体制報告/README.md) が"
+                "存在しないため FF-27 をスキップします。"
+                "公開リポジトリでは意図的に除去されています。"
+                "ダッシュボードの検証は原本のある private リポジトリ側で行ってください。"
+            )
+        return path
 
     def test_dashboard_exists_and_not_empty(self):
         """ダッシュボード README.md が存在し、ファイルサイズが空でない"""

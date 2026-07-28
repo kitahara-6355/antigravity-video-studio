@@ -16,11 +16,25 @@
 
 | 除外 | 理由 |
 |---|---|
-| `Human01_Official Artifact/` の本文 2,846件 | セッションレポート・受信トレイ。`.resolved` 272件と推移表は保持（FF ラチェットが要求） |
+| `Human01_Official Artifact/` **一式** | セッションレポート・受信トレイ・会話ログ。ディレクトリごと除外した |
 | `antigravity_phase18/19_*` | 過去版スナップショット。API キー直書きもここにあった |
 | ルート直下の作業ゴミ 59件 | ログ・カバレッジダンプ・一時出力・バックアップ |
 | 人物写真4点 | プレースホルダに差し替え済み（`assets/asset_index.json` は無変更） |
 | `e2e-tests.yml` | `next-gen-ui` が `.gitmodules` 未登録の gitlink で、一度も成功していなかった |
+
+#### `Human01_Official Artifact/` について（重要）
+
+**このリポジトリには 1 ファイルも存在しない。**`.resolved` 272件と開発推移表も含めて除外済み。
+かつてこの表には「`.resolved` 272件と推移表は保持」と書かれていたが**事実と異なっていた**ため、
+2026-07-28 に訂正した。原本は private の
+`kitahara-6355/antigravity-video-studio-archive` にある。
+
+- **再生成しないこと。** `generate_subagent_reports.py` やフルスイート実行で
+  このディレクトリが作られることがある。コミットすると除去した意味が消える。
+  `.gitignore` で無視しているが、`git add -f` では入ってしまう
+- FF-25 / FF-27 はこのディレクトリを前提としたフィットネス関数なので、
+  不在時は `pytest.skip` する（`backend/tests/test_fitness_functions.py`）。
+  検証が必要なら原本のある private リポジトリ側で実行する
 
 ## このブランチの目的
 

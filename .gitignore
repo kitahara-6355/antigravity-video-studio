@@ -106,3 +106,14 @@ CLAUDE.local.md
 
 # 環境ファイルのテキストコピー（実キー混入の再発防止）
 *.env.txt
+
+# Human01_Official Artifact/ — 公開リポジトリには持ち込まない
+#
+# 会話ログ・セッションレポート・受信トレイを含むため、公開時に意図的に除去した
+# （docs/CC_HANDOVER_TRACE_20260725.md、CLAUDE.md §旧リポジトリから持ち込まなかったもの）。
+# 原本は private の kitahara-6355/antigravity-video-studio-archive にある。
+#
+# backend/tests/test_fitness_functions.py などを実行すると、link_validator が
+# event_log.jsonl を書くなどして このディレクトリを再生成してしまう。
+# ignore していないと生成物が ?? で出て、気づかずコミットできてしまうため明示的に無視する。
+Human01_Official Artifact/
