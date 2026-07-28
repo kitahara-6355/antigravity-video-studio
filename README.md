@@ -13,7 +13,7 @@
 
 ### 📋 ユーザー向けアクション提案
 
-- 🚨 **【効果検証しきい値逸脱】** 2026-06-28 に警告が自動生成されました。今後の方向性についてOpusチャット内で相談の上、必要に応じて手動で改善アクション（結合度しきい値調整や代替案A適用）を検討・適用してください。 ➡ [警告レポート全文](Human01_Official%20Artifact/%E3%82%B5%E3%83%96%E3%82%A8%E3%83%BC%E3%82%B8%E3%82%A7%E3%83%B3%E3%83%88%E4%BD%93%E5%88%B6%E5%A0%B1%E5%91%8A/%E5%88%86%E8%A7%A3%E3%82%A8%E3%83%B3%E3%82%B8%E3%83%B3%E7%A0%94%E7%A9%B6/effectiveness_verification_warning_20260628.md)
+- 🚨 **【効果検証しきい値逸脱】** 2026-06-28 に警告が自動生成されました。今後の方向性についてOpusチャット内で相談の上、必要に応じて手動で改善アクション（結合度しきい値調整や代替案A適用）を検討・適用してください。
 - 📦 Flashセッションが完遂済みです → **Opusセッションで新規Flashセッションを開設**してください
 - 🔴 Flashセッションが自動停止されました（heartbeat_stale_1506min_threshold_60min） → **新規Flashセッション開設が必要**
 
@@ -50,8 +50,6 @@ Milestone: M2.1 進行中 (復帰タグ: v2.0-pre-oss-integration)
 
 ---
 
-👉 **詳細な開発統計、技術負債一覧、活動ログ、改善提案などは [📊 運用ダッシュボード（詳細版）](Human01_Official%20Artifact/%E3%82%B5%E3%83%96%E3%82%A8%E3%83%BC%E3%82%B8%E3%82%A7%E3%83%B3%E3%83%88%E4%BD%93%E5%88%B6%E5%A0%B1%E5%91%8A/README.md) をご参照ください。**
-
 <!-- DASHBOARD_END -->
 ---
 
@@ -84,13 +82,12 @@ c:\Users\PC_User\Desktop\script\
 | 設計書台帳 | [design_stock.json](backend/agents/orchestration/design_stock.json) |
 | Phase状態 | [phase_state.json](backend/agents/memory/phase_state.json) |
 | 技術負債台帳 | [technical_debt_index.json](backend/agents/memory/technical_debt_index.json) |
-| 運用ダッシュボード | [サブエージェント体制報告](<Human01_Official Artifact/サブエージェント体制報告/README.md>) |
 
 ---
 
 ## 🚀 パイプライン制御（Pipeline Coordinator）
 
-動画生成・編集の全工程を統合制御する、パイプラインの唯一の実行パスです。[pipeline_coordinator.py](file:///c:/Users/PC_User/Desktop/script/video-automation/backend/agents/pipeline_coordinator.py) に実装されています。
+動画生成・編集の全工程を統合制御する、パイプラインの唯一の実行パスです。[pipeline_coordinator.py](backend/agents/pipeline_coordinator.py) に実装されています。
 
 ### 1. 適用している設計パターン
 - **Prompt Chaining**: 各 Worker（音声認識、AI校閲、SmartCut、プレビュー、最適化、品質チェック、レンダリング）を順次実行し、TaskContract（DoD）で成否を検証します。
@@ -107,7 +104,7 @@ c:\Users\PC_User\Desktop\script\
 
 ## 🛡️ エラーハンドリング戦略（Pipeline Error Strategy）
 
-自律型パイプラインの安定運用のため、[pipeline_error_strategy.py](file:///c:/Users/PC_User/Desktop/script/video-automation/backend/pipeline_error_strategy.py) は4つのエラー分類戦略と3つの高度な自律自己修復パターンを提供しています。
+自律型パイプラインの安定運用のため、[pipeline_error_strategy.py](backend/pipeline_error_strategy.py) は4つのエラー分類戦略と3つの高度な自律自己修復パターンを提供しています。
 
 ### 1. 4分類のエラーハンドリング戦略
 
@@ -131,7 +128,7 @@ c:\Users\PC_User\Desktop\script\
 
 ## 🖼️ テロップ自動生成（Caption Generator）
 
-動画内の各シーンやテーマに応じたテロップ画像を自動生成・合成する処理は、[gen_telops.py](file:///c:/Users/PC_User/Desktop/script/video-automation/backend/gen_telops.py) で行われます。
+動画内の各シーンやテーマに応じたテロップ画像を自動生成・合成する処理は、[gen_telops.py](backend/gen_telops.py) で行われます。
 
 ### 1. 処理フロー
 1. **フォントスキャン**: Windows, macOS, Linux のシステムフォントを自動スキャンし、利用可能なフォントをロードします。フォントが検出できない場合は、デフォルトフォントに自動フォールバックします。
@@ -148,7 +145,7 @@ c:\Users\PC_User\Desktop\script\
 
 ## 📝 字幕生成・チェックポイント処理（Subtitle Engine & Video Hash）
 
-動画に対する音声認識・字幕生成（Whisper）の中間データ管理として、動画ハッシュおよびチェックポイントパスの自動生成機能が [video_hash.py](file:///c:/Users/PC_User/Desktop/script/video-automation/backend/subtitle_engine/video_hash.py) に実装されています。
+動画に対する音声認識・字幕生成（Whisper）の中間データ管理として、動画ハッシュおよびチェックポイントパスの自動生成機能が [video_hash.py](backend/subtitle_engine/video_hash.py) に実装されています。
 
 ### 1. 処理フローと設計
 - **ハッシュ値の算出**: 動画ファイルパスから一意な SHA-256 ハッシュを計算し、その先頭 8 文字を抽出します。
