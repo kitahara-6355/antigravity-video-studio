@@ -209,6 +209,12 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     """pytest設定"""
+    # テストが本番ファイルへ書き込むのを検出する（記録のみ・挙動は変えない）。
+    # 詳細は fs_guard.py の docstring。
+    import fs_guard
+
+    fs_guard.install()
+
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
@@ -365,3 +371,13 @@ def _block_external_network(request):
         yield
     finally:
         uninstall()
+
+
+# ---------------- 本番ファイル書き込みの検出 ----------------
+# フック本体は fs_guard.py にある。rootdir がバッチ構成で変わるため、
+# 複数の conftest から同じものを取り込む。install も報告も冪等。
+from fs_guard import (  # noqa: E402, F401
+    pytest_runtest_setup,
+    pytest_terminal_summary,
+    pytest_unconfigure,
+)

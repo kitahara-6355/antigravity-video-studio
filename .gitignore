@@ -128,3 +128,6 @@ CLAUDE.local.md
 # event_log.jsonl を書くなどして このディレクトリを再生成してしまう。
 # ignore していないと生成物が ?? で出て、気づかずコミットできてしまうため明示的に無視する。
 Human01_Official Artifact/
+
+# fs_guard の検出結果（実行のたびに変わる作業ファイル）
+fs-guard-report.txt

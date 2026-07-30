@@ -74,3 +74,19 @@ def _block_external_network(request):
         yield
     finally:
         uninstall()
+
+
+# ---------------- 本番ファイル書き込みの検出 ----------------
+# フック本体は backend/tests/fs_guard.py にある。rootdir がバッチ構成で変わるため、
+# 複数の conftest から同じものを取り込む。install も報告も冪等。
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent / "backend" / "tests"))
+
+from fs_guard import (  # noqa: F401
+    pytest_configure,
+    pytest_runtest_setup,
+    pytest_terminal_summary,
+    pytest_unconfigure,
+)
