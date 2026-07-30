@@ -9,18 +9,29 @@
 さらに rootdir がバッチ構成で変わる（`backend/tests/` だけのバッチでは
 rootdir が `backend/tests` になり、このファイルは読まれない）。
 そのため同じフックを複数の conftest から取り込んでいる。install も報告も冪等。
+
+sys.path は触らない。conftest の sys.path 操作を exec して検証しているテストが
+あり、1要素足すだけで落ちる。ファイルパス直接指定で読み込み、sys.modules に
+登録して同じインスタンスを共有する（登録しないと記録が分裂する）。
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import importlib.util as _ilu
+import sys as _sys
+from pathlib import Path as _Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "backend" / "tests"))
+_fs_guard = _sys.modules.get("fs_guard")
+if _fs_guard is None:
+    _spec = _ilu.spec_from_file_location(
+        "fs_guard",
+        _Path(__file__).resolve().parent / "backend" / "tests" / "fs_guard.py",
+    )
+    _fs_guard = _ilu.module_from_spec(_spec)
+    _sys.modules["fs_guard"] = _fs_guard
+    _spec.loader.exec_module(_fs_guard)
 
-from fs_guard import (  # noqa: F401
-    pytest_configure,
-    pytest_runtest_setup,
-    pytest_terminal_summary,
-    pytest_unconfigure,
-)
+pytest_configure = _fs_guard.pytest_configure
+pytest_runtest_setup = _fs_guard.pytest_runtest_setup
+pytest_terminal_summary = _fs_guard.pytest_terminal_summary
+pytest_unconfigure = _fs_guard.pytest_unconfigure

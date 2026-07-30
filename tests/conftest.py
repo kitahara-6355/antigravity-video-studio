@@ -79,14 +79,26 @@ def _block_external_network(request):
 # ---------------- 本番ファイル書き込みの検出 ----------------
 # フック本体は backend/tests/fs_guard.py にある。rootdir がバッチ構成で変わるため、
 # 複数の conftest から同じものを取り込む。install も報告も冪等。
+#
+# sys.path は触らないこと。tests/test_conftest.py がこのファイルの sys.path 操作を
+# exec して検証しており、1要素でも足すと落ちる（CI で3件失敗した）。
+# そのためファイルパス直接指定で読み込む。sys.modules に登録するので、
+# 他の conftest から読まれても同じインスタンスを共有する（記録が分裂しない）。
+import importlib.util as _ilu
 import sys as _sys
 from pathlib import Path as _Path
 
-_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent / "backend" / "tests"))
+_fs_guard = _sys.modules.get("fs_guard")
+if _fs_guard is None:
+    _spec = _ilu.spec_from_file_location(
+        "fs_guard",
+        _Path(__file__).resolve().parent.parent / "backend" / "tests" / "fs_guard.py",
+    )
+    _fs_guard = _ilu.module_from_spec(_spec)
+    _sys.modules["fs_guard"] = _fs_guard
+    _spec.loader.exec_module(_fs_guard)
 
-from fs_guard import (  # noqa: F401
-    pytest_configure,
-    pytest_runtest_setup,
-    pytest_terminal_summary,
-    pytest_unconfigure,
-)
+pytest_configure = _fs_guard.pytest_configure
+pytest_runtest_setup = _fs_guard.pytest_runtest_setup
+pytest_terminal_summary = _fs_guard.pytest_terminal_summary
+pytest_unconfigure = _fs_guard.pytest_unconfigure
