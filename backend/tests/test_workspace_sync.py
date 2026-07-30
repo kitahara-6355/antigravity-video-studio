@@ -13,8 +13,11 @@
 
 Google には一切接続しない。サービスクライアントは差し替える。
 """
+import logging
 import os
+import shutil
 import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,10 +25,13 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from backend.services.workspace_sync import (
+    DOWNLOAD_CHUNK_SIZE,
     GoogleDriveStore,
     GoogleSheetsStore,
+    InsufficientDiskSpaceError,
     WorkspacePipelineRunner,
     WorkspaceSyncError,
+    ensure_disk_space,
     temp_raw_videos_dir,
 )
 
@@ -168,8 +174,12 @@ def test_progress_tab_is_configurable(monkeypatch):
 
 # ---------------- Drive: 列挙 ----------------
 
-def _drive_store_with(service):
-    store = GoogleDriveStore(root_folder_id="folder_123", user_email="u@example.com")
+def _drive_store_with(service, output_folder_id="out_456"):
+    store = GoogleDriveStore(
+        root_folder_id="folder_123",
+        output_folder_id=output_folder_id,
+        user_email="u@example.com",
+    )
     store._service = service
     return store
 
@@ -303,7 +313,9 @@ def test_upload_video_actually_calls_the_api(tmp_path):
     service.files.return_value.create.assert_called_once()
     body = service.files.return_value.create.call_args.kwargs["body"]
     assert body["name"] == "out.mp4"
-    assert body["parents"] == ["folder_123"]
+    # 入力フォルダ(folder_123)ではなく出力フォルダへ入れる。
+    # 入力に書き戻すと次回の未処理 RAW として拾われ、無限に再処理される。
+    assert body["parents"] == ["out_456"]
     media.assert_called_once()
 
 
@@ -401,7 +413,9 @@ def test_runner_happy_path():
 
     sheets.update_progress.assert_any_call("task_v_001", 0, "STARTING", "Starting processing for test_raw.mp4")
     sheets.update_progress.assert_any_call("task_v_001", 100, "COMPLETED", "Completed. Drive Link: https://drive.google.com/file/d/real/view")
-    drive.cleanup_local_raw_video.assert_called_once()
+    # 作業ディレクトリごと消えている。以前はファイル単位で消していたため、
+    # executor が想定外の中間ファイルを置くと残り続けた。
+    assert not (temp_raw_videos_dir() / "task_v_001").exists()
 
 
 def test_runner_reports_failure_when_download_raises():
@@ -532,3 +546,159 @@ def test_runner_cleans_up_output_on_success():
 
     assert _runner(executor, drive).run_pipeline_for_next_video() is True
     assert not produced["out"].exists()
+
+
+# ---------------- 出力フォルダの分離 ----------------
+
+def test_upload_refuses_when_output_folder_unset(tmp_path):
+    """出力先が無いとき、入力フォルダに書き戻さず失敗する。
+
+    書き戻すと成果物が次回の未処理 RAW として拾われ、無限に再処理される。
+    旧実装は `dest_folder_id or self.root_folder_id` で黙って入力へ入れていた。
+    """
+    video = tmp_path / "out.mp4"
+    video.write_bytes(b"data")
+    store = _drive_store_with(MagicMock(), output_folder_id=None)
+
+    with pytest.raises(WorkspaceSyncError, match="出力フォルダ"):
+        store.upload_video(video)
+
+
+def test_upload_prefers_explicit_dest_over_configured_output(tmp_path):
+    video = tmp_path / "out.mp4"
+    video.write_bytes(b"data")
+    service = MagicMock()
+    service.files.return_value.create.return_value.execute.return_value = {"id": "i"}
+    store = _drive_store_with(service)
+
+    with patch("googleapiclient.http.MediaFileUpload"):
+        store.upload_video(video, dest_folder_id="explicit_789")
+
+    body = service.files.return_value.create.call_args.kwargs["body"]
+    assert body["parents"] == ["explicit_789"]
+
+
+def test_upload_warns_when_output_equals_input(tmp_path, caplog):
+    """明示的に入力と同じにした場合は通すが、警告を残す。"""
+    video = tmp_path / "out.mp4"
+    video.write_bytes(b"data")
+    service = MagicMock()
+    service.files.return_value.create.return_value.execute.return_value = {"id": "i"}
+    store = _drive_store_with(service, output_folder_id="folder_123")
+
+    with caplog.at_level(logging.WARNING), patch("googleapiclient.http.MediaFileUpload"):
+        store.upload_video(video)
+
+    assert "入力フォルダと同じ" in caplog.text
+
+
+def test_constructor_rejects_positional_output_folder():
+    """位置引数を許すと user_email が出力フォルダとして解釈され静かに壊れる。"""
+    with pytest.raises(TypeError):
+        GoogleDriveStore("folder_123", "u@example.com")  # type: ignore[misc]
+
+
+# ---------------- ダウンロードのチャンクサイズ ----------------
+
+def test_download_uses_large_chunk_size(tmp_path):
+    """1 MB では往復回数が律速になる（239 MB で実測 172 秒 → 64 MB なら 11 秒）。"""
+    assert DOWNLOAD_CHUNK_SIZE == 64 * 1024 * 1024
+
+    store = _drive_store_with(MagicMock())
+    dest = tmp_path / "v.mp4"
+
+    with patch("googleapiclient.http.MediaIoBaseDownload") as dl:
+        dl.return_value.next_chunk.return_value = (MagicMock(), True)
+        store.download_file_chunked("fid", dest)
+
+    assert dl.call_args.kwargs["chunksize"] == DOWNLOAD_CHUNK_SIZE
+
+
+# ---------------- 空き容量の事前チェック ----------------
+
+def test_ensure_disk_space_passes_when_enough(tmp_path):
+    ensure_disk_space(tmp_path, 1)
+
+
+def test_ensure_disk_space_raises_when_short(tmp_path):
+    with pytest.raises(InsufficientDiskSpaceError, match="空き容量が足りません"):
+        ensure_disk_space(tmp_path, 10**18)
+
+
+def test_runner_checks_disk_before_downloading():
+    """容量不足なら、ダウンロードを始める前に落とす。
+
+    始めてしまうと原本は落ちても中間生成で力尽き、原因が容量だと分かりにくい。
+    """
+    drive = MagicMock()
+    sheets = MagicMock()
+    drive.list_input_raw_videos.return_value = [
+        {"id": "v_001", "name": "huge.mp4", "size": 10**17}
+    ]
+
+    assert _runner(lambda a, b: None, drive, sheets).run_pipeline_for_next_video() is False
+    drive.download_file_chunked.assert_not_called()
+    status = [c.args[2] for c in sheets.update_progress.call_args_list]
+    assert "FAILED" in status
+
+
+def test_runner_requires_headroom_beyond_raw_size(monkeypatch, tmp_path):
+    """原本ぶんだけでは足りない。中間ファイルと出力ぶんの余裕を要求する。"""
+    monkeypatch.setenv("ANTIGRAVITY_TEMP_RAW_VIDEOS", str(tmp_path / "t"))
+    drive = MagicMock()
+    size = 100
+    drive.list_input_raw_videos.return_value = [
+        {"id": "v_001", "name": "t.mp4", "size": size}
+    ]
+    calls = []
+
+    def fake_usage(path):
+        calls.append(path)
+        return SimpleNamespace(total=0, used=0, free=size * 2)  # 2倍しかない
+
+    monkeypatch.setattr(shutil, "disk_usage", fake_usage)
+    assert _runner(lambda a, b: None, drive).run_pipeline_for_next_video() is False
+    drive.download_file_chunked.assert_not_called()
+    assert calls, "空き容量を確認していない"
+
+
+# ---------------- ジョブ単位の作業ディレクトリ ----------------
+
+def test_job_dir_is_scoped_per_task():
+    """同名 RAW の別ジョブが踏み合わないよう、task_id でディレクトリを分ける。"""
+    drive = MagicMock()
+    drive.list_input_raw_videos.return_value = [{"id": "v_042", "name": "t.mp4", "size": 5}]
+    seen = {}
+
+    def download(file_id, dest):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text("raw", encoding="utf-8")
+        seen["dir"] = dest.parent
+        return True
+
+    drive.download_file_chunked.side_effect = download
+    drive.upload_video.return_value = "https://drive.google.com/file/d/x/view"
+
+    _runner(lambda s, o: o.write_text("p", encoding="utf-8") or o, drive).run_pipeline_for_next_video()
+
+    assert seen["dir"].name == "task_v_042"
+    assert seen["dir"].parent == temp_raw_videos_dir()
+
+
+def test_job_dir_removed_even_when_pipeline_fails():
+    """失敗しても作業ディレクトリを残さない。残すと次のジョブが容量で弾かれる。"""
+    drive = MagicMock()
+    drive.list_input_raw_videos.return_value = [{"id": "v_001", "name": "t.mp4", "size": 5}]
+
+    def download(file_id, dest):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text("raw", encoding="utf-8")
+        return True
+
+    drive.download_file_chunked.side_effect = download
+
+    def failing_executor(src, out):
+        raise RuntimeError("処理に失敗")
+
+    assert _runner(failing_executor, drive).run_pipeline_for_next_video() is False
+    assert not (temp_raw_videos_dir() / "task_v_001").exists()

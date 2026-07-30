@@ -1,7 +1,27 @@
 """Google Workspace (Sheets / Drive) 連携。
 
-素材と成果物の置き場を Google Drive（AI Pro 5TB・個人）に置き、
-進捗 DB / UI を Google スプレッドシートで代用する。クラウド DB は使わない。
+素材と成果物の置き場を Google Drive に置き、進捗 DB / UI を Google
+スプレッドシートで代用する。クラウド DB は使わない。
+
+## フォルダ構成（2026-07-30 に共有ドライブへ移行）
+
+Workspace の共有ドライブを使う。マイドライブではない。共有ドライブでは
+ファイルの所有者が個人ではなくドライブ自体になるため、投稿者が抜けても
+素材が消えず、外部から RAW を受け取っても相手の容量枠を消費しない。
+
+    共有ドライブ「10-チャンネルA」
+      01-input/    未処理 RAW      → root_folder_id
+      02-output/   成果物          → output_folder_id
+      03-library/  インサート素材
+      04-work/     予約（未使用）
+
+**入力と出力は必ず別フォルダにする。** 同じにすると、アップロードした成果物が
+次回の実行で未処理 RAW として拾われ、無限に再処理される。`upload_video` は
+出力フォルダが未設定なら入力へ書き戻さずに失敗する。
+
+素材の同一性をファイル名で判定しないこと。名前と中身が食い違う実例が既にある
+（`20251010_..._インタビュー.mp4` の中身が別収録だった）。Drive のファイル ID か
+`appProperties` を使う。
 
 ## 2026-07-28 の作り直しについて
 
@@ -36,6 +56,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -61,16 +82,56 @@ except ImportError:  # backend/ を直接 sys.path に載せている経路向�
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "DOWNLOAD_CHUNK_SIZE",
     "GoogleDriveStore",
     "GoogleSheetsStore",
+    "InsufficientDiskSpaceError",
     "WorkspacePipelineRunner",
     "WorkspaceSyncError",
+    "ensure_disk_space",
     "temp_raw_videos_dir",
 ]
+
+# ダウンロードのチャンクサイズ。チャンク1個につき HTTPS の往復が1回起きるため、
+# 小さいと往復回数が律速になる。2026-07-30 に共有ドライブ上の 239.3 MB で実測:
+#
+#     1 MB  → 172.5 秒 (1.4 MB/秒)  往復 240 回   ← 変更前の値
+#    16 MB  →  19.5 秒 (12.3 MB/秒) 往復  15 回
+#    64 MB  →  11.2 秒 (21.3 MB/秒) 往復   4 回
+#
+# 回線ではなく往復回数が支配的だった。6 GB の RAW で約74分→約5分の差になる。
+# 大きくするとチャンク1個ぶんがメモリに載るので、64 MB を上限とする。
+DOWNLOAD_CHUNK_SIZE = 64 * 1024 * 1024
+
+# ダウンロード前に確保を要求する空き容量の倍率（元動画サイズに対して）。
+# 内訳: 原本1 + ffmpeg の中間ファイル2 + 出力1。多段処理では中間が実サイズで
+# 2本残ることがあるため 4 を採る。足りないまま始めると、原本のダウンロードは
+# 通っても中間生成で力尽きる。原因が容量だと分かりにくいので事前に落とす。
+DISK_HEADROOM_FACTOR = 4
 
 
 class WorkspaceSyncError(RuntimeError):
     """Drive / Sheets との同期に失敗した。"""
+
+
+class InsufficientDiskSpaceError(WorkspaceSyncError):
+    """作業に必要な空き容量が無い。"""
+
+
+def ensure_disk_space(target_dir: Path, required_bytes: int) -> None:
+    """`target_dir` のあるドライブに `required_bytes` の空きがあることを確認する。
+
+    無ければ `InsufficientDiskSpaceError` を上げて、ダウンロードを始める前に止める。
+    """
+    target_dir.mkdir(parents=True, exist_ok=True)
+    free = shutil.disk_usage(target_dir).free
+    if free >= required_bytes:
+        return
+    gb = 1024**3
+    raise InsufficientDiskSpaceError(
+        f"空き容量が足りません: 必要 {required_bytes / gb:,.2f} GB / "
+        f"空き {free / gb:,.2f} GB ({target_dir})"
+    )
 
 
 def temp_raw_videos_dir() -> Path:
@@ -235,11 +296,30 @@ class GoogleDriveStore(BaseWorkspaceStore):
         "includeItemsFromAllDrives": True,
     }
 
-    def __init__(self, root_folder_id: str, user_email: str | None = None):
+    def __init__(
+        self,
+        root_folder_id: str,
+        *,
+        output_folder_id: str | None = None,
+        user_email: str | None = None,
+    ):
+        """
+        `output_folder_id` を第2引数に足したため、以降はキーワード専用にしている。
+        位置引数を許すと `GoogleDriveStore(folder, "u@example.com")` が
+        「出力フォルダ = u@example.com」と解釈され、静かに誤動作する。
+
+        Args:
+            root_folder_id: 未処理 RAW を読む入力フォルダ。
+            output_folder_id: 成果物を書く出力フォルダ。**入力とは別にすること。**
+                同じにすると、アップロードした成果物が次回の実行で未処理 RAW として
+                拾われ、無限に再処理される。読み取りしかしない場合は省略してよい
+                （その場合 `upload_video` は失敗する）。
+        """
         super().__init__(user_email)
         if not root_folder_id:
             raise ValueError("root_folder_id は必須です")
         self.root_folder_id = root_folder_id
+        self.output_folder_id = output_folder_id
         self._service: Any = None
 
     def _get_service(self) -> Any:
@@ -308,7 +388,7 @@ class GoogleDriveStore(BaseWorkspaceStore):
         retries_left = 3
         try:
             with io.FileIO(str(dest_local_path), mode="wb") as fh:
-                downloader = MediaIoBaseDownload(fh, request, chunksize=1024 * 1024)
+                downloader = MediaIoBaseDownload(fh, request, chunksize=DOWNLOAD_CHUNK_SIZE)
                 done = False
                 while not done:
                     try:
@@ -339,11 +419,27 @@ class GoogleDriveStore(BaseWorkspaceStore):
         """完成した動画を Drive にアップロードし、閲覧リンクを返す。
 
         旧実装はアップロードせずに偽リンクを返していた。
+
+        宛先は `dest_folder_id` → `self.output_folder_id` の順に解決する。
+        どちらも無いときに入力フォルダへ書き戻すことはしない。それをやると
+        成果物が次回の未処理 RAW として拾われ、無限に再処理される。
         """
         if not local_path.exists():
             raise WorkspaceSyncError(f"アップロード対象がありません: {local_path}")
 
-        folder = dest_folder_id or self.root_folder_id
+        folder = dest_folder_id or self.output_folder_id
+        if not folder:
+            raise WorkspaceSyncError(
+                "出力フォルダが設定されていません。"
+                "GoogleDriveStore(output_folder_id=...) を指定してください"
+                "（入力フォルダに書き戻すと無限に再処理されます）"
+            )
+        if folder == self.root_folder_id:
+            logger.warning(
+                "[Drive Sync] 出力先が入力フォルダと同じです (%s)。"
+                "成果物が次回の未処理 RAW として拾われます",
+                folder,
+            )
         try:
             from googleapiclient.http import MediaFileUpload
         except ImportError as e:
@@ -431,20 +527,23 @@ class WorkspacePipelineRunner:
         task_id = f"task_{file_id}"
 
         logger.info(f"[Pipeline Runner] Starting pipeline for video: {file_name} ({file_id})")
-        dest_local_path, output_local_path = self._prepare_paths(file_name)
+        job_dir, dest_local_path, output_local_path = self._prepare_paths(task_id, file_name)
+        remote_size = int(target_video.get("size") or 0)
 
         try:
-            self._download_raw_video(task_id, file_id, file_name, dest_local_path)
+            self._download_raw_video(task_id, file_id, file_name, dest_local_path, remote_size)
             output_local_path = self._execute_pipeline(task_id, dest_local_path, output_local_path)
             self._upload_and_complete(task_id, output_local_path)
-            self._cleanup_paths(dest_local_path, output_local_path)
             logger.info(f"[Pipeline Runner] Pipeline completed successfully for {file_name}")
             return True
         except Exception as e:  # noqa: BLE001 — ループの最上位。1本の失敗で運用を止めない
             logger.error(f"[Pipeline Runner] Pipeline failed: {e}")
             self._report_failure(task_id, e)
-            self._cleanup_paths(dest_local_path, output_local_path)
             return False
+        finally:
+            # 成否にかかわらず片付ける。残すとローカルが埋まり、次のジョブが
+            # 容量チェックで弾かれる。
+            self._cleanup_job_dir(job_dir, output_local_path)
 
     def _report_failure(self, task_id: str, error: Exception) -> None:
         """失敗をシートに書き戻す。
@@ -461,14 +560,31 @@ class WorkspacePipelineRunner:
                 f"(元の失敗: {error})"
             )
 
-    def _prepare_paths(self, file_name: str) -> tuple[Path, Path]:
-        temp_dir = temp_raw_videos_dir()
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        return temp_dir / file_name, temp_dir / f"processed_{file_name}"
+    def _prepare_paths(self, task_id: str, file_name: str) -> tuple[Path, Path, Path]:
+        """ジョブ専用の作業ディレクトリを作る。
+
+        以前は全ジョブが `temp_raw_videos/` を直接共有していたため、同名の
+        RAW を扱うジョブ同士が上書きし合い、失敗時のゴミも誰の物か分からなく
+        なっていた。ジョブごとに掘れば、片付けはディレクトリごと消すだけで済む。
+        """
+        job_dir = temp_raw_videos_dir() / task_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        return job_dir, job_dir / file_name, job_dir / f"processed_{file_name}"
 
     def _download_raw_video(
-        self, task_id: str, file_id: str, file_name: str, dest_local_path: Path
+        self,
+        task_id: str,
+        file_id: str,
+        file_name: str,
+        dest_local_path: Path,
+        remote_size: int = 0,
     ) -> None:
+        # ダウンロードを始める前に容量を見る。始めてしまうと、原本は落ちても
+        # 中間ファイル生成の途中で力尽きる。そこで出る例外は容量が原因だと
+        # 分かりにくく、切り分けに時間を取られる。
+        if remote_size > 0:
+            ensure_disk_space(dest_local_path.parent, remote_size * DISK_HEADROOM_FACTOR)
+
         self.sheets_store.update_progress(
             task_id, 0, "STARTING", f"Starting processing for {file_name}"
         )
@@ -513,14 +629,31 @@ class WorkspacePipelineRunner:
             task_id, 100, "COMPLETED", f"Completed. Drive Link: {upload_url}"
         )
 
-    def _cleanup_paths(self, dest_local_path: Path, output_local_path: Path) -> None:
-        if dest_local_path.exists():
-            self.drive_store.cleanup_local_raw_video(dest_local_path)
-        if output_local_path.exists():
+    def _cleanup_job_dir(self, job_dir: Path, output_local_path: Path | None = None) -> None:
+        """ジョブの作業ディレクトリを丸ごと消す。
+
+        `local_pipeline_executor` が作業ディレクトリ外のパスを返すことがあるため、
+        その場合は個別に消してから本体を消す。片付けの失敗でジョブを失敗扱いに
+        はしない（成果物は既に Drive にある）。警告だけ残す。
+        """
+        if output_local_path is not None and output_local_path.exists():
             try:
-                os.remove(output_local_path)
+                outside = job_dir.resolve() not in output_local_path.resolve().parents
+            except OSError:
+                outside = False
+            if outside:
+                try:
+                    os.remove(output_local_path)
+                except OSError as e:
+                    logger.warning(
+                        f"[Pipeline Runner] Failed to remove local output file "
+                        f"{output_local_path}: {e}"
+                    )
+
+        if job_dir.exists():
+            try:
+                shutil.rmtree(job_dir)
             except OSError as e:
                 logger.warning(
-                    f"[Pipeline Runner] Failed to remove local output file "
-                    f"{output_local_path}: {e}"
+                    f"[Pipeline Runner] Failed to remove job directory {job_dir}: {e}"
                 )
