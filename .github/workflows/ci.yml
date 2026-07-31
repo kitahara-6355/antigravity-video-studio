@@ -5,16 +5,34 @@ name: Antigravity CI — 品質ゲート
 #   実行履歴は 2026-01-29 の1件だけだった（その間に約2,120コミット）。
 #   さらに `|| true` と `continue-on-error` により発火しても必ず緑になっていた。
 #   ゲートとして機能するよう、発火条件を広げ、握り潰しを除去した。
+#
+# 2026-08-01 改訂: 作業ブランチを push トリガーから外した。
+#   上の改訂で 'feature/**' と 'cc/**' を足したが、当時と違って作業は必ず
+#   PR を通すようになったため、**同一コミットに対して push と pull_request で
+#   CI が2本走っていた**（1本 22分）。実測では PR 1本のマージに 3〜4 本分の
+#   CI が費やされていた（strict なブランチ保護で BEHIND になるたび回り直すため）。
+#
+#   push 側の実行はもともと「参考表示」で、マージゲートは
+#   `continue-on-error: github.event_name != 'pull_request'` により
+#   PR のときだけ効く設計だった。つまり push 側の1本は PR 側の完全な重複。
+#
+#   PR を開いていない作業ブランチでは CI が回らなくなるが、
+#   回したいときは draft PR を開けばよい。
+#
+#   併せて concurrency を入れ、同じ PR へ続けて push したときは
+#   古い実行を打ち切る。main は打ち切らない（マージ後の検証を欠かさないため）。
 
 on:
   push:
     branches:
       - main
       - develop
-      - 'feature/**'
-      - 'cc/**'
   pull_request:
     branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # テスト中の自動 Git コミットを抑止する。
