@@ -29,10 +29,13 @@ from backend.services.workspace_sync import (
     GoogleDriveStore,
     GoogleSheetsStore,
     InsufficientDiskSpaceError,
+    WorkspaceConfigError,
     WorkspacePipelineRunner,
     WorkspaceSyncError,
+    build_workspace_stores,
     ensure_disk_space,
     temp_raw_videos_dir,
+    workspace_spreadsheet_id,
 )
 
 
@@ -702,3 +705,63 @@ def test_job_dir_removed_even_when_pipeline_fails():
 
     assert _runner(failing_executor, drive).run_pipeline_for_next_video() is False
     assert not (temp_raw_videos_dir() / "task_v_001").exists()
+
+
+# ---------------- 設定シートからの組み立て ----------------
+
+def test_spreadsheet_id_requires_env(monkeypatch):
+    monkeypatch.delenv("ANTIGRAVITY_SHEETS_ID", raising=False)
+    with pytest.raises(WorkspaceConfigError, match="ANTIGRAVITY_SHEETS_ID"):
+        workspace_spreadsheet_id()
+
+
+def test_spreadsheet_id_from_env(monkeypatch):
+    monkeypatch.setenv("ANTIGRAVITY_SHEETS_ID", "  sheet_abc  ")
+    assert workspace_spreadsheet_id() == "sheet_abc"
+
+
+def _build_with_config(monkeypatch, config):
+    """read_config が `config` を返す状態で build_workspace_stores を呼ぶ。"""
+    monkeypatch.setenv("ANTIGRAVITY_SHEETS_ID", "sheet_abc")
+    monkeypatch.setattr(GoogleSheetsStore, "read_config", lambda self, tab: config)
+    return build_workspace_stores(user_email="u@example.com")
+
+
+def test_build_stores_reads_folder_ids_from_sheet(monkeypatch):
+    """フォルダ ID をコードに書かない。運用側がシートで差し替えられる。"""
+    sheets, drive = _build_with_config(monkeypatch, {
+        "drive_input_folder_id": "in_1",
+        "drive_output_folder_id": "out_2",
+        "drive_library_folder_id": "lib_3",
+    })
+    assert sheets.spreadsheet_id == "sheet_abc"
+    assert drive.root_folder_id == "in_1"
+    assert drive.output_folder_id == "out_2"
+
+
+def test_build_stores_rejects_missing_keys(monkeypatch):
+    with pytest.raises(WorkspaceConfigError, match="drive_output_folder_id"):
+        _build_with_config(monkeypatch, {"drive_input_folder_id": "in_1"})
+
+
+def test_build_stores_rejects_same_input_and_output(monkeypatch):
+    """同じにすると成果物が次回の未処理 RAW として拾われ、無限に再処理される。"""
+    with pytest.raises(WorkspaceConfigError, match="無限に再処理"):
+        _build_with_config(monkeypatch, {
+            "drive_input_folder_id": "same",
+            "drive_output_folder_id": "same",
+        })
+
+
+def test_build_stores_uses_configurable_tab(monkeypatch):
+    monkeypatch.setenv("ANTIGRAVITY_SHEETS_ID", "sheet_abc")
+    monkeypatch.setenv("ANTIGRAVITY_SHEETS_CONFIG_TAB", "設定")
+    seen = {}
+
+    def fake_read_config(self, tab):
+        seen["tab"] = tab
+        return {"drive_input_folder_id": "i", "drive_output_folder_id": "o"}
+
+    monkeypatch.setattr(GoogleSheetsStore, "read_config", fake_read_config)
+    build_workspace_stores()
+    assert seen["tab"] == "設定"
