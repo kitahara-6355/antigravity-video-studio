@@ -11,6 +11,10 @@ Flash指示プロンプト自動生成スクリプト
 - Opusが「記憶から」プロンプトを組み立てることを禁止するための機械的生成
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import os
 import sys
@@ -27,8 +31,8 @@ from backend.agents.orchestration.atomic_io import safe_read_json, atomic_write_
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
 PHASE_STATE_PATH = os.path.join(WORKSPACE_DIR, "backend", "agents", "memory", "phase_state.json")
 DIRECTIVE_PATH = os.path.join(ORCHESTRATION_DIR, "opus_directive.json")
-TASK_QUEUE_PATH = os.path.join(ORCHESTRATION_DIR, "task_queue.json")
-FLASH_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "flash_session.json")
+TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
+FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 
 
 def _safe_read_json(path, default=None):

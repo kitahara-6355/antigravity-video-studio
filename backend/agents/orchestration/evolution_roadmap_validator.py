@@ -6,6 +6,10 @@
 進捗状況をステージ別に自動検証・数値化する。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import os
 import json
 import re
@@ -17,7 +21,7 @@ class RoadmapValidator:
         self.workspace_path = Path(workspace_path or os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
         self.orchestration_dir = self.workspace_path / "backend" / "agents" / "orchestration"
         self.flash_reports_path = self.orchestration_dir / "flash_reports.jsonl"
-        self.task_queue_path = self.orchestration_dir / "task_queue.json"
+        self.task_queue_path = _writable_path("backend/agents/orchestration/task_queue.json")
         self._flash_reports = None
 
     def _get_flash_reports(self) -> List[Dict[str, Any]]:

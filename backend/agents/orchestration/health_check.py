@@ -9,6 +9,10 @@ Git log（客観的事実）× flash_session.json（自己報告）× flash_repo
     python health_check.py --json  # JSON出力（プログラム連携用）
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import os
 import subprocess
@@ -27,10 +31,10 @@ from pathlib import Path
 from backend.agents.orchestration.atomic_io import safe_read_json, atomic_write_json
 from backend.agents.orchestration.jst_time import now_jst
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
-FLASH_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "flash_session.json")
+FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
 PHASE_STATE_PATH = os.path.join(WORKSPACE_DIR, "backend", "agents", "memory", "phase_state.json")
-TASK_QUEUE_PATH = os.path.join(ORCHESTRATION_DIR, "task_queue.json")
+TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
 OPUS_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "opus_session.json")
 EVENT_LOG_PATH = os.path.join(
     WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告", "event_log.jsonl"

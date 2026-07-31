@@ -1,4 +1,8 @@
 # satisfies: REQ-WAVE-02
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import time
 import os
 import random
@@ -15,7 +19,7 @@ class ResourceGovernor:
         self.max_rpm = max_rpm
         self.max_tpm = max_tpm
         self.threshold_pct = threshold_pct
-        self.state_path = Path(state_path) if state_path else Path(__file__).parent / "resource_state.json"
+        self.state_path = Path(state_path) if state_path else _writable_path("backend/agents/orchestration/resource_state.json")
         self._cached_state = {"request_times": [], "token_usage": []}
         self._last_cpu_time = 0.0
         self._last_cpu_val = 50.0

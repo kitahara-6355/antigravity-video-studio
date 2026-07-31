@@ -33,7 +33,8 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     os.environ["ANTIGRAVITY_WRITABLE_ROOT"] = _writable_root
     # 書き込み先の親ディレクトリはここで作る。本番コード側で mkdir すると、
     # Path.stat を差し替えているテストで exist_ok の内部判定が壊れる。
-    for _sub in ("backend/usage_tracker", "backend/branding", "backend/data"):
+    for _sub in ("backend/usage_tracker", "backend/branding", "backend/data",
+                 "backend/agents/orchestration"):
         os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
     # constitution / strategy / user_model は**設定でもある**ので、空のまま
     # にすると中身を読むテストが壊れる。本番の内容を複製して起点にする。
@@ -44,6 +45,15 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
         _src = os.path.join(project_root, "backend", "branding", _seed)
         if os.path.exists(_src):
             _shutil.copyfile(_src, os.path.join(_writable_root, "backend", "branding", _seed))
+    # orchestration の状態ファイルも同じ理由で複製する。task_queue.json は
+    # schema_version と tasks を持つ実データで、空だと読む側が壊れる。
+    for _seed in ("task_queue.json", "flash_session.json", "resource_state.json"):
+        _src = os.path.join(project_root, "backend", "agents", "orchestration", _seed)
+        if os.path.exists(_src):
+            _shutil.copyfile(
+                _src,
+                os.path.join(_writable_root, "backend", "agents", "orchestration", _seed),
+            )
 
 
 def _norm(p):

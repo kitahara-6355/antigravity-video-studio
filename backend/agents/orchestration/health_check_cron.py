@@ -6,6 +6,10 @@
 v3: health_check.py --json の構造化データから状態に応じた
     リッチなサマリーを独自生成。キーワードフィルタ方式を廃止。
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import subprocess
 import sys
@@ -13,7 +17,7 @@ import os
 from datetime import datetime, timezone, timedelta
 
 ORCHESTRATION_DIR = os.path.dirname(os.path.abspath(__file__))
-FLASH_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "flash_session.json")
+FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 OPUS_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "opus_session.json")
 USER_SCHEDULE_PATH = os.path.join(ORCHESTRATION_DIR, "user_schedule.json")
 

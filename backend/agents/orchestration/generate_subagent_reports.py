@@ -1,3 +1,7 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import os
 from backend.agents.orchestration.link_validator import (
     get_rel_link,
@@ -50,8 +54,8 @@ backend_path = os.path.join(WORKSPACE_DIR, "backend")
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
-TASK_QUEUE_PATH = os.path.join(ORCHESTRATION_DIR, "task_queue.json")
-FLASH_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "flash_session.json")
+TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
+FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
 
 OFFICIAL_ARTIFACT_DIR = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact")
@@ -1294,7 +1298,7 @@ def generate_stability_metrics(cache: dict = None) -> str:
                     hb_str = f"✅ {diff_min}分前" if diff_min <= 15 else f"⚠️ {diff_min}分前"
 
         # Resource Governor Metrics
-        state_path = os.path.join(ORCHESTRATION_DIR, "resource_state.json")
+        state_path = str(_writable_path("backend/agents/orchestration/resource_state.json"))
         res_state = _safe_read_json_local(state_path, {})
         peak_cpu = res_state.get("peak_cpu", 0.0)
         peak_mem = res_state.get("peak_mem", 0.0)

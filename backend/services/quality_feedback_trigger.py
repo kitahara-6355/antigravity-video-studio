@@ -3,6 +3,10 @@
 パイプライン完了後に自動実行され、品質スコアが閾値以下の軸があれば
 自動的にbug_hunterタスクをOrchestrationHub経由でキューに投入する。
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
 import math
@@ -16,7 +20,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-TASK_QUEUE_PATH = _PROJECT_ROOT / "backend" / "agents" / "orchestration" / "task_queue.json"
+TASK_QUEUE_PATH = _writable_path("backend/agents/orchestration/task_queue.json")
 QUALITY_SCORE_HISTORY_PATH = _PROJECT_ROOT / "backend" / "quality_score_history.jsonl"
 
 

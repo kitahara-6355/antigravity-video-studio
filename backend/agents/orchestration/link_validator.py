@@ -4,6 +4,10 @@ generate_subagent_reports.py から抽出された、ダッシュボードリン
 およびイベントログの記録・読み取りのためのユーティリティ関数群。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import os
 import json
 import re
@@ -18,7 +22,7 @@ except ImportError:  # 単体モジュールとして読み込まれた場合
 # パスの定義
 WORKSPACE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 ORCHESTRATION_DIR = os.path.dirname(__file__)
-FLASH_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "flash_session.json")
+FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
 
 
