@@ -1,6 +1,11 @@
 """
 全編通してプレミアムテロップを表示（YOUTUBE_PREMIUM.mp4と同じ）
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import subprocess
 import time
 from pathlib import Path
@@ -97,7 +102,7 @@ def _combine_logo_and_telop(
 def _resolve_branding_paths(project_root: Path) -> tuple[Path, Path]:
     """ロゴとプレミアムブランディング画像の出力パスを取得する"""
     logo_path = project_root / "backend" / "branding" / "logos" / "brand_logo.png"
-    output_path = project_root / "backend" / "branding" / "premium_branding.png"
+    output_path = _writable_path("backend/branding/premium_branding.png")
     return logo_path, output_path
 
 

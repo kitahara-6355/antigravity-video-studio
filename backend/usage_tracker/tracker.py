@@ -13,12 +13,17 @@ SSoT: model_config.json（free_tier_limits セクション）
   - free_tier_config.json は廃止 → model_config.json に統合
   - モデル別 RPD は model_config.json の free_tier_limits から動的取得
 """
-from typing import Dict, Any, Optional, List
-from pathlib import Path
-from datetime import datetime, date
-from dataclasses import dataclass, field
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +53,7 @@ class UsageRecord:
 class DailyUsage:
     """日次使用量"""
     date: str
-    models: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    models: dict[str, dict[str, int]] = field(default_factory=dict)
 
     def add_request(self, model: str, tokens_in: int = 0, tokens_out: int = 0):
         if not model:
@@ -67,7 +72,7 @@ class DailyUsage:
         return self.models.get(model, {}).get("requests", 0)
 
 
-def _load_model_config(config_path: Optional[Path] = None) -> Dict:
+def _load_model_config(config_path: Path | None = None) -> dict:
     """model_config.json を読み込み（SSoT）"""
     path = config_path or MODEL_CONFIG_PATH
     try:
@@ -89,14 +94,16 @@ class UsageTracker:
     使用率に応じた4段階エスカレーションを実行する。
     """
 
-    def __init__(self, usage_path: Optional[Path] = None, model_config_path: Optional[Path] = None):
-        base_dir = Path(__file__).parent
-        self._usage_path = usage_path or (base_dir / "usage_data.json")
+    def __init__(self, usage_path: Path | None = None, model_config_path: Path | None = None):
+        # 実行のたびに書き換わるファイルなので writable_path で解決する。
+        # 以前は Path(__file__).parent 固定だったため、テストが本番の
+        # usage_data.json を上書きしていた（Git 追跡下のファイル）。
+        self._usage_path = usage_path or _writable_path("backend/usage_tracker/usage_data.json")
         self._model_config_path = model_config_path or MODEL_CONFIG_PATH
-        self._free_tier_limits: Dict = {}
-        self._alert_thresholds: Dict = dict(DEFAULT_THRESHOLDS)
-        self._daily_usage: Optional[DailyUsage] = None
-        self._callbacks: List[callable] = []
+        self._free_tier_limits: dict = {}
+        self._alert_thresholds: dict = dict(DEFAULT_THRESHOLDS)
+        self._daily_usage: DailyUsage | None = None
+        self._callbacks: list[callable] = []
 
         self._load_config()
         self._load_or_create_daily_usage()
@@ -118,7 +125,7 @@ class UsageTracker:
         model_limits = self._free_tier_limits.get(model, {})
         return model_limits.get("rpd", 1000)  # デフォルト1000
 
-    def _load_existing_usage_data(self) -> Optional[DailyUsage]:
+    def _load_existing_usage_data(self) -> DailyUsage | None:
         """既存の使用量データをロードする（存在しない、またはエラーの場合は None を返す）"""
         if not self._usage_path.exists():
             return None
@@ -156,6 +163,8 @@ class UsageTracker:
                 "models": self._daily_usage.models,
                 "last_updated": datetime.now().isoformat()
             }
+            # 保存先が writable_path で差し替えられている場合、親が無いことがある。
+            self._usage_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._usage_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except TypeError as e:
@@ -168,7 +177,7 @@ class UsageTracker:
         if self._daily_usage.date != today:
             self._daily_usage = DailyUsage(date=today)
 
-    def _dispatch_alert_callbacks(self, result: Dict[str, Any]):
+    def _dispatch_alert_callbacks(self, result: dict[str, Any]):
         """登録されたコールバックにアラート結果を送信する"""
         for callback in self._callbacks:
             try:
@@ -181,7 +190,7 @@ class UsageTracker:
         model: str,
         tokens_in: int = 0,
         tokens_out: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """リクエストを追跡"""
         if not model:
             raise ValueError("Model name cannot be empty")
@@ -230,7 +239,7 @@ class UsageTracker:
             return "info"
         return "normal"
 
-    def _log_alert(self, result: Dict):
+    def _log_alert(self, result: dict):
         """アラートをログ"""
         level = result["alert_level"]
         model = result["model"]
@@ -261,7 +270,7 @@ class UsageTracker:
         current = self._daily_usage.get_requests(model)
         return max(0, rpd - current)
 
-    def get_daily_summary(self) -> Dict[str, Any]:
+    def get_daily_summary(self) -> dict[str, Any]:
         """日次サマリーを取得（全モデル）"""
         summary = {
             "date": self._daily_usage.date,
@@ -302,7 +311,7 @@ class UsageTracker:
             logger.error(f"Error in model_registry: {e}", exc_info=True)
             return "gemini-2.5-flash"
 
-    def _resolve_fallback_model(self, preferred: str) -> Optional[str]:
+    def _resolve_fallback_model(self, preferred: str) -> str | None:
         """制限に達したモデルのフォールバック先を取得する"""
         config = _load_model_config(self._model_config_path)
         fallback_chain = {}

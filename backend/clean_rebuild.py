@@ -2,6 +2,11 @@
 元のRAW動画から完全に再構築
 クロップ + カット編集 + 全編プレミアムテロップ
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import subprocess
 from pathlib import Path
 from datetime import datetime
@@ -53,7 +58,7 @@ def create_premium_branding():
     """プレミアムブランディング画像を作成"""
     base = Path(__file__).resolve().parent.parent
     logo_path = base / "backend" / "branding" / "logos" / "brand_logo.png"
-    output_path = base / "backend" / "branding" / "premium_branding.png"
+    output_path = _writable_path("backend/branding/premium_branding.png")
     
     output_path.parent.mkdir(parents=True, exist_ok=True)
     

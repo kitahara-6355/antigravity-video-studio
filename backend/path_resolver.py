@@ -40,6 +40,7 @@
 |---|---|---|
 | `ANTIGRAVITY_BASE_DIR` | プロジェクトルート | `backend/` の親 |
 | `VIDEO_AUTOMATION_BASE_DIR` | 同上（旧名・後方互換） | — |
+| `ANTIGRAVITY_WRITABLE_ROOT` | 実行時に書き換わるファイルの起点 | プロジェクトルート |
 | `ANTIGRAVITY_VAULT_OUTPUTS` | 出力の保存先 | `<root>/vault-outputs` |
 | `ANTIGRAVITY_VAULT_ASSETS` | 素材の置き場 | `<root>/../vault-assets` |
 | `ANTIGRAVITY_VAULT_ENVIRONMENTS` | 環境別設定 | `<root>/../vault-environments` |
@@ -53,16 +54,17 @@ import os
 from pathlib import Path
 
 __all__ = [
+    "app_data_dir",
+    "app_scratch_dir",
     "backend_dir",
+    "brain_dir",
     "project_root",
-    "workspace_root",
-    "vault_outputs_dir",
+    "raw_videos_dir",
     "vault_assets_dir",
     "vault_environments_dir",
-    "app_data_dir",
-    "brain_dir",
-    "app_scratch_dir",
-    "raw_videos_dir",
+    "vault_outputs_dir",
+    "workspace_root",
+    "writable_path",
 ]
 
 
@@ -99,6 +101,29 @@ def project_root() -> Path:
         _from_env("ANTIGRAVITY_BASE_DIR", "VIDEO_AUTOMATION_BASE_DIR")
         or backend_dir().parent
     )
+
+
+def writable_path(relative: str) -> Path:
+    """**実行時に書き換わる**ファイルのパスを返す。
+
+    使用量ログや進化履歴のように、動かすたびに中身が変わるファイル専用。
+    `ANTIGRAVITY_WRITABLE_ROOT` が設定されていればそこを起点にする。
+
+    なぜ `project_root()` の環境変数ではなく別の名前かというと、
+    `ANTIGRAVITY_BASE_DIR` を振り向けると `model_config.json` のような
+    **読み取り専用の設定ファイルまで**振り向いてしまい、読めなくなるため。
+    書き換わるものだけを移せる必要がある。
+
+    テスト実行時に conftest がこれを一時ディレクトリへ向ける。そうしないと
+    テストが本番のファイルを書き換える。2026-07-31 の実測では、Git 追跡下の
+    7ファイルがテストによって上書きされていた（`backend/branding/`の
+    ブランド画像を含む）。
+
+    Args:
+        relative: プロジェクトルートからの相対パス（POSIX 区切りでよい）。
+    """
+    root = _from_env("ANTIGRAVITY_WRITABLE_ROOT") or project_root()
+    return root.joinpath(*relative.split("/"))
 
 
 def workspace_root() -> Path:

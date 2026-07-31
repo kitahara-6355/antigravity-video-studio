@@ -86,10 +86,13 @@ __all__ = [
     "GoogleDriveStore",
     "GoogleSheetsStore",
     "InsufficientDiskSpaceError",
+    "WorkspaceConfigError",
     "WorkspacePipelineRunner",
     "WorkspaceSyncError",
+    "build_workspace_stores",
     "ensure_disk_space",
     "temp_raw_videos_dir",
+    "workspace_spreadsheet_id",
 ]
 
 # ダウンロードのチャンクサイズ。チャンク1個につき HTTPS の往復が1回起きるため、
@@ -495,6 +498,78 @@ class GoogleDriveStore(BaseWorkspaceStore):
             # 消せなくてもパイプラインは成立する。ディスクを食うだけなので警告に留める。
             logger.error(f"[Drive Sync] Failed to clean up {local_path}: {e}")
             return False
+
+
+# ---------------- 設定の読み込み ----------------
+#
+# フォルダ ID をコードに書かない。チャンネルを増やすたびにコードを触ることに
+# なるうえ、公開リポジトリに他人のフォルダ ID が載る。設定シートに置いて
+# 運用側で差し替えられるようにする。
+#
+# 鶏と卵になるのは設定シート自身の ID だけなので、そこだけ環境変数で与える。
+
+CONFIG_KEY_INPUT = "drive_input_folder_id"
+CONFIG_KEY_OUTPUT = "drive_output_folder_id"
+CONFIG_KEY_LIBRARY = "drive_library_folder_id"
+
+
+class WorkspaceConfigError(WorkspaceSyncError):
+    """設定が足りない、または不正。"""
+
+
+def workspace_spreadsheet_id() -> str:
+    """設定シートの ID を環境変数から取る。"""
+    sid = os.environ.get("ANTIGRAVITY_SHEETS_ID", "").strip()
+    if not sid:
+        raise WorkspaceConfigError(
+            "環境変数 ANTIGRAVITY_SHEETS_ID が設定されていません。"
+            "進捗・設定シートの ID を指定してください"
+            "（URL の /spreadsheets/d/ と /edit の間の文字列）"
+        )
+    return sid
+
+
+def build_workspace_stores(
+    user_email: str | None = None,
+    config_tab: str | None = None,
+) -> tuple[GoogleSheetsStore, GoogleDriveStore]:
+    """設定シートを起点に Sheets / Drive のストアを組み立てる。
+
+    設定シートに必要なのは以下（A列=キー / B列=値）。
+
+        drive_input_folder_id     未処理 RAW を読むフォルダ
+        drive_output_folder_id    成果物を書くフォルダ（**入力とは別にする**）
+        drive_library_folder_id   インサート素材（任意）
+
+    Returns:
+        (Sheets ストア, Drive ストア)。パイプラインの実行体は呼び出し側が
+        与えるため、`WorkspacePipelineRunner` はここでは組み立てない。
+    """
+    tab = config_tab or os.environ.get("ANTIGRAVITY_SHEETS_CONFIG_TAB", "Settings")
+    sheets = GoogleSheetsStore(
+        spreadsheet_id=workspace_spreadsheet_id(), user_email=user_email
+    )
+    config = sheets.read_config(tab)
+
+    missing = [k for k in (CONFIG_KEY_INPUT, CONFIG_KEY_OUTPUT) if not config.get(k)]
+    if missing:
+        raise WorkspaceConfigError(
+            f"設定シート「{tab}」に必要なキーがありません: {', '.join(missing)}。"
+            "A列にキー、B列にフォルダ ID を入れてください"
+        )
+
+    input_id = str(config[CONFIG_KEY_INPUT])
+    output_id = str(config[CONFIG_KEY_OUTPUT])
+    if input_id == output_id:
+        raise WorkspaceConfigError(
+            f"{CONFIG_KEY_INPUT} と {CONFIG_KEY_OUTPUT} が同じです ({input_id})。"
+            "成果物が次回の未処理 RAW として拾われ、無限に再処理されます"
+        )
+
+    drive = GoogleDriveStore(
+        root_folder_id=input_id, output_folder_id=output_id, user_email=user_email
+    )
+    return sheets, drive
 
 
 class WorkspacePipelineRunner:

@@ -38,6 +38,27 @@ if not os.environ.get("ANTIGRAVITY_VERIFIED_FACTS_DIR"):
         prefix="antigravity_facts_"
     )
 
+# 2026-07-31: テストが本番ファイルを書き換えるのを防ぐ。fs_guard の計測で、
+# Git 追跡下の7ファイルが上書きされていた（backend/branding/ のブランド画像を含む）。
+# 実行のたびに書き換わるファイルだけを一時ディレクトリへ振り向ける。
+# path_resolver.writable_path() がこの変数を見る。
+#
+# `ANTIGRAVITY_BASE_DIR` ではなく専用の変数なのは、そちらを振り向けると
+# model_config.json のような読み取り専用の設定まで振り向いて読めなくなるため。
+#
+# VERIFIED_FACTS と同様、モジュールレベルで設定する必要がある
+# （保存先をモジュール定数として解決しているモジュールがあるため、import より前）。
+if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
+    import tempfile
+    _writable_root = tempfile.mkdtemp(prefix="antigravity_writable_")
+    os.environ["ANTIGRAVITY_WRITABLE_ROOT"] = _writable_root
+    # 書き込み先の親ディレクトリをここで作る。本番コード側で mkdir すると、
+    # Path.stat を差し替えているテスト（test_apply_full_premium_telop）で
+    # exist_ok の内部判定が壊れて落ちる。テストの都合を本番コードに
+    # 持ち込まないよう、用意はこちら側で済ませる。
+    for _sub in ("backend/usage_tracker", "backend/branding", "backend/data"):
+        os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
+
 sys.path = [p for p in sys.path if _norm(p) not in (_norm(backend_dir), _norm(project_root))]
 sys.path.insert(0, backend_dir)
 if not os.environ.get("ISOLATE_BACKEND"):

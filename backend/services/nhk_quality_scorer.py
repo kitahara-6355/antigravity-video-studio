@@ -7,20 +7,24 @@
 4. BGM/SE/ナレーション音量バランス: LUFS計測
 5. カット割りリズム: シーンチェンジ検出の間隔分布
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
 import os
 import re
 import subprocess
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-QUALITY_LOG_PATH = _PROJECT_ROOT / "backend" / "pipeline_quality_log.jsonl"
+QUALITY_LOG_PATH = _writable_path("backend/pipeline_quality_log.jsonl")
 
 
 @dataclass
@@ -31,7 +35,7 @@ class AxisScore:
     max_score: float    # 100.0
     grade: str          # "Excellent", "Good", "Acceptable", "Poor"
     threshold: float    # この値以下でbug_hunterタスク生成
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     suggestion: str = ""
 
 
@@ -45,12 +49,12 @@ class NHKScoreReport:
     cut_rhythm: AxisScore
     overall_score: float = 0.0
     overall_grade: str = ""
-    degradation_log: List[dict] = field(default_factory=list)
-    suggestions: List[str] = field(default_factory=list)
+    degradation_log: list[dict] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
     scored_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     @property
-    def axes(self) -> List[AxisScore]:
+    def axes(self) -> list[AxisScore]:
         return [
             self.timing_accuracy, self.display_duration,
             self.readability, self.audio_balance, self.cut_rhythm
@@ -83,7 +87,7 @@ class NHKQualityScorer:
     CONTRAST_RATIO_AAA = 7.0  # WCAG AAA
     BUG_HUNTER_THRESHOLD = 60.0  # このスコア以下で自動タスク生成
 
-    def score(self, video_path: str, srt_path: Optional[str] = None) -> NHKScoreReport:
+    def score(self, video_path: str, srt_path: str | None = None) -> NHKScoreReport:
         """動画ファイルと5軸スコアリングを実行し、統合レポートを返す"""
         timing = self._score_timing(video_path, srt_path)
         display = self._score_display_duration(srt_path)
@@ -119,7 +123,7 @@ class NHKQualityScorer:
             suggestions=suggestions,
         )
 
-    def _score_timing(self, video_path: str, srt_path: Optional[str]) -> AxisScore:
+    def _score_timing(self, video_path: str, srt_path: str | None) -> AxisScore:
         """軸1: 字幕タイミング精度 (Whisper forced alignment vs SRT)"""
         if not srt_path or not os.path.exists(srt_path):
             return AxisScore(
@@ -151,7 +155,7 @@ class NHKQualityScorer:
             suggestion=suggestion
         )
 
-    def _count_timing_issues(self, entries: List[Dict]) -> int:
+    def _count_timing_issues(self, entries: list[dict]) -> int:
         """SRT内のタイミング整合性（重複、ギャップ、自己逆転）をカウント"""
         detected_issues_count = 0
         total = len(entries)
@@ -170,7 +174,7 @@ class NHKQualityScorer:
                     detected_issues_count += 1
         return detected_issues_count
 
-    def _score_display_duration(self, srt_path: Optional[str]) -> AxisScore:
+    def _score_display_duration(self, srt_path: str | None) -> AxisScore:
         """軸2: 字幕表示時間 (文字数÷表示秒数 vs NHK基準)"""
         if not srt_path or not os.path.exists(srt_path):
             return AxisScore(
@@ -259,7 +263,7 @@ class NHKQualityScorer:
         text = text.replace(" ", "").replace("\u3000", "").replace("\n", "").strip()
         return text
 
-    def _evaluate_single_entry_cps(self, entry: Dict) -> str:
+    def _evaluate_single_entry_cps(self, entry: dict) -> str:
         """単一のSRTエントリの表示秒数あたりの文字数(CPS)を評価"""
         duration_sec = (entry["end"] - entry["start"]) / 1000.0
         if duration_sec <= 0:
@@ -289,7 +293,7 @@ class NHKQualityScorer:
                 violations += 1
         return violations
 
-    def _score_readability(self, video_path: str, srt_path: Optional[str] = None) -> AxisScore:
+    def _score_readability(self, video_path: str, srt_path: str | None = None) -> AxisScore:
         """軸3: テロップ可読性 (コントラスト比 + フォントサイズ)"""
         if not srt_path or not os.path.exists(srt_path):
             return AxisScore(
@@ -324,7 +328,7 @@ class NHKQualityScorer:
             suggestion=suggestion
         )
 
-    def _analyze_entry_readability(self, text: str) -> tuple[float, List[str]]:
+    def _analyze_entry_readability(self, text: str) -> tuple[float, list[str]]:
         """単一のテキストの可読性を分析し、減点スコアと検出された問題を返す"""
         deduction = 0.0
         issues = []
@@ -420,7 +424,7 @@ class NHKQualityScorer:
             if not info.get("streams"):
                 raise ValueError("No audio streams found")
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            raise RuntimeError(f"Failed to parse ffprobe output: {str(e)}")
+            raise RuntimeError(f"Failed to parse ffprobe output: {e!s}")
 
     def _measure_loudness(self, video_path: str) -> float:
         """ffmpegのloudnormフィルタを用いて動画のLUFS値を測定"""
@@ -544,7 +548,7 @@ class NHKQualityScorer:
             return 50.0
         return 25.0
 
-    def _parse_srt_timing(self, srt_path: str) -> List[Dict]:
+    def _parse_srt_timing(self, srt_path: str) -> list[dict]:
         """簡易SRTパーサー: タイミングとテキストを抽出"""
         entries = []
         try:
@@ -602,7 +606,7 @@ class NHKQualityScorer:
         except (ValueError, IndexError):
             return 0
 
-    def _load_degradation_log(self, video_path: str) -> List[dict]:
+    def _load_degradation_log(self, video_path: str) -> list[dict]:
         """品質低下ログを読み取り（Component 1との連携）"""
         if not QUALITY_LOG_PATH.exists():
             return []

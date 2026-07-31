@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import os
 import json
 import time
@@ -59,6 +64,8 @@ class BrandingManager:
 
     def _save_json(self, path, data):
         try:
+            # 保存先が writable_path で差し替えられている場合、親が無いことがある。
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except PermissionError as e:
@@ -111,7 +118,7 @@ class BrandingManager:
         """
         過去の全哲学エントリーをコンテキストとして取得（憲法 5.2 哲学の深化）
         """
-        EVOLUTION_LOG_PATH = os.path.join(BRANDING_DIR, "evolution_log.json")
+        EVOLUTION_LOG_PATH = str(_writable_path("backend/branding/evolution_log.json"))
         evo_log = self._load_json(EVOLUTION_LOG_PATH)
         
         if not evo_log:
@@ -483,19 +490,19 @@ class BrandingManager:
         }
 
     def get_evolution_log(self):
-        EVOLUTION_LOG_PATH = os.path.join(BRANDING_DIR, "evolution_log.json")
+        EVOLUTION_LOG_PATH = str(_writable_path("backend/branding/evolution_log.json"))
         return self._load_json(EVOLUTION_LOG_PATH)
 
     def save_evolution_log(self, data):
         """evolution_log.json を保存する"""
-        EVOLUTION_LOG_PATH = os.path.join(BRANDING_DIR, "evolution_log.json")
+        EVOLUTION_LOG_PATH = str(_writable_path("backend/branding/evolution_log.json"))
         self._save_json(EVOLUTION_LOG_PATH, data)
 
     def log_evolution(self, session_data):
         """
         Extracts narrative evolution insights from a session and saves to evolution_log.json.
         """
-        EVOLUTION_LOG_PATH = os.path.join(BRANDING_DIR, "evolution_log.json")
+        EVOLUTION_LOG_PATH = str(_writable_path("backend/branding/evolution_log.json"))
         
         # 1. Load existing log
         evo_log = self._load_json(EVOLUTION_LOG_PATH)

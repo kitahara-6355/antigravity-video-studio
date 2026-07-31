@@ -112,6 +112,21 @@ def _transport_request() -> Any:
     return Request()
 
 
+def _refresh_error_types() -> tuple[type[BaseException], ...]:
+    """`credentials.refresh()` が投げうる例外の型。
+
+    以前ここは全例外を受ける広い catch だった。フィットネス関数 FF-26 が
+    「技術的負債レジストリに未登録の広い catch」として検出する。
+    実際に投げられるのは google.auth の例外階層と、その下で起きる OSError なので、
+    そこまで絞れば十分で、全例外を受ける必要はない。
+
+    ライブラリ未導入時は import 自体が先に失敗するため、ここは呼ばれない。
+    """
+    from google.auth import exceptions as google_auth_exceptions
+
+    return (google_auth_exceptions.GoogleAuthError, OSError)
+
+
 def _save_token(path: Path, credentials: Any) -> None:
     """更新後のトークンを書き戻す。
 
@@ -158,7 +173,7 @@ def load_credentials(scopes: Sequence[str]) -> Any:
             )
         try:
             credentials.refresh(_transport_request())
-        except Exception as e:  # google.auth 側の例外型が広いのでここで包む
+        except _refresh_error_types() as e:
             raise GoogleAuthError(f"認証トークンのリフレッシュに失敗しました: {e}") from e
         _save_token(path, credentials)
         logger.info("[Google OAuth] トークンをリフレッシュしました")
