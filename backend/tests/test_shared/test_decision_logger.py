@@ -538,17 +538,19 @@ class TestDecisionLogger:
         finally:
             decision_logger.__file__ = original_file
 
-    def test_init_with_existing_file(self, tmp_path):
-        """__init__: すでに decision_log.json が存在する場合に正しく読み込まれること"""
-        import decision_logger
-        original_file = decision_logger.__file__
-        dummy_file = tmp_path / "decision_logger.py"
-        decision_logger.__file__ = str(dummy_file)
-        
-        log_dir = tmp_path / "branding"
+    def test_init_with_existing_file(self, tmp_path, monkeypatch):
+        """__init__: すでに decision_log.json が存在する場合に正しく読み込まれること
+
+        以前は `decision_logger.__file__` を差し替えて保存先を動かしていたが、
+        保存先の解決は `path_resolver.writable_path` に移ったので、
+        同じ経路（`ANTIGRAVITY_WRITABLE_ROOT`）で振り向ける。
+        """
+        monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+
+        log_dir = tmp_path / "backend" / "branding"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "decision_log.json"
-        
+
         log_data = {
             "decisions": [
                 {
@@ -568,11 +570,9 @@ class TestDecisionLogger:
             ]
         }
         log_file.write_text(json.dumps(log_data), encoding="utf-8")
-        
-        try:
-            logger = DecisionLogger()
-            assert len(logger.decisions) == 1
-            assert logger.decisions[0].decision_id == "init001"
-        finally:
-            decision_logger.__file__ = original_file
+
+        logger = DecisionLogger()
+        assert logger.log_file == log_file
+        assert len(logger.decisions) == 1
+        assert logger.decisions[0].decision_id == "init001"
 

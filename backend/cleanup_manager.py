@@ -10,6 +10,11 @@ Progressive Quality Pipeline Phase 2
 - 再生成可能なファイルは積極的に削除
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import os
 import time
 import logging
@@ -508,9 +513,9 @@ class CleanupManager:
                 logger.error(f"❌ Invalid evolution_log_path (expected): {evolution_log_path}, error: {e}")
                 return
         else:
-            evo_path = (
-                Path(__file__).parent / "branding" / "evolution_log.json"
-            )
+            # 既定値は writable_path 経由。直接 __file__ 起点で解決すると、
+            # テストが Git 追跡下の evolution_log.json を書き換える。
+            evo_path = _writable_path("backend/branding/evolution_log.json")
 
         try:
             from utils.json_safe_io import safe_load_json, safe_save_json
