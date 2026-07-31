@@ -14,6 +14,21 @@ import backend.apply_full_premium_telop as target_module
 BASE_PATH = Path(target_module.__file__).resolve().parent.parent
 
 # 1. create_premium_branding のフォントフォールバックテスト
+
+def _expected_output_path():
+    """生成される premium_branding.png の期待パス。
+
+    以前は project_root 起点で組んでいたが、テストが本番の
+    backend/branding/premium_branding.png（Git 追跡下のブランド画像）を
+    上書きしていた。生成物なので writable_path で解決する。
+    """
+    try:
+        from backend.path_resolver import writable_path
+    except ImportError:
+        from path_resolver import writable_path
+    return writable_path("backend/branding/premium_branding.png")
+
+
 def test_create_premium_branding_font_fallback():
     """フォント読み込みのフォールバック処理を検証する"""
     font_mock_calls = []
@@ -58,7 +73,7 @@ def test_create_premium_branding_font_fallback():
         mock_combined.paste.assert_any_call(mock_logo, (0, 0), mock_logo)
         mock_combined.paste.assert_any_call(mock_telop, (28, 0), mock_telop)
         mock_combined.save.assert_called_once()
-        assert result == BASE_PATH / "backend" / "branding" / "premium_branding.png"
+        assert result == _expected_output_path()
 
 
 # 2. apply_premium_telop_to_entire_video: 入力動画なし ＆ 再構築(concat)失敗
@@ -369,7 +384,7 @@ def test_create_premium_branding_yugothic_success():
 
         assert len(font_mock_calls) == 1
         assert "YuGothB.ttc" in font_mock_calls[0]
-        assert result == BASE_PATH / "backend" / "branding" / "premium_branding.png"
+        assert result == _expected_output_path()
 
 
 # 13. create_premium_branding: Yu Gothic Bold が失敗し、Meiryo Bold が成功するケース
@@ -405,7 +420,7 @@ def test_create_premium_branding_meiryo_success():
         assert len(font_mock_calls) == 2
         assert "YuGothB.ttc" in font_mock_calls[0]
         assert "meiryob.ttc" in font_mock_calls[1]
-        assert result == BASE_PATH / "backend" / "branding" / "premium_branding.png"
+        assert result == _expected_output_path()
 
 
 # 14. apply_premium_telop_to_entire_video: ffprobe実行中にSubprocessErrorが発生するケース
@@ -866,4 +881,4 @@ def test_resolve_branding_paths_direct():
     dummy_root = Path("/dummy/project/root")
     logo, output = target_module._resolve_branding_paths(dummy_root)
     assert logo == dummy_root / "backend" / "branding" / "logos" / "brand_logo.png"
-    assert output == dummy_root / "backend" / "branding" / "premium_branding.png"
+    assert output == _expected_output_path()

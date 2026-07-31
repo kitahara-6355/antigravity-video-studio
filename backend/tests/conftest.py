@@ -50,9 +50,14 @@ if not os.environ.get("ANTIGRAVITY_VERIFIED_FACTS_DIR"):
 # （保存先をモジュール定数として解決しているモジュールがあるため、import より前）。
 if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     import tempfile
-    os.environ["ANTIGRAVITY_WRITABLE_ROOT"] = tempfile.mkdtemp(
-        prefix="antigravity_writable_"
-    )
+    _writable_root = tempfile.mkdtemp(prefix="antigravity_writable_")
+    os.environ["ANTIGRAVITY_WRITABLE_ROOT"] = _writable_root
+    # 書き込み先の親ディレクトリをここで作る。本番コード側で mkdir すると、
+    # Path.stat を差し替えているテスト（test_apply_full_premium_telop）で
+    # exist_ok の内部判定が壊れて落ちる。テストの都合を本番コードに
+    # 持ち込まないよう、用意はこちら側で済ませる。
+    for _sub in ("backend/usage_tracker", "backend/branding", "backend/data"):
+        os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
 
 sys.path = [p for p in sys.path if _norm(p) not in (_norm(backend_dir), _norm(project_root))]
 sys.path.insert(0, backend_dir)
