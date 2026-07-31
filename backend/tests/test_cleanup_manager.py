@@ -787,9 +787,12 @@ def test_report_to_evolution_log_default_path():
          patch("utils.json_safe_io.safe_save_json") as mock_save:
         
         manager.report_to_evolution_log(cleanup_res, evolution_log_path=None)
-        
-        # Verify that default path is resolved to the package's branding directory
-        expected_path = Path(__file__).parent.parent / "branding" / "evolution_log.json"
+
+        # 既定パスは writable_path で解決される。__file__ 起点で直接
+        # 組み立てると本番の evolution_log.json を指してしまい、テストが
+        # Git 追跡下のファイルを書き換える。
+        from path_resolver import writable_path
+        expected_path = writable_path("backend/branding/evolution_log.json")
         mock_load.assert_called_once_with(expected_path)
         mock_save.assert_called_once()
 

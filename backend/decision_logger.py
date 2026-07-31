@@ -20,6 +20,11 @@ Progressive Quality Pipeline 追加機能
 - 承認パターン = 「好み」として次回提案に反映
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import time
 import logging
@@ -60,12 +65,20 @@ class DecisionLogger:
     """意思決定記録・学習システム"""
     
     def __init__(self):
-        """初期化"""
-        base_dir = Path(__file__).parent
-        self.log_dir = base_dir / "branding"
+        """初期化
+
+        書き込み先は `writable_path` で解決する。以前は
+        `Path(__file__).parent / "branding"` を直接見ていたため、テストが
+        Git 追跡下の `decision_log.json` と `evolution_log.json` を
+        本番のまま書き換えていた。`branding_manager` は同じ2ファイルを
+        すでに `writable_path` 経由にしてあり、こちらが別経路で残っていた。
+
+        ディレクトリの作成はここでは行わない。書き込み側（`_save` /
+        `sync_to_soul_narrative`）で必要になった時点で作る。
+        """
+        self.log_dir = _writable_path("backend/branding")
         self.log_file = self.log_dir / "decision_log.json"
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # ログ読み込み
         self.decisions: List[Decision] = []
         self._load()
@@ -95,6 +108,8 @@ class DecisionLogger:
     def _save(self):
         """ログファイルを保存"""
         try:
+            # 保存先が writable_path で差し替えられている場合、親が無いことがある。
+            self.log_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.log_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     "decisions": [asdict(d) for d in self.decisions],
@@ -422,6 +437,7 @@ class DecisionLogger:
             evo_log["entries"].append(summary_entry)
         
         # 保存
+        evolution_log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(evolution_log_path, 'w', encoding='utf-8') as f:
             json.dump(evo_log, f, ensure_ascii=False, indent=2)
         

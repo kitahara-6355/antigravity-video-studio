@@ -11,6 +11,11 @@ Sprint 4.2.1: 閾値トリガーエンジン
 
 MASTER L1789: Milestone 4.2 Soul自律進化 (D-05)
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import copy
 import json
 import os
@@ -139,8 +144,11 @@ class EvolutionTriggerService:
         constitution_path: Optional[Path] = None,
         cooldown_seconds: int = _COOLDOWN_SECONDS,
     ):
-        self._evolution_log_path = evolution_log_path or (
-            Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        # evolution_log.json は実行のたびに書き換わるので writable_path で解決する。
+        # 直接 `Path(__file__).parent.parent` を見ていると、テストが Git 追跡下の
+        # 本番ファイルを書き換える（branding_manager は既に writable_path 経由）。
+        self._evolution_log_path = evolution_log_path or _writable_path(
+            "backend/branding/evolution_log.json"
         )
         self._constitution_path = constitution_path or (
             Path(__file__).parent.parent / "branding" / "constitution.json"

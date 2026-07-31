@@ -11,6 +11,11 @@ Sprint 4.2.2: 哲学自動提案
 
 MASTER L1789: Milestone 4.2 Soul自律進化 (D-05)
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import asyncio
 import hashlib
 import json
@@ -55,8 +60,10 @@ class PhilosophyProposalService:
         if evolution_log_path is not None:
             self._evolution_log_path = Path(evolution_log_path)
         else:
-            self._evolution_log_path = (
-                Path(__file__).parent.parent / "branding" / "evolution_log.json"
+            # 既定値は writable_path 経由。直接 __file__ 起点で解決すると、
+            # テストが Git 追跡下の evolution_log.json を書き換える。
+            self._evolution_log_path = _writable_path(
+                "backend/branding/evolution_log.json"
             )
 
     # ------------------------------------------------------------------

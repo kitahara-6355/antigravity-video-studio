@@ -15,6 +15,11 @@ MASTER L1778-L1779 テスト:
 - S414-02: finalize → evolution_logにstrategyエントリ
 """
 import json
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import time
 import logging
 from datetime import datetime
@@ -38,8 +43,10 @@ class EvolutionSyncService:
     """
 
     def __init__(self, evolution_log_path: Path = None):
-        self._evolution_log_path = evolution_log_path or (
-            Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        # 既定値は writable_path 経由。直接 __file__ 起点で解決すると、
+        # テストが Git 追跡下の evolution_log.json を書き換える。
+        self._evolution_log_path = evolution_log_path or _writable_path(
+            "backend/branding/evolution_log.json"
         )
 
     @contextmanager
