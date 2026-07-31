@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import subprocess
 import shutil
 import logging
@@ -27,10 +32,13 @@ class AudioMaster:
                 )
                 self.ffmpeg = None  # 各メソッドで None チェック
         
-        # 出力ディレクトリ
-        self.output_dir = Path("audio_mastered")
-        self.output_dir.mkdir(exist_ok=True)
-        
+        # 出力ディレクトリ。
+        # 以前は `Path("audio_mastered")` という相対パスをここで mkdir していた。
+        # インスタンス化しただけで**サーバの起動ディレクトリに**フォルダができ、
+        # fs_guard の計測ではテスト21件がリポジトリのルートを汚していた。
+        # 場所を writable_path で固定し、作成は実際に書く直前まで遅らせる。
+        self.output_dir = _writable_path("audio_mastered")
+
         if self.ffmpeg:
             logger.info(f"✅ AudioMaster initialized. FFmpeg: {self.ffmpeg}")
 
@@ -48,7 +56,12 @@ class AudioMaster:
             raise FileNotFoundError(f"Audio file not found: {file_path}")
 
     def _generate_output_path(self, suffix: str) -> Path:
-        """UUID を付与したユニークな出力ファイルパスを生成する"""
+        """UUID を付与したユニークな出力ファイルパスを生成する
+
+        出力ディレクトリの作成はここで行う。`__init__` でやると、FFmpeg が
+        無い環境でインスタンス化しただけの場合まで空のフォルダが残る。
+        """
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         output_id = str(uuid.uuid4())
         return self.output_dir / f"{output_id}_{suffix}"
 
