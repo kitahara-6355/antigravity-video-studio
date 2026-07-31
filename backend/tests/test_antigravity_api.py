@@ -84,6 +84,7 @@ def test_process_srt():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
@@ -103,6 +104,7 @@ def test_process_srt():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
@@ -121,6 +123,7 @@ def test_process_srt():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
@@ -139,6 +142,7 @@ def test_process_srt_no_file_exists():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
@@ -149,6 +153,45 @@ def test_process_srt_no_file_exists():
             response = client.post("/api/antigravity/process-srt", files={"file": ("test.srt", b"1" + bytes([10]) + b"...", "text/plain")})
             assert response.status_code == 200
             mock_path_inst.unlink.assert_not_called()
+
+def test_process_srt_strips_directories_from_upload_name(tmp_path, monkeypatch):
+    """アップロード名の `../` で temp/ の外へ書けない。
+
+    filename は multipart ヘッダ由来でクライアントが自由に決められる。
+    上の各ケースのように `antigravity_api.Path` をモックすると連結の実装ごと
+    隠れてしまうので、ここは書き込み先だけを一時ディレクトリへ向けて
+    実物のパス解決を通す。
+    """
+    monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+
+    with patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
+        mock_pipeline = mock_pipeline_cls.return_value
+        mock_pipeline.process_srt.return_value = {"success": True}
+
+        response = client.post(
+            "/api/antigravity/process-srt",
+            files={"file": ("../../evil.srt", b"1" + bytes([10]) + b"...", "text/plain")}
+        )
+
+    assert response.status_code == 200
+    used_path = Path(mock_pipeline.process_srt.call_args[0][0])
+    assert used_path.parent == tmp_path / "temp"
+    assert used_path.name == "evil.srt"
+    # 抜けた先に書かれていないこと（finally で unlink されるのは temp/ 側だけ）
+    assert not (tmp_path.parent / "evil.srt").exists()
+
+def test_process_srt_rejects_traversal_only_name(tmp_path, monkeypatch):
+    """ディレクトリ部分しか無い名前は 400 で弾く。"""
+    monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+
+    with patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
+        response = client.post(
+            "/api/antigravity/process-srt",
+            files={"file": ("..", b"1" + bytes([10]) + b"...", "text/plain")}
+        )
+        mock_pipeline_cls.assert_not_called()
+
+    assert response.status_code == 400
 
 def test_get_telop_proposals():
     # 提案ディレクトリが存在しない場合

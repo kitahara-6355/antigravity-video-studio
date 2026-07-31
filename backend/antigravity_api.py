@@ -3,6 +3,11 @@ Antigravity 3.0 API Router
 ブラウザからAntigravity全機能を操作するためのエンドポイント
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -109,12 +114,24 @@ async def add_proper_noun(entry: ProperNounEntry):
 
 @router.post("/process-srt")
 async def process_srt(file: UploadFile = File(...)):
-    """SRTファイルを統合パイプラインで処理"""
-    temp_path = Path("temp") / file.filename
+    """SRTファイルを統合パイプラインで処理
+
+    アップロード名は信用しない。以前は `Path("temp") / file.filename` と
+    連結していたため、`../../` を含む名前を送られると temp/ の外へ書けた
+    （filename はクライアントが自由に指定できる）。ディレクトリ部分を捨てる。
+
+    保存先が相対パスだったため、サーバの起動ディレクトリ次第で書き込み先が
+    変わってもいた。`writable_path` で固定する。
+    """
+    safe_name = Path(file.filename or "upload.srt").name
+    if not safe_name or safe_name in (".", ".."):
+        raise HTTPException(status_code=400, detail="ファイル名が不正です")
+
+    temp_path = _writable_path("temp") / safe_name
     try:
         # 一時保存
         temp_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(temp_path, "wb") as f:
             content = await file.read()
             f.write(content)
