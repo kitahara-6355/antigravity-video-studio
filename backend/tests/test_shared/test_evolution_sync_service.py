@@ -623,11 +623,15 @@ class TestEvolutionSyncInit:
     """EvolutionSyncService初期化テスト"""
 
     def test_init_default_path(self):
-        """パス指定なしで初期化した場合、デフォルトのパスが設定される"""
-        import services.evolution_sync_service
+        """パス指定なしで初期化した場合、デフォルトのパスが設定される
+
+        既定パスは writable_path で解決される。`__file__` 起点で組み立てると
+        本番の evolution_log.json を指してしまい、テストが Git 追跡下の
+        ファイルを書き換える。
+        """
+        from path_resolver import writable_path
         service = EvolutionSyncService()
-        backend_dir = Path(services.evolution_sync_service.__file__).parent.parent
-        expected_path = backend_dir / "branding" / "evolution_log.json"
+        expected_path = writable_path("backend/branding/evolution_log.json")
         assert service._evolution_log_path.resolve() == expected_path.resolve()
 
 
