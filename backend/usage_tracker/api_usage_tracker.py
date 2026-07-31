@@ -7,16 +7,19 @@ API使用量トラッカー — 無料枠（500 RPD）の消費を監視
 - 95%サスペンド（待機モード移行）および 100%強制ブロック（Banned）
 - パイプライン実行前に残り回数を確認
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
-from pathlib import Path
-from datetime import datetime, date
-from typing import Dict, Optional, List, Tuple
+from datetime import date
 from enum import Enum
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-USAGE_FILE = Path(__file__).parent / "daily_usage.json"
+USAGE_FILE = _writable_path("backend/usage_tracker/daily_usage.json")
 FREE_TIER_LIMIT = 500  # Gemini 2.5-flash 無料枠 RPD
 
 
@@ -39,7 +42,7 @@ class APIUsageTracker:
     def __init__(self, usage_path: Path = USAGE_FILE):
         self.usage_path = usage_path
         self._data = self._load()
-        self._last_escalation: Optional[EscalationLevel] = None
+        self._last_escalation: EscalationLevel | None = None
         self.override_active = False
         self.thresholds = {
             "info": 0.60,
@@ -47,7 +50,7 @@ class APIUsageTracker:
             "critical": 0.95
         }
 
-    def get_escalation_thresholds(self) -> List[Tuple[float, EscalationLevel, str]]:
+    def get_escalation_thresholds(self) -> list[tuple[float, EscalationLevel, str]]:
         """現在の閾値設定に基づく閾値リストを生成して返す"""
         return [
             (1.00, EscalationLevel.BANNED,   "🛑 API使用量上限到達: {used}/{limit} RPD — パイプライン実行を強制禁止 (Banned)"),
@@ -68,7 +71,7 @@ class APIUsageTracker:
         """自動サスペンドのオーバーライド状態を設定"""
         self.override_active = active
 
-    def _load(self) -> Dict:
+    def _load(self) -> dict:
         """使用量データを読み込み"""
         if self.usage_path.exists():
             try:
@@ -172,7 +175,7 @@ class APIUsageTracker:
                 return level
         return EscalationLevel.NORMAL
 
-    def get_today_usage(self) -> Dict:
+    def get_today_usage(self) -> dict:
         """今日の使用状況を取得"""
         today = self._today()
         daily = self._data["daily"].get(today, {"total": 0, "sources": {}})
@@ -199,7 +202,7 @@ class APIUsageTracker:
             "can_run_pipeline": not self.should_block() and remaining > 0,
         }
 
-    def estimate_pipeline_cost(self, segment_count: int) -> Dict:
+    def estimate_pipeline_cost(self, segment_count: int) -> dict:
         """パイプライン実行に必要なAPIコール数を推定"""
         batch_size = 50
         ai_proofread_calls = (segment_count + batch_size - 1) // batch_size
@@ -261,7 +264,7 @@ def record_api_call(count: int = 1, source: str = "unknown"):
     usage_tracker.record_calls(count, source)
 
 
-def get_usage_status() -> Dict:
+def get_usage_status() -> dict:
     """使用状況を取得（簡易関数）"""
     return usage_tracker.get_today_usage()
 

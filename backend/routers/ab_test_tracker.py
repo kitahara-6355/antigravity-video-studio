@@ -5,13 +5,18 @@ PROJECT_CONSTITUTION §5.2 Soul Narrative準拠:
 - 選択履歴をevolution_logに記録
 - 実CTRフィードバックで予測精度向上
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +24,7 @@ router = APIRouter(prefix="/api/thumbnail", tags=["A/B Test Tracking"])
 
 # データ保存パス
 DATA_DIR = Path(__file__).parent.parent / "data"
-SELECTION_HISTORY_PATH = DATA_DIR / "thumbnail_selection_history.json"
+SELECTION_HISTORY_PATH = _writable_path("backend/data/thumbnail_selection_history.json")
 CTR_FEEDBACK_PATH = DATA_DIR / "ctr_feedback_history.json"
 
 
@@ -27,8 +32,8 @@ class SelectThumbnailRequest(BaseModel):
     """サムネイル選択リクエスト"""
     video_id: str
     selected_index: int  # 0, 1, 2
-    thumbnail_concepts: List[str]  # 3案のコンセプト
-    predicted_ctrs: List[float]  # 予測CTR
+    thumbnail_concepts: list[str]  # 3案のコンセプト
+    predicted_ctrs: list[float]  # 予測CTR
     reason: str = ""  # 選択理由（Soul Narrative用）
 
 
@@ -47,13 +52,13 @@ class SelectionRecord(BaseModel):
     selected_index: int
     selected_concept: str
     predicted_ctr: float
-    all_predicted_ctrs: List[float]
+    all_predicted_ctrs: list[float]
     reason: str
-    actual_ctr: Optional[float] = None
-    feedback_at: Optional[str] = None
+    actual_ctr: float | None = None
+    feedback_at: str | None = None
 
 
-def _load_json(path: Path) -> List[Dict]:
+def _load_json(path: Path) -> list[dict]:
     """JSONファイルを読み込み"""
     if path.exists():
         try:
@@ -64,7 +69,7 @@ def _load_json(path: Path) -> List[Dict]:
     return []
 
 
-def _save_json(path: Path, data: List[Dict]):
+def _save_json(path: Path, data: list[dict]):
     """JSONファイルに保存"""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
@@ -72,7 +77,7 @@ def _save_json(path: Path, data: List[Dict]):
 
 
 @router.post("/select")
-async def select_thumbnail(req: SelectThumbnailRequest) -> Dict[str, Any]:
+async def select_thumbnail(req: SelectThumbnailRequest) -> dict[str, Any]:
     """
     サムネイル選択を記録
     
@@ -116,7 +121,7 @@ async def select_thumbnail(req: SelectThumbnailRequest) -> Dict[str, Any]:
 
 
 @router.post("/feedback")
-async def record_ctr_feedback(req: CTRFeedbackRequest) -> Dict[str, Any]:
+async def record_ctr_feedback(req: CTRFeedbackRequest) -> dict[str, Any]:
     """
     実CTRフィードバックを記録
     
@@ -168,7 +173,7 @@ async def record_ctr_feedback(req: CTRFeedbackRequest) -> Dict[str, Any]:
 
 
 @router.get("/history")
-async def get_selection_history(limit: int = 20) -> Dict[str, Any]:
+async def get_selection_history(limit: int = 20) -> dict[str, Any]:
     """選択履歴を取得"""
     try:
         history = _load_json(SELECTION_HISTORY_PATH)
@@ -190,7 +195,7 @@ async def get_selection_history(limit: int = 20) -> Dict[str, Any]:
 
 
 @router.get("/accuracy")
-async def get_prediction_accuracy() -> Dict[str, Any]:
+async def get_prediction_accuracy() -> dict[str, Any]:
     """予測精度を取得"""
     try:
         history = _load_json(SELECTION_HISTORY_PATH)
@@ -208,7 +213,7 @@ async def get_prediction_accuracy() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _analyze_prediction_accuracy(history: List[Dict]) -> Dict[str, Any]:
+def _analyze_prediction_accuracy(history: list[dict]) -> dict[str, Any]:
     """予測精度を分析"""
     # フィードバック済みのレコードのみ抽出
     with_feedback = [r for r in history if r.get("actual_ctr") is not None]
@@ -254,6 +259,6 @@ def _analyze_prediction_accuracy(history: List[Dict]) -> Dict[str, Any]:
 
 
 @router.get("/health")
-async def health_check() -> Dict[str, str]:
+async def health_check() -> dict[str, str]:
     """ヘルスチェック"""
     return {"status": "ok", "service": "ab_test_tracker"}

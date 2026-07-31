@@ -6,28 +6,34 @@
 - FATAL: 復旧不能 → 例外を再送出
 - DIAGNOSE: 非クリティカル → ログ記録のみ、処理続行
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
 import os
+
+# エラー判定・分類エンジンのインポート
+import sys
 import time
-from dataclasses import dataclass, field, asdict
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
-# エラー判定・分類エンジンのインポート
-import sys
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-from backend.services.error_classifier import ErrorClassifier, ErrorCategory, ErrorSeverity, ErrorAction
+from backend.services.error_classifier import ErrorCategory, ErrorClassifier
 
 logger = logging.getLogger(__name__)
 
 # 品質低下ログのデフォルトパス
-QUALITY_LOG_PATH = _PROJECT_ROOT / "backend" / "pipeline_quality_log.jsonl"
+QUALITY_LOG_PATH = _writable_path("backend/pipeline_quality_log.jsonl")
 
 
 class PipelineErrorStrategy(Enum):
@@ -48,7 +54,6 @@ class PipelineErrorStrategy(Enum):
 
 class PipelineFatalError(Exception):
     """パイプラインの復旧不可能な重大エラー (FATAL) を示す例外クラス."""
-    pass
 
 
 @dataclass
