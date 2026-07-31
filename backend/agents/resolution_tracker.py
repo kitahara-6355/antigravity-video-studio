@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import os
 import json
 import time
@@ -73,7 +78,14 @@ class ResolutionTracker:
     議案トラッカー（みらい議会スタイル）
     """
     def __init__(self, archive_dir="archives/resolutions"):
-        self.archive_dir = archive_dir
+        # 相対パスはプロセスの起動ディレクトリ基準になる。モジュール末尾で
+        # シングルトンを作っているので、import しただけで起動ディレクトリに
+        # フォルダができ、テストがリポジトリを汚していた。writable_path で
+        # 固定する。呼び出し側が絶対パスを渡した場合はそのまま使う。
+        self.archive_dir = (
+            archive_dir if os.path.isabs(archive_dir)
+            else str(_writable_path(archive_dir))
+        )
         if not os.path.exists(self.archive_dir):
             os.makedirs(self.archive_dir)
         self.active_resolutions: Dict[str, Resolution] = {}

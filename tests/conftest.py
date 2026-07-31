@@ -19,6 +19,23 @@ if not os.environ.get("ANTIGRAVITY_VERIFIED_FACTS_DIR"):
         prefix="antigravity_facts_"
     )
 
+# 2026-07-31: backend/tests/conftest.py にはあったが、こちら側には無かった。
+# その結果このツリーのテストは path_resolver.writable_path() の振り向けを
+# 受けず、本番ファイルをそのまま書き換えていた（実測: archives/council_logs、
+# backend/branding）。設定の意図と注意点は backend/tests/conftest.py の
+# 同じブロックに書いてある。
+#
+# 両方のツリーを続けて走らせたときに向き先が食い違わないよう、
+# すでに設定されていれば尊重する（`if not ...` はそのための条件）。
+if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
+    import tempfile
+    _writable_root = tempfile.mkdtemp(prefix="antigravity_writable_")
+    os.environ["ANTIGRAVITY_WRITABLE_ROOT"] = _writable_root
+    # 書き込み先の親ディレクトリはここで作る。本番コード側で mkdir すると、
+    # Path.stat を差し替えているテストで exist_ok の内部判定が壊れる。
+    for _sub in ("backend/usage_tracker", "backend/branding", "backend/data"):
+        os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
+
 
 def _norm(p):
     return os.path.normcase(os.path.abspath(p))
