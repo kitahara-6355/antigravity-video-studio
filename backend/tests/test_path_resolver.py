@@ -204,11 +204,52 @@ def test_no_windows_drive_letters_in_defaults(clean_env):
 
 
 def test_all_public_names_are_callable(clean_env):
-    """__all__ に挙げたものが全て呼べること（書き忘れ・改名の検出）"""
+    """__all__ に挙げたものが全て呼べること（書き忘れ・改名の検出）。
+
+    大半は引数なしの基準ディレクトリ取得だが、`writable_path(relative)` の
+    ように引数が要るものもある。必須引数にはダミーを渡す。ここで固定値を
+    要求すると、関数を1つ足すたびにこのテストが落ちてしまう。
+    """
+    import inspect
+
     for name in path_resolver.__all__:
         func = getattr(path_resolver, name)
         assert callable(func), f"{name} が呼び出せない"
-        assert isinstance(func(), Path), f"{name}() が Path を返していない"
+        required = [
+            p
+            for p in inspect.signature(func).parameters.values()
+            if p.default is inspect.Parameter.empty
+            and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+        ]
+        assert isinstance(func(*["dummy"] * len(required)), Path), (
+            f"{name}() が Path を返していない"
+        )
+
+
+def test_writable_path_defaults_to_project_root(clean_env, monkeypatch):
+    monkeypatch.delenv("ANTIGRAVITY_WRITABLE_ROOT", raising=False)
+    expected = path_resolver.project_root() / "backend" / "usage_tracker" / "usage_data.json"
+    assert path_resolver.writable_path("backend/usage_tracker/usage_data.json") == expected
+
+
+def test_writable_path_follows_env(clean_env, monkeypatch, tmp_path):
+    """テスト中に本番ファイルを書き換えないための振り向け先。"""
+    monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+    assert path_resolver.writable_path("backend/branding/evolution_log.json") == (
+        tmp_path / "backend" / "branding" / "evolution_log.json"
+    )
+
+
+def test_writable_path_is_independent_of_base_dir(clean_env, monkeypatch, tmp_path):
+    """BASE_DIR とは別変数であること。
+
+    BASE_DIR を振り向けると model_config.json のような読み取り専用の設定まで
+    移動してしまい読めなくなる。書き換わるものだけを移せる必要がある。
+    """
+    monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path / "w"))
+    monkeypatch.setenv("ANTIGRAVITY_BASE_DIR", str(tmp_path / "b"))
+    assert path_resolver.writable_path("x.json") == tmp_path / "w" / "x.json"
+    assert path_resolver.project_root() == tmp_path / "b"
 
 
 def test_module_source_has_no_hardcoded_local_path():

@@ -1,6 +1,11 @@
 """
 高級感のあるフォント版：Yu Gothic Bold 20px
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import os
 import subprocess
 from pathlib import Path
@@ -15,7 +20,7 @@ def create_premium_branding():
     """ロゴ + プレミアムフォントのテロップを作成"""
     base = BASE_DIR
     logo_path = base / "backend" / "branding" / "logos" / "brand_logo.png"
-    output_path = base / "backend" / "branding" / "premium_branding.png"
+    output_path = _writable_path("backend/branding/premium_branding.png")
     
     # ロゴ読み込み（23x45px）
     logo = Image.open(logo_path).convert('RGBA')
