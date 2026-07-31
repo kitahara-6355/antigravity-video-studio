@@ -221,8 +221,12 @@ def test_tracker_save_resolution_oserror(tmp_path):
             mock_log_err.assert_called_once_with("Failed to save resolution id-error: Disk Full")
 
 def test_default_singleton():
+    # 既定の相対パスは writable_path で解決される。相対パスのままだと
+    # 書き込み先がプロセスの起動ディレクトリ次第になり、import しただけで
+    # リポジトリに archives/resolutions ができる。
+    from path_resolver import writable_path
     assert isinstance(resolution_tracker, ResolutionTracker)
-    assert resolution_tracker.archive_dir == "archives/resolutions"
+    assert resolution_tracker.archive_dir == str(writable_path("archives/resolutions"))
 
 def test_tracker_apply_gavel_invalid_decision(tmp_path):
     tracker = ResolutionTracker(archive_dir=str(tmp_path))
