@@ -53,6 +53,14 @@ _IGNORED_DIRS = frozenset({
 # 検出そのものやカバレッジが作るファイル。自分の書き込みを数えない。
 _IGNORED_NAMES = frozenset({"fs-guard-report.txt", ".coverage"})
 
+# 名前に実行ごとの識別子が入るため、完全一致では拾えない生成物。
+# 前方一致で落とす。ここに漏れがあると「本番ファイルへの書き込み」の
+# 件数がテスト基盤自身の生成物で嵩上げされ、残件が読めなくなる。
+_IGNORED_PREFIXES = (
+    "pytest-cache-files-",   # pytest 自身（キャッシュ無効時の一時ディレクトリ）
+    ".junit_batch_",         # scripts/run_test_batches.py の JUnit 出力
+)
+
 # 書き込みを伴うモード。"r" だけのときは見ない。
 _WRITE_FLAGS = frozenset("wax+")
 
@@ -81,7 +89,11 @@ def _is_watched(path) -> bool:
     if os.path.basename(p) in _IGNORED_NAMES:
         return False
     parts = os.path.relpath(p, _REPO_ROOT).split(os.sep)
-    return not any(part in _IGNORED_DIRS for part in parts)
+    if any(part in _IGNORED_DIRS for part in parts):
+        return False
+    # 前方一致の除外は構成要素すべてに当てる。生成物そのものだけでなく、
+    # その中に作られるファイルも落とす必要がある。
+    return not any(part.startswith(_IGNORED_PREFIXES) for part in parts)
 
 
 def _record(operation: str, path) -> None:

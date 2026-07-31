@@ -132,9 +132,13 @@ def test_log_session_serialization_error():
         assert filepath is None
 
 def test_default_instance():
-    # デフォルトインスタンスの確認
+    # デフォルトインスタンスの確認。
+    # 既定の相対パスは writable_path で解決される。相対パスのままだと
+    # 書き込み先がプロセスの起動ディレクトリ次第になり、import しただけで
+    # リポジトリに archives/council_logs ができる。
+    from path_resolver import writable_path
     assert isinstance(council_logger, CouncilSessionLogger)
-    assert council_logger.archive_dir == "archives/council_logs"
+    assert council_logger.archive_dir == str(writable_path("archives/council_logs"))
 
 def test_log_session_wagamama_other_exception():
     # wagamama_managerのメソッド呼び出し時にImportError以外の例外（例: AttributeError）が発生した場合のテスト
