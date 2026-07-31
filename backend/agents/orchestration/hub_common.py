@@ -7,6 +7,10 @@ Orchestration Hub — 共通ユーティリティ
 orchestrator.py のトップレベル定義をそのまま移植。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import uuid
 import logging
@@ -22,13 +26,13 @@ _MEMORY_DIR = _BASE_DIR.parent / "memory"
 _PROJECT_ROOT = _BASE_DIR.parent.parent.parent  # orchestration → agents → backend → project root
 INBOX_DIR = _PROJECT_ROOT / "Human01_Official Artifact" / "受信トレイ"
 
-TASK_QUEUE_PATH = _BASE_DIR / "task_queue.json"
+TASK_QUEUE_PATH = _writable_path("backend/agents/orchestration/task_queue.json")
 OPUS_DIRECTIVE_PATH = _BASE_DIR / "opus_directive.json"
 FLASH_REPORTS_PATH = _BASE_DIR / "flash_reports.jsonl"
 MESSAGE_BOX_PATH = _BASE_DIR / "message_box.jsonl"
 PHASE_STATE_PATH = _MEMORY_DIR / "phase_state.json"
 PHASE_GATES_PATH = _MEMORY_DIR / "phase_gates.json"
-FLASH_SESSION_PATH = _BASE_DIR / "flash_session.json"
+FLASH_SESSION_PATH = _writable_path("backend/agents/orchestration/flash_session.json")
 USER_SCHEDULE_PATH = _BASE_DIR / "user_schedule.json"
 DESIGN_STOCK_PATH = _BASE_DIR / "design_stock.json"
 ETA_STORE_PATH = _BASE_DIR / "eta_tracker.json"

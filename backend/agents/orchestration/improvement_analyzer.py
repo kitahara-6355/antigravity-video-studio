@@ -10,6 +10,10 @@
     python improvement_analyzer.py --force      # 強制生成（チェック無視）
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import os
 import glob
@@ -18,7 +22,7 @@ from datetime import datetime, timezone, timedelta
 WORKSPACE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
 FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
-FLASH_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "flash_session.json")
+FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 
 REPORT_BASE_DIR = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告")
 PROPOSAL_DIR = os.path.join(REPORT_BASE_DIR, "改善提案")

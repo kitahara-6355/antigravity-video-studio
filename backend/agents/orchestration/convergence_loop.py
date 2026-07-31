@@ -10,6 +10,10 @@ Convergence Loop (収束ループ)
 # satisfies: REQ-CONV-01
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
 import re
@@ -20,7 +24,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent
-TASK_QUEUE_PATH = _BASE_DIR / "task_queue.json"
+TASK_QUEUE_PATH = _writable_path("backend/agents/orchestration/task_queue.json")
 FLASH_REPORTS_PATH = _BASE_DIR / "flash_reports.jsonl"
 
 # デフォルトのリトライ上限

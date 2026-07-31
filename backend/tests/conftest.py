@@ -56,7 +56,8 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     # Path.stat を差し替えているテスト（test_apply_full_premium_telop）で
     # exist_ok の内部判定が壊れて落ちる。テストの都合を本番コードに
     # 持ち込まないよう、用意はこちら側で済ませる。
-    for _sub in ("backend/usage_tracker", "backend/branding", "backend/data"):
+    for _sub in ("backend/usage_tracker", "backend/branding", "backend/data",
+                 "backend/agents/orchestration"):
         os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
     # constitution / strategy / user_model は**設定でもある**ので、空のまま
     # にすると中身を読むテストが壊れる。本番の内容を複製して起点にする。
@@ -68,6 +69,15 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
         _src = os.path.join(_repo_root, "backend", "branding", _seed)
         if os.path.exists(_src):
             _shutil.copyfile(_src, os.path.join(_writable_root, "backend", "branding", _seed))
+    # orchestration の状態ファイルも同じ理由で複製する。task_queue.json は
+    # schema_version と tasks を持つ実データで、空だと読む側が壊れる。
+    for _seed in ("task_queue.json", "flash_session.json", "resource_state.json"):
+        _src = os.path.join(_repo_root, "backend", "agents", "orchestration", _seed)
+        if os.path.exists(_src):
+            _shutil.copyfile(
+                _src,
+                os.path.join(_writable_root, "backend", "agents", "orchestration", _seed),
+            )
 
 sys.path = [p for p in sys.path if _norm(p) not in (_norm(backend_dir), _norm(project_root))]
 sys.path.insert(0, backend_dir)
