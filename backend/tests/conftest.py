@@ -58,6 +58,16 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     # 持ち込まないよう、用意はこちら側で済ませる。
     for _sub in ("backend/usage_tracker", "backend/branding", "backend/data"):
         os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
+    # constitution / strategy / user_model は**設定でもある**ので、空のまま
+    # にすると中身を読むテストが壊れる。本番の内容を複製して起点にする。
+    # 書き込みは複製側に落ちるので、本番ファイルは汚れない。
+    # ログ類（evolution_log など）は空から始めてよいので複製しない。
+    import shutil as _shutil
+    _repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    for _seed in ("constitution.json", "strategy.json", "user_model.json"):
+        _src = os.path.join(_repo_root, "backend", "branding", _seed)
+        if os.path.exists(_src):
+            _shutil.copyfile(_src, os.path.join(_writable_root, "backend", "branding", _seed))
 
 sys.path = [p for p in sys.path if _norm(p) not in (_norm(backend_dir), _norm(project_root))]
 sys.path.insert(0, backend_dir)

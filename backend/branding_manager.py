@@ -24,9 +24,20 @@ except ImportError:
     decision_logger = None  # 後方互換性
 
 BRANDING_DIR = os.path.dirname(os.path.abspath(__file__)) + "/branding"
-CONSTITUTION_PATH = os.path.join(BRANDING_DIR, "constitution.json")
-STRATEGY_PATH = os.path.join(BRANDING_DIR, "strategy.json")
-USER_MODEL_PATH = os.path.join(BRANDING_DIR, "user_model.json")
+
+# この3つは**設定であり、かつ実行時に書き換わる**。BRANDING_DIR 直下を
+# 直接指していたため、テストが Git 追跡下の本番ファイルを上書きしていた
+# （constitution.json / user_model.json の実測あり）。
+#
+# evolution_log.json と同じく writable_path で解決する。ただしこちらは
+# 読み取りも兼ねるので、conftest が本番の内容を writable root へ複製する。
+# 中身が要るテストが空ファイルを読むことにならないようにするため。
+#
+# BRANDING_DIR 自体は据え置く。ロゴや BGM のような読み取り専用の素材が
+# ぶら下がっており、そちらを移すと読めなくなる。
+CONSTITUTION_PATH = str(_writable_path("backend/branding/constitution.json"))
+STRATEGY_PATH = str(_writable_path("backend/branding/strategy.json"))
+USER_MODEL_PATH = str(_writable_path("backend/branding/user_model.json"))
 # 字幕データのパス（プロジェクトルートからの相対パスを想定）
 SUBTITLES_PATH = os.path.join(os.path.dirname(BRANDING_DIR), "src", "segments_a_plus_plus.json")
 
