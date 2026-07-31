@@ -35,6 +35,15 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     # Path.stat を差し替えているテストで exist_ok の内部判定が壊れる。
     for _sub in ("backend/usage_tracker", "backend/branding", "backend/data"):
         os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
+    # constitution / strategy / user_model は**設定でもある**ので、空のまま
+    # にすると中身を読むテストが壊れる。本番の内容を複製して起点にする。
+    # 書き込みは複製側に落ちるので、本番ファイルは汚れない。
+    # ログ類（evolution_log など）は空から始めてよいので複製しない。
+    import shutil as _shutil
+    for _seed in ("constitution.json", "strategy.json", "user_model.json"):
+        _src = os.path.join(project_root, "backend", "branding", _seed)
+        if os.path.exists(_src):
+            _shutil.copyfile(_src, os.path.join(_writable_root, "backend", "branding", _seed))
 
 
 def _norm(p):
