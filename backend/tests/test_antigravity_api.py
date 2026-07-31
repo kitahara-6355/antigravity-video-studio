@@ -84,6 +84,7 @@ def test_process_srt():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
@@ -103,6 +104,7 @@ def test_process_srt():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
@@ -121,6 +123,7 @@ def test_process_srt():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
@@ -139,6 +142,7 @@ def test_process_srt_no_file_exists():
     mock_path_inst.__truediv__.return_value = mock_path_inst
     
     with patch("antigravity_api.Path", return_value=mock_path_inst), \
+         patch("antigravity_api._writable_path", return_value=mock_path_inst), \
          patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls:
         
         mock_pipeline = mock_pipeline_cls.return_value
