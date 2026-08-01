@@ -40,8 +40,12 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_evolution_log():
-    branding_dir = Path(themes_router.__file__).parent.parent / "branding"
-    log_path = branding_dir / "evolution_log.json"
+    # themes_router と同じ経路で解決する。モジュールの位置から組み立てると
+    # 本番の backend/branding/ を指し、autouse なのでこのファイルの全テストが
+    # 本番の evolution_log.json を退避・削除・復元していた（2026-08-01 実測で
+    # 260 件）。復元するとはいえ、途中で落ちれば本番ファイルが消える。
+    log_path = themes_router._writable_path("backend/branding/evolution_log.json")
+    branding_dir = log_path.parent
     
     # branding ディレクトリ作成
     branding_dir.mkdir(parents=True, exist_ok=True)
