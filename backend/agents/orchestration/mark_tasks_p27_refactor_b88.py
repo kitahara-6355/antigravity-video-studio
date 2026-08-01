@@ -152,7 +152,6 @@ async def run_thumbnail_stage_task(task_id: str, db_path: str = ":memory:") -> s
     output_path = None
     is_success = False
     try:
-        project_root = Path(__file__).resolve().parents[2]
         output_dir = _writable_path("backend/temp_thumbnails")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{task_id}.png"

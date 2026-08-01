@@ -168,7 +168,6 @@ class AnalyticsManager:
         
         if output_dir is None:
             # プロジェクトルート以下の temp_thumbnails
-            project_root = Path(__file__).resolve().parents[2]
             output_dir = _writable_path("temp_thumbnails")
         else:
             output_dir = Path(output_dir)
