@@ -231,8 +231,8 @@ class SmartCutStrategyService:
 
     def _load_evolution_log(self, evolution_log_path: Optional[Path] = None) -> Dict[str, Any]:
         """evolution_log.json からデータを読み込む共通ヘルパー"""
-        path = evolution_log_path or (
-            Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        path = evolution_log_path or _writable_path(
+            "backend/branding/evolution_log.json"
         )
         try:
             with open(path, "r", encoding="utf-8") as f:

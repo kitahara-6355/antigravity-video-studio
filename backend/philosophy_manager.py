@@ -21,7 +21,8 @@ import uuid
 logger = logging.getLogger(__name__)
 
 BRANDING_DIR = Path(__file__).parent / "branding"
-EVOLUTION_LOG_PATH = BRANDING_DIR / "evolution_log.json"
+# 実行のたびに追記される進化履歴。読み書きの両方をこの経路へ通すこと。
+EVOLUTION_LOG_PATH = _writable_path("backend/branding/evolution_log.json")
 
 
 class PhilosophyManager:

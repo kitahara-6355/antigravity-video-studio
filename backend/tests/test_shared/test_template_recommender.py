@@ -499,11 +499,34 @@ def test_apply_learning_bias_no_files_exist():
         assert best_id == "nhk_documentary"
 
 
-def test_apply_learning_bias_first_not_exist_second_exists():
+def test_apply_learning_bias_log_missing_keeps_initial_choice():
+    """evolution_log が無いときは学習バイアスを掛けずに初期選択を返す。
+
+    2026-08-02: 以前は「1件目が無ければ2件目（CWD 相対の
+    `backend/branding/evolution_log.json`）を見る」という2候補の
+    フォールバックがあり、このテストはその2件目を検証していた。
+    CWD 相対の候補は起動ディレクトリ次第で別のファイルを掴むうえ、
+    書き手（writable_path 経由）と読み先がずれるので候補から外した。
+    """
     tr = TemplateRecommender()
-    
-    # Path.exists() の呼び出しに対して、1回目は False、2回目は True を返すように設定
-    with patch("pathlib.Path.exists", side_effect=[False, True]), \
+
+    with patch("pathlib.Path.exists", return_value=False), \
+         patch("pathlib.Path.read_text") as mock_read:
+        scores = {
+            "nhk_documentary": {"score": 50, "reasons": [], "profile": {}},
+            "hikakin_vlog": {"score": 50, "reasons": [], "profile": {}},
+        }
+        best_id = tr._apply_learning_bias("nhk_documentary", scores)
+        assert best_id == "nhk_documentary"
+        assert scores["hikakin_vlog"]["score"] == 50
+        assert mock_read.call_count == 0
+
+
+def test_apply_learning_bias_log_exists_applies_bias():
+    """evolution_log があれば選択履歴からバイアスを掛ける。"""
+    tr = TemplateRecommender()
+
+    with patch("pathlib.Path.exists", return_value=True), \
          patch("pathlib.Path.read_text", return_value='{"template_selections": [{"template_id": "hikakin_vlog", "satisfaction": 5}]}') as mock_read:
         scores = {
             "nhk_documentary": {"score": 50, "reasons": [], "profile": {}},
