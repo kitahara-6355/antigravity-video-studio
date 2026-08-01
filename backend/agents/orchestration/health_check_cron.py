@@ -18,7 +18,7 @@ from datetime import datetime, timezone, timedelta
 
 ORCHESTRATION_DIR = os.path.dirname(os.path.abspath(__file__))
 FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
-OPUS_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "opus_session.json")
+OPUS_SESSION_PATH = str(_writable_path("backend/agents/orchestration/opus_session.json"))
 USER_SCHEDULE_PATH = os.path.join(ORCHESTRATION_DIR, "user_schedule.json")
 
 # AUTO_NUDGE 発動の閾値（分）

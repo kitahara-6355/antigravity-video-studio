@@ -71,13 +71,22 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
             _shutil.copyfile(_src, os.path.join(_writable_root, "backend", "branding", _seed))
     # orchestration の状態ファイルも同じ理由で複製する。task_queue.json は
     # schema_version と tasks を持つ実データで、空だと読む側が壊れる。
-    for _seed in ("task_queue.json", "flash_session.json", "resource_state.json"):
+    for _seed in ("task_queue.json", "flash_session.json", "resource_state.json",
+                  "opus_session.json", "message_box.jsonl", "module_index.json",
+                  "task_learning_cache.json", "harness_audit_status.json",
+                  "harness_audit_log.jsonl"):
         _src = os.path.join(_repo_root, "backend", "agents", "orchestration", _seed)
         if os.path.exists(_src):
             _shutil.copyfile(
                 _src,
                 os.path.join(_writable_root, "backend", "agents", "orchestration", _seed),
             )
+    # README.md は generate_subagent_reports がダッシュボード統計を
+    # DASHBOARD_START/END の間へ同期する対象。実行するとリポジトリの
+    # README が書き換わっていた。複製しておけば同期処理はそのまま動く。
+    _readme = os.path.join(_repo_root, "README.md")
+    if os.path.exists(_readme):
+        _shutil.copyfile(_readme, os.path.join(_writable_root, "README.md"))
 
 sys.path = [p for p in sys.path if _norm(p) not in (_norm(backend_dir), _norm(project_root))]
 sys.path.insert(0, backend_dir)

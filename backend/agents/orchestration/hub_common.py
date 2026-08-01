@@ -29,14 +29,14 @@ INBOX_DIR = _PROJECT_ROOT / "Human01_Official Artifact" / "受信トレイ"
 TASK_QUEUE_PATH = _writable_path("backend/agents/orchestration/task_queue.json")
 OPUS_DIRECTIVE_PATH = _BASE_DIR / "opus_directive.json"
 FLASH_REPORTS_PATH = _BASE_DIR / "flash_reports.jsonl"
-MESSAGE_BOX_PATH = _BASE_DIR / "message_box.jsonl"
+MESSAGE_BOX_PATH = _writable_path("backend/agents/orchestration/message_box.jsonl")
 PHASE_STATE_PATH = _MEMORY_DIR / "phase_state.json"
 PHASE_GATES_PATH = _MEMORY_DIR / "phase_gates.json"
 FLASH_SESSION_PATH = _writable_path("backend/agents/orchestration/flash_session.json")
 USER_SCHEDULE_PATH = _BASE_DIR / "user_schedule.json"
 DESIGN_STOCK_PATH = _BASE_DIR / "design_stock.json"
 ETA_STORE_PATH = _BASE_DIR / "eta_tracker.json"
-MODULE_INDEX_PATH = _BASE_DIR / "module_index.json"
+MODULE_INDEX_PATH = _writable_path("backend/agents/orchestration/module_index.json")
 
 
 class OpusQuotaExceededException(Exception):

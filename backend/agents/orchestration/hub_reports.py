@@ -7,6 +7,10 @@ _emit_harness_audit_log, _extract_task_summaries_from_git, _parse_git_log_stat
 を orchestrator.py からそのまま抽出。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import subprocess
 import re
@@ -1310,7 +1314,7 @@ Phase {completed_phase + 1} のタスク配分およびゲート条件は以下�
         - ハーネスの監査ログとOrchestrationのバッチログが統合される
         - Stage 2（Hook発火）への移行時にデータ形式の互換性が保証される
         """
-        audit_log_path = _BASE_DIR / "harness_audit_log.jsonl"
+        audit_log_path = _writable_path("backend/agents/orchestration/harness_audit_log.jsonl")
         
         passed = results.get("passed", 0)
         failed = results.get("failed", 0)

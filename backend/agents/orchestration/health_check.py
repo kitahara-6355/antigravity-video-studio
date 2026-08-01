@@ -35,7 +35,7 @@ FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_sess
 FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
 PHASE_STATE_PATH = os.path.join(WORKSPACE_DIR, "backend", "agents", "memory", "phase_state.json")
 TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
-OPUS_SESSION_PATH = os.path.join(ORCHESTRATION_DIR, "opus_session.json")
+OPUS_SESSION_PATH = str(_writable_path("backend/agents/orchestration/opus_session.json"))
 EVENT_LOG_PATH = os.path.join(
     WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告", "event_log.jsonl"
 )
