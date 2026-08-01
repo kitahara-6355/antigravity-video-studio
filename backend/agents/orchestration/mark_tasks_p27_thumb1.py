@@ -100,7 +100,6 @@ async def run_thumbnail_stage_task(task_id: str, db_path: str = ":memory:") -> s
     対角線上の3色線形グラデーションや、幾何学的オーバーレイによるプレミアム品質画像を生成する。
     """
     try:
-        project_root = Path(__file__).resolve().parents[3]
         output_dir = _writable_path("temp_thumbnails")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{task_id}.png"

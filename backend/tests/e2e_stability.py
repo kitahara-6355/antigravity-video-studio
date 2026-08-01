@@ -368,7 +368,6 @@ def _run_thumbnail_automation_test() -> bool:
         res_dict = json.loads(res_json)
         passed = res_dict.get("valid", False)
         # クリーンアップ
-        project_root = Path(__file__).resolve().parents[2]
         p_str = str(_wp("temp_thumbnails") / f"{task_id}.png")
         _safe_unlink(p_str)
     except (RuntimeError, json.JSONDecodeError, ValueError, OSError) as e:
@@ -529,7 +528,6 @@ async def run_thumbnail_stage_task(task_id: str, db_path: str = ":memory:") -> s
     StageBoundAgent の process_func として動作する non-blocking な非同期タスク処理。
     自動リトライ、結果保存、DBマイグレーションと連携。
     """
-    project_root = Path(__file__).resolve().parents[2]
     output_dir = _wp("temp_thumbnails")
     os.makedirs(str(output_dir), exist_ok=True)
     output_path = output_dir / f"{task_id}.png"
