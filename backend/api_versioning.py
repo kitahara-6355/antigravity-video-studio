@@ -11,6 +11,11 @@ API バージョニング — /api/v1/ プレフィクス化（U-19）
     from api_versioning import v1_router
     app.include_router(v1_router)
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 
 import logging
 from fastapi import APIRouter, HTTPException
@@ -285,7 +290,7 @@ async def resolve_api_thumbnail_task(task_id: str) -> str:
     """
     import json
     from pathlib import Path
-    output_dir = Path("backend/temp_thumbnails")
+    output_dir = _writable_path("backend/temp_thumbnails")
     output_path = output_dir / f"api_versioning_{task_id}.png"
     
     generate_api_thumbnail(output_path, width=1280, height=720, text=f"ApiVersioning {task_id}")
@@ -310,7 +315,7 @@ async def generate_v1_thumbnail(req: ThumbnailGenerateRequest):
     from fastapi import HTTPException
     from pathlib import Path
     try:
-        output_dir = Path("backend/temp_thumbnails")
+        output_dir = _writable_path("backend/temp_thumbnails")
         output_path = output_dir / f"api_versioning_{req.task_id}.png"
         generate_api_thumbnail(
             output_path,

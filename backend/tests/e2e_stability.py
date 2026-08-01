@@ -10,6 +10,11 @@ E2Eテスト: 安定稼働品質ゲート検証
   - 75点以上 = 安定稼働合格
   - stabilityカテゴリ = 100点必須
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 
 import asyncio
 import http.client
@@ -364,7 +369,7 @@ def _run_thumbnail_automation_test() -> bool:
         passed = res_dict.get("valid", False)
         # クリーンアップ
         project_root = Path(__file__).resolve().parents[2]
-        p_str = str(project_root / "temp_thumbnails" / f"{task_id}.png")
+        p_str = str(_wp("temp_thumbnails") / f"{task_id}.png")
         _safe_unlink(p_str)
     except (RuntimeError, json.JSONDecodeError, ValueError, OSError) as e:
         print(f"  ❌ サムネイル自動化テスト失敗: {e}")
@@ -525,7 +530,7 @@ async def run_thumbnail_stage_task(task_id: str, db_path: str = ":memory:") -> s
     自動リトライ、結果保存、DBマイグレーションと連携。
     """
     project_root = Path(__file__).resolve().parents[2]
-    output_dir = project_root / "temp_thumbnails"
+    output_dir = _wp("temp_thumbnails")
     os.makedirs(str(output_dir), exist_ok=True)
     output_path = output_dir / f"{task_id}.png"
     output_path_str = str(output_path)

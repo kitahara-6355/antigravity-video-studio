@@ -3,6 +3,11 @@
 debug_mapping.py — サムネイル画像生成および品質検証モジュール
 StageBoundAgent や自動リトライ、結果保存、DBマイグレーションと連携して動作する。
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import json
 import logging
@@ -110,7 +115,7 @@ async def resolve_thumbnail_task(self, task_id: str) -> str:
     StageBoundAgent などの process_func として登録して動作するタスクハンドラ。
     呼び出し元インスタンス (self) の属性から出力ディレクトリ、解像度、テキストを動的に取得する。
     """
-    output_dir = Path(getattr(self, "output_dir", None) or "backend/temp_thumbnails")
+    output_dir = Path(getattr(self, "output_dir", None) or _wp("backend/temp_thumbnails"))
     output_path = output_dir / f"{task_id}.png"
     
     width = getattr(self, "width", 1280)

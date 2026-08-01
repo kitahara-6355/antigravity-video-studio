@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import pytest
 import os
 import sys
@@ -30,7 +35,7 @@ def cleanup_test_db_and_temp():
             except Exception:
                 pass
     
-    temp_dir = Path("backend/temp_thumbnails")
+    temp_dir = _wp("backend/temp_thumbnails")
     if temp_dir.exists():
         for f in temp_dir.glob("*"):
             try:

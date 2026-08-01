@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import subprocess
 import shutil
 from pathlib import Path
@@ -867,7 +872,7 @@ class PreviewEngine:
         if not ext.startswith("."):
             ext = f".{ext}"
             
-        output_dir = Path("backend/temp_thumbnails")
+        output_dir = _writable_path("backend/temp_thumbnails")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{task_id}{ext}"
         

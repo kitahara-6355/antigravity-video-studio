@@ -6,6 +6,11 @@ Preview Report Generator
 Phase 30.5 - プログレッシブ・プレビュー機能
 Phase 30.6 - 改善: 並列処理、差分ハイライト、音声分析
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 
 import json
 from pathlib import Path
@@ -790,7 +795,7 @@ from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 import uuid
 import textwrap
 
-OUTPUT_DIR = "backend/temp_thumbnails"
+OUTPUT_DIR = str(_writable_path("backend/temp_thumbnails"))
 
 def verify_and_optimize_image(image_bytes: bytes, target_width=1280, target_height=720) -> bytes:
     """

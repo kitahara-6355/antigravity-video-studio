@@ -2,6 +2,11 @@
 Subtitle Overlay Preview Generator
 字幕を含むプレビューを生成
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 
 import subprocess
 from pathlib import Path
@@ -599,7 +604,7 @@ async def resolve_subtitle_preview_task(agent_or_id, task_id: str = None, db_pat
     
     if actual_output_dir is None:
         project_root = Path(__file__).resolve().parents[1]
-        actual_output_dir = project_root / "temp_thumbnails"
+        actual_output_dir = _writable_path("temp_thumbnails")
     else:
         actual_output_dir = Path(actual_output_dir)
         

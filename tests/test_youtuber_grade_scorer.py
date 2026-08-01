@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import sys
 import json
@@ -327,7 +332,7 @@ class DummyAgentWithoutAttributes:
 async def test_resolve_youtuber_preview_task_defaults():
     self_mock = DummyAgentWithoutAttributes()
     task_id = "test_default_task"
-    expected_path = Path("backend/temp_thumbnails") / f"{task_id}_youtuber_preview.png"
+    expected_path = _wp("backend/temp_thumbnails") / f"{task_id}_youtuber_preview.png"
     
     # 既存のファイルを退避または削除
     if expected_path.exists():

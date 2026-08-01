@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from branding_manager import branding_manager
 from branding.history_manager import history_manager
 
@@ -86,7 +91,7 @@ def generate_thumbnail_file(output_path: str, width: int = 1280, height: int = 7
     img.save(path, "PNG")
     return path
 
-async def resolve_thumbnail_task(task_id: str, db_path: str = ":memory:", output_dir: str = "temp_thumbnails") -> str:
+async def resolve_thumbnail_task(task_id: str, db_path: str = ":memory:", output_dir: str = str(_writable_path("temp_thumbnails"))) -> str:
     """
     StageBoundAgent の process_func として動作する非同期タスク処理。
     """

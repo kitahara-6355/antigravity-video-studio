@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import random
 import json
 import os
@@ -164,7 +169,7 @@ class AnalyticsManager:
         if output_dir is None:
             # プロジェクトルート以下の temp_thumbnails
             project_root = Path(__file__).resolve().parents[2]
-            output_dir = project_root / "temp_thumbnails"
+            output_dir = _writable_path("temp_thumbnails")
         else:
             output_dir = Path(output_dir)
             

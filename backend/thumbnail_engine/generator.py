@@ -2,6 +2,11 @@
 Thumbnail Generator - Imagen 4.0統合
 サムネイル生成エンジンのメインロジック
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import os
 import sys
 import base64
@@ -860,7 +865,7 @@ async def resolve_generator_thumbnail_task(agent, task_id: str) -> str:
     from usage_tracker.alert_system import emit_critical
     
     try:
-        output_dir = Path(getattr(agent, "output_dir", None) or "backend/temp_thumbnails")
+        output_dir = Path(getattr(agent, "output_dir", None) or _writable_path("backend/temp_thumbnails"))
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # タイトルと説明をagentの属性から取得。なければデフォルト。

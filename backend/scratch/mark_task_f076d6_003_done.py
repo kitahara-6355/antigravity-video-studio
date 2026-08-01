@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import sys
 from pathlib import Path
 project_root = Path(__file__).resolve().parents[2]
@@ -11,7 +16,7 @@ import uuid
 from datetime import datetime
 
 # 定数定義
-OUTPUT_DIR = "backend/temp_thumbnails"
+OUTPUT_DIR = str(_writable_path("backend/temp_thumbnails"))
 DEFAULT_WIDTH = 1280
 DEFAULT_HEIGHT = 720
 MIN_WIDTH = 1280

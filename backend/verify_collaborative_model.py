@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import uuid
 from pathlib import Path
@@ -166,7 +171,7 @@ async def resolve_collaborative_thumbnail_task(task_id: str) -> str:
     """
     StageBoundAgent から呼び出し可能な非同期タスク処理ハンドラ。
     """
-    output_dir = Path("backend/temp_thumbnails")
+    output_dir = _writable_path("backend/temp_thumbnails")
     output_path = output_dir / f"collaborative_model_{task_id}.png"
     
     # 画像生成
@@ -280,7 +285,7 @@ async def test_resolve_collaborative_thumbnail_task():
     result_json = await resolve_collaborative_thumbnail_task(task_id)
     info = json.loads(result_json)
     
-    expected_path = Path("backend/temp_thumbnails") / f"collaborative_model_{task_id}.png"
+    expected_path = _writable_path("backend/temp_thumbnails") / f"collaborative_model_{task_id}.png"
     assert expected_path.exists()
     assert info["width"] == 1280
     assert info["height"] == 720

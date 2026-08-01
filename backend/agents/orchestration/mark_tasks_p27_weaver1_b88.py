@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import sys
 sys.path.insert(0, '.')
 from backend.agents.orchestration import OrchestrationHub
@@ -109,7 +114,7 @@ async def resolve_weaver_thumbnail_task(task_id: str) -> str:
     """
     import json
     from pathlib import Path
-    output_dir = Path("backend/temp_thumbnails")
+    output_dir = _writable_path("backend/temp_thumbnails")
     output_path = output_dir / f"{task_id}.png"
     
     generate_thumbnail(output_path, width=1280, height=720, text="Weaver Thumbnail Task")

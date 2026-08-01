@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import sys
 import sqlite3
@@ -762,7 +767,7 @@ class TestE2EStabilityDockerRobustness(unittest.TestCase):
                     asyncio.set_event_loop(None)
                 
             project_root = Path(__file__).resolve().parents[2]
-            p = project_root / "temp_thumbnails" / "task_test_p27.png"
+            p = _wp("temp_thumbnails") / "task_test_p27.png"
             if p.exists():
                 try: p.unlink()
                 except OSError: pass

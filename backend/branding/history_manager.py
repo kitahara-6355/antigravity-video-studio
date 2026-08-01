@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import os
 import time
@@ -670,7 +675,7 @@ async def resolve_thumbnail_task(agent_or_id, task_id: str = None, db_path: str 
     # 出力パスの決定
     if actual_output_dir is None:
         project_root = Path(__file__).resolve().parents[2]
-        actual_output_dir = project_root / "temp_thumbnails"
+        actual_output_dir = _writable_path("temp_thumbnails")
     else:
         actual_output_dir = Path(actual_output_dir)
         

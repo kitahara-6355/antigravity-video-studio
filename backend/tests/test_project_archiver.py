@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import json
 import shutil
@@ -409,7 +416,7 @@ async def test_resolve_thumbnail_task(tmp_path):
 async def test_resolve_thumbnail_task_default_dir(tmp_path):
     archiver = ProjectArchiver()
     task_id = "default_async_task"
-    expected_path = Path("backend/temp_thumbnails") / f"{task_id}.png"
+    expected_path = _wp("backend/temp_thumbnails") / f"{task_id}.png"
     
     if expected_path.exists():
         expected_path.unlink()
