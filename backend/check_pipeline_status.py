@@ -1,4 +1,9 @@
 """Pipeline status checker."""
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import urllib.request
 import json
 import sys
@@ -89,7 +94,7 @@ from pathlib import Path
 from datetime import datetime
 import asyncio
 
-OUTPUT_DIR = "backend/temp_thumbnails"
+OUTPUT_DIR = str(_writable_path("backend/temp_thumbnails"))
 
 def generate_pipeline_status_thumbnail(output_path, width=1280, height=720, text=None):
     """Pillowを使用して、パイプラインステータスのサムネイル画像を生成する"""

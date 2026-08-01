@@ -1,4 +1,9 @@
 """Session 9: O-10/O-11/O-12 ストーリーJSON + スナップショット生成スクリプト"""
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 from pathlib import Path
 
@@ -221,7 +226,7 @@ async def validate_session9_thumbnails(db_path: str = "backend/temp/legacy_thumb
         raise ValueError("Session9 thumbnail validation via StageBoundAgent failed.")
     
     # 出力された画像のパスを取得して検証
-    output_path = Path("backend/temp_thumbnails") / f"{task_id}.png"
+    output_path = _writable_path("backend/temp_thumbnails") / f"{task_id}.png"
     try:
         result_info = overlay.validate_thumbnail(output_path)
         print(f"✅ Session9 thumbnail validation completed successfully via StageBoundAgent: {result_info}")

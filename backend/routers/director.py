@@ -1,6 +1,11 @@
 """
 Director Router - AI Director endpoints
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from pydantic import BaseModel, Field
 import json
@@ -271,7 +276,7 @@ async def batch_generate(req: BatchGenRequest, background_tasks: BackgroundTasks
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-THUMBNAIL_OUTPUT_DIR = Path("backend/temp_thumbnails")
+THUMBNAIL_OUTPUT_DIR = _writable_path("backend/temp_thumbnails")
 
 def generate_director_thumbnail(output_path, width=1280, height=720, text="Director Thumbnail"):
     """Pillowを使用して、指定された解像度とテキストでサムネイル画像を生成する"""

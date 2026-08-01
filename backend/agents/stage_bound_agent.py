@@ -3,6 +3,11 @@
 Stage Bound Agent — 分散型ステージ内部エージェント (IMP-009)
 中央オーケストレーターを介さず、SQLiteのタスクステータスを監視して自律的に起動・制御する。
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import sqlite3
 import time
 import asyncio
@@ -293,7 +298,7 @@ async def resolve_thumbnail_task(self, task_id: str) -> str:
     """
     import json
     from pathlib import Path
-    output_dir = Path(getattr(self, "output_dir", None) or "backend/temp_thumbnails")
+    output_dir = Path(getattr(self, "output_dir", None) or _writable_path("backend/temp_thumbnails"))
     output_path = output_dir / f"{task_id}.png"
     
     width = getattr(self, "width", 1280)

@@ -631,7 +631,7 @@ async def resolve_premium_branding_task(task_id: str, agent=None) -> str:
     import sys
     import traceback
     
-    output_dir_path = Path("backend/temp_thumbnails")
+    output_dir_path = _writable_path("backend/temp_thumbnails")
     width = 1280
     height = 720
     text = f"Premium Branding Task: {task_id}"

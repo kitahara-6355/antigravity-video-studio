@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import sys
 import os
 import base64
@@ -329,7 +336,7 @@ def test_mark_timeout_fail_fallback_integration(tmp_path):
         assert final_status == "COMPLETED"
         
         # 出力されたファイルの存在と品質を検証
-        output_path = Path("backend/temp_thumbnails") / f"{task_id}_fallback.png"
+        output_path = _wp("backend/temp_thumbnails") / f"{task_id}_fallback.png"
         assert output_path.exists()
         
         try:
@@ -975,7 +982,7 @@ def test_resolve_timeout_fallback_task_failure(tmp_path):
     import asyncio
 
     task_id = "test_fail_task_123"
-    expected_output_path = Path("backend/temp_thumbnails") / f"{task_id}_fallback.png"
+    expected_output_path = _wp("backend/temp_thumbnails") / f"{task_id}_fallback.png"
 
     # 確実に削除されていることを確認するための初期状態
     if expected_output_path.exists():
@@ -1331,7 +1338,7 @@ def test_resolve_timeout_fallback_task_unlink_oserror():
     import pytest
 
     task_id = "test_task_unlink_oserror"
-    expected_output_path = Path("backend/temp_thumbnails") / f"{task_id}_fallback.png"
+    expected_output_path = _wp("backend/temp_thumbnails") / f"{task_id}_fallback.png"
 
     # 初期状態でファイルが存在しないようにする
     if expected_output_path.exists():

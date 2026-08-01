@@ -2,6 +2,11 @@
 GCP費用監視スクリプト
 恒久的な費用管理の一環として、月次費用をチェック
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 
 import subprocess
 import json
@@ -10,7 +15,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 import uuid
 
-OUTPUT_DIR = "backend/temp_thumbnails"
+OUTPUT_DIR = str(_writable_path("backend/temp_thumbnails"))
 
 
 def _get_nested_value(data, *keys, default="N/A"):

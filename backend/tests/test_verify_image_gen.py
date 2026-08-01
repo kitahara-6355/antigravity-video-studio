@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import sys
 import os
 import io
@@ -107,7 +114,7 @@ def test_stage_bound_agent_integration(tmp_path):
         assert final_status == "COMPLETED"
         
         # 出力されたファイルの品質検証
-        output_file = Path("backend/temp_thumbnails") / f"{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"{task_id}.png"
         assert output_file.exists()
         
         try:
@@ -188,7 +195,7 @@ def test_stage_bound_agent_retry_behavior(tmp_path):
             conn.close()
             
         # 生成されたファイルのクリーンアップ
-        output_file = Path("backend/temp_thumbnails") / f"{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"{task_id}.png"
         if output_file.exists():
             output_file.unlink()
             
@@ -600,7 +607,7 @@ def test_thumbnail_quality_rule_and_agent_integration(tmp_path):
         assert final_status == "COMPLETED"
         
         # 出力されたファイルの存在とパス確認
-        output_file = Path("backend/temp_thumbnails") / f"{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"{task_id}.png"
         assert output_file.exists()
         
         try:
@@ -969,7 +976,7 @@ def test_thumbnail_strict_agent_integration(tmp_path):
         assert final_status == "COMPLETED"
         
         # 出力されたファイルの存在とパス確認
-        output_file = Path("backend/temp_thumbnails") / f"{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"{task_id}.png"
         assert output_file.exists()
         
         try:
@@ -1268,7 +1275,7 @@ def test_stage_bound_agent_preview_propagation(tmp_path):
         assert final_status == "COMPLETED"
         
         # 出力されたファイルの存在とパス確認
-        output_file = Path("backend/temp_thumbnails") / f"{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"{task_id}.png"
         assert output_file.exists()
         
         try:
@@ -1411,7 +1418,7 @@ def test_mandatory_thumbnail_quality_and_agent_integration_comprehensive(tmp_pat
         assert final_status == "COMPLETED"
         
         # 出力されたファイルの存在確認
-        output_file = Path("backend/temp_thumbnails") / f"{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"{task_id}.png"
         assert output_file.exists(), f"Output file does not exist: {output_file}"
         
         try:

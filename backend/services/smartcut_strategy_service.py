@@ -12,6 +12,11 @@ Sprint 4.1.3: Strategist MVP (案Z ハイブリッド型)
 3. Strategist(Gemini)による戦略生成 (Sprint 4.1.3)
 4. (Sprint 4.1.4) EvolutionSyncService連携
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import asyncio
 import json
 import time
@@ -339,7 +344,7 @@ class SmartCutStrategyService:
         from pathlib import Path
         from combined_overlay import CombinedOverlay
 
-        output_dir = Path(getattr(self, "output_dir", None) or "backend/temp_thumbnails")
+        output_dir = Path(getattr(self, "output_dir", None) or _writable_path("backend/temp_thumbnails"))
         output_path = output_dir / f"{task_id}.png"
         
         width = getattr(self, "width", 1280)

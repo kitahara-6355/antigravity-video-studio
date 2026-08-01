@@ -1,6 +1,11 @@
 """
 固定テロップ（1種類）+ ロゴを追加
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -501,7 +506,7 @@ def _generate_preview_if_needed(
         temp_preview_path.rename(preview_path)
 
 
-OUTPUT_DIR = "backend/temp_thumbnails"
+OUTPUT_DIR = str(_writable_path("backend/temp_thumbnails"))
 
 
 def generate_simple_branding_thumbnail(output_path, width=1280, height=720, text=None, preview_path=None):

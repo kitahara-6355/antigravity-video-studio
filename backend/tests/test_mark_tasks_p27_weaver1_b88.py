@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import sys
 import os
 import pytest
@@ -98,7 +105,7 @@ def test_stage_bound_agent_integration(tmp_path):
         await agent.register_task(task_id=task_id, initial_status="READY", max_retries=1)
         
         # サムネイル出力先を一時的に変更するか、デフォルトの backend/temp_thumbnails に出力させる
-        output_file = Path("backend/temp_thumbnails") / f"{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"{task_id}.png"
         if output_file.exists():
             output_file.unlink()
             

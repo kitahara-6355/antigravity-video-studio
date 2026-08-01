@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import sys
 import os
 import json
@@ -42,9 +49,9 @@ def test_smartcut_thumbnail_generation_success(tmp_path):
     assert thumb_info["size_bytes"] < 4 * 1024 * 1024
     
     # 物理ファイルが存在し、破損していないか確認
-    output_path = Path("backend/temp_thumbnails/test_smartcut_task_success.png")
+    output_path = (_wp("backend/temp_thumbnails") / "test_smartcut_task_success.png")
     if not output_path.exists():
-        output_path = Path("temp_thumbnails/test_smartcut_task_success.png")
+        output_path = (_wp("temp_thumbnails") / "test_smartcut_task_success.png")
         
     assert output_path.exists()
     
@@ -322,8 +329,8 @@ def test_smartcut_thumbnail_special_characters_success():
     
     import os
     from pathlib import Path
-    output_path = Path("backend/temp_thumbnails/test_smartcut_task_special_char.png")
+    output_path = (_wp("backend/temp_thumbnails") / "test_smartcut_task_special_char.png")
     if not output_path.exists():
-        output_path = Path("temp_thumbnails/test_smartcut_task_special_char.png")
+        output_path = (_wp("temp_thumbnails") / "test_smartcut_task_special_char.png")
         
     assert output_path.exists()

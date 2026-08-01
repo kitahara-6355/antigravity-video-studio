@@ -9,6 +9,11 @@ Phase 20: インタラクティブプレビューシステム
 
 辞書不要 - AIが文脈から判断
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 
 import json
 import logging
@@ -264,7 +269,7 @@ from PIL import Image, ImageDraw
 import uuid
 from datetime import datetime
 
-OUTPUT_DIR = "backend/temp_thumbnails"
+OUTPUT_DIR = str(_writable_path("backend/temp_thumbnails"))
 
 def generate_subtitle_confirmation_thumbnail(output_path, width=1280, height=720, text=None):
     """Pillowを使用して、字幕確認レポート用画像を生成する"""

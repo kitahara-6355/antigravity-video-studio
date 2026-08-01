@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import sys
 from unittest.mock import MagicMock, patch
 import pytest
@@ -220,7 +227,7 @@ def test_collaborative_thumbnail_stage_bound_agent_integration(tmp_path):
         assert final_status == "COMPLETED"
         
         # ファイルの存在と検証
-        output_file = Path("backend/temp_thumbnails") / f"collaborative_model_{task_id}.png"
+        output_file = _wp("backend/temp_thumbnails") / f"collaborative_model_{task_id}.png"
         assert output_file.exists()
         
         try:
@@ -704,7 +711,7 @@ async def test_resolve_collaborative_thumbnail_task_cleanup_on_failure():
     from pathlib import Path
     
     task_id = "test_cleanup_fail"
-    expected_path = Path("backend/temp_thumbnails") / f"collaborative_model_{task_id}.png"
+    expected_path = _wp("backend/temp_thumbnails") / f"collaborative_model_{task_id}.png"
     
     # 既存のファイルがないことを保証
     if expected_path.exists():

@@ -9,6 +9,11 @@ SmartCut Router - スマートカットAPIエンドポイント
 - /api/smartcut/all-candidates: 全候補取得
 - /api/smartcut/finalize: 最終構成確定
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Any, List, Optional
@@ -415,7 +420,7 @@ async def generate_smartcut_thumbnail(req: SmartCutThumbnailRequest) -> Dict[str
         
         # データベースと出力ディレクトリの設定
         db_path = "backend/temp/smartcut_stage.db" if os.path.exists("backend") else "temp/smartcut_stage.db"
-        output_dir = "backend/temp_thumbnails" if os.path.exists("backend") else "temp_thumbnails"
+        output_dir = str(_writable_path("backend/temp_thumbnails"))
         
         try:
             os.makedirs(os.path.dirname(db_path), exist_ok=True)

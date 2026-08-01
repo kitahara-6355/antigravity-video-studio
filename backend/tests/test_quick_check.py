@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import sys
 import os
 import runpy
@@ -218,7 +225,7 @@ def test_stage_bound_agent_integration_quick_check(tmp_path):
     from quick_check import resolve_quick_check_thumbnail_task, validate_quick_check_thumbnail, BASE_DIR
     
     db_file = tmp_path / "quick_check_agent_test.db"
-    output_dir = BASE_DIR / "backend" / "temp_thumbnails"
+    output_dir = _wp("backend/temp_thumbnails")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     agent = StageBoundAgent(stage_name="thumbnail", db_path=str(db_file))

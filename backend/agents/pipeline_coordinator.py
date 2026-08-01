@@ -18,6 +18,11 @@ Anthropic推奨の設計パターンを適用:
   - WebSocket によるリアルタイム進捗通知
   - パイプライン完了時に DreamEngine への学習フック
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 
 
 import json
@@ -881,7 +886,7 @@ pipeline_coordinator = PipelineCoordinator()
 
 
 # --- Thumbnail Generation & Quality Validation for Phase 27 ---
-THUMBNAIL_OUTPUT_DIR = Path("backend/temp_thumbnails")
+THUMBNAIL_OUTPUT_DIR = _writable_path("backend/temp_thumbnails")
 
 def generate_pipeline_coordinator_thumbnail(output_path, width=1280, height=720, text="Pipeline Coordinator Thumbnail"):
     """Pillowを使用して、指定された解像度とテキストでサムネイル画像を生成する"""

@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import asyncio
 import json
 import logging
@@ -390,7 +395,7 @@ class SubtitleThumbnailVerifier:
 async def resolve_subtitle_thumbnail_task(agent, task_id: str) -> str:
     """StageBoundAgent の process_func として動作する非同期タスク処理"""
     try:
-        output_dir = Path(getattr(agent, "output_dir", None) or "backend/temp_thumbnails")
+        output_dir = Path(getattr(agent, "output_dir", None) or _writable_path("backend/temp_thumbnails"))
         output_path = output_dir / f"{task_id}.png"
         
         # 画像生成

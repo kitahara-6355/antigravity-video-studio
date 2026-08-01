@@ -1,3 +1,10 @@
+# 出力先は実装と同じ経路で解決する。直書きすると、実装を writable_path へ
+# 寄せた後もテストだけがリポジトリ内を見に行き、本番ディレクトリを掴む。
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import pytest
 from pathlib import Path
@@ -263,7 +270,7 @@ async def test_resolve_subtitle_thumbnail_task_default_dir():
     agent = DummyAgentWithoutOutputDir()
     task_id = "task_default_dir_001"
     
-    default_dir = Path("backend/temp_thumbnails")
+    default_dir = _wp("backend/temp_thumbnails")
     default_dir.mkdir(parents=True, exist_ok=True)
     expected_file = default_dir / f"{task_id}.png"
     

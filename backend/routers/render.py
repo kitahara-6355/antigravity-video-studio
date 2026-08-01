@@ -7,6 +7,11 @@ O-8 レンダリングUXストーリー対応:
 - レンダリングジョブ管理
 - 品質チェック連携
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -674,7 +679,7 @@ async def generate_thumbnail(req: ThumbnailGenerateRequest) -> Dict[str, Any]:
             
             # 原子的な一時ファイル書き出し
             from pathlib import Path
-            output_dir = Path("backend/temp_thumbnails")
+            output_dir = _writable_path("backend/temp_thumbnails")
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / f"{task_id}.jpg"
             

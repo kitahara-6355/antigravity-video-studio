@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import sys
 import json
@@ -260,7 +265,7 @@ def test_generate_v1_thumbnail_success(api_client, clean_thumbnail_file):
         "height": 720
     }
     
-    expected_path = Path("backend/temp_thumbnails") / f"api_versioning_{task_id}.png"
+    expected_path = _wp("backend/temp_thumbnails") / f"api_versioning_{task_id}.png"
     clean_thumbnail_file(expected_path)
     
     response = api_client.post("/api/v1/thumbnail/generate", json=payload)

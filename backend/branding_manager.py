@@ -978,7 +978,7 @@ class BrandingManager:
         img.save(buf, format="JPEG", quality=95)
         return buf.getvalue()
 
-    async def resolve_thumbnail_task(self, task_id: str, output_dir: str = "backend/temp_thumbnails") -> str:
+    async def resolve_thumbnail_task(self, task_id: str, output_dir: str = str(_writable_path("backend/temp_thumbnails"))) -> str:
         """
         StageBoundAgent の process_func として動作する非同期タスク処理。
         ブランディング設定に基づいて画像を生成し、その結果を指定のパスに保存、

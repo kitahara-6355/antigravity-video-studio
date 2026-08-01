@@ -7,6 +7,11 @@
 - カラーコントラスト分析（YouTube白背景での視認性）
 - IMP-007: Gemini Vision APIによる実画像分析（テキストマッチのフォールバック付き）
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import logging
 import base64
 import json
@@ -1119,7 +1124,7 @@ class ThumbnailAnalyzer:
             text = getattr(self, "text", f"Thumbnail {actual_task_id}")
 
         try:
-            out_dir = Path(actual_output_dir or "backend/temp_thumbnails")
+            out_dir = Path(actual_output_dir or _writable_path("backend/temp_thumbnails"))
             out_dir.mkdir(parents=True, exist_ok=True)
             output_path = out_dir / f"{actual_task_id}.png"
             
@@ -1199,7 +1204,7 @@ class ThumbnailResolver(ThumbnailAnalyzer):
         super().__init__()
         from pathlib import Path
         self.project_root = project_root or Path(__file__).resolve().parents[2]
-        self.output_dir = output_dir or (self.project_root / "temp_thumbnails")
+        self.output_dir = output_dir or _writable_path("temp_thumbnails")
         
     async def resolve_thumbnail_task(self, task_id):
         # 親クラスの resolve_thumbnail_task を呼び出す

@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import io
 import pytest
@@ -64,7 +69,7 @@ async def test_run_thumbnail_stage_task_success(tmp_path):
     task_id = "test_task_123"
     
     from pathlib import Path
-    output_png = Path(mark_tasks_p27_refactor_b88.__file__).resolve().parents[2] / "temp_thumbnails" / f"{task_id}.png"
+    output_png = _wp("backend/temp_thumbnails") / f"{task_id}.png"
     
     try:
         with patch("backend.agents.orchestration.mark_tasks_p27_refactor_b88.emit_critical") as mock_emit_critical:
@@ -98,7 +103,7 @@ async def test_run_thumbnail_stage_task_cleanup_on_error(tmp_path):
     task_id = "test_task_cleanup_err"
     
     from pathlib import Path
-    output_png = Path(mark_tasks_p27_refactor_b88.__file__).resolve().parents[2] / "temp_thumbnails" / f"{task_id}.png"
+    output_png = _wp("backend/temp_thumbnails") / f"{task_id}.png"
     
     with patch("backend.agents.orchestration.mark_tasks_p27_refactor_b88.verify_thumbnail_quality", side_effect=ValueError("Mocked validation error")):
         with pytest.raises(ValueError, match="Mocked validation error"):

@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _wp
+except ImportError:
+    from path_resolver import writable_path as _wp
+
 import os
 import sqlite3
 import pytest
@@ -23,7 +28,7 @@ async def test_thumbnail_quality_standards():
     3. ファイルサイズが 4MB 未満であること
     4. 出力ファイルが正常に存在し、破損していないこと（Pillowでロード可能）
     """
-    output_dir = Path("backend/temp_thumbnails_test")
+    output_dir = _wp("backend/temp_thumbnails_test")
     output_path = output_dir / "test_quality.png"
     if output_path.exists():
         output_path.unlink()
@@ -69,12 +74,12 @@ async def test_stage_bound_agent_integration():
     """
     StageBoundAgent 等に登録され、自動リトライや結果保存、DBマイグレーションの各機能と連携して動作することを検証
     """
-    db_path = "backend/temp_thumbnails_test_agent.db"
+    db_path = str(_wp("backend/temp_thumbnails_test_agent.db"))
     if os.path.exists(db_path):
         os.unlink(db_path)
         
     # テスト用の出力ディレクトリ
-    output_dir = Path("backend/temp_thumbnails_test_agent_out")
+    output_dir = _wp("backend/temp_thumbnails_test_agent_out")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     try:

@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import sys
 import os
 import json
@@ -148,7 +153,7 @@ async def run_thumbnail_stage_task(task_id: str, db_path: str = ":memory:") -> s
     is_success = False
     try:
         project_root = Path(__file__).resolve().parents[2]
-        output_dir = project_root / "temp_thumbnails"
+        output_dir = _writable_path("backend/temp_thumbnails")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{task_id}.png"
         

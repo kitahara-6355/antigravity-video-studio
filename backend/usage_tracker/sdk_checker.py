@@ -6,6 +6,11 @@ PROJECT_CONSTITUTION §18 準拠:
 - 非互換モデルを検知して警告
 - 自動フォールバック
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from typing import Dict, Any, List, Optional, Set
 from pathlib import Path
 from datetime import datetime
@@ -17,7 +22,7 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-OUTPUT_DIR = "backend/temp_thumbnails"
+OUTPUT_DIR = str(_writable_path("backend/temp_thumbnails"))
 
 
 class SDKCompatibilityChecker:
