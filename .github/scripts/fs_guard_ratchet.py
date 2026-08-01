@@ -22,10 +22,25 @@
     落ちて fs_guard が動かなかった回に黙って緑になる。fs_guard は
     検出ゼロでも空のファイルを必ず作る。**不在は失敗**として扱う。
 
-判定の粒度:
-    パスごとに「何テストがそこへ書いたか」を数える。合計だけを見ていると、
-    片方を減らしたぶんでもう片方の増加を相殺できてしまう（絶対パス
-    ラチェットで分類を分けたのと同じ理由）。パス単位ならその余地が無い。
+判定の粒度 — 3分類に分ける:
+    | 分類 | 2026-08-01 CI(Linux) 実測 | 数え方 |
+    |---|---|---|
+    | `tracked`（Git 追跡下の本番ファイル） | 36 パス | パスごと |
+    | `official_artifact`（`Human01_Official Artifact/`） | 16 パス | パスごと |
+    | `untracked`（テストが新規に作るもの） | 2,343 パス | **合計数だけ** |
+
+    分類を分ける理由は絶対パスラチェットと同じ。合計だけを見ていると、
+    片方を減らしたぶんでもう片方の増加を相殺できてしまう。
+
+    `untracked` だけ合計数なのは、**名前が実行のたびに変わるものが大半**
+    だから。2,343 パスを個別の鍵として並べると、正規化しきれなかった揺れが
+    毎回「新規パス」として出て恒常的に赤くなる。合計数なら、揺れは
+    出入りで相殺されて安定し、「汚染先が増えた」ことだけが残る。
+
+    逆に `tracked` と `official_artifact` は名前が安定していて、しかも
+    **1件でも増やしたくないもの**なのでパスごとに数える。`git status` は
+    判定に使えない — `Human01_Official Artifact/` は `.gitignore` 済みで
+    status に出ないまま再生成される。
 
     ただし**そのままのパスは鍵にできない**。2026-08-01 の実測では、
     汚染先の名前に実行ごとの識別子が入るものが多数あった。
@@ -54,12 +69,18 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / ".github" / "fs-guard-baseline.json"
 RECORDS = ROOT / "fs-guard-records.jsonl"
+
+# 会話ログを含むため公開時にディレクトリごと除去したもの（CLAUDE.md 参照）。
+# テストが再生成し、気づかずコミットすると除去した意味が消える。
+# `.gitignore` 済みなので `git status` には出ない — だからここで数える。
+OFFICIAL_ARTIFACT = "Human01_Official Artifact"
 
 
 # 実行ごとに変わる部分。左から順に当てる（時刻は数字より先に落とす）。
@@ -107,27 +128,74 @@ def read_records(path: Path) -> dict[str, int]:
     現れる。テスト名の集合として合流させる — 行数を足すとバッチの
     分割数だけ数字が変わってしまう。
     """
+    # 読めない・壊れているのは「汚染ゼロ」ではなく計測の失敗。
+    # 例外を素通しすると traceback + exit 1 になり、ラチェット違反と見分けが
+    # つかない。records の不在と同じ扱い（exit 2）にする。
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"::error ::{path.name} を読めませんでした: {e}")
+        sys.exit(2)
+
     by_path: dict[str, set[str]] = {}
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for lineno, line in enumerate(text.splitlines(), 1):
         line = line.strip()
         if not line:
             continue
         try:
             item = json.loads(line)
-        except json.JSONDecodeError:
-            print(f"{path.name}:{lineno} を解析できませんでした", file=sys.stderr)
-            return {}
+        except json.JSONDecodeError as e:
+            print(f"::error ::{path.name}:{lineno} を解析できませんでした: {e}")
+            sys.exit(2)
         by_path.setdefault(normalize(item["path"]), set()).update(
             test_key(t) for t in item.get("tests") or []
         )
     return {p: len(t) for p, t in sorted(by_path.items())}
 
 
-def write_baseline(counts: dict[str, int]) -> None:
+def tracked_files() -> frozenset[str]:
+    """Git 追跡下のファイル一覧。
+
+    取れなかったら落とす。「取れなかった＝追跡ファイル 0 件」にすると、
+    本番ファイルの汚染が全部 untracked に流れ込んで一番効かせたい分類が
+    空になる。records の不在と同じく fail-closed にする。
+    """
+    proc = subprocess.run(
+        ["git", "ls-files"], capture_output=True, text=True, encoding="utf-8", cwd=ROOT
+    )
+    if proc.returncode != 0:
+        print(f"::error ::git ls-files に失敗しました (exit={proc.returncode})")
+        print(proc.stderr[:1000])
+        sys.exit(2)
+    return frozenset(proc.stdout.splitlines())
+
+
+def classify(counts: dict[str, int]) -> tuple[dict[str, int], dict[str, int], int]:
+    """(tracked, official_artifact, untracked の件数) に分ける。"""
+    tracked_set = tracked_files()
+    tracked: dict[str, int] = {}
+    artifact: dict[str, int] = {}
+    untracked = 0
+    for path, n in counts.items():
+        if path == OFFICIAL_ARTIFACT or path.startswith(OFFICIAL_ARTIFACT + "/"):
+            artifact[path] = n
+        elif path in tracked_set:
+            tracked[path] = n
+        else:
+            untracked += 1
+    return dict(sorted(tracked.items())), dict(sorted(artifact.items())), untracked
+
+
+def write_baseline(tracked: dict[str, int], artifact: dict[str, int],
+                   untracked: int) -> None:
     BASELINE.parent.mkdir(parents=True, exist_ok=True)
     BASELINE.write_text(
         json.dumps(
-            {"total_paths": len(counts), "by_path": dict(sorted(counts.items()))},
+            {
+                "tracked": tracked,
+                "official_artifact": artifact,
+                "untracked_paths": untracked,
+            },
             ensure_ascii=False,
             indent=2,
         )
@@ -152,51 +220,64 @@ def main() -> int:
               "テストが1件も収集されなかったか）。")
         return 2
 
-    current = read_records(records_path)
+    tracked, artifact, untracked = classify(read_records(records_path))
 
     if not BASELINE.exists():
-        write_baseline(current)
-        print(f"ベースラインを新規作成しました: {len(current)} パス")
+        write_baseline(tracked, artifact, untracked)
+        print(f"ベースラインを新規作成しました: 追跡 {len(tracked)} / "
+              f"公式成果物 {len(artifact)} / その他 {untracked} パス")
         return 0
 
-    base: dict[str, int] = json.loads(BASELINE.read_text(encoding="utf-8")).get("by_path", {})
+    base = json.loads(BASELINE.read_text(encoding="utf-8"))
+    base_tracked: dict[str, int] = base.get("tracked", {})
+    base_artifact: dict[str, int] = base.get("official_artifact", {})
+    base_untracked: int = base.get("untracked_paths", 0)
 
-    # (パス, 前, 後)。表示用の文字列を後から解析すると壊れるので組で持つ。
-    regressions: list[tuple[str, int, int]] = [
-        (p, base.get(p, 0), n) for p, n in current.items() if n > base.get(p, 0)
-    ]
-    fixed = [p for p in base if p not in current]
+    # (分類, パス, 前, 後)。表示用の文字列を後から解析すると壊れるので組で持つ。
+    regressions: list[tuple[str, str, int, int]] = []
+    for label, now, before in (("追跡ファイル", tracked, base_tracked),
+                               ("公式成果物", artifact, base_artifact)):
+        regressions += [
+            (label, p, before.get(p, 0), n) for p, n in now.items() if n > before.get(p, 0)
+        ]
+    if untracked > base_untracked:
+        regressions.append(("その他", "(パス数の合計)", base_untracked, untracked))
 
-    print(f"汚染パス: {len(base)} → {len(current)}")
-    for path, count in current.items():
-        before = base.get(path)
-        print(f"  {path}: {'新規' if before is None else before} → {count} テスト")
+    fixed = ([p for p in base_tracked if p not in tracked]
+             + [p for p in base_artifact if p not in artifact])
+
+    print(f"追跡ファイル : {len(base_tracked)} → {len(tracked)} パス")
+    print(f"公式成果物   : {len(base_artifact)} → {len(artifact)} パス")
+    print(f"その他       : {base_untracked} → {untracked} パス")
 
     if args.update:
         if regressions:
             print("\n汚染が増えているためベースラインを更新できません:")
-            for path, before, now in regressions:
-                print(f"  {path}: {before} → {now}")
+            for label, path, before, now in regressions:
+                print(f"  [{label}] {path}: {before} → {now}")
             return 1
-        write_baseline(current)
+        write_baseline(tracked, artifact, untracked)
         print("ベースラインを更新しました")
         return 0
 
     if regressions:
-        print(f"\n🚫 ラチェット違反: {len(regressions)} パスで汚染が増加しました")
-        for path, before, now in regressions:
-            label = "新規" if path not in base else str(before)
-            print(f"  ::error ::{path}: {label} → {now} テスト")
+        print(f"\n🚫 ラチェット違反: {len(regressions)} 件の増加")
+        for label, path, before, now in regressions:
+            first = before == 0 and path != "(パス数の合計)"
+            print(f"  ::error ::[{label}] {path}: "
+                  f"{'新規' if first else before} → {now}")
         print(
             "\nテストが本番ファイルを書き換えています。書き込み先を "
             "tmp_path か backend/path_resolver.py の writable_path へ寄せてください。"
-            "どのテストかは fs-guard-report.txt にあります。"
+            "どのテストが書いたかは fs-guard-report.txt にあります。"
+            "意図的な変更なら --update でベースラインを更新してください。"
         )
         return 1
 
-    if fixed:
-        print(f"\n✅ 汚染が {len(fixed)} パス減りました。"
-              f"--update でベースラインを更新することを推奨します")
+    if fixed or untracked < base_untracked:
+        print(f"\n✅ 汚染が減りました（追跡・公式成果物で {len(fixed)} パス、"
+              f"その他で {base_untracked - untracked} パス）。"
+              "--update でベースラインを更新することを推奨します")
     else:
         print("✅ ラチェット維持（汚染の増加なし）")
     return 0

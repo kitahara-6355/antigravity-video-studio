@@ -129,3 +129,53 @@ class TestReadRecords:
             '\n{"path":"README.md","tests":["test_x.py::t"]}\n\n', encoding="utf-8"
         )
         assert ratchet.read_records(records) == {"README.md": 1}
+
+
+class TestClassify:
+    """3分類の振り分け
+
+    分類を間違えると、一番効かせたい `tracked` と `official_artifact` が
+    合計数だけの `untracked` に流れ込んで、増加が1件ずつ見えなくなる。
+    """
+
+    @pytest.fixture
+    def fake_tracked(self, ratchet, monkeypatch):
+        monkeypatch.setattr(
+            ratchet, "tracked_files",
+            lambda: frozenset({"README.md", "backend/branding/evolution_log.json"}),
+        )
+
+    def test_tracked_goes_to_tracked(self, ratchet, fake_tracked):
+        tracked, artifact, untracked = ratchet.classify({"README.md": 3})
+        assert tracked == {"README.md": 3}
+        assert artifact == {} and untracked == 0
+
+    def test_untracked_is_counted_not_listed(self, ratchet, fake_tracked):
+        tracked, artifact, untracked = ratchet.classify(
+            {"backend/temp/a.png": 1, "backend/temp/b.png": 9}
+        )
+        assert tracked == {} and artifact == {}
+        assert untracked == 2  # パス数であってテスト数の合計ではない
+
+    def test_official_artifact_wins_over_tracked(self, ratchet, monkeypatch):
+        # `.gitignore` 済みなので通常は追跡されないが、取り違えると
+        # 「1件でも増やさない」対象が合計数の側へ落ちる。
+        monkeypatch.setattr(
+            ratchet, "tracked_files",
+            lambda: frozenset({"Human01_Official Artifact/受信トレイ/x.md"}),
+        )
+        tracked, artifact, _ = ratchet.classify(
+            {"Human01_Official Artifact/受信トレイ/x.md": 2}
+        )
+        assert tracked == {}
+        assert artifact == {"Human01_Official Artifact/受信トレイ/x.md": 2}
+
+    def test_artifact_dir_itself(self, ratchet, fake_tracked):
+        _, artifact, untracked = ratchet.classify({"Human01_Official Artifact": 1})
+        assert artifact == {"Human01_Official Artifact": 1}
+        assert untracked == 0
+
+    def test_similar_prefix_is_not_artifact(self, ratchet, fake_tracked):
+        # 前方一致で見るので、紛らわしいだけの名前を巻き込まないこと。
+        _, artifact, untracked = ratchet.classify({"Human01_Official Artifact_old": 1})
+        assert artifact == {} and untracked == 1

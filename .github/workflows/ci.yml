@@ -146,15 +146,12 @@ jobs:
       # 上のテスト実行が出した実測 fs-guard-records.jsonl を判定する。
       # 失敗しても他のステップの結果を隠さないよう always() で回す。
       #
-      # continue-on-error は**この回だけ**。ベースラインは CI(Linux) の実測で
-      # 作る必要があり、そのためにはまずこのステップを1回通す必要がある。
-      # 手元(Windows)の全掃引で作ると、CI が一度も出さない鍵が並ぶうえ、
-      # Linux でだけ出る鍵を取りこぼして初回から赤くなる。
-      # 下のアーティファクトに上がる fs-guard-records.jsonl からベースラインを
-      # 作って .github/fs-guard-baseline.json をコミットし、そのときに外す。
+      # ベースライン（.github/fs-guard-baseline.json）は **CI(Linux) の実測**で
+      # 作った。手元(Windows)とは通る経路が違い、Linux でだけ出る汚染がある
+      # （`C:/dummy/...` のような偽の Windows パスは Linux では相対パスとして
+      # 解決され、リポジトリ内にディレクトリが実際に作られる）。
       - name: 本番ファイル汚染ラチェット（増加を許さない）
         if: always()
-        continue-on-error: true
         run: python .github/scripts/fs_guard_ratchet.py
 
       - name: テスト結果アップロード
