@@ -4,6 +4,10 @@ orchestrator.py から抽出された Mixin クラス。
 HubOrchestrator が多重継承することで利用される。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import uuid
 import random
@@ -873,7 +877,7 @@ class BatchMixin:
         existing_titles = {i.get("title", "").lower() for i in existing_items}
         
         # module_indexから対象モジュールを取得
-        module_index_path = _PROJECT_ROOT / "backend" / "agents" / "orchestration" / "module_index.json"
+        module_index_path = _writable_path("backend/agents/orchestration/module_index.json")
         module_index = safe_read_json(str(module_index_path), {})
         modules = module_index.get("modules", [])
         

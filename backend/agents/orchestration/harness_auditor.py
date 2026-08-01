@@ -4,6 +4,10 @@
 コミット時・デプロイ時・週次・月次・四半期等の監査を自動化する。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import os
 import sys
 import json
@@ -22,7 +26,7 @@ if PROJECT_ROOT not in sys.path:
 
 from backend.agents.memory.technical_debt import TechnicalDebtStore
 
-STATUS_PATH = os.path.join(ORCHESTRATION_DIR, "harness_audit_status.json")
+STATUS_PATH = str(_writable_path("backend/agents/orchestration/harness_audit_status.json"))
 
 # 有効なカテゴリのリスト (入力ガードレール用)
 VALID_CATEGORIES = {
@@ -77,7 +81,7 @@ def check_H02():
 
 def check_H03():
     """H-03: Hook 発火率"""
-    log_path = os.path.join(ORCHESTRATION_DIR, "harness_audit_log.jsonl")
+    log_path = str(_writable_path("backend/agents/orchestration/harness_audit_log.jsonl"))
     if os.path.exists(log_path):
         return True, "Hookログの記録を確認"
     return False, "検証対象ファイル不在: harness_audit_log.jsonl (FAIL)"

@@ -10,6 +10,10 @@ OrchestrationHub から呼び出され、バッチ生成時の判断材料を提
   - 収穫逓減の検出（同一モジュールへの投資効率低下）
   - モジュール別の推奨グループ提案
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
 from collections import defaultdict
@@ -20,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent
 _FLASH_REPORTS_PATH = _BASE_DIR / "flash_reports.jsonl"
-_LEARNING_CACHE_PATH = _BASE_DIR / "task_learning_cache.json"
+_LEARNING_CACHE_PATH = _writable_path("backend/agents/orchestration/task_learning_cache.json")
 
 
 def _read_jsonl(path: Path) -> list[dict]:
