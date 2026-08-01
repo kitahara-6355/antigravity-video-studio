@@ -51,7 +51,7 @@ _IGNORED_DIRS = frozenset({
 })
 
 # 検出そのものやカバレッジが作るファイル。自分の書き込みを数えない。
-_IGNORED_NAMES = frozenset({"fs-guard-report.txt", ".coverage"})
+_IGNORED_NAMES = frozenset({"fs-guard-report.txt", "fs-guard-records.jsonl", ".coverage"})
 
 # 名前に実行ごとの識別子が入るため、完全一致では拾えない生成物。
 # 前方一致で落とす。ここに漏れがあると「本番ファイルへの書き込み」の
@@ -221,6 +221,10 @@ def report() -> str:
 _reported = False
 _REPORT_PATH = os.path.join(_REPO_ROOT, "fs-guard-report.txt")
 
+# 機械可読の出力。人間向けの報告を後から解析すると、書式を変えただけで
+# ラチェットが壊れる。判定にはこちらを使う（.github/scripts/fs_guard_ratchet.py）。
+_RECORDS_PATH = os.path.join(_REPO_ROOT, "fs-guard-records.jsonl")
+
 
 def pytest_configure(config):
     install()
@@ -241,9 +245,22 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     追記して全バッチぶんを1ファイルに集める。
     """
     global _reported
-    if _reported or not _records:
+    if _reported:
         return
     _reported = True
+
+    # 検出ゼロでも JSONL は必ず作る。「ファイルが無い＝汚染ゼロ」にすると、
+    # 計測そのものが走らなかったときにラチェットが黙って通る（fail-open）。
+    # ゼロ件は「中身が空のファイル」、未計測は「ファイルが無い」で区別する。
+    try:
+        with open(_RECORDS_PATH, "a", encoding="utf-8") as fh:
+            for line in records_jsonl():
+                fh.write(line + "\n")
+    except OSError:  # pragma: no cover — 報告の失敗でテストを落とさない
+        pass
+
+    if not _records:
+        return
     text = report()
     terminalreporter.write_sep("=", "本番ファイルへの書き込み検出", yellow=True)
     terminalreporter.write_line(text)
@@ -254,6 +271,36 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         pass
 
 
+def records_jsonl() -> list[str]:
+    """パス単位に畳んだ検出結果を JSON Lines で返す。
+
+    生の記録は同じテストが同じファイルを何度も書くたびに増えるので、
+    そのまま出すと件数が実装の都合で揺れる。判定に使うのは
+    「どのパスを、どのテストが汚したか」だけなのでそこまで畳む。
+    パス区切りは OS 差を消すため posix 形式に揃える。
+    """
+    import json
+
+    by_path: dict[str, set[str]] = {}
+    ops: dict[str, set[str]] = {}
+    for r in _records:
+        key = r["path"].replace(os.sep, "/")
+        by_path.setdefault(key, set()).add(r["test"])
+        ops.setdefault(key, set()).add(r["operation"])
+    return [
+        json.dumps(
+            {
+                "path": path,
+                "tests": sorted(by_path[path]),
+                "operations": sorted(ops[path]),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        for path in sorted(by_path)
+    ]
+
+
 __all__ = [
     "install",
     "pytest_configure",
@@ -261,6 +308,7 @@ __all__ = [
     "pytest_terminal_summary",
     "pytest_unconfigure",
     "records",
+    "records_jsonl",
     "report",
     "set_current_test",
     "uninstall",

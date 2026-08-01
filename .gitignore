@@ -131,3 +131,4 @@ Human01_Official Artifact/
 
 # fs_guard の検出結果（実行のたびに変わる作業ファイル）
 fs-guard-report.txt
+fs-guard-records.jsonl

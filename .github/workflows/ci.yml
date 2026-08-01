@@ -141,6 +141,22 @@ jobs:
           PYTHONPATH: ./backend
         run: python scripts/bisect_chaos_pollution.py
 
+      # テストが本番ファイルを書き換えるのを増やさないためのゲート。
+      # 静的解析ではできない（書き込み先は実行時にしか分からない）ので、
+      # 上のテスト実行が出した実測 fs-guard-records.jsonl を判定する。
+      # 失敗しても他のステップの結果を隠さないよう always() で回す。
+      #
+      # continue-on-error は**この回だけ**。ベースラインは CI(Linux) の実測で
+      # 作る必要があり、そのためにはまずこのステップを1回通す必要がある。
+      # 手元(Windows)の全掃引で作ると、CI が一度も出さない鍵が並ぶうえ、
+      # Linux でだけ出る鍵を取りこぼして初回から赤くなる。
+      # 下のアーティファクトに上がる fs-guard-records.jsonl からベースラインを
+      # 作って .github/fs-guard-baseline.json をコミットし、そのときに外す。
+      - name: 本番ファイル汚染ラチェット（増加を許さない）
+        if: always()
+        continue-on-error: true
+        run: python .github/scripts/fs_guard_ratchet.py
+
       - name: テスト結果アップロード
         if: always()
         uses: actions/upload-artifact@v4
@@ -149,6 +165,8 @@ jobs:
           path: |
             test-results.xml
             coverage.json
+            fs-guard-records.jsonl
+            fs-guard-report.txt
           retention-days: 30
 
       # main へのマージ可否は「マージするとき」に判定する。

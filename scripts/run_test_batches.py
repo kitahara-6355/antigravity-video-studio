@@ -21,6 +21,14 @@ GitHub ランナーのメモリに収まらない。
     python scripts/run_test_batches.py --batches 4 \
         --junit test-results.xml --coverage coverage.json
 
+testpaths に**入っていない**テストも含めて流したいときは `--paths` を使う。
+
+    python scripts/run_test_batches.py --paths backend/tests tests --batches 12 --no-cov
+
+これは fs_guard の計測用。CI が報告する数字は testpaths 内だけのもので、
+外にあるテストの汚染は見えない。ゲート（マージ判定）には使わない —
+testpaths 外のテストは実装から drift しており、失敗は汚染とは別の理由で起きる。
+
 終了コード: 0 = 全バッチ成功 / 1 = いずれかのバッチが失敗
 """
 
@@ -52,6 +60,33 @@ def read_testpaths() -> list[str]:
         if s and not s.startswith("#") and s.endswith(".py"):
             entries.append(s)
     return entries
+
+
+# 収集対象にしないディレクトリ。過去版スナップショットと生成物。
+_SKIP_DIRS = frozenset({
+    "__pycache__", ".git", ".venv", "venv", "node_modules",
+    ".pytest_cache", ".ruff_cache", ".mypy_cache",
+})
+
+
+def discover(roots: list[str]) -> list[str]:
+    """指定ディレクトリ配下の test_*.py を集める（testpaths を無視する）。
+
+    並びは相対パスの辞書順で固定する。バッチ分割は順序に依存するので、
+    ファイルシステムの列挙順に任せると実行のたびに割り当てが変わる。
+    """
+    found: set[str] = set()
+    for root in roots:
+        base = (ROOT / root).resolve()
+        if not base.exists():
+            print(f"存在しないパスを指定しました: {root}", file=sys.stderr)
+            continue
+        for path in base.rglob("test_*.py"):
+            rel = path.relative_to(ROOT)
+            if any(part in _SKIP_DIRS for part in rel.parts):
+                continue
+            found.add(rel.as_posix())
+    return sorted(found)
 
 
 def split(items: list[str], n: int) -> list[list[str]]:
@@ -99,19 +134,35 @@ def main() -> int:
     ap.add_argument("--junit", default="test-results.xml")
     ap.add_argument("--coverage", default="coverage.json")
     ap.add_argument("--timeout", type=int, default=120)
+    ap.add_argument("--paths", nargs="+", metavar="DIR",
+                    help="testpaths の代わりに、指定ディレクトリ配下の test_*.py を全部流す")
+    ap.add_argument("--no-cov", action="store_true",
+                    help="カバレッジを取らない（fs_guard の計測など、判定に使わない実行用）")
     args = ap.parse_args()
 
-    files = read_testpaths()
-    if not files:
-        print("testpaths が読み取れませんでした", file=sys.stderr)
-        return 1
+    if args.paths:
+        files = discover(args.paths)
+        if not files:
+            print("指定パス配下にテストが見つかりませんでした", file=sys.stderr)
+            return 1
+    else:
+        files = read_testpaths()
+        if not files:
+            print("testpaths が読み取れませんでした", file=sys.stderr)
+            return 1
     chunks = split(files, args.batches)
     print(f"{len(files)} ファイルを {len(chunks)} バッチに分割して実行します", flush=True)
 
     env = dict(os.environ)
     env.setdefault("PYTHONIOENCODING", "utf-8")
 
-    subprocess.run([sys.executable, "-m", "coverage", "erase"], cwd=ROOT, env=env)
+    # fs_guard の出力はバッチをまたいで**追記**される。前回の残りがあると
+    # 今回の検出と混ざるので、実行のたびに捨てる。
+    for stale in ("fs-guard-report.txt", "fs-guard-records.jsonl"):
+        (ROOT / stale).unlink(missing_ok=True)
+
+    if not args.no_cov:
+        subprocess.run([sys.executable, "-m", "coverage", "erase"], cwd=ROOT, env=env)
 
     parts: list[Path] = []
     failed_batches: list[int] = []
@@ -124,7 +175,8 @@ def main() -> int:
             # 1ファイルの収集エラーでバッチ全体（約2,500件）が失われるのを防ぐ。
             # エラー自体は JUnit XML に残るのでマージゲートの判定材料からは漏れない。
             "--continue-on-collection-errors",
-            f"--junitxml={part}", "--cov", "--cov-append", "--cov-report=",
+            f"--junitxml={part}",
+            *([] if args.no_cov else ["--cov", "--cov-append", "--cov-report="]),
             *chunk,
         ]
         print(f"\n=== バッチ {i}/{len(chunks)}（{len(chunk)} ファイル）===", flush=True)
@@ -137,8 +189,9 @@ def main() -> int:
     for p in parts:
         p.unlink(missing_ok=True)
 
-    subprocess.run([sys.executable, "-m", "coverage", "json", "-o", args.coverage],
-                   cwd=ROOT, env=env)
+    if not args.no_cov:
+        subprocess.run([sys.executable, "-m", "coverage", "json", "-o", args.coverage],
+                       cwd=ROOT, env=env)
 
     print(f"\n合計: {tests} 件 / 失敗 {failures} / エラー {errors}")
     if failed_batches:
