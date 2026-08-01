@@ -6,6 +6,10 @@ Anti-Hallucination Gate — 空想リスク排除の自己検証レイヤー
 
 2026-06-28 制定 — 空想リスク排除規約に基づく
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
 import json
 import logging
 from dataclasses import dataclass, field
@@ -19,7 +23,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 SNAPSHOTS_DIR = PROJECT_ROOT / "backend" / "ux_verification" / "snapshots"
 E2E_RESULTS_PATH = PROJECT_ROOT / "backend" / "tests" / "e2e_results.json"
 HARNESS_STATUS_PATH = (
-    PROJECT_ROOT / "backend" / "agents" / "orchestration" / "harness_audit_status.json"
+    _writable_path("backend/agents/orchestration/harness_audit_status.json")
 )
 
 

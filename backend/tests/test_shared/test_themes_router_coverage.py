@@ -17,8 +17,17 @@ class TestThemesRouterCoverage:
 
     @pytest.fixture(autouse=True)
     def manage_evolution_log(self):
-        log_path = Path(__file__).parent.parent.parent / "branding" / "evolution_log.json"
-        
+        # themes_router と同じ経路で解決する。ファイルの位置から組み立てると
+        # 本番の backend/branding/ を指し、autouse なのでこのクラスの全テストが
+        # 本番の evolution_log.json を複製・削除・復元していた（2026-08-01 実測）。
+        try:  # backend/ を直接 sys.path に載せている経路にも対応する
+            from backend.path_resolver import writable_path
+        except ImportError:
+            from path_resolver import writable_path
+
+        log_path = writable_path("backend/branding/evolution_log.json")
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
         backup_path = log_path.with_name("evolution_log.json.bak_test")
         
         existed = log_path.exists()
