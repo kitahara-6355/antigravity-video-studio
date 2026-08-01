@@ -22,6 +22,11 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/themes", tags=["themes"])
@@ -128,7 +133,7 @@ async def get_template_stats():
     from collections import Counter
 
     try:
-        log_path = Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        log_path = _writable_path("backend/branding/evolution_log.json")
         if not log_path.exists():
             return {"stats": {}, "total_selections": 0}
 
@@ -556,7 +561,7 @@ def _record_template_selection(template_id: str, theme_id: str):
     import os
 
     try:
-        log_path = Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        log_path = _writable_path("backend/branding/evolution_log.json")
 
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -662,7 +667,7 @@ async def generate_theme_thumbnail(req: ThemeThumbnailRequest):
     theme = MOOD_THEMES[req.theme_id]
     
     if not req.output_path:
-        temp_dir = Path(__file__).parent.parent / "temp_thumbnails"
+        temp_dir = _writable_path("backend/temp_thumbnails")
         temp_dir.mkdir(parents=True, exist_ok=True)
         req.output_path = str(temp_dir / f"theme_{req.theme_id}_preview.png")
     
