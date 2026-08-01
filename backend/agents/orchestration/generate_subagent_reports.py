@@ -757,7 +757,7 @@ def generate_session_cumulative_stats(cache: dict = None) -> str:
             md += "| 設計ストック | 未設定 |\n"
         
         # 恒常監査 (harness-audit) 連動表示
-        audit_path = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration", "harness_audit_status.json")
+        audit_path = str(_writable_path("backend/agents/orchestration/harness_audit_status.json"))
         audit_info = "未実行"
         if os.path.exists(audit_path):
             try:
@@ -1658,7 +1658,7 @@ def generate_agent_ranking_inline(cache: dict = None) -> str:
 
 def _generate_opus_health_md() -> str:
     """Opusセッション健全性をダッシュボード用Markdownで生成する。"""
-    opus_path = os.path.join(ORCHESTRATION_DIR, "opus_session.json")
+    opus_path = str(_writable_path("backend/agents/orchestration/opus_session.json"))
     if not os.path.exists(opus_path):
         return ""
 
@@ -2723,7 +2723,7 @@ def generate_dashboard_quick():
 
     # ── プロジェクトルートのREADME.mdへの自動同期（ベストプラクティス対応・簡易表示版） ──
     try:
-        root_readme_path = os.path.join(WORKSPACE_DIR, "README.md")
+        root_readme_path = str(_writable_path("README.md"))
         if os.path.exists(root_readme_path):
             with open(root_readme_path, "r", encoding="utf-8") as rf:
                 root_content = rf.read()
