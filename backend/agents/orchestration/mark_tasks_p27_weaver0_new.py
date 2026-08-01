@@ -82,7 +82,6 @@ async def run_thumbnail_stage_task(task_id: str, db_path: str = ":memory:") -> s
     StageBoundAgent の process_func として動作する非同期タスク処理。
     自動リトライ、結果保存、DBマイグレーションと連携。
     """
-    project_root = Path(__file__).resolve().parents[3]
     output_dir = _writable_path("temp_thumbnails")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{task_id}.png"
