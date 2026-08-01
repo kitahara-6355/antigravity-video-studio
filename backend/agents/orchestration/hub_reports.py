@@ -23,7 +23,7 @@ from .hub_common import (
     logger, _read_json, _write_json, _now_iso, _safe_parse_iso,
     _append_jsonl, _read_jsonl,
     FLASH_REPORTS_PATH, PHASE_STATE_PATH, FLASH_SESSION_PATH,
-    TASK_QUEUE_PATH, INBOX_DIR, _BASE_DIR, _MEMORY_DIR, _PROJECT_ROOT,
+    TASK_QUEUE_PATH, INBOX_DIR, SUBAGENT_REPORT_DIR, _BASE_DIR, _MEMORY_DIR, _PROJECT_ROOT,
     PHASE_ROADMAP, PHASE_TASK_TEMPLATES,
 )
 from .report_compressor import ReportCompressor
@@ -968,7 +968,7 @@ Phase {completed_phase + 1} のタスク配分およびゲート条件は以下�
             f.write(content)
             
         # 定時レポート用ディレクトリにもコピー
-        report_dir = _PROJECT_ROOT / "Human01_Official Artifact" / "サブエージェント体制報告" / "定時レポート"
+        report_dir = SUBAGENT_REPORT_DIR / "定時レポート"
         report_dir.mkdir(parents=True, exist_ok=True)
         report_filepath = report_dir / filename
         try:

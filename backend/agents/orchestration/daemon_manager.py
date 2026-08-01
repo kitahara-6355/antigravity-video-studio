@@ -13,6 +13,11 @@ Phase 38 コアモジュール。
     manager.stop()
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
+except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
+
 import json
 import logging
 import logging.handlers
@@ -40,8 +45,7 @@ except ImportError:
 _WORKSPACE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 _ORCHESTRATION_DIR = Path(__file__).resolve().parent
 _EVENT_LOG_PATH = (
-    _WORKSPACE_DIR / "Human01_Official Artifact"
-    / "サブエージェント体制報告" / "event_log.jsonl"
+    _official_artifact_dir() / "サブエージェント体制報告" / "event_log.jsonl"
 )
 
 IS_WINDOWS = platform.system() == "Windows"

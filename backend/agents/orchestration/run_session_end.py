@@ -1,3 +1,8 @@
+
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
+except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
 import sys
 import os
 import traceback
@@ -206,7 +211,7 @@ class FlashSessionInfo(TypedDict):
 @dataclass
 class SessionEndConfig:
     reason: str = ""
-    inbox_dir: str = "Human01_Official Artifact/受信トレイ"
+    inbox_dir: str = str(_official_artifact_dir() / "受信トレイ")
 
 class SessionEndManager:
     def verify_session_state(self, session_info: dict) -> None:

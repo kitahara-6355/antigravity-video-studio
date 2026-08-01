@@ -1,6 +1,8 @@
 try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
     from backend.path_resolver import writable_path as _writable_path
 except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
     from path_resolver import writable_path as _writable_path
 import os
 from backend.agents.orchestration.link_validator import (
@@ -58,7 +60,7 @@ TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.js
 FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
 
-OFFICIAL_ARTIFACT_DIR = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact")
+OFFICIAL_ARTIFACT_DIR = str(_official_artifact_dir())
 REPORT_BASE_DIR = os.path.join(OFFICIAL_ARTIFACT_DIR, "サブエージェント体制報告")
 PERIODIC_REPORT_DIR = os.path.join(REPORT_BASE_DIR, "定時レポート")
 BULLETIN_REPORT_DIR = os.path.join(REPORT_BASE_DIR, "速報")
@@ -114,7 +116,7 @@ def _load_event_log_cached(cache: dict = None) -> list:
         return cache['event_log']
 
     event_log_path = os.path.join(
-        WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告", "event_log.jsonl"
+        REPORT_BASE_DIR, "event_log.jsonl"
     )
     entries = []
     if os.path.exists(event_log_path):
@@ -1057,8 +1059,7 @@ def generate_kaizen_dashboard(cache: dict = None) -> str:
     改善提案レポートの履歴からKPIメトリクス推移を自動抽出し、
     「提案→実施→効果」のPDCAループを可視化する。
     """
-    proposal_dir = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact",
-                                "サブエージェント体制報告", "改善提案")
+    proposal_dir = os.path.join(REPORT_BASE_DIR, "改善提案")
     if not os.path.exists(proposal_dir):
         return ""
 
@@ -1865,7 +1866,7 @@ def generate_task_summary_top20(cache: dict = None) -> str:
 
 def generate_tri_agent_council_logs_md() -> str:
     """自己改善ログ（3者評議会）の一覧Markdownを生成する。"""
-    log_dir = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告", "自己改善ログ")
+    log_dir = os.path.join(REPORT_BASE_DIR, "自己改善ログ")
     if not os.path.exists(log_dir):
         return ""
 
@@ -1889,7 +1890,7 @@ def generate_tri_agent_council_logs_md() -> str:
             ms_label = "不明"
 
         # 定時レポートフォルダから該当フェーズの最新完了報告書を探す
-        periodic_report_dir = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告", "定時レポート")
+        periodic_report_dir = os.path.join(REPORT_BASE_DIR, "定時レポート")
         periodic_files = sorted(glob.glob(os.path.join(periodic_report_dir, f"phase_{phase}_completion_*.md")), reverse=True) if phase else []
 
         if periodic_files:
@@ -2032,7 +2033,7 @@ def generate_dashboard_quick():
     _load_flash_reports_cached(_cache)
     _load_event_log_cached(_cache)
 
-    report_base = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告")
+    report_base = REPORT_BASE_DIR
     readme_path = os.path.join(report_base, "README.md")
     event_log_path = os.path.join(report_base, "event_log.jsonl")
 

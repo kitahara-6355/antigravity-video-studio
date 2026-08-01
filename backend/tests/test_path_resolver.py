@@ -252,6 +252,39 @@ def test_writable_path_is_independent_of_base_dir(clean_env, monkeypatch, tmp_pa
     assert path_resolver.project_root() == tmp_path / "b"
 
 
+def test_official_artifact_dir_defaults_to_project_root(clean_env, monkeypatch):
+    """本番では従来どおりプロジェクトルート直下。"""
+    monkeypatch.delenv("ANTIGRAVITY_WRITABLE_ROOT", raising=False)
+    assert path_resolver.official_artifact_dir() == (
+        path_resolver.project_root() / "Human01_Official Artifact"
+    )
+
+
+def test_official_artifact_dir_follows_writable_root(clean_env, monkeypatch, tmp_path):
+    """テスト中は一時ディレクトリへ向くこと。
+
+    `Human01_Official Artifact/` は会話ログを含むため公開時に除去したもの。
+    `.gitignore` 済みなので再生成されても `git status` に出ない。
+    振り向けが効かなくなっても気づけないので、ここで固定する。
+    """
+    monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+    assert path_resolver.official_artifact_dir() == tmp_path / "Human01_Official Artifact"
+
+
+def test_official_artifact_dir_is_not_under_repo_when_redirected(
+    clean_env, monkeypatch, tmp_path
+):
+    """振り向け後はリポジトリの外にあること。
+
+    等値比較だけだと、リポジトリ直下を指したまま名前が一致する取り違えを
+    見逃す。「リポジトリ内に作られない」ことが要件そのものなので直接見る。
+    """
+    monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+    assert not path_resolver.official_artifact_dir().is_relative_to(
+        path_resolver.project_root()
+    )
+
+
 def test_module_source_has_no_hardcoded_local_path():
     """このモジュール自身が直書きパスを持たないこと。
 

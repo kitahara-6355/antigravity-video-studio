@@ -486,10 +486,22 @@ def test_run_main_via_runpy():
         assert any_success
 
     # 2. 生成をスキップするルート (--force なし)
+    #
+    # スキップ判定は「PROPOSAL_DIR に24時間以内の improvement_*.md があるか」で
+    # 決まる（should_generate）。以前はリポジトリ直下の 改善提案/ に過去の実行が
+    # 残したファイルがあり、それに依存してこの経路が成立していた。振り向け先は
+    # 実行ごとに空なので、必要な前提はこのテストが自分で用意する。
+    #
+    # runpy はモジュールを新しい名前空間で再実行するため、should_generate を
+    # patch しても再定義側が使われる。状態を置くのが確実。
+    os.makedirs(ia.PROPOSAL_DIR, exist_ok=True)
+    recent_report = os.path.join(ia.PROPOSAL_DIR, "improvement_20260101_0000.md")
+    with open(recent_report, "w", encoding="utf-8") as f:
+        f.write("# 直近レポートの代わり\n")
+
     with patch("sys.argv", ["improvement_analyzer.py"]), \
-         patch("backend.agents.orchestration.improvement_analyzer.should_generate", return_value=False), \
          patch("builtins.print") as mock_print:
-        
+
         runpy.run_module("backend.agents.orchestration.improvement_analyzer", run_name="__main__")
         any_skip = any("1日未経過のため生成をスキップしました" in str(args[0]) for args, _ in mock_print.call_args_list if args)
         assert any_skip

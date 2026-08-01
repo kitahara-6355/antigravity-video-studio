@@ -8,8 +8,10 @@ orchestrator.py のトップレベル定義をそのまま移植。
 """
 
 try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
     from backend.path_resolver import writable_path as _writable_path
 except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
     from path_resolver import writable_path as _writable_path
 import json
 import uuid
@@ -24,7 +26,9 @@ logger = logging.getLogger(__name__)
 _BASE_DIR = Path(__file__).resolve().parent
 _MEMORY_DIR = _BASE_DIR.parent / "memory"
 _PROJECT_ROOT = _BASE_DIR.parent.parent.parent  # orchestration → agents → backend → project root
-INBOX_DIR = _PROJECT_ROOT / "Human01_Official Artifact" / "受信トレイ"
+OFFICIAL_ARTIFACT_DIR = _official_artifact_dir()
+INBOX_DIR = OFFICIAL_ARTIFACT_DIR / "受信トレイ"
+SUBAGENT_REPORT_DIR = OFFICIAL_ARTIFACT_DIR / "サブエージェント体制報告"
 
 TASK_QUEUE_PATH = _writable_path("backend/agents/orchestration/task_queue.json")
 OPUS_DIRECTIVE_PATH = _BASE_DIR / "opus_directive.json"

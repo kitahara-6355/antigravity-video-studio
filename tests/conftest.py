@@ -33,8 +33,15 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     os.environ["ANTIGRAVITY_WRITABLE_ROOT"] = _writable_root
     # 書き込み先の親ディレクトリはここで作る。本番コード側で mkdir すると、
     # Path.stat を差し替えているテストで exist_ok の内部判定が壊れる。
+    # `Human01_Official Artifact/` の配下も作る。orchestration のレポート出力は
+    # `os.makedirs` を差し替えているテストから呼ばれることがあり、そこでは
+    # 本番コード側の mkdir が効かない。従来はリポジトリ直下の同名ディレクトリが
+    # 他のテストの汚染で既に存在していたため通っていた（＝汚染に依存していた）。
     for _sub in ("backend/usage_tracker", "backend/branding", "backend/data",
-                 "backend/agents/orchestration"):
+                 "backend/agents/orchestration",
+                 "Human01_Official Artifact/受信トレイ",
+                 "Human01_Official Artifact/サブエージェント体制報告",
+                 "Human01_Official Artifact/サブエージェント体制報告/改善提案"):
         os.makedirs(os.path.join(_writable_root, *_sub.split("/")), exist_ok=True)
     # constitution / strategy / user_model は**設定でもある**ので、空のまま
     # にすると中身を読むテストが壊れる。本番の内容を複製して起点にする。
