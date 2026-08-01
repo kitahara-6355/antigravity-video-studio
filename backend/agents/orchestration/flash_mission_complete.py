@@ -1,3 +1,8 @@
+
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
+except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
 import sys
 import os
 import json
@@ -38,7 +43,7 @@ def main():
 """
     
     # 保存先フォルダ
-    output_dir = Path("Human01_Official Artifact/受信トレイ")
+    output_dir = _official_artifact_dir() / "受信トレイ"
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / "flash_completion_report_20260602.md"
     

@@ -11,8 +11,10 @@
 """
 
 try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
     from backend.path_resolver import writable_path as _writable_path
 except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
     from path_resolver import writable_path as _writable_path
 import json
 import os
@@ -24,7 +26,7 @@ ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestrat
 FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
 FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
 
-REPORT_BASE_DIR = os.path.join(WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告")
+REPORT_BASE_DIR = os.path.join(str(_official_artifact_dir()), "サブエージェント体制報告")
 PROPOSAL_DIR = os.path.join(REPORT_BASE_DIR, "改善提案")
 EVENT_LOG_PATH = os.path.join(REPORT_BASE_DIR, "event_log.jsonl")
 

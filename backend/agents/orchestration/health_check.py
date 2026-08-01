@@ -10,8 +10,10 @@ Git log（客観的事実）× flash_session.json（自己報告）× flash_repo
 """
 
 try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
     from backend.path_resolver import writable_path as _writable_path
 except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
     from path_resolver import writable_path as _writable_path
 import json
 import os
@@ -37,7 +39,7 @@ PHASE_STATE_PATH = os.path.join(WORKSPACE_DIR, "backend", "agents", "memory", "p
 TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
 OPUS_SESSION_PATH = str(_writable_path("backend/agents/orchestration/opus_session.json"))
 EVENT_LOG_PATH = os.path.join(
-    WORKSPACE_DIR, "Human01_Official Artifact", "サブエージェント体制報告", "event_log.jsonl"
+    str(_official_artifact_dir()), "サブエージェント体制報告", "event_log.jsonl"
 )
 
 
@@ -979,7 +981,8 @@ def evaluate_effectiveness_gate(workspace_path: Path, phase_data: dict) -> dict:
         is_failed = is_wasted_failed or is_dep_failed
         
         if is_failed:
-            report_dir = workspace_path / "Human01_Official Artifact" / "サブエージェント体制報告" / "分解エンジン研究"
+            # 公式成果物の置き場は引数から組み立てない（research_reporter と同じ理由）。
+            report_dir = _official_artifact_dir() / "サブエージェント体制報告" / "分解エンジン研究"
             report_dir.mkdir(parents=True, exist_ok=True)
             # 日付は JST 固定。ローカル時刻だと UTC 環境で 1 日戻り、
             # 同じ日の警告が別ファイル名で二重に生成される。

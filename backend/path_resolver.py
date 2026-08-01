@@ -126,6 +126,24 @@ def writable_path(relative: str) -> Path:
     return root.joinpath(*relative.split("/"))
 
 
+def official_artifact_dir() -> Path:
+    """`Human01_Official Artifact/` の置き場を返す。
+
+    会話ログを含むため公開時にディレクトリごと除去したもの（CLAUDE.md 参照）。
+    orchestration の 9 モジュールがここへレポートを書くが、それぞれが
+    `WORKSPACE_DIR` から自前で組み立てていたため、テストを流すたびに
+    **リポジトリ内に再生成されていた**（2026-08-01 の CI 実測で 16 パス）。
+
+    `.gitignore` 済みなので `git status` には出ない。気づかず
+    `git add -f` すると、除去した意味が消える。
+
+    `writable_path` に寄せることで、テスト中は一時ディレクトリへ向く。
+    本番では従来どおりプロジェクトルート直下になる。読み書きの両方を
+    ここへ通すこと — 書き込みだけ振り向けると読み返しが壊れる。
+    """
+    return writable_path("Human01_Official Artifact")
+
+
 def workspace_root() -> Path:
     """プロジェクトルートの親を返す。
 

@@ -4,6 +4,11 @@ Research Reporter (research_reporter.py)
 レビューレポート markdown を生成・保存する。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import official_artifact_dir as _official_artifact_dir
+except ImportError:
+    from path_resolver import official_artifact_dir as _official_artifact_dir
+
 import os
 import json
 from datetime import datetime, timezone, timedelta
@@ -12,7 +17,12 @@ from pathlib import Path
 class ResearchReporter:
     def __init__(self, workspace_path: str = None):
         self.workspace_path = Path(workspace_path or os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-        self.report_dir = self.workspace_path / "Human01_Official Artifact" / "サブエージェント体制報告" / "分解エンジン研究"
+        # 公式成果物の置き場だけは workspace_path から組み立てない。
+        # 呼び出し側がリポジトリルートを渡すため、テスト中もリポジトリ内に
+        # 再生成されていた。置き場の解決は path_resolver に一本化する。
+        self.report_dir = (
+            _official_artifact_dir() / "サブエージェント体制報告" / "分解エンジン研究"
+        )
 
     def _parse_utc_datetime(self, timestamp_str: str) -> datetime:
         """ISOフォーマットの文字列をUTCのdatetimeオブジェクトに変換する"""
