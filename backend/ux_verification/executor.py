@@ -553,7 +553,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             result = L1Ratchet().check(report, load_baseline(path))
             print(f"\n{result.to_text()}")
-            if not result.valid:
+            # ベースラインが無いこと自体を失敗にする。緑にしてしまうと、
+            # ファイルを消すだけでラチェットを無効化できてしまう。
+            if result.baseline_missing or not result.valid:
                 return 1
 
     if args.fail_under is not None and report.pass_rate < args.fail_under:
