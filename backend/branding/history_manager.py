@@ -14,7 +14,11 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 # Paths
-HISTORY_FILE = Path("archives/analytics/history.jsonl")
+# 相対パスなのでプロセスの起動ディレクトリ基準になっていた。リポジトリ直下から
+# 動かすと Git 追跡下の archives/analytics/history.jsonl に追記される
+# （`archives/` は過去版のスナップショット置き場で、触ってはいけない領域）。
+# 実行のたびに追記されるログなので writable_path 経由にする。
+HISTORY_FILE = _writable_path("archives/analytics/history.jsonl")
 
 logger = logging.getLogger(__name__)
 
