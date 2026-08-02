@@ -213,63 +213,72 @@
       "layer": 1,
       "story_scene": "S3",
       "description": "タイトル候補リストが存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-title-candidates"
     },
     {
       "id": "O9-L1-04",
       "layer": 1,
       "story_scene": "S6",
       "description": "タグリストが存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-tag-list"
     },
     {
       "id": "O9-L1-05",
       "layer": 1,
       "story_scene": "S10",
       "description": "チャプターリストが存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-chapter-list"
     },
     {
       "id": "O9-L1-06",
       "layer": 1,
       "story_scene": "S12",
       "description": "サムネイル候補が存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-thumbnail-candidates"
     },
     {
       "id": "O9-L1-07",
       "layer": 1,
       "story_scene": "S14",
       "description": "SEOスコアが存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-seo-score"
     },
     {
       "id": "O9-L1-08",
       "layer": 1,
       "story_scene": "S16",
       "description": "説明文エリアが存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-description"
     },
     {
       "id": "O9-L1-09",
       "layer": 1,
       "story_scene": "S20",
       "description": "ハッシュタグが存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-hashtag-list"
     },
     {
       "id": "O9-L1-10",
       "layer": 1,
       "story_scene": "S21",
       "description": "CTR予測が存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-ctr-prediction"
     },
     {
       "id": "O9-L1-11",
       "layer": 1,
       "story_scene": "S22",
       "description": "投稿準備バッジが存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "testid": "youtube-publish-readiness"
     },
     {
       "id": "O9-L1-12",

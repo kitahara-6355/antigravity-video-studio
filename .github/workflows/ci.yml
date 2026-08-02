@@ -154,6 +154,16 @@ jobs:
         if: always()
         run: python .github/scripts/fs_guard_ratchet.py
 
+      # UX 検証 L1（DOM存在）の非退行ゲート。判定は frontend ソースの静的走査
+      # だけなので、ブラウザもサーバも要らず課金も発生しない。
+      # 集計値ではなく **項目ごと** に突き合わせる（PASS 数が同じまま中身が
+      # 入れ替わる退行を、集計値では検出できない）。
+      - name: UX 検証 L1 ラチェット（PASS の後退を許さない）
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+        run: python -m backend.ux_verification.executor --persona owner --ratchet
+
       - name: テスト結果アップロード
         if: always()
         uses: actions/upload-artifact@v4
