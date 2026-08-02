@@ -516,6 +516,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="スナップショットとして保存する（例 v9_l1_owner）")
     parser.add_argument("--fail-under", type=float, metavar="RATE",
                         help="充足率がこの値未満なら exit 1")
+    parser.add_argument("--ratchet", action="store_true",
+                        help="ベースラインと項目ごとに突き合わせ、退行があれば exit 1")
+    parser.add_argument("--update-baseline", action="store_true",
+                        help="ラチェットのベースラインを現在値で締め直す")
     args = parser.parse_args(argv)
 
     report = L1Executor.for_repo().run(persona=args.persona)
@@ -534,6 +538,23 @@ def main(argv: list[str] | None = None) -> int:
 
         path = SnapshotStore().save(report.to_snapshot(version=args.snapshot))
         print(f"  スナップショット: {path}")
+
+    if args.ratchet or args.update_baseline:
+        from .l1_ratchet import L1Ratchet, baseline_path, load_baseline
+
+        path = baseline_path(report.persona)
+        if args.update_baseline:
+            try:
+                L1Ratchet().update(report, path)
+            except ValueError as exc:
+                print(f"\n{exc}", file=sys.stderr)
+                return 1
+            print(f"\nベースラインを更新しました: {path}")
+        else:
+            result = L1Ratchet().check(report, load_baseline(path))
+            print(f"\n{result.to_text()}")
+            if not result.valid:
+                return 1
 
     if args.fail_under is not None and report.pass_rate < args.fail_under:
         print(f"\n充足率 {report.pass_rate}% < {args.fail_under}%", file=sys.stderr)
