@@ -197,84 +197,96 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "ヘルスチェックAPIが正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/health"
     },
     {
       "id": "O8-L1-02",
       "layer": 1,
       "story_scene": "S1",
       "description": "設定取得APIが正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/settings"
     },
     {
       "id": "O8-L1-03",
       "layer": 1,
       "story_scene": "S2",
       "description": "GPU検出APIが正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/gpu-detect"
     },
     {
       "id": "O8-L1-04",
       "layer": 1,
       "story_scene": "S5",
       "description": "BGM設定が含まれる",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/settings"
     },
     {
       "id": "O8-L1-05",
       "layer": 1,
       "story_scene": "S7",
       "description": "LUFS設定が含まれる",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/settings"
     },
     {
       "id": "O8-L1-06",
       "layer": 1,
       "story_scene": "S9",
       "description": "ロゴ設定が含まれる",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/settings"
     },
     {
       "id": "O8-L1-07",
       "layer": 1,
       "story_scene": "S10",
       "description": "字幕設定が含まれる",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/settings"
     },
     {
       "id": "O8-L1-08",
       "layer": 1,
       "story_scene": "S11",
       "description": "開始APIが正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/render/start"
     },
     {
       "id": "O8-L1-09",
       "layer": 1,
       "story_scene": "S13",
       "description": "stagesフィールド存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/status/{job_id}"
     },
     {
       "id": "O8-L1-10",
       "layer": 1,
       "story_scene": "S14",
       "description": "output_file存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/status/{job_id}"
     },
     {
       "id": "O8-L1-11",
       "layer": 1,
       "story_scene": "S15",
       "description": "download_url存在",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/render/download/{job_id}"
     },
     {
       "id": "O8-L1-12",
       "layer": 1,
       "story_scene": "S22",
       "description": "完了通知API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/render/complete/{job_id}"
     },
     {
       "id": "O8-L2-01",

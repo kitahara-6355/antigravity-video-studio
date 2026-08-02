@@ -197,84 +197,96 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "SmartCut初期化APIが正常応答を返す",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/init"
     },
     {
       "id": "O4-L1-02",
       "layer": 1,
       "story_scene": "S1",
       "description": "SmartCutヘルスチェックAPIが正常応答を返す",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/smartcut/health"
     },
     {
       "id": "O4-L1-03",
       "layer": 1,
       "story_scene": "S2",
       "description": "推奨レスポンスにestimated_output_secondsが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O4-L1-04",
       "layer": 1,
       "story_scene": "S3",
       "description": "推奨APIが目標尺パラメータを受け付ける",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O4-L1-05",
       "layer": 1,
       "story_scene": "S6",
       "description": "4種プリセット(15/30/45/60分)でAPIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O4-L1-06",
       "layer": 1,
       "story_scene": "S8",
       "description": "シーン固定APIが正常応答を返す",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/lock"
     },
     {
       "id": "O4-L1-07",
       "layer": 1,
       "story_scene": "S12",
       "description": "推奨レスポンスにrecommended_segmentsが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O4-L1-08",
       "layer": 1,
       "story_scene": "S14",
       "description": "全候補APIが正常応答を返す",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
     },
     {
       "id": "O4-L1-09",
       "layer": 1,
       "story_scene": "S16",
       "description": "推奨レスポンスにestimated_output_strが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O4-L1-10",
       "layer": 1,
       "story_scene": "S13",
       "description": "推奨セグメントにscoreフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O4-L1-11",
       "layer": 1,
       "story_scene": "S17",
       "description": "候補にtypeフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
     },
     {
       "id": "O4-L1-12",
       "layer": 1,
       "story_scene": "S15",
       "description": "候補にtimestampフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
     },
     {
       "id": "O4-L2-01",

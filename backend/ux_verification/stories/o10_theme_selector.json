@@ -209,70 +209,80 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "ヘルスチェックAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /themes/health"
     },
     {
       "id": "O10-L1-02",
       "layer": 1,
       "story_scene": "S2",
       "description": "テンプレート一覧API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /themes/templates"
     },
     {
       "id": "O10-L1-03",
       "layer": 1,
       "story_scene": "S3",
       "description": "テンプレート詳細API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /themes/templates/{template_id}"
     },
     {
       "id": "O10-L1-04",
       "layer": 1,
       "story_scene": "S4",
       "description": "テーマ一覧API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /themes"
     },
     {
       "id": "O10-L1-05",
       "layer": 1,
       "story_scene": "S5",
       "description": "テーマ詳細API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /themes/{theme_id}"
     },
     {
       "id": "O10-L1-06",
       "layer": 1,
       "story_scene": "S6",
       "description": "適用API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /themes/apply"
     },
     {
       "id": "O10-L1-07",
       "layer": 1,
       "story_scene": "S8",
       "description": "現在設定取得API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /themes/current/active"
     },
     {
       "id": "O10-L1-08",
       "layer": 1,
       "story_scene": "S9",
       "description": "統計API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /themes/stats"
     },
     {
       "id": "O10-L1-09",
       "layer": 1,
       "story_scene": "S10",
       "description": "推奨API正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /themes/recommend"
     },
     {
       "id": "O10-L1-10",
       "layer": 1,
       "story_scene": "S11",
       "description": "オーバーライドAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /themes/override"
     },
     {
       "id": "O10-L2-01",

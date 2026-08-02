@@ -309,21 +309,27 @@ class L1Executor:
     """ストーリー定義と frontend ソースを突き合わせ、L1 を判定する。"""
 
     def __init__(self, stories_dir: Path, frontend_src: Path,
-                 entry: Path | None = None):
+                 entry: Path | None = None, contract=None):
         self.stories_dir = Path(stories_dir)
         self.frontend_src = Path(frontend_src)
         if entry is None:
             candidate = self.frontend_src / "main.jsx"
             entry = candidate if candidate.exists() else None
         self.entry = entry
+        # API 契約の判定器。L1 の項目のうち testid ではなく endpoint を
+        # 宣言しているものはこちらに回す（P2）。None なら回さない。
+        self.contract = contract
 
     @classmethod
     def for_repo(cls) -> L1Executor:
         """このリポジトリの実データを見る実行系。"""
+        from .api_contract import ApiContractExecutor, EndpointRegistry
+
         root = _project_root()
         return cls(
             stories_dir=root / "backend" / "ux_verification" / "stories",
             frontend_src=root / "frontend" / "src",
+            contract=ApiContractExecutor(EndpointRegistry.for_repo()),
         )
 
     def run(self, persona: str = "owner") -> L1Report:
@@ -344,10 +350,23 @@ class L1Executor:
             for item in story.get("verification_items", []):
                 if item.get("layer") != 1:
                     continue
-                report.results.append(self._judge(ux_id, item, registry))
+                report.results.append(self._route(ux_id, item, registry))
 
         report.results.sort(key=lambda r: _item_sort_key(r.item_id))
         return report
+
+    def _route(self, ux_id: str, item: dict, registry: TestIdRegistry) -> L1Result:
+        """項目が宣言している照合先に応じて判定器を選ぶ。
+
+        L1 は名目上すべて `dom_exists` だが、実際には 86件が API・データ契約の
+        主張だった（`docs/ux_l1_triage_20260802.md`）。`test_method` は
+        書き換えず、項目が持つ照合先（testid / endpoint）で振り分ける。
+        """
+        if not (item.get("testid") or "").strip() and (item.get("endpoint") or "").strip():
+            if self.contract is None:
+                return self._judge(ux_id, item, registry)
+            return _from_contract(self.contract.judge(ux_id, item))
+        return self._judge(ux_id, item, registry)
 
     @staticmethod
     def _judge(ux_id: str, item: dict, registry: TestIdRegistry) -> L1Result:
@@ -396,6 +415,24 @@ class L1Executor:
 
 
 # --- ここから下はファイル走査のこまごました部分 -------------------------------
+
+
+def _from_contract(result) -> L1Result:
+    """API 契約の判定を L1 の結果に載せ替える。
+
+    verdict と evidence はそのまま持ち越す。evidence には判定器側の
+    `static_route_scan` が刻まれているので、どちらで測ったかは失われない。
+    """
+    return L1Result(
+        item_id=result.item_id,
+        ux_story=result.ux_story,
+        story_scene=result.story_scene,
+        description=result.description,
+        testid=result.endpoint,
+        verdict=Verdict[result.verdict.name],
+        reason=result.reason,
+        evidence=result.evidence,
+    )
 
 
 def _project_root() -> Path:
@@ -476,8 +513,12 @@ def _item_sort_key(item_id: str):
 
 
 def _format_report(report: L1Report) -> str:
+    methods = sorted({
+        r.evidence.split(":", 1)[0] for r in report.results if ":" in r.evidence
+    })
     lines = [
-        f"UX 検証 L1（DOM存在） — persona={report.persona} method={report.method}",
+        f"UX 検証 L1 — persona={report.persona} 判定方法={' + '.join(methods) or report.method}",
+        "  ※ いずれも静的走査。実行時に描画される / 200 を返すことは保証しない",
         f"  走査: frontend ソース {report.files_scanned} ファイル",
         (
             f"  判定: {report.total}件 / PASS {report.pass_count}"

@@ -197,77 +197,88 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "SmartCut初期化APIが正常応答を返す",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/init"
     },
     {
       "id": "O5-L1-02",
       "layer": 1,
       "story_scene": "S1",
       "description": "全候補APIが正常応答を返す",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
     },
     {
       "id": "O5-L1-03",
       "layer": 1,
       "story_scene": "S2",
       "description": "候補レスポンスにhighlights配列が存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
     },
     {
       "id": "O5-L1-04",
       "layer": 1,
       "story_scene": "S5",
       "description": "固定APIが正常応答しlocked_segmentsが返る",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/lock"
     },
     {
       "id": "O5-L1-05",
       "layer": 1,
       "story_scene": "S7",
       "description": "固定解除APIが正常応答しlocked_segmentsが更新される",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/unlock"
     },
     {
       "id": "O5-L1-06",
       "layer": 1,
       "story_scene": "S10",
       "description": "推奨APIで再計算が可能(undo相当)",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O5-L1-07",
       "layer": 1,
       "story_scene": "S11",
       "description": "再度同一パラメータで推奨取得が可能(redo相当)",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O5-L1-08",
       "layer": 1,
       "story_scene": "S8",
       "description": "候補レスポンスにchapters配列が存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
     },
     {
       "id": "O5-L1-09",
       "layer": 1,
       "story_scene": "S14",
       "description": "推奨レスポンスにestimated_output_strが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O5-L1-10",
       "layer": 1,
       "story_scene": "S15",
       "description": "推奨レスポンスにrecommended_segments配列が存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/recommend"
     },
     {
       "id": "O5-L1-11",
       "layer": 1,
       "story_scene": "S17",
       "description": "確定APIが正常応答を返す",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/smartcut/finalize"
     },
     {
       "id": "O5-L2-01",
