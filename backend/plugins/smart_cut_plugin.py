@@ -7,6 +7,11 @@ SmartCutPlugin - スマートカット機能
 - AI推奨構成
 - セマンティック境界調整
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -359,7 +364,7 @@ class SmartCutPlugin(Plugin):
     def _save_to_evolution_log(self, entry: Dict[str, Any]):
         """evolution_logに固定シーン理由を保存"""
         try:
-            evolution_path = Path(__file__).parent.parent / "branding" / "evolution_log.json"
+            evolution_path = _writable_path("backend/branding/evolution_log.json")
             
             if evolution_path.exists():
                 with open(evolution_path, 'r', encoding='utf-8') as f:

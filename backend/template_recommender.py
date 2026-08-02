@@ -8,6 +8,11 @@ template_recommender.py — テンプレート自動推奨AI
   「おまかせ」ボタンを押すだけで最適テンプレートが選ばれる。
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import logging
 import json
 from typing import Dict, List, Optional, Tuple
@@ -282,9 +287,11 @@ class TemplateRecommender:
           - 選択回数が多いテンプレートに馴染みボーナス（+5）
         """
         try:
+            # 実行のたびに追記される進化履歴。書き手と同じ経路で解決する。
+            # 以前は本番の場所と CWD 相対の2候補を順に見ていたが、後者は
+            # 起動ディレクトリ次第で別のファイルを掴むので候補から外した。
             evolution_log_paths = [
-                Path(__file__).parent / "branding" / "evolution_log.json",
-                Path("backend/branding/evolution_log.json"),
+                _writable_path("backend/branding/evolution_log.json"),
             ]
             
             history = []

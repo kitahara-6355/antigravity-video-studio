@@ -1,6 +1,11 @@
 """
 Collaboration Router - フィードバック・ジャーナル・意思決定関連エンドポイント
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -49,7 +54,8 @@ class CouncilSessionRequest(BaseModel):
 
 # --- 定義された定数 ---
 BASE_DIR = Path(__file__).parent.parent
-EVOLUTION_LOG_PATH = BASE_DIR / "branding" / "evolution_log.json"
+# 実行のたびに追記される進化履歴。読み書きの両方をこの経路へ通すこと。
+EVOLUTION_LOG_PATH = _writable_path("backend/branding/evolution_log.json")
 
 DEFAULT_COUNCIL_QUERY = "現在のチャンネル成長についての戦略的分析をお願いします。"
 DEFAULT_COUNCIL_MODE = "post_production"

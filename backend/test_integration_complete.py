@@ -71,8 +71,10 @@ def test_smartcut_evolution_log():
         
         print(f"✅ lock_segment: {'成功' if success else '失敗'}")
         
-        # evolution_logを確認
-        evolution_path = Path(__file__).parent / "branding" / "evolution_log.json"
+        # evolution_logを確認。実装と同じ経路で解決する
+        # （直書きだと Git 追跡下の本番ファイルを読みに行ってしまう）。
+        from path_resolver import writable_path
+        evolution_path = writable_path("backend/branding/evolution_log.json")
         if evolution_path.exists():
             with open(evolution_path, 'r', encoding='utf-8') as f:
                 log = json.load(f)

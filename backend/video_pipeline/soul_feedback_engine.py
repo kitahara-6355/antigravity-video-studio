@@ -9,6 +9,11 @@ Phase 37 M37.1 準拠。
 
 from __future__ import annotations
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 import statistics
@@ -220,7 +225,13 @@ class SoulFeedbackEngine:
         self._constitution_path = (
             Path(constitution_path) if constitution_path else _DEFAULT_CONSTITUTION_PATH
         )
-        self._evolution_log_path = self._analytics_dir / "evolution_log.json"
+        # analytics_dir が明示されたときだけその配下。既定は writable_path で
+        # 解決する — 実行のたびに追記されるログなので書き手と経路を揃える。
+        self._evolution_log_path = (
+            self._analytics_dir / "evolution_log.json"
+            if analytics_dir
+            else _writable_path("backend/branding/evolution_log.json")
+        )
         self._constitution_text: Optional[str] = None
         self._prohibited_patterns: list[str] = list(_CONSTITUTION_PROHIBITED_PATTERNS)
 

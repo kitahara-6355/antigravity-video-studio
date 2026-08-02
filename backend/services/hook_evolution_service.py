@@ -4,6 +4,11 @@ Hook Evolution Service — フック改善履歴の管理サービス
 AR-04 対応: youtube_optimizer.py のルーター層から
 ビジネスロジック（evolution_log.json の読み書き）を分離。
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 from pathlib import Path
@@ -13,7 +18,8 @@ from safe_io import SafeJsonStore, BRANDING_DIR
 
 logger = logging.getLogger(__name__)
 
-EVOLUTION_LOG_FILE = BRANDING_DIR / "evolution_log.json"
+# 実行のたびに追記される進化履歴。読み書きの両方をこの経路へ通すこと。
+EVOLUTION_LOG_FILE = _writable_path("backend/branding/evolution_log.json")
 
 
 class HookEvolutionService:
