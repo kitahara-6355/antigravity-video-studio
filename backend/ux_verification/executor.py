@@ -175,7 +175,11 @@ class TestIdRegistry:
                 if value.startswith(stem) and value != stem:
                     yield site
             for prefix, site in self.prefixes.items():
-                if prefix.startswith(stem) or stem.startswith(prefix):
+                # テンプレートが生む id は必ず prefix で始まる。要求を満たすのは
+                # prefix 自身が stem で始まるときだけ。逆向き（stem が prefix で
+                # 始まる）を許すと、`foo-${x}` という雑なテンプレート1つで
+                # `foo-bar-*` も `foo-baz-*` も通ってしまう。
+                if prefix.startswith(stem):
                     yield site
             return
 
