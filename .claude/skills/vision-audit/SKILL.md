@@ -37,6 +37,20 @@ E2E を根拠に 50% と評価し、キャッシュを消したら 26% だった
 | progressive_preview | 5 | 承認フローの強制 |
 | ux_guarantee_admin | 5 | A-1〜A-7 の動作率 |
 
+## 課金する軸がある（着手前に必ず確認する）
+
+**`pipeline_e2e` の実測はパイプラインを実際に走らせる = Gemini API を叩く = 課金。**
+`ui_api_connection` も、UI からパイプラインを起動する経路を踏むと同じ。
+憲法第3条により、**この2軸を実測する前にユーザーの承認を取る。**
+
+承認が得られないときは、その軸を `status: "not_measured"` として前回値を据え置き、
+**据え置いたことを監査レポートに明記する。** 測っていないものを測ったことにしない。
+
+無料で測れる軸: `test_coverage`（CI の coverage.json）、
+`trinity_council` / `storage_auto_manage` / `progressive_preview`（実装存在 + テスト）、
+`soul_auto_evolution`（振り向け先のファイル更新）。
+`ux_guarantee_*` は表示確認までなら無料、操作で生成を起こすと課金。
+
 ## 手順
 
 1. **前回値を読む** — `vision_realization_score` / `score_history` / `axis_scores`。

@@ -4,14 +4,29 @@
 憲法第3条: フェーズ内であっても、**課金判断だけ**は必ず人間の承認を通す。
 それ以外は Claude Code が単独で実行してよい（2026-08-02 決定）。
 
+**1円でも請求されるものはすべて対象**（2026-08-02 追加）。外部サービスの
+アカウント操作だけでなく、**従量課金の API を実際に叩く実行**を含む。
+
+このリポジトリで金がかかるのは主に Gemini API（本番38モジュールが使用、
+`gemini-2.5-flash` ほか）と `text-embedding-004`。
+Whisper / faster_whisper / pyannote はローカル実行なので無料。
+
+    テスト実行は無料。net_guard が外部接続を遮断し、キーも
+    `dummy_key_for_ci` なので API に到達しない。**有料になるのは
+    実 API キーでの実行と、パイプラインを起動する API 呼び出し。**
+
 なぜフックなのか:
     CLAUDE.md の記述は勧告でしかなく、文脈が長くなると埋もれる。
     「必ず守る」ものはコードで止める。
 
+何を止められないか:
+    `python backend/foo.py` の中で Gemini を呼ぶような経路は静的には
+    見えない。フックは網ではなく**最後の一枚**で、一次的な防御は憲法。
+
 fail-open にしている理由:
     このスクリプトが落ちたときに `deny` を返すと、Bash が全面的に
     使えなくなってセッションが死ぬ。誤検出の代償のほうが大きいので、
-    例外は素通し（exit 0）にする。CLAUDE.md の憲法が二重の防御。
+    例外は素通し（exit 0）にする。
 """
 
 from __future__ import annotations
@@ -19,6 +34,25 @@ from __future__ import annotations
 import json
 import re
 import sys
+
+# キーがダミーだと分かる値。これらに一致するときは API に到達しないので通す。
+_DUMMY_KEY = re.compile(r"^[\"']?(dummy|test|fake|placeholder|xxx+|none|changeme)", re.I)
+
+# 実 API キーを環境変数で渡す形。値がダミーでなければ従量課金に届く。
+_API_KEY_ASSIGN = re.compile(
+    r"\b(GOOGLE_API_KEY|GEMINI_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|"
+    r"ELEVENLABS_API_KEY|DEEPL_API_KEY)\s*=\s*(\S+)",
+    re.I,
+)
+
+# アプリの API を **書き込み側**で叩く形。パイプライン起動や生成系は
+# その先で Gemini を呼ぶので課金に直結する。GET（status/health）は通す。
+_HTTP_CLIENTS = r"(curl|wget|http|https|Invoke-WebRequest|Invoke-RestMethod|iwr|irm)"
+_WRITE_TO_APP_API = re.compile(
+    rf"\b{_HTTP_CLIENTS}\b(?=.*\b/api/)(?=.*(-X\s*(POST|PUT|PATCH)|--data|-d\s|"
+    r"-Method\s*(POST|PUT|PATCH)|--json))",
+    re.I,
+)
 
 # 実測より先に「金が動く形」で並べる。名前ではなく**効果**で捕まえる。
 _BILLING_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -33,6 +67,9 @@ _BILLING_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bgh\s+api\b.*\bbranch(es)?/[^ ]+/protection\b", re.I),
      "ブランチ保護（Private では GitHub Pro が必要）"),
     (re.compile(r"\bgh\s+(billing|sponsors)\b", re.I), "GitHub の課金・スポンサー"),
+    # 従量課金の API を叩く CLI。
+    (re.compile(r"\b(gemini|openai|anthropic|llm)\s+(chat|complete|generate|embed|run)\b", re.I),
+     "生成 API の CLI 実行（従量課金）"),
     # 受け皿。**広げすぎない。**
     # 2026-08-02: 当初 `checkout` を入れていて `git checkout` を全部止めた。
     # 誤検出でセッションが止まるとフックごと外されるので、ゲートの価値がゼロになる。
@@ -40,6 +77,16 @@ _BILLING_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bsubscriptions?\b", re.I), "サブスクリプション操作"),
     (re.compile(r"\b(paddle|paypal|braintree)\b", re.I), "決済サービス"),
 )
+
+
+def _paid_api_reason(command: str) -> str | None:
+    """従量課金の API に到達する実行かどうか。到達するなら理由を返す。"""
+    match = _API_KEY_ASSIGN.search(command)
+    if match and not _DUMMY_KEY.match(match.group(2)):
+        return f"実 API キーでの実行（{match.group(1)}）。Gemini は従量課金"
+    if _WRITE_TO_APP_API.search(command):
+        return "アプリ API への書き込み要求。パイプラインが Gemini を呼ぶ"
+    return None
 
 
 def _decision(reason: str) -> None:
@@ -70,6 +117,10 @@ def main() -> int:
         if pattern.search(command):
             _decision(reason)
             return 0
+
+    paid = _paid_api_reason(command)
+    if paid:
+        _decision(paid)
     return 0
 
 

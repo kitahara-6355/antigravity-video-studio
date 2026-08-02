@@ -31,6 +31,12 @@ CASES: tuple[tuple[str, bool], ...] = (
     ("gh run download 123 -D /tmp/x", False),
     # 文言が紛らわしいだけのもの。コミットメッセージやコード中の語で止めない
     ("git commit -m 'checkout flow purchase plan'", False),
+    # テスト実行は無料。net_guard が外部接続を遮断し、キーもダミー
+    ("PYTHONPATH=./backend GOOGLE_API_KEY=dummy_key_for_ci python -m pytest -q", False),
+    ("GEMINI_API_KEY=test-key python -m pytest backend/tests -q", False),
+    # 読み取りだけの API 呼び出しは課金しない
+    ("curl http://127.0.0.1:8000/health", False),
+    ("curl http://127.0.0.1:8000/api/pipeline/status", False),
     # 止めるべきもの — 実際に金が動く / 有料プランへの依存を生む
     ("gcloud billing accounts list", True),
     ("npm publish", True),
@@ -38,6 +44,12 @@ CASES: tuple[tuple[str, bool], ...] = (
     ("gh billing actions", True),
     ("stripe charges create", True),
     ("gh api repos/o/r/branches/main/protection -X PUT", True),
+    # 従量課金の API に実際に到達するもの（2026-08-02 追加）
+    ("GOOGLE_API_KEY=AIzaSyRealLookingKey123 python backend/main.py", True),
+    ("GEMINI_API_KEY=$MY_REAL_KEY python scripts/run_pipeline.py", True),
+    ('curl -X POST http://127.0.0.1:8000/api/pipeline/start -d "{}"', True),
+    ("Invoke-RestMethod -Uri http://localhost:8000/api/youtube/pre-plan -Method POST", True),
+    ("curl http://127.0.0.1:8000/api/pipeline/start --json '{}'", True),
 )
 
 
