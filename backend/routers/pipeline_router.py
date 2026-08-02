@@ -1,3 +1,8 @@
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from routers.pipeline_default_states import (
     get_initial_pipeline_state,
     get_initial_transcription_state,
@@ -869,7 +874,7 @@ async def force_render(req: ForceRenderRequest):
 async def _record_force_render(reason: str, quality_score: int):
     """T-035: evolution_log に強制レンダリング理由を記録"""
     try:
-        log_path = Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        log_path = _writable_path("backend/branding/evolution_log.json")
         if log_path.exists():
             data = json.loads(log_path.read_text(encoding="utf-8"))
         else:

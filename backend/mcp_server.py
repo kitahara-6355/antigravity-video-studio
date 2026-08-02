@@ -25,6 +25,11 @@ Antigravity の状態を外部AIツール（Claude Desktop等）から
   依存: mcp パッケージ未インストール時はスタブモードで動作
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 from pathlib import Path
@@ -33,7 +38,8 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 BRANDING_DIR = Path(__file__).parent / "branding"
-EVOLUTION_LOG_PATH = BRANDING_DIR / "evolution_log.json"
+# 実行のたびに追記される進化履歴。読み書きの両方をこの経路へ通すこと。
+EVOLUTION_LOG_PATH = _writable_path("backend/branding/evolution_log.json")
 CONSTITUTION_PATH = BRANDING_DIR / "constitution.json"
 
 

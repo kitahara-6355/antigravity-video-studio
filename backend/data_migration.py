@@ -8,6 +8,11 @@ PROJECT_CONSTITUTION 準拠:
 このモジュールは、システムが新しい統合アーキテクチャにアップデートされた際に、
 古いデータ構造や設定ファイルを新しい仕様に安全に適合・検証するための移行ユーティリティを提供します。
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
@@ -210,15 +215,17 @@ class DataMigration:
             - action: "exists"（ファイルが存在する場合）、"will_create"（dry_runで未存在の場合）、
                       "created"（新規作成された場合）
         """
-        log_path = self._branding_dir / "evolution_log.json"
-        
+        # 実行のたびに追記される進化履歴。設定ファイルと違って書き換わるので、
+        # 読み書きの両方をこの経路へ通す。
+        log_path = _writable_path("backend/branding/evolution_log.json")
+
         if not log_path.exists():
             if dry_run:
                 return {"name": "evolution_log", "status": "passed", "action": "will_create"}
-            
+
             # 新規作成（dry_run=False の場合のみディレクトリとファイルを作成）
             try:
-                self._branding_dir.mkdir(parents=True, exist_ok=True)
+                log_path.parent.mkdir(parents=True, exist_ok=True)
             except OSError as e:
                 logger.error(f"Failed to create branding directory: {e}")
                 return {"name": "evolution_log", "status": "failed", "reason": f"Failed to create branding directory: {str(e)}"}

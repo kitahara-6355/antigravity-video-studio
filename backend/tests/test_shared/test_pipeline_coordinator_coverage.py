@@ -70,6 +70,25 @@ class TestPipelineCoordinatorCoverage:
     """pipeline_coordinator.py のカバレッジ100%を達成するためのテストクラス"""
 
     @pytest.fixture(autouse=True)
+    def video_path(self, tmp_path):
+        """`ctx.video_path` を一時ディレクトリ配下に置く。
+
+        2026-08-02: 以前は素の `"test.mp4"` を渡していた。
+        `_init_performance_budget_manager` は
+        `Path(ctx.video_path).parent / "performance"` を出力先にするので、
+        親が `.` になり、パフォーマンスレポートが**カレントディレクトリ**、
+        すなわちリポジトリ直下の `performance/` に書かれていた
+        （2026-08-01 の CI 実測で `performance/worker_perf_s123.json` ほか2パスが
+        Git 追跡下のまま上書きされていた）。
+
+        本番では動画の隣に置くのが仕様なので、直すのは実装ではなく
+        テストが渡す入力のほう。実体は作らない — 動画を読む処理は
+        いずれもモックされており、必要なのは親ディレクトリだけ。
+        """
+        self.video_path = str(tmp_path / "test.mp4")
+        return self.video_path
+
+    @pytest.fixture(autouse=True)
     def clean_sys_modules(self):
         dummy_module_names = [
             'proper_noun_dict', 'template_config', 'harness', 
@@ -93,7 +112,7 @@ class TestPipelineCoordinatorCoverage:
 
     def test_init_harness_import_error(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         with patch("builtins.__import__", side_effect=ImportError("Mocked ImportError")):
             harness = pc._init_harness(ctx)
@@ -101,7 +120,7 @@ class TestPipelineCoordinatorCoverage:
 
     def test_init_harness_general_exception(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         with patch("harness.session_manager.session_manager.create_session", side_effect=Exception("Mocked general error")):
             harness = pc._init_harness(ctx)
@@ -109,7 +128,7 @@ class TestPipelineCoordinatorCoverage:
 
     def test_init_harness_resume_session_success(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="existing_session_id")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="existing_session_id")
         
         mock_ge = MagicMock()
         mock_sm = MagicMock()
@@ -127,7 +146,7 @@ class TestPipelineCoordinatorCoverage:
     def test_init_harness_create_new_session(self):
         """151-152 のカバー: session_id が None の時に create_session を呼ぶパス"""
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id=None)
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id=None)
         
         mock_ge = MagicMock()
         mock_sm = MagicMock()
@@ -139,26 +158,26 @@ class TestPipelineCoordinatorCoverage:
              patch("harness.governance.governance_engine", mock_ge):
             harness = pc._init_harness(ctx)
             assert harness is not None
-            mock_sm.create_session.assert_called_once_with(video_path="test.mp4")
+            mock_sm.create_session.assert_called_once_with(video_path=self.video_path)
             assert ctx.session_id == "new_generated_session_id"
 
     def test_ensure_template_import_error(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123", template_id="nhk_style")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123", template_id="nhk_style")
         
         with patch("builtins.__import__", side_effect=ImportError("Mocked ImportError")):
             pc._ensure_template(ctx)
 
     def test_ensure_template_exception(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123", template_id="nhk_style")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123", template_id="nhk_style")
         
         with patch("template_config.TemplateConfigProvider.is_active", new_callable=PropertyMock, side_effect=Exception("Mocked error")):
             pc._ensure_template(ctx)
 
     def test_ensure_template_restore(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123", template_id="nhk_style")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123", template_id="nhk_style")
         
         mock_template_config = MagicMock()
         mock_template_config.is_active = False
@@ -173,7 +192,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_disk_space_insufficient(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         mock_usage = MagicMock(free=500 * 1024 * 1024)  # 500MB
         with patch("shutil.disk_usage", return_value=mock_usage):
@@ -187,7 +206,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_disk_space_warning(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         mock_usage = MagicMock(free=3 * 1024 * 1024 * 1024)  # 3GB
         with patch("shutil.disk_usage", return_value=mock_usage):
@@ -204,7 +223,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_disk_check_exception(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         with patch("shutil.disk_usage", side_effect=Exception("Disk error")):
             pc._init_harness = MagicMock(return_value=None)
@@ -219,7 +238,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_performance_budget_manager_import_error(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage), \
@@ -234,7 +253,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_pre_hook_governance_permission_denied(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         mock_ge = MagicMock()
         mock_ge.check_permission.return_value = False  # Permission Denied
@@ -256,7 +275,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_pre_hook_governance_rate_limit_exceeded(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         mock_ge = MagicMock()
         mock_ge.check_permission.return_value = True
@@ -279,7 +298,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_pre_hook_system_deny(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         mock_ge = MagicMock()
         mock_ge.check_permission.return_value = True
@@ -308,7 +327,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_first_worker_denied(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         pc._init_harness = MagicMock(return_value=None)
         pc._finalize_harness = MagicMock()
@@ -323,7 +342,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_later_worker_denied(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         pc._init_harness = MagicMock(return_value=None)
         pc._finalize_harness = MagicMock()
@@ -349,7 +368,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_serial_worker_retry_and_success(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         pc._init_harness = MagicMock(return_value=None)
         pc._finalize_harness = MagicMock()
@@ -378,7 +397,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_serial_worker_fail_completely(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         pc._init_harness = MagicMock(return_value=None)
         pc._finalize_harness = MagicMock()
@@ -402,7 +421,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_parallel_worker_exception_and_preview_fail(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         
         pc._init_harness = MagicMock(return_value=None)
@@ -447,7 +466,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_parallel_worker_pre_hook_denied(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         async def side_effect_pre_hook(harness, worker, ctx):
             from agents.workers import YouTubeOptWorker
@@ -472,7 +491,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_evaluator_optimizer_success(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         
         pc._init_harness = MagicMock(return_value={"session_manager": MagicMock()})
@@ -508,7 +527,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_evaluator_optimizer_failed(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         
         pc._init_harness = MagicMock(return_value=None)
@@ -540,7 +559,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_quality_improvement_loop_fallback_success(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         ctx.quality_feedback = []
         
@@ -567,7 +586,7 @@ class TestPipelineCoordinatorCoverage:
     async def test_quality_improvement_loop_with_perf_manager(self):
         """631 と 642 をカバー: perf_manager.record_worker_time を呼ぶパス"""
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         ctx.quality_feedback = []
         
@@ -590,7 +609,7 @@ class TestPipelineCoordinatorCoverage:
     async def test_quality_improvement_loop_missing_workers(self):
         pc = PipelineCoordinator()
         pc.workers = []  # Empty workers list
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         res = await pc._quality_improvement_loop(ctx)
         assert res is False
@@ -598,7 +617,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_quality_improvement_loop_max_retries_reached(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         ctx.quality_feedback = []
         
@@ -615,7 +634,7 @@ class TestPipelineCoordinatorCoverage:
 
     def test_finalize_harness_cases(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         # Case 1: harness is None
         pc._finalize_harness(None, ctx)
@@ -638,7 +657,7 @@ class TestPipelineCoordinatorCoverage:
 
     def test_generate_improvement_suggestions(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         ctx.quality_feedback = [
             "音声ラウドネスが基準以下です",
@@ -657,7 +676,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_run_retention_analysis_success(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.segments = [{"start": 0, "end": 10}, {"start": 10, "end": 25}]
         
         mock_report = MagicMock()
@@ -684,7 +703,7 @@ class TestPipelineCoordinatorCoverage:
     async def test_run_retention_analysis_with_segment_objects(self):
         from agents.pipeline_types import Segment
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.segments = [Segment(start=0.0, end=10.0, text="hello"), Segment(start=10.0, end=25.0, text="world")]
         
         mock_report = MagicMock()
@@ -710,7 +729,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_run_retention_analysis_fallback_duration(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=5, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=5, session_id="s123")
         ctx.segments = []
         
         mock_report = MagicMock()
@@ -726,14 +745,14 @@ class TestPipelineCoordinatorCoverage:
             mock_plugin.analyze_retention_risks.assert_called_once_with(
                 video_id="test",
                 duration_sec=300,
-                video_path="test.mp4"
+                video_path=self.video_path
             )
             assert res is not None
 
     @pytest.mark.asyncio
     async def test_run_retention_analysis_exception(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=5, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=5, session_id="s123")
         
         with patch("builtins.__import__", side_effect=ImportError("plugin not found")):
             res = await pc._run_retention_analysis(ctx)
@@ -742,7 +761,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_trigger_dream_learning_success(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=5, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=5, session_id="s123")
         ctx.segments = []
         ctx.selected_segments = []
         ctx.quality_score = 95
@@ -753,9 +772,12 @@ class TestPipelineCoordinatorCoverage:
         mock_dream_engine.should_dream = AsyncMock(return_value=True)
         mock_dream_engine.run_dream_cycle = AsyncMock()
         
-        from agents import pipeline_coordinator
-        actual_knowledge_dir = Path(pipeline_coordinator.__file__).parent / "logs" / "pipeline_knowledge"
-        
+        # 実装と同じ経路で解決する。`Path(pipeline_coordinator.__file__).parent`
+        # 直書きだと、この rmtree が**リポジトリ内の** backend/agents/logs/
+        # pipeline_knowledge を消していた（13 テストが同じことをしていた）。
+        from path_resolver import writable_path
+        actual_knowledge_dir = writable_path("backend/agents/logs/pipeline_knowledge")
+
         if actual_knowledge_dir.exists():
             shutil.rmtree(str(actual_knowledge_dir))
             
@@ -775,7 +797,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_trigger_dream_learning_exception(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=5, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=5, session_id="s123")
         
         with patch("agents.dream_engine.dream_engine", side_effect=Exception("Dream engine error")):
             await pc._trigger_dream_learning(ctx)
@@ -784,7 +806,7 @@ class TestPipelineCoordinatorCoverage:
     async def test_execute_harness_integration_full_flow(self):
         """565 (StageResult.append) をカバーするために _run_retention_analysis を AsyncMock(StageResult) に差し替える"""
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="")
         ctx.quality_score = 95
         
         mock_progress = MagicMock()
@@ -840,7 +862,7 @@ class TestPipelineCoordinatorCoverage:
 
     def test_finalize_harness_error(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.warnings = ["fatal error"]
         
         mock_ge = MagicMock()
@@ -858,7 +880,7 @@ class TestPipelineCoordinatorCoverage:
     async def test_execute_quality_improvement_loop_fallback_failed(self):
         """559 をカバーするためにループ失敗を再現"""
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         ctx.quality_feedback = []
         
@@ -889,7 +911,7 @@ class TestPipelineCoordinatorCoverage:
     async def test_execute_performance_budget_save_report_exception(self):
         """585-586 をカバーするために save_report での例外発生を模倣"""
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         pc._init_harness = MagicMock(return_value=None)
         pc._finalize_harness = MagicMock()
@@ -912,7 +934,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_quality_improvement_loop_preview_fail(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 85
         ctx.quality_feedback = []
         
@@ -929,7 +951,7 @@ class TestPipelineCoordinatorCoverage:
     @pytest.mark.asyncio
     async def test_execute_render_worker_fail(self):
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         ctx.quality_score = 95
         
         pc._init_harness = MagicMock(return_value=None)
@@ -954,7 +976,7 @@ class TestPipelineCoordinatorCoverage:
     async def test_fire_post_hook_success_and_failure(self):
         """287-292 のカバー: post_hook 失敗系パス"""
         pc = PipelineCoordinator()
-        ctx = PipelineContext(video_path="test.mp4", target_minutes=10, session_id="s123")
+        ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
         mock_hook_system = AsyncMock()
         mock_hook_event = MagicMock()

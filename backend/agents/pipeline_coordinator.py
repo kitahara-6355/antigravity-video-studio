@@ -856,8 +856,9 @@ class PipelineCoordinator:
                 "retries_used": sum(r.retries for r in ctx.stage_results),
             }
 
-            # DreamEngine のシグナルとして記録
-            knowledge_path = Path(__file__).parent / "logs" / "pipeline_knowledge"
+            # DreamEngine のシグナルとして記録。実行のたびに増える記録なので
+            # writable_path 経由にする（読み出す tick_loop 側も同じ経路）。
+            knowledge_path = _writable_path("backend/agents/logs/pipeline_knowledge")
             knowledge_path.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             knowledge_file = knowledge_path / f"run_{ts}.json"
