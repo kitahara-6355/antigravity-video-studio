@@ -60,14 +60,38 @@ pytest tests/test_ux_ratchet.py     # UX検証ラチェット（連動率85%以�
 
 - `backend/.env`、`*.key`、`vault-assets/raw/**` — 読み取りも行わない
 - `archives/`、`antigravity_phase18_stable_v1/`、`antigravity_phase19_experimental_v1/` — 過去版のスナップショット
-- `backend/branding/PROJECT_CONSTITUTION.md`、`backend/agents/memory/VERIFIED_FACTS.md` — 変更前に必ず承認を取る
-- `TECHNICAL_DEBT_REGISTRY.md` は自動生成。手で編集せず `TechnicalDebtStore` API 経由で更新する
+- `backend/branding/PROJECT_CONSTITUTION.md` — **製品のビジョンそのもの**なので憲法第1条により協働。私からは提案だけ
+- `backend/agents/memory/VERIFIED_FACTS.md` — 自動生成（DreamEngine）。手で編集しない
+- `TECHNICAL_DEBT_REGISTRY.md` も自動生成。手で編集せず `TechnicalDebtStore` API 経由で更新する
+
+## 憲法 — Claude Code の行動規範（2026-08-02 制定・最優先）
+
+**human-on-the-loop。** 実務は Claude Code が自律実行し、人間はフェーズの境界だけで判断する。
+
+1. **判断の分界。** ビジョン・方針・優先順位・フェーズの定義は**ユーザーと協働**（私は提案するだけ）。
+   そのフェーズ内の実装・設計・PR 分割・マージ時機・検証方法は**私が単独で決めて実行し、事後報告**する。
+2. **停止条件。** フェーズの終了条件を満たしたら止まり、`/gate-report` を出して判断を待つ。
+   **次のフェーズには入らない。**
+3. **自律の対象外は課金判断のみ。** それ以外は main への push も含めて私が単独で実行してよい。
+   Claude Code は**定額プラン**なので、実際に相談が要るのは主に次の2つ。
+   - **プラン上限に当たって活動量が足りず、追加費用が要るとき** — 何にいくら必要かを示して判断を仰ぐ
+   - **大規模 fan-out**（workflow・エージェント並列）— 消費が桁で変わるので着手前に相談する
+   外部サービスの課金（GCP/npm/決済 API・GitHub Pro が要るブランチ保護など）は
+   `.claude/hooks/billing_gate.py` が機械的に止める。
+4. **証拠主義。** 「完了」は主張ではなく証拠で示す（コマンドと出力、CI の run ID）。
+   **自分の成果を自分で採点しない** — ゲート判定は `gate-verifier` に別コンテキストで検証させる。
+5. **正典は1つ。** 現在地の正典は `backend/branding/vision_backlog.json`。
+   `phase_state.json` と `docs/BACKLOG_MASTER.md` は参照資料。
+   **台帳が食い違ったら実装を止めて正典の修復を優先する。**
+6. **実装は Claude Code に一本化。** `.agent/` と `GEMINI.md` は読むが書かない。
+
+手順の本体は `.claude/skills/`（`/phase-run`・`/vision-audit`・`/gate-report`）にある。
 
 ## 進め方
 
 - TDD。テストを 1 つ書き、それを通す実装を 1 つ書く、を繰り返す
 - デバッグは「仮説 → ログで観測 → 検証」。推測で直さない
-- 破壊的操作（ファイル削除、大量書き換え、外部 API への書き込み）は事前に承認を取る
+- 破壊的操作は実行前に対象を確認する（承認は憲法第3条の範囲のみ）
 
 ## 詳細ルールの原典
 

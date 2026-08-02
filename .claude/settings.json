@@ -1,0 +1,31 @@
+{
+  "_comment": "このリポジトリを直接開いたときの設定。script/ から開いたときは script/.claude/settings.json が同じフックを登録する（あちらは登録だけのスタブで、実体はここ）。",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/billing_gate.py\"",
+            "timeout": 15,
+            "statusMessage": "課金判断の有無を確認中"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session_context.py\"",
+            "timeout": 20,
+            "statusMessage": "ロードマップ現在地を読み込み中"
+          }
+        ]
+      }
+    ]
+  }
+}
