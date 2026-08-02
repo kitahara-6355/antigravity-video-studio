@@ -5,6 +5,11 @@ Phase遷移時にOpus Directiveを自動更新する。
 学習エンジンの分析結果と収穫逓減検出を反映し、
 ユーザー介入なしでFlashの戦略を最新Phaseに追従させる。
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 from datetime import datetime, timezone
@@ -15,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent
 _DIRECTIVE_PATH = _BASE_DIR / "opus_directive.json"
-_PHASE_STATE_PATH = _BASE_DIR.parent / "memory" / "phase_state.json"
+_PHASE_STATE_PATH = _writable_path("backend/agents/memory/phase_state.json")
 
 
 def _read_json(path: Path) -> dict:

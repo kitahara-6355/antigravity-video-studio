@@ -72,7 +72,10 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     # ログ類（evolution_log など）は空から始めてよいので複製しない。
     import shutil as _shutil
     _repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    for _seed in ("constitution.json", "strategy.json", "user_model.json"):
+    # proper_nouns.json も同じ扱い。出荷時の辞書を持ちつつ実行時に自動学習で
+    # 追記されるので、空から始めると辞書を引くテストが壊れる。
+    for _seed in ("constitution.json", "strategy.json", "user_model.json",
+                  "proper_nouns.json"):
         _src = os.path.join(_repo_root, "backend", "branding", _seed)
         if os.path.exists(_src):
             _shutil.copyfile(_src, os.path.join(_writable_root, "backend", "branding", _seed))
@@ -81,13 +84,23 @@ if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     for _seed in ("task_queue.json", "flash_session.json", "resource_state.json",
                   "opus_session.json", "message_box.jsonl", "module_index.json",
                   "task_learning_cache.json", "harness_audit_status.json",
-                  "harness_audit_log.jsonl"):
+                  "harness_audit_log.jsonl", "flash_reports.jsonl"):
         _src = os.path.join(_repo_root, "backend", "agents", "orchestration", _seed)
         if os.path.exists(_src):
             _shutil.copyfile(
                 _src,
                 os.path.join(_writable_root, "backend", "agents", "orchestration", _seed),
             )
+    # phase_state.json は「現在の Phase」を持つ実データで、読む側（health_check /
+    # generate_flash_prompt / directive_auto_updater）が中身を前提にしている。
+    # atomic_io が書き込み時に .bak も作るので、そちらは複製しなくてよい。
+    os.makedirs(os.path.join(_writable_root, "backend", "agents", "memory"), exist_ok=True)
+    _src = os.path.join(_repo_root, "backend", "agents", "memory", "phase_state.json")
+    if os.path.exists(_src):
+        _shutil.copyfile(
+            _src,
+            os.path.join(_writable_root, "backend", "agents", "memory", "phase_state.json"),
+        )
     # README.md は generate_subagent_reports がダッシュボード統計を
     # DASHBOARD_START/END の間へ同期する対象。実行するとリポジトリの
     # README が書き換わっていた。複製しておけば同期処理はそのまま動く。

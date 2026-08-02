@@ -29,7 +29,7 @@ from path_resolver import project_root
 from backend.agents.orchestration.atomic_io import safe_read_json, atomic_write_json
 
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
-PHASE_STATE_PATH = os.path.join(WORKSPACE_DIR, "backend", "agents", "memory", "phase_state.json")
+PHASE_STATE_PATH = str(_writable_path("backend/agents/memory/phase_state.json"))
 DIRECTIVE_PATH = os.path.join(ORCHESTRATION_DIR, "opus_directive.json")
 TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
 FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
