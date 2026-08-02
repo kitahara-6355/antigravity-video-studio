@@ -24,6 +24,11 @@ Verified Facts に書き込む。
     - usage_tracker 連携でコスト上限を遵守
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 import asyncio
@@ -40,8 +45,13 @@ logger = logging.getLogger(__name__)
 # ============================================================
 DREAM_INTERVAL_HOURS = 24       # Gate 1: 最小間隔
 DREAM_MIN_SESSIONS = 5          # Gate 2: 最小セッション数
-DREAM_LOCK_FILE = Path(__file__).parent / ".dream_lock"
-DREAM_STATE_FILE = Path(__file__).parent / "memory" / "dream_state.json"
+# ロックと状態は**実行のたびに書き換わる**ので writable_path 経由にする。
+# `Path(__file__).parent` 直書きだと、テストを流すたびに Git 追跡下の
+# backend/agents/memory/dream_state.json が上書きされていた（2026-08-01 の
+# CI 実測で 11 テスト）。本番では project_root() 起点なので置き場は変わらない。
+# 読み書きの両方をここへ通すこと — 書き込みだけ振り向けると読み返しが壊れる。
+DREAM_LOCK_FILE = _writable_path("backend/agents/.dream_lock")
+DREAM_STATE_FILE = _writable_path("backend/agents/memory/dream_state.json")
 DATA_DIR = Path(__file__).parent
 
 

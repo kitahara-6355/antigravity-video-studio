@@ -603,7 +603,6 @@ async def resolve_subtitle_preview_task(agent_or_id, task_id: str = None, db_pat
         max_file_size_bytes = 4 * 1024 * 1024
     
     if actual_output_dir is None:
-        project_root = Path(__file__).resolve().parents[1]
         actual_output_dir = _writable_path("temp_thumbnails")
     else:
         actual_output_dir = Path(actual_output_dir)

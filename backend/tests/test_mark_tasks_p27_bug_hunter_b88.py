@@ -615,7 +615,12 @@ async def test_run_thumbnail_stage_task_name_error_prevented(temp_db):
     """run_thumbnail_stage_task で output_path が定義される前にエラーが起きた際、
     _cleanup_file 呼び出しで NameError が発生せずに元の例外が正しく再送出されることを検証
     """
-    with patch("pathlib.Path.resolve", side_effect=OSError("Mocked Resolve Error")):
+    # 早期エラーの起点は mkdir。以前は出力先を組み立てる際の Path.resolve() を
+    # 差し替えていたが、出力先の解決を path_resolver に寄せた際に resolve() を
+    # 通らなくなり、何も送出されなくなった。検証したいのは
+    # 「output_path 未定義のまま例外が起きても NameError にならない」ことなので、
+    # output_path 代入より前にある操作を起点にすればよい。
+    with patch("pathlib.Path.mkdir", side_effect=OSError("Mocked Resolve Error")):
         with pytest.raises(OSError, match="Mocked Resolve Error"):
             await run_thumbnail_stage_task("task_name_error_test", db_path=temp_db)
 
