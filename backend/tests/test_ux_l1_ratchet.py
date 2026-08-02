@@ -166,6 +166,42 @@ def test_report_text_lists_each_regression(tmp_path):
     assert not result.valid
 
 
+# --- ベースラインの不在を成功にしない ------------------------------------------
+
+
+def test_cli_fails_when_baseline_is_missing(tmp_path, monkeypatch):
+    """ベースラインを消すだけでラチェットを無効化できてはいけない。
+
+    退行を抱えたままファイルを1つ消せば緑になる、という抜け道を塞ぐ。
+    """
+    from backend.ux_verification import executor as ex
+
+    monkeypatch.setattr(ex, "_project_root", lambda: _repo_root())
+    monkeypatch.setattr(
+        "backend.ux_verification.l1_ratchet.baseline_path",
+        lambda persona: tmp_path / "does_not_exist.json",
+    )
+
+    assert ex.main(["--persona", "owner", "--ratchet"]) == 1
+
+
+def test_committed_baseline_exists_and_covers_every_owner_l1_item():
+    """コミット済みベースラインが消えていないことを固定する。"""
+    from backend.ux_verification.executor import L1Executor
+    from backend.ux_verification.l1_ratchet import baseline_path, load_baseline
+
+    base = load_baseline(baseline_path("owner"))
+
+    assert base is not None, "l1_owner_baseline.json がコミットされていない"
+    report = L1Executor.for_repo().run("owner")
+    assert set(base["items"]) == {r.item_id for r in report.results}
+
+
+def _repo_root():
+    from pathlib import Path
+    return Path(__file__).resolve().parents[2]
+
+
 # --- 更新の安全弁 -------------------------------------------------------------
 
 

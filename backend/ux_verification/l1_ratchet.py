@@ -83,8 +83,10 @@ class L1RatchetResult:
     def to_text(self) -> str:
         if self.baseline_missing:
             return (
-                "ベースラインがありません。--update-baseline で作成してください"
-                f"（現在 PASS {self.after_pass}件）。"
+                "🚫 ベースラインがありません。--update-baseline で作成してください"
+                f"（現在 PASS {self.after_pass}件）。\n"
+                "  ベースラインが無い状態を緑にすると、ファイルを消すだけで"
+                "ラチェットを無効化できてしまうため失敗として扱います。"
             )
         head = (
             f"L1 ラチェット: PASS {self.before_pass} → {self.after_pass}"
