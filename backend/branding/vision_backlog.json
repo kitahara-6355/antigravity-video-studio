@@ -127,10 +127,11 @@
       "score": 65,
       "weight": 15,
       "status": "build_verified",
-      "note": "**ビルド可否を初めて実測した**（フロントには CI が無く未検証だった）。画面表示と API 接続は 2026-05-18 の Browser Agent 確認のまま。UX 充足マトリクス（docs/ux_fulfillment_matrix.md）も 2026-04-30 が最終更新。",
+      "note": "**L1（DOM存在）だけ実測できるようになった**（P1）。122項目に PASS/FAIL が付き SKIP はゼロ。ただし判定は frontend ソースの静的走査で、実行時に描画されるかは保証しない。L2〜L5 は判定手段が無く未検証のまま。画面表示と API 接続は 2026-05-18 の Browser Agent 確認のまま。",
       "confidence": "partial",
       "measured_at": "2026-08-02",
-      "evidence": "frontend `npm run build` 成功（vite 7.3.6 / 2,393 modules / 9.00s）。`npm run lint` 46 errors 6 warnings"
+      "evidence": "L1 実測 122件 / PASS 30 / FAIL 92 / SKIP 0（充足率 24.59%）。CI run 30744247166 の「UX 検証 L1 ラチェット」ステップ。frontend `npm run build` 成功（vite 7.3.6）、`npm run lint` 46 errors 6 warnings（main と同数）。",
+      "score_unchanged_reason": "P1 で入れたのは測定手段であって UX の能力ではない。O-9 の 8件も既存要素への属性付与で機能追加ではない。scoring_policy は「E2E動作確認=50%以上」を要求しており静的走査はこれに当たらないため、実測なしにスコアを動かさない原則に従い 65 のまま据え置く。"
     },
     "ux_guarantee_admin": {
       "score": 55,
@@ -391,34 +392,44 @@
       {
         "id": "C-1",
         "condition": "検証項目の実行系が存在し、コマンド1つで L1 を判定できる",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "`python -m backend.ux_verification.executor --persona owner` がリポジトリルートから単独で完走（exit 0）。gate-verifier が `env -u PYTHONPATH -u GOOGLE_API_KEY` でも同一出力を確認しており、環境変数も事前準備も要らない。CI では ci.yml:161-165 が同一コマンドを`if: always()` かつ continue-on-error なしで実行（run 30744247166）。--persona admin も動作（108件）。"
       },
       {
         "id": "C-2",
         "condition": "Owner の L1 122項目すべてに PASS/FAIL が付く（SKIP ゼロ）",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "122件 / PASS 30 / FAIL 92 / SKIP 0（充足率 24.59%）。CI run 30744247166（50d55c9）のステップログと手元実行が一致。gate-verifier がストーリー JSON を独立に数えて owner layer=1 が 122件であることを確認。test_real_owner_l1_is_fully_judged が total==122 / skip_count==0 を固定。**留保**: FAIL 92件のうち 86件は照合先の testid を持たず、gate-verifier が 86件すべての description を読んだ結果 86/86 がAPI・データ契約の主張で、DOM の主張は1件も無い。dom_exists では原理的に判定できない（P2 の判断事項）。"
       },
       {
         "id": "C-3",
         "condition": "結果がスナップショットとして保存され、ラチェットで比較できる",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "l1_owner_baseline.json に 122項目の項目別 verdict をコミット。gate-verifier の実地検証: export-srt-btn を改名すると`[退行] O3-L1-11: PASS → FAIL` で exit 1、その状態の --update-baseline もexit 1 でベースラインは書き換わらない。集計値では見逃す入れ替わりもtest_swap_keeping_pass_count_is_still_a_violation が固定。verifier が見つけた「ベースラインを消すと緑になる」抜け道は PR #47 で塞いだ。"
       },
       {
         "id": "C-4",
         "condition": "逆向き索引の欠落 105件を解消する",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "gate-verifier が両方向を独立に計数。変更前 39da3e0 で逆向き欠落がちょうど 105件、現 a589a6f で逆向き欠落 0 / 順方向欠落 0 / orphan 0 / 双方向不整合 0。項目を消して数を合わせた形跡なし（verification_items の削除0・追加0・description 変更0・test_method 変更0・layer 変更0）。PR #39。"
       },
       {
         "id": "C-5",
         "condition": "既存 FAIL 16件（O-1 に14 / O-8 に2）が実在の不具合か古い判定かを切り分ける",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "docs/ux_l1_triage_20260802.md。gate-verifier が事実主張を全部独立に再現: e2e_results.json は初回コミット bb1bcde 以降更新なし、FAIL 31件のうち 15件が存在しない項目 ID、残り 16件の内訳 O-1:14 / O-8:2 が v8_baseline と一致。**実在の不具合として確認できたものは 0件。**"
       }
-    ]
+    ],
+    "gate": {
+      "verified_by": "gate-verifier（別コンテキスト・2026-08-02）",
+      "verdict": "overall: ready（5/5 met）",
+      "note": "判定は実装側ではなく gate-verifier のもの（憲法第4条）。5条件はいずれも、主張ではなく verifier が独立に再現した数値・exit code・CI ログで充足を確認した。",
+      "open_questions": [
+        "C-2 の 86件は dom_exists では判定できない。形だけ data-testid を足して PASS にすると、API の主張を DOM 存在で PASS にする偽 PASS が構造的に成立する。(a) API 契約用の実行系を別に作る / (b) test_method を実態に合わせて訂正する の二択。フェーズの定義に関わるのでユーザー判断。",
+        "Phase 0 の verifier が指摘した積み残し: CI の scripts/check_merge_gate.py は正典を読まず、phase_state.json の古い現在地（45フェーズ体系 Phase 2 / M2.1）を注釈なしで出力し続けている。正典を読む機械は SessionStart フック1つだけ。"
+      ],
+      "user_approval": "未取得。ゲート報告を提出して判断を待つ。"
+    }
   },
   "phase_history": [
     {
