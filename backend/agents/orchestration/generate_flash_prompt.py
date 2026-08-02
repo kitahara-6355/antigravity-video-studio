@@ -63,7 +63,7 @@ def _get_directive_info():
     focus_modules = data.get("focus_modules", [])
 
     # evolution_log.json から agent_performance をロードして優先度配分を調整
-    evo_log_path = os.path.join(WORKSPACE_DIR, "backend", "branding", "evolution_log.json")
+    evo_log_path = str(_writable_path("backend/branding/evolution_log.json"))
     evo_log = _safe_read_json(evo_log_path, {})
     agent_perf = evo_log.get("agent_performance", {})
 

@@ -7,6 +7,11 @@ PROJECT_CONSTITUTION §17 準拠:
 - 変更履歴記録
 - evolution_log.json 連携 (DS-06 M3.5)
 """
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from datetime import datetime
@@ -30,7 +35,9 @@ class DesignTokenManager:
         self._branding_dir = Path(__file__).parent.parent / "branding"
         self._constitution_path = self._branding_dir / "constitution.json"
         self._history_path = self._branding_dir / "design_tokens_history.json"
-        self._evolution_log_path = self._branding_dir / "evolution_log.json"
+        # 実行のたびに追記される進化履歴。設定ファイル（constitution.json 等）と
+        # 違って書き換わるので、読み書きの両方をこの経路へ通す。
+        self._evolution_log_path = _writable_path("backend/branding/evolution_log.json")
         self._design_tokens_path = Path(__file__).parent.parent.parent / "frontend" / "src" / "design_tokens.json"
         self._cache: Optional[Dict] = None
         self._cache_mtime: float = 0

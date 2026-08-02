@@ -23,7 +23,7 @@ from backend.agents.pipeline_coordinator import PipelineCoordinator
 # Scenario 01: 正常系フル動画作成フロー
 # =====================================================================
 @pytest.mark.asyncio
-async def test_scenario_01_normal_full_pipeline(safe_popen_mock):
+async def test_scenario_01_normal_full_pipeline(safe_popen_mock, tmp_path):
     """正常系フル動画作成フローのシミュレーション"""
     coordinator = PipelineCoordinator()
     
@@ -41,8 +41,11 @@ async def test_scenario_01_normal_full_pipeline(safe_popen_mock):
         worker.execute = AsyncMock(return_value=mock_result)
         worker.verify = MagicMock(return_value=True)
 
-    # 仮想の動画パスを設定
-    ctx = PipelineContext(video_path="test_videos/tv01_real_clip.mp4")
+    # 仮想の動画パス。実体は作らない（os.path.exists をモックしている）。
+    # 2026-08-02: 以前はリポジトリ内の `test_videos/` を指していた。
+    # パフォーマンスレポートの出力先は動画の隣（`<動画の親>/performance/`）
+    # なので、Git 追跡下の test_videos/performance/ に書き込まれていた。
+    ctx = PipelineContext(video_path=str(tmp_path / "tv01_real_clip.mp4"))
     ctx.session_id = "test-session-s01"
     ctx.final_path = "vault-assets/output/final.mp4"
     ctx.quality_score = 95
@@ -69,12 +72,12 @@ async def test_scenario_01_normal_full_pipeline(safe_popen_mock):
 # Scenario 02: 空ファイル/ファイル不在エラー
 # =====================================================================
 @pytest.mark.asyncio
-async def test_scenario_02_empty_or_missing_file():
+async def test_scenario_02_empty_or_missing_file(tmp_path):
     """空ファイル/ファイル不在エラーに対するバリデーションおよびエラーハンドリング"""
     coordinator = PipelineCoordinator()
     
-    # 存在しない動画パス
-    ctx = PipelineContext(video_path="test_videos/missing_file_xyz.mp4")
+    # 存在しない動画パス（Scenario 01 と同じ理由で一時ディレクトリ配下にする）
+    ctx = PipelineContext(video_path=str(tmp_path / "missing_file_xyz.mp4"))
     ctx.session_id = "test-session-s02"
 
     from unittest.mock import AsyncMock

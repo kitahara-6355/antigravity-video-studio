@@ -19,6 +19,11 @@ Antigravity 版の Tick アクション候補:
     - 未使用アセットの検出
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 import asyncio
@@ -323,7 +328,7 @@ class TickLoop:
 
         # 6. パイプラインナレッジ学習（7 Tick ごと ≒ 7分に1回）
         if tick_id % 7 == 0:
-            knowledge_dir = Path(__file__).parent / "logs" / "pipeline_knowledge"
+            knowledge_dir = _writable_path("backend/agents/logs/pipeline_knowledge")
             if knowledge_dir.exists() and list(knowledge_dir.glob("run_*.json")):
                 return TickActionType.PIPELINE_KNOWLEDGE
 
@@ -425,7 +430,7 @@ class TickLoop:
         alerts = []
         data = {"processed": 0, "new_facts": 0}
 
-        knowledge_dir = Path(__file__).parent / "logs" / "pipeline_knowledge"
+        knowledge_dir = _writable_path("backend/agents/logs/pipeline_knowledge")
         if not knowledge_dir.exists():
             return {"data": data, "alerts": alerts}
 

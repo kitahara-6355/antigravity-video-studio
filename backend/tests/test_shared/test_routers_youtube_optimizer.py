@@ -622,29 +622,38 @@ class TestEdgeCases:
             res = client.post("/api/youtube/feedback-loop/wag001")
             assert res.status_code == 500
 
-    def test_record_post_publish_feedback_rotation_and_exception(self, tmp_path):
-        """_record_post_publish_feedback — 50件ローテーション & HTTPException/Exception処理"""
+    def test_record_post_publish_feedback_rotation_and_exception(self, tmp_path, monkeypatch):
+        """_record_post_publish_feedback — 50件ローテーション & HTTPException/Exception処理
+
+        2026-08-02: 以前は `pathlib.Path.__truediv__` を差し替えて出力先を
+        逸らしていた。実装が writable_path 経由（`joinpath`）になったので
+        効かなくなったうえ、`/` を全面的に差し替えるのはこのテストと無関係な
+        パス生成まで巻き込む。振り向けは実装と同じ経路
+        （`ANTIGRAVITY_WRITABLE_ROOT`）で行う。
+        """
         import json
         from routers.youtube_optimizer import _record_post_publish_feedback
-        log_file = tmp_path / "evolution_log.json"
+        monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+        log_file = tmp_path / "backend" / "branding" / "evolution_log.json"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         initial_data = {
             "post_publish_feedbacks": [{"dummy": i} for i in range(60)]
         }
         log_file.write_text(json.dumps(initial_data), encoding="utf-8")
-        with patch("pathlib.Path.__truediv__", return_value=log_file):
-            _record_post_publish_feedback(
-                wagamama_id="w1", video_id="v1",
-                actual_metrics={"metrics": {}, "retention_map": {"drop_off_points": ["1:30"]}},
-                validation={"analysis": {"difference": 15, "significant_deviation": True}}
-            )
-            written_data = json.loads(log_file.read_text(encoding="utf-8"))
-            assert len(written_data["post_publish_feedbacks"]) == 50
+        _record_post_publish_feedback(
+            wagamama_id="w1", video_id="v1",
+            actual_metrics={"metrics": {}, "retention_map": {"drop_off_points": ["1:30"]}},
+            validation={"analysis": {"difference": 15, "significant_deviation": True}}
+        )
+        written_data = json.loads(log_file.read_text(encoding="utf-8"))
+        assert len(written_data["post_publish_feedbacks"]) == 50
 
-        with patch("pathlib.Path.__truediv__", side_effect=HTTPException(status_code=400, detail="Write blocked")):
+        with patch("routers.youtube_optimizer._writable_path",
+                   side_effect=HTTPException(status_code=400, detail="Write blocked")):
             with pytest.raises(HTTPException):
                 _record_post_publish_feedback("w1", "v1", {}, {})
 
-        with patch("pathlib.Path.__truediv__", side_effect=Exception("Disk full")):
+        with patch("routers.youtube_optimizer._writable_path", side_effect=Exception("Disk full")):
             _record_post_publish_feedback("w1", "v1", {}, {})
 
     def test_retention_map_http_exception(self):
@@ -1175,17 +1184,19 @@ class TestEdgeCases:
             data = res.json()
             assert "past_lessons" in data
 
-    def test_record_post_publish_feedback_log_not_exists(self, tmp_path):
+    def test_record_post_publish_feedback_log_not_exists(self, tmp_path, monkeypatch):
         """_record_post_publish_feedback — evolution_log.json が存在しない場合、および lessons_learned の空分岐をカバー"""
         from routers.youtube_optimizer import _record_post_publish_feedback
-        non_existent_file = tmp_path / "non_existent_log.json"
-        with patch("pathlib.Path.__truediv__", return_value=non_existent_file):
-            _record_post_publish_feedback(
-                wagamama_id="w1", video_id="v1",
-                actual_metrics={"metrics": {}, "retention_map": {"drop_off_points": []}},
-                validation={"analysis": {"difference": 1, "significant_deviation": False}}
-            )
-            assert non_existent_file.exists()
+        monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+        log_file = tmp_path / "backend" / "branding" / "evolution_log.json"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        assert not log_file.exists()
+        _record_post_publish_feedback(
+            wagamama_id="w1", video_id="v1",
+            actual_metrics={"metrics": {}, "retention_map": {"drop_off_points": []}},
+            validation={"analysis": {"difference": 1, "significant_deviation": False}}
+        )
+        assert log_file.exists()
 
     def test_record_post_publish_feedback_http_exception_and_timeout(self):
         """_record_post_publish_feedback — HTTPExceptionがそのまま上に伝播し、Timeoutはキャッチして警告ログを出力することを検証"""
@@ -1195,7 +1206,8 @@ class TestEdgeCases:
         import pytest
 
         # 1. HTTPException発生時にそのまま上に伝播することを確認
-        with patch("pathlib.Path.__truediv__", side_effect=HTTPException(status_code=400, detail="HTTP error")):
+        with patch("routers.youtube_optimizer._writable_path",
+                   side_effect=HTTPException(status_code=400, detail="HTTP error")):
             with pytest.raises(HTTPException):
                 _record_post_publish_feedback("w1", "v1", {}, {})
 

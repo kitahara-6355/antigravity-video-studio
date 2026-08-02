@@ -14,7 +14,7 @@ from typing import List, Dict, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
-from path_resolver import raw_videos_dir
+from path_resolver import raw_videos_dir, writable_path as _writable_path
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class VideoProcessor:
             import json
             from datetime import datetime
             
-            evolution_log_path = Path(__file__).parent / "branding" / "evolution_log.json"
+            evolution_log_path = _writable_path("backend/branding/evolution_log.json")
             
             # 既存ログを読み込み
             if evolution_log_path.exists():

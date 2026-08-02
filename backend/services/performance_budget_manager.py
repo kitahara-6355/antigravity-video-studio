@@ -8,6 +8,11 @@ PB-04: パフォーマンスレポート生成
 """
 from __future__ import annotations
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 from dataclasses import dataclass, field, asdict
@@ -82,7 +87,12 @@ class PerformanceBudgetManager:
                  output_dir: Optional[Path | str] = None,
                  video_duration_min: Optional[float] = None):
         self._budget_path = Path(budget_path) if budget_path else None
-        self._output_dir = Path(output_dir) if output_dir else Path("output/performance")
+        # 既定は相対パスだったのでプロセスの起動ディレクトリ基準になっていた。
+        # リポジトリ直下から動かすと出力がリポジトリ内に落ちるため、
+        # writable_path 経由（本番では project_root() 起点）に揃える。
+        self._output_dir = (
+            Path(output_dir) if output_dir else _writable_path("output/performance")
+        )
         self._config = self._load_budgets()
         if not isinstance(self._config, dict):
             self._config = {}

@@ -8,6 +8,11 @@ soul_router.py — Soul Passportダッシュボード統合API（U-09）
 - 制作統計
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any, List, Optional
 from pathlib import Path
@@ -20,7 +25,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/soul", tags=["soul"])
 
 BRANDING_DIR = Path(__file__).parent.parent / "branding"
-EVOLUTION_LOG_PATH = BRANDING_DIR / "evolution_log.json"
+# 実行のたびに追記される進化履歴。読み書きの両方をこの経路へ通すこと。
+EVOLUTION_LOG_PATH = _writable_path("backend/branding/evolution_log.json")
 CONSTITUTION_PATH = BRANDING_DIR / "constitution.json"
 
 try:

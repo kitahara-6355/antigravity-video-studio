@@ -16,6 +16,11 @@ Phase 5: セマンティック資産検索（Semantic Archive Search）
 
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 from fastapi import APIRouter, HTTPException
 
 from utils.json_safe_io import safe_load_json, safe_save_json
@@ -252,7 +257,7 @@ async def pre_plan_content(req: PrePlanRequest) -> Dict[str, Any]:
 
         past_lessons = []
 
-        log_path = Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        log_path = _writable_path("backend/branding/evolution_log.json")
 
         if log_path.exists():
 
@@ -1211,7 +1216,7 @@ def _record_post_publish_feedback(
 
     try:
 
-        log_path = Path(__file__).parent.parent / "branding" / "evolution_log.json"
+        log_path = _writable_path("backend/branding/evolution_log.json")
 
         data = safe_load_json(log_path)
 
