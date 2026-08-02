@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from pathlib import Path
 
 # キーがダミーだと分かる値。これらに一致するときは API に到達しないので通す。
 _DUMMY_KEY = re.compile(r"^[\"']?(dummy|test|fake|placeholder|xxx+|none|changeme)", re.I)
@@ -89,6 +90,50 @@ def _paid_api_reason(command: str) -> str | None:
     return None
 
 
+def _active_budget() -> dict | None:
+    """残額のある承認済み予算を返す。
+
+    憲法第3条: **予算の範囲内は都度確認しない。** 相談が要るのは
+    「予算を組んでいない有料利用」で、それは実行の直前ではなく
+    **計画段階で**洗い出して取る。だから実行時のゲートが見るのは
+    「承認済みの枠があるか」だけでよい。
+    """
+    path = Path(__file__).resolve().parents[1] / "budget.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    for entry in data.get("budgets") or []:
+        if entry.get("status") != "active":
+            continue
+        try:
+            remaining = float(entry.get("limit_jpy", 0)) - float(entry.get("spent_jpy", 0))
+        except (TypeError, ValueError):
+            continue
+        if remaining > 0:
+            return {**entry, "remaining_jpy": remaining}
+    return None
+
+
+# ヒアドキュメントの中身と `-m` のメッセージ本文。**コマンドではなくデータ。**
+_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?^\2\s*$", re.S | re.M)
+_MESSAGE_ARG = re.compile(r"(?:-m|--message)\s+(['\"])(?:\\.|(?!\1).)*\1", re.S)
+
+
+def _strip_payloads(command: str) -> str:
+    """コマンドが**運んでいるデータ**を落とす。
+
+    2026-08-02: コミットメッセージに `npm publish` と書いただけで
+    `git commit` が止まった。`git checkout` を止めた件と同じ型の誤検出で、
+    原因も同じ — 判定対象がコマンドではなくデータになっている。
+
+    ヒアドキュメントの本文と `-m` のメッセージは、どんな文字列でも
+    入りうる（PR 本文・コミットメッセージ・テストデータ）。ここを見ると
+    「課金の話を書いた」だけで止まる。落としてから判定する。
+    """
+    return _MESSAGE_ARG.sub(" ", _HEREDOC.sub(" ", command))
+
+
 def _decision(reason: str) -> None:
     print(json.dumps({
         "hookSpecificOutput": {
@@ -112,6 +157,7 @@ def main() -> int:
     command = (payload.get("tool_input") or {}).get("command") or ""
     if not isinstance(command, str):
         return 0
+    command = _strip_payloads(command)
 
     for pattern, reason in _BILLING_PATTERNS:
         if pattern.search(command):
@@ -119,8 +165,28 @@ def main() -> int:
             return 0
 
     paid = _paid_api_reason(command)
-    if paid:
-        _decision(paid)
+    if not paid:
+        return 0
+
+    budget = _active_budget()
+    if budget is None:
+        _decision(
+            f"{paid}。**予算が組まれていません。**"
+            "計画段階で有料利用を洗い出して予算を取ってから実行してください"
+        )
+        return 0
+
+    # 予算内なので通す。ただし実績の記録を忘れると枠が意味を失う。
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": (
+                f"[予算] {budget.get('id')}「{budget.get('purpose')}」"
+                f"の残 {budget['remaining_jpy']:.0f} 円の範囲内なので実行してよい。"
+                "実行後に .claude/budget.json の spent_jpy を実績で更新すること。"
+            ),
+        }
+    }, ensure_ascii=False))
     return 0
 
 
