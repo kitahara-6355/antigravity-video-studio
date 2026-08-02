@@ -209,70 +209,80 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "ヘルスチェックAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/youtube/health"
     },
     {
       "id": "O11-L1-02",
       "layer": 1,
       "story_scene": "S2",
       "description": "pre-planAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/youtube/pre-plan"
     },
     {
       "id": "O11-L1-03",
       "layer": 1,
       "story_scene": "S5",
       "description": "サムネコンセプトAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/youtube/generate-thumbnail"
     },
     {
       "id": "O11-L1-04",
       "layer": 1,
       "story_scene": "S7",
       "description": "past_lessons含む",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/youtube/pre-plan"
     },
     {
       "id": "O11-L1-05",
       "layer": 1,
       "story_scene": "S8",
       "description": "optimizeAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/youtube/optimize"
     },
     {
       "id": "O11-L1-06",
       "layer": 1,
       "story_scene": "S9",
       "description": "analyze-scriptAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/director/analyze-script"
     },
     {
       "id": "O11-L1-07",
       "layer": 1,
       "story_scene": "S10",
       "description": "quality-scoreAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/director/quality-score"
     },
     {
       "id": "O11-L1-08",
       "layer": 1,
       "story_scene": "S11",
       "description": "plan-storyboardAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/director/plan-storyboard"
     },
     {
       "id": "O11-L1-09",
       "layer": 1,
       "story_scene": "S2",
       "description": "success=true",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/youtube/pre-plan"
     },
     {
       "id": "O11-L1-10",
       "layer": 1,
       "story_scene": "S8",
       "description": "hook_score含む",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/youtube/pre-plan"
     },
     {
       "id": "O11-L2-01",

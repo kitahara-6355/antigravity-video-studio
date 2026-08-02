@@ -303,3 +303,101 @@ def test_real_repo_marks_registration():
 
     assert True in states, "登録済みと判定されたエンドポイントが1つも無い"
     assert None not in states, "アプリ定義が読めていない"
+
+
+# --- L1 実行系との振り分け ----------------------------------------------------
+
+
+def test_l1_executor_routes_endpoint_items_to_the_contract_judge(tmp_path):
+    """testid が無く endpoint がある項目は API 契約側で判定される。"""
+    import json as _json
+
+    from backend.ux_verification.executor import L1Executor
+    from backend.ux_verification.executor import Verdict as L1Verdict
+
+    _write(tmp_path, "routers/live.py", """
+        router = APIRouter(prefix="/api/live")
+
+        @router.get("/status")
+        def status():
+            return {}
+    """)
+    _write(tmp_path, "routers/__init__.py",
+           "from .live import router as live_router\n")
+    _write(tmp_path, "main.py", "app.include_router(live_router)\n")
+    _write(tmp_path, "fe/src/main.jsx", "import App from './App.jsx'")
+    _write(tmp_path, "fe/src/App.jsx", '<div data-testid="present" />')
+
+    stories = tmp_path / "stories"
+    stories.mkdir()
+    (stories / "o4.json").write_text(_json.dumps({
+        "ux_id": "O-4",
+        "verification_items": [
+            {"id": "O4-L1-01", "layer": 1, "test_method": "dom_exists",
+             "story_scene": "S1", "description": "API",
+             "endpoint": "GET /api/live/status"},
+            {"id": "O4-L1-02", "layer": 1, "test_method": "dom_exists",
+             "story_scene": "S1", "description": "DOM", "testid": "present"},
+        ],
+    }, ensure_ascii=False), encoding="utf-8")
+
+    registry = EndpointRegistry.scan(tmp_path / "routers",
+                                     app_files=[tmp_path / "main.py"])
+    report = L1Executor(stories, tmp_path / "fe" / "src",
+                        contract=ApiContractExecutor(registry)).run("owner")
+
+    by_id = {r.item_id: r for r in report.results}
+    assert by_id["O4-L1-01"].verdict is L1Verdict.PASS
+    assert "static_route_scan" in by_id["O4-L1-01"].evidence
+    assert by_id["O4-L1-02"].verdict is L1Verdict.PASS
+    assert "static_source_scan" in by_id["O4-L1-02"].evidence
+
+
+def test_testid_wins_when_an_item_declares_both(tmp_path):
+    """両方あるときは DOM 側で判定する（endpoint への逃げ道を作らない）。"""
+    import json as _json
+
+    from backend.ux_verification.executor import L1Executor
+    from backend.ux_verification.executor import Verdict as L1Verdict
+
+    _write(tmp_path, "routers/live.py", """
+        router = APIRouter(prefix="/api/live")
+
+        @router.get("/status")
+        def status():
+            return {}
+    """)
+    _write(tmp_path, "routers/__init__.py",
+           "from .live import router as live_router\n")
+    _write(tmp_path, "main.py", "app.include_router(live_router)\n")
+    _write(tmp_path, "fe/src/main.jsx", "import App from './App.jsx'")
+    _write(tmp_path, "fe/src/App.jsx", "export default function App(){return null}")
+
+    stories = tmp_path / "stories"
+    stories.mkdir()
+    (stories / "o4.json").write_text(_json.dumps({
+        "ux_id": "O-4",
+        "verification_items": [
+            {"id": "O4-L1-01", "layer": 1, "test_method": "dom_exists",
+             "story_scene": "S1", "description": "both",
+             "testid": "absent", "endpoint": "GET /api/live/status"},
+        ],
+    }, ensure_ascii=False), encoding="utf-8")
+
+    registry = EndpointRegistry.scan(tmp_path / "routers",
+                                     app_files=[tmp_path / "main.py"])
+    report = L1Executor(stories, tmp_path / "fe" / "src",
+                        contract=ApiContractExecutor(registry)).run("owner")
+
+    assert report.results[0].verdict is L1Verdict.FAIL
+    assert report.results[0].reason == "not_found"
+
+
+def test_real_owner_l1_still_has_no_skip():
+    from backend.ux_verification.executor import L1Executor
+
+    report = L1Executor.for_repo().run("owner")
+
+    assert report.total == 122
+    assert report.skip_count == 0
+    assert report.pass_count >= 115
