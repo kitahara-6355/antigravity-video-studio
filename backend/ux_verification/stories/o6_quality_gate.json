@@ -110,70 +110,80 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "品質ゲートステータスAPIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/status"
     },
     {
       "id": "O6-L1-02",
       "layer": 1,
       "story_scene": "S1",
       "description": "statusフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/status"
     },
     {
       "id": "O6-L1-03",
       "layer": 1,
       "story_scene": "S2",
       "description": "overall_scoreフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/scores"
     },
     {
       "id": "O6-L1-04",
       "layer": 1,
       "story_scene": "S3",
       "description": "カテゴリ別スコアAPIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/scores"
     },
     {
       "id": "O6-L1-05",
       "layer": 1,
       "story_scene": "S3",
       "description": "4カテゴリ(audio/video/subtitle/structure)が存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/scores"
     },
     {
       "id": "O6-L1-06",
       "layer": 1,
       "story_scene": "S5",
       "description": "ドリルダウンAPIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/drilldown/{category}"
     },
     {
       "id": "O6-L1-07",
       "layer": 1,
       "story_scene": "S6",
       "description": "AI改善提案APIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/pipeline/quality-gate/improve"
     },
     {
       "id": "O6-L1-08",
       "layer": 1,
       "story_scene": "S7",
       "description": "thresholdフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/status"
     },
     {
       "id": "O6-L1-09",
       "layer": 1,
       "story_scene": "S9",
       "description": "履歴APIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/history"
     },
     {
       "id": "O6-L1-10",
       "layer": 1,
       "story_scene": "S9",
       "description": "履歴にhistory配列が存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/history"
     },
     {
       "id": "O6-L2-01",

@@ -88,42 +88,48 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "改善ループステータスAPIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/improvement/status"
     },
     {
       "id": "O7-L1-02",
       "layer": 1,
       "story_scene": "S1",
       "description": "statusフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/improvement/status"
     },
     {
       "id": "O7-L1-03",
       "layer": 1,
       "story_scene": "S2",
       "description": "iteration/max_iterationsフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/improvement/status"
     },
     {
       "id": "O7-L1-04",
       "layer": 1,
       "story_scene": "S3",
       "description": "アクション一覧APIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/improvement/actions"
     },
     {
       "id": "O7-L1-05",
       "layer": 1,
       "story_scene": "S3",
       "description": "actions配列が存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/improvement/actions"
     },
     {
       "id": "O7-L1-06",
       "layer": 1,
       "story_scene": "S5",
       "description": "スコア変化APIが正常応答する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/improvement/score-change"
     },
     {
       "id": "O7-L2-01",
@@ -277,7 +283,8 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "total_actions/completed_actionsフィールドが存在する",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/pipeline/improvement/status"
     },
     {
       "id": "O7-L3-06",

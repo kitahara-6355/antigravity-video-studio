@@ -226,77 +226,88 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "statusAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/evolution/status"
     },
     {
       "id": "O12-L1-02",
       "layer": 1,
       "story_scene": "S2",
       "description": "analytics/syncAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/analytics/sync"
     },
     {
       "id": "O12-L1-03",
       "layer": 1,
       "story_scene": "S3",
       "description": "analytics/simulateAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/analytics/simulate"
     },
     {
       "id": "O12-L1-04",
       "layer": 1,
       "story_scene": "S5",
       "description": "evolutionAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/evolution"
     },
     {
       "id": "O12-L1-05",
       "layer": 1,
       "story_scene": "S6",
       "description": "evolution/syncAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/evolution/sync"
     },
     {
       "id": "O12-L1-06",
       "layer": 1,
       "story_scene": "S7",
       "description": "evolution/statusAPI正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/evolution/status"
     },
     {
       "id": "O12-L1-07",
       "layer": 1,
       "story_scene": "S1",
       "description": "user_modelオブジェクト含む",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/evolution/status"
     },
     {
       "id": "O12-L1-08",
       "layer": 1,
       "story_scene": "S2",
       "description": "result含む",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/analytics/sync"
     },
     {
       "id": "O12-L1-09",
       "layer": 1,
       "story_scene": "S3",
       "description": "simulation含む",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/analytics/simulate"
     },
     {
       "id": "O12-L1-10",
       "layer": 1,
       "story_scene": "S5",
       "description": "entries配列含む",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/evolution"
     },
     {
       "id": "O12-L1-11",
       "layer": 1,
       "story_scene": "S7",
       "description": "evolution_entries含む",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/evolution/status"
     },
     {
       "id": "O12-L2-01",

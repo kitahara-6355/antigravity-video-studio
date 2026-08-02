@@ -199,14 +199,16 @@
       "layer": 1,
       "story_scene": "S1",
       "description": "ヘルスチェックAPIが正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "GET /api/youtube/health"
     },
     {
       "id": "O9-L1-02",
       "layer": 1,
       "story_scene": "S1",
       "description": "最適化APIが正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "endpoint": "POST /api/youtube/optimize"
     },
     {
       "id": "O9-L1-03",
