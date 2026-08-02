@@ -32,9 +32,13 @@ SUBAGENT_REPORT_DIR = OFFICIAL_ARTIFACT_DIR / "サブエージェント体制報
 
 TASK_QUEUE_PATH = _writable_path("backend/agents/orchestration/task_queue.json")
 OPUS_DIRECTIVE_PATH = _BASE_DIR / "opus_directive.json"
-FLASH_REPORTS_PATH = _BASE_DIR / "flash_reports.jsonl"
+# 実行のたびに追記されるログと、実行のたびに書き換わる状態。
+# 直書きだと Git 追跡下のファイルがテストで上書きされる
+# （phase_state.json は atomic_io が .bak も作るので2パス増える）。
+# 読み書きの両方をここへ通すこと。conftest が本番の内容を複製する。
+FLASH_REPORTS_PATH = _writable_path("backend/agents/orchestration/flash_reports.jsonl")
 MESSAGE_BOX_PATH = _writable_path("backend/agents/orchestration/message_box.jsonl")
-PHASE_STATE_PATH = _MEMORY_DIR / "phase_state.json"
+PHASE_STATE_PATH = _writable_path("backend/agents/memory/phase_state.json")
 PHASE_GATES_PATH = _MEMORY_DIR / "phase_gates.json"
 FLASH_SESSION_PATH = _writable_path("backend/agents/orchestration/flash_session.json")
 USER_SCHEDULE_PATH = _BASE_DIR / "user_schedule.json"

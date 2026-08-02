@@ -34,8 +34,8 @@ from backend.agents.orchestration.atomic_io import safe_read_json, atomic_write_
 from backend.agents.orchestration.jst_time import now_jst
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
 FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
-FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
-PHASE_STATE_PATH = os.path.join(WORKSPACE_DIR, "backend", "agents", "memory", "phase_state.json")
+FLASH_REPORTS_PATH = str(_writable_path("backend/agents/orchestration/flash_reports.jsonl"))
+PHASE_STATE_PATH = str(_writable_path("backend/agents/memory/phase_state.json"))
 TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
 OPUS_SESSION_PATH = str(_writable_path("backend/agents/orchestration/opus_session.json"))
 EVENT_LOG_PATH = os.path.join(

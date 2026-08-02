@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent
 TASK_QUEUE_PATH = _writable_path("backend/agents/orchestration/task_queue.json")
-FLASH_REPORTS_PATH = _BASE_DIR / "flash_reports.jsonl"
+FLASH_REPORTS_PATH = _writable_path("backend/agents/orchestration/flash_reports.jsonl")
 
 # デフォルトのリトライ上限
 DEFAULT_MAX_RETRIES = 3
