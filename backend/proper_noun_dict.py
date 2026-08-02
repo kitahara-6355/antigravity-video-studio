@@ -8,6 +8,11 @@ Phase 1: Foundation
 - 不確実語句のリストアップ
 """
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.path_resolver import writable_path as _writable_path
+except ImportError:
+    from path_resolver import writable_path as _writable_path
+
 import json
 import logging
 from pathlib import Path
@@ -17,8 +22,12 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# 辞書ファイルパス
-DICT_PATH = Path(__file__).parent / "branding" / "proper_nouns.json"
+# 辞書ファイルパス。
+# 辞書は**設定でもありログでもある** — 出荷時の内容を持ちつつ、
+# 実行時に自動学習で追記される。直書きだと辞書追加 API を叩くテストが
+# Git 追跡下の proper_nouns.json を書き換えるので writable_path 経由にする。
+# conftest が本番の内容を振り向け先へ複製するので、読む側は従来どおり動く。
+DICT_PATH = _writable_path("backend/branding/proper_nouns.json")
 
 
 @dataclass

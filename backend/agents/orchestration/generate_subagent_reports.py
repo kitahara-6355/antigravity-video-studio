@@ -58,7 +58,7 @@ if backend_path not in sys.path:
 ORCHESTRATION_DIR = os.path.join(WORKSPACE_DIR, "backend", "agents", "orchestration")
 TASK_QUEUE_PATH = str(_writable_path("backend/agents/orchestration/task_queue.json"))
 FLASH_SESSION_PATH = str(_writable_path("backend/agents/orchestration/flash_session.json"))
-FLASH_REPORTS_PATH = os.path.join(ORCHESTRATION_DIR, "flash_reports.jsonl")
+FLASH_REPORTS_PATH = str(_writable_path("backend/agents/orchestration/flash_reports.jsonl"))
 
 OFFICIAL_ARTIFACT_DIR = str(_official_artifact_dir())
 REPORT_BASE_DIR = os.path.join(OFFICIAL_ARTIFACT_DIR, "サブエージェント体制報告")

@@ -530,7 +530,12 @@ class PhilosophyManager:
             生成されたHTMLファイルのパス
         """
         if output_path is None:
-            output_path = BRANDING_DIR / "philosophy_dashboard.html"
+            # 生成物なので writable_path 経由にする。`BRANDING_DIR` 直書きだと、
+            # __main__ ブロックを runpy で実行するテストが Git 追跡下の
+            # backend/branding/philosophy_dashboard.html を上書きしていた
+            # （runpy はモジュールを別名前空間で再実行するので、
+            # インポート済みモジュールへの patch が効かない）。
+            output_path = _writable_path("backend/branding/philosophy_dashboard.html")
         
         data = self._prepare_dashboard_data()
         html = self._render_dashboard_html(data)

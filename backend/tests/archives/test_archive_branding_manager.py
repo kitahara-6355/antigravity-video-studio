@@ -129,13 +129,17 @@ def test_archive_bm_load_json_errors(caplog):
             assert res == {}
             assert any("Invalid JSON format" in record.message for record in caplog.records)
 
-def test_archive_bm_save_json_error(caplog):
+def test_archive_bm_save_json_error(caplog, tmp_path):
     import logging
     bm = BrandingManager()
     # 無効なJSONデータ（シリアライズできないオブジェクトなど）
+    #
+    # 2026-08-02: 保存先は素の "output.json" だった。相対パスは
+    # カレントディレクトリ基準なので、リポジトリ直下に output.json が
+    # 作られていた（json.dump が落ちても open(w) の時点でファイルはできる）。
     caplog.clear()
     with caplog.at_level(logging.ERROR):
-        bm._save_json("output.json", object())
+        bm._save_json(str(tmp_path / "output.json"), object())
         assert any("Type error during JSON serialization" in record.message for record in caplog.records)
 
 def test_archive_bm_evolve_constitution_error(mock_branding_manager, caplog):
@@ -212,17 +216,20 @@ def test_archive_bm_auto_evolve_all_no_integration(mock_branding_manager):
 
 
 
-def test_archive_bm_additional_exceptions(caplog):
+def test_archive_bm_additional_exceptions(caplog, tmp_path):
     import logging
     from unittest.mock import patch
-    
+
     bm = BrandingManager()
-    
+    # 相対パスはカレントディレクトリ基準になり、2 の open(w) が
+    # リポジトリ直下に dummy_path.json を作っていた（2026-08-02）。
+    dummy_path = str(tmp_path / "dummy_path.json")
+
     # 1. _load_json で OSError が発生した場合のテスト
     with patch("builtins.open", side_effect=OSError("Mock OS Error")):
         caplog.clear()
         with caplog.at_level(logging.ERROR):
-            res = bm._load_json("dummy_path.json")
+            res = bm._load_json(dummy_path)
             assert res == {}
             assert any("OS error" in record.message for record in caplog.records)
 
@@ -230,7 +237,7 @@ def test_archive_bm_additional_exceptions(caplog):
     with patch("json.dump", side_effect=ValueError("Mock Value Error")):
         caplog.clear()
         with caplog.at_level(logging.ERROR):
-            bm._save_json("dummy_path.json", {})
+            bm._save_json(dummy_path, {})
             assert any("Value error" in record.message for record in caplog.records)
 
 def test_archive_bm_auto_evolve_attribute_error(mock_branding_manager, caplog):
