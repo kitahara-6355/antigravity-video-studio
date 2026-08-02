@@ -97,7 +97,7 @@
       "story_scene": "S1",
       "description": "動画一覧にvideos配列が存在する",
       "test_method": "dom_exists",
-      "testid": "video-list"
+      "endpoint": "GET /api/pipeline/videos"
     },
     {
       "id": "O1-L1-03",
@@ -105,7 +105,7 @@
       "story_scene": "S2",
       "description": "メタデータAPIが必須フィールドを返す",
       "test_method": "dom_exists",
-      "testid": "video-metadata"
+      "endpoint": "POST /api/pipeline/videos/metadata"
     },
     {
       "id": "O1-L1-04",
@@ -113,7 +113,7 @@
       "story_scene": "S3",
       "description": "動画リストに対応拡張子のみ含まれる",
       "test_method": "dom_exists",
-      "testid": "extension-filter"
+      "endpoint": "GET /api/pipeline/videos"
     },
     {
       "id": "O1-L1-05",
@@ -129,7 +129,7 @@
       "story_scene": "S6",
       "description": "バリデーションAPIが正常応答を返す",
       "test_method": "dom_exists",
-      "testid": "validation-api"
+      "endpoint": "POST /api/pipeline/videos/validate"
     },
     {
       "id": "O1-L1-07",
@@ -137,7 +137,7 @@
       "story_scene": "S7",
       "description": "localStorageに履歴キーが存在する",
       "test_method": "dom_exists",
-      "testid": "recent-history"
+      "testid": "recent-videos-section"
     },
     {
       "id": "O1-L2-01",

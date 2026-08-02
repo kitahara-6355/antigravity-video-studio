@@ -225,6 +225,27 @@
         "axis": "test_coverage",
         "created": "2026-08-02",
         "note": "前回値 77% は branch、今回測れたのは line 75.4%。ci.yml に --cov-branch を足せば以後は比較できる。"
+      },
+      {
+        "id": "D-23",
+        "title": "/api/review/* 7エンドポイントが定義のみで未登録",
+        "detail": "backend/routers/review_router.py は APIRouter(prefix='/api/review') を定義しているが、routers/__init__.py にも main.py にも api_versioning.py にも登録が無く、呼んでも 404 になる。フロントエンドからの呼び出しは 0 件なので実害は出ていない。archives/ の E2E テストだけが参照しており、かつてはマウントされていたものが外れた形跡。登録するか削除するかの判断が要る。",
+        "found_by": "P2 の API 契約実行系（unregistered 判定）",
+        "status": "open"
+      },
+      {
+        "id": "D-24",
+        "title": "エントリから到達できないフロントエンド3ファイル",
+        "detail": "ModelQuotaDashboard.jsx / RivalRadar.jsx / useSegments.js は frontend/src/main.jsx から import を辿って到達できない。いずれも data-testid を持たないため現在の UX 判定には影響しないが、ビルドには含まれる。",
+        "found_by": "P1 の L1 実行系（reachability 判定）",
+        "status": "open"
+      },
+      {
+        "id": "D-25",
+        "title": "backend/tests/e2e_results.json が現在地の根拠として腐っている",
+        "detail": "初回コミット bb1bcde 以降1度も更新されていない。記録された FAIL 31件のうち15件が現在のストーリーに存在しない項目 ID を指す。gap_analyzer がこれを読んでv8_baseline.json を作っており、その『FAIL 16件』は消滅した項目を落とした残りかす。snapshots/quarantined/ と同じ隔離扱いにするのが一貫する。**削除は非推奨** — 唯一の過去記録なので由来を残すべき。詳細は docs/ux_l1_triage_20260802.md。",
+        "found_by": "P1 C-5 の切り分け",
+        "status": "open"
       }
     ],
     "structural": [
@@ -245,6 +266,13 @@
         "title": "GitHub Actions CI/CD設定確認",
         "status": "open",
         "priority": "P2"
+      },
+      {
+        "id": "D-26",
+        "title": "CI のマージゲートが正典を読まない",
+        "detail": "scripts/check_merge_gate.py は vision_backlog.json を一切読まず、参照資料である phase_state.json から『45フェーズ体系: Phase 2 / M2.1』を現在地として注釈なしで出力し続けている。正典を読む機械は SessionStart フック1つだけで、CI には無い。台帳が2つあると片方が腐る問題の再発経路。",
+        "found_by": "Phase 0 の gate-verifier",
+        "status": "open"
       }
     ],
     "resolved": [
@@ -380,56 +408,46 @@
   },
   "canonical": "この文書がロードマップ現在地の正典（2026-08-02 決定）。backend/agents/memory/phase_state.json と docs/BACKLOG_MASTER.md は参照資料。",
   "current_phase": {
-    "id": "P1",
-    "title": "Owner UX 保証の実行系",
+    "id": "P2",
+    "title": "Owner UX 保証：API 契約の実行系",
     "axis": "ux_guarantee_owner",
-    "started_at": "2026-08-02",
-    "rationale": "ux_guarantee_owner は重み15で最大。スコア65 は build_verified 止まりで、UX 検証項目 1,045件のうち実行されているのは 16.5%（550中91件）にすぎない。判定を出す仕組みが無いため、実装が進んでも軸のスコアを動かす根拠が作れない。まず L1（DOM 存在）を機械判定できる実行系を作り、Owner の 122項目にPASS/FAIL を付けきる。",
+    "started_at": "2026-08-03",
+    "rationale": "P1 で L1 の 122項目に PASS/FAIL は付いたが、92件が FAIL で、うち 86件は照合先すら持たなかった。gate-verifier が 86件すべての説明文を読んだ結果、86/86 が DOM ではなく API・データ契約の主張だった。dom_exists では原理的に判定できず、形だけ data-testid を足して PASS にすれば偽 PASS が構造的に成立する。ユーザー判断により、ストーリーを書き換えるのではなく判定手段の側を足す。",
     "budget_jpy": 0,
-    "budget_note": "予算不要。L1 は frontend ソースの静的走査のみで、Gemini API もパイプラインも起動しない。",
-    "scope_note": "L2〜L5 と Admin（A-*）は本フェーズのスコープ外。L1 を判定しきることだけを終了条件にする。",
+    "budget_note": "予算不要。FastAPI のルーター定義を AST で静的に読むだけで、サーバも起動しない。Gemini API を叩く経路は無い。",
+    "scope_note": "Owner の L1 のみ。L2〜L5 と Admin（A-*）はスコープ外。L2〜L5 は動作中のバックエンドを要求し、backend/.env が無いためそもそも実行できない（D-20）。",
     "exit_criteria": [
       {
         "id": "C-1",
-        "condition": "検証項目の実行系が存在し、コマンド1つで L1 を判定できる",
-        "met": true,
-        "evidence": "`python -m backend.ux_verification.executor --persona owner` がリポジトリルートから単独で完走（exit 0）。gate-verifier が `env -u PYTHONPATH -u GOOGLE_API_KEY` でも同一出力を確認しており、環境変数も事前準備も要らない。CI では ci.yml:161-165 が同一コマンドを`if: always()` かつ continue-on-error なしで実行（run 30744247166）。--persona admin も動作（108件）。"
+        "condition": "API 契約の実行系が存在し、コマンド1つでエンドポイントの実在を判定できる",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-2",
-        "condition": "Owner の L1 122項目すべてに PASS/FAIL が付く（SKIP ゼロ）",
-        "met": true,
-        "evidence": "122件 / PASS 30 / FAIL 92 / SKIP 0（充足率 24.59%）。CI run 30744247166（50d55c9）のステップログと手元実行が一致。gate-verifier がストーリー JSON を独立に数えて owner layer=1 が 122件であることを確認。test_real_owner_l1_is_fully_judged が total==122 / skip_count==0 を固定。**留保**: FAIL 92件のうち 86件は照合先の testid を持たず、gate-verifier が 86件すべての description を読んだ結果 86/86 がAPI・データ契約の主張で、DOM の主張は1件も無い。dom_exists では原理的に判定できない（P2 の判断事項）。"
+        "condition": "L1 の判定不能項目が解消され、Owner L1 の充足率が 90% 以上になる",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-3",
-        "condition": "結果がスナップショットとして保存され、ラチェットで比較できる",
-        "met": true,
-        "evidence": "l1_owner_baseline.json に 122項目の項目別 verdict をコミット。gate-verifier の実地検証: export-srt-btn を改名すると`[退行] O3-L1-11: PASS → FAIL` で exit 1、その状態の --update-baseline もexit 1 でベースラインは書き換わらない。集計値では見逃す入れ替わりもtest_swap_keeping_pass_count_is_still_a_violation が固定。verifier が見つけた「ベースラインを消すと緑になる」抜け道は PR #47 で塞いだ。"
+        "condition": "API 契約の判定が CI ゲートで守られ、退行が検出される",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-4",
-        "condition": "逆向き索引の欠落 105件を解消する",
-        "met": true,
-        "evidence": "gate-verifier が両方向を独立に計数。変更前 39da3e0 で逆向き欠落がちょうど 105件、現 a589a6f で逆向き欠落 0 / 順方向欠落 0 / orphan 0 / 双方向不整合 0。項目を消して数を合わせた形跡なし（verification_items の削除0・追加0・description 変更0・test_method 変更0・layer 変更0）。PR #39。"
+        "condition": "残る FAIL を実在の欠落か仕様の穴かに切り分ける",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-5",
-        "condition": "既存 FAIL 16件（O-1 に14 / O-8 に2）が実在の不具合か古い判定かを切り分ける",
-        "met": true,
-        "evidence": "docs/ux_l1_triage_20260802.md。gate-verifier が事実主張を全部独立に再現: e2e_results.json は初回コミット bb1bcde 以降更新なし、FAIL 31件のうち 15件が存在しない項目 ID、残り 16件の内訳 O-1:14 / O-8:2 が v8_baseline と一致。**実在の不具合として確認できたものは 0件。**"
+        "condition": "死蔵コード（未登録エンドポイント・到達不能コンポーネント）の扱いを決める",
+        "met": false,
+        "evidence": ""
       }
-    ],
-    "gate": {
-      "verified_by": "gate-verifier（別コンテキスト・2026-08-02）",
-      "verdict": "overall: ready（5/5 met）",
-      "note": "判定は実装側ではなく gate-verifier のもの（憲法第4条）。5条件はいずれも、主張ではなく verifier が独立に再現した数値・exit code・CI ログで充足を確認した。",
-      "open_questions": [
-        "C-2 の 86件は dom_exists では判定できない。形だけ data-testid を足して PASS にすると、API の主張を DOM 存在で PASS にする偽 PASS が構造的に成立する。(a) API 契約用の実行系を別に作る / (b) test_method を実態に合わせて訂正する の二択。フェーズの定義に関わるのでユーザー判断。",
-        "Phase 0 の verifier が指摘した積み残し: CI の scripts/check_merge_gate.py は正典を読まず、phase_state.json の古い現在地（45フェーズ体系 Phase 2 / M2.1）を注釈なしで出力し続けている。正典を読む機械は SessionStart フック1つだけ。"
-      ],
-      "user_approval": "未取得。ゲート報告を提出して判断を待つ。"
-    }
+    ]
   },
   "phase_history": [
     {
@@ -474,6 +492,59 @@
       ],
       "completed_at": "2026-08-02",
       "gate": "ユーザー承認済み（次フェーズに ux_guarantee_owner を選択）。gate-verifier による独立検証は未実施（憲法第4条の宿題）。"
+    },
+    {
+      "id": "P1",
+      "title": "Owner UX 保証の実行系",
+      "axis": "ux_guarantee_owner",
+      "started_at": "2026-08-02",
+      "rationale": "ux_guarantee_owner は重み15で最大。スコア65 は build_verified 止まりで、UX 検証項目 1,045件のうち実行されているのは 16.5%（550中91件）にすぎない。判定を出す仕組みが無いため、実装が進んでも軸のスコアを動かす根拠が作れない。まず L1（DOM 存在）を機械判定できる実行系を作り、Owner の 122項目にPASS/FAIL を付けきる。",
+      "budget_jpy": 0,
+      "budget_note": "予算不要。L1 は frontend ソースの静的走査のみで、Gemini API もパイプラインも起動しない。",
+      "scope_note": "L2〜L5 と Admin（A-*）は本フェーズのスコープ外。L1 を判定しきることだけを終了条件にする。",
+      "exit_criteria": [
+        {
+          "id": "C-1",
+          "condition": "検証項目の実行系が存在し、コマンド1つで L1 を判定できる",
+          "met": true,
+          "evidence": "`python -m backend.ux_verification.executor --persona owner` がリポジトリルートから単独で完走（exit 0）。gate-verifier が `env -u PYTHONPATH -u GOOGLE_API_KEY` でも同一出力を確認しており、環境変数も事前準備も要らない。CI では ci.yml:161-165 が同一コマンドを`if: always()` かつ continue-on-error なしで実行（run 30744247166）。--persona admin も動作（108件）。"
+        },
+        {
+          "id": "C-2",
+          "condition": "Owner の L1 122項目すべてに PASS/FAIL が付く（SKIP ゼロ）",
+          "met": true,
+          "evidence": "122件 / PASS 30 / FAIL 92 / SKIP 0（充足率 24.59%）。CI run 30744247166（50d55c9）のステップログと手元実行が一致。gate-verifier がストーリー JSON を独立に数えて owner layer=1 が 122件であることを確認。test_real_owner_l1_is_fully_judged が total==122 / skip_count==0 を固定。**留保**: FAIL 92件のうち 86件は照合先の testid を持たず、gate-verifier が 86件すべての description を読んだ結果 86/86 がAPI・データ契約の主張で、DOM の主張は1件も無い。dom_exists では原理的に判定できない（P2 の判断事項）。"
+        },
+        {
+          "id": "C-3",
+          "condition": "結果がスナップショットとして保存され、ラチェットで比較できる",
+          "met": true,
+          "evidence": "l1_owner_baseline.json に 122項目の項目別 verdict をコミット。gate-verifier の実地検証: export-srt-btn を改名すると`[退行] O3-L1-11: PASS → FAIL` で exit 1、その状態の --update-baseline もexit 1 でベースラインは書き換わらない。集計値では見逃す入れ替わりもtest_swap_keeping_pass_count_is_still_a_violation が固定。verifier が見つけた「ベースラインを消すと緑になる」抜け道は PR #47 で塞いだ。"
+        },
+        {
+          "id": "C-4",
+          "condition": "逆向き索引の欠落 105件を解消する",
+          "met": true,
+          "evidence": "gate-verifier が両方向を独立に計数。変更前 39da3e0 で逆向き欠落がちょうど 105件、現 a589a6f で逆向き欠落 0 / 順方向欠落 0 / orphan 0 / 双方向不整合 0。項目を消して数を合わせた形跡なし（verification_items の削除0・追加0・description 変更0・test_method 変更0・layer 変更0）。PR #39。"
+        },
+        {
+          "id": "C-5",
+          "condition": "既存 FAIL 16件（O-1 に14 / O-8 に2）が実在の不具合か古い判定かを切り分ける",
+          "met": true,
+          "evidence": "docs/ux_l1_triage_20260802.md。gate-verifier が事実主張を全部独立に再現: e2e_results.json は初回コミット bb1bcde 以降更新なし、FAIL 31件のうち 15件が存在しない項目 ID、残り 16件の内訳 O-1:14 / O-8:2 が v8_baseline と一致。**実在の不具合として確認できたものは 0件。**"
+        }
+      ],
+      "gate": {
+        "verified_by": "gate-verifier（別コンテキスト・2026-08-02）",
+        "verdict": "overall: ready（5/5 met）",
+        "note": "判定は実装側ではなく gate-verifier のもの（憲法第4条）。5条件はいずれも、主張ではなく verifier が独立に再現した数値・exit code・CI ログで充足を確認した。",
+        "open_questions": [
+          "C-2 の 86件は dom_exists では判定できない。形だけ data-testid を足して PASS にすると、API の主張を DOM 存在で PASS にする偽 PASS が構造的に成立する。(a) API 契約用の実行系を別に作る / (b) test_method を実態に合わせて訂正する の二択。フェーズの定義に関わるのでユーザー判断。",
+          "Phase 0 の verifier が指摘した積み残し: CI の scripts/check_merge_gate.py は正典を読まず、phase_state.json の古い現在地（45フェーズ体系 Phase 2 / M2.1）を注釈なしで出力し続けている。正典を読む機械は SessionStart フック1つだけ。"
+        ],
+        "user_approval": "未取得。ゲート報告を提出して判断を待つ。"
+      },
+      "completed_at": "2026-08-03"
     }
   ]
 }
