@@ -379,44 +379,90 @@
   },
   "canonical": "この文書がロードマップ現在地の正典（2026-08-02 決定）。backend/agents/memory/phase_state.json と docs/BACKLOG_MASTER.md は参照資料。",
   "current_phase": {
-    "id": "P0",
-    "title": "正典の再建",
+    "id": "P1",
+    "title": "Owner UX 保証の実行系",
+    "axis": "ux_guarantee_owner",
     "started_at": "2026-08-02",
-    "rationale": "3つの台帳が食い違い、現在地を機械的に答えられなかった。自律実行の停止条件が定義できないため、実装より先に修復する（憲法第5条）。",
+    "rationale": "ux_guarantee_owner は重み15で最大。スコア65 は build_verified 止まりで、UX 検証項目 1,045件のうち実行されているのは 16.5%（550中91件）にすぎない。判定を出す仕組みが無いため、実装が進んでも軸のスコアを動かす根拠が作れない。まず L1（DOM 存在）を機械判定できる実行系を作り、Owner の 122項目にPASS/FAIL を付けきる。",
+    "budget_jpy": 0,
+    "budget_note": "予算不要。L1 は frontend ソースの静的走査のみで、Gemini API もパイプラインも起動しない。",
+    "scope_note": "L2〜L5 と Admin（A-*）は本フェーズのスコープ外。L1 を判定しきることだけを終了条件にする。",
     "exit_criteria": [
       {
         "id": "C-1",
-        "condition": "vision_realization_score が score_history の最新と一致する",
-        "met": true,
-        "evidence": "60 → 71.2。axis_scores の加重平均も 71.2 で一致する"
+        "condition": "検証項目の実行系が存在し、コマンド1つで L1 を判定できる",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-2",
-        "condition": "10軸すべてに confidence（measured / partial / carried_over / not_measured）と evidence がある",
-        "met": true,
-        "evidence": "10/10 軸に付与。measured 5 / partial 2 / carried_over 1 / not_measured 2"
+        "condition": "Owner の L1 122項目すべてに PASS/FAIL が付く（SKIP ゼロ）",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-3",
-        "condition": "current_phase と機械可読な exit_criteria が正典に入っている",
-        "met": true,
-        "evidence": "このオブジェクト自身"
+        "condition": "結果がスナップショットとして保存され、ラチェットで比較できる",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-4",
-        "condition": "docs/vision_audit_20260802.md が出ている",
-        "met": true,
-        "evidence": "docs/vision_audit_20260802.md（結論・軸ごとの実測・据え置き理由・次フェーズ候補）"
+        "condition": "逆向き索引の欠落 105件を解消する",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-5",
-        "condition": "phase_state.json と docs/BACKLOG_MASTER.md に『参照資料。正典は vision_backlog.json』と明記されている",
-        "met": true,
-        "evidence": "docs/BACKLOG_MASTER.md 冒頭に警告ブロック / phase_state.json 先頭に _canonical_note。追加キーで既存の読み書きが壊れないことを testpaths 85ファイル 1,168件 PASS で確認"
+        "condition": "既存 FAIL 16件（O-1 に14 / O-8 に2）が実在の不具合か古い判定かを切り分ける",
+        "met": false,
+        "evidence": ""
       }
-    ],
-    "also_fixed": [
-      "バックログ ID の重複 2件（D-08 / D-15）を resolved へ統合"
     ]
-  }
+  },
+  "phase_history": [
+    {
+      "id": "P0",
+      "title": "正典の再建",
+      "started_at": "2026-08-02",
+      "rationale": "3つの台帳が食い違い、現在地を機械的に答えられなかった。自律実行の停止条件が定義できないため、実装より先に修復する（憲法第5条）。",
+      "exit_criteria": [
+        {
+          "id": "C-1",
+          "condition": "vision_realization_score が score_history の最新と一致する",
+          "met": true,
+          "evidence": "60 → 71.2。axis_scores の加重平均も 71.2 で一致する"
+        },
+        {
+          "id": "C-2",
+          "condition": "10軸すべてに confidence（measured / partial / carried_over / not_measured）と evidence がある",
+          "met": true,
+          "evidence": "10/10 軸に付与。measured 5 / partial 2 / carried_over 1 / not_measured 2"
+        },
+        {
+          "id": "C-3",
+          "condition": "current_phase と機械可読な exit_criteria が正典に入っている",
+          "met": true,
+          "evidence": "このオブジェクト自身"
+        },
+        {
+          "id": "C-4",
+          "condition": "docs/vision_audit_20260802.md が出ている",
+          "met": true,
+          "evidence": "docs/vision_audit_20260802.md（結論・軸ごとの実測・据え置き理由・次フェーズ候補）"
+        },
+        {
+          "id": "C-5",
+          "condition": "phase_state.json と docs/BACKLOG_MASTER.md に『参照資料。正典は vision_backlog.json』と明記されている",
+          "met": true,
+          "evidence": "docs/BACKLOG_MASTER.md 冒頭に警告ブロック / phase_state.json 先頭に _canonical_note。追加キーで既存の読み書きが壊れないことを testpaths 85ファイル 1,168件 PASS で確認"
+        }
+      ],
+      "also_fixed": [
+        "バックログ ID の重複 2件（D-08 / D-15）を resolved へ統合"
+      ],
+      "completed_at": "2026-08-02",
+      "gate": "ユーザー承認済み（次フェーズに ux_guarantee_owner を選択）。gate-verifier による独立検証は未実施（憲法第4条の宿題）。"
+    }
+  ]
 }
