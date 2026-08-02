@@ -116,6 +116,20 @@ def test_resolve_wildcard_matches_literal_with_same_prefix(tmp_path):
     assert reg.resolve("diff-mark-*") is not None
 
 
+def test_wildcard_does_not_match_a_broader_template(tmp_path):
+    """雑なテンプレート1つで、別々の要求をまとめて通してはいけない。
+
+    `segment-${x}` は segment-approve-btn-1 を生むとは限らない。
+    テンプレートが生む id は必ずその接頭辞で始まるので、要求を満たすのは
+    接頭辞の側が要求で始まるときだけ。
+    """
+    _write(tmp_path, "src/App.jsx", '<div data-testid={`segment-${id}`} />')
+    reg = TestIdRegistry.scan(tmp_path / "src")
+
+    assert reg.resolve("segment-approve-btn-*") is None
+    assert reg.resolve("segment-*") is not None
+
+
 def test_resolve_returns_none_for_unknown(tmp_path):
     _write(tmp_path, "src/App.jsx", '<div data-testid="video-list" />')
     reg = TestIdRegistry.scan(tmp_path / "src")
