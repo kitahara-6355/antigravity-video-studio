@@ -67,6 +67,51 @@ class TestIgnoredPrefixes:
         assert fs_guard._is_watched(_in_repo("junit_batch_07.xml"))
 
 
+class TestResolvesAgainstFd:
+    """dir_fd 付きの相対パスは記録しない
+
+    `shutil.rmtree` は Linux で `os.unlink(entry.name, dir_fd=topfd)` と
+    ファイル名だけを渡す。カレントディレクトリ基準で解決すると、
+    リポジトリ外を rmtree しただけでリポジトリ直下のファイルを消したように
+    見える（CI 実測で `.gitignore` / `README.md` / `implementation_plan.md`）。
+    """
+
+    def test_relative_path_with_dir_fd_is_skipped(self):
+        assert fs_guard._resolves_against_fd(".gitignore", {"dir_fd": 7})
+
+    def test_relative_path_without_dir_fd_is_recorded(self):
+        # dir_fd が無ければカレントディレクトリ基準で正しく解決できる。
+        assert not fs_guard._resolves_against_fd(".gitignore", {})
+        assert not fs_guard._resolves_against_fd(".gitignore", {"dir_fd": None})
+
+    def test_absolute_path_with_dir_fd_is_recorded(self):
+        # 絶対パスなら dir_fd は OS 側で無視されるので、記録してよい。
+        assert not fs_guard._resolves_against_fd(_in_repo("README.md"), {"dir_fd": 7})
+
+    def test_rename_style_fd_kwargs(self):
+        assert fs_guard._resolves_against_fd("a.json", {"src_dir_fd": 3})
+        assert fs_guard._resolves_against_fd("a.json", {"dst_dir_fd": 3})
+
+    def test_non_path_argument(self):
+        # ファイルディスクリプタが直接渡ることがある。例外にしない。
+        assert not fs_guard._resolves_against_fd(3, {"dir_fd": 7})
+
+    def test_wrapper_skips_fd_relative_unlink(self, monkeypatch, clean_records):
+        calls = []
+        wrapped = fs_guard._wrap_path(lambda *a, **k: calls.append((a, k)), "os.unlink")
+
+        # リポジトリ外の一時ディレクトリを rmtree したときの内部呼び出し。
+        wrapped(".gitignore", dir_fd=7)
+        assert clean_records == []
+        # 本物には委譲する — 挙動は変えない。
+        assert calls == [((".gitignore",), {"dir_fd": 7})]
+
+        # dir_fd が無ければ従来どおり記録する。
+        monkeypatch.chdir(REPO_ROOT)
+        wrapped(".gitignore")
+        assert [r["path"] for r in clean_records] == [".gitignore"]
+
+
 @pytest.fixture
 def clean_records(monkeypatch):
     """モジュール全体で共有している記録を、このテストの間だけ空にする。"""

@@ -115,6 +115,33 @@ def _wrap_open(real, label):
     return wrapper
 
 
+# ディレクトリファイルディスクリプタを取る引数。これが渡っているとき、
+# 相対パスは**プロセスのカレントディレクトリではなくその fd** を起点に解決される。
+_DIR_FD_KWARGS = ("dir_fd", "src_dir_fd", "dst_dir_fd")
+
+
+def _resolves_against_fd(path, kwargs) -> bool:
+    """`dir_fd` 付きの相対パスかどうか。
+
+    `shutil.rmtree` は Linux では fd ベースの実装を使い
+    （`shutil._use_fd_functions`）、内部で `os.unlink(entry.name, dir_fd=topfd)`
+    と**ファイル名だけ**を渡す。これをカレントディレクトリ基準で解決すると、
+    リポジトリの**外**を rmtree しただけでリポジトリ直下のファイルを
+    消したように見える。2026-08-01 の CI 実測では `.gitignore`
+    `README.md` `implementation_plan.md` が本番ファイルとして数えられていた
+    （Windows は `_use_fd_functions` が False なので手元では再現しない）。
+
+    fd の指す先は追えないので、この形の呼び出しは記録しない。rmtree 自体は
+    フルパスで別途記録しているため、落ちるのは誤検出だけで情報は失わない。
+    """
+    if not any(kwargs.get(name) is not None for name in _DIR_FD_KWARGS):
+        return False
+    try:
+        return not os.path.isabs(os.fspath(path))
+    except TypeError:
+        return False
+
+
 def _wrap_path(real, label, index=0):
     """パスを引数に取る関数。`index` 番目の引数を対象として記録する。
 
@@ -125,7 +152,11 @@ def _wrap_path(real, label, index=0):
     """
 
     def wrapper(*args, **kwargs):
-        if len(args) > index and _is_watched(args[index]):
+        if (
+            len(args) > index
+            and not _resolves_against_fd(args[index], kwargs)
+            and _is_watched(args[index])
+        ):
             _record(label, args[index])
         return real(*args, **kwargs)
 
