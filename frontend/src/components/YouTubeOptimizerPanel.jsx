@@ -84,7 +84,7 @@ const ThumbnailABPanel = ({ thumbnails, selectedId, onSelect, onRegenerate, onCu
         <div className="thumbnail-ab-panel">
             <h3>🖼️ サムネイルA/Bテスト（3案比較）</h3>
 
-            <div className="thumbnail-grid">
+            <div className="thumbnail-grid" data-testid="youtube-thumbnail-candidates">
                 {thumbnails.map((thumb, i) => (
                     <div
                         key={thumb.id}
@@ -169,7 +169,7 @@ const SEOMetadataEditor = ({ seoData, onUpdate }) => {
 
             <div className="seo-section">
                 <h4>タイトル候補（クリックで選択）</h4>
-                <div className="title-list">
+                <div className="title-list" data-testid="youtube-title-candidates">
                     {seoData.title_candidates?.map((title, i) => (
                         <div
                             key={i}
@@ -193,6 +193,7 @@ const SEOMetadataEditor = ({ seoData, onUpdate }) => {
                 <div className="description-container">
                     <textarea
                         className="description-text"
+                        data-testid="youtube-description"
                         value={seoData.description}
                         readOnly
                         rows={6}
@@ -206,7 +207,7 @@ const SEOMetadataEditor = ({ seoData, onUpdate }) => {
 
             <div className="seo-section">
                 <h4>タグ ({seoData.tags?.length || 0}個)</h4>
-                <div className="tags-container">
+                <div className="tags-container" data-testid="youtube-tag-list">
                     {seoData.tags?.map((tag, i) => (
                         <span key={i} className="tag-badge">{tag}</span>
                     ))}
@@ -215,7 +216,7 @@ const SEOMetadataEditor = ({ seoData, onUpdate }) => {
 
             <div className="seo-section">
                 <h4>ハッシュタグ</h4>
-                <div className="hashtags-container">
+                <div className="hashtags-container" data-testid="youtube-hashtag-list">
                     {seoData.hashtags?.map((tag, i) => (
                         <span key={i} className="hashtag-badge">{tag}</span>
                     ))}
@@ -224,7 +225,7 @@ const SEOMetadataEditor = ({ seoData, onUpdate }) => {
 
             <div className="seo-section">
                 <h4>チャプター ({seoData.chapters?.length || 0}個)</h4>
-                <div className="chapters-container">
+                <div className="chapters-container" data-testid="youtube-chapter-list">
                     {seoData.chapters?.map((chapter, i) => (
                         <div key={i} className="chapter-item">
                             <span className="chapter-time">{chapter.time}</span>
@@ -563,9 +564,9 @@ const YouTubeOptimizerPanel = ({ isOpen, onClose, segments, topics }) => {
 
                 <div className="panel-footer">
                     <div className="growth-predictions">
-                        <span>CTR予測: {optimizationData?.thumbnail_candidates?.[0]?.predicted_ctr || '-'}%</span>
+                        <span data-testid="youtube-ctr-prediction">CTR予測: {optimizationData?.thumbnail_candidates?.[0]?.predicted_ctr || '-'}%</span>
                         <span>視聴維持: {optimizationData?.hook_analysis?.predicted_retention_impact?.split(':')[0] || '-'}</span>
-                        <span>SEOスコア: {optimizationData?.seo_metadata?.tags?.length >= 15 ? '良好' : '改善余地あり'}</span>
+                        <span data-testid="youtube-seo-score">SEOスコア: {optimizationData?.seo_metadata?.tags?.length >= 15 ? '良好' : '改善余地あり'}</span>
                     </div>
 
                     <div className="footer-actions">
