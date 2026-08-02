@@ -1,8 +1,8 @@
 {
   "version": "2.0.0",
-  "last_audit_date": "2026-04-28T18:51",
-  "vision_realization_score": 60,
-  "scoring_policy": "コード存在=最大20%、E2E動作確認=50%以上、本番動画確認=100%",
+  "last_audit_date": "2026-08-02T00:00",
+  "vision_realization_score": 71.2,
+  "scoring_policy": "コード存在=最大20% / E2E動作確認=50%以上 / 本番動画確認=100%。confidence: measured=今回実測 / partial=一部実測 / carried_over=前回値据え置き / not_measured=未計測。**実測なしにスコアを動かさない。**",
   "score_history": [
     {
       "date": "2026-04-15",
@@ -43,79 +43,107 @@
       "date": "2026-05-18T07:45",
       "score": 71.2,
       "trigger": "Sprint 4.6.0 VGA実測。Phase 4完了(M4.1-M4.5)。evolution_log自動更新確認、7/7 UIコンポーネント表示、パイプライン5/7完走、FF 40/42"
+    },
+    {
+      "date": "2026-08-02T00:00",
+      "score": 71.2,
+      "trigger": "Phase 0 正典の再建。サマリー欄の不整合（60 → 71.2）を解消し、10軸に confidence と evidence を付与。有料2軸は据え置き。"
     }
   ],
   "axis_scores": {
     "pipeline_e2e": {
       "score": 85,
       "weight": 20,
-      "status": "improved",
-      "note": "5/7 E2E PASS。文字起こし(GPU/small)/AI校閲(gemini-3-flash)/YouTube最適化/最終レンダリング(safe_mode)完走。SmartCut/プレビューはテスト動画30秒でセグメント不足(想定通り)。完成動画0.8MB生成確認。"
+      "status": "deferred_paid",
+      "note": "実測にはパイプライン実走が必要で **Gemini API の課金が発生する**。2026-08-02 にユーザー判断で据え置き。加えて backend/.env が無く API キーが未設定のため、現状そもそも実行できない。値は 2026-05-18 のもの。",
+      "confidence": "not_measured",
+      "measured_at": "2026-05-18",
+      "evidence": "なし"
     },
     "ui_api_connection": {
       "score": 85,
       "weight": 15,
-      "status": "verified",
-      "note": "7/7コンポーネント表示確認(Browser Agent 2026-05-18)。バックエンドONLINE。全APIルート応答(pipeline/evolution/storage/performance)。パイプラインモーダルで7ステージ表示。"
+      "status": "deferred_paid",
+      "note": "UI からパイプラインを起動する経路が課金するため据え置き（同上）。値は 2026-05-18 のもの。",
+      "confidence": "not_measured",
+      "measured_at": "2026-05-18",
+      "evidence": "なし"
     },
     "trinity_council": {
       "score": 55,
       "weight": 5,
-      "status": "mock_tested",
-      "note": "council_graph.py(8KB) + nexus.py存在。SmartCutStrategyService(12KB) + EvolutionSyncService(12KB)実装済み。29/29 Mock PASS。trust_score=0.0(本番セッション未実行のため)。Phase 5で完全評議会実装予定。"
+      "status": "tests_pass",
+      "note": "実装とテストの存在を再確認。**本番セッションは未実行**なので trust_score は 0.0 のまま。E2E 証拠は 2026-05-18 のもの。",
+      "confidence": "measured",
+      "measured_at": "2026-08-02",
+      "evidence": "評議会系 testpaths 7ファイル 219 件 PASS（2026-08-02 手元実測）"
     },
     "quality_auto_improve": {
       "score": 65,
       "weight": 10,
-      "status": "tested",
-      "note": "QualityGateWorker E2E実行。品質改善ループ3/3サイクル実行(10→36点)。safe_modeレンダリング正常動作。self_review_engine.py(11KB)存在。§8.2ブロック機構テスト済み。"
+      "status": "tests_pass",
+      "note": "改善ループのテストは通る。**本番動画での実効性は未検証**（D-04）。",
+      "confidence": "measured",
+      "measured_at": "2026-08-02",
+      "evidence": "品質ゲート系 testpaths 11ファイル 277 件 PASS（2026-08-02 手元実測）"
     },
     "soul_auto_evolution": {
       "score": 75,
       "weight": 10,
-      "status": "active",
-      "note": "evolution_log.json自動更新(パイプライン完了時07:25)。273哲学/24通知/12エントリ。EvolutionDashboard API 200 OK。4トリガールール稼働中。EvolutionTrigger(25KB)+PhilosophyProposal(21KB)+EvolutionSync(12KB)。68/68テストPASS。director_profile生成確認。"
+      "status": "tests_pass",
+      "note": "2026-08-02 に evolution_log.json の解決を writable_path へ集約した（PR #34）。本番の置き場は不変。パイプライン完了時の自動更新は課金するため未再検証。",
+      "confidence": "measured",
+      "measured_at": "2026-08-02",
+      "evidence": "進化系 testpaths 16ファイル 298 件 PASS（2026-08-02 手元実測）"
     },
     "storage_auto_management": {
       "score": 60,
       "weight": 5,
-      "status": "implemented",
-      "note": "cleanup_manager.py(13KB)。Storage API(stats/cleanup)稼働。パイプライン完了フック実装済み。16/16テストPASS。retention期限切れファイル自動削除。raw/final保護。"
+      "status": "tests_pass",
+      "note": "前回 16/16 から件数が増えている（テスト集合が変わったため）。",
+      "confidence": "measured",
+      "measured_at": "2026-08-02",
+      "evidence": "cleanup/storage testpaths 2ファイル 53 件 PASS（2026-08-02 手元実測）"
     },
     "progressive_preview": {
       "score": 30,
       "weight": 5,
-      "status": "partial",
-      "note": "preview_engine.py(11KB)存在。PreviewWorker E2Eは30秒テスト動画でセグメント不足により失敗(想定通り)。承認フロー完全版はPhase 5 M5.2。段階的レビューUIは5ステップ確認。"
+      "status": "tests_pass",
+      "note": "承認フロー完全版は未実装のまま（D-16）。スコアは据え置き。",
+      "confidence": "measured",
+      "measured_at": "2026-08-02",
+      "evidence": "preview/段階レビュー系 testpaths 15ファイル 484 件 PASS（2026-08-02 手元実測）"
     },
     "test_coverage": {
       "score": 77,
       "weight": 10,
-      "status": "gate_d_target",
-      "note": "Combined branch 77%(Gate D監査時計測)。3,349 passed / FF 40/42。TDR critical_open 56。Phase 4サービスは高カバレッジ(evolution_trigger 97%/evolution_sync 100%/smartcut_strategy 91%)。Sprint 4.6.1-4.6.5でA/B分類カバレッジ改善予定。"
+      "status": "metric_mismatch",
+      "note": "前回値 77 は **branch** coverage。CI は --cov-branch を採っていないので line でしか測れず、指標が違うため比較できない。スコアは据え置き。D-22 参照。",
+      "confidence": "carried_over",
+      "measured_at": "2026-05-18",
+      "evidence": "CI main e02972c (run 30732518139): line 75.4% (53,217/70,535 行) / テスト 9,244 件 失敗0 スキップ12"
     },
     "ux_guarantee_owner": {
       "score": 65,
       "weight": 15,
-      "status": "improved",
-      "note": "7/7 UIコンポーネント表示。パイプラインモーダル7ステージ。AI校閲承認/却下UI。YouTube最適化(タイトル5案/タグ17個/チャプター6件)。SoulPassportデータ管理。29ジャーニーテストPASS。"
+      "status": "build_verified",
+      "note": "**ビルド可否を初めて実測した**（フロントには CI が無く未検証だった）。画面表示と API 接続は 2026-05-18 の Browser Agent 確認のまま。UX 充足マトリクス（docs/ux_fulfillment_matrix.md）も 2026-04-30 が最終更新。",
+      "confidence": "partial",
+      "measured_at": "2026-08-02",
+      "evidence": "frontend `npm run build` 成功（vite 7.3.6 / 2,393 modules / 9.00s）。`npm run lint` 46 errors 6 warnings"
     },
     "ux_guarantee_admin": {
       "score": 55,
       "weight": 5,
-      "status": "improved",
-      "note": "運用監視ダッシュボード表示。パフォーマンスバジェットAPI(budget/current/history)。ストレージ統計API。進化ダッシュボードAPI。DIコンテナ稼働。"
+      "status": "build_verified",
+      "note": "管理画面の表示確認は 2026-05-18 のまま。",
+      "confidence": "partial",
+      "measured_at": "2026-08-02",
+      "evidence": "同上（フロントは単一ビルド）"
     }
   },
   "backlog": {
     "critical": [
-      {
-        "id": "D-15",
-        "title": "品質不合格でもレンダリング進行（§8.2違反）",
-        "status": "resolved",
-        "resolved_date": "2026-04-28",
-        "note": "T-031テスト実装。score<90→safe_modeレンダリング。"
-      },
       {
         "id": "D-16",
         "title": "Progressive Preview承認フロー完全版未実装（§9違反）",
@@ -163,19 +191,39 @@
         "priority": "P2"
       },
       {
-        "id": "D-08",
-        "title": "テストカバレッジ真のE2E向上",
-        "status": "resolved",
-        "resolved_date": "2026-04-28",
-        "note": "72%達成。M2.6品質ゲート70%通過。"
-      },
-      {
         "id": "D-19",
         "title": "Pre-existing test failures (9件)",
         "status": "resolved",
         "priority": "P1",
         "note": "Pre-existing failures全件xfail化完了(Sprint 4.3.4 EBVP制度化)。",
         "resolved_date": "2026-05-17"
+      },
+      {
+        "id": "D-20",
+        "title": "backend/.env が無く実 API キーが未設定。E2E 軸を実測できない",
+        "status": "open",
+        "priority": "P2",
+        "axis": "pipeline_e2e",
+        "created": "2026-08-02",
+        "note": "公開リポジトリ再作成時に持ち込まなかったもの。E2E 実測はキー設定と予算取得が前提になる。"
+      },
+      {
+        "id": "D-21",
+        "title": "UX 充足マトリクスが 2026-04-30 から更新されていない",
+        "status": "open",
+        "priority": "P2",
+        "axis": "ux_guarantee_owner",
+        "created": "2026-08-02",
+        "note": "O-4/5/8/9/10/11 が『動くが5層未定義』のまま。画面表示の再確認は無料でできる（パイプライン起動だけが課金）。"
+      },
+      {
+        "id": "D-22",
+        "title": "CI が branch coverage を採らないためカバレッジの時系列が比較不能",
+        "status": "open",
+        "priority": "P1",
+        "axis": "test_coverage",
+        "created": "2026-08-02",
+        "note": "前回値 77% は branch、今回測れたのは line 75.4%。ci.yml に --cov-branch を足せば以後は比較できる。"
       }
     ],
     "structural": [
@@ -218,13 +266,6 @@
         "resolved_date": "2026-04-18T21:58"
       },
       {
-        "id": "D-08",
-        "title": "テストカバレッジ向上",
-        "status": "resolved",
-        "resolved_date": "2026-04-28",
-        "note": "72%達成。2,064テスト。"
-      },
-      {
         "id": "D-12",
         "title": "Governance権限バグ修正",
         "status": "resolved"
@@ -242,16 +283,24 @@
         "resolved_date": "2026-04-20"
       },
       {
-        "id": "D-15",
-        "title": "品質不合格レンダリングブロック",
-        "status": "resolved",
-        "resolved_date": "2026-04-28"
-      },
-      {
         "id": "D-18",
         "title": "テスト動画が合成動画でE2E不適切",
         "status": "resolved",
         "resolved_date": "2026-04-20"
+      },
+      {
+        "id": "D-08",
+        "title": "テストカバレッジ真のE2E向上",
+        "status": "resolved",
+        "resolved_date": "2026-04-28",
+        "note": "72%達成。M2.6品質ゲート70%通過。 ／ 2026-08-02: 重複エントリを統合"
+      },
+      {
+        "id": "D-15",
+        "title": "品質不合格でもレンダリング進行（§8.2違反）",
+        "status": "resolved",
+        "resolved_date": "2026-04-28",
+        "note": "T-031テスト実装。score<90→safe_modeレンダリング。 ／ 2026-08-02: 重複エントリを統合"
       }
     ]
   },
@@ -314,12 +363,60 @@
       "score_after": 71.2,
       "items_resolved": [],
       "note": "Sprint 4.6.0 VGA実測。Phase 4完了後。前回比+9.2pt。Soul自動進化(+10pt)、ストレージ管理(+45pt)、品質改善(+10pt)が主な改善要因。"
+    },
+    {
+      "cycle": 8,
+      "date": "2026-08-02T00:00",
+      "score_after": 71.2,
+      "note": "実測はしたがスコアは動かしていない（測ったのは通過証拠であって E2E ではない）。変わったのはサマリー欄の不整合解消のみ。"
     }
   ],
   "trinity_roadmap": {
     "trigger_score": 70,
     "current_score": 71.2,
-    "gap": 1.2000000000000028,
+    "gap": 1.2,
     "approved_date": "2026-04-18"
+  },
+  "canonical": "この文書がロードマップ現在地の正典（2026-08-02 決定）。backend/agents/memory/phase_state.json と docs/BACKLOG_MASTER.md は参照資料。",
+  "current_phase": {
+    "id": "P0",
+    "title": "正典の再建",
+    "started_at": "2026-08-02",
+    "rationale": "3つの台帳が食い違い、現在地を機械的に答えられなかった。自律実行の停止条件が定義できないため、実装より先に修復する（憲法第5条）。",
+    "exit_criteria": [
+      {
+        "id": "C-1",
+        "condition": "vision_realization_score が score_history の最新と一致する",
+        "met": true,
+        "evidence": "60 → 71.2。axis_scores の加重平均も 71.2 で一致する"
+      },
+      {
+        "id": "C-2",
+        "condition": "10軸すべてに confidence（measured / partial / carried_over / not_measured）と evidence がある",
+        "met": true,
+        "evidence": "10/10 軸に付与。measured 5 / partial 2 / carried_over 1 / not_measured 2"
+      },
+      {
+        "id": "C-3",
+        "condition": "current_phase と機械可読な exit_criteria が正典に入っている",
+        "met": true,
+        "evidence": "このオブジェクト自身"
+      },
+      {
+        "id": "C-4",
+        "condition": "docs/vision_audit_20260802.md が出ている",
+        "met": true,
+        "evidence": "docs/vision_audit_20260802.md（結論・軸ごとの実測・据え置き理由・次フェーズ候補）"
+      },
+      {
+        "id": "C-5",
+        "condition": "phase_state.json と docs/BACKLOG_MASTER.md に『参照資料。正典は vision_backlog.json』と明記されている",
+        "met": true,
+        "evidence": "docs/BACKLOG_MASTER.md 冒頭に警告ブロック / phase_state.json 先頭に _canonical_note。追加キーで既存の読み書きが壊れないことを testpaths 85ファイル 1,168件 PASS で確認"
+      }
+    ],
+    "also_fixed": [
+      "バックログ ID の重複 2件（D-08 / D-15）を resolved へ統合"
+    ]
   }
 }

@@ -1,4 +1,5 @@
 {
+  "_canonical_note": "参照資料。ロードマップ現在地の正典は backend/branding/vision_backlog.json（2026-08-02 決定）。このファイルは Antigravity のオーケストレーション状態で、内部に不整合がある — current_phase=2 に対し next_milestones は Phase 30 から始まり、metrics は旧 video-automation の計測（44% / 2,240件、実際は line 75.4% / 9,244件）を指している。現在地の判断に使わないこと。経緯は docs/vision_audit_20260802.md。",
   "schema_version": "1.2",
   "orchestration_enabled": true,
   "current_phase": 2,
