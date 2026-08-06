@@ -262,3 +262,38 @@ def test_non_layer1_items_are_left_alone(tmp_path):
     ])
 
     assert [r.item_id for r in audit(stories).rows] == ["O1-L1-01"]
+
+
+# --- 判定の意味を言葉で固定する ------------------------------------------------
+
+
+def test_every_claim_states_what_it_does_not_verify():
+    """分類だけして意味を書かないと、判定が妥当か読み手に分からない。
+
+    「正常応答を返す」を経路の実在で PASS にしているのが妥当かどうかは、
+    route_exists が何を確かめないかを書いて初めて読める。
+    """
+    from backend.ux_verification.claim_audit import CLAIM_SEMANTICS
+
+    assert set(CLAIM_SEMANTICS) == set(CLAIM_METHODS), (
+        "claim を足したら意味も書く"
+    )
+    for claim, (verifies, does_not) in CLAIM_SEMANTICS.items():
+        assert verifies and does_not, claim
+
+
+def test_unjudgeable_claims_have_no_verifies_clause():
+    """判定手段が無いものが『確かめる』を持っていたら、分類か実装が食い違っている。"""
+    from backend.ux_verification.claim_audit import CLAIM_SEMANTICS
+
+    for claim in UNJUDGEABLE_CLAIMS:
+        assert CLAIM_SEMANTICS[claim][0] == "（判定手段なし）", claim
+
+
+def test_semantics_output_lists_every_claim(capsys):
+    from backend.ux_verification import claim_audit as ca
+
+    assert ca.main(["--semantics"]) == 0
+    out = capsys.readouterr().out
+    for claim in CLAIM_METHODS:
+        assert claim in out

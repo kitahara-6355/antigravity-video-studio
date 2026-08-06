@@ -61,10 +61,62 @@ CLAIM_METHODS: dict[str, tuple[str, ...] | None] = {
     # None = **静的走査では原理的に判定できないと結論した**主張。
     # 空タプル（未実装）とは別物で、こちらは実装しても埋まらない。
     # 該当項目は PASS に逃がさず、理由つきで FAIL にする（P3 C-3）。
-    "element_count": None,      # 実行時に何件描画されるかはソースに書かれていない
-    "idempotency": None,        # 2回呼んで同じかは実行しないと分からない
-    "runtime_behavior": None,   # 特定の入力で 200 が返るかは実行しないと分からない
-    "spec_incomplete": None,    # 何を照合すべきか仕様が決まっていない
+    "element_count": None,
+    "idempotency": None,
+    "parameter_coverage": None,
+    "spec_incomplete": None,
+}
+
+# 各 claim が**何を確かめ、何を確かめないか**。
+# ここを書かずに分類だけしていると、「正常応答を返す」を経路の実在で PASS に
+# しているのが妥当なのか読み手に分からない。判定の意味を言葉で固定する。
+CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
+    "dom_exists": (
+        "その data-testid が、エントリから到達できるソースに書かれている",
+        "実行時に本当に描画されるか（条件分岐で一度も出ない要素も PASS になる）",
+    ),
+    "route_exists": (
+        "そのエンドポイントが定義され、アプリに include_router されている",
+        "**呼んで 200 が返るか。** ハンドラが例外を投げるかは静的には分からない。"
+        "L1 が保証するのは『呼び先が存在し、404 にはならない』ところまで",
+    ),
+    "response_field": (
+        "宣言されたフィールドが、ハンドラの返り値（呼び先を一段展開）に現れる",
+        "その値が何であるか。空配列でもフィールドが在れば PASS になる",
+    ),
+    "storage_key": (
+        "その localStorage キーの読み書きが、到達できるソースにある",
+        "実行時に実際に書かれるか",
+    ),
+    "value_constraint": (
+        "宣言された値が、エンドポイントの実装（参照するモジュール変数を含む）に現れる",
+        "実行時にその値だけが返るか（「〜のみ」の『のみ』は確かめていない）",
+    ),
+    "request_contract": (
+        "そのフィールドがリクエストモデルに定義されている",
+        "その値域が受理されるか",
+    ),
+    "element_count": (
+        "（判定手段なし）",
+        "**描画される件数。** 既定データの件数なら静的に数えられるが、"
+        "主張は『表示される』で、実際の描画件数は実行時のデータ次第。"
+        "既定データで代用するのは別の主張への置き換えになる",
+    ),
+    "idempotency": (
+        "（判定手段なし）",
+        "2回呼んで同じ結果になるか。実行しないと分からない",
+    ),
+    "parameter_coverage": (
+        "（判定手段なし）",
+        "**特定の入力値の集合が受理されるか。** 型が int としか書かれておらず、"
+        "受理する値の集合が実装のどこにも宣言されていない場合、"
+        "静的走査には照合する相手が無い",
+    ),
+    "spec_incomplete": (
+        "（判定手段なし）",
+        "何を照合すべきかが仕様に書かれていない。"
+        "推測で照合先を書けば判定は出るが、それは実装ではなく判定の捏造",
+    ),
 }
 
 # 判定手段がまだ無い主張（実装すれば埋まる）。ここが空でないと C-3 を満たせない。
@@ -203,7 +255,18 @@ def main(argv: list[str] | None = None) -> int:
                         help="対応が取れていない項目の ID だけを JSON で出す")
     parser.add_argument("--gate", action="store_true",
                         help="対応が取れていない項目が1件でもあれば exit 1")
+    parser.add_argument("--semantics", action="store_true",
+                        help="各 claim が何を確かめ、何を確かめないかを出す")
     args = parser.parse_args(argv)
+
+    if args.semantics:
+        for claim in CLAIM_METHODS:
+            verifies, does_not = CLAIM_SEMANTICS[claim]
+            mark = "⛔" if claim in UNJUDGEABLE_CLAIMS else "  "
+            print(f"{mark} {claim}")
+            print(f"     確かめる  : {verifies}")
+            print(f"     確かめない: {does_not}\n")
+        return 0
 
     report = for_repo(args.persona)
 

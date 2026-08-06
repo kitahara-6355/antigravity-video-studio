@@ -237,7 +237,7 @@
       "description": "4種プリセット(15/30/45/60分)でAPIが正常応答する",
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
-      "claim": "runtime_behavior"
+      "claim": "parameter_coverage"
     },
     {
       "id": "O4-L1-06",

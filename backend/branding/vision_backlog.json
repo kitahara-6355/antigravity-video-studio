@@ -471,7 +471,7 @@
         "id": "C-3",
         "condition": "対応が取れていない項目がゼロになる。静的に判定できないと結論した項目は PASS にせず FAIL として理由を残す",
         "met": true,
-        "evidence": "`python -m backend.ux_verification.claim_audit --persona owner --gate` → **✅ 122 項目すべてで対応が取れています**（対応が取れていない項目 0 件 / exit 0）。判定できないと結論した5件は unjudgeable の FAIL として出る（O2-L1-07 element_count / O4-L1-05 runtime_behavior / O5-L1-06・O5-L1-07 idempotency / O9-L1-12 spec_incomplete）。結果としての充足率は 122件 / PASS 109 / FAIL 13 / SKIP 0 = 89.34%。**充足率は条件にしていない**（design_note）。判定していない主張は 9 → 0 件。"
+        "evidence": "`python -m backend.ux_verification.claim_audit --persona owner --gate` → **✅ 122 項目すべてで対応が取れています**（対応が取れていない項目 0 件 / exit 0）。判定できないと結論した5件は unjudgeable の FAIL として出る（O2-L1-07 element_count / O4-L1-05 runtime_behavior / O5-L1-06・O5-L1-07 idempotency / O9-L1-12 spec_incomplete）。結果としての充足率は 122件 / PASS 109 / FAIL 13 / SKIP 0 = 89.34%。**充足率は条件にしていない**（design_note）。判定していない主張は 9 → 0 件。 gate-verifier の4回目の指摘（route_exists 47件は全件が『正常応答を返す』と主張しているのに経路の実在しか見ておらず、同じ述語の O4-L1-05 だけ判定不能にしていて一貫しない）を受け、**ユーザー判断で (A)「L1 の正常応答は経路の実在と読む」を採用**（2026-08-06）。曖昧なままにしないため、claim ごとの「確かめること／確かめないこと」を CLAIM_SEMANTICS に機械可読で書き、`--semantics` で出せるようにした（claim を足して意味を書き忘れることはテストで禁じている）。O4-L1-05 は runtime_behavior → parameter_coverage へ分類し直した。判定できないのは『正常応答』ではなく『4種プリセットで』という入力値の集合のほうで、受理する値の集合が実装のどこにも宣言されていない。決定の記録は docs/ux_l1_claim_semantics_20260806.md。"
       },
       {
         "id": "C-4",
