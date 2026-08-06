@@ -89,7 +89,8 @@
       "story_scene": "S1",
       "description": "動画一覧APIが正常応答を返す",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/videos"
+      "endpoint": "GET /api/pipeline/videos",
+      "claim": "route_exists"
     },
     {
       "id": "O1-L1-02",
@@ -98,7 +99,8 @@
       "description": "動画一覧にvideos配列が存在する",
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/videos",
-      "response_field": "videos"
+      "response_field": "videos",
+      "claim": "response_field"
     },
     {
       "id": "O1-L1-03",
@@ -112,7 +114,8 @@
         "path",
         "size_mb",
         "modified"
-      ]
+      ],
+      "claim": "response_field"
     },
     {
       "id": "O1-L1-04",
@@ -120,7 +123,8 @@
       "story_scene": "S3",
       "description": "動画リストに対応拡張子のみ含まれる",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/videos"
+      "endpoint": "GET /api/pipeline/videos",
+      "claim": "value_constraint"
     },
     {
       "id": "O1-L1-05",
@@ -128,7 +132,8 @@
       "story_scene": "S4",
       "description": "ドロップゾーン要素が存在する",
       "test_method": "dom_exists",
-      "testid": "pipeline-drop-zone"
+      "testid": "pipeline-drop-zone",
+      "claim": "dom_exists"
     },
     {
       "id": "O1-L1-06",
@@ -136,7 +141,8 @@
       "story_scene": "S6",
       "description": "バリデーションAPIが正常応答を返す",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/pipeline/videos/validate"
+      "endpoint": "POST /api/pipeline/videos/validate",
+      "claim": "route_exists"
     },
     {
       "id": "O1-L1-07",
@@ -144,7 +150,8 @@
       "story_scene": "S7",
       "description": "localStorageに履歴キーが存在する",
       "test_method": "dom_exists",
-      "testid": "recent-videos-section"
+      "testid": "recent-videos-section",
+      "claim": "storage_key"
     },
     {
       "id": "O1-L2-01",

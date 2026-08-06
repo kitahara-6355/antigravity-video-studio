@@ -198,7 +198,8 @@
       "story_scene": "S1",
       "description": "ヘルスチェックAPIが正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/health"
+      "endpoint": "GET /api/render/health",
+      "claim": "route_exists"
     },
     {
       "id": "O8-L1-02",
@@ -206,7 +207,8 @@
       "story_scene": "S1",
       "description": "設定取得APIが正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/settings"
+      "endpoint": "GET /api/render/settings",
+      "claim": "route_exists"
     },
     {
       "id": "O8-L1-03",
@@ -214,7 +216,8 @@
       "story_scene": "S2",
       "description": "GPU検出APIが正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/gpu-detect"
+      "endpoint": "GET /api/render/gpu-detect",
+      "claim": "route_exists"
     },
     {
       "id": "O8-L1-04",
@@ -226,7 +229,8 @@
       "response_field": [
         "bgm_volume",
         "bgm_ducking"
-      ]
+      ],
+      "claim": "response_field"
     },
     {
       "id": "O8-L1-05",
@@ -235,7 +239,8 @@
       "description": "LUFS設定が含まれる",
       "test_method": "dom_exists",
       "endpoint": "GET /api/render/settings",
-      "response_field": "lufs_target"
+      "response_field": "lufs_target",
+      "claim": "response_field"
     },
     {
       "id": "O8-L1-06",
@@ -248,7 +253,8 @@
         "logo_enabled",
         "logo_position",
         "logo_opacity"
-      ]
+      ],
+      "claim": "response_field"
     },
     {
       "id": "O8-L1-07",
@@ -261,7 +267,8 @@
         "subtitle_enabled",
         "subtitle_font",
         "subtitle_size"
-      ]
+      ],
+      "claim": "response_field"
     },
     {
       "id": "O8-L1-08",
@@ -269,7 +276,8 @@
       "story_scene": "S11",
       "description": "開始APIが正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/render/start"
+      "endpoint": "POST /api/render/start",
+      "claim": "route_exists"
     },
     {
       "id": "O8-L1-09",
@@ -278,7 +286,8 @@
       "description": "stagesフィールド存在",
       "test_method": "dom_exists",
       "endpoint": "GET /api/render/status/{job_id}",
-      "response_field": "stages"
+      "response_field": "stages",
+      "claim": "response_field"
     },
     {
       "id": "O8-L1-10",
@@ -287,7 +296,8 @@
       "description": "output_file存在",
       "test_method": "dom_exists",
       "endpoint": "GET /api/render/status/{job_id}",
-      "response_field": "output_file"
+      "response_field": "output_file",
+      "claim": "response_field"
     },
     {
       "id": "O8-L1-11",
@@ -296,7 +306,8 @@
       "description": "download_url存在",
       "test_method": "dom_exists",
       "endpoint": "GET /api/render/download/{job_id}",
-      "response_field": "download_url"
+      "response_field": "download_url",
+      "claim": "response_field"
     },
     {
       "id": "O8-L1-12",
@@ -304,7 +315,8 @@
       "story_scene": "S22",
       "description": "完了通知API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/render/complete/{job_id}"
+      "endpoint": "POST /api/render/complete/{job_id}",
+      "claim": "route_exists"
     },
     {
       "id": "O8-L2-01",

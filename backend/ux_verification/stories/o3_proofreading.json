@@ -114,7 +114,8 @@
       "story_scene": "S1",
       "description": "校閲ステージパネルが存在する",
       "test_method": "dom_exists",
-      "testid": "proofreading-stage-panel"
+      "testid": "proofreading-stage-panel",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-02",
@@ -122,7 +123,8 @@
       "story_scene": "S2",
       "description": "diffコンテナが存在する",
       "test_method": "dom_exists",
-      "testid": "proofreading-diff"
+      "testid": "proofreading-diff",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-03",
@@ -130,7 +132,8 @@
       "story_scene": "S2",
       "description": "差分マーク要素が存在する",
       "test_method": "dom_exists",
-      "testid": "diff-mark-*"
+      "testid": "diff-mark-*",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-04",
@@ -138,7 +141,8 @@
       "story_scene": "S3",
       "description": "比較ビューコンテナが存在する",
       "test_method": "dom_exists",
-      "testid": "proofreading-comparison"
+      "testid": "proofreading-comparison",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-05",
@@ -146,7 +150,8 @@
       "story_scene": "S4",
       "description": "個別承認ボタンが存在する",
       "test_method": "dom_exists",
-      "testid": "segment-approve-btn-*"
+      "testid": "segment-approve-btn-*",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-06",
@@ -154,7 +159,8 @@
       "story_scene": "S4",
       "description": "個別却下ボタンが存在する",
       "test_method": "dom_exists",
-      "testid": "segment-reject-btn-*"
+      "testid": "segment-reject-btn-*",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-07",
@@ -162,7 +168,8 @@
       "story_scene": "S5",
       "description": "全承認ボタンが存在する",
       "test_method": "dom_exists",
-      "testid": "approve-all-btn"
+      "testid": "approve-all-btn",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-08",
@@ -170,7 +177,8 @@
       "story_scene": "S5",
       "description": "全却下ボタンが存在する",
       "test_method": "dom_exists",
-      "testid": "reject-all-btn"
+      "testid": "reject-all-btn",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-09",
@@ -178,7 +186,8 @@
       "story_scene": "S6",
       "description": "辞書パネルが存在する",
       "test_method": "dom_exists",
-      "testid": "dictionary-panel"
+      "testid": "dictionary-panel",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-10",
@@ -186,7 +195,8 @@
       "story_scene": "S8",
       "description": "校閲進捗バーが存在する",
       "test_method": "dom_exists",
-      "testid": "proofreading-progress"
+      "testid": "proofreading-progress",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-11",
@@ -194,7 +204,8 @@
       "story_scene": "S9",
       "description": "SRTエクスポートボタンが存在する",
       "test_method": "dom_exists",
-      "testid": "export-srt-btn"
+      "testid": "export-srt-btn",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-12",
@@ -202,7 +213,8 @@
       "story_scene": "S9",
       "description": "TXTエクスポートボタンが存在する",
       "test_method": "dom_exists",
-      "testid": "export-txt-btn"
+      "testid": "export-txt-btn",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L1-13",
@@ -210,7 +222,8 @@
       "story_scene": "S10",
       "description": "スキップトグルが存在する",
       "test_method": "dom_exists",
-      "testid": "skip-proofreading-toggle"
+      "testid": "skip-proofreading-toggle",
+      "claim": "dom_exists"
     },
     {
       "id": "O3-L2-01",

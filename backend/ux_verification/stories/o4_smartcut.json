@@ -198,7 +198,8 @@
       "story_scene": "S1",
       "description": "SmartCut初期化APIが正常応答を返す",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/init"
+      "endpoint": "POST /api/smartcut/init",
+      "claim": "route_exists"
     },
     {
       "id": "O4-L1-02",
@@ -206,7 +207,8 @@
       "story_scene": "S1",
       "description": "SmartCutヘルスチェックAPIが正常応答を返す",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/smartcut/health"
+      "endpoint": "GET /api/smartcut/health",
+      "claim": "route_exists"
     },
     {
       "id": "O4-L1-03",
@@ -215,7 +217,8 @@
       "description": "推奨レスポンスにestimated_output_secondsが存在する",
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
-      "response_field": "estimated_output_seconds"
+      "response_field": "estimated_output_seconds",
+      "claim": "response_field"
     },
     {
       "id": "O4-L1-04",
@@ -223,7 +226,8 @@
       "story_scene": "S3",
       "description": "推奨APIが目標尺パラメータを受け付ける",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/recommend"
+      "endpoint": "POST /api/smartcut/recommend",
+      "claim": "request_contract"
     },
     {
       "id": "O4-L1-05",
@@ -231,7 +235,8 @@
       "story_scene": "S6",
       "description": "4種プリセット(15/30/45/60分)でAPIが正常応答する",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/recommend"
+      "endpoint": "POST /api/smartcut/recommend",
+      "claim": "request_contract"
     },
     {
       "id": "O4-L1-06",
@@ -239,7 +244,8 @@
       "story_scene": "S8",
       "description": "シーン固定APIが正常応答を返す",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/lock"
+      "endpoint": "POST /api/smartcut/lock",
+      "claim": "route_exists"
     },
     {
       "id": "O4-L1-07",
@@ -248,7 +254,8 @@
       "description": "推奨レスポンスにrecommended_segmentsが存在する",
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
-      "response_field": "recommended_segments"
+      "response_field": "recommended_segments",
+      "claim": "response_field"
     },
     {
       "id": "O4-L1-08",
@@ -256,7 +263,8 @@
       "story_scene": "S14",
       "description": "全候補APIが正常応答を返す",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/smartcut/all-candidates"
+      "endpoint": "GET /api/smartcut/all-candidates",
+      "claim": "route_exists"
     },
     {
       "id": "O4-L1-09",
@@ -265,7 +273,8 @@
       "description": "推奨レスポンスにestimated_output_strが存在する",
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
-      "response_field": "estimated_output_str"
+      "response_field": "estimated_output_str",
+      "claim": "response_field"
     },
     {
       "id": "O4-L1-10",
@@ -274,7 +283,8 @@
       "description": "推奨セグメントにscoreフィールドが存在する",
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
-      "response_field": "score"
+      "response_field": "score",
+      "claim": "response_field"
     },
     {
       "id": "O4-L1-11",
@@ -283,7 +293,8 @@
       "description": "候補にtypeフィールドが存在する",
       "test_method": "dom_exists",
       "endpoint": "GET /api/smartcut/all-candidates",
-      "response_field": "type"
+      "response_field": "type",
+      "claim": "response_field"
     },
     {
       "id": "O4-L1-12",
@@ -292,7 +303,8 @@
       "description": "候補にtimestampフィールドが存在する",
       "test_method": "dom_exists",
       "endpoint": "GET /api/smartcut/all-candidates",
-      "response_field": "timestamp"
+      "response_field": "timestamp",
+      "claim": "response_field"
     },
     {
       "id": "O4-L2-01",
