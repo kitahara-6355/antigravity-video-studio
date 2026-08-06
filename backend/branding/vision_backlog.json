@@ -426,8 +426,8 @@
       {
         "id": "C-2",
         "condition": "L1 の判定不能項目が解消され、Owner L1 の充足率が 90% 以上になる",
-        "met": true,
-        "evidence": "`python -m backend.ux_verification.executor --persona owner` → 122件 / PASS 112 / FAIL 10 / SKIP 0（充足率 91.80%）。判定手段の内訳は found 82 / field_found 30 / field_not_found 8 / not_found 1 / no_testid 1。gate-verifier に2回かけ、2回とも「レスポンス内容の主張が経路の実在だけで PASS している」と指摘されたので、response_field を宣言して返り値のフィールドまで判定するようにした（docs/ux_l1_response_claims_20260806.md）。**判定されていない主張は 37件 → 6件 → 1件に減り、判定した結果ダメだった 8件は PASS ではなく FAIL として出ている。**残る1件（O1-L1-04）は値の条件であってフィールドの有無ではないため 宣言できる response_field が無い。これを PASS から外す厳しい数え方でも 111/122 = 90.98% で 90% を満たす。2回目の指摘で走査側の欠陥も2つ見つかり修正した（AnnAssign のモジュール辞書を落としていた / `.copy()` を剥がさず呼び先索引を空振りさせていた。GET /api/render/settings の設定 11 フィールドが見えていなかった）。"
+        "met": false,
+        "evidence": "**未達。3回の独立検証で3回とも「判定が主張に届いていない項目が残る」と指摘された。**実測は 122件 / PASS 112 / FAIL 10 / SKIP 0（充足率 91.80%）で、内訳は found 82 / field_found 30 / field_not_found 8 / not_found 1 / no_testid 1。SKIP はゼロなので『判定不能項目の解消』は達成したが、**判定手段が主張に対応していない項目が 7件残る**（O1-L1-04 拡張子の値 / O1-L1-07 localStorage / O2-L1-07 件数 / O4-L1-04 リクエスト契約 / O4-L1-05 プリセット網羅 / O5-L1-06・O5-L1-07 冪等性）。これらを PASS から外す厳しい数え方では 105/122 = 86.07% で 90% に届かない。残りは localStorage キー・要素数・リクエストパラメータ・冪等性という**別種の判定手段**を要し、P2 のスコープ（API 契約の実行系）の外にある。閾値の数え方を決めるか判定手段を足すかはフェーズ定義の問題なのでユーザー判断を仰ぐ（憲法第1条）。詳細は docs/ux_l1_response_claims_20260806.md。"
       },
       {
         "id": "C-3",
@@ -448,7 +448,7 @@
         "evidence": "docs/dead_code_inventory_20260806.md と backend/ux_verification/dead_code.py（PR #54）。棚卸しの結果 10件（未登録エンドポイント 7 = review_router / 到達不能ファイル 3）。うち 8件は PROJECT_CONSTITUTION §16.5・§18.8 が要求する機能が結線されていないだけだった。削除か結線かは製品判断のためユーザーへ回し、実行系は『増やさない』ことだけを引き受けて CI ラチェット（`python -m backend.ux_verification.dead_code --ratchet`）にした。"
       }
     ],
-    "note": "終了条件は 5/5 とも満たしたが、フェーズはまだ閉じていない。憲法第2条により /gate-report を出してユーザーの判断を待つ。gate-verifier の独立検証を1回受けており（2026-08-06）、C-2 の偽 PASS 指摘と C-5 の成果物未マージ指摘はどちらも対応済み。ゲート報告に添える判定は再検証後のもの。vision_realization_score と axis_scores は自分で採点しないため据え置いた（更新は検証後の /vision-audit で行う）。"
+    "note": "**C-2 が未達のままフェーズを閉じない。** 憲法第2条により /gate-report を出してユーザーの判断を待つ。gate-verifier の独立検証を3回受け、3回とも not_ready だった（2026-08-06）。1回目の C-2 偽 PASS 指摘・C-5 未マージ指摘、2回目の走査見落とし・--tighten 抜け道指摘、3回目のラチェット弱化検出漏れ指摘はいずれも対応済み。残るのは C-2 の『判定手段が主張に対応していない7件』で、これは別種の判定手段を要するためフェーズの定義に関わる。vision_realization_score と axis_scores は自分で採点しないため据え置いた。"
   },
   "phase_history": [
     {
