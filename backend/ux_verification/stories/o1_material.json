@@ -124,7 +124,13 @@
       "description": "動画リストに対応拡張子のみ含まれる",
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/videos",
-      "claim": "value_constraint"
+      "claim": "value_constraint",
+      "value_literals": [
+        ".mp4",
+        ".mov",
+        ".mkv",
+        ".avi"
+      ]
     },
     {
       "id": "O1-L1-05",
@@ -150,8 +156,8 @@
       "story_scene": "S7",
       "description": "localStorageに履歴キーが存在する",
       "test_method": "dom_exists",
-      "testid": "recent-videos-section",
-      "claim": "storage_key"
+      "claim": "storage_key",
+      "storage_key": "pipeline_recent_videos"
     },
     {
       "id": "O1-L2-01",

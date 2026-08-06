@@ -35,6 +35,10 @@ METHOD = "static_route_scan"
 # 経路の実在だけを見た判定と、返り値の中身まで見た判定を証拠の上で区別する。
 # 同じラベルにすると「何を確かめて PASS にしたのか」が後から追えない。
 FIELD_METHOD = "static_response_scan"
+# 値についての主張とリクエスト側の契約。どちらもレスポンスのフィールド名では
+# 測れないので、証拠の上でも別のラベルにする。
+VALUE_METHOD = "static_value_scan"
+REQUEST_METHOD = "static_request_scan"
 
 _HTTP_METHODS = ("get", "post", "put", "delete", "patch", "head", "options")
 _EXCLUDED_DIRS = {"__pycache__", "node_modules"}
@@ -64,6 +68,11 @@ class EndpointSite:
     registered: bool | None = None  # None = アプリ定義を渡しておらず未判定
     # ハンドラが返しうるフィールド名。レスポンス内容の主張を判定するのに使う。
     fields: frozenset[str] = frozenset()
+    # ハンドラ本体に現れる文字列リテラル。「対応拡張子のみ」「4カテゴリ」のような
+    # **値についての主張**を判定するのに使う。フィールド名では測れない。
+    literals: frozenset[str] = frozenset()
+    # リクエストモデルのフィールド名。「目標尺パラメータを受け付ける」を判定する。
+    request_fields: frozenset[str] = frozenset()
 
     def as_evidence(self) -> str:
         return f"{METHOD}: {self.file}:{self.line} {self.method} {self.path}"
@@ -89,6 +98,10 @@ class EndpointRegistry:
         # ハンドラの返り値を一段展開するための索引。渡さなければ展開しない
         # （ルーターの return だけを読む従来の挙動）。
         callees = _function_index([Path(d) for d in callee_dirs]) if callee_dirs else {}
+        # 値についての主張を判定するための索引。ハンドラが参照するモジュール変数の
+        # 先にしか無い値（カテゴリ名など）へ届かせる。
+        literals_of = (_literal_index([Path(d) for d in callee_dirs])
+                       if callee_dirs else {})
 
         aliases = _router_aliases(routers_dir / "__init__.py")
         if app_files:
@@ -113,10 +126,15 @@ class EndpointRegistry:
                 None if reg.registered_modules is None
                 else module in reg.registered_modules
             )
-            for method, route, line, fields in _routes(tree, callees):
+            models = _response_models(tree)
+            for method, route, line, fields, lits, reqs in _routes(
+                    tree, callees, _module_values(tree, literals_of), literals_of):
                 full = _join(prefix, route)
                 site = EndpointSite(full, method, _display(path, routers_dir),
-                                    line, module, registered, fields)
+                                    line, module, registered, fields, lits,
+                                    frozenset().union(
+                                        *(models.get(r, frozenset()) for r in reqs)
+                                    ) if reqs else frozenset())
                 reg.endpoints.setdefault((method, full), site)
         return reg
 
@@ -156,7 +174,9 @@ class ContractResult:
     description: str
     endpoint: str
     verdict: Verdict
-    reason: str  # found / not_found / unregistered / no_endpoint / field_not_found
+    reason: str  # found / not_found / unregistered / no_endpoint /
+                 # field_found / field_not_found / value_found / value_not_found /
+                 # request_field_found / request_field_not_found
     evidence: str
 
     @property
@@ -211,6 +231,51 @@ class ApiContractExecutor:
                     f"{METHOD}: {site.file}:{site.line} に定義はあるが、"
                     f"ルーター {site.module} がアプリに include_router されていない"
                     "（呼んでも 404 になる）。"
+                ),
+            )
+
+        # 値についての主張。フィールド名では測れない。
+        wanted = _as_list(item.get("value_literals"))
+        if wanted:
+            missing = [v for v in wanted if not _has_literal(v, site.literals)]
+            if missing:
+                return ContractResult(
+                    **common, verdict=Verdict.FAIL, reason="value_not_found",
+                    evidence=(
+                        f"{VALUE_METHOD}: {site.file}:{site.line} の"
+                        f" {site.method} {site.path} の実装に"
+                        f" {'・'.join(missing)} が現れない"
+                        f"（拾えた文字列リテラル {len(site.literals)} 個）。"
+                    ),
+                )
+            return ContractResult(
+                **common, verdict=Verdict.PASS, reason="value_found",
+                evidence=(
+                    f"{VALUE_METHOD}: {site.file}:{site.line}"
+                    f" {site.method} {site.path} の実装に"
+                    f" {'・'.join(wanted)} が現れる"
+                ),
+            )
+
+        # リクエスト側の契約。レスポンスをいくら見ても判定できない。
+        req = _as_list(item.get("request_field"))
+        if req:
+            missing = [f for f in req if f not in site.request_fields]
+            if missing:
+                return ContractResult(
+                    **common, verdict=Verdict.FAIL, reason="request_field_not_found",
+                    evidence=(
+                        f"{REQUEST_METHOD}: {site.file}:{site.line} の"
+                        f" {site.method} {site.path} のリクエストモデルに"
+                        f" {'・'.join(missing)} が無い"
+                        f"（拾えたフィールド {len(site.request_fields)} 個）。"
+                    ),
+                )
+            return ContractResult(
+                **common, verdict=Verdict.PASS, reason="request_field_found",
+                evidence=(
+                    f"{REQUEST_METHOD}: {site.file}:{site.line}"
+                    f" {site.method} {site.path} が {'・'.join(req)} を受け取る"
                 ),
             )
 
@@ -278,7 +343,8 @@ def _router_prefix(tree: ast.Module) -> str:
     return ""
 
 
-def _routes(tree: ast.Module, callees: dict | None = None):
+def _routes(tree: ast.Module, callees: dict | None = None,
+            module_values: dict | None = None, literals_of: dict | None = None):
     """`@router.get("/x")` を (METHOD, "/x", 行番号, フィールドのパス集合) で返す。"""
     models = _response_models(tree)
     module_dicts = _module_dicts(tree)
@@ -298,7 +364,10 @@ def _routes(tree: ast.Module, callees: dict | None = None):
                 for kw in dec.keywords:
                     if kw.arg == "response_model" and isinstance(kw.value, ast.Name):
                         fields |= models.get(kw.value.id, frozenset())
-                yield func.attr.upper(), str(dec.args[0].value), dec.lineno, fields
+                yield (func.attr.upper(), str(dec.args[0].value), dec.lineno,
+                       fields,
+                       _string_literals(node, module_values, literals_of),
+                       _request_models(node))
 
 
 def _module_dicts(tree: ast.Module) -> dict:
@@ -465,6 +534,131 @@ def _function_index(search_dirs: list[Path]) -> dict:
     return {name: frozenset(paths) for name, paths in out.items()}
 
 
+def _string_literals(node, module_values: dict | None = None,
+                     literal_index: dict | None = None) -> frozenset:
+    """ハンドラが扱う値に現れる文字列リテラルを集める。
+
+    「動画リストに対応拡張子のみ含まれる」「4カテゴリ(audio/video/subtitle/
+    structure)が存在する」は**値についての主張**で、フィールド名では測れない。
+    `for ext in ["*.mp4", "*.mov", ...]` のような値そのものを照合する。
+
+    ハンドラ本体だけでは届かないことがある:
+
+        _quality_gate_state = get_initial_quality_gate_state()   # モジュール変数
+        ...
+        categories = _quality_gate_state["categories"]           # ← 値は別モジュール
+
+    そこで**ハンドラが実際に参照しているモジュール変数**だけを辿る。
+    モジュール全体のリテラルを混ぜると、無関係な場所にある同じ文字列で
+    PASS してしまう。
+
+    辞書のキーと値は区別しない。ストーリー側は位置を書いておらず、
+    「この値がこのエンドポイントの実装に現れる」以上のことは主張していない。
+    """
+    module_values = module_values or {}
+    literal_index = literal_index or {}
+    out = {
+        sub.value for sub in ast.walk(node)
+        if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and sub.value
+    }
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Name) and sub.id in module_values:
+            out |= module_values[sub.id]
+        elif isinstance(sub, ast.Call):
+            name = (sub.func.attr if isinstance(sub.func, ast.Attribute)
+                    else sub.func.id if isinstance(sub.func, ast.Name) else "")
+            out |= literal_index.get(name, frozenset())
+    return frozenset(out)
+
+
+def _nested_literals(node, depth: int = 0) -> set:
+    """式の中に現れる文字列リテラルを入れ子ごと集める。"""
+    if depth > 8 or node is None:
+        return set()
+    out = set()
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and sub.value:
+            out.add(sub.value)
+    return out
+
+
+def _module_values(tree: ast.Module, literal_index: dict | None = None) -> dict:
+    """モジュール直下の代入を {変数名: 値に現れる文字列リテラル} で返す。
+
+    初期化が呼び出しのときは索引で引く。本番はこの形が多い:
+
+        _quality_gate_state = get_initial_quality_gate_state()
+
+    リテラルを直接持っていないので、辿らないと値に永久に届かない。
+    """
+    literal_index = literal_index or {}
+    out: dict[str, set] = {}
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign):
+            targets, value = [node.target], node.value
+        elif isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        else:
+            continue
+        literals = _nested_literals(value)
+        for sub in ast.walk(value) if value is not None else ():
+            if isinstance(sub, ast.Call):
+                name = (sub.func.attr if isinstance(sub.func, ast.Attribute)
+                        else sub.func.id if isinstance(sub.func, ast.Name) else "")
+                literals |= literal_index.get(name, frozenset())
+        for target in targets:
+            if isinstance(target, ast.Name) and literals:
+                out.setdefault(target.id, set()).update(literals)
+    return {k: frozenset(v) for k, v in out.items()}
+
+
+def _literal_index(search_dirs: list[Path]) -> dict:
+    """{関数名: その関数が返す値に現れる文字列リテラル}。
+
+    `get_initial_quality_gate_state()` は `copy.deepcopy(INITIAL_...)` を返す。
+    定数そのものを辿らないと、カテゴリ名 4 つに永久に届かない。
+    """
+    out: dict[str, set] = {}
+    for directory in search_dirs:
+        if not Path(directory).is_dir():
+            continue
+        for path in sorted(Path(directory).rglob("*.py")):
+            if _INDEX_EXCLUDED_DIRS & set(path.parts) or path.name.startswith("test_"):
+                continue
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+            except (SyntaxError, ValueError):
+                continue
+            values = _module_values(tree)
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                found: set = set()
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Return) and sub.value is not None:
+                        found |= _nested_literals(sub.value)
+                        for ref in ast.walk(sub.value):
+                            if isinstance(ref, ast.Name) and ref.id in values:
+                                found |= values[ref.id]
+                if found:
+                    out.setdefault(node.name, set()).update(found)
+    return {k: frozenset(v) for k, v in out.items()}
+
+
+def _request_models(node) -> frozenset:
+    """ハンドラの引数に注釈されたモデル名を返す。
+
+    `async def get_recommendation(req: RecommendRequest)` の `RecommendRequest`。
+    「目標尺パラメータを受け付ける」はリクエスト側の契約なので、
+    レスポンスをいくら見ても判定できない。
+    """
+    return frozenset(
+        arg.annotation.id
+        for arg in list(node.args.args) + list(node.args.kwonlyargs)
+        if isinstance(arg.annotation, ast.Name)
+    )
+
+
 def _callee_fields(func, callees: dict) -> frozenset:
     """`service.get_status()` / `build()` の呼び先が返すパスを索引から引く。
 
@@ -548,17 +742,30 @@ def _normalise(path: str) -> str:
     return path if path != "/" else "/"
 
 
+def _as_list(raw) -> list[str]:
+    """文字列でも配列でも受ける。"""
+    if not raw:
+        return []
+    values = raw if isinstance(raw, list) else [raw]
+    return [v for v in (str(x).strip() for x in values) if v]
+
+
+def _has_literal(wanted: str, literals: frozenset[str]) -> bool:
+    """完全一致を先に見て、無ければ部分一致で拾う。
+
+    ストーリーは `.mp4` と書き、実装は `"*.mp4"` と書いていることがある。
+    グロブや接頭辞の差で落とすと、実装が在るのに FAIL になる。
+    """
+    return wanted in literals or any(wanted in lit for lit in literals)
+
+
 def _declared_fields(item: dict) -> list[str]:
     """`response_field` を文字列でも配列でも受ける。
 
     「iteration/max_iterations フィールドが存在する」のように1項目が複数の
     フィールドを主張することがある。片方だけ見て PASS にすると取りこぼす。
     """
-    raw = item.get("response_field")
-    if not raw:
-        return []
-    values = raw if isinstance(raw, list) else [raw]
-    return [f for f in (str(v).strip() for v in values) if f]
+    return _as_list(item.get("response_field"))
 
 
 def _match_path(wanted: str, paths: frozenset[str]) -> str | None:

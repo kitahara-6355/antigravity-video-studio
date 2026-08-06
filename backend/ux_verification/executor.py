@@ -42,6 +42,7 @@ from pathlib import Path
 from .snapshot import UXVerificationSnapshot, VerificationItem
 
 METHOD = "static_source_scan"
+STORAGE_METHOD = "static_storage_scan"
 
 # 走査対象の拡張子と、除外するディレクトリ
 _SOURCE_SUFFIXES = (".jsx", ".js", ".tsx", ".ts")
@@ -57,6 +58,12 @@ _TESTID_RE = re.compile(
     r'|\{\s*"(?P<bdq>[^"]*)"\s*\}'
     r"|\{\s*'(?P<bsq>[^']*)'\s*\}"
     r")"
+)
+
+# localStorage / sessionStorage のキー。「履歴キーが存在する」は DOM の主張では
+# ないので data-testid では測れない。読み書きしている実体を直接見る。
+_STORAGE_RE = re.compile(
+    r"""(?:local|session)Storage\.(?:get|set|remove)Item\s*\(\s*['"`]([^'"`]+)['"`]"""
 )
 
 # import 文と動的 import。相対指定のものだけを到達可能性の辺として使う。
@@ -319,6 +326,7 @@ class L1Executor:
         # API 契約の判定器。L1 の項目のうち testid ではなく endpoint を
         # 宣言しているものはこちらに回す（P2）。None なら回さない。
         self.contract = contract
+        self._storage_cache: dict | None = None
 
     @classmethod
     def for_repo(cls) -> L1Executor:
@@ -339,6 +347,7 @@ class L1Executor:
                 f"未知のペルソナ: {persona}（owner / admin のいずれか）"
             )
 
+        self._storage_cache = None
         registry = TestIdRegistry.scan(self.frontend_src, entry=self.entry)
         report = L1Report(persona=persona.lower(), files_scanned=registry.files_scanned)
 
@@ -355,6 +364,65 @@ class L1Executor:
         report.results.sort(key=lambda r: _item_sort_key(r.item_id))
         return report
 
+    def _storage_keys(self) -> dict:
+        """エントリから到達できるソースにある localStorage キーを集める。"""
+        if self._storage_cache is None:
+            reachable = _reachable_files(self.entry) if self.entry else None
+            found: dict[str, tuple[str, int]] = {}
+            for path in _iter_source_files(self.frontend_src):
+                if reachable is not None and path.resolve() not in reachable:
+                    continue  # マウントされない場所のキーは UX を保証しない
+                rel = _display_path(path, self.frontend_src)
+                for line_no, raw in enumerate(
+                    path.read_text(encoding="utf-8", errors="replace").splitlines(),
+                    start=1,
+                ):
+                    for match in _STORAGE_RE.finditer(raw):
+                        found.setdefault(match.group(1), (rel, line_no))
+            self._storage_cache = found
+        return self._storage_cache
+
+    def _judge_storage(self, ux_id: str, item: dict) -> L1Result:
+        key = (item.get("storage_key") or "").strip()
+        common = {
+            "item_id": item.get("id", ""),
+            "ux_story": ux_id,
+            "story_scene": item.get("story_scene", ""),
+            "description": item.get("description", ""),
+            "testid": "",
+        }
+        hit = self._storage_keys().get(key)
+        if hit is None:
+            return L1Result(
+                **common, verdict=Verdict.FAIL, reason="storage_key_not_found",
+                evidence=(
+                    f"{STORAGE_METHOD}: localStorage キー {key} の読み書きが"
+                    "到達可能な frontend ソースのどこにも無い。"
+                ),
+            )
+        return L1Result(
+            **common, verdict=Verdict.PASS, reason="storage_key_found",
+            evidence=f"{STORAGE_METHOD}: {hit[0]}:{hit[1]} localStorage キー {key}",
+        )
+
+    @staticmethod
+    def _judge_unjudgeable(ux_id: str, item: dict) -> L1Result:
+        """静的には判定できないと**結論した**主張。PASS には逃がさない。
+
+        判定していないものを緑にするのが、P2 で3回潰した偽 PASS そのもの。
+        """
+        claim = (item.get("claim") or "").strip()
+        return L1Result(
+            item_id=item.get("id", ""), ux_story=ux_id,
+            story_scene=item.get("story_scene", ""),
+            description=item.get("description", ""), testid="",
+            verdict=Verdict.FAIL, reason="unjudgeable",
+            evidence=(
+                f"{METHOD}: 主張の種類 {claim} は静的走査では判定できない。"
+                "実行時の応答を見る層が要る（判定していないものを PASS にしない）。"
+            ),
+        )
+
     def _route(self, ux_id: str, item: dict, registry: TestIdRegistry) -> L1Result:
         """項目が宣言している照合先に応じて判定器を選ぶ。
 
@@ -362,6 +430,21 @@ class L1Executor:
         主張だった（`docs/ux_l1_triage_20260802.md`）。`test_method` は
         書き換えず、項目が持つ照合先（testid / endpoint）で振り分ける。
         """
+        claim = (item.get("claim") or "").strip()
+        if claim:
+            # claim があれば**主張の種類**で振り分ける。宣言の有無で振り分けると、
+            # 経路の主張なのに testid しか持たない項目が DOM 判定に流れ、
+            # 要素の実在だけで PASS する（P2 で3回見落とした型）。
+            from .claim_audit import UNJUDGEABLE_CLAIMS
+
+            if claim in UNJUDGEABLE_CLAIMS:
+                return self._judge_unjudgeable(ux_id, item)
+            if claim == "storage_key":
+                return self._judge_storage(ux_id, item)
+            if claim != "dom_exists" and self.contract is not None:
+                return _from_contract(self.contract.judge(ux_id, item))
+            return self._judge(ux_id, item, registry)
+
         if not (item.get("testid") or "").strip() and (item.get("endpoint") or "").strip():
             if self.contract is None:
                 return self._judge(ux_id, item, registry)

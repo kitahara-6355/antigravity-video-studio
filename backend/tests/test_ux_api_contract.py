@@ -400,12 +400,17 @@ def test_real_owner_l1_still_has_no_skip():
 
     assert report.total == 122
     assert report.skip_count == 0
-    # 下限は P2 の終了条件と同じ 90%（110件）。
-    # 以前は 115 だったが、レスポンス内容の判定を入れて 8 件が
-    # field_not_found で FAIL に変わったため下げた。判定を厳しくした結果であって
-    # 実装の退行ではない（内訳は docs/ux_l1_response_claims_20260806.md）。
+    # **PASS 数の下限は固定しない。** 以前は 115 → 110 と2回下げた。判定を
+    # 厳しくするたびに下がる数字を条件にすると、条件のほうを緩め続けることになる
+    # （P2 の C-2 が3回とも未達になった原因そのもの）。
+    #
+    # ここで守るのは「判定していないものが PASS になっていないこと」。
     # 項目ごとの非退行は l1_owner_baseline.json のラチェットが別に見ている。
-    assert report.pass_count >= 110
+    from backend.ux_verification.claim_audit import for_repo
+
+    assert for_repo("owner").mismatched == [], (
+        "主張と判定手段の対応が取れていない項目がある"
+    )
 
 
 # --- レスポンス内容の判定 ------------------------------------------------------
@@ -611,3 +616,139 @@ def test_method_call_on_a_dict_does_not_hide_it(tmp_path):
     site = ex.registry.resolve("/api/demo/settings", "GET")
 
     assert "settings.encoder" in site.fields
+
+
+# --- 値についての主張 / リクエスト契約 -----------------------------------------
+#
+# 「対応拡張子のみ含まれる」「4カテゴリが存在する」はフィールド名では測れない。
+# 「目標尺パラメータを受け付ける」はレスポンスをいくら見ても判定できない。
+
+
+def test_value_literal_in_the_handler_passes(tmp_path):
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/videos")
+        def list_videos():
+            for ext in ["*.mp4", "*.mov"]:
+                pass
+            return {"videos": []}
+    """)
+    item = {"id": "O1-L1-04", "layer": 1, "test_method": "api_contract",
+            "story_scene": "S1", "description": "テスト",
+            "endpoint": "GET /api/demo/videos",
+            "value_literals": [".mp4", ".mov"]}
+
+    result = ex.judge("O-1", item)
+
+    assert result.verdict is Verdict.PASS
+    assert result.reason == "value_found"
+
+
+def test_missing_value_literal_fails(tmp_path):
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/videos")
+        def list_videos():
+            return {"videos": []}
+    """)
+    item = {"id": "O1-L1-04", "layer": 1, "test_method": "api_contract",
+            "story_scene": "S1", "description": "テスト",
+            "endpoint": "GET /api/demo/videos", "value_literals": [".mp4"]}
+
+    result = ex.judge("O-1", item)
+
+    assert result.verdict is Verdict.FAIL
+    assert result.reason == "value_not_found"
+
+
+def test_value_reached_through_a_module_variable(tmp_path):
+    """本番はこの形。ハンドラ本体だけでは値に永久に届かない。"""
+    ex = _contract(
+        tmp_path,
+        router_body="""
+            router = APIRouter(prefix="/api/demo")
+
+            _state = build_initial_state()
+
+            @router.get("/scores")
+            def get_scores():
+                return {"categories": _state["categories"]}
+        """,
+        service_body="""
+            INITIAL = {"categories": [{"id": "audio"}, {"id": "subtitle"}]}
+
+            def build_initial_state():
+                return copy.deepcopy(INITIAL)
+        """,
+    )
+    item = {"id": "O6-L1-05", "layer": 1, "test_method": "api_contract",
+            "story_scene": "S1", "description": "テスト",
+            "endpoint": "GET /api/demo/scores",
+            "value_literals": ["audio", "subtitle"]}
+
+    assert ex.judge("O-6", item).verdict is Verdict.PASS
+
+
+def test_request_field_is_read_from_the_request_model(tmp_path):
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        class RecommendRequest(BaseModel):
+            target_duration_minutes: int
+
+        @router.post("/recommend")
+        def recommend(req: RecommendRequest):
+            return {"success": True}
+    """)
+    item = {"id": "O4-L1-04", "layer": 1, "test_method": "api_contract",
+            "story_scene": "S1", "description": "テスト",
+            "endpoint": "POST /api/demo/recommend",
+            "request_field": "target_duration_minutes"}
+
+    result = ex.judge("O-4", item)
+
+    assert result.verdict is Verdict.PASS
+    assert result.reason == "request_field_found"
+
+
+def test_request_field_absent_fails(tmp_path):
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        class RecommendRequest(BaseModel):
+            something_else: int
+
+        @router.post("/recommend")
+        def recommend(req: RecommendRequest):
+            return {"success": True}
+    """)
+    item = {"id": "O4-L1-04", "layer": 1, "test_method": "api_contract",
+            "story_scene": "S1", "description": "テスト",
+            "endpoint": "POST /api/demo/recommend",
+            "request_field": "target_duration_minutes"}
+
+    assert ex.judge("O-4", item).reason == "request_field_not_found"
+
+
+def test_evidence_labels_each_method_separately(tmp_path):
+    """何を確かめて PASS にしたのかが後から追える。"""
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        class Req(BaseModel):
+            size: int
+
+        @router.post("/x")
+        def x(req: Req):
+            return {"ok": "yes"}
+    """)
+    base = {"layer": 1, "test_method": "api_contract", "story_scene": "S1",
+            "description": "テスト", "endpoint": "POST /api/demo/x"}
+
+    value = ex.judge("O-1", {**base, "id": "a", "value_literals": ["yes"]})
+    request = ex.judge("O-1", {**base, "id": "b", "request_field": "size"})
+
+    assert "static_value_scan" in value.evidence
+    assert "static_request_scan" in request.evidence

@@ -150,13 +150,13 @@
       "description": "4カテゴリ(audio/video/subtitle/structure)が存在する",
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/quality-gate/scores",
-      "response_field": [
+      "claim": "value_constraint",
+      "value_literals": [
         "audio",
         "video",
         "subtitle",
         "structure"
-      ],
-      "claim": "value_constraint"
+      ]
     },
     {
       "id": "O6-L1-06",

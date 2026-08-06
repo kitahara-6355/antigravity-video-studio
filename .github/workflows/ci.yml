@@ -164,6 +164,15 @@ jobs:
           GOOGLE_API_KEY: "dummy_key_for_ci"
         run: python -m backend.ux_verification.executor --persona owner --ratchet
 
+      # 主張と判定手段の対応。ここが崩れると、判定していないものが PASS になる。
+      # P2 では走査範囲を人間が description を読んで決めていたため、3回の独立検証で
+      # 3回とも数え漏れが出た。新しい項目に claim を書き忘れれば no_claim で落ちる。
+      - name: 主張と判定手段の対応ゲート（判定していないものを PASS にしない）
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+        run: python -m backend.ux_verification.claim_audit --persona owner --gate
+
       # 死蔵コード（include_router されていないエンドポイント・エントリから
       # import を辿れないファイル）を増やさせない。テストが通ることは到達可能で
       # あることを意味しない——review_router は 21件のテストが緑のまま本番では
