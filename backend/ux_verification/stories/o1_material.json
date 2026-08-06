@@ -89,7 +89,7 @@
       "story_scene": "S1",
       "description": "動画一覧APIが正常応答を返す",
       "test_method": "dom_exists",
-      "testid": "video-file-browser"
+      "endpoint": "GET /api/pipeline/videos"
     },
     {
       "id": "O1-L1-02",

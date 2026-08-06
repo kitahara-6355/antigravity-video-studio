@@ -308,7 +308,8 @@ def test_tightening_history_survives_a_later_update(tmp_path):
     L1Ratchet().tighten(_report([("O1-L1-01", Verdict.FAIL, "field_not_found")]),
                         path, "厳しくした")
 
-    L1Ratchet().update(_report([("O1-L1-01", Verdict.PASS)]), path)
+    # 内容判定を保ったまま直したので、これは普通の改善（弱化ではない）
+    L1Ratchet().update(_report([("O1-L1-01", Verdict.PASS, "field_found")]), path)
 
     assert load_baseline(path)["tightenings"][-1]["reason"] == "厳しくした"
 
@@ -375,3 +376,85 @@ def test_baseline_records_the_reason_of_every_item(tmp_path):
     assert load_baseline(path)["reasons"] == {
         "O1-L1-01": "field_found", "O1-L1-02": "found",
     }
+
+
+# --- 判定の弱化 ---------------------------------------------------------------
+#
+# verdict だけを見ていると「判定の強さが落ちた」ことに気づけない。
+# 項目から response_field を消すだけで内容の判定が丸ごと巻き戻り、
+# しかもラチェットは緑のままになる。
+
+
+def test_losing_content_judgment_while_staying_pass_is_a_violation(tmp_path):
+    """field_found → found。PASS のままなので verdict 比較では検出できない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "field_found")]), path)
+
+    result = L1Ratchet().check(
+        _report([("O1-L1-01", Verdict.PASS, "found")]), load_baseline(path)
+    )
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["weakened"]
+
+
+def test_dropping_a_failing_content_check_is_not_an_improvement(tmp_path):
+    """field_not_found → found は FAIL → PASS。放置すると「改善」に見える。
+
+    宣言を消せば落ちていた8件がまとめて PASS に戻り、充足率が上がったように
+    見える。これを緑にすると、判定を消すことで数字を作れてしまう。
+    """
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.FAIL, "field_not_found")]), path)
+
+    result = L1Ratchet().check(
+        _report([("O1-L1-01", Verdict.PASS, "found")]), load_baseline(path)
+    )
+
+    assert not result.valid
+    assert result.improvements == []
+    assert "判定の弱化" in result.to_text()
+
+
+def test_keeping_the_content_judgment_is_still_valid(tmp_path):
+    """内容判定を保ったままの FAIL → PASS は、普通の改善。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.FAIL, "field_not_found")]), path)
+
+    result = L1Ratchet().check(
+        _report([("O1-L1-01", Verdict.PASS, "field_found")]), load_baseline(path)
+    )
+
+    assert result.valid
+    assert result.improvements == ["O1-L1-01"]
+
+
+def test_route_only_items_are_unaffected(tmp_path):
+    """もともと内容を見ていない項目は、この規則の対象外。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "found")]), path)
+
+    result = L1Ratchet().check(
+        _report([("O1-L1-01", Verdict.PASS, "found")]), load_baseline(path)
+    )
+
+    assert result.valid
+
+
+def test_tighten_refuses_when_one_items_reason_was_deleted(tmp_path):
+    """reasons を辞書ごと消さなくても、1項目分を消せば素通りできてしまった。"""
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "field_found"),
+                            ("O1-L1-02", Verdict.PASS, "found")]), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload["reasons"]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="前回の判定理由がベースラインに無い"):
+        L1Ratchet().tighten(
+            _report([("O1-L1-01", Verdict.FAIL, "field_not_found"),
+                     ("O1-L1-02", Verdict.PASS, "found")]),
+            path, "厳しくした",
+        )

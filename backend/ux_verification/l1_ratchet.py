@@ -31,6 +31,14 @@ TIGHTENING_REASONS = ("field_not_found",)
 # 新しい理由コードだけを見ていると、この2つが同じ顔で出てくる。
 VERIFIED_PASS_REASONS = ("field_found",)
 
+# 「レスポンス内容まで見て判定した」ことを示す理由コード。PASS でも FAIL でも、
+# ここから外れたら判定の強さが落ちたということ。
+CONTENT_JUDGED_REASONS = ("field_found", "field_not_found")
+
+
+def _is_content_judged(reason: str | None) -> bool:
+    return reason in CONTENT_JUDGED_REASONS
+
 
 def baseline_path(persona: str) -> Path:
     return BASELINE_DIR / f"l1_{persona}_baseline.json"
@@ -77,7 +85,7 @@ def load_baseline(path: Path) -> dict | None:
 
 @dataclass
 class L1Violation:
-    kind: str  # "regressed" | "removed"
+    kind: str  # "regressed" | "removed" | "weakened"
     item_id: str
     before: str
     after: str
@@ -85,6 +93,11 @@ class L1Violation:
     def __str__(self) -> str:
         if self.kind == "removed":
             return f"[削除] {self.item_id}: {self.before} → 項目が存在しない"
+        if self.kind == "weakened":
+            return (
+                f"[判定の弱化] {self.item_id}: {self.before} → {self.after}"
+                "（レスポンス内容を見なくなった）"
+            )
         return f"[退行] {self.item_id}: {self.before} → {self.after}"
 
 
@@ -133,6 +146,8 @@ class L1Ratchet:
 
         before: dict[str, str] = baseline.get("items", {})
         after = {r.item_id: r.verdict.value for r in report.results}
+        before_reasons: dict[str, str] = baseline.get("reasons") or {}
+        after_reasons = {r.item_id: r.reason for r in report.results}
 
         violations: list[L1Violation] = []
         improvements: list[str] = []
@@ -141,8 +156,20 @@ class L1Ratchet:
             now = after.get(item_id)
             if now is None:
                 violations.append(L1Violation("removed", item_id, was, "—"))
-            elif was == "PASS" and now != "PASS":
+                continue
+            if was == "PASS" and now != "PASS":
                 violations.append(L1Violation("regressed", item_id, was, now))
+                continue
+            # verdict だけを見ていると、**判定の強さ**が落ちたことに気づけない。
+            # 項目から response_field を消せば field_found → found（PASS のまま）、
+            # field_not_found → found（FAIL → PASS で「改善」に見える）。
+            # どちらもラチェットは緑で、内容の判定が丸ごと巻き戻る。
+            was_content = _is_content_judged(before_reasons.get(item_id))
+            if was_content and not _is_content_judged(after_reasons.get(item_id)):
+                violations.append(L1Violation(
+                    "weakened", item_id,
+                    before_reasons.get(item_id, "?"), after_reasons.get(item_id, "?"),
+                ))
             elif was != "PASS" and now == "PASS":
                 improvements.append(item_id)
 
@@ -214,7 +241,11 @@ class L1Ratchet:
         for v in result.violations:
             if v.kind != "regressed" or reasons.get(v.item_id) not in allowed_reasons:
                 illegitimate.append((v, reasons.get(v.item_id, "不明")))
-            elif (before_reasons or {}).get(v.item_id) in VERIFIED_PASS_REASONS:
+            elif v.item_id not in (before_reasons or {}):
+                # 辞書ごとの不在だけを見ていると、1項目分の理由を消すだけで
+                # ここを素通りできる。項目単位でも「分からない」は通さない。
+                illegitimate.append((v, "前回の判定理由がベースラインに無い"))
+            elif before_reasons[v.item_id] in VERIFIED_PASS_REASONS:
                 illegitimate.append((v, "前回は内容まで見て PASS だった"))
         if illegitimate:
             raise ValueError(
