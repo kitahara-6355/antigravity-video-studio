@@ -20,10 +20,10 @@ python -m backend.ux_verification.dead_code
 | 区分 | 件数 | 実体 |
 |---|---:|---|
 | **未結線** — 実装はあるが呼び出し口が無い | **8** | `review_router` 7 / `ModelQuotaDashboard` 1 |
-| **重複** — 同じロジックが呼び出し側に展開済み | **1** | `useSegments` |
-| **孤児** — 供給元も要求元も無い | **1** | `RivalRadar` |
+| **重複** — 同じものが呼び出し側に展開済み | **2** | `useSegments` / `RivalRadar` |
 
 走査: エンドポイント 454 件 / frontend ソース 31 ファイル。
+バックログの D-23（未登録エンドポイント）・D-24（到達不能ファイル）に対応する。
 
 ## 1. なぜカバレッジで見つからなかったか
 
@@ -46,6 +46,11 @@ def client():
 
 カバレッジは「その行を実行したか」しか見ない。「本番から到達できるか」は別の問いで、
 既存のゲートはどれもそれを見ていなかった。だから独立したゲートを置く。
+
+なおバックログ D-23 は「`archives/` の E2E テストだけが参照しており」と書いているが、
+**`backend/tests/test_routers/test_review_router.py` は `pytest.ini` の `testpaths`
+に載っている現役のテスト**で、CI で毎回 21 件が緑になっている。
+「参照しているのは archives だけ」という前提で消すと、現役テストが 21 件落ちる。
 
 ## 2. 未結線（8件）
 
@@ -85,18 +90,53 @@ def client():
 憲法 §18.8 は枠切れ時に「待機 / フォールバック / 強制使用」の3択を提示せよと
 規定している。**バックエンドもフロントも完成していて、`import` 1行が無いだけ。**
 
-## 3. 重複（1件）
+## 3. 重複（2件）
+
+### 3.1 `useSegments.js`
 
 `frontend/src/hooks/useSegments.js`（3,003 バイト）。
 `setSegments` / `activeSegmentIndex` / `cutMode` を持つ同じ状態管理が
 `EditorPage.jsx`・`TranscriptionStagePanel.jsx`・`ProofreadingStagePanel.jsx`
 に直接展開されている。抽出したフックが取り込まれないまま残った形。
 
-## 4. 孤児（1件）
+### 3.2 `RivalRadar.jsx` — 生きている側がハードコードのモック
 
 `frontend/src/components/RivalRadar.jsx`（3,791 バイト）。
-`rivals` / `quests` / `currentSubs` を props で受けるが、**それらを渡す側が
-リポジトリ内に1つも無い。** `PROJECT_CONSTITUTION` にも該当する規定が無い。
+`rivals` / `quests` / `currentSubs` を props で受ける**データ駆動の実装**だが、
+到達不能。
+
+一方 `Boardroom.jsx:162-183`（到達可能）に**同じ「ライバル出現 (RIVAL DETECTED)」
+UI がインラインで書かれており、そちらは値がハードコードされている**:
+
+```
+GadgetReviewer / You: 200 / Target: 250 / 差分: 50 人
+TechMastery / 目標: 10,000 人
+```
+
+**画面に出ているのはモックのほうで、props を受け取れる実装が死んでいる。**
+
+## 4. ビルド成果物での裏取り
+
+「到達不能」が机上の話でないことを、実際のバンドルで確認した。
+
+```bash
+cd frontend && npm run build      # vite 7.3.6 / ✓ built in 9.53s
+```
+
+| 探した文字列 | 由来 | `dist/assets/index-*.js` |
+|---|---|---:|
+| `two-tier-status` | `ModelQuotaDashboard` | **0** |
+| `activeSegmentIndex` | `useSegments` | **0** |
+| `pipeline_recent_videos` | 到達可能なコンポーネント（対照） | 1 |
+| `RIVAL DETECTED` | `Boardroom`（到達可能）と `RivalRadar`（到達不能） | 1 |
+
+最後の1件は `Boardroom.jsx` のインライン版で、`RivalRadar.jsx` 由来ではない
+（同じ文字列を両方が持つため件数だけでは区別できない。出どころは
+`grep -rn "RIVAL DETECTED" frontend/src/` で確認した）。
+
+**3件とも、バンドルには入っていない。**
+バックログ D-24 の「いずれも…ビルドには含まれる」という記述は事実と異なるので、
+この実測で訂正する。
 
 ## 5. なぜ L1 判定に現れなかったか
 
@@ -137,11 +177,17 @@ python -m backend.ux_verification.dead_code --update-baseline  # 意図した増
 | 1 | `review_router` 7本 | 憲法 §16.5 を実装として復活させるか（`include_router` 1行）、機能ごと畳むか |
 | 2 | `ModelQuotaDashboard` | 憲法 §18.8 を UI に出すか（`import` 1行）、畳むか |
 | 3 | `useSegments` | 重複解消として削除してよいか（呼び出し側を書き換えるか、フックを消すか） |
-| 4 | `RivalRadar` | 削除してよいか |
+| 4 | `RivalRadar` | 消すか、逆に `Boardroom` のハードコードを置き換えるか |
 
 **1 と 2 は「実装が足りない」のではなく「繋いでいない」。**
 どちらも憲法が明文で要求している機能なので、畳む場合は憲法側の改訂が要る
 （憲法第1条によりユーザーとの協働事項）。
+
+**4 は「消す」が正解とは限らない。** 生きている `Boardroom` 側がモックなので、
+死んでいる `RivalRadar` のほうが本来の実装に近い。
+
+なお 1 を「使っていないから消す」と判断する場合、
+`backend/tests/test_routers/test_review_router.py` の 21 件も一緒に消えることに注意。
 
 ## 8. 判定の限界
 
