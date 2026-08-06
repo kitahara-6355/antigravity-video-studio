@@ -420,34 +420,35 @@
       {
         "id": "C-1",
         "condition": "API 契約の実行系が存在し、コマンド1つでエンドポイントの実在を判定できる",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "backend/ux_verification/api_contract.py（PR #50）。`python -m backend.ux_verification.api_contract --list-endpoints` でルーター 37 ファイル / エンドポイント 454 件を列挙し、include_router されていないものを ✗ で区別する。サーバを起動せず AST で読むだけなので課金は発生しない。"
       },
       {
         "id": "C-2",
         "condition": "L1 の判定不能項目が解消され、Owner L1 の充足率が 90% 以上になる",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "`python -m backend.ux_verification.executor --persona owner` → 122件 / PASS 120 / FAIL 2 / SKIP 0（充足率 98.36%）。判定手段の内訳は endpoint 89 / testid 32 / どちらも無し 1。P1 時点で照合先を持たなかった 86件のうち 85件が API 契約判定で解消した（PR #51・#52）。残る 1件（O9-L1-12）は何を指す API か特定できないため、推測で endpoint を書かず未記入のまま FAIL にしてある。"
       },
       {
         "id": "C-3",
         "condition": "API 契約の判定が CI ゲートで守られ、退行が検出される",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": ".github/workflows/ci.yml の「UX 検証 L1 ラチェット（PASS の後退を許さない）」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たないので、失敗すればマージが止まる。API 契約で判定される 89件を含む 122 項目を**項目ごと**に backend/ux_verification/snapshots/l1_owner_baseline.json と突き合わせる（集計値では、1件 PASS が消えて別の1件が PASS になる入れ替わりを検出できないため）。ベースライン不在も失敗として扱う。"
       },
       {
         "id": "C-4",
         "condition": "残る FAIL を実在の欠落か仕様の穴かに切り分ける",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "docs/ux_l1_remaining_fails_20260803.md（PR #51）。当時の FAIL 7件を「仕様の穴 5 / 実在の欠落 1 / 仕様が不完全 1」に切り分けた。仕様の穴 5件は PR #52 で照合先を実体に合わせて解消し、FAIL は 2件（O9-L1-11 実在の欠落・O9-L1-12 仕様が不完全）に減った。"
       },
       {
         "id": "C-5",
         "condition": "死蔵コード（未登録エンドポイント・到達不能コンポーネント）の扱いを決める",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "docs/dead_code_inventory_20260806.md と backend/ux_verification/dead_code.py（PR #54）。棚卸しの結果 10件（未登録エンドポイント 7 = review_router / 到達不能ファイル 3）。うち 8件は PROJECT_CONSTITUTION §16.5・§18.8 が要求する機能が結線されていないだけだった。削除か結線かは製品判断のためユーザーへ回し、実行系は『増やさない』ことだけを引き受けて CI ラチェット（`python -m backend.ux_verification.dead_code --ratchet`）にした。"
       }
-    ]
+    ],
+    "note": "終了条件は 5/5 とも満たしたが、フェーズはまだ閉じていない。憲法第2条により /gate-report を出してユーザーの判断を待つ。憲法第4条により、この met 判定は gate-verifier の独立検証を経るまで自己申告にとどまる。vision_realization_score と axis_scores は自分で採点しないため据え置いた（更新は検証後の /vision-audit で行う）。"
   },
   "phase_history": [
     {
