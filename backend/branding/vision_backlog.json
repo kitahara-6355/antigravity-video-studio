@@ -458,28 +458,29 @@
       {
         "id": "C-1",
         "condition": "122項目すべての『主張の種類 ↔ 判定手段』の対応が機械可読になり、対応が取れていない項目をコマンド1つで列挙できる",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "backend/ux_verification/claim_audit.py（PR #60）。`python -m backend.ux_verification.claim_audit --persona owner` で 122項目の claim 別内訳と、対応が取れていない項目を列挙する。122項目すべてに claim を付与済み（route_exists 47 / response_field 37 / dom_exists 29 / value_constraint 2 / idempotency 2 / storage_key 1 / element_count 1 / request_contract 1 / runtime_behavior 1 / spec_incomplete 1）。**実行系は手作業より2件多く見つけた**（O6-L1-05 と O9-L1-12）。claim を書き忘れた項目は no_claim として必ず出るので、以降の取りこぼしは人間の数え直しに依存しない。"
       },
       {
         "id": "C-2",
         "condition": "P2 から引き継いだ 7件に、主張に対応する判定手段が入る",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "PR #61。引き継いだ 7件＋実行系が追加で見つけた 2件の計 9件を片付けた。判定手段を足したのは4件（storage_key: O1-L1-07 / value_constraint: O1-L1-04・O6-L1-05 / request_contract: O4-L1-04）。値の主張はハンドラ本体だけでは届かず、**ハンドラが実際に参照しているモジュール変数**を辿って解決した（_quality_gate_state → 別モジュールの定数）。残る5件は静的走査では原理的に判定できないと結論し、PASS に逃がさず unjudgeable の FAIL として理由つきで出している。"
       },
       {
         "id": "C-3",
         "condition": "対応が取れていない項目がゼロになる。静的に判定できないと結論した項目は PASS にせず FAIL として理由を残す",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": "`python -m backend.ux_verification.claim_audit --persona owner --gate` → **✅ 122 項目すべてで対応が取れています**（対応が取れていない項目 0 件 / exit 0）。判定できないと結論した5件は unjudgeable の FAIL として出る（O2-L1-07 element_count / O4-L1-05 runtime_behavior / O5-L1-06・O5-L1-07 idempotency / O9-L1-12 spec_incomplete）。結果としての充足率は 122件 / PASS 109 / FAIL 13 / SKIP 0 = 89.34%。**充足率は条件にしていない**（design_note）。判定していない主張は 9 → 0 件。"
       },
       {
         "id": "C-4",
         "condition": "『対応ゼロ』と新しい判定手段が CI ゲートで守られ、判定の弱化も検出される",
-        "met": false,
-        "evidence": ""
+        "met": true,
+        "evidence": ".github/workflows/ci.yml の「主張と判定手段の対応ゲート」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たない。項目を1件も読み取れなかった場合も 0 件として通さず失敗にする（ディレクトリを消せば緑、を防ぐ）。判定の弱化は l1_ratchet の weakened 違反が検出する（強い判定 field_found/value_found/request_field_found/storage_key_found/unjudgeable から、経路の実在だけの found へ戻ることを拒否）。CI run 31098362753 で3チェックとも success、テスト 9,383件 失敗0 / カバレッジ 75.7%。"
       }
-    ]
+    ],
+    "note": "終了条件は 4/4 とも満たした。憲法第2条により /gate-report を出してユーザーの判断を待つ。憲法第4条により、この met 判定は gate-verifier の独立検証を経るまで自己申告にとどまる。vision_realization_score と axis_scores は自分で採点しないため据え置いた（更新は検証後の /vision-audit で行う）。"
   },
   "phase_history": [
     {
