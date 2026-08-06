@@ -363,3 +363,126 @@ def test_real_report_is_convertible_to_snapshot():
     assert snapshot.total_items == 122
     assert snapshot.skip_items == 0
     assert all(i.evidence for i in snapshot.items if i.passed is True)
+
+
+# --- 主張の種類による振り分け（P3） --------------------------------------------
+
+
+def _story(tmp_path, items):
+    import json
+    stories = tmp_path / "stories"
+    stories.mkdir(exist_ok=True)
+    (stories / "o1.json").write_text(
+        json.dumps({"ux_id": "O-1", "name": "O-1",
+                    "verification_items": items}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return stories
+
+
+def _frontend(tmp_path, body):
+    src = tmp_path / "fe" / "src"
+    src.mkdir(parents=True, exist_ok=True)
+    (src / "main.jsx").write_text("import './App';\n", encoding="utf-8")
+    (src / "App.jsx").write_text(body, encoding="utf-8")
+    return src
+
+
+def test_storage_key_claim_is_judged_by_the_storage_scan(tmp_path):
+    """「localStorage に履歴キーが存在する」は DOM の主張ではない。"""
+    from backend.ux_verification.executor import L1Executor
+
+    src = _frontend(tmp_path, """
+        export default function App() {
+          const saved = localStorage.getItem('pipeline_recent_videos');
+          return null;
+        }
+    """)
+    stories = _story(tmp_path, [{
+        "id": "O1-L1-07", "layer": 1, "test_method": "dom_exists",
+        "story_scene": "S1", "description": "localStorageに履歴キーが存在する",
+        "claim": "storage_key", "storage_key": "pipeline_recent_videos",
+    }])
+
+    result = L1Executor(stories, src).run("owner").results[0]
+
+    assert result.verdict is Verdict.PASS
+    assert result.reason == "storage_key_found"
+    assert "static_storage_scan" in result.evidence
+
+
+def test_storage_key_absent_fails(tmp_path):
+    from backend.ux_verification.executor import L1Executor
+
+    src = _frontend(tmp_path, "export default function App() { return null; }")
+    stories = _story(tmp_path, [{
+        "id": "O1-L1-07", "layer": 1, "test_method": "dom_exists",
+        "story_scene": "S1", "description": "テスト",
+        "claim": "storage_key", "storage_key": "missing_key",
+    }])
+
+    assert L1Executor(stories, src).run("owner").results[0].reason == (
+        "storage_key_not_found"
+    )
+
+
+def test_storage_key_in_an_unreachable_file_does_not_count(tmp_path):
+    """マウントされない場所のキーは UX を何も保証しない。"""
+    from backend.ux_verification.executor import L1Executor
+
+    src = _frontend(tmp_path, "export default function App() { return null; }")
+    (src / "Orphan.jsx").write_text(
+        "localStorage.setItem('pipeline_recent_videos', '1');", encoding="utf-8"
+    )
+    stories = _story(tmp_path, [{
+        "id": "O1-L1-07", "layer": 1, "test_method": "dom_exists",
+        "story_scene": "S1", "description": "テスト",
+        "claim": "storage_key", "storage_key": "pipeline_recent_videos",
+    }])
+
+    assert L1Executor(stories, src).run("owner").results[0].verdict is Verdict.FAIL
+
+
+def test_unjudgeable_claim_fails_instead_of_passing(tmp_path):
+    """判定していないものを PASS にしない。P2 で3回潰した偽 PASS の型。"""
+    from backend.ux_verification.executor import L1Executor
+
+    src = _frontend(tmp_path, 'export default () => <div data-testid="x" />;')
+    stories = _story(tmp_path, [{
+        "id": "O2-L1-07", "layer": 1, "test_method": "dom_exists",
+        "story_scene": "S1", "description": "セグメントが3件以上表示される",
+        "claim": "element_count", "testid": "x",
+    }])
+
+    result = L1Executor(stories, src).run("owner").results[0]
+
+    assert result.verdict is Verdict.FAIL
+    assert result.reason == "unjudgeable"
+    assert "element_count" in result.evidence
+
+
+def test_route_claim_with_only_a_testid_no_longer_passes_on_the_dom(tmp_path):
+    """claim があれば**主張の種類**で振り分ける。
+
+    宣言の有無で振り分けると、経路の主張なのに testid しか持たない項目が
+    DOM 判定に流れ、要素の実在だけで PASS する。
+    """
+    from backend.ux_verification.api_contract import (
+        ApiContractExecutor,
+        EndpointRegistry,
+    )
+    from backend.ux_verification.executor import L1Executor
+
+    src = _frontend(tmp_path, 'export default () => <div data-testid="browser" />;')
+    stories = _story(tmp_path, [{
+        "id": "O1-L1-01", "layer": 1, "test_method": "dom_exists",
+        "story_scene": "S1", "description": "動画一覧APIが正常応答を返す",
+        "claim": "route_exists", "testid": "browser",
+    }])
+    (tmp_path / "routers").mkdir(exist_ok=True)
+    contract = ApiContractExecutor(EndpointRegistry.scan(tmp_path / "routers"))
+
+    result = L1Executor(stories, src, contract=contract).run("owner").results[0]
+
+    assert result.verdict is Verdict.FAIL
+    assert result.reason == "no_endpoint"

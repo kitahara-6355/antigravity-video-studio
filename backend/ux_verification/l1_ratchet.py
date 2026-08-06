@@ -24,16 +24,32 @@ BASELINE_DIR = Path(__file__).parent / "snapshots"
 
 # 「判定を厳しくしたから PASS が減った」と認めてよい**新しい**理由。
 # これ以外の理由で PASS が減っていれば、それは実装の退行。
-TIGHTENING_REASONS = ("field_not_found",)
+TIGHTENING_REASONS = (
+    "field_not_found", "value_not_found", "request_field_not_found",
+    "storage_key_not_found",
+    # 「静的には判定できない」と結論した結果の FAIL。判定していないものを
+    # PASS に逃がさない側の変更なので、厳格化として受け入れる。
+    "unjudgeable",
+)
 
 # 前回すでに内容まで判定して PASS だった理由。ここから field_not_found に
 # 落ちたのは「判定を厳しくした」ではなく**レスポンスからフィールドが消えた**。
 # 新しい理由コードだけを見ていると、この2つが同じ顔で出てくる。
-VERIFIED_PASS_REASONS = ("field_found",)
+VERIFIED_PASS_REASONS = (
+    "field_found", "value_found", "request_field_found", "storage_key_found",
+)
 
 # 「レスポンス内容まで見て判定した」ことを示す理由コード。PASS でも FAIL でも、
 # ここから外れたら判定の強さが落ちたということ。
-CONTENT_JUDGED_REASONS = ("field_found", "field_not_found")
+CONTENT_JUDGED_REASONS = (
+    "field_found", "field_not_found",
+    "value_found", "value_not_found",
+    "request_field_found", "request_field_not_found",
+    "storage_key_found", "storage_key_not_found",
+    # 判定できないと結論した状態も「主張に向き合った」側。ここから
+    # 経路の実在だけの found へ戻るのは、向き合うのをやめたということ。
+    "unjudgeable",
+)
 
 
 def _is_content_judged(reason: str | None) -> bool:

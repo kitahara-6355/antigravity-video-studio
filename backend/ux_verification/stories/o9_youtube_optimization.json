@@ -299,7 +299,7 @@
       "story_scene": "S18",
       "description": "エクスポートAPIが正常応答",
       "test_method": "dom_exists",
-      "claim": "route_exists"
+      "claim": "spec_incomplete"
     },
     {
       "id": "O9-L2-01",
