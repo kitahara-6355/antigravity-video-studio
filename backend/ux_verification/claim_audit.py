@@ -124,17 +124,20 @@ class ClaimAuditReport:
         return sorted(r.item_id for r in self.mismatched)
 
 
-def audit(stories_dir: Path, persona: str = "owner",
-          layer: int = 1) -> ClaimAuditReport:
+def audit(stories_dir: Path, persona: str = "owner") -> ClaimAuditReport:
+    """**判定側と同じ列挙**で走査する。
+
+    別々に列挙していた頃は監査の範囲のほうが狭く、その隙間に置いた claim 無しの
+    項目が実行系では PASS になるのに監査に現れなかった。範囲がずれていると、
+    「対応ゼロ」は「監査が見ている範囲では対応ゼロ」という意味しか持たない。
+    """
+    from .executor import iter_l1_items
+
     report = ClaimAuditReport(persona=persona)
     prefix = "O" if persona == "owner" else "A"
-    for path in sorted(Path(stories_dir).glob(f"{prefix.lower()}*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        for item, story in _iter_items(data):
-            item_id = item.get("id") or item.get("item_id") or ""
-            if f"-L{layer}-" not in item_id:
-                continue
-            report.rows.append(_judge(item_id, story, item))
+    for ux_id, item in iter_l1_items(stories_dir, prefix):
+        item_id = item.get("id") or item.get("item_id") or ""
+        report.rows.append(_judge(item_id, ux_id, item))
     report.rows.sort(key=_sort_key)
     return report
 
@@ -165,24 +168,6 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
         return ClaimRow(**common, reason="not_declared")
     return ClaimRow(**common, reason="")
 
-
-def _iter_items(node, story: str = ""):
-    if isinstance(node, dict):
-        story = node.get("ux_id") or node.get("story_id") or node.get("id") or story
-        if node.get("id") or node.get("item_id"):
-            candidate = node.get("id") or node.get("item_id")
-            if isinstance(candidate, str) and "-L" in candidate:
-                yield node, _story_of(candidate)
-        for value in node.values():
-            yield from _iter_items(value, story)
-    elif isinstance(node, list):
-        for value in node:
-            yield from _iter_items(value, story)
-
-
-def _story_of(item_id: str) -> str:
-    head = item_id.split("-L")[0]
-    return f"{head[0]}-{head[1:]}" if len(head) > 1 else head
 
 
 def _sort_key(row: ClaimRow):
