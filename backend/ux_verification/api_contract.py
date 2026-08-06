@@ -53,6 +53,8 @@ class EndpointSite:
     line: int
     module: str
     registered: bool | None = None  # None = アプリ定義を渡しておらず未判定
+    # ハンドラが返しうるフィールド名。レスポンス内容の主張を判定するのに使う。
+    fields: frozenset[str] = frozenset()
 
     def as_evidence(self) -> str:
         return f"{METHOD}: {self.file}:{self.line} {self.method} {self.path}"
@@ -98,10 +100,10 @@ class EndpointRegistry:
                 None if reg.registered_modules is None
                 else module in reg.registered_modules
             )
-            for method, route, line in _routes(tree):
+            for method, route, line, fields in _routes(tree):
                 full = _join(prefix, route)
                 site = EndpointSite(full, method, _display(path, routers_dir),
-                                    line, module, registered)
+                                    line, module, registered, fields)
                 reg.endpoints.setdefault((method, full), site)
         return reg
 
@@ -136,7 +138,7 @@ class ContractResult:
     description: str
     endpoint: str
     verdict: Verdict
-    reason: str  # "found" | "not_found" | "unregistered" | "no_endpoint"
+    reason: str  # found / not_found / unregistered / no_endpoint / field_not_found
     evidence: str
 
     @property
@@ -194,6 +196,27 @@ class ApiContractExecutor:
                 ),
             )
 
+        # レスポンス内容の主張は、エンドポイントの実在では検証できない。
+        # 宣言されたフィールドがハンドラの返り値に現れるかまで見る。
+        field = (item.get("response_field") or "").strip()
+        if field:
+            if field not in site.fields:
+                return ContractResult(
+                    **common, verdict=Verdict.FAIL, reason="field_not_found",
+                    evidence=(
+                        f"{METHOD}: {site.file}:{site.line} の {site.method} {site.path} は"
+                        f"存在するが、返り値に {field} が現れない"
+                        f"（拾えたフィールド {len(site.fields)} 個）。"
+                    ),
+                )
+            return ContractResult(
+                **common, verdict=Verdict.PASS, reason="found",
+                evidence=(
+                    f"{METHOD}: {site.file}:{site.line} {site.method} {site.path}"
+                    f" が {field} を返す"
+                ),
+            )
+
         return ContractResult(
             **common, verdict=Verdict.PASS, reason="found",
             evidence=site.as_evidence(),
@@ -228,7 +251,9 @@ def _router_prefix(tree: ast.Module) -> str:
 
 
 def _routes(tree: ast.Module):
-    """`@router.get("/x")` を (METHOD, "/x", 行番号) で返す。"""
+    """`@router.get("/x")` を (METHOD, "/x", 行番号, フィールド集合) で返す。"""
+    models = _response_models(tree)
+    module_dicts = _module_dicts(tree)
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -241,7 +266,89 @@ def _routes(tree: ast.Module):
             if not isinstance(func.value, ast.Name) or func.value.id != "router":
                 continue
             if dec.args and isinstance(dec.args[0], ast.Constant):
-                yield func.attr.upper(), str(dec.args[0].value), dec.lineno
+                fields = _handler_fields(node, module_dicts)
+                for kw in dec.keywords:
+                    if kw.arg == "response_model" and isinstance(kw.value, ast.Name):
+                        fields |= models.get(kw.value.id, frozenset())
+                yield func.attr.upper(), str(dec.args[0].value), dec.lineno, fields
+
+
+def _module_dicts(tree: ast.Module) -> dict:
+    """モジュール直下の `X = {...}` を {変数名: キー集合} で返す。
+
+    ハンドラが `return {"settings": _render_settings.copy()}` のように
+    モジュール変数を返す形が多く、参照を辿らないと中身を見落とす。
+    """
+    out: dict[str, frozenset] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):
+            continue
+        keys = {k.value for k in node.value.keys
+                if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+        for target in node.targets:
+            if isinstance(target, ast.Name) and keys:
+                out[target.id] = frozenset(keys)
+    return out
+
+
+def _handler_fields(node, module_dicts: dict | None = None) -> frozenset:
+    """ハンドラが返しうるフィールド名を集める。
+
+    `return {"status": ...}` の文字列キーを拾う。入れ子の辞書も辿るのは、
+    「推奨セグメントに score フィールドが存在する」のような
+    一段深い主張があるため。値の型までは見ない。
+    """
+    out: set[str] = set()
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Return) and sub.value is not None:
+            _collect_keys(sub.value, out, 0, module_dicts or {})
+    return frozenset(out)
+
+
+def _collect_keys(node, out: set, depth: int = 0, module_dicts: dict | None = None) -> None:
+    module_dicts = module_dicts or {}
+    if depth > 6:
+        return
+    if isinstance(node, ast.Name):
+        out |= module_dicts.get(node.id, frozenset())
+        return
+    if isinstance(node, ast.Attribute):
+        _collect_keys(node.value, out, depth + 1, module_dicts)
+        return
+    if isinstance(node, ast.Dict):
+        for key, value in zip(node.keys, node.values):
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                out.add(key.value)
+            _collect_keys(value, out, depth + 1, module_dicts)
+    elif isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        for elt in node.elts:
+            _collect_keys(elt, out, depth + 1, module_dicts)
+    elif isinstance(node, ast.Call):
+        _collect_keys(node.func, out, depth + 1, module_dicts)
+        for kw in node.keywords:
+            if kw.arg:
+                out.add(kw.arg)
+        for arg in node.args:
+            _collect_keys(arg, out, depth + 1, module_dicts)
+    elif isinstance(node, (ast.ListComp, ast.GeneratorExp)):
+        _collect_keys(node.elt, out, depth + 1, module_dicts)
+    elif isinstance(node, ast.IfExp):
+        _collect_keys(node.body, out, depth + 1, module_dicts)
+        _collect_keys(node.orelse, out, depth + 1, module_dicts)
+
+
+def _response_models(tree: ast.Module) -> dict:
+    """モジュール内のクラス定義から、注釈付き属性名を集める。"""
+    out = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            names = {
+                b.target.id for b in node.body
+                if isinstance(b, ast.AnnAssign) and isinstance(b.target, ast.Name)
+            }
+            if names:
+                out[node.name] = frozenset(names)
+    return out
 
 
 def _router_aliases(init_path: Path) -> dict[str, str]:
