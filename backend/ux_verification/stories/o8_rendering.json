@@ -262,7 +262,8 @@
       "story_scene": "S13",
       "description": "stagesフィールド存在",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/status/{job_id}"
+      "endpoint": "GET /api/render/status/{job_id}",
+      "response_field": "stages"
     },
     {
       "id": "O8-L1-10",
@@ -270,7 +271,8 @@
       "story_scene": "S14",
       "description": "output_file存在",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/status/{job_id}"
+      "endpoint": "GET /api/render/status/{job_id}",
+      "response_field": "output_file"
     },
     {
       "id": "O8-L1-11",
@@ -278,7 +280,8 @@
       "story_scene": "S15",
       "description": "download_url存在",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/download/{job_id}"
+      "endpoint": "GET /api/render/download/{job_id}",
+      "response_field": "download_url"
     },
     {
       "id": "O8-L1-12",

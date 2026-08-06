@@ -400,4 +400,177 @@ def test_real_owner_l1_still_has_no_skip():
 
     assert report.total == 122
     assert report.skip_count == 0
-    assert report.pass_count >= 115
+    # 下限は P2 の終了条件と同じ 90%（110件）。
+    # 以前は 115 だったが、レスポンス内容の判定を入れて 8 件が
+    # field_not_found で FAIL に変わったため下げた。判定を厳しくした結果であって
+    # 実装の退行ではない（内訳は docs/ux_l1_response_claims_20260806.md）。
+    # 項目ごとの非退行は l1_owner_baseline.json のラチェットが別に見ている。
+    assert report.pass_count >= 110
+
+
+# --- レスポンス内容の判定 ------------------------------------------------------
+#
+# エンドポイントの実在だけを見ると「statusフィールドが存在する」のような主張が
+# 経路の有無で PASS になる。返り値が空でも通るので、偽 PASS が経路の粒度で成立する。
+
+
+def _contract(root, service_body=None, router_body=""):
+    _write(root, "routers/demo.py", router_body)
+    if service_body is not None:
+        _write(root, "services/demo_service.py", service_body)
+    _write(root, "routers/__init__.py", "from .demo import router as demo_router\n")
+    _write(root, "main.py", "app.include_router(demo_router)\n")
+    reg = EndpointRegistry.scan(root / "routers", app_files=[root / "main.py"],
+                                callee_dirs=[root])
+    return ApiContractExecutor(reg)
+
+
+def _field_item(endpoint, field):
+    return {"id": "O1-L1-01", "layer": 1, "test_method": "api_contract",
+            "story_scene": "S1", "description": "テスト",
+            "endpoint": endpoint, "response_field": field}
+
+
+def test_declared_field_present_in_the_handler_passes(tmp_path):
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/status")
+        def get_status():
+            return {"status": "ok", "threshold": 80}
+    """)
+    result = ex.judge("O-1", _field_item("GET /api/demo/status", "threshold"))
+
+    assert result.verdict is Verdict.PASS
+    assert result.reason == "field_found"
+
+
+def test_declared_field_absent_fails_even_though_the_endpoint_exists(tmp_path):
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/status")
+        def get_status():
+            return {"status": "ok"}
+    """)
+    result = ex.judge("O-1", _field_item("GET /api/demo/status", "threshold"))
+
+    assert result.verdict is Verdict.FAIL
+    assert result.reason == "field_not_found"
+
+
+def test_field_built_by_a_service_is_still_found(tmp_path):
+    """本番のハンドラはほとんどが薄い受け皿。呼び先を辿らないと 0 件に見える。"""
+    ex = _contract(
+        tmp_path,
+        router_body="""
+            router = APIRouter(prefix="/api/demo")
+
+            @router.get("/status")
+            def get_status():
+                status = service.build_status()
+                return status
+        """,
+        service_body="""
+            def build_status():
+                return {"evolution_entries": [], "last_sync": None}
+        """,
+    )
+    result = ex.judge("O-1", _field_item("GET /api/demo/status", "evolution_entries"))
+
+    assert result.verdict is Verdict.PASS
+
+
+def test_nested_field_is_reported_with_its_path(tmp_path):
+    """どこで見つけたかを証拠に書けないと、後から確かめ直せない。"""
+    ex = _contract(
+        tmp_path,
+        router_body="""
+            router = APIRouter(prefix="/api/demo")
+
+            @router.post("/recommend")
+            def recommend():
+                return {"success": True, "recommendation": plugin.get_recommendation()}
+        """,
+        service_body="""
+            def get_recommendation():
+                return {"estimated_output_str": "", "segments": [{"score": 0}]}
+        """,
+    )
+    result = ex.judge("O-1", _field_item("POST /api/demo/recommend", "score"))
+
+    assert result.verdict is Verdict.PASS
+    assert "recommendation.segments.score" in result.evidence
+
+
+def test_evidence_distinguishes_a_content_check_from_a_route_check(tmp_path):
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/status")
+        def get_status():
+            return {"status": "ok"}
+    """)
+
+    with_field = ex.judge("O-1", _field_item("GET /api/demo/status", "status"))
+    route_only = ex.judge("O-1", {"id": "O1-L1-02", "layer": 1,
+                              "test_method": "api_contract", "story_scene": "S1",
+                              "description": "テスト",
+                              "endpoint": "GET /api/demo/status"})
+
+    assert "static_response_scan" in with_field.evidence
+    assert "static_response_scan" not in route_only.evidence
+
+
+def test_multiple_declared_fields_all_have_to_be_present(tmp_path):
+    """「iteration/max_iterations フィールドが存在する」は2つの主張。"""
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/status")
+        def get_status():
+            return {"iteration": 1}
+    """)
+    result = ex.judge("O-1", _field_item("GET /api/demo/status",
+                                         ["iteration", "max_iterations"]))
+
+    assert result.verdict is Verdict.FAIL
+    assert "max_iterations" in result.evidence
+
+
+def test_unregistered_router_still_loses_to_field_presence(tmp_path):
+    """フィールドが在っても、登録されていなければ呼べない。順序を間違えない。"""
+    _write(tmp_path, "routers/demo.py", """
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/status")
+        def get_status():
+            return {"threshold": 80}
+    """)
+    _write(tmp_path, "routers/__init__.py", "")
+    _write(tmp_path, "main.py", "pass\n")
+    reg = EndpointRegistry.scan(tmp_path / "routers", app_files=[tmp_path / "main.py"],
+                                callee_dirs=[tmp_path])
+    result = ApiContractExecutor(reg).judge(
+        "O-1", _field_item("GET /api/demo/status", "threshold"))
+
+    assert result.verdict is Verdict.FAIL
+    assert result.reason == "unregistered"
+
+
+def test_no_declared_field_keeps_the_route_only_judgment(tmp_path):
+    """response_field を書いていない項目の判定は変わらない。"""
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        @router.get("/status")
+        def get_status():
+            return {"status": "ok"}
+    """)
+    result = ex.judge("O-1", {"id": "O1-L1-03", "layer": 1,
+                          "test_method": "api_contract", "story_scene": "S1",
+                          "description": "テスト",
+                          "endpoint": "GET /api/demo/status"})
+
+    assert result.verdict is Verdict.PASS
+    assert result.reason == "found"

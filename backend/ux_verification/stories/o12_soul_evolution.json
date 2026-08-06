@@ -275,7 +275,8 @@
       "story_scene": "S1",
       "description": "user_modelオブジェクト含む",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/evolution/status"
+      "endpoint": "GET /api/evolution/status",
+      "response_field": "user_model"
     },
     {
       "id": "O12-L1-08",
@@ -283,7 +284,8 @@
       "story_scene": "S2",
       "description": "result含む",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/analytics/sync"
+      "endpoint": "POST /api/analytics/sync",
+      "response_field": "result"
     },
     {
       "id": "O12-L1-09",
@@ -291,7 +293,8 @@
       "story_scene": "S3",
       "description": "simulation含む",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/analytics/simulate"
+      "endpoint": "POST /api/analytics/simulate",
+      "response_field": "simulation"
     },
     {
       "id": "O12-L1-10",
@@ -299,7 +302,8 @@
       "story_scene": "S5",
       "description": "entries配列含む",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/evolution"
+      "endpoint": "GET /api/evolution",
+      "response_field": "entries"
     },
     {
       "id": "O12-L1-11",
@@ -307,7 +311,8 @@
       "story_scene": "S7",
       "description": "evolution_entries含む",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/evolution/status"
+      "endpoint": "GET /api/evolution/status",
+      "response_field": "evolution_entries"
     },
     {
       "id": "O12-L2-01",

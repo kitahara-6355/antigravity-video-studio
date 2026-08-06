@@ -214,7 +214,8 @@
       "story_scene": "S2",
       "description": "候補レスポンスにhighlights配列が存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/smartcut/all-candidates"
+      "endpoint": "GET /api/smartcut/all-candidates",
+      "response_field": "highlights"
     },
     {
       "id": "O5-L1-04",
@@ -222,7 +223,8 @@
       "story_scene": "S5",
       "description": "固定APIが正常応答しlocked_segmentsが返る",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/lock"
+      "endpoint": "POST /api/smartcut/lock",
+      "response_field": "locked_segments"
     },
     {
       "id": "O5-L1-05",
@@ -230,7 +232,8 @@
       "story_scene": "S7",
       "description": "固定解除APIが正常応答しlocked_segmentsが更新される",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/unlock"
+      "endpoint": "POST /api/smartcut/unlock",
+      "response_field": "locked_segments"
     },
     {
       "id": "O5-L1-06",
@@ -254,7 +257,8 @@
       "story_scene": "S8",
       "description": "候補レスポンスにchapters配列が存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/smartcut/all-candidates"
+      "endpoint": "GET /api/smartcut/all-candidates",
+      "response_field": "chapters"
     },
     {
       "id": "O5-L1-09",
@@ -262,7 +266,8 @@
       "story_scene": "S14",
       "description": "推奨レスポンスにestimated_output_strが存在する",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/recommend"
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "estimated_output_str"
     },
     {
       "id": "O5-L1-10",
@@ -270,7 +275,8 @@
       "story_scene": "S15",
       "description": "推奨レスポンスにrecommended_segments配列が存在する",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/smartcut/recommend"
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "recommended_segments"
     },
     {
       "id": "O5-L1-11",

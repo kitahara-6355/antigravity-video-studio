@@ -11,7 +11,7 @@ from backend.ux_verification.executor import L1Report, L1Result, Verdict
 from backend.ux_verification.l1_ratchet import L1Ratchet, load_baseline, write_baseline
 
 
-def _result(item_id, verdict, story="O-1"):
+def _result(item_id, verdict, story="O-1", reason=None):
     return L1Result(
         item_id=item_id,
         ux_story=story,
@@ -19,15 +19,17 @@ def _result(item_id, verdict, story="O-1"):
         description=item_id,
         testid=item_id.lower(),
         verdict=verdict,
-        reason="found" if verdict is Verdict.PASS else "not_found",
+        reason=reason or ("found" if verdict is Verdict.PASS else "not_found"),
         evidence="static_source_scan: どこか:1",
     )
 
 
 def _report(pairs):
+    """(item_id, verdict) か (item_id, verdict, reason) の並び。"""
     return L1Report(
         persona="owner",
-        results=[_result(i, v) for i, v in pairs],
+        results=[_result(*p) if len(p) == 2 else _result(p[0], p[1], reason=p[2])
+                 for p in pairs],
         files_scanned=1,
     )
 
@@ -235,3 +237,86 @@ def test_baseline_has_no_timestamp_so_diffs_stay_readable(tmp_path):
 
     assert "timestamp" not in raw
     assert "measured_at" not in raw
+
+
+# --- 判定の厳格化 -------------------------------------------------------------
+#
+# ラチェットは「実装が退行していないこと」を守る道具で、「測り方を厳しくしては
+# いけない」という意味ではない。だが両者はどちらも PASS の減少として現れるので、
+# 機械的に区別できないと「厳しくした」と言えば何でも通せてしまう。
+
+
+def test_tighten_accepts_a_regression_caused_by_a_stricter_judgment(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
+    stricter = _report([("O1-L1-01", Verdict.FAIL, "field_not_found")])
+
+    L1Ratchet().tighten(stricter, path, "レスポンス内容まで見るようにした")
+
+    assert load_baseline(path)["items"]["O1-L1-01"] == "FAIL"
+
+
+def test_tighten_refuses_a_real_regression(tmp_path):
+    """実体が消えた（not_found）のは厳格化では説明できない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
+    broken = _report([("O1-L1-01", Verdict.FAIL, "not_found")])
+
+    with pytest.raises(ValueError, match="厳格化では説明できない"):
+        L1Ratchet().tighten(broken, path, "厳しくしたことにする")
+
+    assert load_baseline(path)["items"]["O1-L1-01"] == "PASS"
+
+
+def test_tighten_refuses_when_an_item_disappeared(tmp_path):
+    """項目そのものが消えるのは厳格化ではない。消せば FAIL は出なくなる。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS),
+                            ("O1-L1-02", Verdict.PASS)]), path)
+    fewer = _report([("O1-L1-01", Verdict.PASS)])
+
+    with pytest.raises(ValueError, match="厳格化では説明できない"):
+        L1Ratchet().tighten(fewer, path, "整理した")
+
+
+def test_tighten_requires_a_reason(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
+    stricter = _report([("O1-L1-01", Verdict.FAIL, "field_not_found")])
+
+    with pytest.raises(ValueError, match="理由は必須"):
+        L1Ratchet().tighten(stricter, path, "   ")
+
+
+def test_tighten_records_the_reason_in_the_baseline(tmp_path):
+    """理由が残らなければ、次に見た人には退行と区別が付かない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
+    stricter = _report([("O1-L1-01", Verdict.FAIL, "field_not_found")])
+
+    L1Ratchet().tighten(stricter, path, "レスポンス内容まで見るようにした")
+
+    history = load_baseline(path)["tightenings"]
+    assert history[-1]["reason"] == "レスポンス内容まで見るようにした"
+    assert history[-1]["items"] == ["O1-L1-01"]
+
+
+def test_tightening_history_survives_a_later_update(tmp_path):
+    """締め直すたびに履歴が消えると、厳格化した事実が1回で失われる。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
+    L1Ratchet().tighten(_report([("O1-L1-01", Verdict.FAIL, "field_not_found")]),
+                        path, "厳しくした")
+
+    L1Ratchet().update(_report([("O1-L1-01", Verdict.PASS)]), path)
+
+    assert load_baseline(path)["tightenings"][-1]["reason"] == "厳しくした"
+
+
+def test_ratchet_still_blocks_the_same_regression_without_tighten(tmp_path):
+    """--tighten を使わなければ、厳格化由来でも普通に違反として止まる。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
+    stricter = _report([("O1-L1-01", Verdict.FAIL, "field_not_found")])
+
+    assert L1Ratchet().check(stricter, load_baseline(path)).valid is False

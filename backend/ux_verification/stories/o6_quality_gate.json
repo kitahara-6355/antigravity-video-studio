@@ -119,7 +119,8 @@
       "story_scene": "S1",
       "description": "statusフィールドが存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/quality-gate/status"
+      "endpoint": "GET /api/pipeline/quality-gate/status",
+      "response_field": "status"
     },
     {
       "id": "O6-L1-03",
@@ -127,7 +128,8 @@
       "story_scene": "S2",
       "description": "overall_scoreフィールドが存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/quality-gate/scores"
+      "endpoint": "GET /api/pipeline/quality-gate/scores",
+      "response_field": "overall_score"
     },
     {
       "id": "O6-L1-04",
@@ -143,7 +145,13 @@
       "story_scene": "S3",
       "description": "4カテゴリ(audio/video/subtitle/structure)が存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/quality-gate/scores"
+      "endpoint": "GET /api/pipeline/quality-gate/scores",
+      "response_field": [
+        "audio",
+        "video",
+        "subtitle",
+        "structure"
+      ]
     },
     {
       "id": "O6-L1-06",
@@ -167,7 +175,8 @@
       "story_scene": "S7",
       "description": "thresholdフィールドが存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/quality-gate/status"
+      "endpoint": "GET /api/pipeline/quality-gate/status",
+      "response_field": "threshold"
     },
     {
       "id": "O6-L1-09",
@@ -183,7 +192,8 @@
       "story_scene": "S9",
       "description": "履歴にhistory配列が存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/quality-gate/history"
+      "endpoint": "GET /api/pipeline/quality-gate/history",
+      "response_field": "history"
     },
     {
       "id": "O6-L2-01",
