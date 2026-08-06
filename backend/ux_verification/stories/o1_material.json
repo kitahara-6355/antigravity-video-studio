@@ -97,7 +97,8 @@
       "story_scene": "S1",
       "description": "動画一覧にvideos配列が存在する",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/pipeline/videos"
+      "endpoint": "GET /api/pipeline/videos",
+      "response_field": "videos"
     },
     {
       "id": "O1-L1-03",

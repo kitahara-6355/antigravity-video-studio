@@ -22,12 +22,17 @@ from .executor import L1Report
 
 BASELINE_DIR = Path(__file__).parent / "snapshots"
 
+# 「判定を厳しくしたから PASS が減った」と認めてよい理由。
+# これ以外の理由で PASS が減っていれば、それは実装の退行。
+TIGHTENING_REASONS = ("field_not_found",)
+
 
 def baseline_path(persona: str) -> Path:
     return BASELINE_DIR / f"l1_{persona}_baseline.json"
 
 
-def write_baseline(report: L1Report, path: Path) -> Path:
+def write_baseline(report: L1Report, path: Path,
+                   tightenings: list | None = None) -> Path:
     """判定を項目ごとに書き出す。
 
     タイムスタンプは入れない。毎回書き換わる欄があると、実質的な変化が
@@ -44,6 +49,10 @@ def write_baseline(report: L1Report, path: Path) -> Path:
         "fail": report.fail_count,
         "items": {r.item_id: r.verdict.value for r in report.results},
     }
+    if tightenings:
+        # 判定を厳しくして PASS が減った履歴。消すと「昔は緑だった」が
+        # 見えなくなり、退行と区別が付かなくなる。
+        payload["tightenings"] = tightenings
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
         f.write("\n")
@@ -144,10 +153,55 @@ class L1Ratchet:
 
         退行したまま緩めれば、退行が無かったことになる。
         """
-        result = self.check(report, load_baseline(path))
+        baseline = load_baseline(path)
+        result = self.check(report, baseline)
         if not result.valid:
             raise ValueError(
                 "退行が残っているためベースラインを更新できません:\n"
                 + "\n".join(f"  {v}" for v in result.violations)
             )
-        return write_baseline(report, path)
+        return write_baseline(report, path,
+                              (baseline or {}).get("tightenings"))
+
+    def tighten(self, report: L1Report, path: Path, reason: str,
+                allowed_reasons: tuple = TIGHTENING_REASONS) -> Path:
+        """**判定を厳しくしたことによる** PASS の減少だけを受け入れて締め直す。
+
+        ラチェットは「実装が退行していないこと」を守る道具で、
+        「測り方を厳しくしてはいけない」という意味ではない。だが両者は
+        どちらも PASS の減少として現れるので、機械的に区別できないと
+        「厳しくした」と言えば何でも通せてしまう。
+
+        そこで受け入れるのは、**新しい判定理由が厳格化に由来するものだけ**。
+        `not_found`（実体が消えた）や `unregistered`（登録が外れた）が
+        混じっていれば、それは退行なので拒否する。
+        理由は必須で、ベースラインに履歴として残す。
+        """
+        if not reason.strip():
+            raise ValueError(
+                "厳格化の理由は必須です。何を厳しくしたのかを書いてください")
+
+        baseline = load_baseline(path)
+        result = self.check(report, baseline)
+        reasons = {r.item_id: r.reason for r in report.results}
+
+        illegitimate = [
+            v for v in result.violations
+            if v.kind != "regressed" or reasons.get(v.item_id) not in allowed_reasons
+        ]
+        if illegitimate:
+            raise ValueError(
+                "厳格化では説明できない退行が混じっています:\n"
+                + "\n".join(
+                    f"  {v}（理由 {reasons.get(v.item_id, '不明')}）"
+                    for v in illegitimate
+                )
+                + "\n  実装の退行と、判定の厳格化は分けて扱ってください。"
+            )
+
+        history = list((baseline or {}).get("tightenings") or [])
+        history.append({
+            "reason": reason.strip(),
+            "items": sorted(v.item_id for v in result.violations),
+        })
+        return write_baseline(report, path, history)

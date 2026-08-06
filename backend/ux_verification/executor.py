@@ -565,6 +565,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="ベースラインと項目ごとに突き合わせ、退行があれば exit 1")
     parser.add_argument("--update-baseline", action="store_true",
                         help="ラチェットのベースラインを現在値で締め直す")
+    parser.add_argument("--tighten", metavar="理由",
+                        help="判定を厳しくしたことによる PASS の減少だけを"
+                             "受け入れて締め直す。理由はベースラインに残る")
     args = parser.parse_args(argv)
 
     report = L1Executor.for_repo().run(persona=args.persona)
@@ -584,13 +587,16 @@ def main(argv: list[str] | None = None) -> int:
         path = SnapshotStore().save(report.to_snapshot(version=args.snapshot))
         print(f"  スナップショット: {path}")
 
-    if args.ratchet or args.update_baseline:
+    if args.ratchet or args.update_baseline or args.tighten:
         from .l1_ratchet import L1Ratchet, baseline_path, load_baseline
 
         path = baseline_path(report.persona)
-        if args.update_baseline:
+        if args.update_baseline or args.tighten:
             try:
-                L1Ratchet().update(report, path)
+                if args.tighten:
+                    L1Ratchet().tighten(report, path, args.tighten)
+                else:
+                    L1Ratchet().update(report, path)
             except ValueError as exc:
                 print(f"\n{exc}", file=sys.stderr)
                 return 1
