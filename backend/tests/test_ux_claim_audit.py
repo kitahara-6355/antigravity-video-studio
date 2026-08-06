@@ -17,14 +17,18 @@ from backend.ux_verification.claim_audit import (
 )
 
 
-def _stories(tmp_path, items):
-    path = tmp_path / "o1_demo.json"
-    path.write_text(json.dumps({"items": items}, ensure_ascii=False), encoding="utf-8")
+def _stories(tmp_path, items, name="o1_demo.json", ux_id="O-1"):
+    path = tmp_path / name
+    path.write_text(
+        json.dumps({"ux_id": ux_id, "name": ux_id, "verification_items": items},
+                   ensure_ascii=False),
+        encoding="utf-8",
+    )
     return tmp_path
 
 
 def _item(item_id, claim=None, **declared):
-    out = {"id": item_id, "description": item_id}
+    out = {"id": item_id, "layer": 1, "description": item_id}
     if claim is not None:
         out["claim"] = claim
     out.update(declared)
@@ -203,3 +207,93 @@ def test_gate_passes_on_the_real_repo():
     from backend.ux_verification import claim_audit as ca
 
     assert ca.main(["--persona", "owner", "--gate"]) == 0
+
+# --- 走査範囲が判定側とずれない ------------------------------------------------
+#
+# 監査の範囲が実行系より狭いと、「対応ゼロ」は「監査が見ている範囲では対応ゼロ」
+# という意味しか持たない。その隙間に置いた項目は3つのゲートすべてをすり抜ける。
+
+
+def _executor_ids(stories_dir):
+    from backend.ux_verification.executor import iter_l1_items
+
+    return sorted(
+        (item.get("id") or item.get("item_id") or "")
+        for _, item in iter_l1_items(stories_dir, "O")
+    )
+
+
+def test_audit_sees_exactly_what_the_executor_judges(tmp_path):
+    stories = _stories(tmp_path, [_item("O1-L1-01", "dom_exists", testid="x")])
+
+    assert sorted(r.item_id for r in audit(stories).rows) == _executor_ids(stories)
+
+
+def test_an_extra_story_file_is_not_invisible_to_the_audit(tmp_path):
+    """ファイル名が o* で始まらないストーリーも判定側は読む。"""
+    _stories(tmp_path, [_item("O1-L1-01", "dom_exists", testid="x")])
+    _stories(tmp_path, [_item("O13-L1-01", endpoint="GET /api/x")],
+             name="zz_extra_story.json", ux_id="O-13")
+
+    report = audit(tmp_path)
+
+    assert sorted(r.item_id for r in report.rows) == _executor_ids(tmp_path)
+    assert [r.reason for r in report.mismatched] == ["no_claim"]
+
+
+def test_an_id_without_the_l1_marker_is_still_audited(tmp_path):
+    """判定側は ID ではなく layer で選ぶ。ID の形だけで除外しない。"""
+    stories = _stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists", testid="x"),
+        _item("O1-S9-99", endpoint="GET /api/x"),
+    ])
+
+    report = audit(stories)
+
+    assert sorted(r.item_id for r in report.rows) == _executor_ids(stories)
+    assert [r.item_id for r in report.mismatched] == ["O1-S9-99"]
+
+
+def test_non_layer1_items_are_left_alone(tmp_path):
+    """L2 以降は P3 のスコープ外。判定側も拾わない。"""
+    stories = _stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists", testid="x"),
+        {"id": "O1-L2-01", "layer": 2, "description": "L2"},
+    ])
+
+    assert [r.item_id for r in audit(stories).rows] == ["O1-L1-01"]
+
+
+# --- 判定の意味を言葉で固定する ------------------------------------------------
+
+
+def test_every_claim_states_what_it_does_not_verify():
+    """分類だけして意味を書かないと、判定が妥当か読み手に分からない。
+
+    「正常応答を返す」を経路の実在で PASS にしているのが妥当かどうかは、
+    route_exists が何を確かめないかを書いて初めて読める。
+    """
+    from backend.ux_verification.claim_audit import CLAIM_SEMANTICS
+
+    assert set(CLAIM_SEMANTICS) == set(CLAIM_METHODS), (
+        "claim を足したら意味も書く"
+    )
+    for claim, (verifies, does_not) in CLAIM_SEMANTICS.items():
+        assert verifies and does_not, claim
+
+
+def test_unjudgeable_claims_have_no_verifies_clause():
+    """判定手段が無いものが『確かめる』を持っていたら、分類か実装が食い違っている。"""
+    from backend.ux_verification.claim_audit import CLAIM_SEMANTICS
+
+    for claim in UNJUDGEABLE_CLAIMS:
+        assert CLAIM_SEMANTICS[claim][0] == "（判定手段なし）", claim
+
+
+def test_semantics_output_lists_every_claim(capsys):
+    from backend.ux_verification import claim_audit as ca
+
+    assert ca.main(["--semantics"]) == 0
+    out = capsys.readouterr().out
+    for claim in CLAIM_METHODS:
+        assert claim in out

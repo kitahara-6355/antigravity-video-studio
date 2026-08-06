@@ -61,10 +61,62 @@ CLAIM_METHODS: dict[str, tuple[str, ...] | None] = {
     # None = **静的走査では原理的に判定できないと結論した**主張。
     # 空タプル（未実装）とは別物で、こちらは実装しても埋まらない。
     # 該当項目は PASS に逃がさず、理由つきで FAIL にする（P3 C-3）。
-    "element_count": None,      # 実行時に何件描画されるかはソースに書かれていない
-    "idempotency": None,        # 2回呼んで同じかは実行しないと分からない
-    "runtime_behavior": None,   # 特定の入力で 200 が返るかは実行しないと分からない
-    "spec_incomplete": None,    # 何を照合すべきか仕様が決まっていない
+    "element_count": None,
+    "idempotency": None,
+    "parameter_coverage": None,
+    "spec_incomplete": None,
+}
+
+# 各 claim が**何を確かめ、何を確かめないか**。
+# ここを書かずに分類だけしていると、「正常応答を返す」を経路の実在で PASS に
+# しているのが妥当なのか読み手に分からない。判定の意味を言葉で固定する。
+CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
+    "dom_exists": (
+        "その data-testid が、エントリから到達できるソースに書かれている",
+        "実行時に本当に描画されるか（条件分岐で一度も出ない要素も PASS になる）",
+    ),
+    "route_exists": (
+        "そのエンドポイントが定義され、アプリに include_router されている",
+        "**呼んで 200 が返るか。** ハンドラが例外を投げるかは静的には分からない。"
+        "L1 が保証するのは『呼び先が存在し、404 にはならない』ところまで",
+    ),
+    "response_field": (
+        "宣言されたフィールドが、ハンドラの返り値（呼び先を一段展開）に現れる",
+        "その値が何であるか。空配列でもフィールドが在れば PASS になる",
+    ),
+    "storage_key": (
+        "その localStorage キーの読み書きが、到達できるソースにある",
+        "実行時に実際に書かれるか",
+    ),
+    "value_constraint": (
+        "宣言された値が、エンドポイントの実装（参照するモジュール変数を含む）に現れる",
+        "実行時にその値だけが返るか（「〜のみ」の『のみ』は確かめていない）",
+    ),
+    "request_contract": (
+        "そのフィールドがリクエストモデルに定義されている",
+        "その値域が受理されるか",
+    ),
+    "element_count": (
+        "（判定手段なし）",
+        "**描画される件数。** 既定データの件数なら静的に数えられるが、"
+        "主張は『表示される』で、実際の描画件数は実行時のデータ次第。"
+        "既定データで代用するのは別の主張への置き換えになる",
+    ),
+    "idempotency": (
+        "（判定手段なし）",
+        "2回呼んで同じ結果になるか。実行しないと分からない",
+    ),
+    "parameter_coverage": (
+        "（判定手段なし）",
+        "**特定の入力値の集合が受理されるか。** 型が int としか書かれておらず、"
+        "受理する値の集合が実装のどこにも宣言されていない場合、"
+        "静的走査には照合する相手が無い",
+    ),
+    "spec_incomplete": (
+        "（判定手段なし）",
+        "何を照合すべきかが仕様に書かれていない。"
+        "推測で照合先を書けば判定は出るが、それは実装ではなく判定の捏造",
+    ),
 }
 
 # 判定手段がまだ無い主張（実装すれば埋まる）。ここが空でないと C-3 を満たせない。
@@ -124,17 +176,20 @@ class ClaimAuditReport:
         return sorted(r.item_id for r in self.mismatched)
 
 
-def audit(stories_dir: Path, persona: str = "owner",
-          layer: int = 1) -> ClaimAuditReport:
+def audit(stories_dir: Path, persona: str = "owner") -> ClaimAuditReport:
+    """**判定側と同じ列挙**で走査する。
+
+    別々に列挙していた頃は監査の範囲のほうが狭く、その隙間に置いた claim 無しの
+    項目が実行系では PASS になるのに監査に現れなかった。範囲がずれていると、
+    「対応ゼロ」は「監査が見ている範囲では対応ゼロ」という意味しか持たない。
+    """
+    from .executor import iter_l1_items
+
     report = ClaimAuditReport(persona=persona)
     prefix = "O" if persona == "owner" else "A"
-    for path in sorted(Path(stories_dir).glob(f"{prefix.lower()}*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        for item, story in _iter_items(data):
-            item_id = item.get("id") or item.get("item_id") or ""
-            if f"-L{layer}-" not in item_id:
-                continue
-            report.rows.append(_judge(item_id, story, item))
+    for ux_id, item in iter_l1_items(stories_dir, prefix):
+        item_id = item.get("id") or item.get("item_id") or ""
+        report.rows.append(_judge(item_id, ux_id, item))
     report.rows.sort(key=_sort_key)
     return report
 
@@ -165,24 +220,6 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
         return ClaimRow(**common, reason="not_declared")
     return ClaimRow(**common, reason="")
 
-
-def _iter_items(node, story: str = ""):
-    if isinstance(node, dict):
-        story = node.get("ux_id") or node.get("story_id") or node.get("id") or story
-        if node.get("id") or node.get("item_id"):
-            candidate = node.get("id") or node.get("item_id")
-            if isinstance(candidate, str) and "-L" in candidate:
-                yield node, _story_of(candidate)
-        for value in node.values():
-            yield from _iter_items(value, story)
-    elif isinstance(node, list):
-        for value in node:
-            yield from _iter_items(value, story)
-
-
-def _story_of(item_id: str) -> str:
-    head = item_id.split("-L")[0]
-    return f"{head[0]}-{head[1:]}" if len(head) > 1 else head
 
 
 def _sort_key(row: ClaimRow):
@@ -218,7 +255,18 @@ def main(argv: list[str] | None = None) -> int:
                         help="対応が取れていない項目の ID だけを JSON で出す")
     parser.add_argument("--gate", action="store_true",
                         help="対応が取れていない項目が1件でもあれば exit 1")
+    parser.add_argument("--semantics", action="store_true",
+                        help="各 claim が何を確かめ、何を確かめないかを出す")
     args = parser.parse_args(argv)
+
+    if args.semantics:
+        for claim in CLAIM_METHODS:
+            verifies, does_not = CLAIM_SEMANTICS[claim]
+            mark = "⛔" if claim in UNJUDGEABLE_CLAIMS else "  "
+            print(f"{mark} {claim}")
+            print(f"     確かめる  : {verifies}")
+            print(f"     確かめない: {does_not}\n")
+        return 0
 
     report = for_repo(args.persona)
 

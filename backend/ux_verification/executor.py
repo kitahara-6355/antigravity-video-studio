@@ -75,6 +75,31 @@ _IMPORT_RE = re.compile(
 )
 
 
+def iter_l1_items(stories_dir: Path, prefix: str = "O"):
+    """L1 の検証項目を (ux_id, item) で列挙する。**判定側と監査側で共有する。**
+
+    以前は実行系と `claim_audit` が別々に列挙していた。実行系は `*.json` を
+    ux_id の接頭辞で選び、監査は `o*.json` を ID の `-L1-` で選んでいたため、
+    **監査の走査範囲が実行系より狭かった。** その隙間に置いた claim 無しの項目は
+    実行系では PASS になるのに監査には現れず、3つのゲートすべてが緑のまま
+    偽 PASS が通った（P2 で3回指摘された「走査範囲の外のポケット」と同型）。
+
+    列挙をここ1箇所に集約する。どちらかだけを直しても、もう片方は追随する。
+    """
+    for story_path in sorted(Path(stories_dir).glob("*.json")):
+        try:
+            story = json.loads(story_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        ux_id = story.get("ux_id", "")
+        if not ux_id.startswith(prefix):
+            continue
+        for item in story.get("verification_items", []):
+            if item.get("layer") != 1:
+                continue
+            yield ux_id, item
+
+
 class Verdict(Enum):
     PASS = "PASS"
     FAIL = "FAIL"
@@ -351,15 +376,8 @@ class L1Executor:
         registry = TestIdRegistry.scan(self.frontend_src, entry=self.entry)
         report = L1Report(persona=persona.lower(), files_scanned=registry.files_scanned)
 
-        for story_path in sorted(self.stories_dir.glob("*.json")):
-            story = json.loads(story_path.read_text(encoding="utf-8"))
-            ux_id = story.get("ux_id", "")
-            if not ux_id.startswith(prefix):
-                continue
-            for item in story.get("verification_items", []):
-                if item.get("layer") != 1:
-                    continue
-                report.results.append(self._route(ux_id, item, registry))
+        for ux_id, item in iter_l1_items(self.stories_dir, prefix):
+            report.results.append(self._route(ux_id, item, registry))
 
         report.results.sort(key=lambda r: _item_sort_key(r.item_id))
         return report
