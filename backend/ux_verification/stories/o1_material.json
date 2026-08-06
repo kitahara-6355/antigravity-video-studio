@@ -106,7 +106,13 @@
       "story_scene": "S2",
       "description": "メタデータAPIが必須フィールドを返す",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/pipeline/videos/metadata"
+      "endpoint": "POST /api/pipeline/videos/metadata",
+      "response_field": [
+        "name",
+        "path",
+        "size_mb",
+        "modified"
+      ]
     },
     {
       "id": "O1-L1-04",

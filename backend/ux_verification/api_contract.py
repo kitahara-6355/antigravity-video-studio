@@ -309,11 +309,20 @@ def _module_dicts(tree: ast.Module) -> dict:
     """
     out: dict[str, frozenset] = {}
     for node in tree.body:
-        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):
+        # 型注釈付き（`_render_settings: Dict[str, Any] = {...}`）も拾う。
+        # AnnAssign を落としていたため、render.py の設定辞書 11 フィールドが
+        # まるごと見えていなかった。
+        if isinstance(node, ast.AnnAssign):
+            targets, value = [node.target], node.value
+        elif isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        else:
             continue
-        keys = {k.value for k in node.value.keys
+        if not isinstance(value, ast.Dict):
+            continue
+        keys = {k.value for k in value.keys
                 if isinstance(k, ast.Constant) and isinstance(k.value, str)}
-        for target in node.targets:
+        for target in targets:
             if isinstance(target, ast.Name) and keys:
                 out[target.id] = frozenset(keys)
     return out
@@ -382,6 +391,13 @@ def _collect_paths(node, prefix: str, out: set, depth: int,
             _collect_paths(target, prefix, out, depth + 1, module_dicts, callees,
                            {k: v for k, v in locals_.items() if k != node.id})
         return
+    if isinstance(node, ast.Attribute):
+        # `_render_settings.copy()` の `.copy` を剥がして本体に降りる。
+        # 剥がさないと呼び先索引を "copy" で引いてしまい、辞書の中身を丸ごと
+        # 見落とす（settings 配下 11 フィールドが 0 件に見えていた）。
+        _collect_paths(node.value, prefix, out, depth + 1,
+                       module_dicts, callees, locals_)
+        return
     if isinstance(node, ast.Dict):
         for key, value in zip(node.keys, node.values):
             if isinstance(key, ast.Constant) and isinstance(key.value, str):
@@ -399,6 +415,11 @@ def _collect_paths(node, prefix: str, out: set, depth: int,
     elif isinstance(node, ast.Call):
         for path in _callee_fields(node.func, callees):
             out.add(f"{prefix}.{path}" if prefix else path)
+        # 呼び先の名前で索引を引くだけでなく、呼ばれている**もの**にも降りる。
+        # `_render_settings.copy()` は索引を "copy" で引いても何も出ないが、
+        # `.copy` を剥がせばモジュール直下の辞書に行き着く。
+        _collect_paths(node.func, prefix, out, depth + 1,
+                       module_dicts, callees, locals_)
         for kw in node.keywords:
             if kw.arg:
                 add(kw.arg)
