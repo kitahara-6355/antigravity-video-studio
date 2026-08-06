@@ -210,7 +210,8 @@
       "story_scene": "S1",
       "description": "ヘルスチェックAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/youtube/health"
+      "endpoint": "GET /api/youtube/health",
+      "claim": "route_exists"
     },
     {
       "id": "O11-L1-02",
@@ -218,7 +219,8 @@
       "story_scene": "S2",
       "description": "pre-planAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/youtube/pre-plan"
+      "endpoint": "POST /api/youtube/pre-plan",
+      "claim": "route_exists"
     },
     {
       "id": "O11-L1-03",
@@ -226,7 +228,8 @@
       "story_scene": "S5",
       "description": "サムネコンセプトAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/youtube/generate-thumbnail"
+      "endpoint": "POST /api/youtube/generate-thumbnail",
+      "claim": "route_exists"
     },
     {
       "id": "O11-L1-04",
@@ -235,7 +238,8 @@
       "description": "past_lessons含む",
       "test_method": "dom_exists",
       "endpoint": "POST /api/youtube/pre-plan",
-      "response_field": "past_lessons"
+      "response_field": "past_lessons",
+      "claim": "response_field"
     },
     {
       "id": "O11-L1-05",
@@ -243,7 +247,8 @@
       "story_scene": "S8",
       "description": "optimizeAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/youtube/optimize"
+      "endpoint": "POST /api/youtube/optimize",
+      "claim": "route_exists"
     },
     {
       "id": "O11-L1-06",
@@ -251,7 +256,8 @@
       "story_scene": "S9",
       "description": "analyze-scriptAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/director/analyze-script"
+      "endpoint": "POST /api/director/analyze-script",
+      "claim": "route_exists"
     },
     {
       "id": "O11-L1-07",
@@ -259,7 +265,8 @@
       "story_scene": "S10",
       "description": "quality-scoreAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/director/quality-score"
+      "endpoint": "POST /api/director/quality-score",
+      "claim": "route_exists"
     },
     {
       "id": "O11-L1-08",
@@ -267,7 +274,8 @@
       "story_scene": "S11",
       "description": "plan-storyboardAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/director/plan-storyboard"
+      "endpoint": "POST /api/director/plan-storyboard",
+      "claim": "route_exists"
     },
     {
       "id": "O11-L1-09",
@@ -276,7 +284,8 @@
       "description": "success=true",
       "test_method": "dom_exists",
       "endpoint": "POST /api/youtube/pre-plan",
-      "response_field": "success"
+      "response_field": "success",
+      "claim": "response_field"
     },
     {
       "id": "O11-L1-10",
@@ -285,7 +294,8 @@
       "description": "hook_score含む",
       "test_method": "dom_exists",
       "endpoint": "POST /api/youtube/pre-plan",
-      "response_field": "hook_score"
+      "response_field": "hook_score",
+      "claim": "response_field"
     },
     {
       "id": "O11-L2-01",

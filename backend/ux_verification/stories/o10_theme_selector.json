@@ -210,7 +210,8 @@
       "story_scene": "S1",
       "description": "ヘルスチェックAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /themes/health"
+      "endpoint": "GET /themes/health",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-02",
@@ -218,7 +219,8 @@
       "story_scene": "S2",
       "description": "テンプレート一覧API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /themes/templates"
+      "endpoint": "GET /themes/templates",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-03",
@@ -226,7 +228,8 @@
       "story_scene": "S3",
       "description": "テンプレート詳細API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /themes/templates/{template_id}"
+      "endpoint": "GET /themes/templates/{template_id}",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-04",
@@ -234,7 +237,8 @@
       "story_scene": "S4",
       "description": "テーマ一覧API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /themes"
+      "endpoint": "GET /themes",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-05",
@@ -242,7 +246,8 @@
       "story_scene": "S5",
       "description": "テーマ詳細API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /themes/{theme_id}"
+      "endpoint": "GET /themes/{theme_id}",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-06",
@@ -250,7 +255,8 @@
       "story_scene": "S6",
       "description": "適用API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /themes/apply"
+      "endpoint": "POST /themes/apply",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-07",
@@ -258,7 +264,8 @@
       "story_scene": "S8",
       "description": "現在設定取得API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /themes/current/active"
+      "endpoint": "GET /themes/current/active",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-08",
@@ -266,7 +273,8 @@
       "story_scene": "S9",
       "description": "統計API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /themes/stats"
+      "endpoint": "GET /themes/stats",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-09",
@@ -274,7 +282,8 @@
       "story_scene": "S10",
       "description": "推奨API正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /themes/recommend"
+      "endpoint": "POST /themes/recommend",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L1-10",
@@ -282,7 +291,8 @@
       "story_scene": "S11",
       "description": "オーバーライドAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /themes/override"
+      "endpoint": "POST /themes/override",
+      "claim": "route_exists"
     },
     {
       "id": "O10-L2-01",

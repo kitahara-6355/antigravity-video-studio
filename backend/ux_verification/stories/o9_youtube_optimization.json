@@ -200,7 +200,8 @@
       "story_scene": "S1",
       "description": "ヘルスチェックAPIが正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/youtube/health"
+      "endpoint": "GET /api/youtube/health",
+      "claim": "route_exists"
     },
     {
       "id": "O9-L1-02",
@@ -208,7 +209,8 @@
       "story_scene": "S1",
       "description": "最適化APIが正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/youtube/optimize"
+      "endpoint": "POST /api/youtube/optimize",
+      "claim": "route_exists"
     },
     {
       "id": "O9-L1-03",
@@ -216,7 +218,8 @@
       "story_scene": "S3",
       "description": "タイトル候補リストが存在",
       "test_method": "dom_exists",
-      "testid": "youtube-title-candidates"
+      "testid": "youtube-title-candidates",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-04",
@@ -224,7 +227,8 @@
       "story_scene": "S6",
       "description": "タグリストが存在",
       "test_method": "dom_exists",
-      "testid": "youtube-tag-list"
+      "testid": "youtube-tag-list",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-05",
@@ -232,7 +236,8 @@
       "story_scene": "S10",
       "description": "チャプターリストが存在",
       "test_method": "dom_exists",
-      "testid": "youtube-chapter-list"
+      "testid": "youtube-chapter-list",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-06",
@@ -240,7 +245,8 @@
       "story_scene": "S12",
       "description": "サムネイル候補が存在",
       "test_method": "dom_exists",
-      "testid": "youtube-thumbnail-candidates"
+      "testid": "youtube-thumbnail-candidates",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-07",
@@ -248,7 +254,8 @@
       "story_scene": "S14",
       "description": "SEOスコアが存在",
       "test_method": "dom_exists",
-      "testid": "youtube-seo-score"
+      "testid": "youtube-seo-score",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-08",
@@ -256,7 +263,8 @@
       "story_scene": "S16",
       "description": "説明文エリアが存在",
       "test_method": "dom_exists",
-      "testid": "youtube-description"
+      "testid": "youtube-description",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-09",
@@ -264,7 +272,8 @@
       "story_scene": "S20",
       "description": "ハッシュタグが存在",
       "test_method": "dom_exists",
-      "testid": "youtube-hashtag-list"
+      "testid": "youtube-hashtag-list",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-10",
@@ -272,7 +281,8 @@
       "story_scene": "S21",
       "description": "CTR予測が存在",
       "test_method": "dom_exists",
-      "testid": "youtube-ctr-prediction"
+      "testid": "youtube-ctr-prediction",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-11",
@@ -280,14 +290,16 @@
       "story_scene": "S22",
       "description": "投稿準備バッジが存在",
       "test_method": "dom_exists",
-      "testid": "youtube-publish-readiness"
+      "testid": "youtube-publish-readiness",
+      "claim": "dom_exists"
     },
     {
       "id": "O9-L1-12",
       "layer": 1,
       "story_scene": "S18",
       "description": "エクスポートAPIが正常応答",
-      "test_method": "dom_exists"
+      "test_method": "dom_exists",
+      "claim": "route_exists"
     },
     {
       "id": "O9-L2-01",

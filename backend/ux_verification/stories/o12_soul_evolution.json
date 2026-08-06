@@ -227,7 +227,8 @@
       "story_scene": "S1",
       "description": "statusAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/evolution/status"
+      "endpoint": "GET /api/evolution/status",
+      "claim": "route_exists"
     },
     {
       "id": "O12-L1-02",
@@ -235,7 +236,8 @@
       "story_scene": "S2",
       "description": "analytics/syncAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/analytics/sync"
+      "endpoint": "POST /api/analytics/sync",
+      "claim": "route_exists"
     },
     {
       "id": "O12-L1-03",
@@ -243,7 +245,8 @@
       "story_scene": "S3",
       "description": "analytics/simulateAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/analytics/simulate"
+      "endpoint": "POST /api/analytics/simulate",
+      "claim": "route_exists"
     },
     {
       "id": "O12-L1-04",
@@ -251,7 +254,8 @@
       "story_scene": "S5",
       "description": "evolutionAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/evolution"
+      "endpoint": "GET /api/evolution",
+      "claim": "route_exists"
     },
     {
       "id": "O12-L1-05",
@@ -259,7 +263,8 @@
       "story_scene": "S6",
       "description": "evolution/syncAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "POST /api/evolution/sync"
+      "endpoint": "POST /api/evolution/sync",
+      "claim": "route_exists"
     },
     {
       "id": "O12-L1-06",
@@ -267,7 +272,8 @@
       "story_scene": "S7",
       "description": "evolution/statusAPI正常応答",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/evolution/status"
+      "endpoint": "GET /api/evolution/status",
+      "claim": "route_exists"
     },
     {
       "id": "O12-L1-07",
@@ -276,7 +282,8 @@
       "description": "user_modelオブジェクト含む",
       "test_method": "dom_exists",
       "endpoint": "GET /api/evolution/status",
-      "response_field": "user_model"
+      "response_field": "user_model",
+      "claim": "response_field"
     },
     {
       "id": "O12-L1-08",
@@ -285,7 +292,8 @@
       "description": "result含む",
       "test_method": "dom_exists",
       "endpoint": "POST /api/analytics/sync",
-      "response_field": "result"
+      "response_field": "result",
+      "claim": "response_field"
     },
     {
       "id": "O12-L1-09",
@@ -294,7 +302,8 @@
       "description": "simulation含む",
       "test_method": "dom_exists",
       "endpoint": "POST /api/analytics/simulate",
-      "response_field": "simulation"
+      "response_field": "simulation",
+      "claim": "response_field"
     },
     {
       "id": "O12-L1-10",
@@ -303,7 +312,8 @@
       "description": "entries配列含む",
       "test_method": "dom_exists",
       "endpoint": "GET /api/evolution",
-      "response_field": "entries"
+      "response_field": "entries",
+      "claim": "response_field"
     },
     {
       "id": "O12-L1-11",
@@ -312,7 +322,8 @@
       "description": "evolution_entries含む",
       "test_method": "dom_exists",
       "endpoint": "GET /api/evolution/status",
-      "response_field": "evolution_entries"
+      "response_field": "evolution_entries",
+      "claim": "response_field"
     },
     {
       "id": "O12-L2-01",

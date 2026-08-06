@@ -90,7 +90,8 @@
       "story_scene": "S1",
       "description": "Whisperモデルセレクトボックスが存在する",
       "test_method": "dom_exists",
-      "testid": "whisper-model-select"
+      "testid": "whisper-model-select",
+      "claim": "dom_exists"
     },
     {
       "id": "O2-L1-02",
@@ -98,7 +99,8 @@
       "story_scene": "S2",
       "description": "推奨モデルバッジが存在する",
       "test_method": "dom_exists",
-      "testid": "whisper-recommended"
+      "testid": "whisper-recommended",
+      "claim": "dom_exists"
     },
     {
       "id": "O2-L1-03",
@@ -106,7 +108,8 @@
       "story_scene": "S3",
       "description": "進捗バーが存在する",
       "test_method": "dom_exists",
-      "testid": "transcription-progress-bar"
+      "testid": "transcription-progress-bar",
+      "claim": "dom_exists"
     },
     {
       "id": "O2-L1-04",
@@ -114,7 +117,8 @@
       "story_scene": "S3",
       "description": "進捗テキスト(%)が存在する",
       "test_method": "dom_exists",
-      "testid": "transcription-progress-text"
+      "testid": "transcription-progress-text",
+      "claim": "dom_exists"
     },
     {
       "id": "O2-L1-05",
@@ -122,7 +126,8 @@
       "story_scene": "S7",
       "description": "経過時間表示が存在する",
       "test_method": "dom_exists",
-      "testid": "transcription-elapsed"
+      "testid": "transcription-elapsed",
+      "claim": "dom_exists"
     },
     {
       "id": "O2-L1-06",
@@ -130,7 +135,8 @@
       "story_scene": "S4",
       "description": "セグメント一覧コンテナが存在する",
       "test_method": "dom_exists",
-      "testid": "segment-list"
+      "testid": "segment-list",
+      "claim": "dom_exists"
     },
     {
       "id": "O2-L1-07",
@@ -138,7 +144,8 @@
       "story_scene": "S4",
       "description": "セグメントが3件以上表示される",
       "test_method": "dom_exists",
-      "testid": "segment-item-*"
+      "testid": "segment-item-*",
+      "claim": "element_count"
     },
     {
       "id": "O2-L2-01",
