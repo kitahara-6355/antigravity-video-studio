@@ -408,47 +408,78 @@
   },
   "canonical": "この文書がロードマップ現在地の正典（2026-08-02 決定）。backend/agents/memory/phase_state.json と docs/BACKLOG_MASTER.md は参照資料。",
   "current_phase": {
-    "id": "P2",
-    "title": "Owner UX 保証：API 契約の実行系",
+    "id": "P3",
+    "title": "Owner UX 保証：主張に対応する判定手段",
     "axis": "ux_guarantee_owner",
-    "started_at": "2026-08-03",
-    "rationale": "P1 で L1 の 122項目に PASS/FAIL は付いたが、92件が FAIL で、うち 86件は照合先すら持たなかった。gate-verifier が 86件すべての説明文を読んだ結果、86/86 が DOM ではなく API・データ契約の主張だった。dom_exists では原理的に判定できず、形だけ data-testid を足して PASS にすれば偽 PASS が構造的に成立する。ユーザー判断により、ストーリーを書き換えるのではなく判定手段の側を足す。",
+    "started_at": "2026-08-06",
+    "rationale": "P2 で L1 の 122項目に PASS/FAIL は付ききり SKIP はゼロになったが、PASS のうち 7件は**判定手段が主張に対応していない**。「localStorage に履歴キーが存在する」を data-testid の実在で、「4種プリセットで正常応答する」を経路の実在で測っている。gate-verifier が3回連続でこの型の偽 PASS を見つけており、そのたびに走査範囲の外に新しいポケットが出てきた。ユーザー判断により、閾値を読み替えるのではなく判定手段の側を足す。",
     "budget_jpy": 0,
-    "budget_note": "予算不要。FastAPI のルーター定義を AST で静的に読むだけで、サーバも起動しない。Gemini API を叩く経路は無い。",
-    "scope_note": "Owner の L1 のみ。L2〜L5 と Admin（A-*）はスコープ外。L2〜L5 は動作中のバックエンドを要求し、backend/.env が無いためそもそも実行できない（D-20）。",
+    "budget_note": "予算不要。7件はいずれも frontend ソースとルーター定義の静的走査で判定する。サーバもブラウザも起動せず、Gemini API を叩く経路は無い。",
+    "scope_note": "Owner の L1 122項目のみ。L2〜L5 と Admin（A-*）はスコープ外。L2 以降は動作中のバックエンドを要求し、backend/.env が無いため実行できない（D-20）。",
+    "design_note": "**閾値を終了条件にしない。** P2 の C-2 は「充足率 90% 以上」という**数え方に依存する値**を条件にしたため、検証のたびに偽 PASS が1つ見つかると数字が動き、3回とも未達になった。P3 では「主張と判定手段の対応が取れていない項目がゼロ」を条件にする。充足率は結果として報告するだけで、条件にはしない。",
+    "carried_items": [
+      {
+        "id": "O1-L1-04",
+        "claim": "動画リストに対応拡張子のみ含まれる",
+        "needs": "値の条件"
+      },
+      {
+        "id": "O1-L1-07",
+        "claim": "localStorage に履歴キーが存在する",
+        "needs": "localStorage キーの静的走査"
+      },
+      {
+        "id": "O2-L1-07",
+        "claim": "セグメントが3件以上表示される",
+        "needs": "要素数"
+      },
+      {
+        "id": "O4-L1-04",
+        "claim": "推奨APIが目標尺パラメータを受け付ける",
+        "needs": "リクエスト契約"
+      },
+      {
+        "id": "O4-L1-05",
+        "claim": "4種プリセット(15/30/45/60分)で正常応答する",
+        "needs": "パラメータ網羅"
+      },
+      {
+        "id": "O5-L1-06",
+        "claim": "推奨APIで再計算が可能(undo相当)",
+        "needs": "冪等性・状態遷移"
+      },
+      {
+        "id": "O5-L1-07",
+        "claim": "同一パラメータで再取得が可能(redo相当)",
+        "needs": "同上"
+      }
+    ],
     "exit_criteria": [
       {
         "id": "C-1",
-        "condition": "API 契約の実行系が存在し、コマンド1つでエンドポイントの実在を判定できる",
-        "met": true,
-        "evidence": "backend/ux_verification/api_contract.py（PR #50）。`python -m backend.ux_verification.api_contract --list-endpoints` でルーター 37 ファイル / エンドポイント 454 件を列挙し、include_router されていないものを ✗ で区別する。サーバを起動せず AST で読むだけなので課金は発生しない。"
+        "condition": "122項目すべての『主張の種類 ↔ 判定手段』の対応が機械可読になり、対応が取れていない項目をコマンド1つで列挙できる",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-2",
-        "condition": "L1 の判定不能項目が解消され、Owner L1 の充足率が 90% 以上になる",
+        "condition": "P2 から引き継いだ 7件に、主張に対応する判定手段が入る",
         "met": false,
-        "evidence": "**未達。3回の独立検証で3回とも「判定が主張に届いていない項目が残る」と指摘された。**実測は 122件 / PASS 112 / FAIL 10 / SKIP 0（充足率 91.80%）で、内訳は found 82 / field_found 30 / field_not_found 8 / not_found 1 / no_testid 1。SKIP はゼロなので『判定不能項目の解消』は達成したが、**判定手段が主張に対応していない項目が 7件残る**（O1-L1-04 拡張子の値 / O1-L1-07 localStorage / O2-L1-07 件数 / O4-L1-04 リクエスト契約 / O4-L1-05 プリセット網羅 / O5-L1-06・O5-L1-07 冪等性）。これらを PASS から外す厳しい数え方では 105/122 = 86.07% で 90% に届かない。残りは localStorage キー・要素数・リクエストパラメータ・冪等性という**別種の判定手段**を要し、P2 のスコープ（API 契約の実行系）の外にある。閾値の数え方を決めるか判定手段を足すかはフェーズ定義の問題なのでユーザー判断を仰ぐ（憲法第1条）。詳細は docs/ux_l1_response_claims_20260806.md。"
+        "evidence": ""
       },
       {
         "id": "C-3",
-        "condition": "API 契約の判定が CI ゲートで守られ、退行が検出される",
-        "met": true,
-        "evidence": ".github/workflows/ci.yml の「UX 検証 L1 ラチェット（PASS の後退を許さない）」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たないので、失敗すればマージが止まる。API 契約で判定される 89件を含む 122 項目を**項目ごと**に backend/ux_verification/snapshots/l1_owner_baseline.json と突き合わせる（集計値では、1件 PASS が消えて別の1件が PASS になる入れ替わりを検出できないため）。ベースライン不在も失敗として扱う。 判定を厳しくして PASS が減る場合に備えて --tighten を足したが、gate-verifier に「field_not_found は厳格化のときもフィールドが消えたときも同じように出るので抜け道になる」と指摘されたため、前回の判定理由も見て field_found → field_not_found（内容の退行）は拒否するようにした。ベースラインに reasons を記録し、理由が無い古いベースラインに対しては受理せず拒否する。"
+        "condition": "対応が取れていない項目がゼロになる。静的に判定できないと結論した項目は PASS にせず FAIL として理由を残す",
+        "met": false,
+        "evidence": ""
       },
       {
         "id": "C-4",
-        "condition": "残る FAIL を実在の欠落か仕様の穴かに切り分ける",
-        "met": true,
-        "evidence": "docs/ux_l1_remaining_fails_20260803.md（PR #51）。当時の FAIL 7件を「仕様の穴 5 / 実在の欠落 1 / 仕様が不完全 1」に切り分けた。仕様の穴 5件は PR #52 で照合先を実体に合わせて解消し、FAIL は 2件（O9-L1-11 実在の欠落・O9-L1-12 仕様が不完全）に減った。"
-      },
-      {
-        "id": "C-5",
-        "condition": "死蔵コード（未登録エンドポイント・到達不能コンポーネント）の扱いを決める",
-        "met": true,
-        "evidence": "docs/dead_code_inventory_20260806.md と backend/ux_verification/dead_code.py（PR #54）。棚卸しの結果 10件（未登録エンドポイント 7 = review_router / 到達不能ファイル 3）。うち 8件は PROJECT_CONSTITUTION §16.5・§18.8 が要求する機能が結線されていないだけだった。削除か結線かは製品判断のためユーザーへ回し、実行系は『増やさない』ことだけを引き受けて CI ラチェット（`python -m backend.ux_verification.dead_code --ratchet`）にした。"
+        "condition": "『対応ゼロ』と新しい判定手段が CI ゲートで守られ、判定の弱化も検出される",
+        "met": false,
+        "evidence": ""
       }
-    ],
-    "note": "**C-2 が未達のままフェーズを閉じない。** 憲法第2条により /gate-report を出してユーザーの判断を待つ。gate-verifier の独立検証を3回受け、3回とも not_ready だった（2026-08-06）。1回目の C-2 偽 PASS 指摘・C-5 未マージ指摘、2回目の走査見落とし・--tighten 抜け道指摘、3回目のラチェット弱化検出漏れ指摘はいずれも対応済み。残るのは C-2 の『判定手段が主張に対応していない7件』で、これは別種の判定手段を要するためフェーズの定義に関わる。vision_realization_score と axis_scores は自分で採点しないため据え置いた。"
+    ]
   },
   "phase_history": [
     {
@@ -546,6 +577,51 @@
         "user_approval": "未取得。ゲート報告を提出して判断を待つ。"
       },
       "completed_at": "2026-08-03"
+    },
+    {
+      "id": "P2",
+      "title": "Owner UX 保証：API 契約の実行系",
+      "axis": "ux_guarantee_owner",
+      "started_at": "2026-08-03",
+      "rationale": "P1 で L1 の 122項目に PASS/FAIL は付いたが、92件が FAIL で、うち 86件は照合先すら持たなかった。gate-verifier が 86件すべての説明文を読んだ結果、86/86 が DOM ではなく API・データ契約の主張だった。dom_exists では原理的に判定できず、形だけ data-testid を足して PASS にすれば偽 PASS が構造的に成立する。ユーザー判断により、ストーリーを書き換えるのではなく判定手段の側を足す。",
+      "budget_jpy": 0,
+      "budget_note": "予算不要。FastAPI のルーター定義を AST で静的に読むだけで、サーバも起動しない。Gemini API を叩く経路は無い。",
+      "scope_note": "Owner の L1 のみ。L2〜L5 と Admin（A-*）はスコープ外。L2〜L5 は動作中のバックエンドを要求し、backend/.env が無いためそもそも実行できない（D-20）。",
+      "exit_criteria": [
+        {
+          "id": "C-1",
+          "condition": "API 契約の実行系が存在し、コマンド1つでエンドポイントの実在を判定できる",
+          "met": true,
+          "evidence": "backend/ux_verification/api_contract.py（PR #50）。`python -m backend.ux_verification.api_contract --list-endpoints` でルーター 37 ファイル / エンドポイント 454 件を列挙し、include_router されていないものを ✗ で区別する。サーバを起動せず AST で読むだけなので課金は発生しない。"
+        },
+        {
+          "id": "C-2",
+          "condition": "L1 の判定不能項目が解消され、Owner L1 の充足率が 90% 以上になる",
+          "met": false,
+          "evidence": "**未達。3回の独立検証で3回とも「判定が主張に届いていない項目が残る」と指摘された。**実測は 122件 / PASS 112 / FAIL 10 / SKIP 0（充足率 91.80%）で、内訳は found 82 / field_found 30 / field_not_found 8 / not_found 1 / no_testid 1。SKIP はゼロなので『判定不能項目の解消』は達成したが、**判定手段が主張に対応していない項目が 7件残る**（O1-L1-04 拡張子の値 / O1-L1-07 localStorage / O2-L1-07 件数 / O4-L1-04 リクエスト契約 / O4-L1-05 プリセット網羅 / O5-L1-06・O5-L1-07 冪等性）。これらを PASS から外す厳しい数え方では 105/122 = 86.07% で 90% に届かない。残りは localStorage キー・要素数・リクエストパラメータ・冪等性という**別種の判定手段**を要し、P2 のスコープ（API 契約の実行系）の外にある。閾値の数え方を決めるか判定手段を足すかはフェーズ定義の問題なのでユーザー判断を仰ぐ（憲法第1条）。詳細は docs/ux_l1_response_claims_20260806.md。",
+          "carried_to": "P3"
+        },
+        {
+          "id": "C-3",
+          "condition": "API 契約の判定が CI ゲートで守られ、退行が検出される",
+          "met": true,
+          "evidence": ".github/workflows/ci.yml の「UX 検証 L1 ラチェット（PASS の後退を許さない）」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たないので、失敗すればマージが止まる。API 契約で判定される 89件を含む 122 項目を**項目ごと**に backend/ux_verification/snapshots/l1_owner_baseline.json と突き合わせる（集計値では、1件 PASS が消えて別の1件が PASS になる入れ替わりを検出できないため）。ベースライン不在も失敗として扱う。 判定を厳しくして PASS が減る場合に備えて --tighten を足したが、gate-verifier に「field_not_found は厳格化のときもフィールドが消えたときも同じように出るので抜け道になる」と指摘されたため、前回の判定理由も見て field_found → field_not_found（内容の退行）は拒否するようにした。ベースラインに reasons を記録し、理由が無い古いベースラインに対しては受理せず拒否する。"
+        },
+        {
+          "id": "C-4",
+          "condition": "残る FAIL を実在の欠落か仕様の穴かに切り分ける",
+          "met": true,
+          "evidence": "docs/ux_l1_remaining_fails_20260803.md（PR #51）。当時の FAIL 7件を「仕様の穴 5 / 実在の欠落 1 / 仕様が不完全 1」に切り分けた。仕様の穴 5件は PR #52 で照合先を実体に合わせて解消し、FAIL は 2件（O9-L1-11 実在の欠落・O9-L1-12 仕様が不完全）に減った。"
+        },
+        {
+          "id": "C-5",
+          "condition": "死蔵コード（未登録エンドポイント・到達不能コンポーネント）の扱いを決める",
+          "met": true,
+          "evidence": "docs/dead_code_inventory_20260806.md と backend/ux_verification/dead_code.py（PR #54）。棚卸しの結果 10件（未登録エンドポイント 7 = review_router / 到達不能ファイル 3）。うち 8件は PROJECT_CONSTITUTION §16.5・§18.8 が要求する機能が結線されていないだけだった。削除か結線かは製品判断のためユーザーへ回し、実行系は『増やさない』ことだけを引き受けて CI ラチェット（`python -m backend.ux_verification.dead_code --ratchet`）にした。"
+        }
+      ],
+      "completed_at": "2026-08-06",
+      "gate": "ユーザー承認済み（2026-08-06）。gate-verifier の独立検証を3回受け、3回とも not_ready だった。指摘はすべて実在の穴で、C-1・C-3・C-4・C-5 は対応して met に到達。C-2 だけは『判定手段が主張に対応していない7件』が残り、これを埋めるには API 契約とは別種の判定手段が要る。選択肢 (a) 読み替えて達成 / (b) 判定手段を足す P3 / (c) 閾値見直し を提示し、**ユーザーが (b) を選択。C-2 は未達のまま P3 へ引き継ぐ。**"
     }
   ]
 }
