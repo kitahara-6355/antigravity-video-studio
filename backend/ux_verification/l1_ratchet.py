@@ -22,9 +22,14 @@ from .executor import L1Report
 
 BASELINE_DIR = Path(__file__).parent / "snapshots"
 
-# 「判定を厳しくしたから PASS が減った」と認めてよい理由。
+# 「判定を厳しくしたから PASS が減った」と認めてよい**新しい**理由。
 # これ以外の理由で PASS が減っていれば、それは実装の退行。
 TIGHTENING_REASONS = ("field_not_found",)
+
+# 前回すでに内容まで判定して PASS だった理由。ここから field_not_found に
+# 落ちたのは「判定を厳しくした」ではなく**レスポンスからフィールドが消えた**。
+# 新しい理由コードだけを見ていると、この2つが同じ顔で出てくる。
+VERIFIED_PASS_REASONS = ("field_found",)
 
 
 def baseline_path(persona: str) -> Path:
@@ -48,6 +53,10 @@ def write_baseline(report: L1Report, path: Path,
         "pass": report.pass_count,
         "fail": report.fail_count,
         "items": {r.item_id: r.verdict.value for r in report.results},
+        # 判定理由も残す。PASS/FAIL だけでは「経路の実在で PASS」と
+        # 「内容まで見て PASS」を区別できず、--tighten が内容の退行を
+        # 厳格化として受理してしまう。
+        "reasons": {r.item_id: r.reason for r in report.results},
     }
     if tightenings:
         # 判定を厳しくして PASS が減った履歴。消すと「昔は緑だった」が
@@ -172,9 +181,15 @@ class L1Ratchet:
         どちらも PASS の減少として現れるので、機械的に区別できないと
         「厳しくした」と言えば何でも通せてしまう。
 
-        そこで受け入れるのは、**新しい判定理由が厳格化に由来するものだけ**。
-        `not_found`（実体が消えた）や `unregistered`（登録が外れた）が
-        混じっていれば、それは退行なので拒否する。
+        そこで2つの側から絞る。
+
+        1. **新しい判定理由**が厳格化に由来するものだけ。`not_found`（実体が
+           消えた）や `unregistered`（登録が外れた）や項目の削除は拒否する
+        2. **前回の判定理由**が「内容まで見て PASS」でないこと。
+           `field_found` → `field_not_found` は厳格化ではなく、
+           **レスポンスからフィールドが消えた**——まさに守りたかった退行そのもの。
+           新しい理由コードだけを見ていると、この2つが同じ顔で出てくる
+
         理由は必須で、ベースラインに履歴として残す。
         """
         if not reason.strip():
@@ -184,18 +199,27 @@ class L1Ratchet:
         baseline = load_baseline(path)
         result = self.check(report, baseline)
         reasons = {r.item_id: r.reason for r in report.results}
+        before_reasons = (baseline or {}).get("reasons")
 
-        illegitimate = [
-            v for v in result.violations
-            if v.kind != "regressed" or reasons.get(v.item_id) not in allowed_reasons
-        ]
+        if result.violations and before_reasons is None:
+            raise ValueError(
+                "ベースラインに判定理由（reasons）が記録されていないため、"
+                "厳格化と退行を区別できません。\n"
+                "  先に --update-baseline で理由付きのベースラインを作り直して"
+                "ください。区別できないものを通すと、--tighten が"
+                "何でも受理する抜け道になります。"
+            )
+
+        illegitimate = []
+        for v in result.violations:
+            if v.kind != "regressed" or reasons.get(v.item_id) not in allowed_reasons:
+                illegitimate.append((v, reasons.get(v.item_id, "不明")))
+            elif (before_reasons or {}).get(v.item_id) in VERIFIED_PASS_REASONS:
+                illegitimate.append((v, "前回は内容まで見て PASS だった"))
         if illegitimate:
             raise ValueError(
                 "厳格化では説明できない退行が混じっています:\n"
-                + "\n".join(
-                    f"  {v}（理由 {reasons.get(v.item_id, '不明')}）"
-                    for v in illegitimate
-                )
+                + "\n".join(f"  {v}（{why}）" for v, why in illegitimate)
                 + "\n  実装の退行と、判定の厳格化は分けて扱ってください。"
             )
 

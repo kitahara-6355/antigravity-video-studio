@@ -320,3 +320,58 @@ def test_ratchet_still_blocks_the_same_regression_without_tighten(tmp_path):
     stricter = _report([("O1-L1-01", Verdict.FAIL, "field_not_found")])
 
     assert L1Ratchet().check(stricter, load_baseline(path)).valid is False
+
+
+def test_tighten_refuses_when_content_verified_pass_regresses(tmp_path):
+    """`field_found` → `field_not_found` は厳格化ではない。
+
+    前回すでに内容まで見て PASS だった項目が落ちたのなら、それは
+    **レスポンスからフィールドが消えた**——C-2 で守れるようにした退行そのもの。
+    新しい理由コードだけを見ていると、厳格化と同じ顔で出てくる。
+    """
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "field_found")]), path)
+    regressed = _report([("O1-L1-01", Verdict.FAIL, "field_not_found")])
+
+    with pytest.raises(ValueError, match="前回は内容まで見て PASS"):
+        L1Ratchet().tighten(regressed, path, "厳しくしたことにする")
+
+    assert load_baseline(path)["items"]["O1-L1-01"] == "PASS"
+
+
+def test_tighten_still_accepts_a_route_only_pass_becoming_strict(tmp_path):
+    """経路の実在だけで PASS だったものが落ちるのは、厳格化として正しい。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "found")]), path)
+    stricter = _report([("O1-L1-01", Verdict.FAIL, "field_not_found")])
+
+    L1Ratchet().tighten(stricter, path, "レスポンス内容まで見るようにした")
+
+    assert load_baseline(path)["items"]["O1-L1-01"] == "FAIL"
+
+
+def test_tighten_refuses_when_the_baseline_has_no_reasons(tmp_path):
+    """理由が無いベースラインでは厳格化と退行を区別できない。通さない。"""
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "field_found")]), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload["reasons"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="判定理由"):
+        L1Ratchet().tighten(
+            _report([("O1-L1-01", Verdict.FAIL, "field_not_found")]),
+            path, "厳しくした",
+        )
+
+
+def test_baseline_records_the_reason_of_every_item(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "field_found"),
+                            ("O1-L1-02", Verdict.PASS, "found")]), path)
+
+    assert load_baseline(path)["reasons"] == {
+        "O1-L1-01": "field_found", "O1-L1-02": "found",
+    }

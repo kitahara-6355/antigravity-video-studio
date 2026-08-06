@@ -574,3 +574,40 @@ def test_no_declared_field_keeps_the_route_only_judgment(tmp_path):
 
     assert result.verdict is Verdict.PASS
     assert result.reason == "found"
+
+
+def test_annotated_module_dict_is_expanded(tmp_path):
+    """`_render_settings: Dict[str, Any] = {...}` を落とすと 11 フィールドが消える。
+
+    AnnAssign を見ていなかったため、`GET /api/render/settings` の設定項目が
+    まるごと 0 件に見えていた。
+    """
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        _settings: Dict[str, Any] = {"lufs_target": -16.0, "bgm_volume": 50.0}
+
+        @router.get("/settings")
+        def get_settings():
+            return {"success": True, "settings": _settings.copy()}
+    """)
+    result = ex.judge("O-8", _field_item("GET /api/demo/settings", "lufs_target"))
+
+    assert result.verdict is Verdict.PASS
+    assert "settings.lufs_target" in result.evidence
+
+
+def test_method_call_on_a_dict_does_not_hide_it(tmp_path):
+    """`.copy()` を剥がさないと呼び先索引を "copy" で引いて中身を見落とす。"""
+    ex = _contract(tmp_path, router_body="""
+        router = APIRouter(prefix="/api/demo")
+
+        _settings = {"encoder": "auto"}
+
+        @router.get("/settings")
+        def get_settings():
+            return {"settings": _settings.copy()}
+    """)
+    site = ex.registry.resolve("/api/demo/settings", "GET")
+
+    assert "settings.encoder" in site.fields

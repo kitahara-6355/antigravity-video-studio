@@ -222,7 +222,11 @@
       "story_scene": "S5",
       "description": "BGM設定が含まれる",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/settings"
+      "endpoint": "GET /api/render/settings",
+      "response_field": [
+        "bgm_volume",
+        "bgm_ducking"
+      ]
     },
     {
       "id": "O8-L1-05",
@@ -230,7 +234,8 @@
       "story_scene": "S7",
       "description": "LUFS設定が含まれる",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/settings"
+      "endpoint": "GET /api/render/settings",
+      "response_field": "lufs_target"
     },
     {
       "id": "O8-L1-06",
@@ -238,7 +243,12 @@
       "story_scene": "S9",
       "description": "ロゴ設定が含まれる",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/settings"
+      "endpoint": "GET /api/render/settings",
+      "response_field": [
+        "logo_enabled",
+        "logo_position",
+        "logo_opacity"
+      ]
     },
     {
       "id": "O8-L1-07",
@@ -246,7 +256,12 @@
       "story_scene": "S10",
       "description": "字幕設定が含まれる",
       "test_method": "dom_exists",
-      "endpoint": "GET /api/render/settings"
+      "endpoint": "GET /api/render/settings",
+      "response_field": [
+        "subtitle_enabled",
+        "subtitle_font",
+        "subtitle_size"
+      ]
     },
     {
       "id": "O8-L1-08",

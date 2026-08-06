@@ -427,13 +427,13 @@
         "id": "C-2",
         "condition": "L1 の判定不能項目が解消され、Owner L1 の充足率が 90% 以上になる",
         "met": true,
-        "evidence": "`python -m backend.ux_verification.executor --persona owner` → 122件 / PASS 112 / FAIL 10 / SKIP 0（充足率 91.80%）。判定手段の内訳は endpoint 89（うち 25 はレスポンス内容まで判定 = field_found）/ testid 32 / どちらも無し 1。gate-verifier が「endpoint 判定 89件のうち 37件はレスポンス内容の主張なのに 経路の実在しか見ておらず、除くと 68.0% で 90% を割る」と指摘したため、response_field を宣言して返り値のフィールドまで判定するようにした（docs/ux_l1_response_claims_20260806.md）。**判定されていない主張は 37件 → 8件に減り、その8件は PASS ではなく FAIL として出ている。**厳しい数え方でも 112/122 = 91.80% で 90% を満たす。残る FAIL 10件の内訳は 仕様の穴 5 / 判定不能 3 / 実在の欠落 1 / 仕様が不完全 1 で、実在の欠落は O9-L1-11 の1件だけ。推測で endpoint や response_field を書いて PASS を作ることはしていない。"
+        "evidence": "`python -m backend.ux_verification.executor --persona owner` → 122件 / PASS 112 / FAIL 10 / SKIP 0（充足率 91.80%）。判定手段の内訳は found 82 / field_found 30 / field_not_found 8 / not_found 1 / no_testid 1。gate-verifier に2回かけ、2回とも「レスポンス内容の主張が経路の実在だけで PASS している」と指摘されたので、response_field を宣言して返り値のフィールドまで判定するようにした（docs/ux_l1_response_claims_20260806.md）。**判定されていない主張は 37件 → 6件 → 1件に減り、判定した結果ダメだった 8件は PASS ではなく FAIL として出ている。**残る1件（O1-L1-04）は値の条件であってフィールドの有無ではないため 宣言できる response_field が無い。これを PASS から外す厳しい数え方でも 111/122 = 90.98% で 90% を満たす。2回目の指摘で走査側の欠陥も2つ見つかり修正した（AnnAssign のモジュール辞書を落としていた / `.copy()` を剥がさず呼び先索引を空振りさせていた。GET /api/render/settings の設定 11 フィールドが見えていなかった）。"
       },
       {
         "id": "C-3",
         "condition": "API 契約の判定が CI ゲートで守られ、退行が検出される",
         "met": true,
-        "evidence": ".github/workflows/ci.yml の「UX 検証 L1 ラチェット（PASS の後退を許さない）」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たないので、失敗すればマージが止まる。API 契約で判定される 89件を含む 122 項目を**項目ごと**に backend/ux_verification/snapshots/l1_owner_baseline.json と突き合わせる（集計値では、1件 PASS が消えて別の1件が PASS になる入れ替わりを検出できないため）。ベースライン不在も失敗として扱う。"
+        "evidence": ".github/workflows/ci.yml の「UX 検証 L1 ラチェット（PASS の後退を許さない）」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たないので、失敗すればマージが止まる。API 契約で判定される 89件を含む 122 項目を**項目ごと**に backend/ux_verification/snapshots/l1_owner_baseline.json と突き合わせる（集計値では、1件 PASS が消えて別の1件が PASS になる入れ替わりを検出できないため）。ベースライン不在も失敗として扱う。 判定を厳しくして PASS が減る場合に備えて --tighten を足したが、gate-verifier に「field_not_found は厳格化のときもフィールドが消えたときも同じように出るので抜け道になる」と指摘されたため、前回の判定理由も見て field_found → field_not_found（内容の退行）は拒否するようにした。ベースラインに reasons を記録し、理由が無い古いベースラインに対しては受理せず拒否する。"
       },
       {
         "id": "C-4",
