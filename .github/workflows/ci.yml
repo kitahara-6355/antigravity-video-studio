@@ -164,6 +164,16 @@ jobs:
           GOOGLE_API_KEY: "dummy_key_for_ci"
         run: python -m backend.ux_verification.executor --persona owner --ratchet
 
+      # 死蔵コード（include_router されていないエンドポイント・エントリから
+      # import を辿れないファイル）を増やさせない。テストが通ることは到達可能で
+      # あることを意味しない——review_router は 21件のテストが緑のまま本番では
+      # 404 を返している。カバレッジでは検出できないので独立したゲートを置く。
+      - name: 死蔵コードラチェット（増加を許さない）
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+        run: python -m backend.ux_verification.dead_code --ratchet
+
       - name: テスト結果アップロード
         if: always()
         uses: actions/upload-artifact@v4

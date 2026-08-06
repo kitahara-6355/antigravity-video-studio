@@ -1,0 +1,16 @@
+{
+  "endpoints": [
+    "GET /api/review/stages",
+    "GET /api/review/stages/{stage}",
+    "GET /api/review/stages/{stage}/report",
+    "GET /api/review/status",
+    "GET /api/review/summary",
+    "POST /api/review/stages/{stage}/approve",
+    "POST /api/review/stages/{stage}/revision"
+  ],
+  "components": [
+    "frontend/src/components/ModelQuotaDashboard.jsx",
+    "frontend/src/components/RivalRadar.jsx",
+    "frontend/src/hooks/useSegments.js"
+  ]
+}
