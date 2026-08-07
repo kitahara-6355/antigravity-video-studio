@@ -166,48 +166,77 @@ CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
 # 「強い主張を別の節に逃がす」経路が構造的に消える。
 _NP = r"[^、。，．]*?"  # 名詞句。節の区切りを含められない
 
-# スロットに紛れ込んだ**強い述語**。これがあれば、その主張は測られていない。
-# 12回目の指摘（`locked_segments が更新され locked_segments を返す`）を潰す。
-_STRONG_IN_SLOT = re.compile(
-    r"更新|変わ|反映|切り替わ|増え|減っ|[=＝]|のみ|だけ|\d+\s*件|が可能|できる"
-    r"|以内|以上|以下|限ら|超え"
-)
+# **強い述語。** これが文のどこかに在るのに、テンプレートがそれを引き受けて
+# いなければ、その主張は測られていない。
+#
+# 13回目の指摘: 以前は名前付きスロットしか走査していなかったので、テンプレートの
+# **無名部分**（`^{_NP}正常応答し…` の先頭）や括弧の中に強い述語を逃がせた。
+# `locked_segments が更新され固定解除APIが正常応答し locked_segments を返す` が
+# 「経路＋フィールド」に化けた。**走査は文全体にかける。**
+_STRONG_MARKERS: dict[str, str] = {
+    "状態遷移": r"更新|変わ|反映|切り替わ|増え|減っ",
+    "値の指定": r"[=＝]",
+    "排他": r"のみ|だけ",
+    "件数": r"\d+\s*件",
+    "範囲": r"以内|以上|以下|超え|限ら",
+    "可能": r"が可能|できる",
+}
+
+
+def strong_markers_in(text: str) -> frozenset:
+    return frozenset(
+        name for name, pattern in _STRONG_MARKERS.items()
+        if re.search(pattern, text)
+    )
+
 
 _IDENT = r"[A-Za-z_][A-Za-z0-9_.]*"
 
-# (名前, 文全体にかかる正規表現, 許される claim)。**強い述語を先に置く。**
-DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("値の指定", rf"^(?P<slot>{_IDENT})\s*[=＝]\s*\S+$", ("response_value",)),
-    ("〜のみ", rf"^(?P<slot>{_NP})のみ含まれる$", ("value_exclusive",)),
-    ("件数", rf"^(?P<slot>{_NP})が\d+件以上表示される$", ("element_count",)),
+# (名前, 文全体の正規表現, 許される claim, **そのテンプレートが引き受ける強い述語**)。
+# 引き受けていない強い述語が文に残っていたら、一致させない。
+DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...], frozenset], ...] = (
+    ("値の指定", rf"^(?P<slot>{_IDENT})\s*[=＝]\s*\S+$", ("response_value",),
+     frozenset({"値の指定"})),
+    ("〜のみ", rf"^(?P<slot>{_NP})のみ含まれる$", ("value_exclusive",),
+     frozenset({"排他"})),
+    ("件数", rf"^(?P<slot>{_NP})が\d+件以上表示される$", ("element_count",),
+     frozenset({"件数", "範囲"})),
     ("プリセット網羅",
      rf"^\d+種プリセット\([^、。]*\)で(?P<slot>{_NP})が正常応答する$",
-     ("parameter_coverage",)),
-    ("可能である", rf"^(?P<slot>{_NP})が可能\([^、。]*\)$", ("idempotency",)),
-    ("列挙の実在", rf"^\d+カテゴリ\([^、。]*\)が存在する$", ("value_constraint",)),
+     ("parameter_coverage",), frozenset()),
+    ("可能である", rf"^(?P<slot>{_NP})が可能\([^、。]*\)$", ("idempotency",),
+     frozenset({"可能"})),
+    ("列挙の実在", rf"^\d+カテゴリ\((?P<slot>[^、。]*)\)が存在する$",
+     ("value_constraint",), frozenset()),
     ("経路＋状態遷移",
-     rf"^{_NP}正常応答し(?P<slot>{_NP})が更新される$", ("state_transition",)),
+     rf"^{_NP}正常応答し(?P<slot>{_NP})が更新される$", ("state_transition",),
+     frozenset({"状態遷移"})),
     ("保存キーの実在",
      rf"^(?:localStorage|sessionStorage)に(?P<slot>{_NP})が存在する$",
-     ("storage_key",)),
+     ("storage_key",), frozenset()),
     ("経路＋フィールド",
-     rf"^{_NP}正常応答し(?P<slot>{_NP})(?:が返る|を返す)$", ("response_field",)),
+     rf"^{_NP}正常応答し(?P<slot>{_NP})(?:が返る|を返す)$", ("response_field",),
+     frozenset()),
     ("経路のみ", rf"^(?P<slot>{_NP})(?:が)?正常応答(?:を返す|する)?$",
-     ("route_exists",)),
+     ("route_exists",), frozenset()),
     ("リクエスト契約", rf"^(?P<slot>{_NP})(?:を受け付ける|を受け取る)$",
-     ("request_contract",)),
+     ("request_contract",), frozenset()),
     ("必須フィールド", rf"^(?P<slot>{_NP})が必須フィールドを返す$",
-     ("response_field",)),
+     ("response_field",), frozenset()),
     ("フィールドの実在", rf"^(?P<slot>{_NP})フィールドが存在する?$",
-     ("response_field",)),
+     ("response_field",), frozenset()),
     ("フィールドを返す", rf"^(?P<slot>{_NP})(?:を返す|が返る|が含まれる|含む)$",
-     ("response_field",)),
+     ("response_field",), frozenset()),
     # 「〜が存在する」は DOM の要素にもレスポンスのフィールドにも使われている。
     # ただしスロットが**そのまま ASCII 識別子**なら、それはフィールド名なので
     # DOM 要素の実在では測れない（12回目の指摘 C）。
     ("要素の実在", rf"^(?P<slot>{_NP})(?:が存在する|が存在|存在)$",
-     ("dom_exists", "response_field")),
+     ("dom_exists", "response_field"), frozenset()),
 )
+
+# フィールド名を書くテンプレート。スロットは宣言した response_field と一致すべき。
+_FIELD_TEMPLATES = ("フィールドを返す", "必須フィールド", "フィールドの実在",
+                    "経路＋フィールド")
 
 _TYPED_SLOT = re.compile(rf"^{_IDENT}(?:/{_IDENT})*$")
 # スロットに英数字の語が混じっていると、名前なのか値なのか判別できない。
@@ -223,21 +252,47 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
     text = (description or "").strip()
     if not text:
         return None
-    for name, pattern, claims in DESCRIPTION_TEMPLATES:
+    present = strong_markers_in(text)
+    for name, pattern, claims, accounts in DESCRIPTION_TEMPLATES:
         match = re.match(pattern, text)
         if match is None:
             continue
-        slot = (match.groupdict().get("slot") or "").strip()
-        # スロットに強い述語が埋まっているなら、この文は測られていない主張を
-        # 含んでいる。テンプレートに一致したことにしない。
-        if _STRONG_IN_SLOT.search(slot):
+        # **引き受けていない強い述語が文に残っていたら、一致させない。**
+        # 走査はスロットではなく文全体（無名部分・括弧の中も含む）。
+        if present - accounts:
             return None
+        slot = (match.groupdict().get("slot") or "").strip()
         if name == "要素の実在" and _TYPED_SLOT.match(slot):
             # `download_url存在` のような ASCII 識別子は、DOM 要素ではなく
             # レスポンスのフィールド名。要素の実在では測れない。
             return name, ("response_field",), slot
         return name, claims, slot
     return None
+
+
+def slot_matches_declaration(description: str, item: dict) -> bool:
+    """フィールド名を書くテンプレートで、スロットが**宣言したフィールドと一致**するか。
+
+    13回目の指摘: スロットが ASCII 識別子なら無条件で「フィールド名」と見なして
+    いたので、`completed を返す` / `true が返る` のように**値そのもの**を書いても
+    宣言不要で通った。`hook_score` と `completed` は機械には見分けられないが、
+    **項目が何を測ると宣言しているか**とは突き合わせられる。
+    """
+    parsed = parse_description(description)
+    if parsed is None:
+        return True
+    name, _claims, slot = parsed
+    if name not in _FIELD_TEMPLATES or not _TYPED_SLOT.match(slot):
+        return True
+    declared = {str(f) for f in _declared_fields(item)}
+    return bool(declared) and set(slot.split("/")) <= declared
+
+
+def _declared_fields(item: dict) -> list:
+    raw = item.get("response_field")
+    if raw is None:
+        return []
+    return list(raw) if isinstance(raw, (list, tuple)) else [raw]
 
 
 def needs_value_note(description: str) -> bool:
@@ -319,6 +374,10 @@ class ClaimRow:
                 "description の述語が語彙に無い。"
                 "DESCRIPTION_GRAMMAR に足して判定手段を決めるか、"
                 "登録済みの書き方に直す"
+            ),
+            "slot_not_declared": (
+                "description が書いているフィールド名が、宣言した "
+                "response_field に無い。フィールド名ではなく**値**を書いている疑いがある"
             ),
             "value_note_required": (
                 "『〜を返す／含まれる』の手前が ASCII 識別子でないため、"
@@ -415,6 +474,11 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
             and needs_value_note(common["description"])
             and not (item.get("value_note") or "").strip()):
         return ClaimRow(**common, reason="value_note_required")
+
+    # スロットが宣言したフィールドと違うなら、それはフィールド名ではなく
+    # **値**を書いている疑いがある（`completed を返す` に response_field=status）。
+    if claim not in ("response_value", "value_exclusive") and             not slot_matches_declaration(common["description"], item):
+        return ClaimRow(**common, reason="slot_not_declared")
 
     required = CLAIM_METHODS[claim]
     if required is None:

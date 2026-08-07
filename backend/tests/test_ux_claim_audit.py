@@ -108,7 +108,8 @@ def test_route_claim_judged_by_a_testid_is_a_mismatch(tmp_path):
 def test_response_field_claim_without_the_field_is_a_mismatch(tmp_path):
     """endpoint だけでは「statusフィールドが存在する」を判定できない。"""
     report = audit(_stories(tmp_path, [
-        _item("O1-L1-01", "response_field", endpoint="GET /api/x"),
+        _item("O1-L1-01", "response_field", description="要素が存在する",
+              endpoint="GET /api/x"),
     ]))
 
     assert [r.reason for r in report.mismatched] == ["not_declared"]
@@ -426,12 +427,16 @@ def test_every_template_points_at_a_known_claim():
 
     from backend.ux_verification.claim_audit import DESCRIPTION_TEMPLATES
 
-    for name, pattern, claims in DESCRIPTION_TEMPLATES:
+    from backend.ux_verification.claim_audit import _STRONG_MARKERS
+
+    for name, pattern, claims, accounts in DESCRIPTION_TEMPLATES:
         assert pattern.startswith("^") and pattern.endswith("$"), name
         _re.compile(pattern)
         assert claims, name
         for claim in claims:
             assert claim in CLAIM_METHODS, f"{name} → {claim}"
+        # 引き受ける述語も語彙に載っていること（綴り間違いで検査が消えない）
+        assert accounts <= set(_STRONG_MARKERS), name
 
 
 def test_every_owner_l1_description_is_in_the_vocabulary():
@@ -600,6 +605,55 @@ def test_a_plain_japanese_ui_name_needs_no_note(tmp_path):
     report = audit(_stories(tmp_path, [
         _item("O1-L1-01", "dom_exists", description="進捗バーが存在する",
               testid="progress-bar"),
+    ]))
+
+    assert report.mismatched == []
+
+
+# --- 検査対象は文全体（gate-verifier 13回目）------------------------------------
+#
+# 強い述語の走査を**名前付きスロットだけ**にしていたので、テンプレートの無名部分や
+# 括弧の中に逃がせた。読点を使わずに「経路＋フィールド」へ化けさせられた。
+
+
+def test_a_strong_predicate_in_an_unnamed_part_is_rejected():
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description(
+        "locked_segmentsが更新され固定解除APIが正常応答しlocked_segmentsを返す") is None
+
+
+def test_a_strong_predicate_inside_parentheses_is_rejected():
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description(
+        "3カテゴリ(A/B/C が更新され3件以内で反映される)が存在する") is None
+
+
+def test_a_template_must_account_for_the_predicates_it_carries():
+    """テンプレート自身が持つ強い述語は引き受けとして宣言されていること。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("動画リストに対応拡張子のみ含まれる") is not None
+    assert parse_description("セグメントが3件以上表示される") is not None
+    assert parse_description("推奨APIで再計算が可能(undo相当)") is not None
+    assert parse_description("固定解除APIが正常応答しlocked_segmentsが更新される") is not None
+
+
+def test_a_bare_value_in_the_slot_is_caught_by_the_declaration(tmp_path):
+    """`completed を返す` の completed は値。宣言した response_field に無い。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="completed を返す",
+              endpoint="GET /api/x", response_field="status"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
+
+
+def test_a_slot_that_names_the_declared_field_is_fine(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="hook_score含む",
+              endpoint="GET /api/x", response_field="hook_score"),
     ]))
 
     assert report.mismatched == []
