@@ -119,6 +119,26 @@ CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
     ),
 }
 
+# 項目が「何を照合先にするか」を宣言しているキー。**CLAIM_METHODS から導く。**
+# ここを手で並べると、新しい判定手段を足したときに片方だけ増えて、
+# 増えたほうがラチェットの外に落ちる（走査範囲の外のポケットの型）。
+DECLARATION_KEYS: tuple[str, ...] = ("claim",) + tuple(sorted(
+    {key for required in CLAIM_METHODS.values() if required for key in required}
+))
+
+
+def declaration_of(item: dict) -> dict:
+    """項目の**宣言内容**を取り出す。「何を測ると言っているか」そのもの。
+
+    ラチェットがこれを固定する。verdict と理由コードだけを記録していた頃は、
+    `response_field` を `hook_score` → `success` のような**実在するが別の
+    フィールド**に差し替えるだけで FAIL が PASS になり、違反ゼロ・改善1件として
+    記録された（P3 C-4 / gate-verifier 5回目）。description は変わっていないので、
+    項目が要求する内容だけが静かに緩む。
+    """
+    return {k: item[k] for k in DECLARATION_KEYS if item.get(k)}
+
+
 # 判定手段がまだ無い主張（実装すれば埋まる）。ここが空でないと C-3 を満たせない。
 UNSUPPORTED_CLAIMS = tuple(k for k, v in CLAIM_METHODS.items() if v == ())
 
@@ -196,9 +216,8 @@ def audit(stories_dir: Path, persona: str = "owner") -> ClaimAuditReport:
 
 def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
     claim = (item.get("claim") or "").strip()
-    declared = tuple(k for k in ("testid", "endpoint", "response_field",
-                                 "storage_key", "value_literals", "request_field")
-                     if item.get(k))
+    declared = tuple(k for k in DECLARATION_KEYS
+                     if k != "claim" and item.get(k))
     common = {
         "item_id": item_id, "ux_story": story,
         "description": item.get("description", ""),

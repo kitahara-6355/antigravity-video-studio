@@ -11,6 +11,23 @@
 ベースラインは `backend/ux_verification/snapshots/l1_{persona}_baseline.json`。
 判定が静的走査で環境に依存しないため、fs-guard のベースラインと違って
 手元の実行値をそのまま使ってよい。
+
+## 何を固定するか（3層）
+
+1. **verdict** — PASS だった項目が FAIL に戻らない
+2. **判定理由** — 内容まで見て判定していた項目が、経路の実在だけの判定に
+   戻らない（`weakened`）
+3. **宣言内容** — 項目が「何を測ると言っているか」そのもの（`substituted`）
+
+3層目が P3 C-4 で足りていなかった。1・2 は宣言の**削除**を捕まえるが、
+**差し替え**を素通りさせる。`response_field` を `hook_score` → `success` の
+ような**実在するが別のフィールド**に付け替えると、`field_not_found` の FAIL が
+`field_found` の PASS になり、理由コードは強いままなので違反ゼロ・
+**改善1件**として記録される。description は変わっていないので、その項目が
+要求する内容だけが静かに緩む（gate-verifier 5回目の指摘）。
+
+宣言を変えること自体は禁じない。**黙って変えられないようにする。**
+`--redeclare "理由"` で理由と before/after を履歴に残して締め直す。
 """
 from __future__ import annotations
 
@@ -56,12 +73,22 @@ def _is_content_judged(reason: str | None) -> bool:
     return reason in CONTENT_JUDGED_REASONS
 
 
+def _render_declaration(declaration: dict | None) -> str:
+    if not declaration:
+        return "（宣言なし）"
+    return " ".join(
+        f"{k}={json.dumps(v, ensure_ascii=False)}" if not isinstance(v, str) else f"{k}={v}"
+        for k, v in sorted(declaration.items())
+    )
+
+
 def baseline_path(persona: str) -> Path:
     return BASELINE_DIR / f"l1_{persona}_baseline.json"
 
 
 def write_baseline(report: L1Report, path: Path,
-                   tightenings: list | None = None) -> Path:
+                   tightenings: list | None = None,
+                   redeclarations: list | None = None) -> Path:
     """判定を項目ごとに書き出す。
 
     タイムスタンプは入れない。毎回書き換わる欄があると、実質的な変化が
@@ -81,11 +108,17 @@ def write_baseline(report: L1Report, path: Path,
         # 「内容まで見て PASS」を区別できず、--tighten が内容の退行を
         # 厳格化として受理してしまう。
         "reasons": {r.item_id: r.reason for r in report.results},
+        # 宣言内容も残す。理由コードは「何を測ったか」の**種類**しか持たず、
+        # 「どれを測ったか」を持たない。差し替えはここでしか見えない。
+        "declarations": {r.item_id: r.declaration for r in report.results},
     }
     if tightenings:
         # 判定を厳しくして PASS が減った履歴。消すと「昔は緑だった」が
         # 見えなくなり、退行と区別が付かなくなる。
         payload["tightenings"] = tightenings
+    if redeclarations:
+        # 宣言を差し替えた履歴。理由と before/after を残す。
+        payload["redeclarations"] = redeclarations
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
         f.write("\n")
@@ -101,7 +134,7 @@ def load_baseline(path: Path) -> dict | None:
 
 @dataclass
 class L1Violation:
-    kind: str  # "regressed" | "removed" | "weakened"
+    kind: str  # "regressed" | "removed" | "weakened" | "substituted" | "unpinned"
     item_id: str
     before: str
     after: str
@@ -113,6 +146,16 @@ class L1Violation:
             return (
                 f"[判定の弱化] {self.item_id}: {self.before} → {self.after}"
                 "（レスポンス内容を見なくなった）"
+            )
+        if self.kind == "substituted":
+            return (
+                f"[宣言の差し替え] {self.item_id}: {self.before} → {self.after}"
+                "（測る対象そのものが変わった）"
+            )
+        if self.kind == "unpinned":
+            return (
+                f"[固定されていない] {self.item_id}: {self.before}"
+                "（ベースラインに記録が無く、変化を検出できない）"
             )
         return f"[退行] {self.item_id}: {self.before} → {self.after}"
 
@@ -143,11 +186,20 @@ class L1RatchetResult:
             return f"✅ {head}"
         lines = [f"🚫 {head}", f"  {len(self.violations)}件の違反:"]
         lines += [f"    {v}" for v in self.violations]
-        lines.append(
-            "\n  PASS だった項目が FAIL に戻っています。frontend から "
-            "data-testid が消えたか、ストーリー側の testid が書き換わっています。"
-            "意図した変更なら --update-baseline で締め直してください。"
-        )
+        kinds = {v.kind for v in self.violations}
+        if kinds - {"substituted", "unpinned"}:
+            lines.append(
+                "\n  PASS だった項目が FAIL に戻っています。frontend から "
+                "data-testid が消えたか、ストーリー側の testid が書き換わっています。"
+                "意図した変更なら --update-baseline で締め直してください。"
+            )
+        if kinds & {"substituted", "unpinned"}:
+            lines.append(
+                "\n  項目が**何を測ると宣言しているか**がベースラインと違います。"
+                "verdict と理由コードは同じでも、要求している内容が変わっています。"
+                "\n  意図した変更なら --redeclare \"理由\" で締め直してください"
+                "（理由と before/after がベースラインに残ります）。"
+            )
         return "\n".join(lines)
 
 
@@ -164,6 +216,8 @@ class L1Ratchet:
         after = {r.item_id: r.verdict.value for r in report.results}
         before_reasons: dict[str, str] = baseline.get("reasons") or {}
         after_reasons = {r.item_id: r.reason for r in report.results}
+        before_decls: dict[str, dict] = baseline.get("declarations") or {}
+        after_decls = {r.item_id: r.declaration for r in report.results}
 
         violations: list[L1Violation] = []
         improvements: list[str] = []
@@ -173,9 +227,39 @@ class L1Ratchet:
             if now is None:
                 violations.append(L1Violation("removed", item_id, was, "—"))
                 continue
+
+            # 記録が無いものは「変化なし」ではなく「分からない」。
+            # `reasons` を丸ごと消せば _is_content_judged が常に False になり、
+            # `declarations` を丸ごと消せば差し替えが素通りする。どちらも
+            # **検出器を黙って無効化する**経路なので、不在自体を違反にする。
+            unpinned = [
+                label for label, book in (
+                    ("前回の判定理由がベースラインに無い", before_reasons),
+                    ("前回の宣言がベースラインに無い", before_decls),
+                )
+                if item_id not in book
+            ]
+            if unpinned:
+                violations.append(L1Violation(
+                    "unpinned", item_id, "・".join(unpinned), "—"))
+                continue
+
             if was == "PASS" and now != "PASS":
                 violations.append(L1Violation("regressed", item_id, was, now))
                 continue
+
+            # 理由コードは「何を測ったか」の**種類**しか持たない。どれを測ったかは
+            # 宣言にしかないので、宣言が変われば同じ理由コードのまま別物を
+            # 測っている。FAIL → PASS になっていても、それは実装が良くなった
+            # 証拠ではなく、要求を取り替えた結果でしかない。
+            if before_decls.get(item_id) != after_decls.get(item_id):
+                violations.append(L1Violation(
+                    "substituted", item_id,
+                    _render_declaration(before_decls.get(item_id)),
+                    _render_declaration(after_decls.get(item_id)),
+                ))
+                continue
+
             # verdict だけを見ていると、**判定の強さ**が落ちたことに気づけない。
             # 項目から response_field を消せば field_found → found（PASS のまま）、
             # field_not_found → found（FAIL → PASS で「改善」に見える）。
@@ -213,7 +297,57 @@ class L1Ratchet:
                 + "\n".join(f"  {v}" for v in result.violations)
             )
         return write_baseline(report, path,
-                              (baseline or {}).get("tightenings"))
+                              (baseline or {}).get("tightenings"),
+                              (baseline or {}).get("redeclarations"))
+
+    def redeclare(self, report: L1Report, path: Path, reason: str) -> Path:
+        """**宣言の差し替え**だけを受け入れて締め直す。
+
+        宣言を変えること自体は正当な作業（誤った `response_field` を直す、
+        判定手段を足して `claim` を強い側へ移す）。禁じるのは**黙って**
+        変えることのほう。理由を必須にし、before/after を履歴に残す。
+
+        受け入れるのは `substituted` と `unpinned` だけ。verdict の退行や
+        判定の弱化が混じっていたら拒否する。宣言の差し替えに紛れ込ませて
+        通せるようにすると、履歴を残す意味が無くなる。
+
+        **これは「差し替えを禁止する」機能ではない。** C-4 が求めているのは
+        検出であって禁止ではないので、通した記録が永久に残るところまでを
+        保証する。FAIL → PASS を買う差し替えも、理由と before/after が
+        ベースラインの差分に出る。
+        """
+        if not reason.strip():
+            raise ValueError(
+                "差し替えの理由は必須です。何を測る対象に変えたのかを書いてください")
+
+        baseline = load_baseline(path)
+        result = self.check(report, baseline)
+        before_decls = (baseline or {}).get("declarations") or {}
+
+        illegitimate = [v for v in result.violations
+                        if v.kind not in ("substituted", "unpinned")]
+        if illegitimate:
+            raise ValueError(
+                "宣言の差し替えでは説明できない違反が混じっています:\n"
+                + "\n".join(f"  {v}" for v in illegitimate)
+                + "\n  退行・判定の弱化は、宣言の差し替えとは分けて扱ってください。"
+            )
+
+        after_decls = {r.item_id: r.declaration for r in report.results}
+        changed = [v.item_id for v in result.violations]
+        history = list((baseline or {}).get("redeclarations") or [])
+        history.append({
+            "reason": reason.strip(),
+            "items": {
+                item_id: {
+                    "before": before_decls.get(item_id),
+                    "after": after_decls.get(item_id),
+                }
+                for item_id in sorted(changed)
+            },
+        })
+        return write_baseline(report, path,
+                              (baseline or {}).get("tightenings"), history)
 
     def tighten(self, report: L1Report, path: Path, reason: str,
                 allowed_reasons: tuple = TIGHTENING_REASONS) -> Path:
@@ -275,4 +409,5 @@ class L1Ratchet:
             "reason": reason.strip(),
             "items": sorted(v.item_id for v in result.violations),
         })
-        return write_baseline(report, path, history)
+        return write_baseline(report, path, history,
+                              (baseline or {}).get("redeclarations"))

@@ -297,3 +297,43 @@ def test_semantics_output_lists_every_claim(capsys):
     out = capsys.readouterr().out
     for claim in CLAIM_METHODS:
         assert claim in out
+
+
+# --- 宣言内容（ラチェットが固定する対象）--------------------------------------
+
+
+def test_declaration_keys_cover_every_judging_method():
+    """新しい判定手段を足したら、その宣言も自動でラチェットの対象になる。
+
+    ここを手で並べていると、増えたほうだけがラチェットの外に落ちて、
+    その宣言だけ黙って差し替えられる（走査範囲の外のポケットの型）。
+    """
+    from backend.ux_verification.claim_audit import DECLARATION_KEYS
+
+    required = {key for r in CLAIM_METHODS.values() if r for key in r}
+
+    assert required <= set(DECLARATION_KEYS)
+    assert "claim" in DECLARATION_KEYS, "claim の貼り替えも差し替えのうち"
+
+
+def test_declaration_of_takes_only_what_the_item_declares():
+    from backend.ux_verification.claim_audit import declaration_of
+
+    item = {
+        "id": "O1-L1-01", "description": "説明", "story_scene": "S1",
+        "layer": 1, "test_method": "dom_exists",
+        "claim": "response_field", "endpoint": "POST /x", "response_field": "success",
+    }
+
+    assert declaration_of(item) == {
+        "claim": "response_field", "endpoint": "POST /x", "response_field": "success",
+    }, "description や layer は宣言ではない（変わっても差し替えではない）"
+
+
+def test_declaration_of_ignores_empty_values():
+    """空文字の testid を「宣言している」と数えると、消しても差分が出ない。"""
+    from backend.ux_verification.claim_audit import declaration_of
+
+    assert declaration_of({"claim": "route_exists", "endpoint": "GET /x",
+                           "testid": ""}) == {
+        "claim": "route_exists", "endpoint": "GET /x"}

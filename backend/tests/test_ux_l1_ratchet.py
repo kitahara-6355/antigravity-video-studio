@@ -11,7 +11,7 @@ from backend.ux_verification.executor import L1Report, L1Result, Verdict
 from backend.ux_verification.l1_ratchet import L1Ratchet, load_baseline, write_baseline
 
 
-def _result(item_id, verdict, story="O-1", reason=None):
+def _result(item_id, verdict, story="O-1", reason=None, declaration=None):
     return L1Result(
         item_id=item_id,
         ux_story=story,
@@ -21,6 +21,7 @@ def _result(item_id, verdict, story="O-1", reason=None):
         verdict=verdict,
         reason=reason or ("found" if verdict is Verdict.PASS else "not_found"),
         evidence="static_source_scan: どこか:1",
+        declaration=declaration if declaration is not None else {},
     )
 
 
@@ -30,6 +31,15 @@ def _report(pairs):
         persona="owner",
         results=[_result(*p) if len(p) == 2 else _result(p[0], p[1], reason=p[2])
                  for p in pairs],
+        files_scanned=1,
+    )
+
+
+def _declared(item_id, verdict, reason, declaration):
+    """宣言内容つきの1項目レポート。"""
+    return L1Report(
+        persona="owner",
+        results=[_result(item_id, verdict, reason=reason, declaration=declaration)],
         files_scanned=1,
     )
 
@@ -458,3 +468,249 @@ def test_tighten_refuses_when_one_items_reason_was_deleted(tmp_path):
                      ("O1-L1-02", Verdict.PASS, "found")]),
             path, "厳しくした",
         )
+
+
+# --- 宣言の差し替え -----------------------------------------------------------
+#
+# 理由コードは「何を測ったか」の**種類**しか持たない。どれを測ったかは宣言に
+# しかないので、宣言を差し替えれば同じ理由コードのまま別物を測れる。
+# `response_field` を `hook_score` → `success` のような**実在するが別の
+# フィールド**に付け替えると、`field_not_found` の FAIL が `field_found` の
+# PASS になり、違反ゼロ・改善1件として記録された（gate-verifier 5回目 / C-4）。
+
+_HOOK = {"claim": "response_field", "endpoint": "POST /x",
+         "response_field": "hook_score"}
+_SUCCESS = {"claim": "response_field", "endpoint": "POST /x",
+            "response_field": "success"}
+
+
+def test_baseline_records_the_declaration_of_every_item(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.FAIL, "field_not_found", _HOOK), path)
+
+    assert load_baseline(path)["declarations"] == {"O1-L1-01": _HOOK}
+
+
+def test_substituting_a_declaration_to_buy_a_pass_is_a_violation(tmp_path):
+    """検証者が実証した抜け道そのもの。FAIL → PASS だが実装は何も変わっていない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.FAIL, "field_not_found", _HOOK), path)
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+        load_baseline(path),
+    )
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["substituted"]
+    assert result.improvements == [], "要求を取り替えただけのものを改善に数えない"
+    assert "hook_score" in result.to_text() and "success" in result.to_text()
+
+
+def test_substituting_a_declaration_while_staying_pass_is_a_violation(tmp_path):
+    """verdict も理由コードも動かない。宣言を記録していないと見えない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+        load_baseline(path),
+    )
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["substituted"]
+
+
+def test_relabelling_the_claim_is_a_substitution(tmp_path):
+    """`claim` の貼り替えで unjudgeable の FAIL を PASS にする経路。
+
+    判定できないと結論した項目に弱い claim を貼り直すと PASS になる。
+    claim も宣言のうちなので、ここで止まる。
+    """
+    path = tmp_path / "base.json"
+    write_baseline(
+        _declared("O4-L1-05", Verdict.FAIL, "unjudgeable",
+                  {"claim": "parameter_coverage", "endpoint": "POST /y"}), path)
+
+    result = L1Ratchet().check(
+        _declared("O4-L1-05", Verdict.PASS, "field_found",
+                  {"claim": "response_field", "endpoint": "POST /y",
+                   "response_field": "success"}),
+        load_baseline(path),
+    )
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["substituted"]
+    assert result.improvements == []
+
+
+def test_unchanged_declaration_is_valid(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.FAIL, "field_not_found", _HOOK), path)
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), load_baseline(path)
+    )
+
+    assert result.valid
+    assert result.improvements == ["O1-L1-01"], "実装が直った改善は通す"
+
+
+# --- 検出器を黙って無効化させない ----------------------------------------------
+#
+# 記録が無いものは「変化なし」ではなく「分からない」。ブロックを消すだけで
+# 検出器が黙って効かなくなる状態を、成功として通さない。
+
+
+@pytest.mark.parametrize("block", ["reasons", "declarations"])
+def test_deleting_a_whole_block_from_the_baseline_is_a_violation(tmp_path, block):
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload[block]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), load_baseline(path)
+    )
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["unpinned"]
+
+
+@pytest.mark.parametrize("block", ["reasons", "declarations"])
+def test_update_refuses_to_silently_repin_a_deleted_block(tmp_path, block):
+    """--update-baseline で黙って締め直せると、消すだけで抜けられる。"""
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload[block]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        L1Ratchet().update(
+            _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS), path)
+
+
+def test_deleting_one_items_declaration_is_a_violation(tmp_path):
+    """辞書ごと消さなくても、1項目分を消せば素通りできてはいけない。"""
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload["declarations"]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+        load_baseline(path),
+    )
+
+    assert [v.kind for v in result.violations] == ["unpinned"]
+
+
+# --- 差し替えの締め直し（--redeclare）------------------------------------------
+#
+# 宣言を変えること自体は正当な作業。禁じるのは**黙って**変えることのほう。
+
+
+def test_redeclare_accepts_a_substitution_and_records_before_and_after(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.FAIL, "field_not_found", _HOOK), path)
+
+    L1Ratchet().redeclare(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+        path, "hook_score は別エンドポイントの綴り間違いだった",
+    )
+
+    base = load_baseline(path)
+    history = base["redeclarations"][-1]
+    assert history["reason"] == "hook_score は別エンドポイントの綴り間違いだった"
+    assert history["items"]["O1-L1-01"]["before"] == _HOOK
+    assert history["items"]["O1-L1-01"]["after"] == _SUCCESS
+    assert base["declarations"]["O1-L1-01"] == _SUCCESS
+
+
+def test_redeclare_requires_a_reason(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+
+    with pytest.raises(ValueError, match="理由は必須"):
+        L1Ratchet().redeclare(
+            _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS), path, "  ")
+
+
+def test_redeclare_refuses_when_a_real_regression_is_mixed_in(tmp_path):
+    """差し替えに紛れ込ませて退行を通せるなら、履歴を残す意味が無くなる。"""
+    path = tmp_path / "base.json"
+    write_baseline(
+        L1Report(persona="owner", results=[
+            _result("O1-L1-01", Verdict.PASS, reason="field_found",
+                    declaration=_HOOK),
+            _result("O1-L1-02", Verdict.PASS, reason="found", declaration=_HOOK),
+        ], files_scanned=1), path)
+
+    mixed = L1Report(persona="owner", results=[
+        _result("O1-L1-01", Verdict.PASS, reason="field_found", declaration=_SUCCESS),
+        _result("O1-L1-02", Verdict.FAIL, reason="not_found", declaration=_HOOK),
+    ], files_scanned=1)
+
+    with pytest.raises(ValueError, match="宣言の差し替えでは説明できない"):
+        L1Ratchet().redeclare(mixed, path, "直した")
+
+    assert load_baseline(path)["items"]["O1-L1-02"] == "PASS"
+
+
+def test_tighten_cannot_launder_a_substitution(tmp_path):
+    """--tighten は「厳しくした」ための穴。差し替えをここから通させない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+
+    with pytest.raises(ValueError, match="厳格化では説明できない"):
+        L1Ratchet().tighten(
+            _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+            path, "厳しくしたことにする")
+
+
+def test_redeclaration_history_survives_a_later_update(tmp_path):
+    """締め直すたびに履歴が消えると、差し替えた事実が1回で失われる。"""
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.FAIL, "field_not_found", _HOOK), path)
+    L1Ratchet().redeclare(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS), path, "直した")
+
+    L1Ratchet().update(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS), path)
+
+    assert load_baseline(path)["redeclarations"][-1]["reason"] == "直した"
+
+
+# --- 実データが宣言を持っていること --------------------------------------------
+
+
+def test_committed_baseline_pins_the_declaration_of_every_owner_l1_item():
+    """宣言が載っていないベースラインでは、差し替えを検出できない。"""
+    from backend.ux_verification.executor import L1Executor
+    from backend.ux_verification.l1_ratchet import baseline_path, load_baseline
+
+    base = load_baseline(baseline_path("owner"))
+    report = L1Executor.for_repo().run("owner")
+
+    assert set(base.get("declarations") or {}) == {r.item_id for r in report.results}
+    assert all(d.get("claim") for d in base["declarations"].values()), \
+        "claim の無い項目があると、貼り替えの前後が比較できない"
+
+
+def test_executor_attaches_the_declaration_to_every_result():
+    """`_route` が載せ忘れると、ベースラインは空の宣言を 122件ピンして緑になる。"""
+    from backend.ux_verification.executor import L1Executor
+
+    report = L1Executor.for_repo().run("owner")
+
+    assert report.results, "項目が0件では何も守れない"
+    assert all(r.declaration for r in report.results)
