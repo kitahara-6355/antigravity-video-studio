@@ -253,6 +253,567 @@
     "O12-L1-10": "field_not_found",
     "O12-L1-11": "field_found"
   },
+  "declarations": {
+    "O1-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/videos"
+    },
+    "O1-L1-02": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/videos",
+      "response_field": "videos"
+    },
+    "O1-L1-03": {
+      "claim": "response_field",
+      "endpoint": "POST /api/pipeline/videos/metadata",
+      "response_field": [
+        "name",
+        "path",
+        "size_mb",
+        "modified"
+      ]
+    },
+    "O1-L1-04": {
+      "claim": "value_constraint",
+      "endpoint": "GET /api/pipeline/videos",
+      "value_literals": [
+        ".mp4",
+        ".mov",
+        ".mkv",
+        ".avi"
+      ]
+    },
+    "O1-L1-05": {
+      "claim": "dom_exists",
+      "testid": "pipeline-drop-zone"
+    },
+    "O1-L1-06": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/pipeline/videos/validate"
+    },
+    "O1-L1-07": {
+      "claim": "storage_key",
+      "storage_key": "pipeline_recent_videos"
+    },
+    "O2-L1-01": {
+      "claim": "dom_exists",
+      "testid": "whisper-model-select"
+    },
+    "O2-L1-02": {
+      "claim": "dom_exists",
+      "testid": "whisper-recommended"
+    },
+    "O2-L1-03": {
+      "claim": "dom_exists",
+      "testid": "transcription-progress-bar"
+    },
+    "O2-L1-04": {
+      "claim": "dom_exists",
+      "testid": "transcription-progress-text"
+    },
+    "O2-L1-05": {
+      "claim": "dom_exists",
+      "testid": "transcription-elapsed"
+    },
+    "O2-L1-06": {
+      "claim": "dom_exists",
+      "testid": "segment-list"
+    },
+    "O2-L1-07": {
+      "claim": "element_count",
+      "testid": "segment-item-*"
+    },
+    "O3-L1-01": {
+      "claim": "dom_exists",
+      "testid": "proofreading-stage-panel"
+    },
+    "O3-L1-02": {
+      "claim": "dom_exists",
+      "testid": "proofreading-diff"
+    },
+    "O3-L1-03": {
+      "claim": "dom_exists",
+      "testid": "diff-mark-*"
+    },
+    "O3-L1-04": {
+      "claim": "dom_exists",
+      "testid": "proofreading-comparison"
+    },
+    "O3-L1-05": {
+      "claim": "dom_exists",
+      "testid": "segment-approve-btn-*"
+    },
+    "O3-L1-06": {
+      "claim": "dom_exists",
+      "testid": "segment-reject-btn-*"
+    },
+    "O3-L1-07": {
+      "claim": "dom_exists",
+      "testid": "approve-all-btn"
+    },
+    "O3-L1-08": {
+      "claim": "dom_exists",
+      "testid": "reject-all-btn"
+    },
+    "O3-L1-09": {
+      "claim": "dom_exists",
+      "testid": "dictionary-panel"
+    },
+    "O3-L1-10": {
+      "claim": "dom_exists",
+      "testid": "proofreading-progress"
+    },
+    "O3-L1-11": {
+      "claim": "dom_exists",
+      "testid": "export-srt-btn"
+    },
+    "O3-L1-12": {
+      "claim": "dom_exists",
+      "testid": "export-txt-btn"
+    },
+    "O3-L1-13": {
+      "claim": "dom_exists",
+      "testid": "skip-proofreading-toggle"
+    },
+    "O4-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/smartcut/init"
+    },
+    "O4-L1-02": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/smartcut/health"
+    },
+    "O4-L1-03": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "estimated_output_seconds"
+    },
+    "O4-L1-04": {
+      "claim": "request_contract",
+      "endpoint": "POST /api/smartcut/recommend",
+      "request_field": "target_duration_minutes"
+    },
+    "O4-L1-05": {
+      "claim": "parameter_coverage",
+      "endpoint": "POST /api/smartcut/recommend"
+    },
+    "O4-L1-06": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/smartcut/lock"
+    },
+    "O4-L1-07": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "recommended_segments"
+    },
+    "O4-L1-08": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
+    },
+    "O4-L1-09": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "estimated_output_str"
+    },
+    "O4-L1-10": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "score"
+    },
+    "O4-L1-11": {
+      "claim": "response_field",
+      "endpoint": "GET /api/smartcut/all-candidates",
+      "response_field": "type"
+    },
+    "O4-L1-12": {
+      "claim": "response_field",
+      "endpoint": "GET /api/smartcut/all-candidates",
+      "response_field": "timestamp"
+    },
+    "O5-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/smartcut/init"
+    },
+    "O5-L1-02": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/smartcut/all-candidates"
+    },
+    "O5-L1-03": {
+      "claim": "response_field",
+      "endpoint": "GET /api/smartcut/all-candidates",
+      "response_field": "highlights"
+    },
+    "O5-L1-04": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/lock",
+      "response_field": "locked_segments"
+    },
+    "O5-L1-05": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/unlock",
+      "response_field": "locked_segments"
+    },
+    "O5-L1-06": {
+      "claim": "idempotency",
+      "endpoint": "POST /api/smartcut/recommend"
+    },
+    "O5-L1-07": {
+      "claim": "idempotency",
+      "endpoint": "POST /api/smartcut/recommend"
+    },
+    "O5-L1-08": {
+      "claim": "response_field",
+      "endpoint": "GET /api/smartcut/all-candidates",
+      "response_field": "chapters"
+    },
+    "O5-L1-09": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "estimated_output_str"
+    },
+    "O5-L1-10": {
+      "claim": "response_field",
+      "endpoint": "POST /api/smartcut/recommend",
+      "response_field": "recommended_segments"
+    },
+    "O5-L1-11": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/smartcut/finalize"
+    },
+    "O6-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/status"
+    },
+    "O6-L1-02": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/quality-gate/status",
+      "response_field": "status"
+    },
+    "O6-L1-03": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/quality-gate/scores",
+      "response_field": "overall_score"
+    },
+    "O6-L1-04": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/scores"
+    },
+    "O6-L1-05": {
+      "claim": "value_constraint",
+      "endpoint": "GET /api/pipeline/quality-gate/scores",
+      "value_literals": [
+        "audio",
+        "video",
+        "subtitle",
+        "structure"
+      ]
+    },
+    "O6-L1-06": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/drilldown/{category}"
+    },
+    "O6-L1-07": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/pipeline/quality-gate/improve"
+    },
+    "O6-L1-08": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/quality-gate/status",
+      "response_field": "threshold"
+    },
+    "O6-L1-09": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/quality-gate/history"
+    },
+    "O6-L1-10": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/quality-gate/history",
+      "response_field": "history"
+    },
+    "O7-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/improvement/status"
+    },
+    "O7-L1-02": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/improvement/status",
+      "response_field": "status"
+    },
+    "O7-L1-03": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/improvement/status",
+      "response_field": [
+        "iteration",
+        "max_iterations"
+      ]
+    },
+    "O7-L1-04": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/improvement/actions"
+    },
+    "O7-L1-05": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/improvement/actions",
+      "response_field": "actions"
+    },
+    "O7-L1-06": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/pipeline/improvement/score-change"
+    },
+    "O7-L1-07": {
+      "claim": "response_field",
+      "endpoint": "GET /api/pipeline/improvement/status",
+      "response_field": [
+        "total_actions",
+        "completed_actions"
+      ]
+    },
+    "O8-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/render/health"
+    },
+    "O8-L1-02": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/render/settings"
+    },
+    "O8-L1-03": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/render/gpu-detect"
+    },
+    "O8-L1-04": {
+      "claim": "response_field",
+      "endpoint": "GET /api/render/settings",
+      "response_field": [
+        "bgm_volume",
+        "bgm_ducking"
+      ]
+    },
+    "O8-L1-05": {
+      "claim": "response_field",
+      "endpoint": "GET /api/render/settings",
+      "response_field": "lufs_target"
+    },
+    "O8-L1-06": {
+      "claim": "response_field",
+      "endpoint": "GET /api/render/settings",
+      "response_field": [
+        "logo_enabled",
+        "logo_position",
+        "logo_opacity"
+      ]
+    },
+    "O8-L1-07": {
+      "claim": "response_field",
+      "endpoint": "GET /api/render/settings",
+      "response_field": [
+        "subtitle_enabled",
+        "subtitle_font",
+        "subtitle_size"
+      ]
+    },
+    "O8-L1-08": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/render/start"
+    },
+    "O8-L1-09": {
+      "claim": "response_field",
+      "endpoint": "GET /api/render/status/{job_id}",
+      "response_field": "stages"
+    },
+    "O8-L1-10": {
+      "claim": "response_field",
+      "endpoint": "GET /api/render/status/{job_id}",
+      "response_field": "output_file"
+    },
+    "O8-L1-11": {
+      "claim": "response_field",
+      "endpoint": "GET /api/render/download/{job_id}",
+      "response_field": "download_url"
+    },
+    "O8-L1-12": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/render/complete/{job_id}"
+    },
+    "O9-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/youtube/health"
+    },
+    "O9-L1-02": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/youtube/optimize"
+    },
+    "O9-L1-03": {
+      "claim": "dom_exists",
+      "testid": "youtube-title-candidates"
+    },
+    "O9-L1-04": {
+      "claim": "dom_exists",
+      "testid": "youtube-tag-list"
+    },
+    "O9-L1-05": {
+      "claim": "dom_exists",
+      "testid": "youtube-chapter-list"
+    },
+    "O9-L1-06": {
+      "claim": "dom_exists",
+      "testid": "youtube-thumbnail-candidates"
+    },
+    "O9-L1-07": {
+      "claim": "dom_exists",
+      "testid": "youtube-seo-score"
+    },
+    "O9-L1-08": {
+      "claim": "dom_exists",
+      "testid": "youtube-description"
+    },
+    "O9-L1-09": {
+      "claim": "dom_exists",
+      "testid": "youtube-hashtag-list"
+    },
+    "O9-L1-10": {
+      "claim": "dom_exists",
+      "testid": "youtube-ctr-prediction"
+    },
+    "O9-L1-11": {
+      "claim": "dom_exists",
+      "testid": "youtube-publish-readiness"
+    },
+    "O9-L1-12": {
+      "claim": "spec_incomplete"
+    },
+    "O10-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /themes/health"
+    },
+    "O10-L1-02": {
+      "claim": "route_exists",
+      "endpoint": "GET /themes/templates"
+    },
+    "O10-L1-03": {
+      "claim": "route_exists",
+      "endpoint": "GET /themes/templates/{template_id}"
+    },
+    "O10-L1-04": {
+      "claim": "route_exists",
+      "endpoint": "GET /themes"
+    },
+    "O10-L1-05": {
+      "claim": "route_exists",
+      "endpoint": "GET /themes/{theme_id}"
+    },
+    "O10-L1-06": {
+      "claim": "route_exists",
+      "endpoint": "POST /themes/apply"
+    },
+    "O10-L1-07": {
+      "claim": "route_exists",
+      "endpoint": "GET /themes/current/active"
+    },
+    "O10-L1-08": {
+      "claim": "route_exists",
+      "endpoint": "GET /themes/stats"
+    },
+    "O10-L1-09": {
+      "claim": "route_exists",
+      "endpoint": "POST /themes/recommend"
+    },
+    "O10-L1-10": {
+      "claim": "route_exists",
+      "endpoint": "POST /themes/override"
+    },
+    "O11-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/youtube/health"
+    },
+    "O11-L1-02": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/youtube/pre-plan"
+    },
+    "O11-L1-03": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/youtube/generate-thumbnail"
+    },
+    "O11-L1-04": {
+      "claim": "response_field",
+      "endpoint": "POST /api/youtube/pre-plan",
+      "response_field": "past_lessons"
+    },
+    "O11-L1-05": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/youtube/optimize"
+    },
+    "O11-L1-06": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/director/analyze-script"
+    },
+    "O11-L1-07": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/director/quality-score"
+    },
+    "O11-L1-08": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/director/plan-storyboard"
+    },
+    "O11-L1-09": {
+      "claim": "response_field",
+      "endpoint": "POST /api/youtube/pre-plan",
+      "response_field": "success"
+    },
+    "O11-L1-10": {
+      "claim": "response_field",
+      "endpoint": "POST /api/youtube/pre-plan",
+      "response_field": "hook_score"
+    },
+    "O12-L1-01": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/evolution/status"
+    },
+    "O12-L1-02": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/analytics/sync"
+    },
+    "O12-L1-03": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/analytics/simulate"
+    },
+    "O12-L1-04": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/evolution"
+    },
+    "O12-L1-05": {
+      "claim": "route_exists",
+      "endpoint": "POST /api/evolution/sync"
+    },
+    "O12-L1-06": {
+      "claim": "route_exists",
+      "endpoint": "GET /api/evolution/status"
+    },
+    "O12-L1-07": {
+      "claim": "response_field",
+      "endpoint": "GET /api/evolution/status",
+      "response_field": "user_model"
+    },
+    "O12-L1-08": {
+      "claim": "response_field",
+      "endpoint": "POST /api/analytics/sync",
+      "response_field": "result"
+    },
+    "O12-L1-09": {
+      "claim": "response_field",
+      "endpoint": "POST /api/analytics/simulate",
+      "response_field": "simulation"
+    },
+    "O12-L1-10": {
+      "claim": "response_field",
+      "endpoint": "GET /api/evolution",
+      "response_field": "entries"
+    },
+    "O12-L1-11": {
+      "claim": "response_field",
+      "endpoint": "GET /api/evolution/status",
+      "response_field": "evolution_entries"
+    }
+  },
   "tightenings": [
     {
       "reason": "レスポンス内容の主張を、エンドポイントの実在ではなく返り値のフィールドで判定するようにした（P2 C-2）",
@@ -275,6 +836,938 @@
         "O5-L1-06",
         "O5-L1-07"
       ]
+    }
+  ],
+  "redeclarations": [
+    {
+      "reason": "P3 C-4: 宣言内容（claim / testid / endpoint / response_field / value_literals / request_field）をベースラインに初回ピンする。これ以降、宣言の差し替えは substituted として検出される",
+      "items": {
+        "O1-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/videos"
+          }
+        },
+        "O1-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/videos",
+            "response_field": "videos"
+          }
+        },
+        "O1-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/pipeline/videos/metadata",
+            "response_field": [
+              "name",
+              "path",
+              "size_mb",
+              "modified"
+            ]
+          }
+        },
+        "O1-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "value_constraint",
+            "endpoint": "GET /api/pipeline/videos",
+            "value_literals": [
+              ".mp4",
+              ".mov",
+              ".mkv",
+              ".avi"
+            ]
+          }
+        },
+        "O1-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "pipeline-drop-zone"
+          }
+        },
+        "O1-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/pipeline/videos/validate"
+          }
+        },
+        "O1-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "storage_key",
+            "storage_key": "pipeline_recent_videos"
+          }
+        },
+        "O10-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/health"
+          }
+        },
+        "O10-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/templates"
+          }
+        },
+        "O10-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/templates/{template_id}"
+          }
+        },
+        "O10-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes"
+          }
+        },
+        "O10-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/{theme_id}"
+          }
+        },
+        "O10-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /themes/apply"
+          }
+        },
+        "O10-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/current/active"
+          }
+        },
+        "O10-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/stats"
+          }
+        },
+        "O10-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /themes/recommend"
+          }
+        },
+        "O10-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /themes/override"
+          }
+        },
+        "O11-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/youtube/health"
+          }
+        },
+        "O11-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/pre-plan"
+          }
+        },
+        "O11-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/generate-thumbnail"
+          }
+        },
+        "O11-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "past_lessons"
+          }
+        },
+        "O11-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/optimize"
+          }
+        },
+        "O11-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/director/analyze-script"
+          }
+        },
+        "O11-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/director/quality-score"
+          }
+        },
+        "O11-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/director/plan-storyboard"
+          }
+        },
+        "O11-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "success"
+          }
+        },
+        "O11-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "hook_score"
+          }
+        },
+        "O12-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/evolution/status"
+          }
+        },
+        "O12-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/analytics/sync"
+          }
+        },
+        "O12-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/analytics/simulate"
+          }
+        },
+        "O12-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/evolution"
+          }
+        },
+        "O12-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/evolution/sync"
+          }
+        },
+        "O12-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/evolution/status"
+          }
+        },
+        "O12-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "user_model"
+          }
+        },
+        "O12-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/analytics/sync",
+            "response_field": "result"
+          }
+        },
+        "O12-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/analytics/simulate",
+            "response_field": "simulation"
+          }
+        },
+        "O12-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution",
+            "response_field": "entries"
+          }
+        },
+        "O12-L1-11": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "evolution_entries"
+          }
+        },
+        "O2-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "whisper-model-select"
+          }
+        },
+        "O2-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "whisper-recommended"
+          }
+        },
+        "O2-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "transcription-progress-bar"
+          }
+        },
+        "O2-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "transcription-progress-text"
+          }
+        },
+        "O2-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "transcription-elapsed"
+          }
+        },
+        "O2-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "segment-list"
+          }
+        },
+        "O2-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "element_count",
+            "testid": "segment-item-*"
+          }
+        },
+        "O3-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "proofreading-stage-panel"
+          }
+        },
+        "O3-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "proofreading-diff"
+          }
+        },
+        "O3-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "diff-mark-*"
+          }
+        },
+        "O3-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "proofreading-comparison"
+          }
+        },
+        "O3-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "segment-approve-btn-*"
+          }
+        },
+        "O3-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "segment-reject-btn-*"
+          }
+        },
+        "O3-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "approve-all-btn"
+          }
+        },
+        "O3-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "reject-all-btn"
+          }
+        },
+        "O3-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "dictionary-panel"
+          }
+        },
+        "O3-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "proofreading-progress"
+          }
+        },
+        "O3-L1-11": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "export-srt-btn"
+          }
+        },
+        "O3-L1-12": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "export-txt-btn"
+          }
+        },
+        "O3-L1-13": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "skip-proofreading-toggle"
+          }
+        },
+        "O4-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/init"
+          }
+        },
+        "O4-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/smartcut/health"
+          }
+        },
+        "O4-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_seconds"
+          }
+        },
+        "O4-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "request_contract",
+            "endpoint": "POST /api/smartcut/recommend",
+            "request_field": "target_duration_minutes"
+          }
+        },
+        "O4-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "parameter_coverage",
+            "endpoint": "POST /api/smartcut/recommend"
+          }
+        },
+        "O4-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/lock"
+          }
+        },
+        "O4-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O4-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/smartcut/all-candidates"
+          }
+        },
+        "O4-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O4-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "score"
+          }
+        },
+        "O4-L1-11": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "type"
+          }
+        },
+        "O4-L1-12": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "timestamp"
+          }
+        },
+        "O5-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/init"
+          }
+        },
+        "O5-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/smartcut/all-candidates"
+          }
+        },
+        "O5-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "highlights"
+          }
+        },
+        "O5-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/lock",
+            "response_field": "locked_segments"
+          }
+        },
+        "O5-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/unlock",
+            "response_field": "locked_segments"
+          }
+        },
+        "O5-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "idempotency",
+            "endpoint": "POST /api/smartcut/recommend"
+          }
+        },
+        "O5-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "idempotency",
+            "endpoint": "POST /api/smartcut/recommend"
+          }
+        },
+        "O5-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "chapters"
+          }
+        },
+        "O5-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O5-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O5-L1-11": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/finalize"
+          }
+        },
+        "O6-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/status"
+          }
+        },
+        "O6-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/status",
+            "response_field": "status"
+          }
+        },
+        "O6-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/scores",
+            "response_field": "overall_score"
+          }
+        },
+        "O6-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/scores"
+          }
+        },
+        "O6-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "value_constraint",
+            "endpoint": "GET /api/pipeline/quality-gate/scores",
+            "value_literals": [
+              "audio",
+              "video",
+              "subtitle",
+              "structure"
+            ]
+          }
+        },
+        "O6-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/drilldown/{category}"
+          }
+        },
+        "O6-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/pipeline/quality-gate/improve"
+          }
+        },
+        "O6-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/status",
+            "response_field": "threshold"
+          }
+        },
+        "O6-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/history"
+          }
+        },
+        "O6-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/history",
+            "response_field": "history"
+          }
+        },
+        "O7-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/improvement/status"
+          }
+        },
+        "O7-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": "status"
+          }
+        },
+        "O7-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": [
+              "iteration",
+              "max_iterations"
+            ]
+          }
+        },
+        "O7-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/improvement/actions"
+          }
+        },
+        "O7-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/actions",
+            "response_field": "actions"
+          }
+        },
+        "O7-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/improvement/score-change"
+          }
+        },
+        "O7-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": [
+              "total_actions",
+              "completed_actions"
+            ]
+          }
+        },
+        "O8-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/render/health"
+          }
+        },
+        "O8-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/render/settings"
+          }
+        },
+        "O8-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/render/gpu-detect"
+          }
+        },
+        "O8-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "bgm_volume",
+              "bgm_ducking"
+            ]
+          }
+        },
+        "O8-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": "lufs_target"
+          }
+        },
+        "O8-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "logo_enabled",
+              "logo_position",
+              "logo_opacity"
+            ]
+          }
+        },
+        "O8-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "subtitle_enabled",
+              "subtitle_font",
+              "subtitle_size"
+            ]
+          }
+        },
+        "O8-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/render/start"
+          }
+        },
+        "O8-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "stages"
+          }
+        },
+        "O8-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "output_file"
+          }
+        },
+        "O8-L1-11": {
+          "before": null,
+          "after": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/download/{job_id}",
+            "response_field": "download_url"
+          }
+        },
+        "O8-L1-12": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/render/complete/{job_id}"
+          }
+        },
+        "O9-L1-01": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/youtube/health"
+          }
+        },
+        "O9-L1-02": {
+          "before": null,
+          "after": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/optimize"
+          }
+        },
+        "O9-L1-03": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-title-candidates"
+          }
+        },
+        "O9-L1-04": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-tag-list"
+          }
+        },
+        "O9-L1-05": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-chapter-list"
+          }
+        },
+        "O9-L1-06": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-thumbnail-candidates"
+          }
+        },
+        "O9-L1-07": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-seo-score"
+          }
+        },
+        "O9-L1-08": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-description"
+          }
+        },
+        "O9-L1-09": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-hashtag-list"
+          }
+        },
+        "O9-L1-10": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-ctr-prediction"
+          }
+        },
+        "O9-L1-11": {
+          "before": null,
+          "after": {
+            "claim": "dom_exists",
+            "testid": "youtube-publish-readiness"
+          }
+        },
+        "O9-L1-12": {
+          "before": null,
+          "after": {
+            "claim": "spec_incomplete"
+          }
+        }
+      }
     }
   ]
 }

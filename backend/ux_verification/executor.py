@@ -234,6 +234,11 @@ class L1Result:
     verdict: Verdict
     reason: str  # "found" | "not_found" | "no_testid" | "unreachable"
     evidence: str
+    # 項目が宣言している照合先そのもの（claim / testid / endpoint / …）。
+    # ラチェットがこれを固定して、宣言の**差し替え**を検出する。
+    # `_route` が一箇所で載せる。既定を空にしてあるのは、この dataclass を
+    # 直に組み立てるテストを壊さないため。
+    declaration: dict = field(default_factory=dict)
 
     @property
     def passed(self) -> bool | None:
@@ -447,7 +452,18 @@ class L1Executor:
         L1 は名目上すべて `dom_exists` だが、実際には 86件が API・データ契約の
         主張だった（`docs/ux_l1_triage_20260802.md`）。`test_method` は
         書き換えず、項目が持つ照合先（testid / endpoint）で振り分ける。
+
+        判定器が何であれ、**宣言内容はここで一箇所だけで載せる。** 判定器ごとに
+        載せると、新しい判定器を足したときに載せ忘れた経路がラチェットの
+        外に落ちる。
         """
+        from .claim_audit import declaration_of
+
+        result = self._dispatch(ux_id, item, registry)
+        result.declaration = declaration_of(item)
+        return result
+
+    def _dispatch(self, ux_id: str, item: dict, registry: TestIdRegistry) -> L1Result:
         claim = (item.get("claim") or "").strip()
         if claim:
             # claim があれば**主張の種類**で振り分ける。宣言の有無で振り分けると、
@@ -669,6 +685,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tighten", metavar="理由",
                         help="判定を厳しくしたことによる PASS の減少だけを"
                              "受け入れて締め直す。理由はベースラインに残る")
+    parser.add_argument("--redeclare", metavar="理由",
+                        help="項目が何を測ると宣言しているかを変えたことだけを"
+                             "受け入れて締め直す。理由と before/after が残る")
     args = parser.parse_args(argv)
 
     report = L1Executor.for_repo().run(persona=args.persona)
@@ -688,14 +707,16 @@ def main(argv: list[str] | None = None) -> int:
         path = SnapshotStore().save(report.to_snapshot(version=args.snapshot))
         print(f"  スナップショット: {path}")
 
-    if args.ratchet or args.update_baseline or args.tighten:
+    if args.ratchet or args.update_baseline or args.tighten or args.redeclare:
         from .l1_ratchet import L1Ratchet, baseline_path, load_baseline
 
         path = baseline_path(report.persona)
-        if args.update_baseline or args.tighten:
+        if args.update_baseline or args.tighten or args.redeclare:
             try:
                 if args.tighten:
                     L1Ratchet().tighten(report, path, args.tighten)
+                elif args.redeclare:
+                    L1Ratchet().redeclare(report, path, args.redeclare)
                 else:
                     L1Ratchet().update(report, path)
             except ValueError as exc:
