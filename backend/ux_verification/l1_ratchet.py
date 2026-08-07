@@ -28,6 +28,18 @@
 
 宣言を変えること自体は禁じない。**黙って変えられないようにする。**
 `--redeclare "理由"` で理由と before/after を履歴に残して締め直す。
+
+## 記録の不在は「変化なし」ではない
+
+3層はどれもベースラインの記録との比較なので、**記録を消せば比較が消える。**
+`items` / `reasons` / `declarations` のどれか1冊から1行消すだけで、その項目の
+退行・弱化・差し替えがまとめて見えなくなる（`items` から消せば「新しい項目」に
+化け、比較ループにすら入らない）。そこで**いま在る項目が3冊すべてにピンされて
+いること**を不変条件にし、欠けていれば `unpinned` として落とす。
+
+3冊すべてに無いもの（＝まだピンしていない新しい項目）だけは `unpinned_new` と
+区別して `--update-baseline` で通す。一部の冊にだけ残っているのは記録を消した跡
+なので、理由を書かせる。
 """
 from __future__ import annotations
 
@@ -157,6 +169,11 @@ class L1Violation:
                 f"[固定されていない] {self.item_id}: {self.before}"
                 "（ベースラインに記録が無く、変化を検出できない）"
             )
+        if self.kind == "unpinned_new":
+            return (
+                f"[未ピン] {self.item_id}: ベースラインに無い新しい項目"
+                "（--update-baseline でピンしてください）"
+            )
         return f"[退行] {self.item_id}: {self.before} → {self.after}"
 
 
@@ -187,13 +204,13 @@ class L1RatchetResult:
         lines = [f"🚫 {head}", f"  {len(self.violations)}件の違反:"]
         lines += [f"    {v}" for v in self.violations]
         kinds = {v.kind for v in self.violations}
-        if kinds - {"substituted", "unpinned"}:
+        if kinds - {"substituted", "unpinned", "unpinned_new"}:
             lines.append(
                 "\n  PASS だった項目が FAIL に戻っています。frontend から "
                 "data-testid が消えたか、ストーリー側の testid が書き換わっています。"
                 "意図した変更なら --update-baseline で締め直してください。"
             )
-        if kinds & {"substituted", "unpinned"}:
+        if kinds & {"substituted", "unpinned", "unpinned_new"}:
             lines.append(
                 "\n  項目が**何を測ると宣言しているか**がベースラインと違います。"
                 "verdict と理由コードは同じでも、要求している内容が変わっています。"
@@ -222,28 +239,43 @@ class L1Ratchet:
         violations: list[L1Violation] = []
         improvements: list[str] = []
 
+        # 3冊（items / reasons / declarations）と**現在の項目**が食い違っている
+        # ものを先に洗い出す。記録が無いものは「変化なし」ではなく「分からない」。
+        #
+        # ここを項目単位で見るだけでは足りなかった。`items` から1行消すと、その
+        # 項目は before に居なくなって `added` に落ち、下のループに一度も入らない。
+        # PASS → FAIL の退行も宣言の差し替えも、まとめて緑で通る
+        # （gate-verifier 6回目）。**現在ある項目が全部ピンされていること**を
+        # 不変条件にして、3冊のどれから消しても違反になるようにする。
+        pinned_books = (
+            ("verdict がベースラインに無い", before),
+            ("前回の判定理由がベースラインに無い", before_reasons),
+            ("前回の宣言がベースラインに無い", before_decls),
+        )
+        unpinned_ids: set[str] = set()
+        for item_id in sorted(set(after) | set(before) | set(before_reasons)
+                              | set(before_decls)):
+            if item_id not in after and item_id in before:
+                continue  # 項目そのものの消滅は下のループが removed として出す
+            missing = [label for label, book in pinned_books if item_id not in book]
+            if not missing:
+                continue
+            unpinned_ids.add(item_id)
+            # 3冊すべてに無ければ、単に**まだピンしていない新しい項目**。
+            # 一部の冊にだけ残っているなら、記録を消した跡。前者は
+            # --update-baseline でピンしてよく、後者は理由を書かせる。
+            kind = "unpinned_new" if len(missing) == len(pinned_books) else "unpinned"
+            violations.append(L1Violation(kind, item_id, "・".join(missing), "—"))
+
         for item_id, was in before.items():
             now = after.get(item_id)
             if now is None:
                 violations.append(L1Violation("removed", item_id, was, "—"))
                 continue
 
-            # 記録が無いものは「変化なし」ではなく「分からない」。
-            # `reasons` を丸ごと消せば _is_content_judged が常に False になり、
-            # `declarations` を丸ごと消せば差し替えが素通りする。どちらも
-            # **検出器を黙って無効化する**経路なので、不在自体を違反にする。
-            unpinned = [
-                label for label, book in (
-                    ("前回の判定理由がベースラインに無い", before_reasons),
-                    ("前回の宣言がベースラインに無い", before_decls),
-                )
-                if item_id not in book
-            ]
-            if unpinned:
-                violations.append(L1Violation(
-                    "unpinned", item_id, "・".join(unpinned), "—"))
-                continue
-
+            # unpinned でも**ここで打ち切らない。** 記録の欠落を退行の目隠しに
+            # 使えてしまう（`declarations` から1行消すと unpinned だけが出て
+            # 退行が報告されず、--redeclare がそれを受理する）。
             if was == "PASS" and now != "PASS":
                 violations.append(L1Violation("regressed", item_id, was, now))
                 continue
@@ -252,10 +284,11 @@ class L1Ratchet:
             # 宣言にしかないので、宣言が変われば同じ理由コードのまま別物を
             # 測っている。FAIL → PASS になっていても、それは実装が良くなった
             # 証拠ではなく、要求を取り替えた結果でしかない。
-            if before_decls.get(item_id) != after_decls.get(item_id):
+            if (item_id in before_decls
+                    and before_decls[item_id] != after_decls.get(item_id)):
                 violations.append(L1Violation(
                     "substituted", item_id,
-                    _render_declaration(before_decls.get(item_id)),
+                    _render_declaration(before_decls[item_id]),
                     _render_declaration(after_decls.get(item_id)),
                 ))
                 continue
@@ -270,7 +303,7 @@ class L1Ratchet:
                     "weakened", item_id,
                     before_reasons.get(item_id, "?"), after_reasons.get(item_id, "?"),
                 ))
-            elif was != "PASS" and now == "PASS":
+            elif was != "PASS" and now == "PASS" and item_id not in unpinned_ids:
                 improvements.append(item_id)
 
         added = [i for i in after if i not in before]
@@ -291,10 +324,14 @@ class L1Ratchet:
         """
         baseline = load_baseline(path)
         result = self.check(report, baseline)
-        if not result.valid:
+        # 未ピン（新しく足した項目、または3冊のどれかから記録が消えたもの）だけは
+        # ここで締め直せる。それ以外が1件でも混じっていたら書かない——退行を
+        # 未ピンに紛れ込ませて通せるようにすると、締め直しが抜け道になる。
+        blocking = [v for v in result.violations if v.kind != "unpinned_new"]
+        if blocking:
             raise ValueError(
                 "退行が残っているためベースラインを更新できません:\n"
-                + "\n".join(f"  {v}" for v in result.violations)
+                + "\n".join(f"  {v}" for v in blocking)
             )
         return write_baseline(report, path,
                               (baseline or {}).get("tightenings"),
@@ -325,7 +362,7 @@ class L1Ratchet:
         before_decls = (baseline or {}).get("declarations") or {}
 
         illegitimate = [v for v in result.violations
-                        if v.kind not in ("substituted", "unpinned")]
+                        if v.kind not in ("substituted", "unpinned", "unpinned_new")]
         if illegitimate:
             raise ValueError(
                 "宣言の差し替えでは説明できない違反が混じっています:\n"

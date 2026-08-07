@@ -140,7 +140,13 @@ def test_removing_an_item_is_a_violation(tmp_path):
     assert "removed" in kinds
 
 
-def test_adding_an_item_is_allowed(tmp_path):
+def test_adding_an_item_must_be_pinned(tmp_path):
+    """項目の追加は歓迎するが、ピンするまでは緑にしない。
+
+    以前は `added` として黙って通していた。だがベースラインの `items` から
+    1行消せば既存項目も「新しい項目」に化けるので、そこが穴になっていた
+    （退行も宣言の差し替えも `added` に落ちて違反ゼロで通った）。
+    """
     path = tmp_path / "base.json"
     write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
 
@@ -149,8 +155,20 @@ def test_adding_an_item_is_allowed(tmp_path):
         load_baseline(path),
     )
 
-    assert result.valid
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["unpinned_new"]
     assert result.added == ["O1-L1-02"]
+
+
+def test_update_pins_a_newly_added_item(tmp_path):
+    """新しい項目のピンは --update-baseline でできる（理由は要らない）。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS)]), path)
+    grown = _report([("O1-L1-01", Verdict.PASS), ("O1-L1-02", Verdict.FAIL)])
+
+    L1Ratchet().update(grown, path)
+
+    assert L1Ratchet().check(grown, load_baseline(path)).valid
 
 
 def test_missing_baseline_is_valid_but_flagged(tmp_path):
@@ -691,6 +709,90 @@ def test_redeclaration_history_survives_a_later_update(tmp_path):
 
 
 # --- 実データが宣言を持っていること --------------------------------------------
+
+
+# --- 記録の欠落を目隠しに使わせない --------------------------------------------
+#
+# gate-verifier 6回目。`unpinned` を足したことで「記録の不在」は違反になったが、
+# 対象が reasons と declarations の2冊だけで、**項目の在否を決めている items
+# 自身**が対象外だった。加えて unpinned が退行の判定より前に短絡していたため、
+# 記録を1行消すだけで退行を隠せた。
+
+
+def test_deleting_an_item_from_the_items_book_does_not_hide_a_regression(tmp_path):
+    """`items` から1行消すと、その項目は「新しい項目」に化けていた。
+
+    before に居なくなるので退行の比較ループに一度も入らず、宣言の差し替えも
+    verdict の後退もまとめて緑で通った（exit 0）。
+    """
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload["items"]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.FAIL, "not_found", _SUCCESS), load_baseline(path)
+    )
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["unpinned"]
+
+
+def test_unpinned_does_not_short_circuit_the_regression_check(tmp_path):
+    """記録の欠落と退行が同じ項目に乗ったら、両方とも報告する。
+
+    unpinned で打ち切っていた頃は退行が報告されず、--redeclare が
+    「差し替えだけ」と判断して受理していた。
+    """
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload["declarations"]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.FAIL, "not_found", _SUCCESS), load_baseline(path)
+    )
+
+    assert {v.kind for v in result.violations} == {"unpinned", "regressed"}
+
+
+def test_redeclare_cannot_pin_over_a_regression_hidden_by_a_deleted_record(tmp_path):
+    """記録を1行消して退行を未ピンの陰に隠し、--redeclare で締め直す経路。"""
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload["declarations"]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="宣言の差し替えでは説明できない"):
+        L1Ratchet().redeclare(
+            _declared("O1-L1-01", Verdict.FAIL, "not_found", _SUCCESS),
+            path, "宣言をピンし直す")
+
+    assert load_baseline(path)["items"]["O1-L1-01"] == "PASS"
+
+
+def test_update_cannot_repin_over_a_partially_deleted_record(tmp_path):
+    """一部の冊にだけ残っている＝記録を消した跡。理由なしでは締め直せない。"""
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload["declarations"]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        L1Ratchet().update(
+            _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS), path)
 
 
 def test_committed_baseline_pins_the_declaration_of_every_owner_l1_item():
