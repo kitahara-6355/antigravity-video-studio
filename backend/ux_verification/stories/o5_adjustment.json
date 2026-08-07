@@ -237,8 +237,7 @@
       "description": "固定解除APIが正常応答しlocked_segmentsが更新される",
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/unlock",
-      "response_field": "locked_segments",
-      "claim": "response_field"
+      "claim": "state_transition"
     },
     {
       "id": "O5-L1-06",

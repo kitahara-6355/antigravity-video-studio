@@ -124,12 +124,12 @@
       "description": "動画リストに対応拡張子のみ含まれる",
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/videos",
-      "claim": "value_constraint",
-      "value_literals": [
-        ".mp4",
-        ".mov",
-        ".mkv",
-        ".avi"
+      "claim": "value_exclusive",
+      "value_set": [
+        "*.mp4",
+        "*.mov",
+        "*.mkv",
+        "*.avi"
       ]
     },
     {

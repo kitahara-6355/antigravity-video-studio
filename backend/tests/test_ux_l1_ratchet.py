@@ -828,7 +828,9 @@ def test_unpinned_does_not_short_circuit_the_regression_check(tmp_path):
         _declared("O1-L1-01", Verdict.FAIL, "not_found", _SUCCESS), load_baseline(path)
     )
 
-    assert {v.kind for v in result.violations} == {"tampered", "regressed"}
+    # 退行で打ち切らないので、判定の弱化も同時に出る（片方だけだと締め直しの
+    # 履歴にもう片方が残らない）。
+    assert {v.kind for v in result.violations} == {"tampered", "regressed", "weakened"}
 
 
 def test_redeclare_cannot_pin_over_a_regression_hidden_by_a_deleted_record(tmp_path):

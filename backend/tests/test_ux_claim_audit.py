@@ -27,8 +27,26 @@ def _stories(tmp_path, items, name="o1_demo.json", ux_id="O-1"):
     return tmp_path
 
 
-def _item(item_id, claim=None, **declared):
-    out = {"id": item_id, "layer": 1, "description": item_id}
+# claim ごとの、**述語の語彙に載っている** description。
+# description の述語と claim の対応も監査するようになったので（P3 C-3）、
+# 合成データも実データと同じ書き方にしないと `unparsed` で落ちる。
+_DESC_FOR_CLAIM = {
+    "dom_exists": "要素が存在する",
+    "route_exists": "APIが正常応答",
+    "response_field": "APIが正常応答しフィールドが返る",
+    "storage_key": "localStorageに履歴キーが存在する",
+    "value_constraint": "4カテゴリ(a/b/c/d)が存在する",
+    "value_exclusive": "対応拡張子のみ含まれる",
+    "request_contract": "パラメータを受け付ける",
+    "response_value": "success=true",
+}
+
+
+def _item(item_id, claim=None, description=None, **declared):
+    out = {
+        "id": item_id, "layer": 1,
+        "description": description or _DESC_FOR_CLAIM.get(claim, "要素が存在する"),
+    }
     if claim is not None:
         out["claim"] = claim
     out.update(declared)
@@ -337,3 +355,87 @@ def test_declaration_of_ignores_empty_values():
     assert declaration_of({"claim": "route_exists", "endpoint": "GET /x",
                            "testid": ""}) == {
         "claim": "route_exists", "endpoint": "GET /x"}
+
+
+# --- description の述語と claim の対応（P3 C-3）---------------------------------
+#
+# claim は人が貼るラベルで、description との対応を誰も検証していなかった。
+# 弱いラベルを選べば主張の一部を捨てたまま PASS にできた（gate-verifier 5回目）。
+
+
+def test_a_value_claim_cannot_be_measured_by_field_existence(tmp_path):
+    """`success=true` に response_field を貼る——実在した偽 PASS そのもの。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="success=true",
+              endpoint="POST /api/x", response_field="success"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+def test_an_exclusivity_claim_cannot_be_measured_by_presence(tmp_path):
+    """「〜のみ」を value_constraint で測ると『のみ』が落ちる。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "value_constraint", description="対応拡張子のみ含まれる",
+              endpoint="GET /api/x", value_literals=[".mp4"]),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+def test_a_state_transition_cannot_be_measured_by_field_existence(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field",
+              description="解除APIが正常応答しlocked_segmentsが更新される",
+              endpoint="POST /api/x", response_field="locked_segments"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+def test_a_description_outside_the_vocabulary_is_rejected(tmp_path):
+    """語彙を閉じる。未登録の書き方で強い主張を書けば素通りしてしまう。
+
+    ユーザー判断（2026-08-07）: マーカー検出だと辞書に無い語を見落とす。
+    実際、最初のパターン表は「4カテゴリ」を拾えなかった。
+    """
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists", description="いい感じに動く", testid="x"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["unparsed"]
+
+
+def test_declaring_it_unmeasurable_is_allowed_for_any_predicate(tmp_path):
+    """「測れない」は述語の種類とは別の軸。どの述語にも貼れる。
+
+    必ず FAIL に落ちるので偽の緑は作れない（ユーザー判断 2026-08-07）。
+    O9-L1-12「エクスポートAPIが正常応答」が実例で、述語は経路の主張だが
+    どの API を指しているかが仕様に無い。
+    """
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "spec_incomplete", description="エクスポートAPIが正常応答"),
+    ]))
+
+    assert report.mismatched == []
+
+
+def test_every_grammar_entry_points_at_a_known_claim():
+    """述語を足して claim を書き忘れたら、対応表の外にポケットができる。"""
+    from backend.ux_verification.claim_audit import DESCRIPTION_GRAMMAR
+
+    for name, _pattern, claims in DESCRIPTION_GRAMMAR:
+        assert claims, name
+        for claim in claims:
+            assert claim in CLAIM_METHODS, f"{name} → {claim}"
+
+
+def test_every_owner_l1_description_is_in_the_vocabulary():
+    """122件すべてが語彙で書かれていること。1件でも外れたら CI が落ちる。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    report = for_repo("owner")
+    unparsed = [r.item_id for r in report.rows
+                if parse_description(r.description) is None]
+
+    assert unparsed == []

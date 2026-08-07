@@ -752,3 +752,120 @@ def test_evidence_labels_each_method_separately(tmp_path):
 
     assert "static_value_scan" in value.evidence
     assert "static_request_scan" in request.evidence
+
+
+# --- 値そのものの主張（P3 C-3 / response_value）---------------------------------
+
+
+def _router(tmp_path, body: str, name="demo_router.py"):
+    path = tmp_path / name
+    path.write_text(
+        "from fastapi import APIRouter\n"
+        "router = APIRouter()\n" + body,
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def _registry(tmp_path):
+    from backend.ux_verification.api_contract import EndpointRegistry
+
+    return EndpointRegistry.scan(tmp_path)
+
+
+def _judge(tmp_path, item):
+    from backend.ux_verification.api_contract import ApiContractExecutor
+
+    return ApiContractExecutor(_registry(tmp_path)).judge("O-1", item)
+
+
+def test_value_claim_passes_when_only_the_expected_literal_is_assigned(tmp_path):
+    _router(tmp_path, '@router.post("/x")\n'
+                      'async def h():\n'
+                      '    return {"success": True}\n')
+
+    result = _judge(tmp_path, {
+        "id": "O1-L1-01", "description": "success=true", "claim": "response_value",
+        "endpoint": "POST /x", "response_field": "success", "expected_value": "true",
+    })
+
+    assert result.reason == "value_matched"
+
+
+def test_value_claim_fails_when_another_literal_is_reachable(tmp_path):
+    """`success=false` を返す経路が1つでもあれば『success=true』とは言えない。"""
+    _router(tmp_path, '@router.post("/x")\n'
+                      'async def h(flag: bool):\n'
+                      '    if flag:\n'
+                      '        return {"success": True}\n'
+                      '    return {"success": False}\n')
+
+    result = _judge(tmp_path, {
+        "id": "O1-L1-01", "description": "success=true", "claim": "response_value",
+        "endpoint": "POST /x", "response_field": "success", "expected_value": "true",
+    })
+
+    assert result.reason == "value_mismatch"
+
+
+def test_value_claim_fails_when_the_value_is_built_dynamically(tmp_path):
+    """動的に組み立てた値は追えない。追えていないものを PASS に逃がさない。"""
+    _router(tmp_path, '@router.post("/x")\n'
+                      'async def h(flag: bool):\n'
+                      '    return {"success": flag}\n')
+
+    result = _judge(tmp_path, {
+        "id": "O1-L1-01", "description": "success=true", "claim": "response_value",
+        "endpoint": "POST /x", "response_field": "success", "expected_value": "true",
+    })
+
+    assert result.reason == "value_mismatch"
+
+
+# --- 集合の主張（P3 C-3 / value_exclusive）-------------------------------------
+
+
+def test_exclusive_claim_passes_on_an_exactly_matching_list(tmp_path):
+    _router(tmp_path, '@router.get("/x")\n'
+                      'async def h():\n'
+                      '    patterns = ["*.mp4", "*.mov"]\n'
+                      '    return {"videos": patterns}\n')
+
+    result = _judge(tmp_path, {
+        "id": "O1-L1-01", "description": "対応拡張子のみ含まれる",
+        "claim": "value_exclusive", "endpoint": "GET /x",
+        "value_set": ["*.mp4", "*.mov"],
+    })
+
+    assert result.reason == "value_set_matched"
+
+
+def test_exclusive_claim_fails_when_the_list_has_an_extra_member(tmp_path):
+    """要素が現れることを見るだけでは『のみ』を確かめたことにならない。"""
+    _router(tmp_path, '@router.get("/x")\n'
+                      'async def h():\n'
+                      '    patterns = ["*.mp4", "*.mov", "*.exe"]\n'
+                      '    return {"videos": patterns}\n')
+
+    result = _judge(tmp_path, {
+        "id": "O1-L1-01", "description": "対応拡張子のみ含まれる",
+        "claim": "value_exclusive", "endpoint": "GET /x",
+        "value_set": ["*.mp4", "*.mov"],
+    })
+
+    assert result.reason == "value_set_mismatch"
+
+
+def test_exclusive_claim_ignores_the_glob_prefix(tmp_path):
+    """ストーリーは `.mp4`、実装は `*.mp4`。書き方の違いで集合を違うと言わない。"""
+    _router(tmp_path, '@router.get("/x")\n'
+                      'async def h():\n'
+                      '    return {"videos": ["*.mp4", "*.mov"]}\n')
+
+    result = _judge(tmp_path, {
+        "id": "O1-L1-01", "description": "対応拡張子のみ含まれる",
+        "claim": "value_exclusive", "endpoint": "GET /x",
+        "value_set": [".mp4", ".mov"],
+    })
+
+    assert result.reason == "value_set_matched"

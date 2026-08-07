@@ -3,8 +3,8 @@
   "layer": 1,
   "method": "static_source_scan",
   "total": 122,
-  "pass": 109,
-  "fail": 13,
+  "pass": 108,
+  "fail": 14,
   "items": {
     "O1-L1-01": "PASS",
     "O1-L1-02": "PASS",
@@ -49,7 +49,7 @@
     "O5-L1-02": "PASS",
     "O5-L1-03": "PASS",
     "O5-L1-04": "PASS",
-    "O5-L1-05": "PASS",
+    "O5-L1-05": "FAIL",
     "O5-L1-06": "FAIL",
     "O5-L1-07": "FAIL",
     "O5-L1-08": "PASS",
@@ -133,7 +133,7 @@
     "O1-L1-01": "found",
     "O1-L1-02": "field_found",
     "O1-L1-03": "field_found",
-    "O1-L1-04": "value_found",
+    "O1-L1-04": "value_set_matched",
     "O1-L1-05": "found",
     "O1-L1-06": "found",
     "O1-L1-07": "storage_key_found",
@@ -173,7 +173,7 @@
     "O5-L1-02": "found",
     "O5-L1-03": "field_found",
     "O5-L1-04": "field_found",
-    "O5-L1-05": "field_found",
+    "O5-L1-05": "unjudgeable",
     "O5-L1-06": "unjudgeable",
     "O5-L1-07": "unjudgeable",
     "O5-L1-08": "field_found",
@@ -239,7 +239,7 @@
     "O11-L1-06": "found",
     "O11-L1-07": "found",
     "O11-L1-08": "found",
-    "O11-L1-09": "field_found",
+    "O11-L1-09": "value_matched",
     "O11-L1-10": "field_not_found",
     "O12-L1-01": "found",
     "O12-L1-02": "found",
@@ -274,13 +274,13 @@
       ]
     },
     "O1-L1-04": {
-      "claim": "value_constraint",
+      "claim": "value_exclusive",
       "endpoint": "GET /api/pipeline/videos",
-      "value_literals": [
-        ".mp4",
-        ".mov",
-        ".mkv",
-        ".avi"
+      "value_set": [
+        "*.mp4",
+        "*.mov",
+        "*.mkv",
+        "*.avi"
       ]
     },
     "O1-L1-05": {
@@ -449,9 +449,8 @@
       "response_field": "locked_segments"
     },
     "O5-L1-05": {
-      "claim": "response_field",
-      "endpoint": "POST /api/smartcut/unlock",
-      "response_field": "locked_segments"
+      "claim": "state_transition",
+      "endpoint": "POST /api/smartcut/unlock"
     },
     "O5-L1-06": {
       "claim": "idempotency",
@@ -755,8 +754,9 @@
       "endpoint": "POST /api/director/plan-storyboard"
     },
     "O11-L1-09": {
-      "claim": "response_field",
+      "claim": "response_value",
       "endpoint": "POST /api/youtube/pre-plan",
+      "expected_value": "true",
       "response_field": "success"
     },
     "O11-L1-10": {
@@ -835,6 +835,12 @@
         "O4-L1-05",
         "O5-L1-06",
         "O5-L1-07"
+      ]
+    },
+    {
+      "reason": "P3 C-3: O5-L1-05『locked_segments が更新される』は状態遷移の主張で、1回の静的走査では『返る』と区別が付かない。フィールドの実在で PASS にしていたのをやめ FAIL にした。ユーザー判断（2026-08-07）",
+      "items": [
+        "O5-L1-05"
       ]
     }
   ],
@@ -1765,6 +1771,62 @@
           "before": null,
           "after": {
             "claim": "spec_incomplete"
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: description の述語に合わせて判定手段を強めた。O11-L1-09『success=true』は値まで測る response_value へ、O1-L1-04『対応拡張子のみ』は集合一致を測る value_exclusive へ。読み方はユーザー判断（2026-08-07）",
+      "items": {
+        "O1-L1-04": {
+          "before": {
+            "claim": "value_constraint",
+            "endpoint": "GET /api/pipeline/videos",
+            "value_literals": [
+              ".mp4",
+              ".mov",
+              ".mkv",
+              ".avi"
+            ]
+          },
+          "after": {
+            "claim": "value_exclusive",
+            "endpoint": "GET /api/pipeline/videos",
+            "value_set": [
+              "*.mp4",
+              "*.mov",
+              "*.mkv",
+              "*.avi"
+            ]
+          }
+        },
+        "O11-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "success"
+          },
+          "after": {
+            "claim": "response_value",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "expected_value": "true",
+            "response_field": "success"
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: O5-L1-05 の claim を response_field から state_transition（判定手段なし）へ。description の述語『更新される』が要求する claim に合わせた",
+      "items": {
+        "O5-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/unlock",
+            "response_field": "locked_segments"
+          },
+          "after": {
+            "claim": "state_transition",
+            "endpoint": "POST /api/smartcut/unlock"
           }
         }
       }

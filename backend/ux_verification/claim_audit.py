@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -58,6 +59,10 @@ CLAIM_METHODS: dict[str, tuple[str, ...] | None] = {
     "storage_key": ("storage_key",),
     "value_constraint": ("endpoint", "value_literals"),
     "request_contract": ("endpoint", "request_field"),
+    # 値そのものの主張（`success=true`）。フィールドの実在では測れない。
+    "response_value": ("endpoint", "response_field", "expected_value"),
+    # 集合の主張（「対応拡張子**のみ**」）。値が現れることでは「のみ」を測れない。
+    "value_exclusive": ("endpoint", "value_set"),
     # None = **静的走査では原理的に判定できないと結論した**主張。
     # 空タプル（未実装）とは別物で、こちらは実装しても埋まらない。
     # 該当項目は PASS に逃がさず、理由つきで FAIL にする（P3 C-3）。
@@ -65,6 +70,9 @@ CLAIM_METHODS: dict[str, tuple[str, ...] | None] = {
     "idempotency": None,
     "parameter_coverage": None,
     "spec_incomplete": None,
+    # 状態遷移（「更新される」）。前後を比べる必要があり、1回の静的走査では
+    # 「返る」との区別が付かない。ユーザー判断（2026-08-07）で FAIL とした。
+    "state_transition": None,
 }
 
 # 各 claim が**何を確かめ、何を確かめないか**。
@@ -96,6 +104,17 @@ CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
         "そのフィールドがリクエストモデルに定義されている",
         "その値域が受理されるか",
     ),
+    "response_value": (
+        "宣言されたフィールドに、宣言された値**以外のリテラルを返す経路が"
+        "ハンドラのソースに無い**",
+        "実行時に必ずその値になるか。ソースに無いだけで、動的に組み立てた値までは"
+        "追えない",
+    ),
+    "value_exclusive": (
+        "宣言した集合と**完全に一致する**リスト・リテラルが実装にある"
+        "（余分な要素が無い）",
+        "実行時にその集合だけが返るか。リストを作ったあとで足す経路は追えない",
+    ),
     "element_count": (
         "（判定手段なし）",
         "**描画される件数。** 既定データの件数なら静的に数えられるが、"
@@ -117,7 +136,70 @@ CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
         "何を照合すべきかが仕様に書かれていない。"
         "推測で照合先を書けば判定は出るが、それは実装ではなく判定の捏造",
     ),
+    "state_transition": (
+        "（判定手段なし）",
+        "**呼ぶ前と後で値が変わったか。** 1回の静的走査では『返る』としか言えず、"
+        "『更新される』と区別が付かない。実行層（L2）が要る",
+    ),
 }
+
+# 主張の**述語**の語彙。ここに載っていない書き方の description は通さない（P3 C-3）。
+#
+# claim は人が貼るラベルなので、弱いラベルを選べば主張の一部を捨てたまま PASS に
+# できた。`description: "success=true"` に `claim: response_field`（＝値は見ないと
+# CLAIM_SEMANTICS が自ら明記している）を貼れば、主張の半分が消えても緑になる
+# （gate-verifier 5回目）。**ラベルの妥当性を機械で見る層がもう1枚要る。**
+#
+# 日本語を解析するのではなく、**述語の書き方そのものを閉じた集合にする。**
+# ユーザー判断（2026-08-07）: マーカー検出では、辞書に無い語で強い主張を書くと
+# 素通りする（実際、当初のパターン表は「4カテゴリ」を拾えなかった）。
+# 未登録の書き方は `unparsed` として落とし、**辞書に足して判定手段を決めるか、
+# 登録済みの語で書き直すか**を選ばせる。
+#
+# 並び順が意味を持つ。**強い述語を先に置く**（「〜のみ含まれる」は「〜含まれる」
+# にも当たるので、先に「のみ」で捕まえないと弱いほうに落ちる）。
+DESCRIPTION_GRAMMAR: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    # --- 強い述語（値・集合・件数・遷移）---
+    ("値の指定", r"^[\w_.]+\s*[=＝]\s*\S+$", ("response_value",)),
+    ("〜のみ", r"(のみ|だけ)", ("value_exclusive",)),
+    ("件数", r"\d+\s*件(以上|以下|ちょうど)?", ("element_count",)),
+    ("プリセット網羅", r"\d+\s*種.*プリセット|プリセット.*\d+\s*種", ("parameter_coverage",)),
+    ("状態遷移", r"(更新される|変わる|反映される|切り替わる|増える|減る)", ("state_transition",)),
+    ("可能である", r"(が可能|できる)", ("idempotency",)),
+    # --- 列挙の実在（「4カテゴリ(a/b/c/d)が存在する」）---
+    # 個数を書いていても列挙が並んでいれば「その列挙が在ること」の主張と読む。
+    # ユーザー判断（2026-08-07）: 「のみ」と書いていない以上、排他性は主張していない。
+    ("列挙の実在", r"^\d+\s*(カテゴリ|種類)\s*[（(].+[)）]が存在する$", ("value_constraint",)),
+    # --- 経路とレスポンス ---
+    ("経路＋フィールド", r"正常応答し.+(が返る|を返す|が含まれる|含む)$",
+     ("response_field",)),
+    ("経路のみ", r"^.*?正常応答(を返す|する)?$", ("route_exists",)),
+    ("リクエスト契約", r"(を受け付ける|を受け取る)$", ("request_contract",)),
+    ("フィールドの実在",
+     r"(を返す|が返る|が含まれる|含む|フィールドが存在する?|オブジェクト含む|配列含む)$",
+     ("response_field",)),
+    # 「localStorage に〜が存在する」は DOM の主張ではない。要素の実在より先に置く。
+    ("保存キーの実在", r"(localStorage|sessionStorage).*(が存在する?|存在)$",
+     ("storage_key",)),
+    # 「〜が存在する」は DOM の要素にも、レスポンスのフィールドにも使われている。
+    # どちらを測るかは claim が決めるので、両方を許す。
+    ("要素の実在", r"(が存在する?|存在)$", ("dom_exists", "response_field")),
+)
+
+
+def parse_description(description: str) -> tuple[str, tuple[str, ...]] | None:
+    """description の述語を語彙に照らし、要求される claim を返す。
+
+    返り値は (述語の名前, 許される claim の並び)。語彙に無ければ `None`。
+    """
+    text = (description or "").strip()
+    if not text:
+        return None
+    for name, pattern, claims in DESCRIPTION_GRAMMAR:
+        if re.search(pattern, text):
+            return name, claims
+    return None
+
 
 # 項目が「何を照合先にするか」を宣言しているキー。**CLAIM_METHODS から導く。**
 # ここを手で並べると、新しい判定手段を足したときに片方だけ増えて、
@@ -168,6 +250,17 @@ class ClaimRow:
                 f"{self.claim} を判定するには "
                 f"{'・'.join(CLAIM_METHODS.get(self.claim) or ())} が要るが、"
                 f"持っているのは {'・'.join(self.declared) or 'なし'}"
+            ),
+            "unparsed": (
+                "description の述語が語彙に無い。"
+                "DESCRIPTION_GRAMMAR に足して判定手段を決めるか、"
+                "登録済みの書き方に直す"
+            ),
+            "claim_too_weak": (
+                f"description の述語『{(parse_description(self.description) or ('?', ()))[0]}』は "
+                f"{'・'.join((parse_description(self.description) or ('', ()))[1])} を要求するが、"
+                f"貼られているのは {self.claim}"
+                f"（{CLAIM_SEMANTICS.get(self.claim, ('', '?'))[1]}）"
             ),
         }.get(self.reason, self.reason)
         return f"{self.item_id:<11} {self.description}\n      → {why}"
@@ -228,6 +321,23 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
         return ClaimRow(**common, reason="no_claim")
     if claim not in CLAIM_METHODS:
         return ClaimRow(**common, reason="unknown_claim")
+
+    # **description の述語と claim の対応。** ここが無かったので、弱いラベルを
+    # 貼るだけで主張の一部を捨てたまま PASS にできた（gate-verifier 5回目）。
+    parsed = parse_description(common["description"])
+    if parsed is None:
+        return ClaimRow(**common, reason="unparsed")
+    if CLAIM_METHODS[claim] == ():
+        # 判定手段がそもそも無いなら、ラベルの当否より先にそれを言う。
+        return ClaimRow(**common, reason="no_method")
+    _, allowed = parsed
+    # 「そもそも測れない」は述語の種類とは別の軸。**どの述語にも貼れる。**
+    # ユーザー判断（2026-08-07）: 必ず FAIL に落ちるので偽の緑は作れず、
+    # 付け替えはラチェットの substituted が捕まえて --redeclare の理由が残る。
+    # PASS だった項目を落とすには --tighten も要る。
+    if claim not in allowed and claim not in UNJUDGEABLE_CLAIMS:
+        return ClaimRow(**common, reason="claim_too_weak")
+
     required = CLAIM_METHODS[claim]
     if required is None:
         # 判定できないと**結論した**もの。結論も対応のうちなので mismatch にしない。
