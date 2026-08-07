@@ -459,28 +459,43 @@
         "id": "C-1",
         "condition": "122項目すべての『主張の種類 ↔ 判定手段』の対応が機械可読になり、対応が取れていない項目をコマンド1つで列挙できる",
         "met": true,
+        "verification": "gate-verifier 5回目（2026-08-07）で met。反証されなかった。走査範囲の一本化を実物で確認（claim_audit.audit() が executor.iter_l1_items() を呼んでおり列挙は1箇所）。CI run 31106675264 のログで Linux 側も 122項目 / 未対応 0 を確認しており、手元 (Windows) と一致するので環境変数欠落による偽の一致ではない。",
         "evidence": "backend/ux_verification/claim_audit.py（PR #60）。`python -m backend.ux_verification.claim_audit --persona owner` で 122項目の claim 別内訳と、対応が取れていない項目を列挙する。122項目すべてに claim を付与済み（route_exists 47 / response_field 37 / dom_exists 29 / value_constraint 2 / idempotency 2 / storage_key 1 / element_count 1 / request_contract 1 / runtime_behavior 1 / spec_incomplete 1）。**実行系は手作業より2件多く見つけた**（O6-L1-05 と O9-L1-12）。claim を書き忘れた項目は no_claim として必ず出るので、以降の取りこぼしは人間の数え直しに依存しない。"
       },
       {
         "id": "C-2",
         "condition": "P2 から引き継いだ 7件に、主張に対応する判定手段が入る",
         "met": true,
+        "verification": "gate-verifier 5回目（2026-08-07）で met。ただし条件文の字面に対しては 3/7。**実際に判定手段が入った引き継ぎ項目は3件**（O1-L1-04 value_found / O1-L1-07 storage_key_found / O4-L1-04 request_field_found）。4件目として数えていた O6-L1-05 は引き継ぎ7件の外（実行系が追加で見つけた2件のうちの1件）。残る4件（O2-L1-07 / O4-L1-05 / O5-L1-06 / O5-L1-07）は判定手段が無く unjudgeable の FAIL。C-3 が事前に定めた処理であり後付けの読み替えではないため met と判定された。",
         "evidence": "PR #61。引き継いだ 7件＋実行系が追加で見つけた 2件の計 9件を片付けた。判定手段を足したのは4件（storage_key: O1-L1-07 / value_constraint: O1-L1-04・O6-L1-05 / request_contract: O4-L1-04）。値の主張はハンドラ本体だけでは届かず、**ハンドラが実際に参照しているモジュール変数**を辿って解決した（_quality_gate_state → 別モジュールの定数）。残る5件は静的走査では原理的に判定できないと結論し、PASS に逃がさず unjudgeable の FAIL として理由つきで出している。"
       },
       {
         "id": "C-3",
         "condition": "対応が取れていない項目がゼロになる。静的に判定できないと結論した項目は PASS にせず FAIL として理由を残す",
-        "met": true,
+        "met": false,
+        "verification": "gate-verifier 5回目（2026-08-07）で **not_met**。前半（未対応ゼロ・unjudgeable 5件が FAIL）は再現できたが、後半『判定していないものを PASS にしない』が破れている。**claim（主張の種類）は人手で貼るラベルで、description と claim の対応を誰も検証していない。** 弱いラベルを選ぶだけで『対応が取れている』を通過できる。実在の3件: O11-L1-09 は description が `success=true` なのに claim=response_field で、CLAIM_SEMANTICS の確かめない欄が『その値が何であるか』と明記しているとおり true かどうかは見ずに PASS。O1-L1-04 は description の『対応拡張子**のみ**』の『のみ』を確かめない（確かめない欄に明記）まま PASS。O5-L1-05 は『locked_segments が**更新される**』をフィールドの実在だけで PASS。いずれも原理的に判定不能ではない（`success=true` は value_constraint で測れる）。実証: コピーに対し O4-L1-05 を parameter_coverage → response_field:'success' に付け替えると FAIL unjudgeable が PASS field_found になり、claim_audit 未対応 0 件・l1_ratchet 違反 0 件のまま『改善1』として記録された（O5-L1-06 も同様）。",
         "evidence": "`python -m backend.ux_verification.claim_audit --persona owner --gate` → **✅ 122 項目すべてで対応が取れています**（対応が取れていない項目 0 件 / exit 0）。判定できないと結論した5件は unjudgeable の FAIL として出る（O2-L1-07 element_count / O4-L1-05 runtime_behavior / O5-L1-06・O5-L1-07 idempotency / O9-L1-12 spec_incomplete）。結果としての充足率は 122件 / PASS 109 / FAIL 13 / SKIP 0 = 89.34%。**充足率は条件にしていない**（design_note）。判定していない主張は 9 → 0 件。 gate-verifier の4回目の指摘（route_exists 47件は全件が『正常応答を返す』と主張しているのに経路の実在しか見ておらず、同じ述語の O4-L1-05 だけ判定不能にしていて一貫しない）を受け、**ユーザー判断で (A)「L1 の正常応答は経路の実在と読む」を採用**（2026-08-06）。曖昧なままにしないため、claim ごとの「確かめること／確かめないこと」を CLAIM_SEMANTICS に機械可読で書き、`--semantics` で出せるようにした（claim を足して意味を書き忘れることはテストで禁じている）。O4-L1-05 は runtime_behavior → parameter_coverage へ分類し直した。判定できないのは『正常応答』ではなく『4種プリセットで』という入力値の集合のほうで、受理する値の集合が実装のどこにも宣言されていない。決定の記録は docs/ux_l1_claim_semantics_20260806.md。"
       },
       {
         "id": "C-4",
         "condition": "『対応ゼロ』と新しい判定手段が CI ゲートで守られ、判定の弱化も検出される",
-        "met": true,
+        "met": false,
+        "verification": "gate-verifier 5回目（2026-08-07）で **not_met**。前半は再現できた（ci.yml の3ステップは `if: always()` のみで continue-on-error 無し。run 31106675264 で3ステップとも success。宣言の削除・claim の削除・項目の削除・走査0件は、実際に落ちることをコピーに対して実証済み）。**破れているのは『判定の弱化も検出される』のほう。弱化の検出が宣言の *削除* と reason カテゴリの *降格* しか見ておらず、宣言の *差し替え* を素通りさせる。** ベースライン snapshots/l1_owner_baseline.json が持つのは items（verdict）と reasons（カテゴリ）だけで、**何を宣言していたか（testid / endpoint / response_field / value_literals / request_field）を記録していない**（構造を実地確認済み）。実証: O11-L1-10 の response_field を 'hook_score' → 'success' に差し替えると FAIL field_not_found が PASS field_found になり、違反0・改善1として記録される。O9-L1-11 の testid を存在する別の testid に差し替えても同じ。description は変えていないので、項目が要求する内容だけが弱くなる。3回目の指摘（宣言を消すと巻き戻る）と同型で、消去は塞いだが差し替えが残っている。副次: ベースラインから reasons ブロックごと消すと `_is_content_judged` が常に False になり weakened 検出が黙って無効化される（`--tighten` にはガードがあるが `--ratchet` には無い）。",
         "evidence": ".github/workflows/ci.yml の「主張と判定手段の対応ゲート」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たない。項目を1件も読み取れなかった場合も 0 件として通さず失敗にする（ディレクトリを消せば緑、を防ぐ）。判定の弱化は l1_ratchet の weakened 違反が検出する（強い判定 field_found/value_found/request_field_found/storage_key_found/unjudgeable から、経路の実在だけの found へ戻ることを拒否）。CI run 31098362753 で3チェックとも success、テスト 9,383件 失敗0 / カバレッジ 75.7%。"
       }
     ],
-    "note": "終了条件は 4/4 とも満たした。憲法第2条により /gate-report を出してユーザーの判断を待つ。憲法第4条により、この met 判定は gate-verifier の独立検証を経るまで自己申告にとどまる。vision_realization_score と axis_scores は自分で採点しないため据え置いた（更新は検証後の /vision-audit で行う）。"
+    "note": "**2026-08-07 の gate-verifier 独立検証（5回目）で 2/4 に下方修正した。** 自己申告では 4/4 だったが、C-3 と C-4 が not_met。overall: not_ready。C-1・C-2 は反証されず met のまま（C-2 は条件文の字面『引き継いだ7件に判定手段が入る』に対し実際に手段が入ったのは3件で、残り4件は C-3 が事前に定めた unjudgeable の FAIL で処理されている。後付けの読み替えではないので met と判定された）。**C-3 と C-4 は同じ穴の表と裏で、description（主張の本文）と宣言（testid / response_field など）の対応を誰も守っていないこと。** (a) description の一部だけを測る claim を選ぶ、(b) 宣言をより緩いものに差し替える、の2経路でどちらも3ゲート緑のまま FAIL→PASS を作れることが実測されている。憲法第2条により /gate-report を出してユーザーの判断を待つ。vision_realization_score と axis_scores は自分で採点しないため据え置いた。",
+    "verification_log": [
+      {
+        "round": 5,
+        "date": "2026-08-07",
+        "verified_against": "origin/main 8641c1b / CI run 31104677162・31106675264",
+        "overall": "not_ready",
+        "verdicts": { "C-1": "met", "C-2": "met", "C-3": "not_met", "C-4": "not_met" },
+        "finding": "description ↔ claim の対応が無検証。claim ラベルの貼り替えと宣言の差し替えで、3ゲート緑のまま FAIL→PASS を作れる",
+        "note": "過去4回と同じ型（走査範囲の外にポケットが残る）。1回目=レスポンス本体、2回目=モジュール変数の展開、3回目=宣言の削除、4回目=監査と実行系の走査範囲の不一致、5回目=description と宣言の対応そのもの"
+      }
+    ]
   },
   "phase_history": [
     {
