@@ -420,18 +420,18 @@ def test_declaring_it_unmeasurable_is_allowed_for_any_predicate(tmp_path):
     assert report.mismatched == []
 
 
-def test_every_combination_points_at_a_known_claim():
-    """組み合わせを足して claim を書き忘れたら、対応表の外にポケットができる。"""
-    from backend.ux_verification.claim_audit import (
-        DESCRIPTION_COMBINATIONS, DESCRIPTION_MARKERS,
-    )
+def test_every_template_points_at_a_known_claim():
+    """テンプレートを足して claim を書き忘れたら、対応表の外にポケットができる。"""
+    import re as _re
 
-    known = {name for name, _ in DESCRIPTION_MARKERS}
-    for markers, claims in DESCRIPTION_COMBINATIONS.items():
-        assert markers <= known, markers
-        assert claims, markers
+    from backend.ux_verification.claim_audit import DESCRIPTION_TEMPLATES
+
+    for name, pattern, claims in DESCRIPTION_TEMPLATES:
+        assert pattern.startswith("^") and pattern.endswith("$"), name
+        _re.compile(pattern)
+        assert claims, name
         for claim in claims:
-            assert claim in CLAIM_METHODS, f"{sorted(markers)} → {claim}"
+            assert claim in CLAIM_METHODS, f"{name} → {claim}"
 
 
 def test_every_owner_l1_description_is_in_the_vocabulary():
@@ -453,14 +453,15 @@ def test_every_owner_l1_description_is_in_the_vocabulary():
 # **同じ主張が空白の有無で強弱に振れていた。**
 
 
-def test_a_value_claim_buried_mid_sentence_still_requires_the_strong_claim(tmp_path):
+def test_a_value_claim_buried_mid_sentence_is_rejected(tmp_path):
+    """`success=true` が文中にあるとテンプレートに丸ごと一致しない → unparsed。"""
     report = audit(_stories(tmp_path, [
         _item("O1-L1-01", "response_field",
               description="事前企画APIが正常応答し success=true が返る",
               endpoint="POST /api/x", response_field="success"),
     ]))
 
-    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+    assert [r.reason for r in report.mismatched] == ["unparsed"]
 
 
 def test_an_unregistered_combination_of_predicates_is_rejected(tmp_path):
@@ -511,11 +512,12 @@ def test_an_ascii_identifier_slot_needs_no_note(tmp_path):
 
 def test_the_identifier_check_is_ascii_only():
     """`\w` は Unicode なので日本語も識別子扱いになる。ASCII に限る。"""
-    from backend.ux_verification.claim_audit import slot_is_typed
+    from backend.ux_verification.claim_audit import needs_value_note
 
-    assert slot_is_typed("hook_scoreが返る")
-    assert not slot_is_typed("BGM設定が含まれる")
-    assert not slot_is_typed("ロゴ設定が含まれる")
+    assert not needs_value_note("hook_scoreが返る")
+    assert needs_value_note("BGM設定が含まれる")
+    assert needs_value_note("ロゴ設定が含まれる"), "フィールド系は識別子でなければ必ず"
+    assert not needs_value_note("進捗バーが存在する"), "純粋な UI 名は対象外"
 
 
 def test_the_value_note_is_pinned_by_the_ratchet():
@@ -526,29 +528,39 @@ def test_the_value_note_is_pinned_by_the_ratchet():
 
 
 def test_every_owner_l1_item_that_needs_a_note_has_one():
-    from backend.ux_verification.claim_audit import slot_is_typed
+    from backend.ux_verification.claim_audit import needs_value_note
 
     report = for_repo("owner")
     missing = [r.item_id for r in report.rows if r.reason == "value_note_required"]
 
     assert missing == []
-    # 検査が空振りしていないこと（全部 typed なら、この層は何も守っていない）
-    assert any(not slot_is_typed(r.description) for r in report.rows)
+    # 検査が空振りしていないこと（1件も要求していないなら何も守っていない）
+    assert any(needs_value_note(r.description) for r in report.rows)
 
 
-def test_the_slot_check_is_not_anchored_to_the_end(tmp_path):
-    """句点や後続節を1文字足すだけで検査ごと素通りした（11回目）。
+def test_a_clause_break_is_not_a_way_out(tmp_path):
+    """読点で強い主張を節の外へ押し出せた（12回目）。
 
-    `_FIELD_TAIL` を文末アンカーで書いていたので、動詞が末尾に来ない文は
-    「照合対象なし」に落ちて型付け済み扱いになっていた。
+    マーカー方式は「当たった述語」しか見ず、当たらなかった部分は黙って
+    捨てられた。いまは**文全体**をテンプレートに突き合わせ、部分一致は認めない。
     """
-    from backend.ux_verification.claim_audit import slot_is_typed
+    from backend.ux_verification.claim_audit import parse_description
 
-    assert not slot_is_typed("ステータスが completed を返す")
-    assert not slot_is_typed("ステータスが completed を返す。")
-    assert not slot_is_typed("推奨レスポンスの status が completed を返す（S3）")
-    assert not slot_is_typed(
-        "事前企画APIが正常応答し、success が true を返すことを確認する")
+    assert parse_description("ステータスが completed を返す。") is None
+    assert parse_description("推奨レスポンスの status が completed を返す（S3）") is None
+    assert parse_description(
+        "事前企画APIが正常応答し、success が true を返すことを確認する") is None
+    assert parse_description("ステータスが completed になり、hook_score を返す") is None
+
+
+def test_a_strong_predicate_buried_in_the_slot_is_rejected(tmp_path):
+    """スロットに強い述語が埋まっていたら、その主張は測られていない。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description(
+        "固定APIが正常応答しlocked_segmentsが更新されlocked_segmentsを返す") is None
+    assert parse_description("レスポンスは3秒以内にstatusを返す") is None
+    assert parse_description("拡張子はmp4に限られvideosを返す") is None
 
 
 def test_a_value_claim_with_a_trailing_clause_is_still_caught(tmp_path):
@@ -558,7 +570,7 @@ def test_a_value_claim_with_a_trailing_clause_is_still_caught(tmp_path):
               endpoint="POST /api/x", response_field="success"),
     ]))
 
-    assert [r.reason for r in report.mismatched] == ["value_note_required"]
+    assert [r.reason for r in report.mismatched] == ["unparsed"]
 
 
 def test_an_element_claim_with_an_ascii_token_needs_a_note(tmp_path):

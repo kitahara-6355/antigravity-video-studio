@@ -143,164 +143,126 @@ CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
     ),
 }
 
-# 主張の**述語**の語彙。ここに載っていない書き方の description は通さない（P3 C-3）。
+# 主張の書き方を**閉じる**（P3 C-3）。
 #
-# claim は人が貼るラベルなので、弱いラベルを選べば主張の一部を捨てたまま PASS に
-# できた。`description: "success=true"` に `claim: response_field`（＝値は見ないと
-# CLAIM_SEMANTICS が自ら明記している）を貼れば、主張の半分が消えても緑になる
-# （gate-verifier 5回目）。**ラベルの妥当性を機械で見る層がもう1枚要る。**
+# claim は人が貼るラベルで、description との対応を誰も検証していなかった。
+# `description: "success=true"` に `claim: response_field`（＝値は見ないと
+# CLAIM_SEMANTICS が自ら明記）を貼れば、主張の半分が消えても緑になった
+# （gate-verifier 5回目）。**ラベルの妥当性を機械で見る層が要る。**
 #
-# 日本語を解析するのではなく、**述語の書き方そのものを閉じた集合にする。**
-# ユーザー判断（2026-08-07）: マーカー検出では、辞書に無い語で強い主張を書くと
-# 素通りする（実際、当初のパターン表は「4カテゴリ」を拾えなかった）。
-# 未登録の書き方は `unparsed` として落とし、**辞書に足して判定手段を決めるか、
-# 登録済みの語で書き直すか**を選ばせる。
+# ここは3回作り直している。**2回とも「同じ主張が書き方の違いで強弱に振れる」で
+# 破られた。**
 #
-# **文末だけを見ない。** 最初の実装は「先に当たったパターンを採る」形にしていたが、
-# それは文末の動詞を閉じただけで、主張の中身は閉じていなかった。
-# `success=true` は強い述語に当たるのに、`…正常応答し success=true が返る` と
-# 書くと「経路＋フィールド」に落ち、値の主張が消えた（gate-verifier 10回目）。
-# **同じ主張が空白の有無で強弱に振れていた。**
+#   10回目: 文末の動詞しか見ておらず、`…正常応答し success=true が返る` で
+#           値の主張が消えた（空白の有無で振れる）
+#   11回目: スロット検査が文末アンカーで、句点を1文字足すと素通りした
+#   12回目: マーカーに**当たらなかった部分が黙って捨てられる**。読点で強い主張を
+#           節の外へ押し出せた（`ステータスが completed になり、hook_score を返す`）
 #
-# そこで文中に現れる述語を**すべて**拾い、その**組み合わせ**に対して
-# 要求される claim を決める。組み合わせが未登録なら `unparsed` として落とす。
-DESCRIPTION_MARKERS: tuple[tuple[str, str], ...] = (
-    ("値の指定", r"[\w_.]+\s*[=＝]\s*\S+"),
-    ("〜のみ", r"のみ|だけ"),
-    ("件数", r"\d+\s*件"),
-    ("プリセット網羅", r"\d+\s*種.*プリセット|プリセット.*\d+\s*種"),
-    ("状態遷移", r"更新される|変わる|反映される|切り替わる|増える|減る"),
-    ("可能である", r"が可能|できる"),
-    ("列挙", r"^\d+\s*(カテゴリ|種類)\s*[（(]"),
-    ("経路", r"正常応答"),
-    ("保存キー", r"localStorage|sessionStorage"),
-    ("リクエスト契約", r"を受け付ける|を受け取る"),
-    # 「正常応答を返す」の「を返す」は**経路**の主張であってフィールドではない。
-    # 除外しないと、経路だけの項目 10 件が「フィールドも主張している」と誤検出される。
-    ("フィールド",
-     r"(?<!正常応答)を返す|が返る|が含まれる|含む|フィールドが存在"),
-    ("要素", r"(が存在する?|存在)$"),
+# 3回目の作り直しでは**文全体**を見る。description は登録済みのテンプレートに
+# **丸ごと**一致しなければならず、一致しなければ `unparsed`。部分一致は無い。
+#
+# 節の区切り（読点・句点）はテンプレートが許さない。**一文一主張**にすることで、
+# 「強い主張を別の節に逃がす」経路が構造的に消える。
+_NP = r"[^、。，．]*?"  # 名詞句。節の区切りを含められない
+
+# スロットに紛れ込んだ**強い述語**。これがあれば、その主張は測られていない。
+# 12回目の指摘（`locked_segments が更新され locked_segments を返す`）を潰す。
+_STRONG_IN_SLOT = re.compile(
+    r"更新|変わ|反映|切り替わ|増え|減っ|[=＝]|のみ|だけ|\d+\s*件|が可能|できる"
+    r"|以内|以上|以下|限ら|超え"
 )
 
-# 述語の**組み合わせ** → その主張を測れる claim。
-# ここに無い組み合わせは `unparsed`。新しい書き方をしたら必ず判断を迫られる。
-DESCRIPTION_COMBINATIONS: dict[frozenset, tuple[str, ...]] = {
-    frozenset({"経路"}): ("route_exists",),
-    frozenset({"経路", "フィールド"}): ("response_field",),
-    frozenset({"フィールド"}): ("response_field",),
-    frozenset({"要素"}): ("dom_exists", "response_field"),
-    frozenset({"フィールド", "要素"}): ("response_field", "dom_exists"),
-    frozenset({"保存キー", "要素"}): ("storage_key",),
-    frozenset({"リクエスト契約"}): ("request_contract",),
-    # 値の主張。**経路やフィールドと同時に書かれていても、強いほうを要求する。**
-    frozenset({"値の指定"}): ("response_value",),
-    frozenset({"値の指定", "フィールド"}): ("response_value",),
-    frozenset({"値の指定", "経路"}): ("response_value",),
-    frozenset({"値の指定", "経路", "フィールド"}): ("response_value",),
-    frozenset({"値の指定", "要素"}): ("response_value",),
-    # 排他性。
-    frozenset({"〜のみ", "フィールド"}): ("value_exclusive",),
-    frozenset({"〜のみ", "要素"}): ("value_exclusive",),
-    frozenset({"〜のみ"}): ("value_exclusive",),
-    # 列挙の実在。ユーザー判断（2026-08-07）: 「のみ」と書いていない以上、
-    # 排他性は主張していないと読む。
-    frozenset({"列挙", "要素"}): ("value_constraint",),
-    # 測る手段が無いと結論した述語。claim 側も判定手段なしのものになる。
-    frozenset({"件数", "要素"}): ("element_count",),
-    frozenset({"件数"}): ("element_count",),
-    frozenset({"プリセット網羅", "経路"}): ("parameter_coverage",),
-    frozenset({"状態遷移", "経路", "フィールド"}): ("state_transition",),
-    frozenset({"状態遷移", "経路"}): ("state_transition",),
-    frozenset({"状態遷移", "フィールド"}): ("state_transition",),
-    frozenset({"状態遷移"}): ("state_transition",),
-    frozenset({"可能である"}): ("idempotency",),
-    frozenset({"可能である", "経路"}): ("idempotency",),
-}
+_IDENT = r"[A-Za-z_][A-Za-z0-9_.]*"
+
+# (名前, 文全体にかかる正規表現, 許される claim)。**強い述語を先に置く。**
+DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("値の指定", rf"^(?P<slot>{_IDENT})\s*[=＝]\s*\S+$", ("response_value",)),
+    ("〜のみ", rf"^(?P<slot>{_NP})のみ含まれる$", ("value_exclusive",)),
+    ("件数", rf"^(?P<slot>{_NP})が\d+件以上表示される$", ("element_count",)),
+    ("プリセット網羅",
+     rf"^\d+種プリセット\([^、。]*\)で(?P<slot>{_NP})が正常応答する$",
+     ("parameter_coverage",)),
+    ("可能である", rf"^(?P<slot>{_NP})が可能\([^、。]*\)$", ("idempotency",)),
+    ("列挙の実在", rf"^\d+カテゴリ\([^、。]*\)が存在する$", ("value_constraint",)),
+    ("経路＋状態遷移",
+     rf"^{_NP}正常応答し(?P<slot>{_NP})が更新される$", ("state_transition",)),
+    ("保存キーの実在",
+     rf"^(?:localStorage|sessionStorage)に(?P<slot>{_NP})が存在する$",
+     ("storage_key",)),
+    ("経路＋フィールド",
+     rf"^{_NP}正常応答し(?P<slot>{_NP})(?:が返る|を返す)$", ("response_field",)),
+    ("経路のみ", rf"^(?P<slot>{_NP})(?:が)?正常応答(?:を返す|する)?$",
+     ("route_exists",)),
+    ("リクエスト契約", rf"^(?P<slot>{_NP})(?:を受け付ける|を受け取る)$",
+     ("request_contract",)),
+    ("必須フィールド", rf"^(?P<slot>{_NP})が必須フィールドを返す$",
+     ("response_field",)),
+    ("フィールドの実在", rf"^(?P<slot>{_NP})フィールドが存在する?$",
+     ("response_field",)),
+    ("フィールドを返す", rf"^(?P<slot>{_NP})(?:を返す|が返る|が含まれる|含む)$",
+     ("response_field",)),
+    # 「〜が存在する」は DOM の要素にもレスポンスのフィールドにも使われている。
+    # ただしスロットが**そのまま ASCII 識別子**なら、それはフィールド名なので
+    # DOM 要素の実在では測れない（12回目の指摘 C）。
+    ("要素の実在", rf"^(?P<slot>{_NP})(?:が存在する|が存在|存在)$",
+     ("dom_exists", "response_field")),
+)
+
+_TYPED_SLOT = re.compile(rf"^{_IDENT}(?:/{_IDENT})*$")
+# スロットに英数字の語が混じっていると、名前なのか値なのか判別できない。
+_ASCII_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
 
 
-# 「〜を返す／〜が含まれる」の手前が **ASCII 識別子** なら、それはフィールド名。
-# 日本語が混じっていると、機械にはフィールド名なのか値なのか判別できない
-# （`hook_score を返す` は実在の主張、`ステータスが completed を返す` は値の主張。
-# どちらも「〜を返す」で終わる）。gate-verifier 10回目。
-_FIELD_VERB = re.compile(
-    r"(?<!正常応答)を返す|が返る|が含まれる|含む|フィールドが存在")
-# `\w` は Unicode なので日本語も拾ってしまう（`BGM設定` が識別子扱いになった）。
-# ASCII に限定する。
-_TYPED_SLOT = re.compile(r"^[A-Za-z_][A-Za-z0-9_./]*$")
-# 節の区切り。スロットはこの直後から動詞の直前まで。
-_CLAUSE_BREAK = re.compile(r"[、。，．,（）()｢｣「」]")
+def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | None:
+    """description をテンプレートに丸ごと突き合わせる。
 
-
-def slot_is_typed(description: str) -> bool:
-    """「何を返すか」の部分が機械で型付けできる（ASCII 識別子）か。
-
-    **文末に固定しない。** 以前は `(.+?)(?:を返す|…)$` と文末アンカーで見ていたので、
-    句点や後続節を1文字足すだけで「照合対象なし」に落ち、検査ごと素通りした
-    （`ステータスが completed を返す` は FAIL、`…を返す。` は緑。gate-verifier 11回目）。
-    いまは動詞の出現を**すべて**見て、1つでも型付けできないスロットがあれば False。
-
-    マーカーが当たっているのに動詞が見つからない場合も False にする。
-    正規表現どうしが食い違ったときに**緩い側へ倒れない**ようにするため。
+    返り値は (テンプレート名, 許される claim, スロット)。
+    どのテンプレートにも一致しなければ `None`。**部分一致は認めない。**
     """
     text = (description or "").strip()
-    if "フィールド" not in markers_in(text):
-        return True  # フィールドの主張ではないので、この検査の対象外
-    found = False
-    for match in _FIELD_VERB.finditer(text):
-        found = True
-        head = text[:match.start()].split("正常応答し")[-1]
-        slot = _CLAUSE_BREAK.split(head)[-1].strip()
-        if not _TYPED_SLOT.match(slot):
-            return False
-    return found
-
-
-# 「〜が存在する」側のスロットに英数字の語が混じっているものも、値なのか名前なのか
-# 判別できない（`ステータス表示が completed で存在する` ＋ dom_exists ＋ testid で
-# 値の主張を要素の実在で緑にできる）。ユーザー判断（2026-08-07）で、
-# **ASCII トークンを含むものだけ**宣言を要求する。純粋な UI 名（`進捗バー`）は対象外。
-_ASCII_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
-_EXISTS_TAIL = re.compile(r"(が存在する?|存在)$")
+    if not text:
+        return None
+    for name, pattern, claims in DESCRIPTION_TEMPLATES:
+        match = re.match(pattern, text)
+        if match is None:
+            continue
+        slot = (match.groupdict().get("slot") or "").strip()
+        # スロットに強い述語が埋まっているなら、この文は測られていない主張を
+        # 含んでいる。テンプレートに一致したことにしない。
+        if _STRONG_IN_SLOT.search(slot):
+            return None
+        if name == "要素の実在" and _TYPED_SLOT.match(slot):
+            # `download_url存在` のような ASCII 識別子は、DOM 要素ではなく
+            # レスポンスのフィールド名。要素の実在では測れない。
+            return name, ("response_field",), slot
+        return name, claims, slot
+    return None
 
 
 def needs_value_note(description: str) -> bool:
-    """項目自身に「この文が値の主張かどうか」を書かせる必要があるか。"""
-    text = (description or "").strip()
-    found = markers_in(text)
-    if "フィールド" in found:
-        return not slot_is_typed(text)
-    if "要素" in found:
-        head = _EXISTS_TAIL.sub("", text)
-        slot = _CLAUSE_BREAK.split(head)[-1].strip()
-        if _TYPED_SLOT.match(slot):
-            return False
+    """項目自身に「この文が値の主張かどうか」を書かせる必要があるか。
+
+    `hook_score を返す`（フィールドの実在）と `ステータスが completed を返す`
+    （値の主張）は、どちらも同じテンプレートに乗る。`completed` が値なのか
+    フィールド名なのかを機械は知らない。**判別できないものは人に宣言させる**
+    （ユーザー判断 2026-08-07）。
+    """
+    parsed = parse_description(description)
+    if parsed is None:
+        return False  # そもそも通らない（unparsed で落ちる）
+    name, _claims, slot = parsed
+    if _TYPED_SLOT.match(slot):
+        return False
+    # ユーザー判断（2026-08-07）で要求の範囲が2つに分かれている。
+    # フィールド系は**識別子でなければ必ず**、要素の実在は**英数字の語が
+    # 混じっているときだけ**（`進捗バーが存在する` のような純粋な UI 名は対象外）。
+    if name in ("フィールドを返す", "必須フィールド", "フィールドの実在",
+                "経路＋フィールド"):
+        return True
+    if name == "要素の実在":
         return bool(_ASCII_TOKEN.search(slot))
     return False
-
-
-def markers_in(description: str) -> frozenset:
-    """description に現れる述語をすべて拾う。文末だけを見ない。"""
-    text = (description or "").strip()
-    return frozenset(
-        name for name, pattern in DESCRIPTION_MARKERS if re.search(pattern, text)
-    )
-
-
-def parse_description(description: str) -> tuple[str, tuple[str, ...]] | None:
-    """description の述語の組み合わせに対して、要求される claim を返す。
-
-    返り値は (述語の組み合わせの表示名, 許される claim の並び)。
-    組み合わせが語彙に無ければ `None`。
-    """
-    if not (description or "").strip():
-        return None
-    found = markers_in(description)
-    if not found:
-        return None
-    claims = DESCRIPTION_COMBINATIONS.get(found)
-    if claims is None:
-        return None
-    return "＋".join(sorted(found)), claims
 
 
 # 項目が「何を照合先にするか」を宣言しているキー。**CLAIM_METHODS から導く。**
@@ -437,7 +399,7 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
     if CLAIM_METHODS[claim] == ():
         # 判定手段がそもそも無いなら、ラベルの当否より先にそれを言う。
         return ClaimRow(**common, reason="no_method")
-    _, allowed = parsed
+    _, allowed, _slot = parsed
     # 「そもそも測れない」は述語の種類とは別の軸。**どの述語にも貼れる。**
     # ユーザー判断（2026-08-07）: 必ず FAIL に落ちるので偽の緑は作れず、
     # 付け替えはラチェットの substituted が捕まえて --redeclare の理由が残る。
