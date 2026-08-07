@@ -203,7 +203,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/quality-gate/history",
       "response_field": "history",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "history はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O6-L2-01",

@@ -291,7 +291,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/render/status/{job_id}",
       "response_field": "stages",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "stages はレスポンスのフィールド名。値の主張ではない"
     },
     {
       "id": "O8-L1-10",

@@ -124,7 +124,8 @@
       "description": "diffコンテナが存在する",
       "test_method": "dom_exists",
       "testid": "proofreading-diff",
-      "claim": "dom_exists"
+      "claim": "dom_exists",
+      "value_note": "diff は UI コンテナの呼び名。値の主張ではない"
     },
     {
       "id": "O3-L1-03",
@@ -205,7 +206,8 @@
       "description": "SRTエクスポートボタンが存在する",
       "test_method": "dom_exists",
       "testid": "export-srt-btn",
-      "claim": "dom_exists"
+      "claim": "dom_exists",
+      "value_note": "SRT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない"
     },
     {
       "id": "O3-L1-12",
@@ -214,7 +216,8 @@
       "description": "TXTエクスポートボタンが存在する",
       "test_method": "dom_exists",
       "testid": "export-txt-btn",
-      "claim": "dom_exists"
+      "claim": "dom_exists",
+      "value_note": "TXT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない"
     },
     {
       "id": "O3-L1-13",

@@ -222,25 +222,60 @@ DESCRIPTION_COMBINATIONS: dict[frozenset, tuple[str, ...]] = {
 # 日本語が混じっていると、機械にはフィールド名なのか値なのか判別できない
 # （`hook_score を返す` は実在の主張、`ステータスが completed を返す` は値の主張。
 # どちらも「〜を返す」で終わる）。gate-verifier 10回目。
-_FIELD_TAIL = re.compile(r"(.+?)(?:を返す|が返る|が含まれる|含む|フィールドが存在する?)$")
+_FIELD_VERB = re.compile(
+    r"(?<!正常応答)を返す|が返る|が含まれる|含む|フィールドが存在")
 # `\w` は Unicode なので日本語も拾ってしまう（`BGM設定` が識別子扱いになった）。
 # ASCII に限定する。
 _TYPED_SLOT = re.compile(r"^[A-Za-z_][A-Za-z0-9_./]*$")
+# 節の区切り。スロットはこの直後から動詞の直前まで。
+_CLAUSE_BREAK = re.compile(r"[、。，．,（）()｢｣「」]")
 
 
 def slot_is_typed(description: str) -> bool:
     """「何を返すか」の部分が機械で型付けできる（ASCII 識別子）か。
 
-    フィールドの主張でない文（経路だけ、要素だけ）は対象外。
+    **文末に固定しない。** 以前は `(.+?)(?:を返す|…)$` と文末アンカーで見ていたので、
+    句点や後続節を1文字足すだけで「照合対象なし」に落ち、検査ごと素通りした
+    （`ステータスが completed を返す` は FAIL、`…を返す。` は緑。gate-verifier 11回目）。
+    いまは動詞の出現を**すべて**見て、1つでも型付けできないスロットがあれば False。
+
+    マーカーが当たっているのに動詞が見つからない場合も False にする。
+    正規表現どうしが食い違ったときに**緩い側へ倒れない**ようにするため。
     """
     text = (description or "").strip()
     if "フィールド" not in markers_in(text):
-        return True
-    match = _FIELD_TAIL.search(text)
-    if match is None:
-        return True
-    slot = match.group(1).split("正常応答し")[-1].strip()
-    return bool(_TYPED_SLOT.match(slot))
+        return True  # フィールドの主張ではないので、この検査の対象外
+    found = False
+    for match in _FIELD_VERB.finditer(text):
+        found = True
+        head = text[:match.start()].split("正常応答し")[-1]
+        slot = _CLAUSE_BREAK.split(head)[-1].strip()
+        if not _TYPED_SLOT.match(slot):
+            return False
+    return found
+
+
+# 「〜が存在する」側のスロットに英数字の語が混じっているものも、値なのか名前なのか
+# 判別できない（`ステータス表示が completed で存在する` ＋ dom_exists ＋ testid で
+# 値の主張を要素の実在で緑にできる）。ユーザー判断（2026-08-07）で、
+# **ASCII トークンを含むものだけ**宣言を要求する。純粋な UI 名（`進捗バー`）は対象外。
+_ASCII_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
+_EXISTS_TAIL = re.compile(r"(が存在する?|存在)$")
+
+
+def needs_value_note(description: str) -> bool:
+    """項目自身に「この文が値の主張かどうか」を書かせる必要があるか。"""
+    text = (description or "").strip()
+    found = markers_in(text)
+    if "フィールド" in found:
+        return not slot_is_typed(text)
+    if "要素" in found:
+        head = _EXISTS_TAIL.sub("", text)
+        slot = _CLAUSE_BREAK.split(head)[-1].strip()
+        if _TYPED_SLOT.match(slot):
+            return False
+        return bool(_ASCII_TOKEN.search(slot))
+    return False
 
 
 def markers_in(description: str) -> frozenset:
@@ -415,7 +450,7 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
     # 空欄は許さない。宣言を消したり書き換えたりすれば、ラチェットの
     # substituted が捕まえて --redeclare の理由が残る。
     if (claim not in ("response_value", "value_exclusive")
-            and not slot_is_typed(common["description"])
+            and needs_value_note(common["description"])
             and not (item.get("value_note") or "").strip()):
         return ClaimRow(**common, reason="value_note_required")
 

@@ -255,7 +255,8 @@
       "description": "SEOスコアが存在",
       "test_method": "dom_exists",
       "testid": "youtube-seo-score",
-      "claim": "dom_exists"
+      "claim": "dom_exists",
+      "value_note": "SEO は指標の名前で、UI 要素の呼び名の一部。値の主張ではない"
     },
     {
       "id": "O9-L1-08",
@@ -282,7 +283,8 @@
       "description": "CTR予測が存在",
       "test_method": "dom_exists",
       "testid": "youtube-ctr-prediction",
-      "claim": "dom_exists"
+      "claim": "dom_exists",
+      "value_note": "CTR は指標の名前で、UI 要素の呼び名の一部。値の主張ではない"
     },
     {
       "id": "O9-L1-11",

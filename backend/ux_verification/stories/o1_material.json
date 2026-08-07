@@ -100,7 +100,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/videos",
       "response_field": "videos",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O1-L1-03",
@@ -158,7 +159,8 @@
       "description": "localStorageに履歴キーが存在する",
       "test_method": "dom_exists",
       "claim": "storage_key",
-      "storage_key": "pipeline_recent_videos"
+      "storage_key": "pipeline_recent_videos",
+      "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない"
     },
     {
       "id": "O1-L2-01",

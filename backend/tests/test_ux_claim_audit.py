@@ -534,3 +534,60 @@ def test_every_owner_l1_item_that_needs_a_note_has_one():
     assert missing == []
     # 検査が空振りしていないこと（全部 typed なら、この層は何も守っていない）
     assert any(not slot_is_typed(r.description) for r in report.rows)
+
+
+def test_the_slot_check_is_not_anchored_to_the_end(tmp_path):
+    """句点や後続節を1文字足すだけで検査ごと素通りした（11回目）。
+
+    `_FIELD_TAIL` を文末アンカーで書いていたので、動詞が末尾に来ない文は
+    「照合対象なし」に落ちて型付け済み扱いになっていた。
+    """
+    from backend.ux_verification.claim_audit import slot_is_typed
+
+    assert not slot_is_typed("ステータスが completed を返す")
+    assert not slot_is_typed("ステータスが completed を返す。")
+    assert not slot_is_typed("推奨レスポンスの status が completed を返す（S3）")
+    assert not slot_is_typed(
+        "事前企画APIが正常応答し、success が true を返すことを確認する")
+
+
+def test_a_value_claim_with_a_trailing_clause_is_still_caught(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field",
+              description="事前企画APIが正常応答し、success が true を返すことを確認する",
+              endpoint="POST /api/x", response_field="success"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["value_note_required"]
+
+
+def test_an_element_claim_with_an_ascii_token_needs_a_note(tmp_path):
+    """`ステータス表示が completed で存在する` ＋ dom_exists ＋ testid で、
+    値の主張を要素の実在で緑にできた（5回目の型の DOM 側）。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists",
+              description="ステータスがcompletedのバッジが存在する",
+              testid="status-badge"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["value_note_required"]
+
+
+def test_an_unregistered_phrasing_of_existence_is_rejected(tmp_path):
+    """「で存在する」は語彙に無い書き方。緑にはならない。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists",
+              description="ステータス表示がcompletedで存在する", testid="status-badge"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["unparsed"]
+
+
+def test_a_plain_japanese_ui_name_needs_no_note(tmp_path):
+    """ユーザー判断（2026-08-07）: 純粋な UI 名は対象外。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists", description="進捗バーが存在する",
+              testid="progress-bar"),
+    ]))
+
+    assert report.mismatched == []

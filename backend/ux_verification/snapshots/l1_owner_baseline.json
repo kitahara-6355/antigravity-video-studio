@@ -260,6 +260,7 @@
     },
     "O1-L1-02": {
       "claim": "response_field",
+      "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/pipeline/videos",
       "response_field": "videos"
     },
@@ -294,10 +295,12 @@
     },
     "O1-L1-07": {
       "claim": "storage_key",
+      "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない",
       "storage_key": "pipeline_recent_videos"
     },
     "O2-L1-01": {
       "claim": "dom_exists",
+      "value_note": "Whisper はモデル系列の名前で、UI 要素の呼び名の一部。値の主張ではない",
       "testid": "whisper-model-select"
     },
     "O2-L1-02": {
@@ -330,6 +333,7 @@
     },
     "O3-L1-02": {
       "claim": "dom_exists",
+      "value_note": "diff は UI コンテナの呼び名。値の主張ではない",
       "testid": "proofreading-diff"
     },
     "O3-L1-03": {
@@ -366,10 +370,12 @@
     },
     "O3-L1-11": {
       "claim": "dom_exists",
+      "value_note": "SRT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
       "testid": "export-srt-btn"
     },
     "O3-L1-12": {
       "claim": "dom_exists",
+      "value_note": "TXT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
       "testid": "export-txt-btn"
     },
     "O3-L1-13": {
@@ -386,6 +392,7 @@
     },
     "O4-L1-03": {
       "claim": "response_field",
+      "value_note": "estimated_output_seconds はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_seconds"
     },
@@ -404,6 +411,7 @@
     },
     "O4-L1-07": {
       "claim": "response_field",
+      "value_note": "recommended_segments はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "recommended_segments"
     },
@@ -413,6 +421,7 @@
     },
     "O4-L1-09": {
       "claim": "response_field",
+      "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_str"
     },
@@ -444,6 +453,7 @@
     },
     "O5-L1-03": {
       "claim": "response_field",
+      "value_note": "highlights はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "highlights"
     },
@@ -466,16 +476,19 @@
     },
     "O5-L1-08": {
       "claim": "response_field",
+      "value_note": "chapters はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "chapters"
     },
     "O5-L1-09": {
       "claim": "response_field",
+      "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_str"
     },
     "O5-L1-10": {
       "claim": "response_field",
+      "value_note": "recommended_segments はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "recommended_segments"
     },
@@ -530,6 +543,7 @@
     },
     "O6-L1-10": {
       "claim": "response_field",
+      "value_note": "history はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/pipeline/quality-gate/history",
       "response_field": "history"
     },
@@ -556,6 +570,7 @@
     },
     "O7-L1-05": {
       "claim": "response_field",
+      "value_note": "actions はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/pipeline/improvement/actions",
       "response_field": "actions"
     },
@@ -624,6 +639,7 @@
     },
     "O8-L1-09": {
       "claim": "response_field",
+      "value_note": "stages はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "GET /api/render/status/{job_id}",
       "response_field": "stages"
     },
@@ -667,6 +683,7 @@
     },
     "O9-L1-07": {
       "claim": "dom_exists",
+      "value_note": "SEO は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
       "testid": "youtube-seo-score"
     },
     "O9-L1-08": {
@@ -679,6 +696,7 @@
     },
     "O9-L1-10": {
       "claim": "dom_exists",
+      "value_note": "CTR は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
       "testid": "youtube-ctr-prediction"
     },
     "O9-L1-11": {
@@ -2004,6 +2022,231 @@
               "subtitle_font",
               "subtitle_size"
             ]
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: 『〜が存在する』側でスロットに ASCII トークンを含む18件にも value_note を足した。値なのか名前なのか機械が判別できないので人に宣言させる（ユーザー判断 2026-08-07）",
+      "items": {
+        "O1-L1-02": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/videos",
+            "response_field": "videos"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/videos",
+            "response_field": "videos"
+          }
+        },
+        "O1-L1-07": {
+          "before": {
+            "claim": "storage_key",
+            "storage_key": "pipeline_recent_videos"
+          },
+          "after": {
+            "claim": "storage_key",
+            "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない",
+            "storage_key": "pipeline_recent_videos"
+          }
+        },
+        "O2-L1-01": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "whisper-model-select"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "Whisper はモデル系列の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "whisper-model-select"
+          }
+        },
+        "O3-L1-02": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "proofreading-diff"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "diff は UI コンテナの呼び名。値の主張ではない",
+            "testid": "proofreading-diff"
+          }
+        },
+        "O3-L1-11": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "export-srt-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "SRT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-srt-btn"
+          }
+        },
+        "O3-L1-12": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "export-txt-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "TXT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-txt-btn"
+          }
+        },
+        "O4-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_seconds"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "estimated_output_seconds はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_seconds"
+          }
+        },
+        "O4-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "recommended_segments はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O4-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O5-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "highlights"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "highlights はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "highlights"
+          }
+        },
+        "O5-L1-08": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "chapters"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "chapters はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "chapters"
+          }
+        },
+        "O5-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O5-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "recommended_segments はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O6-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/history",
+            "response_field": "history"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "history はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/quality-gate/history",
+            "response_field": "history"
+          }
+        },
+        "O7-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/actions",
+            "response_field": "actions"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "actions はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/improvement/actions",
+            "response_field": "actions"
+          }
+        },
+        "O8-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "stages"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "stages はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "stages"
+          }
+        },
+        "O9-L1-07": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-seo-score"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "SEO は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-seo-score"
+          }
+        },
+        "O9-L1-10": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-ctr-prediction"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "CTR は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-ctr-prediction"
           }
         }
       }
