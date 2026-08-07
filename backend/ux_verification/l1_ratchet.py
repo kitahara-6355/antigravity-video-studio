@@ -39,7 +39,17 @@
 
 3冊すべてに無いもの（＝まだピンしていない新しい項目）だけは `unpinned_new` と
 区別して `--update-baseline` で通す。一部の冊にだけ残っているのは記録を消した跡
-なので、理由を書かせる。
+なので、理由を書かせる。`items`（verdict）が欠けているものは `verdict_lost` で、
+**締め直しでは復旧させない**——退行したのかどうかを誰にも言えないから。
+
+ただし3冊すべてから同じ項目を消せば「新しい項目」に化ける。そこで集計欄
+（`total` / `pass` / `fail`）を `items` と突き合わせる（`tampered`）。ピンを
+1件でも間引けば必ずここで落ちる。
+
+**ここが守れる範囲の端。** 集計欄まで辻褄を合わせてベースラインを手で書き換えれば
+通る。それはベースラインを丸ごと消すのと同じ扱いで、**差分に出ることをもって
+歯止めとする**（このファイルは記録そのものなので、記録を書き換えた事実は
+必ず PR の差分に現れる）。
 """
 from __future__ import annotations
 
@@ -146,7 +156,8 @@ def load_baseline(path: Path) -> dict | None:
 
 @dataclass
 class L1Violation:
-    kind: str  # "regressed" | "removed" | "weakened" | "substituted" | "unpinned"
+    kind: str  # regressed | removed | weakened | substituted
+              # | unpinned | unpinned_new | verdict_lost | tampered
     item_id: str
     before: str
     after: str
@@ -173,6 +184,16 @@ class L1Violation:
             return (
                 f"[未ピン] {self.item_id}: ベースラインに無い新しい項目"
                 "（--update-baseline でピンしてください）"
+            )
+        if self.kind == "verdict_lost":
+            return (
+                f"[記録の欠落] {self.item_id}: {self.before}"
+                "（退行したかどうかを言えない。git からベースラインを戻してください）"
+            )
+        if self.kind == "tampered":
+            return (
+                f"[ベースラインの不整合] {self.item_id}: {self.before}"
+                "（ピンを間引いた跡。git から戻してください）"
             )
         return f"[退行] {self.item_id}: {self.before} → {self.after}"
 
@@ -204,13 +225,15 @@ class L1RatchetResult:
         lines = [f"🚫 {head}", f"  {len(self.violations)}件の違反:"]
         lines += [f"    {v}" for v in self.violations]
         kinds = {v.kind for v in self.violations}
-        if kinds - {"substituted", "unpinned", "unpinned_new"}:
+        if kinds - {"substituted", "unpinned", "unpinned_new",
+                    "verdict_lost", "tampered"}:
             lines.append(
                 "\n  PASS だった項目が FAIL に戻っています。frontend から "
                 "data-testid が消えたか、ストーリー側の testid が書き換わっています。"
                 "意図した変更なら --update-baseline で締め直してください。"
             )
-        if kinds & {"substituted", "unpinned", "unpinned_new"}:
+        if kinds & {"substituted", "unpinned", "unpinned_new",
+                    "verdict_lost", "tampered"}:
             lines.append(
                 "\n  項目が**何を測ると宣言しているか**がベースラインと違います。"
                 "verdict と理由コードは同じでも、要求している内容が変わっています。"
@@ -239,38 +262,68 @@ class L1Ratchet:
         violations: list[L1Violation] = []
         improvements: list[str] = []
 
-        # 3冊（items / reasons / declarations）と**現在の項目**が食い違っている
-        # ものを先に洗い出す。記録が無いものは「変化なし」ではなく「分からない」。
+        # --- ベースライン自身の整合性 --------------------------------------
         #
-        # ここを項目単位で見るだけでは足りなかった。`items` から1行消すと、その
-        # 項目は before に居なくなって `added` に落ち、下のループに一度も入らない。
-        # PASS → FAIL の退行も宣言の差し替えも、まとめて緑で通る
-        # （gate-verifier 6回目）。**現在ある項目が全部ピンされていること**を
-        # 不変条件にして、3冊のどれから消しても違反になるようにする。
+        # ここまでの検出はすべて「ベースラインの記録との比較」なので、
+        # **記録を消せば比較が消える。** 6回目で3冊のピンを不変条件にしたが、
+        # 3冊すべてから同じ項目を消せば「新しい項目」に化け、集計欄
+        # （total / pass / fail）はどこからも照合されていなかったため、
+        # 消したこと自体が痕跡を残さなかった（7回目）。
+        #
+        # 集計欄を items と突き合わせる。ピンを1件でも間引けば、必ずここで落ちる。
+        tampered: list[tuple[str, str]] = []
+        counted = {
+            "total": (baseline.get("total"), len(before)),
+            "pass": (baseline.get("pass"),
+                     sum(1 for v in before.values() if v == "PASS")),
+            "fail": (baseline.get("fail"),
+                     sum(1 for v in before.values() if v == "FAIL")),
+        }
+        for name, (recorded, actual) in counted.items():
+            if recorded is not None and recorded != actual:
+                tampered.append((name, f"{name}={recorded} だが items は {actual}件"))
+        for name, why in tampered:
+            violations.append(L1Violation("tampered", f"baseline.{name}", why, "—"))
+
+        # 3冊（items / reasons / declarations）と**現在の項目**が食い違っている
+        # ものを洗い出す。記録が無いものは「変化なし」ではなく「分からない」。
+        #
+        # 既知の項目は3冊の**和**で数える。`items` からだけ消すと、その項目は
+        # before に居なくなって比較ループに一度も入らず、退行も差し替えも
+        # まとめて消える（6回目の穴1）。和で持てば、どの冊に1行でも残っていれば
+        # 「前は在った項目」として扱える。
+        known_ids = set(before) | set(before_reasons) | set(before_decls)
         pinned_books = (
             ("verdict がベースラインに無い", before),
             ("前回の判定理由がベースラインに無い", before_reasons),
             ("前回の宣言がベースラインに無い", before_decls),
         )
         unpinned_ids: set[str] = set()
-        for item_id in sorted(set(after) | set(before) | set(before_reasons)
-                              | set(before_decls)):
-            if item_id not in after and item_id in before:
+        for item_id in sorted(set(after) | known_ids):
+            if item_id not in after and item_id in known_ids:
                 continue  # 項目そのものの消滅は下のループが removed として出す
             missing = [label for label, book in pinned_books if item_id not in book]
             if not missing:
                 continue
             unpinned_ids.add(item_id)
-            # 3冊すべてに無ければ、単に**まだピンしていない新しい項目**。
-            # 一部の冊にだけ残っているなら、記録を消した跡。前者は
-            # --update-baseline でピンしてよく、後者は理由を書かせる。
-            kind = "unpinned_new" if len(missing) == len(pinned_books) else "unpinned"
+            if len(missing) == len(pinned_books) and not tampered:
+                # 3冊すべてに無く、集計も整合している＝**まだピンしていない
+                # 新しい項目**。--update-baseline でピンしてよい。
+                kind = "unpinned_new"
+            elif item_id not in before:
+                # verdict の記録だけが消えている。退行したのかどうかを誰も
+                # 言えないので、締め直しでは復旧させない（--redeclare も
+                # --update-baseline も拒否する）。git から戻すしかない。
+                kind = "verdict_lost"
+            else:
+                kind = "unpinned"
             violations.append(L1Violation(kind, item_id, "・".join(missing), "—"))
 
-        for item_id, was in before.items():
+        for item_id in sorted(known_ids):
+            was = before.get(item_id)
             now = after.get(item_id)
             if now is None:
-                violations.append(L1Violation("removed", item_id, was, "—"))
+                violations.append(L1Violation("removed", item_id, was or "?", "—"))
                 continue
 
             # unpinned でも**ここで打ち切らない。** 記録の欠落を退行の目隠しに

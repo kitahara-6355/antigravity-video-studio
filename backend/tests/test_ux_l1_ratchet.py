@@ -733,12 +733,77 @@ def test_deleting_an_item_from_the_items_book_does_not_hide_a_regression(tmp_pat
     del payload["items"]["O1-L1-01"]
     path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-    result = L1Ratchet().check(
-        _declared("O1-L1-01", Verdict.FAIL, "not_found", _SUCCESS), load_baseline(path)
-    )
+    broken = _declared("O1-L1-01", Verdict.FAIL, "not_found", _SUCCESS)
+    result = L1Ratchet().check(broken, load_baseline(path))
 
     assert not result.valid
-    assert [v.kind for v in result.violations] == ["unpinned"]
+    # verdict の記録が消えている以上、退行したかどうかは誰にも言えない。
+    # 締め直しで先に進めず、git から戻すしかない状態にする。
+    kinds = {v.kind for v in result.violations}
+    assert "verdict_lost" in kinds
+    assert "tampered" in kinds, "items を間引けば集計欄とも食い違う"
+    with pytest.raises(ValueError):
+        L1Ratchet().redeclare(broken, path, "ピンし直す")
+    with pytest.raises(ValueError):
+        L1Ratchet().update(broken, path)
+
+
+def test_deleting_an_item_from_every_book_is_caught_by_the_counters(tmp_path):
+    """3冊すべてから消せば「新しい項目」に化けた（7回目の穴）。
+
+    集計欄（total / pass / fail）はどこからも照合されていなかったので、
+    間引いた跡が残らなかった。items と突き合わせて必ず落とす。
+    """
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(
+        L1Report(persona="owner", results=[
+            _result("O1-L1-01", Verdict.PASS, reason="field_found",
+                    declaration=_HOOK),
+            _result("O1-L1-02", Verdict.PASS, reason="found", declaration=_HOOK),
+        ], files_scanned=1), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    for book in ("items", "reasons", "declarations"):
+        del payload[book]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    weakened = L1Report(persona="owner", results=[
+        _result("O1-L1-01", Verdict.FAIL, reason="not_found", declaration=_SUCCESS),
+        _result("O1-L1-02", Verdict.PASS, reason="found", declaration=_HOOK),
+    ], files_scanned=1)
+    result = L1Ratchet().check(weakened, load_baseline(path))
+
+    assert not result.valid
+    assert "tampered" in {v.kind for v in result.violations}
+    with pytest.raises(ValueError):
+        L1Ratchet().update(weakened, path)
+
+
+def test_deleting_an_item_from_the_story_and_every_book_is_caught(tmp_path):
+    """項目そのものを消してベースラインからも消す経路（7回目の穴1）。
+
+    `removed` は「before に居て after に居ない」でしか出ないので、記録ごと
+    消せば発火しない。集計欄との突き合わせが最後の網になる。
+    """
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(
+        L1Report(persona="owner", results=[
+            _result("O1-L1-01", Verdict.PASS, reason="found", declaration=_HOOK),
+            _result("O1-L1-02", Verdict.PASS, reason="found", declaration=_HOOK),
+        ], files_scanned=1), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    for book in ("items", "reasons", "declarations"):
+        del payload[book]["O1-L1-01"]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    shrunk = _declared("O1-L1-02", Verdict.PASS, "found", _HOOK)
+    result = L1Ratchet().check(shrunk, load_baseline(path))
+
+    assert not result.valid
+    assert "tampered" in {v.kind for v in result.violations}
 
 
 def test_unpinned_does_not_short_circuit_the_regression_check(tmp_path):
