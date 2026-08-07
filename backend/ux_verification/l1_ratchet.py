@@ -33,18 +33,20 @@
 
 3層はどれもベースラインの記録との比較なので、**記録を消せば比較が消える。**
 `items` / `reasons` / `declarations` のどれか1冊から1行消すだけで、その項目の
-退行・弱化・差し替えがまとめて見えなくなる（`items` から消せば「新しい項目」に
-化け、比較ループにすら入らない）。そこで**いま在る項目が3冊すべてにピンされて
-いること**を不変条件にし、欠けていれば `unpinned` として落とす。
+退行・弱化・差し替えがまとめて見えなくなる。だから**いま在る項目が3冊すべてに
+ピンされていること**を不変条件にする。
 
-3冊すべてに無いもの（＝まだピンしていない新しい項目）だけは `unpinned_new` と
-区別して `--update-baseline` で通す。一部の冊にだけ残っているのは記録を消した跡
-なので、理由を書かせる。`items`（verdict）が欠けているものは `verdict_lost` で、
-**締め直しでは復旧させない**——退行したのかどうかを誰にも言えないから。
+- **一部の冊にだけ残っている** → `tampered`。記録を間引いた跡で、何が失われたかを
+  もう言えない。`--redeclare` も `--update-baseline` も受け付けない。git から戻す
+- **3冊すべてに無く、集計欄も整合している** → `unpinned_new`。まだピンしていない
+  新しい項目なので `--update-baseline` で通す。**何をピンしたかは `pins` に残す**
+- **集計欄（`total` / `pass` / `fail`）が items と合わない、または欄ごと無い**
+  → `tampered`。「無い＝照合しない」にすると、3行消すだけで検出器が丸ごと消える
 
-ただし3冊すべてから同じ項目を消せば「新しい項目」に化ける。そこで集計欄
-（`total` / `pass` / `fail`）を `items` と突き合わせる（`tampered`）。ピンを
-1件でも間引けば必ずここで落ちる。
+締め直しの3つは役割を分ける。`--tighten` は判定を厳しくしたことによる PASS の
+減少だけ、`--redeclare` は宣言の差し替えだけ（理由必須・before/after を記録）、
+`--update-baseline` は新しい項目のピンだけ。**どれも他の種類の違反が1件でも
+混じっていたら書かない。**
 
 **ここが守れる範囲の端。** 集計欄まで辻褄を合わせてベースラインを手で書き換えれば
 通る。それはベースラインを丸ごと消すのと同じ扱いで、**差分に出ることをもって
@@ -110,7 +112,8 @@ def baseline_path(persona: str) -> Path:
 
 def write_baseline(report: L1Report, path: Path,
                    tightenings: list | None = None,
-                   redeclarations: list | None = None) -> Path:
+                   redeclarations: list | None = None,
+                   pins: list | None = None) -> Path:
     """判定を項目ごとに書き出す。
 
     タイムスタンプは入れない。毎回書き換わる欄があると、実質的な変化が
@@ -141,6 +144,10 @@ def write_baseline(report: L1Report, path: Path,
     if redeclarations:
         # 宣言を差し替えた履歴。理由と before/after を残す。
         payload["redeclarations"] = redeclarations
+    if pins:
+        # 新しくピンした項目の履歴。理由は要らないが記録は要る——記録を消して
+        # 「新しい項目」に化けさせたものを、履歴ゼロで締め直せなくするため。
+        payload["pins"] = pins
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
         f.write("\n")
@@ -157,7 +164,7 @@ def load_baseline(path: Path) -> dict | None:
 @dataclass
 class L1Violation:
     kind: str  # regressed | removed | weakened | substituted
-              # | unpinned | unpinned_new | verdict_lost | tampered
+              # | unpinned_new | tampered
     item_id: str
     before: str
     after: str
@@ -175,25 +182,16 @@ class L1Violation:
                 f"[宣言の差し替え] {self.item_id}: {self.before} → {self.after}"
                 "（測る対象そのものが変わった）"
             )
-        if self.kind == "unpinned":
-            return (
-                f"[固定されていない] {self.item_id}: {self.before}"
-                "（ベースラインに記録が無く、変化を検出できない）"
-            )
         if self.kind == "unpinned_new":
             return (
                 f"[未ピン] {self.item_id}: ベースラインに無い新しい項目"
                 "（--update-baseline でピンしてください）"
             )
-        if self.kind == "verdict_lost":
-            return (
-                f"[記録の欠落] {self.item_id}: {self.before}"
-                "（退行したかどうかを言えない。git からベースラインを戻してください）"
-            )
         if self.kind == "tampered":
             return (
-                f"[ベースラインの不整合] {self.item_id}: {self.before}"
-                "（ピンを間引いた跡。git から戻してください）"
+                f"[記録の欠落] {self.item_id}: {self.before}"
+                "（ピンを間引いた跡。何が失われたか言えないので、"
+                "git からベースラインを戻してください）"
             )
         return f"[退行] {self.item_id}: {self.before} → {self.after}"
 
@@ -225,15 +223,13 @@ class L1RatchetResult:
         lines = [f"🚫 {head}", f"  {len(self.violations)}件の違反:"]
         lines += [f"    {v}" for v in self.violations]
         kinds = {v.kind for v in self.violations}
-        if kinds - {"substituted", "unpinned", "unpinned_new",
-                    "verdict_lost", "tampered"}:
+        if kinds - {"substituted", "unpinned_new", "tampered"}:
             lines.append(
                 "\n  PASS だった項目が FAIL に戻っています。frontend から "
                 "data-testid が消えたか、ストーリー側の testid が書き換わっています。"
                 "意図した変更なら --update-baseline で締め直してください。"
             )
-        if kinds & {"substituted", "unpinned", "unpinned_new",
-                    "verdict_lost", "tampered"}:
+        if kinds & {"substituted", "unpinned_new", "tampered"}:
             lines.append(
                 "\n  項目が**何を測ると宣言しているか**がベースラインと違います。"
                 "verdict と理由コードは同じでも、要求している内容が変わっています。"
@@ -271,6 +267,11 @@ class L1Ratchet:
         # 消したこと自体が痕跡を残さなかった（7回目）。
         #
         # 集計欄を items と突き合わせる。ピンを1件でも間引けば、必ずここで落ちる。
+        #
+        # **欄が無いことを「照合しない」にしない。** 値の書き換えだけを見て
+        # `recorded is not None` で素通りさせていたので、3つの欄をキーごと消せば
+        # 照合が丸ごと消え、間引きが exit 0 で通った（8回目）。無い欄は
+        # 「合っている」ではなく「照合できない」。
         tampered: list[tuple[str, str]] = []
         counted = {
             "total": (baseline.get("total"), len(before)),
@@ -280,7 +281,9 @@ class L1Ratchet:
                      sum(1 for v in before.values() if v == "FAIL")),
         }
         for name, (recorded, actual) in counted.items():
-            if recorded is not None and recorded != actual:
+            if recorded is None:
+                tampered.append((name, f"{name} の欄がベースラインに無い"))
+            elif recorded != actual:
                 tampered.append((name, f"{name}={recorded} だが items は {actual}件"))
         for name, why in tampered:
             violations.append(L1Violation("tampered", f"baseline.{name}", why, "—"))
@@ -298,6 +301,11 @@ class L1Ratchet:
             ("前回の判定理由がベースラインに無い", before_reasons),
             ("前回の宣言がベースラインに無い", before_decls),
         )
+        # **3冊の一部にだけ残っている状態は「未ピン」ではなく「記録を消した跡」。**
+        # 集計欄は items としか突き合わせていないので、reasons と declarations から
+        # 消すだけなら集計に触れずに済み、`substituted` が `unpinned` に格下げされて
+        # 失った内容が表示されないまま --redeclare が飲み込んだ（8回目）。
+        # 3冊が食い違っていること自体を tampered として、締め直しでは直せなくする。
         unpinned_ids: set[str] = set()
         for item_id in sorted(set(after) | known_ids):
             if item_id not in after and item_id in known_ids:
@@ -308,16 +316,12 @@ class L1Ratchet:
             unpinned_ids.add(item_id)
             if len(missing) == len(pinned_books) and not tampered:
                 # 3冊すべてに無く、集計も整合している＝**まだピンしていない
-                # 新しい項目**。--update-baseline でピンしてよい。
-                kind = "unpinned_new"
-            elif item_id not in before:
-                # verdict の記録だけが消えている。退行したのかどうかを誰も
-                # 言えないので、締め直しでは復旧させない（--redeclare も
-                # --update-baseline も拒否する）。git から戻すしかない。
-                kind = "verdict_lost"
+                # 新しい項目**。--update-baseline でピンしてよい（何をピンしたかは
+                # 履歴に残る）。
+                violations.append(L1Violation("unpinned_new", item_id, "—", "—"))
             else:
-                kind = "unpinned"
-            violations.append(L1Violation(kind, item_id, "・".join(missing), "—"))
+                violations.append(L1Violation(
+                    "tampered", item_id, "・".join(missing), "—"))
 
         for item_id in sorted(known_ids):
             was = before.get(item_id)
@@ -377,18 +381,37 @@ class L1Ratchet:
         """
         baseline = load_baseline(path)
         result = self.check(report, baseline)
-        # 未ピン（新しく足した項目、または3冊のどれかから記録が消えたもの）だけは
-        # ここで締め直せる。それ以外が1件でも混じっていたら書かない——退行を
-        # 未ピンに紛れ込ませて通せるようにすると、締め直しが抜け道になる。
+        # まだピンしていない新しい項目だけは、ここで理由なしにピンしてよい。
+        # それ以外が1件でも混じっていたら書かない——退行を未ピンに紛れ込ませて
+        # 通せるようにすると、締め直しが抜け道になる。
         blocking = [v for v in result.violations if v.kind != "unpinned_new"]
         if blocking:
             raise ValueError(
                 "退行が残っているためベースラインを更新できません:\n"
                 + "\n".join(f"  {v}" for v in blocking)
             )
+        # **何を新しくピンしたかを残す。** 理由は要らないが、記録は要る。
+        # 残さないと、記録を消して「新しい項目」に化けさせたものを、履歴ゼロで
+        # 締め直せてしまう（8回目の指摘②）。
+        pins = list((baseline or {}).get("pins") or [])
+        newly = sorted(v.item_id for v in result.violations
+                       if v.kind == "unpinned_new")
+        if newly:
+            after_decls = {r.item_id: r.declaration for r in report.results}
+            after_items = {r.item_id: r.verdict.value for r in report.results}
+            pins.append({
+                "items": {
+                    item_id: {
+                        "verdict": after_items.get(item_id),
+                        "declaration": after_decls.get(item_id),
+                    }
+                    for item_id in newly
+                },
+            })
         return write_baseline(report, path,
                               (baseline or {}).get("tightenings"),
-                              (baseline or {}).get("redeclarations"))
+                              (baseline or {}).get("redeclarations"),
+                              pins)
 
     def redeclare(self, report: L1Report, path: Path, reason: str) -> Path:
         """**宣言の差し替え**だけを受け入れて締め直す。
@@ -397,9 +420,11 @@ class L1Ratchet:
         判定手段を足して `claim` を強い側へ移す）。禁じるのは**黙って**
         変えることのほう。理由を必須にし、before/after を履歴に残す。
 
-        受け入れるのは `substituted` と `unpinned` だけ。verdict の退行や
-        判定の弱化が混じっていたら拒否する。宣言の差し替えに紛れ込ませて
-        通せるようにすると、履歴を残す意味が無くなる。
+        受け入れるのは `substituted` だけ。verdict の退行・判定の弱化・
+        記録の欠落（`tampered`）が混じっていたら拒否する。差し替えに
+        紛れ込ませて通せるようにすると、履歴を残す意味が無くなる。
+        とくに `tampered` を受けてはいけない——記録が消えている項目は
+        before が `null` になるので、**何が弱くなったかを履歴に書けない。**
 
         **これは「差し替えを禁止する」機能ではない。** C-4 が求めているのは
         検出であって禁止ではないので、通した記録が永久に残るところまでを
@@ -414,8 +439,7 @@ class L1Ratchet:
         result = self.check(report, baseline)
         before_decls = (baseline or {}).get("declarations") or {}
 
-        illegitimate = [v for v in result.violations
-                        if v.kind not in ("substituted", "unpinned", "unpinned_new")]
+        illegitimate = [v for v in result.violations if v.kind != "substituted"]
         if illegitimate:
             raise ValueError(
                 "宣言の差し替えでは説明できない違反が混じっています:\n"
@@ -437,7 +461,8 @@ class L1Ratchet:
             },
         })
         return write_baseline(report, path,
-                              (baseline or {}).get("tightenings"), history)
+                              (baseline or {}).get("tightenings"), history,
+                              (baseline or {}).get("pins"))
 
     def tighten(self, report: L1Report, path: Path, reason: str,
                 allowed_reasons: tuple = TIGHTENING_REASONS) -> Path:
@@ -500,4 +525,5 @@ class L1Ratchet:
             "items": sorted(v.item_id for v in result.violations),
         })
         return write_baseline(report, path, history,
-                              (baseline or {}).get("redeclarations"))
+                              (baseline or {}).get("redeclarations"),
+                              (baseline or {}).get("pins"))

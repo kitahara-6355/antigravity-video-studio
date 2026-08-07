@@ -595,7 +595,7 @@ def test_deleting_a_whole_block_from_the_baseline_is_a_violation(tmp_path, block
     )
 
     assert not result.valid
-    assert [v.kind for v in result.violations] == ["unpinned"]
+    assert [v.kind for v in result.violations] == ["tampered"]
 
 
 @pytest.mark.parametrize("block", ["reasons", "declarations"])
@@ -629,7 +629,13 @@ def test_deleting_one_items_declaration_is_a_violation(tmp_path):
         load_baseline(path),
     )
 
-    assert [v.kind for v in result.violations] == ["unpinned"]
+    # 一部の冊にだけ残っている＝記録を消した跡。何が失われたか言えないので
+    # 差し替え（substituted）に格下げせず、締め直しでも直せなくする。
+    assert [v.kind for v in result.violations] == ["tampered"]
+    with pytest.raises(ValueError, match="宣言の差し替えでは説明できない"):
+        L1Ratchet().redeclare(
+            _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+            path, "ピンし直す")
 
 
 # --- 差し替えの締め直し（--redeclare）------------------------------------------
@@ -739,9 +745,7 @@ def test_deleting_an_item_from_the_items_book_does_not_hide_a_regression(tmp_pat
     assert not result.valid
     # verdict の記録が消えている以上、退行したかどうかは誰にも言えない。
     # 締め直しで先に進めず、git から戻すしかない状態にする。
-    kinds = {v.kind for v in result.violations}
-    assert "verdict_lost" in kinds
-    assert "tampered" in kinds, "items を間引けば集計欄とも食い違う"
+    assert "tampered" in {v.kind for v in result.violations}
     with pytest.raises(ValueError):
         L1Ratchet().redeclare(broken, path, "ピンし直す")
     with pytest.raises(ValueError):
@@ -824,7 +828,7 @@ def test_unpinned_does_not_short_circuit_the_regression_check(tmp_path):
         _declared("O1-L1-01", Verdict.FAIL, "not_found", _SUCCESS), load_baseline(path)
     )
 
-    assert {v.kind for v in result.violations} == {"unpinned", "regressed"}
+    assert {v.kind for v in result.violations} == {"tampered", "regressed"}
 
 
 def test_redeclare_cannot_pin_over_a_regression_hidden_by_a_deleted_record(tmp_path):
@@ -858,6 +862,75 @@ def test_update_cannot_repin_over_a_partially_deleted_record(tmp_path):
     with pytest.raises(ValueError):
         L1Ratchet().update(
             _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS), path)
+
+
+# --- 集計欄の照合（8回目）------------------------------------------------------
+#
+# 集計欄の**値の書き換え**だけを見て `recorded is not None` で素通りさせていたので、
+# 3つの欄をキーごと消せば照合が丸ごと消え、ピンの間引きが exit 0 で通った。
+# 無い欄は「合っている」ではなく「照合できない」。
+
+
+@pytest.mark.parametrize("field_name", ["total", "pass", "fail"])
+def test_deleting_a_counter_field_is_a_violation(tmp_path, field_name):
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    del payload[field_name]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), load_baseline(path)
+    )
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["tampered"]
+
+
+def test_deleting_counters_and_records_cannot_launder_a_weakening(tmp_path):
+    """8回目の②。集計欄ごと消せば弱化が `unpinned_new` に化けて締め直せた。"""
+    import json as _json
+
+    path = tmp_path / "base.json"
+    write_baseline(
+        L1Report(persona="owner", results=[
+            _result("O1-L1-01", Verdict.PASS, reason="field_found",
+                    declaration=_HOOK),
+            _result("O1-L1-02", Verdict.PASS, reason="found", declaration=_HOOK),
+        ], files_scanned=1), path)
+    payload = _json.loads(path.read_text(encoding="utf-8"))
+    for book in ("items", "reasons", "declarations"):
+        del payload[book]["O1-L1-01"]
+    for counter in ("total", "pass", "fail"):
+        del payload[counter]
+    path.write_text(_json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    weakened = L1Report(persona="owner", results=[
+        _result("O1-L1-01", Verdict.PASS, reason="found",
+                declaration={"claim": "route_exists", "endpoint": "POST /x"}),
+        _result("O1-L1-02", Verdict.PASS, reason="found", declaration=_HOOK),
+    ], files_scanned=1)
+
+    assert not L1Ratchet().check(weakened, load_baseline(path)).valid
+    with pytest.raises(ValueError):
+        L1Ratchet().update(weakened, path)
+
+
+def test_update_records_what_it_newly_pinned(tmp_path):
+    """理由は要らないが記録は要る。何をピンしたかが残らないと追えない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    grown = L1Report(persona="owner", results=[
+        _result("O1-L1-01", Verdict.PASS, reason="field_found", declaration=_HOOK),
+        _result("O1-L1-02", Verdict.FAIL, reason="not_found", declaration=_SUCCESS),
+    ], files_scanned=1)
+
+    L1Ratchet().update(grown, path)
+
+    pinned = load_baseline(path)["pins"][-1]["items"]
+    assert pinned["O1-L1-02"] == {"verdict": "FAIL", "declaration": _SUCCESS}
 
 
 def test_committed_baseline_pins_the_declaration_of_every_owner_l1_item():
