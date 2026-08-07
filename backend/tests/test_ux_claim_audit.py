@@ -33,7 +33,7 @@ def _stories(tmp_path, items, name="o1_demo.json", ux_id="O-1"):
 _DESC_FOR_CLAIM = {
     "dom_exists": "要素が存在する",
     "route_exists": "APIが正常応答",
-    "response_field": "APIが正常応答しフィールドが返る",
+    "response_field": "APIが正常応答しvideosが返る",
     "storage_key": "localStorageに履歴キーが存在する",
     "value_constraint": "4カテゴリ(a/b/c/d)が存在する",
     "value_exclusive": "対応拡張子のみ含まれる",
@@ -420,14 +420,18 @@ def test_declaring_it_unmeasurable_is_allowed_for_any_predicate(tmp_path):
     assert report.mismatched == []
 
 
-def test_every_grammar_entry_points_at_a_known_claim():
-    """述語を足して claim を書き忘れたら、対応表の外にポケットができる。"""
-    from backend.ux_verification.claim_audit import DESCRIPTION_GRAMMAR
+def test_every_combination_points_at_a_known_claim():
+    """組み合わせを足して claim を書き忘れたら、対応表の外にポケットができる。"""
+    from backend.ux_verification.claim_audit import (
+        DESCRIPTION_COMBINATIONS, DESCRIPTION_MARKERS,
+    )
 
-    for name, _pattern, claims in DESCRIPTION_GRAMMAR:
-        assert claims, name
+    known = {name for name, _ in DESCRIPTION_MARKERS}
+    for markers, claims in DESCRIPTION_COMBINATIONS.items():
+        assert markers <= known, markers
+        assert claims, markers
         for claim in claims:
-            assert claim in CLAIM_METHODS, f"{name} → {claim}"
+            assert claim in CLAIM_METHODS, f"{sorted(markers)} → {claim}"
 
 
 def test_every_owner_l1_description_is_in_the_vocabulary():
@@ -439,3 +443,94 @@ def test_every_owner_l1_description_is_in_the_vocabulary():
                 if parse_description(r.description) is None]
 
     assert unparsed == []
+
+
+# --- 文末だけを見ない（gate-verifier 10回目）------------------------------------
+#
+# 最初の実装は「先に当たったパターンを採る」形で、文末の動詞しか閉じていなかった。
+# `success=true` は強い述語に当たるのに、`…正常応答し success=true が返る` と
+# 書くと「経路＋フィールド」に落ちて値の主張が消えた。
+# **同じ主張が空白の有無で強弱に振れていた。**
+
+
+def test_a_value_claim_buried_mid_sentence_still_requires_the_strong_claim(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field",
+              description="事前企画APIが正常応答し success=true が返る",
+              endpoint="POST /api/x", response_field="success"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+def test_an_unregistered_combination_of_predicates_is_rejected(tmp_path):
+    """述語そのものは既知でも、**組み合わせ**が未登録なら通さない。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists",
+              description="3件以上のセグメントがlocalStorageに存在する", testid="x"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["unparsed"]
+
+
+# --- 機械が型付けできないスロットは人に宣言させる -------------------------------
+#
+# `hook_score を返す`（フィールドの実在）と `ステータスが completed を返す`
+# （値の主張）は、どちらも「〜を返す」で終わる。completed が値なのか
+# フィールド名なのかを機械は知らない。ユーザー判断（2026-08-07）で、
+# 判別できないものは項目自身に宣言させ、**空欄を機械が許さない**ことにした。
+
+
+def test_an_untypable_slot_requires_an_explicit_note(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="ステータスがcompletedを返す",
+              endpoint="GET /api/x", response_field="status"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["value_note_required"]
+
+
+def test_an_explicit_note_settles_it(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="ステータスがcompletedを返す",
+              endpoint="GET /api/x", response_field="status",
+              value_note="completed はフィールド名で、値の主張ではない"),
+    ]))
+
+    assert report.mismatched == []
+
+
+def test_an_ascii_identifier_slot_needs_no_note(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="hook_scoreが返る",
+              endpoint="GET /api/x", response_field="hook_score"),
+    ]))
+
+    assert report.mismatched == []
+
+
+def test_the_identifier_check_is_ascii_only():
+    """`\w` は Unicode なので日本語も識別子扱いになる。ASCII に限る。"""
+    from backend.ux_verification.claim_audit import slot_is_typed
+
+    assert slot_is_typed("hook_scoreが返る")
+    assert not slot_is_typed("BGM設定が含まれる")
+    assert not slot_is_typed("ロゴ設定が含まれる")
+
+
+def test_the_value_note_is_pinned_by_the_ratchet():
+    """宣言を消せば検査が消える。ラチェットの固定対象に入っていること。"""
+    from backend.ux_verification.claim_audit import DECLARATION_KEYS
+
+    assert "value_note" in DECLARATION_KEYS
+
+
+def test_every_owner_l1_item_that_needs_a_note_has_one():
+    from backend.ux_verification.claim_audit import slot_is_typed
+
+    report = for_repo("owner")
+    missing = [r.item_id for r in report.rows if r.reason == "value_note_required"]
+
+    assert missing == []
+    # 検査が空振りしていないこと（全部 typed なら、この層は何も守っていない）
+    assert any(not slot_is_typed(r.description) for r in report.rows)

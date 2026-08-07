@@ -115,7 +115,8 @@
         "size_mb",
         "modified"
       ],
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている"
     },
     {
       "id": "O1-L1-04",

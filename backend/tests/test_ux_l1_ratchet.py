@@ -956,3 +956,76 @@ def test_executor_attaches_the_declaration_to_every_result():
 
     assert report.results, "項目が0件では何も守れない"
     assert all(r.declaration for r in report.results)
+
+
+def test_a_substitution_does_not_disable_the_weakening_detector(tmp_path):
+    """宣言の差し替えで打ち切ると、弱化の検出器が回らなくなる（10回目）。
+
+    `field_found` → `found` を差し替えと一緒に出せば、--redeclare が
+    理由1本で受理してしまった（3層のうち2層目が、3層目が発火するときだけ無効）。
+    """
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    weakened = _declared("O1-L1-01", Verdict.PASS, "found",
+                         {"claim": "route_exists", "endpoint": "POST /x"})
+
+    result = L1Ratchet().check(weakened, load_baseline(path))
+
+    assert {v.kind for v in result.violations} == {"substituted", "weakened"}
+    with pytest.raises(ValueError, match="宣言の差し替えでは説明できない"):
+        L1Ratchet().redeclare(weakened, path, "理由")
+
+
+def test_settle_accepts_a_tightening_that_also_changes_the_declaration(tmp_path):
+    """判定手段を強めると宣言も変わる。片方ずつだと互いに拒否して詰む。"""
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+    parked = _declared("O1-L1-01", Verdict.FAIL, "unjudgeable",
+                       {"claim": "state_transition", "endpoint": "POST /x"})
+
+    with pytest.raises(ValueError):
+        L1Ratchet().tighten(parked, path, "厳しくした")
+    with pytest.raises(ValueError):
+        L1Ratchet().redeclare(parked, path, "貼り替えた")
+
+    L1Ratchet().settle(parked, path, "測れないと結論した", "claim を貼り替えた")
+
+    base = load_baseline(path)
+    assert base["items"]["O1-L1-01"] == "FAIL"
+    assert base["tightenings"][-1]["reason"] == "測れないと結論した"
+    assert base["redeclarations"][-1]["reason"] == "claim を貼り替えた"
+
+
+def test_settle_refuses_anything_that_is_not_a_tightening_or_a_substitution(tmp_path):
+    """緩めるための道具にしない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_report([("O1-L1-01", Verdict.PASS, "field_found"),
+                            ("O1-L1-02", Verdict.PASS, "found")]), path)
+    weakened = _report([("O1-L1-01", Verdict.PASS, "found"),
+                        ("O1-L1-02", Verdict.PASS, "found")])
+
+    with pytest.raises(ValueError, match="厳格化とも差し替えとも説明できない"):
+        L1Ratchet().settle(weakened, path, "理由A", "理由B")
+
+
+def test_settle_requires_both_reasons(tmp_path):
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.PASS, "field_found", _HOOK), path)
+
+    with pytest.raises(ValueError, match="両方書いて"):
+        L1Ratchet().settle(
+            _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+            path, "理由だけ", "  ")
+
+
+def test_a_substitution_is_never_counted_as_an_improvement(tmp_path):
+    """打ち切りをやめた副作用で、差し替えが改善に数えられてはいけない。"""
+    path = tmp_path / "base.json"
+    write_baseline(_declared("O1-L1-01", Verdict.FAIL, "field_not_found", _HOOK), path)
+
+    result = L1Ratchet().check(
+        _declared("O1-L1-01", Verdict.PASS, "field_found", _SUCCESS),
+        load_baseline(path),
+    )
+
+    assert result.improvements == []

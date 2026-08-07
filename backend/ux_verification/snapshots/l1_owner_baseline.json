@@ -265,6 +265,7 @@
     },
     "O1-L1-03": {
       "claim": "response_field",
+      "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている",
       "endpoint": "POST /api/pipeline/videos/metadata",
       "response_field": [
         "name",
@@ -417,16 +418,19 @@
     },
     "O4-L1-10": {
       "claim": "response_field",
+      "value_note": "「推奨セグメントに score フィールド」の score はフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "score"
     },
     "O4-L1-11": {
       "claim": "response_field",
+      "value_note": "「候補に type フィールド」の type はフィールド名。値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "type"
     },
     "O4-L1-12": {
       "claim": "response_field",
+      "value_note": "「候補に timestamp フィールド」の timestamp はフィールド名。値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "timestamp"
     },
@@ -581,6 +585,7 @@
     },
     "O8-L1-04": {
       "claim": "response_field",
+      "value_note": "「BGM設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない。実体は response_field の宣言で確定させている",
       "endpoint": "GET /api/render/settings",
       "response_field": [
         "bgm_volume",
@@ -589,11 +594,13 @@
     },
     "O8-L1-05": {
       "claim": "response_field",
+      "value_note": "「LUFS設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
       "endpoint": "GET /api/render/settings",
       "response_field": "lufs_target"
     },
     "O8-L1-06": {
       "claim": "response_field",
+      "value_note": "「ロゴ設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
       "endpoint": "GET /api/render/settings",
       "response_field": [
         "logo_enabled",
@@ -603,6 +610,7 @@
     },
     "O8-L1-07": {
       "claim": "response_field",
+      "value_note": "「字幕設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
       "endpoint": "GET /api/render/settings",
       "response_field": [
         "subtitle_enabled",
@@ -790,6 +798,7 @@
     },
     "O12-L1-07": {
       "claim": "response_field",
+      "value_note": "「user_model オブジェクト」の user_model はフィールド名。「オブジェクト」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/evolution/status",
       "response_field": "user_model"
     },
@@ -805,6 +814,7 @@
     },
     "O12-L1-10": {
       "claim": "response_field",
+      "value_note": "「entries 配列」の entries はフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/evolution",
       "response_field": "entries"
     },
@@ -1827,6 +1837,173 @@
           "after": {
             "claim": "state_transition",
             "endpoint": "POST /api/smartcut/unlock"
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: 『〜を返す／含まれる』の手前が ASCII 識別子でない10件に value_note を足した。フィールド名なのか値なのかを機械が判別できないので、人に宣言させて空欄を許さない（ユーザー判断 2026-08-07）",
+      "items": {
+        "O1-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/pipeline/videos/metadata",
+            "response_field": [
+              "name",
+              "path",
+              "size_mb",
+              "modified"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている",
+            "endpoint": "POST /api/pipeline/videos/metadata",
+            "response_field": [
+              "name",
+              "path",
+              "size_mb",
+              "modified"
+            ]
+          }
+        },
+        "O12-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "user_model"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「user_model オブジェクト」の user_model はフィールド名。「オブジェクト」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "user_model"
+          }
+        },
+        "O12-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution",
+            "response_field": "entries"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「entries 配列」の entries はフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution",
+            "response_field": "entries"
+          }
+        },
+        "O4-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "score"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「推奨セグメントに score フィールド」の score はフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "score"
+          }
+        },
+        "O4-L1-11": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "type"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「候補に type フィールド」の type はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "type"
+          }
+        },
+        "O4-L1-12": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "timestamp"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「候補に timestamp フィールド」の timestamp はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "timestamp"
+          }
+        },
+        "O8-L1-04": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "bgm_volume",
+              "bgm_ducking"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「BGM設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない。実体は response_field の宣言で確定させている",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "bgm_volume",
+              "bgm_ducking"
+            ]
+          }
+        },
+        "O8-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": "lufs_target"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「LUFS設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": "lufs_target"
+          }
+        },
+        "O8-L1-06": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "logo_enabled",
+              "logo_position",
+              "logo_opacity"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「ロゴ設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "logo_enabled",
+              "logo_position",
+              "logo_opacity"
+            ]
+          }
+        },
+        "O8-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "subtitle_enabled",
+              "subtitle_font",
+              "subtitle_size"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「字幕設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "subtitle_enabled",
+              "subtitle_font",
+              "subtitle_size"
+            ]
           }
         }
       }

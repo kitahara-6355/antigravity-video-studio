@@ -283,7 +283,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/evolution/status",
       "response_field": "user_model",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「user_model オブジェクト」の user_model はフィールド名。「オブジェクト」は型の説明で、値の主張ではない"
     },
     {
       "id": "O12-L1-08",
@@ -313,7 +314,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/evolution",
       "response_field": "entries",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「entries 配列」の entries はフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O12-L1-11",

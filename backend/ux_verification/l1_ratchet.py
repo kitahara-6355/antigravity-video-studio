@@ -280,6 +280,10 @@ class L1Ratchet:
 
         violations: list[L1Violation] = []
         improvements: list[str] = []
+        # 退行・差し替えが乗った項目を「改善」に数えないための控え。
+        # 打ち切り（continue）をやめて全部の検出器を回すようにしたので、
+        # 除外は明示的に持つ。
+        not_improvements: set[str] = set()
 
         # --- ベースライン自身の整合性 --------------------------------------
         #
@@ -358,6 +362,7 @@ class L1Ratchet:
             # 退行が報告されず、--redeclare がそれを受理する）。
             if was == "PASS" and now != "PASS":
                 violations.append(L1Violation("regressed", item_id, was, now))
+                not_improvements.add(item_id)
                 # **退行で打ち切らない。** 判定手段を強めると退行と宣言の
                 # 差し替えが同時に起きる。片方しか報告しないと、締め直しの
                 # 履歴にもう片方が残らない。
@@ -373,7 +378,11 @@ class L1Ratchet:
                     _render_declaration(before_decls[item_id]),
                     _render_declaration(after_decls.get(item_id)),
                 ))
-                continue
+                not_improvements.add(item_id)
+                # **ここでも打ち切らない。** 打ち切ると、宣言を差し替えた項目では
+                # 弱化の検出器が回らなくなる。`field_found` → `found` を
+                # 差し替えと一緒に出せば、--redeclare が理由1本で受理してしまう
+                # （3層のうち2層目が、3層目が発火するときだけ無効になる）。
 
             # verdict だけを見ていると、**判定の強さ**が落ちたことに気づけない。
             # 項目から response_field を消せば field_found → found（PASS のまま）、
@@ -385,7 +394,9 @@ class L1Ratchet:
                     "weakened", item_id,
                     before_reasons.get(item_id, "?"), after_reasons.get(item_id, "?"),
                 ))
-            elif was != "PASS" and now == "PASS" and item_id not in unpinned_ids:
+            elif (was != "PASS" and now == "PASS"
+                  and item_id not in unpinned_ids
+                  and item_id not in not_improvements):
                 improvements.append(item_id)
 
         added = [i for i in after if i not in before]
