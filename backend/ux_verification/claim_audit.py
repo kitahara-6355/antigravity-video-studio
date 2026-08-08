@@ -543,15 +543,28 @@ DOM_PHRASES: frozenset = frozenset({
 # 経路（endpoint）にだけ照合を掛けていたので、`ドロップゾーン要素が存在する` に
 # 無関係な testid を宣言しても通った（24回目）。18・22回目と同型。
 PHRASE_TARGETS: dict = {
+    ("フィールドの実在", "候補にtimestamp", "response_field"): frozenset({'timestamp'}),
+    ("フィールドの実在", "候補にtype", "response_field"): frozenset({'type'}),
+    ("フィールドの実在", "推奨セグメントにscore", "response_field"): frozenset({'score'}),
+    ("フィールドを返す", "BGM設定", "response_field"): frozenset({'bgm_ducking', 'bgm_volume'}),
+    ("フィールドを返す", "LUFS設定", "response_field"): frozenset({'lufs_target'}),
+    ("フィールドを返す", "entries配列", "response_field"): frozenset({'entries'}),
+    ("フィールドを返す", "user_modelオブジェクト", "response_field"): frozenset({'user_model'}),
+    ("フィールドを返す", "ロゴ設定", "response_field"): frozenset({'logo_enabled', 'logo_opacity', 'logo_position'}),
+    ("フィールドを返す", "字幕設定", "response_field"): frozenset({'subtitle_enabled', 'subtitle_font', 'subtitle_size'}),
     ("リクエスト契約", "推奨APIが目標尺パラメータ", "request_field"): frozenset({'target_duration_minutes'}),
     ("件数", "セグメント", "testid"): frozenset({'segment-item-*'}),
     ("保存キーの実在", "履歴キー", "storage_key"): frozenset({'pipeline_recent_videos'}),
+    ("必須フィールド", "メタデータAPI", "response_field"): frozenset({'modified', 'name', 'path', 'size_mb'}),
+    ("経路＋フィールド", "固定APIが", "response_field"): frozenset({'locked_segments'}),
     ("要素の実在", "CTR予測", "testid"): frozenset({'youtube-ctr-prediction'}),
     ("要素の実在", "SEOスコア", "testid"): frozenset({'youtube-seo-score'}),
     ("要素の実在", "SRTエクスポートボタン", "testid"): frozenset({'export-srt-btn'}),
     ("要素の実在", "TXTエクスポートボタン", "testid"): frozenset({'export-txt-btn'}),
     ("要素の実在", "Whisperモデルセレクトボックス", "testid"): frozenset({'whisper-model-select'}),
+    ("要素の実在", "actions配列", "response_field"): frozenset({'actions'}),
     ("要素の実在", "diffコンテナ", "testid"): frozenset({'proofreading-diff'}),
+    ("要素の実在", "stagesフィールド", "response_field"): frozenset({'stages'}),
     ("要素の実在", "サムネイル候補", "testid"): frozenset({'youtube-thumbnail-candidates'}),
     ("要素の実在", "スキップトグル", "testid"): frozenset({'skip-proofreading-toggle'}),
     ("要素の実在", "セグメント一覧コンテナ", "testid"): frozenset({'segment-list'}),
@@ -562,11 +575,19 @@ PHRASE_TARGETS: dict = {
     ("要素の実在", "ハッシュタグ", "testid"): frozenset({'youtube-hashtag-list'}),
     ("要素の実在", "個別却下ボタン", "testid"): frozenset({'segment-reject-btn-*'}),
     ("要素の実在", "個別承認ボタン", "testid"): frozenset({'segment-approve-btn-*'}),
+    ("要素の実在", "候補レスポンスにchapters配列", "response_field"): frozenset({'chapters'}),
+    ("要素の実在", "候補レスポンスにhighlights配列", "response_field"): frozenset({'highlights'}),
     ("要素の実在", "全却下ボタン", "testid"): frozenset({'reject-all-btn'}),
     ("要素の実在", "全承認ボタン", "testid"): frozenset({'approve-all-btn'}),
+    ("要素の実在", "動画一覧にvideos配列", "response_field"): frozenset({'videos'}),
+    ("要素の実在", "履歴にhistory配列", "response_field"): frozenset({'history'}),
     ("要素の実在", "差分マーク要素", "testid"): frozenset({'diff-mark-*'}),
     ("要素の実在", "投稿準備バッジ", "testid"): frozenset({'youtube-publish-readiness'}),
     ("要素の実在", "推奨モデルバッジ", "testid"): frozenset({'whisper-recommended'}),
+    ("要素の実在", "推奨レスポンスにestimated_output_seconds", "response_field"): frozenset({'estimated_output_seconds'}),
+    ("要素の実在", "推奨レスポンスにestimated_output_str", "response_field"): frozenset({'estimated_output_str'}),
+    ("要素の実在", "推奨レスポンスにrecommended_segments", "response_field"): frozenset({'recommended_segments'}),
+    ("要素の実在", "推奨レスポンスにrecommended_segments配列", "response_field"): frozenset({'recommended_segments'}),
     ("要素の実在", "校閲ステージパネル", "testid"): frozenset({'proofreading-stage-panel'}),
     ("要素の実在", "校閲進捗バー", "testid"): frozenset({'proofreading-progress'}),
     ("要素の実在", "比較ビューコンテナ", "testid"): frozenset({'proofreading-comparison'}),
@@ -621,23 +642,24 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
     # 名詞句と前置の**両方**に登録があり、かつ一致することを要求する。
     declared_ep = (item.get("endpoint") or "").strip()
     if declared_ep:
-        for part in (slot, _prefix_of(description)):
+        for part, is_slot in ((slot, True), (_prefix_of(description), False)):
             if not part:
                 continue
-            if _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
+            # 免除は**スロットだけ**（20回目）。prefix は識別子でも照合する。
+            if is_slot and _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
                 continue  # フィールド名は response_field と突き合わせる
             if declared_ep not in PHRASE_ENDPOINTS.get((name, part), frozenset()):
                 return False
     # 経路以外の照合先も同じ扱い。未登録は不合格。
-    for kind in ("testid", "storage_key", "request_field"):
+    for kind in ("testid", "storage_key", "request_field", "response_field"):
         raw = item.get(kind)
         if not raw:
             continue
         values = {str(v) for v in (raw if isinstance(raw, (list, tuple)) else [raw])}
-        for part in (slot, _prefix_of(description)):
+        for part, is_slot in ((slot, True), (_prefix_of(description), False)):
             if not part:
                 continue
-            if _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
+            if is_slot and _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
                 continue
             if not values <= PHRASE_TARGETS.get((name, part, kind), frozenset()):
                 return False
@@ -716,6 +738,20 @@ def needs_value_note(description: str) -> bool:
 DECLARATION_KEYS: tuple[str, ...] = ("claim", "description", "value_note") + tuple(sorted(
     {key for required in CLAIM_METHODS.values() if required for key in required}
 ))
+
+
+def _has_value(raw) -> bool:
+    """空文字や空白だけの宣言を「宣言あり」と数えない。
+
+    `response_field: [""]` は監査では宣言ありに見えるのに、判定側は空文字を
+    捨てて経路の実在に落ちる。レスポンスの主張が route_exists に**降格**した
+    まま緑になっていた（25回目）。
+    """
+    if raw is None:
+        return False
+    if isinstance(raw, (list, tuple)):
+        return any(str(v).strip() for v in raw)
+    return bool(str(raw).strip())
 
 
 def declaration_of(item: dict) -> dict:
@@ -828,7 +864,7 @@ def audit(stories_dir: Path, persona: str = "owner") -> ClaimAuditReport:
 def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
     claim = (item.get("claim") or "").strip()
     declared = tuple(k for k in DECLARATION_KEYS
-                     if k != "claim" and item.get(k))
+                     if k != "claim" and _has_value(item.get(k)))
     common = {
         "item_id": item_id, "ux_story": story,
         "description": item.get("description", ""),

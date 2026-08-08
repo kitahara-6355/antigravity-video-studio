@@ -1106,3 +1106,41 @@ def test_a_storage_key_and_request_field_are_matched_too():
     assert slot_matches_declaration(
         "localStorageに履歴キーが存在する",
         {"claim": "storage_key", "storage_key": "pipeline_recent_videos"})
+
+
+# --- response_field も名詞句と突き合わせる（gate-verifier 25回目）---------------
+
+
+def test_a_response_field_is_matched_against_the_phrase():
+    """小文字スネークを含まない名詞句（`ロゴ設定`）は埋め込み照合が空振りし、
+    response_field が何であっても検査が走らなかった。"""
+    from backend.ux_verification.claim_audit import (
+        PHRASE_TARGETS, slot_matches_declaration,
+    )
+
+    registered = sorted(PHRASE_TARGETS[("フィールドを返す", "ロゴ設定", "response_field")])
+    assert slot_matches_declaration(
+        "ロゴ設定が含まれる",
+        {"claim": "response_field", "endpoint": "GET /api/render/settings",
+         "response_field": registered})
+    assert not slot_matches_declaration(
+        "ロゴ設定が含まれる",
+        {"claim": "response_field", "endpoint": "GET /api/render/settings",
+         "response_field": ["success"]})
+
+
+def test_an_empty_declaration_is_not_a_declaration(tmp_path):
+    """`response_field: [""]` は監査では宣言ありに見え、判定側は経路に降格した。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="statusフィールドが存在する",
+              endpoint="GET /api/x", response_field=[""]),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["not_declared"]
+
+
+def test_the_exemption_never_applies_to_the_prefix():
+    """免除はスロットだけ。20回目の修正が照合ループに入っていなかった。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("unlock_api正常応答しlocked_segmentsを返す") is None
