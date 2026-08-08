@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from backend.ux_verification.claim_audit import (
     CLAIM_METHODS,
     UNJUDGEABLE_CLAIMS,
@@ -15,6 +17,22 @@ from backend.ux_verification.claim_audit import (
     audit,
     for_repo,
 )
+
+
+# 名詞句は登録済みのものだけ通る（P3 C-3）。合成データが使う名詞句を足しておく。
+# **実データの語彙は触らない。** 登録外を弾くこと自体を確かめるテストは、
+# ここに無い名詞句を使う。
+_TEST_PHRASES = frozenset({
+    "要素", "API", "履歴キー", "対応拡張子", "パラメータ",
+    "ステータスがcompleted", "ステータスがcompletedのバッジ", "ID表示",
+})
+
+
+@pytest.fixture(autouse=True)
+def _extend_vocabulary(monkeypatch):
+    from backend.ux_verification import claim_audit as ca
+
+    monkeypatch.setattr(ca, "NOUN_PHRASES", ca.NOUN_PHRASES | _TEST_PHRASES)
 
 
 def _stories(tmp_path, items, name="o1_demo.json", ux_id="O-1"):
@@ -680,3 +698,44 @@ def test_a_semicolon_is_a_clause_break_too(tmp_path):
     assert parse_description(
         "ステータスがcompletedに一致する；シーン固定APIが正常応答を返す") is None
     assert parse_description("A" + chr(10) + "Bが正常応答") is None
+
+
+# --- 名詞句の語彙（gate-verifier 15回目・ユーザー判断 2026-08-07）-----------------
+#
+# 強い述語の検査は語彙に依存し、語彙外の述語は名詞句に吸収される。
+# **足すたびに次の未登録語で抜ける。5回作り直して5回ともそうだった。**
+# 名詞句そのものを閉じて、はじめて原理的に閉じる。
+
+
+def test_an_unregistered_noun_phrase_is_rejected():
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description(
+        "アップロードAPIがmp4以外を拒否し5個までに制限したうえで正常応答を返す") is None
+    assert parse_description("ステータスがcompletedに一致するAPIが正常応答を返す") is None
+
+
+def test_a_registered_noun_phrase_passes():
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("動画一覧APIが正常応答を返す") is not None
+    assert parse_description("進捗バーが存在する") is not None
+
+
+def test_an_ascii_identifier_slot_needs_no_registration():
+    """フィールド名は `slot_not_declared` が宣言と突き合わせるので登録不要。"""
+    from backend.ux_verification.claim_audit import NOUN_PHRASES, parse_description
+
+    assert "hook_score" not in NOUN_PHRASES
+    assert parse_description("hook_score含む") is not None
+
+
+def test_every_owner_l1_noun_phrase_is_registered():
+    """実データが全件テンプレートに一致すること（語彙が実装から drift しない）。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    report = for_repo("owner")
+    unparsed = [r.item_id for r in report.rows
+                if parse_description(r.description) is None]
+
+    assert unparsed == []

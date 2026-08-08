@@ -237,12 +237,123 @@ DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...], frozenset], ...] =
 )
 
 # フィールド名を書くテンプレート。スロットは宣言した response_field と一致すべき。
+# 「要素の実在」もスロットが ASCII 識別子なら response_field に振り替えるので、
+# ここに含めないとその経路だけスロット照合が走らない（15回目の指摘）。
+# `download_url存在` と `download_urlフィールドが存在する` で強弱が振れていた。
 _FIELD_TEMPLATES = ("フィールドを返す", "必須フィールド", "フィールドの実在",
-                    "経路＋フィールド")
+                    "経路＋フィールド", "要素の実在")
 
 _TYPED_SLOT = re.compile(rf"^{_IDENT}(?:/{_IDENT})*$")
 # スロットに英数字の語が混じっていると、名前なのか値なのか判別できない。
-_ASCII_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
+# 2文字（`ID`）で回避されていたので下限を外した（15回目の指摘）。
+_ASCII_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+# **名詞句の語彙。** ここに無い名詞句は書けない（15回目・ユーザー判断 2026-08-07）。
+#
+# 強い述語の検査は語彙に依存し、語彙外の述語（`以外` `一致する` `巻き戻して`
+# `5個まで`）は名詞句に吸収される。**足すたびに次の未登録語で抜ける。5回作り直して
+# 5回ともそうだった。** 既存項目の書き換えはラチェットが止めるが、新規項目は
+# 素通りしていた（`--update-baseline` 一発で恒久に緑になる）。
+#
+# 名詞句そのものを閉じれば、そこで初めて原理的に閉じる。新しい項目を足すときは
+# ここに登録する——**その登録が、人が主張を読む機会**になる。
+#
+# ASCII 識別子のスロット（フィールド名）は登録不要。`slot_not_declared` が
+# 宣言した response_field と突き合わせる。
+NOUN_PHRASES: frozenset = frozenset({
+    "AI改善提案API",
+    "BGM設定",
+    "CTR予測",
+    "GPU検出API",
+    "LUFS設定",
+    "SEOスコア",
+    "SRTエクスポートボタン",
+    "SmartCutヘルスチェックAPI",
+    "SmartCut初期化API",
+    "TXTエクスポートボタン",
+    "Whisperモデルセレクトボックス",
+    "actions配列",
+    "analyze-scriptAPI",
+    "diffコンテナ",
+    "entries配列",
+    "plan-storyboardAPI",
+    "pre-planAPI",
+    "quality-scoreAPI",
+    "stagesフィールド",
+    "user_modelオブジェクト",
+    "アクション一覧API",
+    "エクスポートAPI",
+    "オーバーライドAPI",
+    "カテゴリ別スコアAPI",
+    "サムネイル候補",
+    "サムネコンセプトAPI",
+    "シーン固定API",
+    "スキップトグル",
+    "スコア変化API",
+    "セグメント",
+    "セグメント一覧コンテナ",
+    "タイトル候補リスト",
+    "タグリスト",
+    "チャプターリスト",
+    "テンプレート一覧API",
+    "テンプレート詳細API",
+    "テーマ一覧API",
+    "テーマ詳細API",
+    "ドリルダウンAPI",
+    "ドロップゾーン要素",
+    "ハッシュタグ",
+    "バリデーションAPI",
+    "ヘルスチェックAPI",
+    "メタデータAPI",
+    "ロゴ設定",
+    "個別却下ボタン",
+    "個別承認ボタン",
+    "候補にtimestamp",
+    "候補にtype",
+    "候補レスポンスにchapters配列",
+    "候補レスポンスにhighlights配列",
+    "全候補API",
+    "全却下ボタン",
+    "全承認ボタン",
+    "再度同一パラメータで推奨取得",
+    "動画リストに対応拡張子",
+    "動画一覧API",
+    "動画一覧にvideos配列",
+    "品質ゲートステータスAPI",
+    "字幕設定",
+    "完了通知API",
+    "履歴API",
+    "履歴にhistory配列",
+    "履歴キー",
+    "差分マーク要素",
+    "投稿準備バッジ",
+    "推奨API",
+    "推奨APIが目標尺パラメータ",
+    "推奨APIで再計算",
+    "推奨セグメントにscore",
+    "推奨モデルバッジ",
+    "推奨レスポンスにestimated_output_seconds",
+    "推奨レスポンスにestimated_output_str",
+    "推奨レスポンスにrecommended_segments",
+    "推奨レスポンスにrecommended_segments配列",
+    "改善ループステータスAPI",
+    "最適化API",
+    "校閲ステージパネル",
+    "校閲進捗バー",
+    "比較ビューコンテナ",
+    "現在設定取得API",
+    "確定API",
+    "経過時間表示",
+    "統計API",
+    "設定取得API",
+    "説明文エリア",
+    "辞書パネル",
+    "進捗テキスト(%)",
+    "進捗バー",
+    "適用API",
+    "開始API",
+})
 
 
 def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | None:
@@ -264,6 +375,10 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
         if present - accounts:
             return None
         slot = (match.groupdict().get("slot") or "").strip()
+        # 名詞句は登録済みのものだけ。ASCII 識別子（フィールド名）は
+        # `slot_not_declared` が宣言と突き合わせるので登録不要。
+        if slot and not _TYPED_SLOT.match(slot) and slot not in NOUN_PHRASES:
+            return None
         if name == "要素の実在" and _TYPED_SLOT.match(slot):
             # `download_url存在` のような ASCII 識別子は、DOM 要素ではなく
             # レスポンスのフィールド名。要素の実在では測れない。
@@ -383,8 +498,8 @@ class ClaimRow:
                 f"持っているのは {'・'.join(self.declared) or 'なし'}"
             ),
             "unparsed": (
-                "description の述語が語彙に無い。"
-                "DESCRIPTION_GRAMMAR に足して判定手段を決めるか、"
+                "description がテンプレートに一致しない。"
+                "DESCRIPTION_TEMPLATES か NOUN_PHRASES に足して判定手段を決めるか、"
                 "登録済みの書き方に直す"
             ),
             "slot_not_declared": (
