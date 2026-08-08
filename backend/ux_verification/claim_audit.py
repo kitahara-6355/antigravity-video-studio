@@ -437,7 +437,9 @@ PHRASE_ENDPOINTS: dict = {
     ("経路のみ", "設定取得API"): frozenset({'GET /api/render/settings'}),
     ("経路のみ", "適用API"): frozenset({'POST /themes/apply'}),
     ("経路のみ", "開始API"): frozenset({'POST /api/render/start'}),
+    ("経路＋フィールド", "固定APIが"): frozenset({'POST /api/smartcut/lock'}),
     ("経路＋状態遷移", "locked_segments"): frozenset({'POST /api/smartcut/unlock'}),
+    ("経路＋状態遷移", "固定解除APIが"): frozenset({'POST /api/smartcut/unlock'}),
     ("要素の実在", "actions配列"): frozenset({'GET /api/pipeline/improvement/actions'}),
     ("要素の実在", "stagesフィールド"): frozenset({'GET /api/render/status/{job_id}'}),
     ("要素の実在", "候補レスポンスにchapters配列"): frozenset({'GET /api/smartcut/all-candidates'}),
@@ -475,6 +477,7 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
         # グローバルな集合にしていたので、判定不能の項目のために登録した名詞句を
         # PASS できる弱いテンプレートへ移せた（16回目の指摘2）。
         # 無名の前置も検査する。名前を付けていなかったので素通りしていた（指摘1）。
+        slot_part = slot
         for part in (slot, (groups.get("prefix") or "").strip()):
             if not part:
                 continue
@@ -485,18 +488,36 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
             # 保存キーの実在ほか）で免除すると、主語と測る対象が無関係でも通る
             # （19回目: `analyze_scriptAPIが正常応答する` に別経路を宣言できた。
             #  ハイフンをアンダースコアに替えるだけで検査が消えた）。
-            if _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
+            # 免除は**スロット**だけ。prefix はどこでも宣言と突き合わされないので、
+            # 識別子でも辞書登録を要求する（20回目: `unlock_api正常応答し
+            # locked_segmentsを返す` が別経路の宣言で通った）。
+            if (part is slot_part and _TYPED_SLOT.match(part)
+                    and name in _SLOT_CHECKED_TEMPLATES):
                 continue
             if name not in NOUN_PHRASES.get(part, frozenset()):
                 return None
         if name in _FIELD_TEMPLATES and not slot:
             return None  # `正常応答しを返す` のような空スロットを通さない
+        if name == "要素の実在" and not _ASCII_TOKEN.search(slot):
+            # 純粋な UI 名（`進捗バー`）は DOM の主張。レスポンスのフィールドを
+            # 測る claim を貼れば、無関係な API の実在で緑にできた（20回目）。
+            return name, ("dom_exists",), slot
         if name == "要素の実在" and _TYPED_SLOT.match(slot):
             # `download_url存在` のような ASCII 識別子は、DOM 要素ではなく
             # レスポンスのフィールド名。要素の実在では測れない。
             return name, ("response_field",), slot
         return name, claims, slot
     return None
+
+
+def _prefix_of(description: str) -> str:
+    """テンプレートの無名前置（`{prefix}正常応答し…`）を取り出す。"""
+    text = (description or "").strip()
+    for _name, pattern, _claims, _accounts in DESCRIPTION_TEMPLATES:
+        match = re.match(pattern, text)
+        if match is not None:
+            return (match.groupdict().get("prefix") or "").strip()
+    return ""
 
 
 def slot_matches_declaration(description: str, item: dict) -> bool:
@@ -526,9 +547,11 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
         buried = {t for t in _ASCII_TOKEN.findall(slot) if _FIELD_LIKE.match(t)}
         if buried and not buried <= {str(f) for f in _declared_fields(item)}:
             return False
-    endpoints = PHRASE_ENDPOINTS.get((name, slot))
-    if endpoints is not None and (item.get("endpoint") or "").strip() not in endpoints:
-        return False
+    declared_ep = (item.get("endpoint") or "").strip()
+    for key in ((name, slot), (name, _prefix_of(description))):
+        endpoints = PHRASE_ENDPOINTS.get(key)
+        if endpoints is not None and declared_ep not in endpoints:
+            return False
     if name == "列挙の実在":
         # 列挙もスロットが ASCII 識別子に見えるので辞書検査を飛ばしていた。
         # 宣言した value_literals と集合一致すること（17回目）。
@@ -747,11 +770,6 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
             and not (item.get("value_note") or "").strip()):
         return ClaimRow(**common, reason="value_note_required")
 
-    # スロットが宣言したフィールドと違うなら、それはフィールド名ではなく
-    # **値**を書いている疑いがある（`completed を返す` に response_field=status）。
-    if not slot_matches_declaration(common["description"], item):
-        return ClaimRow(**common, reason="slot_not_declared")
-
     required = CLAIM_METHODS[claim]
     if required is None:
         # 判定できないと**結論した**もの。結論も対応のうちなので mismatch にしない。
@@ -760,7 +778,13 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
     if not required:
         return ClaimRow(**common, reason="no_method")
     if any(r not in declared for r in required):
+        # 宣言そのものが欠けているなら、突き合わせより先にそれを言う。
         return ClaimRow(**common, reason="not_declared")
+
+    # スロットが宣言したフィールドと違うなら、それはフィールド名ではなく
+    # **値**を書いている疑いがある（`completed を返す` に response_field=status）。
+    if not slot_matches_declaration(common["description"], item):
+        return ClaimRow(**common, reason="slot_not_declared")
     return ClaimRow(**common, reason="")
 
 

@@ -31,7 +31,7 @@ _ALL_TEMPLATES = frozenset({
 })
 _TEST_PHRASES = {
     p: _ALL_TEMPLATES for p in (
-        "要素", "API", "APIが", "履歴キー", "対応拡張子", "パラメータ",
+        "要素", "API", "APIが", "履歴キー", "対応拡張子", "パラメータ", "status",
         "ステータスがcompleted", "ステータスがcompletedのバッジ", "ID表示",
         "解除APIが", "事前企画APIが",
     )
@@ -136,7 +136,7 @@ def test_route_claim_judged_by_a_testid_is_a_mismatch(tmp_path):
 def test_response_field_claim_without_the_field_is_a_mismatch(tmp_path):
     """endpoint だけでは「statusフィールドが存在する」を判定できない。"""
     report = audit(_stories(tmp_path, [
-        _item("O1-L1-01", "response_field", description="要素が存在する",
+        _item("O1-L1-01", "response_field", description="statusフィールドが存在する",
               endpoint="GET /api/x"),
     ]))
 
@@ -906,3 +906,37 @@ def test_the_endpoint_registry_is_scoped_per_template(tmp_path):
     from backend.ux_verification.claim_audit import PHRASE_ENDPOINTS
 
     assert all(isinstance(k, tuple) and len(k) == 2 for k in PHRASE_ENDPOINTS)
+
+
+# --- 前置と純粋 UI 名（gate-verifier 20回目）------------------------------------
+
+
+def test_the_prefix_endpoint_is_matched(tmp_path):
+    """`固定APIが正常応答し…` の前置が経路と突き合わされていなかった。"""
+    def _row(endpoint):
+        return audit(_stories(tmp_path, [
+            _item("O1-L1-01", "response_field",
+                  description="固定APIが正常応答しlocked_segmentsが返る",
+                  endpoint=endpoint, response_field="locked_segments"),
+        ]))
+
+    assert [r.reason for r in _row("POST /api/smartcut/unlock").mismatched] == [
+        "slot_not_declared"]
+    assert _row("POST /api/smartcut/lock").mismatched == []
+
+
+def test_an_identifier_prefix_is_not_exempt():
+    """免除はスロットだけ。prefix はどこでも照合されないので登録が要る。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("unlock_api正常応答しlocked_segmentsを返す") is None
+
+
+def test_a_plain_ui_name_is_a_dom_claim_only(tmp_path):
+    """純粋な UI 名に response_field を貼れば、無関係な API で緑にできた。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="進捗バーが存在する",
+              endpoint="GET /api/render/health", response_field="status"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
