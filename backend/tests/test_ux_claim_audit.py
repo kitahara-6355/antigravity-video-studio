@@ -38,11 +38,36 @@ _TEST_PHRASES = {
 }
 
 
+class _PermissiveEndpoints(dict):
+    """合成データの名詞句については、宣言した経路をそのまま受け入れる。
+
+    実データの語彙は触らない——経路の登録が要ることを確かめるテストは、
+    `_TEST_PHRASES` に無い名詞句を使う。
+    """
+
+    def get(self, key, default=None):
+        if key in self:
+            return dict.get(self, key)
+        if isinstance(key, tuple) and len(key) == 2 and key[1] in _TEST_PHRASES:
+            return _ANY_ENDPOINT
+        return default
+
+
+class _AnyEndpoint(frozenset):
+    def __contains__(self, item):  # noqa: D105
+        return True
+
+
+_ANY_ENDPOINT = _AnyEndpoint()
+
+
 @pytest.fixture(autouse=True)
 def _extend_vocabulary(monkeypatch):
     from backend.ux_verification import claim_audit as ca
 
     monkeypatch.setattr(ca, "NOUN_PHRASES", {**ca.NOUN_PHRASES, **_TEST_PHRASES})
+    monkeypatch.setattr(ca, "PHRASE_ENDPOINTS",
+                        _PermissiveEndpoints(ca.PHRASE_ENDPOINTS))
 
 
 def _stories(tmp_path, items, name="o1_demo.json", ux_id="O-1"):
@@ -968,3 +993,31 @@ def test_the_enumeration_count_must_match(tmp_path):
     assert [r.reason for r in _row("99カテゴリ(audio/video)が存在する").mismatched] == [
         "slot_not_declared"]
     assert _row("2カテゴリ(audio/video)が存在する").mismatched == []
+
+
+def test_an_unregistered_phrase_cannot_claim_any_endpoint(tmp_path):
+    """未登録を「無検査」にしていた（22回目）。fail-open だった。
+
+    `エクスポートAPI` は経路の登録が無いので、endpoint を何と宣言しても
+    通っていた。18回目に塞いだはずの型が、辞書の穴として残っていた。
+    """
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "route_exists", description="エクスポートAPIが正常応答",
+              endpoint="GET /api/health"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
+
+
+def test_a_dom_phrase_cannot_borrow_an_unrelated_endpoint(tmp_path):
+    """先頭が小文字の UI 名（`diffコンテナ`）は dom_exists 固定から外れる。
+
+    その場合でも、経路の登録が無ければ endpoint を宣言できない。
+    """
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="diffコンテナが存在する",
+              endpoint="GET /api/health", response_field="diff",
+              value_note="diff は UI コンテナの呼び名"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]

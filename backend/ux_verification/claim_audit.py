@@ -557,11 +557,19 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
         buried = {t for t in _ASCII_TOKEN.findall(slot) if _FIELD_LIKE.match(t)}
         if buried and not buried <= {str(f) for f in _declared_fields(item)}:
             return False
+    # **未登録を「無検査」にしない。** `PHRASE_ENDPOINTS.get(...)` が None なら
+    # 素通りさせていたので、辞書に無い名詞句（`エクスポートAPI`）は endpoint を
+    # 何と宣言しても通った（22回目）。endpoint を宣言している項目では、
+    # 名詞句と前置の**両方**に登録があり、かつ一致することを要求する。
     declared_ep = (item.get("endpoint") or "").strip()
-    for key in ((name, slot), (name, _prefix_of(description))):
-        endpoints = PHRASE_ENDPOINTS.get(key)
-        if endpoints is not None and declared_ep not in endpoints:
-            return False
+    if declared_ep:
+        for part in (slot, _prefix_of(description)):
+            if not part:
+                continue
+            if _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
+                continue  # フィールド名は response_field と突き合わせる
+            if declared_ep not in PHRASE_ENDPOINTS.get((name, part), frozenset()):
+                return False
     if name == "列挙の実在":
         # 列挙もスロットが ASCII 識別子に見えるので辞書検査を飛ばしていた。
         # 宣言した value_literals と集合一致すること（17回目）。
