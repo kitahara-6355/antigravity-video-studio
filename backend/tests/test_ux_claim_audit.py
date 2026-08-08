@@ -776,3 +776,49 @@ def test_an_empty_slot_is_not_a_field_claim():
     from backend.ux_verification.claim_audit import parse_description
 
     assert parse_description("正常応答しを返す") is None
+
+
+# --- 強い主張用テンプレートの照合（gate-verifier 17回目）------------------------
+#
+# `値の指定` と `列挙の実在` だけ、スロットが ASCII 識別子に見えるために
+# 名詞句の辞書も宣言照合も飛ばしていた。
+
+
+def test_a_value_template_does_not_allow_a_second_clause():
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("success=true、locked_segmentsは巻き戻る") is None
+    assert parse_description("success=true。校閲進捗バーが存在する") is None
+    assert parse_description("success=true以外") is None
+    assert parse_description("success=true") is not None
+
+
+def test_the_written_value_must_match_the_declaration(tmp_path):
+    """description が false と書いているのに expected_value が true なら嘘。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_value", description="success=false",
+              endpoint="POST /api/x", response_field="success",
+              expected_value="true"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
+
+
+def test_the_written_field_must_match_the_declaration(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_value", description="hook_score=0.9",
+              endpoint="POST /api/x", response_field="success",
+              expected_value="true"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
+
+
+def test_an_enumeration_must_match_the_declared_literals(tmp_path):
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "value_constraint",
+              description="4カテゴリ(a/b/c/d)が存在する",
+              endpoint="GET /api/x", value_literals=["a", "b", "c"]),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]

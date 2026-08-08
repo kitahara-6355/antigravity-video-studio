@@ -180,7 +180,7 @@ _STRONG_MARKERS: dict[str, str] = {
     "値の指定": r"[=＝]",
     "排他": r"のみ|だけ",
     "件数": r"\d+\s*件",
-    "範囲": r"以内|以上|以下|超え|限ら",
+    "範囲": r"以内|以上|以下|超え|限ら|以外",
     "可能": r"が可能|できる",
 }
 
@@ -197,8 +197,11 @@ _IDENT = r"[A-Za-z_][A-Za-z0-9_.]*"
 # (名前, 文全体の正規表現, 許される claim, **そのテンプレートが引き受ける強い述語**)。
 # 引き受けていない強い述語が文に残っていたら、一致させない。
 DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...], frozenset], ...] = (
-    ("値の指定", rf"^(?P<slot>{_IDENT})\s*[=＝]\s*\S+$", ("response_value",),
-     frozenset({"値の指定"})),
+    # 値の側も節の区切りを許さない。`\S+` にしていたので
+    # `success=true、locked_segmentsは巻き戻る` が通った（17回目）。
+    ("値の指定",
+     rf"^(?P<slot>{_IDENT})\s*[=＝]\s*(?P<value>[^\s、。；;・｜|,]+)$",
+     ("response_value",), frozenset({"値の指定"})),
     ("〜のみ", rf"^(?P<slot>{_NP})のみ含まれる$", ("value_exclusive",),
      frozenset({"排他"})),
     ("件数", rf"^(?P<slot>{_NP})が\d+件以上表示される$", ("element_count",),
@@ -241,7 +244,7 @@ DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...], frozenset], ...] =
 # ここに含めないとその経路だけスロット照合が走らない（15回目の指摘）。
 # `download_url存在` と `download_urlフィールドが存在する` で強弱が振れていた。
 _FIELD_TEMPLATES = ("フィールドを返す", "必須フィールド", "フィールドの実在",
-                    "経路＋フィールド", "要素の実在")
+                    "経路＋フィールド", "要素の実在", "値の指定")
 
 _TYPED_SLOT = re.compile(rf"^{_IDENT}(?:/{_IDENT})*$")
 # スロットに英数字の語が混じっていると、名前なのか値なのか判別できない。
@@ -409,10 +412,25 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
     if parsed is None:
         return True
     name, _claims, slot = parsed
+    if name == "列挙の実在":
+        # 列挙もスロットが ASCII 識別子に見えるので辞書検査を飛ばしていた。
+        # 宣言した value_literals と集合一致すること（17回目）。
+        raw = item.get("value_literals")
+        declared = ({str(v) for v in raw} if isinstance(raw, (list, tuple))
+                    else {str(raw)} if raw else set())
+        return bool(declared) and set(slot.split("/")) == declared
     if name not in _FIELD_TEMPLATES or not _TYPED_SLOT.match(slot):
         return True
     declared = {str(f) for f in _declared_fields(item)}
-    return bool(declared) and set(slot.split("/")) <= declared
+    if not (declared and set(slot.split("/")) <= declared):
+        return False
+    if name == "値の指定":
+        # 値そのものも宣言と一致すること。description と expected_value が
+        # 食い違っていたら、どちらかが嘘をついている。
+        match = re.match(DESCRIPTION_TEMPLATES[0][1], (description or "").strip())
+        written = (match.groupdict().get("value") or "").strip() if match else ""
+        return written.lower() == str(item.get("expected_value", "")).strip().lower()
+    return True
 
 
 def _declared_fields(item: dict) -> list:
@@ -614,7 +632,7 @@ def _judge(item_id: str, story: str, item: dict) -> ClaimRow:
 
     # スロットが宣言したフィールドと違うなら、それはフィールド名ではなく
     # **値**を書いている疑いがある（`completed を返す` に response_field=status）。
-    if claim not in ("response_value", "value_exclusive") and             not slot_matches_declaration(common["description"], item):
+    if not slot_matches_declaration(common["description"], item):
         return ClaimRow(**common, reason="slot_not_declared")
 
     required = CLAIM_METHODS[claim]
