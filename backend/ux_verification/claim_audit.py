@@ -164,7 +164,9 @@ CLAIM_SEMANTICS: dict[str, tuple[str, str]] = {
 #
 # 節の区切り（読点・句点）はテンプレートが許さない。**一文一主張**にすることで、
 # 「強い主張を別の節に逃がす」経路が構造的に消える。
-_NP = r"[^、。，．]*?"  # 名詞句。節の区切りを含められない
+# 名詞句。**節の区切りを含められない。** 読点・句点だけでなく、セミコロンや
+# 改行・中黒も区切りとして扱う（14回目: `；` で別節に主張を逃がされた）。
+_NP = "[^、。，．;；・｜|]*?"
 
 # **強い述語。** これが文のどこかに在るのに、テンプレートがそれを引き受けて
 # いなければ、その主張は測られていない。
@@ -250,8 +252,8 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
     どのテンプレートにも一致しなければ `None`。**部分一致は認めない。**
     """
     text = (description or "").strip()
-    if not text:
-        return None
+    if not text or any(ch in text for ch in (chr(10), chr(13), chr(9))):
+        return None  # 改行やタブで節を分けるのも許さない
     present = strong_markers_in(text)
     for name, pattern, claims, accounts in DESCRIPTION_TEMPLATES:
         match = re.match(pattern, text)
@@ -323,7 +325,17 @@ def needs_value_note(description: str) -> bool:
 # 項目が「何を照合先にするか」を宣言しているキー。**CLAIM_METHODS から導く。**
 # ここを手で並べると、新しい判定手段を足したときに片方だけ増えて、
 # 増えたほうがラチェットの外に落ちる（走査範囲の外のポケットの型）。
-DECLARATION_KEYS: tuple[str, ...] = ("claim", "value_note") + tuple(sorted(
+# **description も宣言のうち。**
+#
+# 14回目の指摘: 強い述語の検査は語彙（6本の正規表現）に依存していて、語彙外の
+# 述語（`以外` `一致する` `巻き戻して` `5個まで`）は名詞句に吸収された。
+# 語彙を足しても、次の語彙外の述語で同じことが起きる——4回続けてそうだった。
+#
+# テンプレート検査は「**新しい**項目が最低限の形をしていること」までしか
+# 保証できない。**既存の項目の主張が黙って変わらないこと**は、ラチェットの
+# 仕事にする。description を宣言に含めれば、書き換えは `substituted` として
+# 検出され、`--redeclare` の理由と before/after が永久に残る。
+DECLARATION_KEYS: tuple[str, ...] = ("claim", "description", "value_note") + tuple(sorted(
     {key for required in CLAIM_METHODS.values() if required for key in required}
 ))
 

@@ -335,6 +335,19 @@ def test_declaration_keys_cover_every_judging_method():
     assert "claim" in DECLARATION_KEYS, "claim の貼り替えも差し替えのうち"
 
 
+def test_the_description_is_pinned_by_the_ratchet():
+    """description を書き換えて主張を逃がす経路は、ラチェットで塞ぐ。
+
+    強い述語の検査は語彙に依存し、語彙外の述語（`以外` `一致する` `巻き戻して`）は
+    名詞句に吸収される——4回続けて同じ型で破られた（gate-verifier 14回目）。
+    テンプレート検査は**新しい**項目の形しか保証できないので、既存項目の主張が
+    黙って変わらないことはラチェットの仕事にする。
+    """
+    from backend.ux_verification.claim_audit import DECLARATION_KEYS
+
+    assert "description" in DECLARATION_KEYS
+
+
 def test_declaration_of_takes_only_what_the_item_declares():
     from backend.ux_verification.claim_audit import declaration_of
 
@@ -345,8 +358,9 @@ def test_declaration_of_takes_only_what_the_item_declares():
     }
 
     assert declaration_of(item) == {
-        "claim": "response_field", "endpoint": "POST /x", "response_field": "success",
-    }, "description や layer は宣言ではない（変わっても差し替えではない）"
+        "claim": "response_field", "description": "説明",
+        "endpoint": "POST /x", "response_field": "success",
+    }, "layer や story_scene は宣言ではない"
 
 
 def test_declaration_of_ignores_empty_values():
@@ -657,3 +671,12 @@ def test_a_slot_that_names_the_declared_field_is_fine(tmp_path):
     ]))
 
     assert report.mismatched == []
+
+
+def test_a_semicolon_is_a_clause_break_too(tmp_path):
+    """`；` で別節に主張を逃がせた（14回目）。読点だけが区切りではない。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description(
+        "ステータスがcompletedに一致する；シーン固定APIが正常応答を返す") is None
+    assert parse_description("A" + chr(10) + "Bが正常応答") is None
