@@ -246,6 +246,10 @@ DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...], frozenset], ...] =
 _FIELD_TEMPLATES = ("フィールドを返す", "必須フィールド", "フィールドの実在",
                     "経路＋フィールド", "要素の実在", "値の指定")
 
+# ASCII 識別子のスロットを宣言と突き合わせるテンプレート。ここに無いものは
+# 辞書（NOUN_PHRASES）で閉じる——照合が走らないのに免除すると素通りになる。
+_SLOT_CHECKED_TEMPLATES = _FIELD_TEMPLATES + ("列挙の実在",)
+
 _TYPED_SLOT = re.compile(rf"^{_IDENT}(?:/{_IDENT})*$")
 # スロットに英数字の語が混じっていると、名前なのか値なのか判別できない。
 # 2文字（`ID`）で回避されていたので下限を外した（15回目の指摘）。
@@ -268,6 +272,7 @@ _FIELD_LIKE = re.compile(r"^[a-z][a-z0-9_]*$")
 # 宣言した response_field と突き合わせる。
 NOUN_PHRASES: dict = {
     "AI改善提案API": frozenset({'経路のみ'}),
+    "API": frozenset({'プリセット網羅'}),
     "BGM設定": frozenset({'フィールドを返す'}),
     "CTR予測": frozenset({'要素の実在'}),
     "GPU検出API": frozenset({'経路のみ'}),
@@ -279,13 +284,21 @@ NOUN_PHRASES: dict = {
     "TXTエクスポートボタン": frozenset({'要素の実在'}),
     "Whisperモデルセレクトボックス": frozenset({'要素の実在'}),
     "actions配列": frozenset({'要素の実在'}),
+    "analytics/simulateAPI": frozenset({'経路のみ'}),
+    "analytics/syncAPI": frozenset({'経路のみ'}),
     "analyze-scriptAPI": frozenset({'経路のみ'}),
     "diffコンテナ": frozenset({'要素の実在'}),
     "entries配列": frozenset({'フィールドを返す'}),
+    "evolution/statusAPI": frozenset({'経路のみ'}),
+    "evolution/syncAPI": frozenset({'経路のみ'}),
+    "evolutionAPI": frozenset({'経路のみ'}),
+    "locked_segments": frozenset({'経路＋状態遷移'}),
+    "optimizeAPI": frozenset({'経路のみ'}),
     "plan-storyboardAPI": frozenset({'経路のみ'}),
     "pre-planAPI": frozenset({'経路のみ'}),
     "quality-scoreAPI": frozenset({'経路のみ'}),
     "stagesフィールド": frozenset({'要素の実在'}),
+    "statusAPI": frozenset({'経路のみ'}),
     "user_modelオブジェクト": frozenset({'フィールドを返す'}),
     "アクション一覧API": frozenset({'経路のみ'}),
     "エクスポートAPI": frozenset({'経路のみ'}),
@@ -367,65 +380,74 @@ NOUN_PHRASES: dict = {
 # `endpoint: /api/health` を宣言しても通っていた（18回目）。名詞句と経路の
 # 対応も登録し、食い違いを `slot_not_declared` として落とす。
 PHRASE_ENDPOINTS: dict = {
-    "AI改善提案API": frozenset({'POST /api/pipeline/quality-gate/improve'}),
-    "BGM設定": frozenset({'GET /api/render/settings'}),
-    "GPU検出API": frozenset({'GET /api/render/gpu-detect'}),
-    "LUFS設定": frozenset({'GET /api/render/settings'}),
-    "SmartCutヘルスチェックAPI": frozenset({'GET /api/smartcut/health'}),
-    "SmartCut初期化API": frozenset({'POST /api/smartcut/init'}),
-    "actions配列": frozenset({'GET /api/pipeline/improvement/actions'}),
-    "analyze-scriptAPI": frozenset({'POST /api/director/analyze-script'}),
-    "entries配列": frozenset({'GET /api/evolution'}),
-    "plan-storyboardAPI": frozenset({'POST /api/director/plan-storyboard'}),
-    "pre-planAPI": frozenset({'POST /api/youtube/pre-plan'}),
-    "quality-scoreAPI": frozenset({'POST /api/director/quality-score'}),
-    "stagesフィールド": frozenset({'GET /api/render/status/{job_id}'}),
-    "user_modelオブジェクト": frozenset({'GET /api/evolution/status'}),
-    "アクション一覧API": frozenset({'GET /api/pipeline/improvement/actions'}),
-    "オーバーライドAPI": frozenset({'POST /themes/override'}),
-    "カテゴリ別スコアAPI": frozenset({'GET /api/pipeline/quality-gate/scores'}),
-    "サムネコンセプトAPI": frozenset({'POST /api/youtube/generate-thumbnail'}),
-    "シーン固定API": frozenset({'POST /api/smartcut/lock'}),
-    "スコア変化API": frozenset({'GET /api/pipeline/improvement/score-change'}),
-    "テンプレート一覧API": frozenset({'GET /themes/templates'}),
-    "テンプレート詳細API": frozenset({'GET /themes/templates/{template_id}'}),
-    "テーマ一覧API": frozenset({'GET /themes'}),
-    "テーマ詳細API": frozenset({'GET /themes/{theme_id}'}),
-    "ドリルダウンAPI": frozenset({'GET /api/pipeline/quality-gate/drilldown/{category}'}),
-    "バリデーションAPI": frozenset({'POST /api/pipeline/videos/validate'}),
-    "ヘルスチェックAPI": frozenset({'GET /api/render/health', 'GET /api/youtube/health', 'GET /themes/health'}),
-    "メタデータAPI": frozenset({'POST /api/pipeline/videos/metadata'}),
-    "ロゴ設定": frozenset({'GET /api/render/settings'}),
-    "候補にtimestamp": frozenset({'GET /api/smartcut/all-candidates'}),
-    "候補にtype": frozenset({'GET /api/smartcut/all-candidates'}),
-    "候補レスポンスにchapters配列": frozenset({'GET /api/smartcut/all-candidates'}),
-    "候補レスポンスにhighlights配列": frozenset({'GET /api/smartcut/all-candidates'}),
-    "全候補API": frozenset({'GET /api/smartcut/all-candidates'}),
-    "再度同一パラメータで推奨取得": frozenset({'POST /api/smartcut/recommend'}),
-    "動画リストに対応拡張子": frozenset({'GET /api/pipeline/videos'}),
-    "動画一覧API": frozenset({'GET /api/pipeline/videos'}),
-    "動画一覧にvideos配列": frozenset({'GET /api/pipeline/videos'}),
-    "品質ゲートステータスAPI": frozenset({'GET /api/pipeline/quality-gate/status'}),
-    "字幕設定": frozenset({'GET /api/render/settings'}),
-    "完了通知API": frozenset({'POST /api/render/complete/{job_id}'}),
-    "履歴API": frozenset({'GET /api/pipeline/quality-gate/history'}),
-    "履歴にhistory配列": frozenset({'GET /api/pipeline/quality-gate/history'}),
-    "推奨API": frozenset({'POST /themes/recommend'}),
-    "推奨APIが目標尺パラメータ": frozenset({'POST /api/smartcut/recommend'}),
-    "推奨APIで再計算": frozenset({'POST /api/smartcut/recommend'}),
-    "推奨セグメントにscore": frozenset({'POST /api/smartcut/recommend'}),
-    "推奨レスポンスにestimated_output_seconds": frozenset({'POST /api/smartcut/recommend'}),
-    "推奨レスポンスにestimated_output_str": frozenset({'POST /api/smartcut/recommend'}),
-    "推奨レスポンスにrecommended_segments": frozenset({'POST /api/smartcut/recommend'}),
-    "推奨レスポンスにrecommended_segments配列": frozenset({'POST /api/smartcut/recommend'}),
-    "改善ループステータスAPI": frozenset({'GET /api/pipeline/improvement/status'}),
-    "最適化API": frozenset({'POST /api/youtube/optimize'}),
-    "現在設定取得API": frozenset({'GET /themes/current/active'}),
-    "確定API": frozenset({'POST /api/smartcut/finalize'}),
-    "統計API": frozenset({'GET /themes/stats'}),
-    "設定取得API": frozenset({'GET /api/render/settings'}),
-    "適用API": frozenset({'POST /themes/apply'}),
-    "開始API": frozenset({'POST /api/render/start'}),
+    ("〜のみ", "動画リストに対応拡張子"): frozenset({'GET /api/pipeline/videos'}),
+    ("フィールドの実在", "候補にtimestamp"): frozenset({'GET /api/smartcut/all-candidates'}),
+    ("フィールドの実在", "候補にtype"): frozenset({'GET /api/smartcut/all-candidates'}),
+    ("フィールドの実在", "推奨セグメントにscore"): frozenset({'POST /api/smartcut/recommend'}),
+    ("フィールドを返す", "BGM設定"): frozenset({'GET /api/render/settings'}),
+    ("フィールドを返す", "LUFS設定"): frozenset({'GET /api/render/settings'}),
+    ("フィールドを返す", "entries配列"): frozenset({'GET /api/evolution'}),
+    ("フィールドを返す", "user_modelオブジェクト"): frozenset({'GET /api/evolution/status'}),
+    ("フィールドを返す", "ロゴ設定"): frozenset({'GET /api/render/settings'}),
+    ("フィールドを返す", "字幕設定"): frozenset({'GET /api/render/settings'}),
+    ("プリセット網羅", "API"): frozenset({'POST /api/smartcut/recommend'}),
+    ("リクエスト契約", "推奨APIが目標尺パラメータ"): frozenset({'POST /api/smartcut/recommend'}),
+    ("可能である", "再度同一パラメータで推奨取得"): frozenset({'POST /api/smartcut/recommend'}),
+    ("可能である", "推奨APIで再計算"): frozenset({'POST /api/smartcut/recommend'}),
+    ("必須フィールド", "メタデータAPI"): frozenset({'POST /api/pipeline/videos/metadata'}),
+    ("経路のみ", "AI改善提案API"): frozenset({'POST /api/pipeline/quality-gate/improve'}),
+    ("経路のみ", "GPU検出API"): frozenset({'GET /api/render/gpu-detect'}),
+    ("経路のみ", "SmartCutヘルスチェックAPI"): frozenset({'GET /api/smartcut/health'}),
+    ("経路のみ", "SmartCut初期化API"): frozenset({'POST /api/smartcut/init'}),
+    ("経路のみ", "analytics/simulateAPI"): frozenset({'POST /api/analytics/simulate'}),
+    ("経路のみ", "analytics/syncAPI"): frozenset({'POST /api/analytics/sync'}),
+    ("経路のみ", "analyze-scriptAPI"): frozenset({'POST /api/director/analyze-script'}),
+    ("経路のみ", "evolution/statusAPI"): frozenset({'GET /api/evolution/status'}),
+    ("経路のみ", "evolution/syncAPI"): frozenset({'POST /api/evolution/sync'}),
+    ("経路のみ", "evolutionAPI"): frozenset({'GET /api/evolution'}),
+    ("経路のみ", "optimizeAPI"): frozenset({'POST /api/youtube/optimize'}),
+    ("経路のみ", "plan-storyboardAPI"): frozenset({'POST /api/director/plan-storyboard'}),
+    ("経路のみ", "pre-planAPI"): frozenset({'POST /api/youtube/pre-plan'}),
+    ("経路のみ", "quality-scoreAPI"): frozenset({'POST /api/director/quality-score'}),
+    ("経路のみ", "statusAPI"): frozenset({'GET /api/evolution/status'}),
+    ("経路のみ", "アクション一覧API"): frozenset({'GET /api/pipeline/improvement/actions'}),
+    ("経路のみ", "オーバーライドAPI"): frozenset({'POST /themes/override'}),
+    ("経路のみ", "カテゴリ別スコアAPI"): frozenset({'GET /api/pipeline/quality-gate/scores'}),
+    ("経路のみ", "サムネコンセプトAPI"): frozenset({'POST /api/youtube/generate-thumbnail'}),
+    ("経路のみ", "シーン固定API"): frozenset({'POST /api/smartcut/lock'}),
+    ("経路のみ", "スコア変化API"): frozenset({'GET /api/pipeline/improvement/score-change'}),
+    ("経路のみ", "テンプレート一覧API"): frozenset({'GET /themes/templates'}),
+    ("経路のみ", "テンプレート詳細API"): frozenset({'GET /themes/templates/{template_id}'}),
+    ("経路のみ", "テーマ一覧API"): frozenset({'GET /themes'}),
+    ("経路のみ", "テーマ詳細API"): frozenset({'GET /themes/{theme_id}'}),
+    ("経路のみ", "ドリルダウンAPI"): frozenset({'GET /api/pipeline/quality-gate/drilldown/{category}'}),
+    ("経路のみ", "バリデーションAPI"): frozenset({'POST /api/pipeline/videos/validate'}),
+    ("経路のみ", "ヘルスチェックAPI"): frozenset({'GET /api/render/health', 'GET /api/youtube/health', 'GET /themes/health'}),
+    ("経路のみ", "全候補API"): frozenset({'GET /api/smartcut/all-candidates'}),
+    ("経路のみ", "動画一覧API"): frozenset({'GET /api/pipeline/videos'}),
+    ("経路のみ", "品質ゲートステータスAPI"): frozenset({'GET /api/pipeline/quality-gate/status'}),
+    ("経路のみ", "完了通知API"): frozenset({'POST /api/render/complete/{job_id}'}),
+    ("経路のみ", "履歴API"): frozenset({'GET /api/pipeline/quality-gate/history'}),
+    ("経路のみ", "推奨API"): frozenset({'POST /themes/recommend'}),
+    ("経路のみ", "改善ループステータスAPI"): frozenset({'GET /api/pipeline/improvement/status'}),
+    ("経路のみ", "最適化API"): frozenset({'POST /api/youtube/optimize'}),
+    ("経路のみ", "現在設定取得API"): frozenset({'GET /themes/current/active'}),
+    ("経路のみ", "確定API"): frozenset({'POST /api/smartcut/finalize'}),
+    ("経路のみ", "統計API"): frozenset({'GET /themes/stats'}),
+    ("経路のみ", "設定取得API"): frozenset({'GET /api/render/settings'}),
+    ("経路のみ", "適用API"): frozenset({'POST /themes/apply'}),
+    ("経路のみ", "開始API"): frozenset({'POST /api/render/start'}),
+    ("経路＋状態遷移", "locked_segments"): frozenset({'POST /api/smartcut/unlock'}),
+    ("要素の実在", "actions配列"): frozenset({'GET /api/pipeline/improvement/actions'}),
+    ("要素の実在", "stagesフィールド"): frozenset({'GET /api/render/status/{job_id}'}),
+    ("要素の実在", "候補レスポンスにchapters配列"): frozenset({'GET /api/smartcut/all-candidates'}),
+    ("要素の実在", "候補レスポンスにhighlights配列"): frozenset({'GET /api/smartcut/all-candidates'}),
+    ("要素の実在", "動画一覧にvideos配列"): frozenset({'GET /api/pipeline/videos'}),
+    ("要素の実在", "履歴にhistory配列"): frozenset({'GET /api/pipeline/quality-gate/history'}),
+    ("要素の実在", "推奨レスポンスにestimated_output_seconds"): frozenset({'POST /api/smartcut/recommend'}),
+    ("要素の実在", "推奨レスポンスにestimated_output_str"): frozenset({'POST /api/smartcut/recommend'}),
+    ("要素の実在", "推奨レスポンスにrecommended_segments"): frozenset({'POST /api/smartcut/recommend'}),
+    ("要素の実在", "推奨レスポンスにrecommended_segments配列"): frozenset({'POST /api/smartcut/recommend'}),
 }
 
 
@@ -454,8 +476,17 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
         # PASS できる弱いテンプレートへ移せた（16回目の指摘2）。
         # 無名の前置も検査する。名前を付けていなかったので素通りしていた（指摘1）。
         for part in (slot, (groups.get("prefix") or "").strip()):
-            if not part or _TYPED_SLOT.match(part):
-                continue  # フィールド名は slot_not_declared が宣言と突き合わせる
+            if not part:
+                continue
+            # ASCII 識別子を辞書検査から免除してよいのは、**その名前が実際に
+            # 宣言と突き合わされるテンプレートだけ。** 免除の根拠は
+            # 「slot_not_declared が response_field と照合するから」なので、
+            # 照合が走らないテンプレート（経路のみ・リクエスト契約・
+            # 保存キーの実在ほか）で免除すると、主語と測る対象が無関係でも通る
+            # （19回目: `analyze_scriptAPIが正常応答する` に別経路を宣言できた。
+            #  ハイフンをアンダースコアに替えるだけで検査が消えた）。
+            if _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
+                continue
             if name not in NOUN_PHRASES.get(part, frozenset()):
                 return None
         if name in _FIELD_TEMPLATES and not slot:
@@ -495,7 +526,7 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
         buried = {t for t in _ASCII_TOKEN.findall(slot) if _FIELD_LIKE.match(t)}
         if buried and not buried <= {str(f) for f in _declared_fields(item)}:
             return False
-    endpoints = PHRASE_ENDPOINTS.get(slot)
+    endpoints = PHRASE_ENDPOINTS.get((name, slot))
     if endpoints is not None and (item.get("endpoint") or "").strip() not in endpoints:
         return False
     if name == "列挙の実在":

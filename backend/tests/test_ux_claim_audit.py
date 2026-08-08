@@ -881,3 +881,28 @@ def test_a_phrase_must_point_at_its_registered_endpoint(tmp_path):
 
     assert [r.reason for r in _row("GET /api/health").mismatched] == ["slot_not_declared"]
     assert _row("GET /api/pipeline/videos").mismatched == []
+
+
+def test_an_identifier_slot_is_only_exempt_where_it_is_cross_checked():
+    """ASCII 識別子の免除は「宣言と突き合わされるテンプレート」に限る（19回目）。
+
+    照合が走らないテンプレート（経路のみ・リクエスト契約・保存キーの実在）で
+    免除していたので、主語と測る対象が無関係でも通った。
+    ハイフンをアンダースコアに替えるだけで検査が消えていた。
+    """
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("analyze_scriptAPIが正常応答する") is None
+    assert parse_description("localStorageにhistory_keyが存在する") is None
+    assert parse_description("target_durationを受け取る") is None
+
+
+def test_the_endpoint_registry_is_scoped_per_template(tmp_path):
+    """同じ名詞句でもテンプレートが違えば指す経路が違う。
+
+    `locked_segments` は「経路＋フィールド」では lock、「経路＋状態遷移」では
+    unlock を指す。名詞句だけで引くと取り違える。
+    """
+    from backend.ux_verification.claim_audit import PHRASE_ENDPOINTS
+
+    assert all(isinstance(k, tuple) and len(k) == 2 for k in PHRASE_ENDPOINTS)
