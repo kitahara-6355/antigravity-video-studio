@@ -3,8 +3,8 @@
   "layer": 1,
   "method": "static_source_scan",
   "total": 122,
-  "pass": 109,
-  "fail": 13,
+  "pass": 108,
+  "fail": 14,
   "items": {
     "O1-L1-01": "PASS",
     "O1-L1-02": "PASS",
@@ -49,7 +49,7 @@
     "O5-L1-02": "PASS",
     "O5-L1-03": "PASS",
     "O5-L1-04": "PASS",
-    "O5-L1-05": "PASS",
+    "O5-L1-05": "FAIL",
     "O5-L1-06": "FAIL",
     "O5-L1-07": "FAIL",
     "O5-L1-08": "PASS",
@@ -133,7 +133,7 @@
     "O1-L1-01": "found",
     "O1-L1-02": "field_found",
     "O1-L1-03": "field_found",
-    "O1-L1-04": "value_found",
+    "O1-L1-04": "value_set_matched",
     "O1-L1-05": "found",
     "O1-L1-06": "found",
     "O1-L1-07": "storage_key_found",
@@ -173,7 +173,7 @@
     "O5-L1-02": "found",
     "O5-L1-03": "field_found",
     "O5-L1-04": "field_found",
-    "O5-L1-05": "field_found",
+    "O5-L1-05": "unjudgeable",
     "O5-L1-06": "unjudgeable",
     "O5-L1-07": "unjudgeable",
     "O5-L1-08": "field_found",
@@ -239,7 +239,7 @@
     "O11-L1-06": "found",
     "O11-L1-07": "found",
     "O11-L1-08": "found",
-    "O11-L1-09": "field_found",
+    "O11-L1-09": "value_matched",
     "O11-L1-10": "field_not_found",
     "O12-L1-01": "found",
     "O12-L1-02": "found",
@@ -256,15 +256,20 @@
   "declarations": {
     "O1-L1-01": {
       "claim": "route_exists",
+      "description": "動画一覧APIが正常応答を返す",
       "endpoint": "GET /api/pipeline/videos"
     },
     "O1-L1-02": {
       "claim": "response_field",
+      "description": "動画一覧にvideos配列が存在する",
+      "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/pipeline/videos",
       "response_field": "videos"
     },
     "O1-L1-03": {
       "claim": "response_field",
+      "description": "メタデータAPIが必須フィールドを返す",
+      "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている",
       "endpoint": "POST /api/pipeline/videos/metadata",
       "response_field": [
         "name",
@@ -274,232 +279,298 @@
       ]
     },
     "O1-L1-04": {
-      "claim": "value_constraint",
+      "claim": "value_exclusive",
+      "description": "動画リストに対応拡張子のみ含まれる",
       "endpoint": "GET /api/pipeline/videos",
-      "value_literals": [
-        ".mp4",
-        ".mov",
-        ".mkv",
-        ".avi"
+      "value_set": [
+        "*.mp4",
+        "*.mov",
+        "*.mkv",
+        "*.avi"
       ]
     },
     "O1-L1-05": {
       "claim": "dom_exists",
+      "description": "ドロップゾーン要素が存在する",
       "testid": "pipeline-drop-zone"
     },
     "O1-L1-06": {
       "claim": "route_exists",
+      "description": "バリデーションAPIが正常応答を返す",
       "endpoint": "POST /api/pipeline/videos/validate"
     },
     "O1-L1-07": {
       "claim": "storage_key",
+      "description": "localStorageに履歴キーが存在する",
+      "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない",
       "storage_key": "pipeline_recent_videos"
     },
     "O2-L1-01": {
       "claim": "dom_exists",
+      "description": "Whisperモデルセレクトボックスが存在する",
+      "value_note": "Whisper はモデル系列の名前で、UI 要素の呼び名の一部。値の主張ではない",
       "testid": "whisper-model-select"
     },
     "O2-L1-02": {
       "claim": "dom_exists",
+      "description": "推奨モデルバッジが存在する",
       "testid": "whisper-recommended"
     },
     "O2-L1-03": {
       "claim": "dom_exists",
+      "description": "進捗バーが存在する",
       "testid": "transcription-progress-bar"
     },
     "O2-L1-04": {
       "claim": "dom_exists",
+      "description": "進捗テキスト(%)が存在する",
       "testid": "transcription-progress-text"
     },
     "O2-L1-05": {
       "claim": "dom_exists",
+      "description": "経過時間表示が存在する",
       "testid": "transcription-elapsed"
     },
     "O2-L1-06": {
       "claim": "dom_exists",
+      "description": "セグメント一覧コンテナが存在する",
       "testid": "segment-list"
     },
     "O2-L1-07": {
       "claim": "element_count",
+      "description": "セグメントが3件以上表示される",
       "testid": "segment-item-*"
     },
     "O3-L1-01": {
       "claim": "dom_exists",
+      "description": "校閲ステージパネルが存在する",
       "testid": "proofreading-stage-panel"
     },
     "O3-L1-02": {
       "claim": "dom_exists",
+      "description": "diffコンテナが存在する",
+      "value_note": "diff は UI コンテナの呼び名。値の主張ではない",
       "testid": "proofreading-diff"
     },
     "O3-L1-03": {
       "claim": "dom_exists",
+      "description": "差分マーク要素が存在する",
       "testid": "diff-mark-*"
     },
     "O3-L1-04": {
       "claim": "dom_exists",
+      "description": "比較ビューコンテナが存在する",
       "testid": "proofreading-comparison"
     },
     "O3-L1-05": {
       "claim": "dom_exists",
+      "description": "個別承認ボタンが存在する",
       "testid": "segment-approve-btn-*"
     },
     "O3-L1-06": {
       "claim": "dom_exists",
+      "description": "個別却下ボタンが存在する",
       "testid": "segment-reject-btn-*"
     },
     "O3-L1-07": {
       "claim": "dom_exists",
+      "description": "全承認ボタンが存在する",
       "testid": "approve-all-btn"
     },
     "O3-L1-08": {
       "claim": "dom_exists",
+      "description": "全却下ボタンが存在する",
       "testid": "reject-all-btn"
     },
     "O3-L1-09": {
       "claim": "dom_exists",
+      "description": "辞書パネルが存在する",
       "testid": "dictionary-panel"
     },
     "O3-L1-10": {
       "claim": "dom_exists",
+      "description": "校閲進捗バーが存在する",
       "testid": "proofreading-progress"
     },
     "O3-L1-11": {
       "claim": "dom_exists",
+      "description": "SRTエクスポートボタンが存在する",
+      "value_note": "SRT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
       "testid": "export-srt-btn"
     },
     "O3-L1-12": {
       "claim": "dom_exists",
+      "description": "TXTエクスポートボタンが存在する",
+      "value_note": "TXT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
       "testid": "export-txt-btn"
     },
     "O3-L1-13": {
       "claim": "dom_exists",
+      "description": "スキップトグルが存在する",
       "testid": "skip-proofreading-toggle"
     },
     "O4-L1-01": {
       "claim": "route_exists",
+      "description": "SmartCut初期化APIが正常応答を返す",
       "endpoint": "POST /api/smartcut/init"
     },
     "O4-L1-02": {
       "claim": "route_exists",
+      "description": "SmartCutヘルスチェックAPIが正常応答を返す",
       "endpoint": "GET /api/smartcut/health"
     },
     "O4-L1-03": {
       "claim": "response_field",
+      "description": "推奨レスポンスにestimated_output_secondsが存在する",
+      "value_note": "estimated_output_seconds はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_seconds"
     },
     "O4-L1-04": {
       "claim": "request_contract",
+      "description": "推奨APIが目標尺パラメータを受け付ける",
       "endpoint": "POST /api/smartcut/recommend",
       "request_field": "target_duration_minutes"
     },
     "O4-L1-05": {
       "claim": "parameter_coverage",
+      "description": "4種プリセット(15/30/45/60分)でAPIが正常応答する",
       "endpoint": "POST /api/smartcut/recommend"
     },
     "O4-L1-06": {
       "claim": "route_exists",
+      "description": "シーン固定APIが正常応答を返す",
       "endpoint": "POST /api/smartcut/lock"
     },
     "O4-L1-07": {
       "claim": "response_field",
+      "description": "推奨レスポンスにrecommended_segmentsが存在する",
+      "value_note": "recommended_segments はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "recommended_segments"
     },
     "O4-L1-08": {
       "claim": "route_exists",
+      "description": "全候補APIが正常応答を返す",
       "endpoint": "GET /api/smartcut/all-candidates"
     },
     "O4-L1-09": {
       "claim": "response_field",
+      "description": "推奨レスポンスにestimated_output_strが存在する",
+      "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_str"
     },
     "O4-L1-10": {
       "claim": "response_field",
+      "description": "推奨セグメントにscoreフィールドが存在する",
+      "value_note": "「推奨セグメントに score フィールド」の score はフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "score"
     },
     "O4-L1-11": {
       "claim": "response_field",
+      "description": "候補にtypeフィールドが存在する",
+      "value_note": "「候補に type フィールド」の type はフィールド名。値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "type"
     },
     "O4-L1-12": {
       "claim": "response_field",
+      "description": "候補にtimestampフィールドが存在する",
+      "value_note": "「候補に timestamp フィールド」の timestamp はフィールド名。値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "timestamp"
     },
     "O5-L1-01": {
       "claim": "route_exists",
+      "description": "SmartCut初期化APIが正常応答を返す",
       "endpoint": "POST /api/smartcut/init"
     },
     "O5-L1-02": {
       "claim": "route_exists",
+      "description": "全候補APIが正常応答を返す",
       "endpoint": "GET /api/smartcut/all-candidates"
     },
     "O5-L1-03": {
       "claim": "response_field",
+      "description": "候補レスポンスにhighlights配列が存在する",
+      "value_note": "highlights はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "highlights"
     },
     "O5-L1-04": {
       "claim": "response_field",
+      "description": "固定APIが正常応答しlocked_segmentsが返る",
       "endpoint": "POST /api/smartcut/lock",
       "response_field": "locked_segments"
     },
     "O5-L1-05": {
-      "claim": "response_field",
-      "endpoint": "POST /api/smartcut/unlock",
-      "response_field": "locked_segments"
+      "claim": "state_transition",
+      "description": "固定解除APIが正常応答しlocked_segmentsが更新される",
+      "endpoint": "POST /api/smartcut/unlock"
     },
     "O5-L1-06": {
       "claim": "idempotency",
+      "description": "推奨APIで再計算が可能(undo相当)",
       "endpoint": "POST /api/smartcut/recommend"
     },
     "O5-L1-07": {
       "claim": "idempotency",
+      "description": "再度同一パラメータで推奨取得が可能(redo相当)",
       "endpoint": "POST /api/smartcut/recommend"
     },
     "O5-L1-08": {
       "claim": "response_field",
+      "description": "候補レスポンスにchapters配列が存在する",
+      "value_note": "chapters はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "chapters"
     },
     "O5-L1-09": {
       "claim": "response_field",
+      "description": "推奨レスポンスにestimated_output_strが存在する",
+      "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_str"
     },
     "O5-L1-10": {
       "claim": "response_field",
+      "description": "推奨レスポンスにrecommended_segments配列が存在する",
+      "value_note": "recommended_segments はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "recommended_segments"
     },
     "O5-L1-11": {
       "claim": "route_exists",
+      "description": "確定APIが正常応答を返す",
       "endpoint": "POST /api/smartcut/finalize"
     },
     "O6-L1-01": {
       "claim": "route_exists",
+      "description": "品質ゲートステータスAPIが正常応答する",
       "endpoint": "GET /api/pipeline/quality-gate/status"
     },
     "O6-L1-02": {
       "claim": "response_field",
+      "description": "statusフィールドが存在する",
       "endpoint": "GET /api/pipeline/quality-gate/status",
       "response_field": "status"
     },
     "O6-L1-03": {
       "claim": "response_field",
+      "description": "overall_scoreフィールドが存在する",
       "endpoint": "GET /api/pipeline/quality-gate/scores",
       "response_field": "overall_score"
     },
     "O6-L1-04": {
       "claim": "route_exists",
+      "description": "カテゴリ別スコアAPIが正常応答する",
       "endpoint": "GET /api/pipeline/quality-gate/scores"
     },
     "O6-L1-05": {
       "claim": "value_constraint",
+      "description": "4カテゴリ(audio/video/subtitle/structure)が存在する",
       "endpoint": "GET /api/pipeline/quality-gate/scores",
       "value_literals": [
         "audio",
@@ -510,37 +581,46 @@
     },
     "O6-L1-06": {
       "claim": "route_exists",
+      "description": "ドリルダウンAPIが正常応答する",
       "endpoint": "GET /api/pipeline/quality-gate/drilldown/{category}"
     },
     "O6-L1-07": {
       "claim": "route_exists",
+      "description": "AI改善提案APIが正常応答する",
       "endpoint": "POST /api/pipeline/quality-gate/improve"
     },
     "O6-L1-08": {
       "claim": "response_field",
+      "description": "thresholdフィールドが存在する",
       "endpoint": "GET /api/pipeline/quality-gate/status",
       "response_field": "threshold"
     },
     "O6-L1-09": {
       "claim": "route_exists",
+      "description": "履歴APIが正常応答する",
       "endpoint": "GET /api/pipeline/quality-gate/history"
     },
     "O6-L1-10": {
       "claim": "response_field",
+      "description": "履歴にhistory配列が存在する",
+      "value_note": "history はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/pipeline/quality-gate/history",
       "response_field": "history"
     },
     "O7-L1-01": {
       "claim": "route_exists",
+      "description": "改善ループステータスAPIが正常応答する",
       "endpoint": "GET /api/pipeline/improvement/status"
     },
     "O7-L1-02": {
       "claim": "response_field",
+      "description": "statusフィールドが存在する",
       "endpoint": "GET /api/pipeline/improvement/status",
       "response_field": "status"
     },
     "O7-L1-03": {
       "claim": "response_field",
+      "description": "iteration/max_iterationsフィールドが存在する",
       "endpoint": "GET /api/pipeline/improvement/status",
       "response_field": [
         "iteration",
@@ -549,19 +629,24 @@
     },
     "O7-L1-04": {
       "claim": "route_exists",
+      "description": "アクション一覧APIが正常応答する",
       "endpoint": "GET /api/pipeline/improvement/actions"
     },
     "O7-L1-05": {
       "claim": "response_field",
+      "description": "actions配列が存在する",
+      "value_note": "actions はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/pipeline/improvement/actions",
       "response_field": "actions"
     },
     "O7-L1-06": {
       "claim": "route_exists",
+      "description": "スコア変化APIが正常応答する",
       "endpoint": "GET /api/pipeline/improvement/score-change"
     },
     "O7-L1-07": {
       "claim": "response_field",
+      "description": "total_actions/completed_actionsフィールドが存在する",
       "endpoint": "GET /api/pipeline/improvement/status",
       "response_field": [
         "total_actions",
@@ -570,18 +655,23 @@
     },
     "O8-L1-01": {
       "claim": "route_exists",
+      "description": "ヘルスチェックAPIが正常応答",
       "endpoint": "GET /api/render/health"
     },
     "O8-L1-02": {
       "claim": "route_exists",
+      "description": "設定取得APIが正常応答",
       "endpoint": "GET /api/render/settings"
     },
     "O8-L1-03": {
       "claim": "route_exists",
+      "description": "GPU検出APIが正常応答",
       "endpoint": "GET /api/render/gpu-detect"
     },
     "O8-L1-04": {
       "claim": "response_field",
+      "description": "BGM設定が含まれる",
+      "value_note": "「BGM設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない。実体は response_field の宣言で確定させている",
       "endpoint": "GET /api/render/settings",
       "response_field": [
         "bgm_volume",
@@ -590,11 +680,15 @@
     },
     "O8-L1-05": {
       "claim": "response_field",
+      "description": "LUFS設定が含まれる",
+      "value_note": "「LUFS設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
       "endpoint": "GET /api/render/settings",
       "response_field": "lufs_target"
     },
     "O8-L1-06": {
       "claim": "response_field",
+      "description": "ロゴ設定が含まれる",
+      "value_note": "「ロゴ設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
       "endpoint": "GET /api/render/settings",
       "response_field": [
         "logo_enabled",
@@ -604,6 +698,8 @@
     },
     "O8-L1-07": {
       "claim": "response_field",
+      "description": "字幕設定が含まれる",
+      "value_note": "「字幕設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
       "endpoint": "GET /api/render/settings",
       "response_field": [
         "subtitle_enabled",
@@ -613,203 +709,257 @@
     },
     "O8-L1-08": {
       "claim": "route_exists",
+      "description": "開始APIが正常応答",
       "endpoint": "POST /api/render/start"
     },
     "O8-L1-09": {
       "claim": "response_field",
+      "description": "stagesフィールド存在",
+      "value_note": "stages はレスポンスのフィールド名。値の主張ではない",
       "endpoint": "GET /api/render/status/{job_id}",
       "response_field": "stages"
     },
     "O8-L1-10": {
       "claim": "response_field",
+      "description": "output_file存在",
       "endpoint": "GET /api/render/status/{job_id}",
       "response_field": "output_file"
     },
     "O8-L1-11": {
       "claim": "response_field",
+      "description": "download_url存在",
       "endpoint": "GET /api/render/download/{job_id}",
       "response_field": "download_url"
     },
     "O8-L1-12": {
       "claim": "route_exists",
+      "description": "完了通知API正常応答",
       "endpoint": "POST /api/render/complete/{job_id}"
     },
     "O9-L1-01": {
       "claim": "route_exists",
+      "description": "ヘルスチェックAPIが正常応答",
       "endpoint": "GET /api/youtube/health"
     },
     "O9-L1-02": {
       "claim": "route_exists",
+      "description": "最適化APIが正常応答",
       "endpoint": "POST /api/youtube/optimize"
     },
     "O9-L1-03": {
       "claim": "dom_exists",
+      "description": "タイトル候補リストが存在",
       "testid": "youtube-title-candidates"
     },
     "O9-L1-04": {
       "claim": "dom_exists",
+      "description": "タグリストが存在",
       "testid": "youtube-tag-list"
     },
     "O9-L1-05": {
       "claim": "dom_exists",
+      "description": "チャプターリストが存在",
       "testid": "youtube-chapter-list"
     },
     "O9-L1-06": {
       "claim": "dom_exists",
+      "description": "サムネイル候補が存在",
       "testid": "youtube-thumbnail-candidates"
     },
     "O9-L1-07": {
       "claim": "dom_exists",
+      "description": "SEOスコアが存在",
+      "value_note": "SEO は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
       "testid": "youtube-seo-score"
     },
     "O9-L1-08": {
       "claim": "dom_exists",
+      "description": "説明文エリアが存在",
       "testid": "youtube-description"
     },
     "O9-L1-09": {
       "claim": "dom_exists",
+      "description": "ハッシュタグが存在",
       "testid": "youtube-hashtag-list"
     },
     "O9-L1-10": {
       "claim": "dom_exists",
+      "description": "CTR予測が存在",
+      "value_note": "CTR は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
       "testid": "youtube-ctr-prediction"
     },
     "O9-L1-11": {
       "claim": "dom_exists",
+      "description": "投稿準備バッジが存在",
       "testid": "youtube-publish-readiness"
     },
     "O9-L1-12": {
-      "claim": "spec_incomplete"
+      "claim": "spec_incomplete",
+      "description": "エクスポートAPIが正常応答"
     },
     "O10-L1-01": {
       "claim": "route_exists",
+      "description": "ヘルスチェックAPI正常応答",
       "endpoint": "GET /themes/health"
     },
     "O10-L1-02": {
       "claim": "route_exists",
+      "description": "テンプレート一覧API正常応答",
       "endpoint": "GET /themes/templates"
     },
     "O10-L1-03": {
       "claim": "route_exists",
+      "description": "テンプレート詳細API正常応答",
       "endpoint": "GET /themes/templates/{template_id}"
     },
     "O10-L1-04": {
       "claim": "route_exists",
+      "description": "テーマ一覧API正常応答",
       "endpoint": "GET /themes"
     },
     "O10-L1-05": {
       "claim": "route_exists",
+      "description": "テーマ詳細API正常応答",
       "endpoint": "GET /themes/{theme_id}"
     },
     "O10-L1-06": {
       "claim": "route_exists",
+      "description": "適用API正常応答",
       "endpoint": "POST /themes/apply"
     },
     "O10-L1-07": {
       "claim": "route_exists",
+      "description": "現在設定取得API正常応答",
       "endpoint": "GET /themes/current/active"
     },
     "O10-L1-08": {
       "claim": "route_exists",
+      "description": "統計API正常応答",
       "endpoint": "GET /themes/stats"
     },
     "O10-L1-09": {
       "claim": "route_exists",
+      "description": "推奨API正常応答",
       "endpoint": "POST /themes/recommend"
     },
     "O10-L1-10": {
       "claim": "route_exists",
+      "description": "オーバーライドAPI正常応答",
       "endpoint": "POST /themes/override"
     },
     "O11-L1-01": {
       "claim": "route_exists",
+      "description": "ヘルスチェックAPI正常応答",
       "endpoint": "GET /api/youtube/health"
     },
     "O11-L1-02": {
       "claim": "route_exists",
+      "description": "pre-planAPI正常応答",
       "endpoint": "POST /api/youtube/pre-plan"
     },
     "O11-L1-03": {
       "claim": "route_exists",
+      "description": "サムネコンセプトAPI正常応答",
       "endpoint": "POST /api/youtube/generate-thumbnail"
     },
     "O11-L1-04": {
       "claim": "response_field",
+      "description": "past_lessons含む",
       "endpoint": "POST /api/youtube/pre-plan",
       "response_field": "past_lessons"
     },
     "O11-L1-05": {
       "claim": "route_exists",
+      "description": "optimizeAPI正常応答",
       "endpoint": "POST /api/youtube/optimize"
     },
     "O11-L1-06": {
       "claim": "route_exists",
+      "description": "analyze-scriptAPI正常応答",
       "endpoint": "POST /api/director/analyze-script"
     },
     "O11-L1-07": {
       "claim": "route_exists",
+      "description": "quality-scoreAPI正常応答",
       "endpoint": "POST /api/director/quality-score"
     },
     "O11-L1-08": {
       "claim": "route_exists",
+      "description": "plan-storyboardAPI正常応答",
       "endpoint": "POST /api/director/plan-storyboard"
     },
     "O11-L1-09": {
-      "claim": "response_field",
+      "claim": "response_value",
+      "description": "success=true",
       "endpoint": "POST /api/youtube/pre-plan",
+      "expected_value": "true",
       "response_field": "success"
     },
     "O11-L1-10": {
       "claim": "response_field",
+      "description": "hook_score含む",
       "endpoint": "POST /api/youtube/pre-plan",
       "response_field": "hook_score"
     },
     "O12-L1-01": {
       "claim": "route_exists",
+      "description": "statusAPI正常応答",
       "endpoint": "GET /api/evolution/status"
     },
     "O12-L1-02": {
       "claim": "route_exists",
+      "description": "analytics/syncAPI正常応答",
       "endpoint": "POST /api/analytics/sync"
     },
     "O12-L1-03": {
       "claim": "route_exists",
+      "description": "analytics/simulateAPI正常応答",
       "endpoint": "POST /api/analytics/simulate"
     },
     "O12-L1-04": {
       "claim": "route_exists",
+      "description": "evolutionAPI正常応答",
       "endpoint": "GET /api/evolution"
     },
     "O12-L1-05": {
       "claim": "route_exists",
+      "description": "evolution/syncAPI正常応答",
       "endpoint": "POST /api/evolution/sync"
     },
     "O12-L1-06": {
       "claim": "route_exists",
+      "description": "evolution/statusAPI正常応答",
       "endpoint": "GET /api/evolution/status"
     },
     "O12-L1-07": {
       "claim": "response_field",
+      "description": "user_modelオブジェクト含む",
+      "value_note": "「user_model オブジェクト」の user_model はフィールド名。「オブジェクト」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/evolution/status",
       "response_field": "user_model"
     },
     "O12-L1-08": {
       "claim": "response_field",
+      "description": "result含む",
       "endpoint": "POST /api/analytics/sync",
       "response_field": "result"
     },
     "O12-L1-09": {
       "claim": "response_field",
+      "description": "simulation含む",
       "endpoint": "POST /api/analytics/simulate",
       "response_field": "simulation"
     },
     "O12-L1-10": {
       "claim": "response_field",
+      "description": "entries配列含む",
+      "value_note": "「entries 配列」の entries はフィールド名。「配列」は型の説明で、値の主張ではない",
       "endpoint": "GET /api/evolution",
       "response_field": "entries"
     },
     "O12-L1-11": {
       "claim": "response_field",
+      "description": "evolution_entries含む",
       "endpoint": "GET /api/evolution/status",
       "response_field": "evolution_entries"
     }
@@ -835,6 +985,12 @@
         "O4-L1-05",
         "O5-L1-06",
         "O5-L1-07"
+      ]
+    },
+    {
+      "reason": "P3 C-3: O5-L1-05『locked_segments が更新される』は状態遷移の主張で、1回の静的走査では『返る』と区別が付かない。フィールドの実在で PASS にしていたのをやめ FAIL にした。ユーザー判断（2026-08-07）",
+      "items": [
+        "O5-L1-05"
       ]
     }
   ],
@@ -1765,6 +1921,1999 @@
           "before": null,
           "after": {
             "claim": "spec_incomplete"
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: description の述語に合わせて判定手段を強めた。O11-L1-09『success=true』は値まで測る response_value へ、O1-L1-04『対応拡張子のみ』は集合一致を測る value_exclusive へ。読み方はユーザー判断（2026-08-07）",
+      "items": {
+        "O1-L1-04": {
+          "before": {
+            "claim": "value_constraint",
+            "endpoint": "GET /api/pipeline/videos",
+            "value_literals": [
+              ".mp4",
+              ".mov",
+              ".mkv",
+              ".avi"
+            ]
+          },
+          "after": {
+            "claim": "value_exclusive",
+            "endpoint": "GET /api/pipeline/videos",
+            "value_set": [
+              "*.mp4",
+              "*.mov",
+              "*.mkv",
+              "*.avi"
+            ]
+          }
+        },
+        "O11-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "success"
+          },
+          "after": {
+            "claim": "response_value",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "expected_value": "true",
+            "response_field": "success"
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: O5-L1-05 の claim を response_field から state_transition（判定手段なし）へ。description の述語『更新される』が要求する claim に合わせた",
+      "items": {
+        "O5-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/unlock",
+            "response_field": "locked_segments"
+          },
+          "after": {
+            "claim": "state_transition",
+            "endpoint": "POST /api/smartcut/unlock"
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: 『〜を返す／含まれる』の手前が ASCII 識別子でない10件に value_note を足した。フィールド名なのか値なのかを機械が判別できないので、人に宣言させて空欄を許さない（ユーザー判断 2026-08-07）",
+      "items": {
+        "O1-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/pipeline/videos/metadata",
+            "response_field": [
+              "name",
+              "path",
+              "size_mb",
+              "modified"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている",
+            "endpoint": "POST /api/pipeline/videos/metadata",
+            "response_field": [
+              "name",
+              "path",
+              "size_mb",
+              "modified"
+            ]
+          }
+        },
+        "O12-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "user_model"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「user_model オブジェクト」の user_model はフィールド名。「オブジェクト」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "user_model"
+          }
+        },
+        "O12-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution",
+            "response_field": "entries"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「entries 配列」の entries はフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution",
+            "response_field": "entries"
+          }
+        },
+        "O4-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "score"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「推奨セグメントに score フィールド」の score はフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "score"
+          }
+        },
+        "O4-L1-11": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "type"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「候補に type フィールド」の type はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "type"
+          }
+        },
+        "O4-L1-12": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "timestamp"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「候補に timestamp フィールド」の timestamp はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "timestamp"
+          }
+        },
+        "O8-L1-04": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "bgm_volume",
+              "bgm_ducking"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「BGM設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない。実体は response_field の宣言で確定させている",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "bgm_volume",
+              "bgm_ducking"
+            ]
+          }
+        },
+        "O8-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": "lufs_target"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「LUFS設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": "lufs_target"
+          }
+        },
+        "O8-L1-06": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "logo_enabled",
+              "logo_position",
+              "logo_opacity"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「ロゴ設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "logo_enabled",
+              "logo_position",
+              "logo_opacity"
+            ]
+          }
+        },
+        "O8-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "subtitle_enabled",
+              "subtitle_font",
+              "subtitle_size"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "「字幕設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "subtitle_enabled",
+              "subtitle_font",
+              "subtitle_size"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: 『〜が存在する』側でスロットに ASCII トークンを含む18件にも value_note を足した。値なのか名前なのか機械が判別できないので人に宣言させる（ユーザー判断 2026-08-07）",
+      "items": {
+        "O1-L1-02": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/videos",
+            "response_field": "videos"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/videos",
+            "response_field": "videos"
+          }
+        },
+        "O1-L1-07": {
+          "before": {
+            "claim": "storage_key",
+            "storage_key": "pipeline_recent_videos"
+          },
+          "after": {
+            "claim": "storage_key",
+            "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない",
+            "storage_key": "pipeline_recent_videos"
+          }
+        },
+        "O2-L1-01": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "whisper-model-select"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "Whisper はモデル系列の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "whisper-model-select"
+          }
+        },
+        "O3-L1-02": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "proofreading-diff"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "diff は UI コンテナの呼び名。値の主張ではない",
+            "testid": "proofreading-diff"
+          }
+        },
+        "O3-L1-11": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "export-srt-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "SRT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-srt-btn"
+          }
+        },
+        "O3-L1-12": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "export-txt-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "TXT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-txt-btn"
+          }
+        },
+        "O4-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_seconds"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "estimated_output_seconds はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_seconds"
+          }
+        },
+        "O4-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "recommended_segments はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O4-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O5-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "highlights"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "highlights はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "highlights"
+          }
+        },
+        "O5-L1-08": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "chapters"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "chapters はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "chapters"
+          }
+        },
+        "O5-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O5-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "recommended_segments はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O6-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/history",
+            "response_field": "history"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "history はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/quality-gate/history",
+            "response_field": "history"
+          }
+        },
+        "O7-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/actions",
+            "response_field": "actions"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "actions はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/improvement/actions",
+            "response_field": "actions"
+          }
+        },
+        "O8-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "stages"
+          },
+          "after": {
+            "claim": "response_field",
+            "value_note": "stages はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "stages"
+          }
+        },
+        "O9-L1-07": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-seo-score"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "SEO は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-seo-score"
+          }
+        },
+        "O9-L1-10": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-ctr-prediction"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "value_note": "CTR は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-ctr-prediction"
+          }
+        }
+      }
+    },
+    {
+      "reason": "P3 C-3: description を宣言に含めた。強い述語の検査は語彙に依存し、語彙外の述語（以外・一致する・巻き戻して・5個まで）は名詞句に吸収される——4回続けて同じ型で破られた。テンプレート検査は新しい項目の形しか保証できないので、既存項目の主張が黙って変わらないことはラチェットの仕事にする（gate-verifier 14回目）",
+      "items": {
+        "O1-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/videos"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "動画一覧APIが正常応答を返す",
+            "endpoint": "GET /api/pipeline/videos"
+          }
+        },
+        "O1-L1-02": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/videos",
+            "response_field": "videos"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "動画一覧にvideos配列が存在する",
+            "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/videos",
+            "response_field": "videos"
+          }
+        },
+        "O1-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている",
+            "endpoint": "POST /api/pipeline/videos/metadata",
+            "response_field": [
+              "name",
+              "path",
+              "size_mb",
+              "modified"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "メタデータAPIが必須フィールドを返す",
+            "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている",
+            "endpoint": "POST /api/pipeline/videos/metadata",
+            "response_field": [
+              "name",
+              "path",
+              "size_mb",
+              "modified"
+            ]
+          }
+        },
+        "O1-L1-04": {
+          "before": {
+            "claim": "value_exclusive",
+            "endpoint": "GET /api/pipeline/videos",
+            "value_set": [
+              "*.mp4",
+              "*.mov",
+              "*.mkv",
+              "*.avi"
+            ]
+          },
+          "after": {
+            "claim": "value_exclusive",
+            "description": "動画リストに対応拡張子のみ含まれる",
+            "endpoint": "GET /api/pipeline/videos",
+            "value_set": [
+              "*.mp4",
+              "*.mov",
+              "*.mkv",
+              "*.avi"
+            ]
+          }
+        },
+        "O1-L1-05": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "pipeline-drop-zone"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "ドロップゾーン要素が存在する",
+            "testid": "pipeline-drop-zone"
+          }
+        },
+        "O1-L1-06": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/pipeline/videos/validate"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "バリデーションAPIが正常応答を返す",
+            "endpoint": "POST /api/pipeline/videos/validate"
+          }
+        },
+        "O1-L1-07": {
+          "before": {
+            "claim": "storage_key",
+            "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない",
+            "storage_key": "pipeline_recent_videos"
+          },
+          "after": {
+            "claim": "storage_key",
+            "description": "localStorageに履歴キーが存在する",
+            "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない",
+            "storage_key": "pipeline_recent_videos"
+          }
+        },
+        "O10-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/health"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "ヘルスチェックAPI正常応答",
+            "endpoint": "GET /themes/health"
+          }
+        },
+        "O10-L1-02": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/templates"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "テンプレート一覧API正常応答",
+            "endpoint": "GET /themes/templates"
+          }
+        },
+        "O10-L1-03": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/templates/{template_id}"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "テンプレート詳細API正常応答",
+            "endpoint": "GET /themes/templates/{template_id}"
+          }
+        },
+        "O10-L1-04": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "テーマ一覧API正常応答",
+            "endpoint": "GET /themes"
+          }
+        },
+        "O10-L1-05": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/{theme_id}"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "テーマ詳細API正常応答",
+            "endpoint": "GET /themes/{theme_id}"
+          }
+        },
+        "O10-L1-06": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /themes/apply"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "適用API正常応答",
+            "endpoint": "POST /themes/apply"
+          }
+        },
+        "O10-L1-07": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/current/active"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "現在設定取得API正常応答",
+            "endpoint": "GET /themes/current/active"
+          }
+        },
+        "O10-L1-08": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /themes/stats"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "統計API正常応答",
+            "endpoint": "GET /themes/stats"
+          }
+        },
+        "O10-L1-09": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /themes/recommend"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "推奨API正常応答",
+            "endpoint": "POST /themes/recommend"
+          }
+        },
+        "O10-L1-10": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /themes/override"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "オーバーライドAPI正常応答",
+            "endpoint": "POST /themes/override"
+          }
+        },
+        "O11-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/youtube/health"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "ヘルスチェックAPI正常応答",
+            "endpoint": "GET /api/youtube/health"
+          }
+        },
+        "O11-L1-02": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/pre-plan"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "pre-planAPI正常応答",
+            "endpoint": "POST /api/youtube/pre-plan"
+          }
+        },
+        "O11-L1-03": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/generate-thumbnail"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "サムネコンセプトAPI正常応答",
+            "endpoint": "POST /api/youtube/generate-thumbnail"
+          }
+        },
+        "O11-L1-04": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "past_lessons"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "past_lessons含む",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "past_lessons"
+          }
+        },
+        "O11-L1-05": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/optimize"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "optimizeAPI正常応答",
+            "endpoint": "POST /api/youtube/optimize"
+          }
+        },
+        "O11-L1-06": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/director/analyze-script"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "analyze-scriptAPI正常応答",
+            "endpoint": "POST /api/director/analyze-script"
+          }
+        },
+        "O11-L1-07": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/director/quality-score"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "quality-scoreAPI正常応答",
+            "endpoint": "POST /api/director/quality-score"
+          }
+        },
+        "O11-L1-08": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/director/plan-storyboard"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "plan-storyboardAPI正常応答",
+            "endpoint": "POST /api/director/plan-storyboard"
+          }
+        },
+        "O11-L1-09": {
+          "before": {
+            "claim": "response_value",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "expected_value": "true",
+            "response_field": "success"
+          },
+          "after": {
+            "claim": "response_value",
+            "description": "success=true",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "expected_value": "true",
+            "response_field": "success"
+          }
+        },
+        "O11-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "hook_score"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "hook_score含む",
+            "endpoint": "POST /api/youtube/pre-plan",
+            "response_field": "hook_score"
+          }
+        },
+        "O12-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/evolution/status"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "statusAPI正常応答",
+            "endpoint": "GET /api/evolution/status"
+          }
+        },
+        "O12-L1-02": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/analytics/sync"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "analytics/syncAPI正常応答",
+            "endpoint": "POST /api/analytics/sync"
+          }
+        },
+        "O12-L1-03": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/analytics/simulate"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "analytics/simulateAPI正常応答",
+            "endpoint": "POST /api/analytics/simulate"
+          }
+        },
+        "O12-L1-04": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/evolution"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "evolutionAPI正常応答",
+            "endpoint": "GET /api/evolution"
+          }
+        },
+        "O12-L1-05": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/evolution/sync"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "evolution/syncAPI正常応答",
+            "endpoint": "POST /api/evolution/sync"
+          }
+        },
+        "O12-L1-06": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/evolution/status"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "evolution/statusAPI正常応答",
+            "endpoint": "GET /api/evolution/status"
+          }
+        },
+        "O12-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「user_model オブジェクト」の user_model はフィールド名。「オブジェクト」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "user_model"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "user_modelオブジェクト含む",
+            "value_note": "「user_model オブジェクト」の user_model はフィールド名。「オブジェクト」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "user_model"
+          }
+        },
+        "O12-L1-08": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/analytics/sync",
+            "response_field": "result"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "result含む",
+            "endpoint": "POST /api/analytics/sync",
+            "response_field": "result"
+          }
+        },
+        "O12-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/analytics/simulate",
+            "response_field": "simulation"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "simulation含む",
+            "endpoint": "POST /api/analytics/simulate",
+            "response_field": "simulation"
+          }
+        },
+        "O12-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「entries 配列」の entries はフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution",
+            "response_field": "entries"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "entries配列含む",
+            "value_note": "「entries 配列」の entries はフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/evolution",
+            "response_field": "entries"
+          }
+        },
+        "O12-L1-11": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "evolution_entries"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "evolution_entries含む",
+            "endpoint": "GET /api/evolution/status",
+            "response_field": "evolution_entries"
+          }
+        },
+        "O2-L1-01": {
+          "before": {
+            "claim": "dom_exists",
+            "value_note": "Whisper はモデル系列の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "whisper-model-select"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "Whisperモデルセレクトボックスが存在する",
+            "value_note": "Whisper はモデル系列の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "whisper-model-select"
+          }
+        },
+        "O2-L1-02": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "whisper-recommended"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "推奨モデルバッジが存在する",
+            "testid": "whisper-recommended"
+          }
+        },
+        "O2-L1-03": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "transcription-progress-bar"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "進捗バーが存在する",
+            "testid": "transcription-progress-bar"
+          }
+        },
+        "O2-L1-04": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "transcription-progress-text"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "進捗テキスト(%)が存在する",
+            "testid": "transcription-progress-text"
+          }
+        },
+        "O2-L1-05": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "transcription-elapsed"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "経過時間表示が存在する",
+            "testid": "transcription-elapsed"
+          }
+        },
+        "O2-L1-06": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "segment-list"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "セグメント一覧コンテナが存在する",
+            "testid": "segment-list"
+          }
+        },
+        "O2-L1-07": {
+          "before": {
+            "claim": "element_count",
+            "testid": "segment-item-*"
+          },
+          "after": {
+            "claim": "element_count",
+            "description": "セグメントが3件以上表示される",
+            "testid": "segment-item-*"
+          }
+        },
+        "O3-L1-01": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "proofreading-stage-panel"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "校閲ステージパネルが存在する",
+            "testid": "proofreading-stage-panel"
+          }
+        },
+        "O3-L1-02": {
+          "before": {
+            "claim": "dom_exists",
+            "value_note": "diff は UI コンテナの呼び名。値の主張ではない",
+            "testid": "proofreading-diff"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "diffコンテナが存在する",
+            "value_note": "diff は UI コンテナの呼び名。値の主張ではない",
+            "testid": "proofreading-diff"
+          }
+        },
+        "O3-L1-03": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "diff-mark-*"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "差分マーク要素が存在する",
+            "testid": "diff-mark-*"
+          }
+        },
+        "O3-L1-04": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "proofreading-comparison"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "比較ビューコンテナが存在する",
+            "testid": "proofreading-comparison"
+          }
+        },
+        "O3-L1-05": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "segment-approve-btn-*"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "個別承認ボタンが存在する",
+            "testid": "segment-approve-btn-*"
+          }
+        },
+        "O3-L1-06": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "segment-reject-btn-*"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "個別却下ボタンが存在する",
+            "testid": "segment-reject-btn-*"
+          }
+        },
+        "O3-L1-07": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "approve-all-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "全承認ボタンが存在する",
+            "testid": "approve-all-btn"
+          }
+        },
+        "O3-L1-08": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "reject-all-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "全却下ボタンが存在する",
+            "testid": "reject-all-btn"
+          }
+        },
+        "O3-L1-09": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "dictionary-panel"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "辞書パネルが存在する",
+            "testid": "dictionary-panel"
+          }
+        },
+        "O3-L1-10": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "proofreading-progress"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "校閲進捗バーが存在する",
+            "testid": "proofreading-progress"
+          }
+        },
+        "O3-L1-11": {
+          "before": {
+            "claim": "dom_exists",
+            "value_note": "SRT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-srt-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "SRTエクスポートボタンが存在する",
+            "value_note": "SRT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-srt-btn"
+          }
+        },
+        "O3-L1-12": {
+          "before": {
+            "claim": "dom_exists",
+            "value_note": "TXT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-txt-btn"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "TXTエクスポートボタンが存在する",
+            "value_note": "TXT はエクスポート形式の名前で、ボタンの呼び名の一部。値の主張ではない",
+            "testid": "export-txt-btn"
+          }
+        },
+        "O3-L1-13": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "skip-proofreading-toggle"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "スキップトグルが存在する",
+            "testid": "skip-proofreading-toggle"
+          }
+        },
+        "O4-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/init"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "SmartCut初期化APIが正常応答を返す",
+            "endpoint": "POST /api/smartcut/init"
+          }
+        },
+        "O4-L1-02": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/smartcut/health"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "SmartCutヘルスチェックAPIが正常応答を返す",
+            "endpoint": "GET /api/smartcut/health"
+          }
+        },
+        "O4-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "estimated_output_seconds はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_seconds"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "推奨レスポンスにestimated_output_secondsが存在する",
+            "value_note": "estimated_output_seconds はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_seconds"
+          }
+        },
+        "O4-L1-04": {
+          "before": {
+            "claim": "request_contract",
+            "endpoint": "POST /api/smartcut/recommend",
+            "request_field": "target_duration_minutes"
+          },
+          "after": {
+            "claim": "request_contract",
+            "description": "推奨APIが目標尺パラメータを受け付ける",
+            "endpoint": "POST /api/smartcut/recommend",
+            "request_field": "target_duration_minutes"
+          }
+        },
+        "O4-L1-05": {
+          "before": {
+            "claim": "parameter_coverage",
+            "endpoint": "POST /api/smartcut/recommend"
+          },
+          "after": {
+            "claim": "parameter_coverage",
+            "description": "4種プリセット(15/30/45/60分)でAPIが正常応答する",
+            "endpoint": "POST /api/smartcut/recommend"
+          }
+        },
+        "O4-L1-06": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/lock"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "シーン固定APIが正常応答を返す",
+            "endpoint": "POST /api/smartcut/lock"
+          }
+        },
+        "O4-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "recommended_segments はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "推奨レスポンスにrecommended_segmentsが存在する",
+            "value_note": "recommended_segments はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O4-L1-08": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/smartcut/all-candidates"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "全候補APIが正常応答を返す",
+            "endpoint": "GET /api/smartcut/all-candidates"
+          }
+        },
+        "O4-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "推奨レスポンスにestimated_output_strが存在する",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O4-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「推奨セグメントに score フィールド」の score はフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "score"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "推奨セグメントにscoreフィールドが存在する",
+            "value_note": "「推奨セグメントに score フィールド」の score はフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "score"
+          }
+        },
+        "O4-L1-11": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「候補に type フィールド」の type はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "type"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "候補にtypeフィールドが存在する",
+            "value_note": "「候補に type フィールド」の type はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "type"
+          }
+        },
+        "O4-L1-12": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「候補に timestamp フィールド」の timestamp はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "timestamp"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "候補にtimestampフィールドが存在する",
+            "value_note": "「候補に timestamp フィールド」の timestamp はフィールド名。値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "timestamp"
+          }
+        },
+        "O5-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/init"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "SmartCut初期化APIが正常応答を返す",
+            "endpoint": "POST /api/smartcut/init"
+          }
+        },
+        "O5-L1-02": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/smartcut/all-candidates"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "全候補APIが正常応答を返す",
+            "endpoint": "GET /api/smartcut/all-candidates"
+          }
+        },
+        "O5-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "highlights はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "highlights"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "候補レスポンスにhighlights配列が存在する",
+            "value_note": "highlights はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "highlights"
+          }
+        },
+        "O5-L1-04": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "POST /api/smartcut/lock",
+            "response_field": "locked_segments"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "固定APIが正常応答しlocked_segmentsが返る",
+            "endpoint": "POST /api/smartcut/lock",
+            "response_field": "locked_segments"
+          }
+        },
+        "O5-L1-05": {
+          "before": {
+            "claim": "state_transition",
+            "endpoint": "POST /api/smartcut/unlock"
+          },
+          "after": {
+            "claim": "state_transition",
+            "description": "固定解除APIが正常応答しlocked_segmentsが更新される",
+            "endpoint": "POST /api/smartcut/unlock"
+          }
+        },
+        "O5-L1-06": {
+          "before": {
+            "claim": "idempotency",
+            "endpoint": "POST /api/smartcut/recommend"
+          },
+          "after": {
+            "claim": "idempotency",
+            "description": "推奨APIで再計算が可能(undo相当)",
+            "endpoint": "POST /api/smartcut/recommend"
+          }
+        },
+        "O5-L1-07": {
+          "before": {
+            "claim": "idempotency",
+            "endpoint": "POST /api/smartcut/recommend"
+          },
+          "after": {
+            "claim": "idempotency",
+            "description": "再度同一パラメータで推奨取得が可能(redo相当)",
+            "endpoint": "POST /api/smartcut/recommend"
+          }
+        },
+        "O5-L1-08": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "chapters はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "chapters"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "候補レスポンスにchapters配列が存在する",
+            "value_note": "chapters はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/smartcut/all-candidates",
+            "response_field": "chapters"
+          }
+        },
+        "O5-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "推奨レスポンスにestimated_output_strが存在する",
+            "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "estimated_output_str"
+          }
+        },
+        "O5-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "recommended_segments はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "推奨レスポンスにrecommended_segments配列が存在する",
+            "value_note": "recommended_segments はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "POST /api/smartcut/recommend",
+            "response_field": "recommended_segments"
+          }
+        },
+        "O5-L1-11": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/smartcut/finalize"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "確定APIが正常応答を返す",
+            "endpoint": "POST /api/smartcut/finalize"
+          }
+        },
+        "O6-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/status"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "品質ゲートステータスAPIが正常応答する",
+            "endpoint": "GET /api/pipeline/quality-gate/status"
+          }
+        },
+        "O6-L1-02": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/status",
+            "response_field": "status"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "statusフィールドが存在する",
+            "endpoint": "GET /api/pipeline/quality-gate/status",
+            "response_field": "status"
+          }
+        },
+        "O6-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/scores",
+            "response_field": "overall_score"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "overall_scoreフィールドが存在する",
+            "endpoint": "GET /api/pipeline/quality-gate/scores",
+            "response_field": "overall_score"
+          }
+        },
+        "O6-L1-04": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/scores"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "カテゴリ別スコアAPIが正常応答する",
+            "endpoint": "GET /api/pipeline/quality-gate/scores"
+          }
+        },
+        "O6-L1-05": {
+          "before": {
+            "claim": "value_constraint",
+            "endpoint": "GET /api/pipeline/quality-gate/scores",
+            "value_literals": [
+              "audio",
+              "video",
+              "subtitle",
+              "structure"
+            ]
+          },
+          "after": {
+            "claim": "value_constraint",
+            "description": "4カテゴリ(audio/video/subtitle/structure)が存在する",
+            "endpoint": "GET /api/pipeline/quality-gate/scores",
+            "value_literals": [
+              "audio",
+              "video",
+              "subtitle",
+              "structure"
+            ]
+          }
+        },
+        "O6-L1-06": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/drilldown/{category}"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "ドリルダウンAPIが正常応答する",
+            "endpoint": "GET /api/pipeline/quality-gate/drilldown/{category}"
+          }
+        },
+        "O6-L1-07": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/pipeline/quality-gate/improve"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "AI改善提案APIが正常応答する",
+            "endpoint": "POST /api/pipeline/quality-gate/improve"
+          }
+        },
+        "O6-L1-08": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/quality-gate/status",
+            "response_field": "threshold"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "thresholdフィールドが存在する",
+            "endpoint": "GET /api/pipeline/quality-gate/status",
+            "response_field": "threshold"
+          }
+        },
+        "O6-L1-09": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/quality-gate/history"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "履歴APIが正常応答する",
+            "endpoint": "GET /api/pipeline/quality-gate/history"
+          }
+        },
+        "O6-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "history はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/quality-gate/history",
+            "response_field": "history"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "履歴にhistory配列が存在する",
+            "value_note": "history はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/quality-gate/history",
+            "response_field": "history"
+          }
+        },
+        "O7-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/improvement/status"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "改善ループステータスAPIが正常応答する",
+            "endpoint": "GET /api/pipeline/improvement/status"
+          }
+        },
+        "O7-L1-02": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": "status"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "statusフィールドが存在する",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": "status"
+          }
+        },
+        "O7-L1-03": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": [
+              "iteration",
+              "max_iterations"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "iteration/max_iterationsフィールドが存在する",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": [
+              "iteration",
+              "max_iterations"
+            ]
+          }
+        },
+        "O7-L1-04": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/improvement/actions"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "アクション一覧APIが正常応答する",
+            "endpoint": "GET /api/pipeline/improvement/actions"
+          }
+        },
+        "O7-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "actions はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/improvement/actions",
+            "response_field": "actions"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "actions配列が存在する",
+            "value_note": "actions はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない",
+            "endpoint": "GET /api/pipeline/improvement/actions",
+            "response_field": "actions"
+          }
+        },
+        "O7-L1-06": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/pipeline/improvement/score-change"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "スコア変化APIが正常応答する",
+            "endpoint": "GET /api/pipeline/improvement/score-change"
+          }
+        },
+        "O7-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": [
+              "total_actions",
+              "completed_actions"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "total_actions/completed_actionsフィールドが存在する",
+            "endpoint": "GET /api/pipeline/improvement/status",
+            "response_field": [
+              "total_actions",
+              "completed_actions"
+            ]
+          }
+        },
+        "O8-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/render/health"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "ヘルスチェックAPIが正常応答",
+            "endpoint": "GET /api/render/health"
+          }
+        },
+        "O8-L1-02": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/render/settings"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "設定取得APIが正常応答",
+            "endpoint": "GET /api/render/settings"
+          }
+        },
+        "O8-L1-03": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/render/gpu-detect"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "GPU検出APIが正常応答",
+            "endpoint": "GET /api/render/gpu-detect"
+          }
+        },
+        "O8-L1-04": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「BGM設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない。実体は response_field の宣言で確定させている",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "bgm_volume",
+              "bgm_ducking"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "BGM設定が含まれる",
+            "value_note": "「BGM設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない。実体は response_field の宣言で確定させている",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "bgm_volume",
+              "bgm_ducking"
+            ]
+          }
+        },
+        "O8-L1-05": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「LUFS設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": "lufs_target"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "LUFS設定が含まれる",
+            "value_note": "「LUFS設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": "lufs_target"
+          }
+        },
+        "O8-L1-06": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「ロゴ設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "logo_enabled",
+              "logo_position",
+              "logo_opacity"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "ロゴ設定が含まれる",
+            "value_note": "「ロゴ設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "logo_enabled",
+              "logo_position",
+              "logo_opacity"
+            ]
+          }
+        },
+        "O8-L1-07": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "「字幕設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "subtitle_enabled",
+              "subtitle_font",
+              "subtitle_size"
+            ]
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "字幕設定が含まれる",
+            "value_note": "「字幕設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない",
+            "endpoint": "GET /api/render/settings",
+            "response_field": [
+              "subtitle_enabled",
+              "subtitle_font",
+              "subtitle_size"
+            ]
+          }
+        },
+        "O8-L1-08": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/render/start"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "開始APIが正常応答",
+            "endpoint": "POST /api/render/start"
+          }
+        },
+        "O8-L1-09": {
+          "before": {
+            "claim": "response_field",
+            "value_note": "stages はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "stages"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "stagesフィールド存在",
+            "value_note": "stages はレスポンスのフィールド名。値の主張ではない",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "stages"
+          }
+        },
+        "O8-L1-10": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "output_file"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "output_file存在",
+            "endpoint": "GET /api/render/status/{job_id}",
+            "response_field": "output_file"
+          }
+        },
+        "O8-L1-11": {
+          "before": {
+            "claim": "response_field",
+            "endpoint": "GET /api/render/download/{job_id}",
+            "response_field": "download_url"
+          },
+          "after": {
+            "claim": "response_field",
+            "description": "download_url存在",
+            "endpoint": "GET /api/render/download/{job_id}",
+            "response_field": "download_url"
+          }
+        },
+        "O8-L1-12": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/render/complete/{job_id}"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "完了通知API正常応答",
+            "endpoint": "POST /api/render/complete/{job_id}"
+          }
+        },
+        "O9-L1-01": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "GET /api/youtube/health"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "ヘルスチェックAPIが正常応答",
+            "endpoint": "GET /api/youtube/health"
+          }
+        },
+        "O9-L1-02": {
+          "before": {
+            "claim": "route_exists",
+            "endpoint": "POST /api/youtube/optimize"
+          },
+          "after": {
+            "claim": "route_exists",
+            "description": "最適化APIが正常応答",
+            "endpoint": "POST /api/youtube/optimize"
+          }
+        },
+        "O9-L1-03": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-title-candidates"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "タイトル候補リストが存在",
+            "testid": "youtube-title-candidates"
+          }
+        },
+        "O9-L1-04": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-tag-list"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "タグリストが存在",
+            "testid": "youtube-tag-list"
+          }
+        },
+        "O9-L1-05": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-chapter-list"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "チャプターリストが存在",
+            "testid": "youtube-chapter-list"
+          }
+        },
+        "O9-L1-06": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-thumbnail-candidates"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "サムネイル候補が存在",
+            "testid": "youtube-thumbnail-candidates"
+          }
+        },
+        "O9-L1-07": {
+          "before": {
+            "claim": "dom_exists",
+            "value_note": "SEO は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-seo-score"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "SEOスコアが存在",
+            "value_note": "SEO は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-seo-score"
+          }
+        },
+        "O9-L1-08": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-description"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "説明文エリアが存在",
+            "testid": "youtube-description"
+          }
+        },
+        "O9-L1-09": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-hashtag-list"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "ハッシュタグが存在",
+            "testid": "youtube-hashtag-list"
+          }
+        },
+        "O9-L1-10": {
+          "before": {
+            "claim": "dom_exists",
+            "value_note": "CTR は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-ctr-prediction"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "CTR予測が存在",
+            "value_note": "CTR は指標の名前で、UI 要素の呼び名の一部。値の主張ではない",
+            "testid": "youtube-ctr-prediction"
+          }
+        },
+        "O9-L1-11": {
+          "before": {
+            "claim": "dom_exists",
+            "testid": "youtube-publish-readiness"
+          },
+          "after": {
+            "claim": "dom_exists",
+            "description": "投稿準備バッジが存在",
+            "testid": "youtube-publish-readiness"
+          }
+        },
+        "O9-L1-12": {
+          "before": {
+            "claim": "spec_incomplete"
+          },
+          "after": {
+            "claim": "spec_incomplete",
+            "description": "エクスポートAPIが正常応答"
           }
         }
       }

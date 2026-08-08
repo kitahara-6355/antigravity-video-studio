@@ -218,7 +218,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "highlights",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "highlights はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O5-L1-04",
@@ -237,8 +238,7 @@
       "description": "固定解除APIが正常応答しlocked_segmentsが更新される",
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/unlock",
-      "response_field": "locked_segments",
-      "claim": "response_field"
+      "claim": "state_transition"
     },
     {
       "id": "O5-L1-06",
@@ -266,7 +266,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "chapters",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "chapters はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O5-L1-09",
@@ -276,7 +277,8 @@
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_str",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない"
     },
     {
       "id": "O5-L1-10",
@@ -286,7 +288,8 @@
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "recommended_segments",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "recommended_segments はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O5-L1-11",

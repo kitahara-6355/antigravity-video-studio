@@ -218,7 +218,8 @@
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_seconds",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "estimated_output_seconds はレスポンスのフィールド名。値の主張ではない"
     },
     {
       "id": "O4-L1-04",
@@ -256,7 +257,8 @@
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "recommended_segments",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "recommended_segments はレスポンスのフィールド名。値の主張ではない"
     },
     {
       "id": "O4-L1-08",
@@ -275,7 +277,8 @@
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "estimated_output_str",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "estimated_output_str はレスポンスのフィールド名。値の主張ではない"
     },
     {
       "id": "O4-L1-10",
@@ -285,7 +288,8 @@
       "test_method": "dom_exists",
       "endpoint": "POST /api/smartcut/recommend",
       "response_field": "score",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「推奨セグメントに score フィールド」の score はフィールド名。値の主張ではない"
     },
     {
       "id": "O4-L1-11",
@@ -295,7 +299,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "type",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「候補に type フィールド」の type はフィールド名。値の主張ではない"
     },
     {
       "id": "O4-L1-12",
@@ -305,7 +310,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/smartcut/all-candidates",
       "response_field": "timestamp",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「候補に timestamp フィールド」の timestamp はフィールド名。値の主張ではない"
     },
     {
       "id": "O4-L2-01",

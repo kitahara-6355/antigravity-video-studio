@@ -84,6 +84,8 @@ BASELINE_DIR = Path(__file__).parent / "snapshots"
 TIGHTENING_REASONS = (
     "field_not_found", "value_not_found", "request_field_not_found",
     "storage_key_not_found",
+    # 値そのもの・集合の一致まで見るようにした結果の FAIL（P3 C-3）。
+    "value_mismatch", "value_set_mismatch",
     # 「静的には判定できない」と結論した結果の FAIL。判定していないものを
     # PASS に逃がさない側の変更なので、厳格化として受け入れる。
     "unjudgeable",
@@ -94,6 +96,7 @@ TIGHTENING_REASONS = (
 # 新しい理由コードだけを見ていると、この2つが同じ顔で出てくる。
 VERIFIED_PASS_REASONS = (
     "field_found", "value_found", "request_field_found", "storage_key_found",
+    "value_matched", "value_set_matched",
 )
 
 # 「レスポンス内容まで見て判定した」ことを示す理由コード。PASS でも FAIL でも、
@@ -103,6 +106,10 @@ CONTENT_JUDGED_REASONS = (
     "value_found", "value_not_found",
     "request_field_found", "request_field_not_found",
     "storage_key_found", "storage_key_not_found",
+    # 値そのもの・集合の一致。フィールドの実在より強い判定なので、
+    # ここから found へ戻るのも弱化。
+    "value_matched", "value_mismatch",
+    "value_set_matched", "value_set_mismatch",
     # 判定できないと結論した状態も「主張に向き合った」側。ここから
     # 経路の実在だけの found へ戻るのは、向き合うのをやめたということ。
     "unjudgeable",
@@ -273,6 +280,10 @@ class L1Ratchet:
 
         violations: list[L1Violation] = []
         improvements: list[str] = []
+        # 退行・差し替えが乗った項目を「改善」に数えないための控え。
+        # 打ち切り（continue）をやめて全部の検出器を回すようにしたので、
+        # 除外は明示的に持つ。
+        not_improvements: set[str] = set()
 
         # --- ベースライン自身の整合性 --------------------------------------
         #
@@ -351,7 +362,10 @@ class L1Ratchet:
             # 退行が報告されず、--redeclare がそれを受理する）。
             if was == "PASS" and now != "PASS":
                 violations.append(L1Violation("regressed", item_id, was, now))
-                continue
+                not_improvements.add(item_id)
+                # **退行で打ち切らない。** 判定手段を強めると退行と宣言の
+                # 差し替えが同時に起きる。片方しか報告しないと、締め直しの
+                # 履歴にもう片方が残らない。
 
             # 理由コードは「何を測ったか」の**種類**しか持たない。どれを測ったかは
             # 宣言にしかないので、宣言が変われば同じ理由コードのまま別物を
@@ -364,7 +378,11 @@ class L1Ratchet:
                     _render_declaration(before_decls[item_id]),
                     _render_declaration(after_decls.get(item_id)),
                 ))
-                continue
+                not_improvements.add(item_id)
+                # **ここでも打ち切らない。** 打ち切ると、宣言を差し替えた項目では
+                # 弱化の検出器が回らなくなる。`field_found` → `found` を
+                # 差し替えと一緒に出せば、--redeclare が理由1本で受理してしまう
+                # （3層のうち2層目が、3層目が発火するときだけ無効になる）。
 
             # verdict だけを見ていると、**判定の強さ**が落ちたことに気づけない。
             # 項目から response_field を消せば field_found → found（PASS のまま）、
@@ -376,7 +394,9 @@ class L1Ratchet:
                     "weakened", item_id,
                     before_reasons.get(item_id, "?"), after_reasons.get(item_id, "?"),
                 ))
-            elif was != "PASS" and now == "PASS" and item_id not in unpinned_ids:
+            elif (was != "PASS" and now == "PASS"
+                  and item_id not in unpinned_ids
+                  and item_id not in not_improvements):
                 improvements.append(item_id)
 
         added = [i for i in after if i not in before]
@@ -461,6 +481,8 @@ class L1Ratchet:
                 "宣言の差し替えでは説明できない違反が混じっています:\n"
                 + "\n".join(f"  {v}" for v in illegitimate)
                 + "\n  退行・判定の弱化は、宣言の差し替えとは分けて扱ってください。"
+                "\n  厳格化と差し替えが同時に起きているなら --tighten と"
+                " --redeclare を両方渡してください。"
             )
 
         after_decls = {r.item_id: r.declaration for r in report.results}
@@ -542,4 +564,82 @@ class L1Ratchet:
         })
         return write_baseline(report, path, history,
                               (baseline or {}).get("redeclarations"),
+                              (baseline or {}).get("pins"))
+
+    def settle(self, report: L1Report, path: Path,
+               tighten_reason: str, redeclare_reason: str) -> Path:
+        """**厳格化と差し替えが同時に起きた**ときに、両方の理由を残して締め直す。
+
+        判定手段を強めると、たいてい宣言も変わる（`claim` を強い側へ移す、
+        `response_field` を落として `expected_value` を足す）。片方ずつの
+        コマンドでは、`--tighten` が「差し替えが混じっている」と拒否し、
+        `--redeclare` が「退行が混じっている」と拒否して詰む。
+
+        **緩めるための道具ではない。** 受け入れるのは `regressed`（しかも
+        `--tighten` と同じ正当性検査を通ったもの）と `substituted` だけで、
+        `weakened` / `removed` / `tampered` / `unpinned_new` が1件でも
+        混じっていたら書かない。理由も履歴も片方ずつと同じだけ残る。
+        """
+        if not tighten_reason.strip() or not redeclare_reason.strip():
+            raise ValueError(
+                "厳格化と差し替えの理由を両方書いてください"
+                "（片方だけなら --tighten か --redeclare を単独で使う）")
+
+        baseline = load_baseline(path)
+        result = self.check(report, baseline)
+        reasons = {r.item_id: r.reason for r in report.results}
+        before_reasons = (baseline or {}).get("reasons")
+        before_decls = (baseline or {}).get("declarations") or {}
+        after_decls = {r.item_id: r.declaration for r in report.results}
+
+        regressed = [v for v in result.violations if v.kind == "regressed"]
+        substituted = [v for v in result.violations if v.kind == "substituted"]
+        other = [v for v in result.violations
+                 if v.kind not in ("regressed", "substituted")]
+        if other:
+            raise ValueError(
+                "厳格化とも差し替えとも説明できない違反が混じっています:\n"
+                + "\n".join(f"  {v}" for v in other)
+            )
+
+        illegitimate = [
+            (v, reasons.get(v.item_id, "不明")) for v in regressed
+            if reasons.get(v.item_id) not in TIGHTENING_REASONS
+        ]
+        # 前回すでに内容まで見て PASS だった項目が落ちたときは、原則として
+        # 退行（フィールドが消えた）。ただし新しい理由が `unjudgeable` なら
+        # 「その主張は測れないと結論した」ので、実装ではなく判定の側の変更。
+        # ここを一律に拒否すると、判定を正す方向の変更まで通せなくなる。
+        for v in regressed:
+            if (v.item_id in (before_reasons or {})
+                    and before_reasons[v.item_id] in VERIFIED_PASS_REASONS
+                    and reasons.get(v.item_id) != "unjudgeable"):
+                illegitimate.append((v, "前回は内容まで見て PASS だった"))
+            elif v.item_id not in (before_reasons or {}):
+                illegitimate.append((v, "前回の判定理由がベースラインに無い"))
+        if illegitimate:
+            raise ValueError(
+                "厳格化では説明できない退行が混じっています:\n"
+                + "\n".join(f"  {v}（{why}）" for v, why in illegitimate)
+            )
+
+        tightenings = list((baseline or {}).get("tightenings") or [])
+        if regressed:
+            tightenings.append({
+                "reason": tighten_reason.strip(),
+                "items": sorted(v.item_id for v in regressed),
+            })
+        redeclarations = list((baseline or {}).get("redeclarations") or [])
+        if substituted:
+            redeclarations.append({
+                "reason": redeclare_reason.strip(),
+                "items": {
+                    v.item_id: {
+                        "before": before_decls.get(v.item_id),
+                        "after": after_decls.get(v.item_id),
+                    }
+                    for v in sorted(substituted, key=lambda x: x.item_id)
+                },
+            })
+        return write_baseline(report, path, tightenings, redeclarations,
                               (baseline or {}).get("pins"))

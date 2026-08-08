@@ -91,7 +91,8 @@
       "description": "Whisperモデルセレクトボックスが存在する",
       "test_method": "dom_exists",
       "testid": "whisper-model-select",
-      "claim": "dom_exists"
+      "claim": "dom_exists",
+      "value_note": "Whisper はモデル系列の名前で、UI 要素の呼び名の一部。値の主張ではない"
     },
     {
       "id": "O2-L1-02",

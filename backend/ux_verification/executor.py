@@ -713,7 +713,11 @@ def main(argv: list[str] | None = None) -> int:
         path = baseline_path(report.persona)
         if args.update_baseline or args.tighten or args.redeclare:
             try:
-                if args.tighten:
+                if args.tighten and args.redeclare:
+                    # 判定手段を強めると、たいてい宣言も変わる。片方ずつだと
+                    # 互いに「もう片方が混じっている」と拒否して詰む。
+                    L1Ratchet().settle(report, path, args.tighten, args.redeclare)
+                elif args.tighten:
                     L1Ratchet().tighten(report, path, args.tighten)
                 elif args.redeclare:
                     L1Ratchet().redeclare(report, path, args.redeclare)

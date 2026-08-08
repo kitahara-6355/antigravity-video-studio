@@ -73,6 +73,13 @@ class EndpointSite:
     literals: frozenset[str] = frozenset()
     # リクエストモデルのフィールド名。「目標尺パラメータを受け付ける」を判定する。
     request_fields: frozenset[str] = frozenset()
+    # ハンドラの dict リテラルで、フィールド名に**どの値が割り当てられているか**。
+    # `{"success": True}` → {"success": {"True"}}。フィールドの実在では
+    # 「success=true」を判定できない（P3 C-3 / ユーザー判断 2026-08-07）。
+    field_values: dict = field(default_factory=dict)
+    # ハンドラに現れるリスト・リテラルの中身（要素をソートしたタプル）。
+    # 「対応拡張子**のみ**」の『のみ』は、集合が完全一致するかでしか測れない。
+    literal_lists: frozenset = frozenset()
 
     def as_evidence(self) -> str:
         return f"{METHOD}: {self.file}:{self.line} {self.method} {self.path}"
@@ -127,14 +134,16 @@ class EndpointRegistry:
                 else module in reg.registered_modules
             )
             models = _response_models(tree)
-            for method, route, line, fields, lits, reqs in _routes(
+            for (method, route, line, fields, lits, reqs, fvals,
+                 llists) in _routes(
                     tree, callees, _module_values(tree, literals_of), literals_of):
                 full = _join(prefix, route)
                 site = EndpointSite(full, method, _display(path, routers_dir),
                                     line, module, registered, fields, lits,
                                     frozenset().union(
                                         *(models.get(r, frozenset()) for r in reqs)
-                                    ) if reqs else frozenset())
+                                    ) if reqs else frozenset(),
+                                    fvals, llists)
                 reg.endpoints.setdefault((method, full), site)
         return reg
 
@@ -194,6 +203,70 @@ class ApiContractExecutor:
     def __init__(self, registry: EndpointRegistry):
         self.registry = registry
 
+    @staticmethod
+    def _judge_value(common: dict, site, fields: list, expected: str):
+        """宣言した値**以外を返す経路がソースに無い**ことを確かめる。
+
+        「実行時に必ずその値になる」ではない。動的に組み立てた値は
+        `<dynamic>` として拾い、**そこで諦めずに FAIL にする**——
+        追えていないものを PASS に逃がすのが、このフェーズで潰した型そのもの。
+        """
+        target = fields[0] if fields else ""
+        seen = site.field_values.get(target)
+        if not seen:
+            return ContractResult(
+                **common, verdict=Verdict.FAIL, reason="value_not_found",
+                evidence=(
+                    f"{VALUE_METHOD}: {site.file}:{site.line} の"
+                    f" {site.method} {site.path} は {target} に定数を割り当てていない"
+                    "（値の主張を照合する相手が無い）。"
+                ),
+            )
+        other = sorted(v for v in seen if v != expected)
+        if other:
+            return ContractResult(
+                **common, verdict=Verdict.FAIL, reason="value_mismatch",
+                evidence=(
+                    f"{VALUE_METHOD}: {site.file}:{site.line} の"
+                    f" {site.method} {site.path} は {target} に"
+                    f" {expected} 以外を割り当てる経路がある（{'・'.join(other)}）。"
+                ),
+            )
+        return ContractResult(
+            **common, verdict=Verdict.PASS, reason="value_matched",
+            evidence=(
+                f"{VALUE_METHOD}: {site.file}:{site.line}"
+                f" {site.method} {site.path} は {target} に {expected} だけを割り当てる"
+                "（他の値を返す経路がソースに無い）"
+            ),
+        )
+
+    @staticmethod
+    def _judge_exclusive(common: dict, site, wanted: list):
+        """宣言した集合と**完全に一致する**リスト・リテラルがあるかを確かめる。"""
+        target = tuple(sorted(_normalise_member(v) for v in wanted))
+        for candidate in site.literal_lists:
+            if tuple(sorted(_normalise_member(v) for v in candidate)) == target:
+                return ContractResult(
+                    **common, verdict=Verdict.PASS, reason="value_set_matched",
+                    evidence=(
+                        f"{VALUE_METHOD}: {site.file}:{site.line}"
+                        f" {site.method} {site.path} の実装に"
+                        f" {'・'.join(candidate)} と完全に一致するリストがある"
+                        "（余分な要素が無い）"
+                    ),
+                )
+        return ContractResult(
+            **common, verdict=Verdict.FAIL, reason="value_set_mismatch",
+            evidence=(
+                f"{VALUE_METHOD}: {site.file}:{site.line} の"
+                f" {site.method} {site.path} に"
+                f" {'・'.join(wanted)} と完全に一致するリストが無い"
+                f"（拾えたリスト {len(site.literal_lists)} 個）。"
+                "要素が現れるだけでは『〜のみ』を確かめたことにならない。"
+            ),
+        )
+
     def judge(self, ux_id: str, item: dict) -> ContractResult:
         declared = (item.get("endpoint") or "").strip()
         common = {
@@ -233,6 +306,17 @@ class ApiContractExecutor:
                     "（呼んでも 404 になる）。"
                 ),
             )
+
+        # 値そのものの主張（`success=true`）。フィールドの実在では測れない。
+        expected = item.get("expected_value")
+        if expected is not None:
+            fields = _declared_fields(item)
+            return self._judge_value(common, site, fields, str(expected).lower())
+
+        # 集合の主張（「対応拡張子**のみ**」）。値が現れることでは「のみ」を測れない。
+        exclusive = _as_list(item.get("value_set"))
+        if exclusive:
+            return self._judge_exclusive(common, site, exclusive)
 
         # 値についての主張。フィールド名では測れない。
         wanted = _as_list(item.get("value_literals"))
@@ -367,7 +451,9 @@ def _routes(tree: ast.Module, callees: dict | None = None,
                 yield (func.attr.upper(), str(dec.args[0].value), dec.lineno,
                        fields,
                        _string_literals(node, module_values, literals_of),
-                       _request_models(node))
+                       _request_models(node),
+                       _field_values(node),
+                       _literal_lists(node))
 
 
 def _module_dicts(tree: ast.Module) -> dict:
@@ -569,6 +655,62 @@ def _string_literals(node, module_values: dict | None = None,
                     else sub.func.id if isinstance(sub.func, ast.Name) else "")
             out |= literal_index.get(name, frozenset())
     return frozenset(out)
+
+
+def _field_values(node) -> dict:
+    """ハンドラの dict リテラルから {キー: そのキーに割り当てられた値の集合} を作る。
+
+    `{"success": True}` なら `{"success": {"True"}}`。値は `repr` ではなく
+    リテラルを小文字化した文字列で持つ（`True` → `"true"`）。JSON の `true` と
+    Python の `True` を description 側で書き分けさせないため。
+
+    **値が定数でないときは `"<dynamic>"` を入れる。** 入れないと「他の値を返す
+    経路が無い」と読めてしまい、動的に組み立てた値を見落とす。
+    """
+    out: dict[str, set] = {}
+    for sub in ast.walk(node):
+        if not isinstance(sub, ast.Dict):
+            continue
+        for key, value in zip(sub.keys, sub.values):
+            if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+                continue
+            if isinstance(value, ast.Constant):
+                token = str(value.value).lower()
+            else:
+                token = "<dynamic>"
+            out.setdefault(key.value, set()).add(token)
+    return {k: frozenset(v) for k, v in out.items()}
+
+
+def _literal_lists(node) -> frozenset:
+    """ハンドラに現れるリスト／タプルのリテラルを、要素をソートした形で集める。
+
+    「対応拡張子**のみ**」は、宣言した集合と実装の集合が**完全一致**するかで
+    しか測れない。要素が現れることを見るだけでは「のみ」を確かめたことにならない。
+    """
+    out = set()
+    for sub in ast.walk(node):
+        if not isinstance(sub, (ast.List, ast.Tuple, ast.Set)):
+            continue
+        members = []
+        for element in sub.elts:
+            if isinstance(element, ast.Constant) and isinstance(element.value, str):
+                members.append(element.value)
+            else:
+                members = []
+                break  # 定数だけで構成されたリストでなければ集合として扱えない
+        if members:
+            out.add(tuple(sorted(members)))
+    return frozenset(out)
+
+
+def _normalise_member(value: str) -> str:
+    """`*.mp4` と `.mp4` を同じものとして扱う。
+
+    ストーリー側は拡張子を `.mp4` と書き、実装は glob を `*.mp4` と書く。
+    書き方の違いで「集合が違う」と言うのは、測っている対象を取り違えている。
+    """
+    return value[1:] if value.startswith("*") else value
 
 
 def _nested_literals(node, depth: int = 0) -> set:
