@@ -215,6 +215,27 @@ def test_making_a_file_unreachable_does_not_pass_silently(tmp_path):
     assert [v.kind for v in result.violations] == ["unreachable_grew"]
 
 
+def test_emptying_the_declarations_does_not_disable_the_substitution_check(tmp_path):
+    """空にすれば検査が消える、を塞ぐ。「空＝無検査」は fail-open。"""
+    baseline = _pinned(tmp_path, _report(_site(declared="routers/a.py:10")))
+    baseline["declarations"] = {k: "" for k in baseline["declarations"]}
+
+    result = UiApiRatchet().check(_report(_site(declared="routers/a.py:10")),
+                                  baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["tampered"]
+
+
+def test_widening_passed_requires_widening_the_semantics_table():
+    """PASS 判定の出どころが1つであること。表の外で広げられないこと。"""
+    from backend.ux_verification.ui_api import VERDICT_SEMANTICS, Verdict
+
+    for verdict in Verdict:
+        site = _site(verdict=verdict)
+        assert site.passed is (VERDICT_SEMANTICS[verdict]["PASS"] == "yes"), verdict
+
+
 def test_an_unparsable_baseline_is_treated_as_missing(tmp_path):
     path = tmp_path / "baseline.json"
     path.write_text("{ not json", encoding="utf-8")

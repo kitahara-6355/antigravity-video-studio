@@ -41,6 +41,11 @@ VALUE_METHOD = "static_value_scan"
 REQUEST_METHOD = "static_request_scan"
 
 _HTTP_METHODS = ("get", "post", "put", "delete", "patch", "head", "options")
+# `@router.websocket("/ws/x")` も UI から叩かれる経路。HTTP メソッドとは
+# 別扱いにする（`resolve()` のメソッド無し探索には入れない——ストーリーが
+# 「正常応答」と言っているものを WebSocket の宣言で PASS にしないため）。
+_WS_METHOD = "websocket"
+_ROUTE_DECORATORS = (*_HTTP_METHODS, _WS_METHOD)
 _EXCLUDED_DIRS = {"__pycache__", "node_modules"}
 # 返り値の索引を作るときに読まないもの。テストと過去版スナップショットは
 # 本番の返り値とは無関係で、同名関数の和集合を汚す。
@@ -439,7 +444,8 @@ def _routes(tree: ast.Module, callees: dict | None = None,
             if not isinstance(dec, ast.Call):
                 continue
             func = dec.func
-            if not isinstance(func, ast.Attribute) or func.attr not in _HTTP_METHODS:
+            if not isinstance(func, ast.Attribute) \
+                    or func.attr not in _ROUTE_DECORATORS:
                 continue
             if not isinstance(func.value, ast.Name) or func.value.id != "router":
                 continue

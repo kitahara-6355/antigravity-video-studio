@@ -188,7 +188,12 @@ class UiApiRatchet:
                 violations.append(Violation("weakened", key, before,
                                             site.verdict.value))
                 continue
-            declared = base_decls.get(key, "")
+            declared = base_decls.get(key)
+            if site.passed and not declared:
+                # 空にすれば差し替え検査が消える、を塞ぐ（gate-verifier 1回目）。
+                violations.append(Violation("tampered", key,
+                                            "PASS なのに宣言の記録が空"))
+                continue
             if declared and site.declared_at and declared != site.declared_at:
                 violations.append(Violation("substituted", key, declared,
                                             site.declared_at))

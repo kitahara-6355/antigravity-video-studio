@@ -74,7 +74,30 @@ _PARAM = "{}"
 # SKIP にはしない（確かめていないものを緑にしない）。
 _LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0")
 
-_FETCH_RE = re.compile(r"(?<![\w.$])fetch\s*\(")
+# `fetch(` と `window.fetch(` / `globalThis.fetch(` / `self.fetch(`。
+# 素の `fetch` だけを見ていると `window.fetch('/api/x')` が走査から**黙って消える**
+# （gate-verifier 1回目の指摘）。受け側を閉じた集合にし、それ以外の `X.fetch(` は
+# 素通りさせず unresolved_url として出す。
+_FETCH_RE = re.compile(r"(?<![\w$])fetch\s*\(")
+# `fetch(` の直前にある受け側（`window.` など）を読む。
+_RECEIVER_RE = re.compile(r"([\w$]+(?:\.[\w$]+)*)\.\s*$")
+_GLOBAL_RECEIVERS = ("window", "globalThis", "self")
+# WebSocket も UI から backend を叩く経路。`@router.websocket` の宣言と
+# 突き合わせる。`fetch` だけ見て「全部見た」と言わない。
+_WEBSOCKET_RE = re.compile(r"(?<![\w.$])new\s+WebSocket\s*\(")
+
+# 走査している呼び出しの形。**機械可読にする** — ここに無い形は
+# 「確かめていない」であって「無い」ではない（gate-verifier 1回目の指摘）。
+SCANNED_FORMS = ("fetch", "window.fetch", "globalThis.fetch", "self.fetch",
+                 "new WebSocket")
+# 走査できない形。実在したら unscanned_form として FAIL にする。
+# 「対応していないから見えない」を「問題なし」に混ぜない。
+UNSCANNED_FORMS = {
+    "axios": re.compile(r"(?<![\w.$])axios\s*[.(]"),
+    "XMLHttpRequest": re.compile(r"(?<![\w.$])new\s+XMLHttpRequest\s*\("),
+    "EventSource": re.compile(r"(?<![\w.$])new\s+EventSource\s*\("),
+    "sendBeacon": re.compile(r"(?<![\w.$])navigator\.sendBeacon\s*\("),
+}
 # `const API_BASE = "http://localhost:8000";` と
 # `const url = ` + backtick + `${API_BASE}/api/segments?t=${t}` + backtick + `;`。
 # **ファイル内で1度しか代入されていない名前だけ**を辞書に入れる。
@@ -84,7 +107,16 @@ _ASSIGN_RE = re.compile(
     r"(?P<value>'[^'\n]*'|\"[^\"\n]*\"|`[^`]*`)",
 )
 # 上の形以外での再代入。1つでもあればその名前は解決しない（fail-closed）。
-_REBIND_RE = re.compile(r"(?<![\w.$])(?P<name>[A-Za-z_$][\w$]*)\s*=(?!=)")
+# 複合代入（`+=` `||=` `??=` …）も再代入。素の `=` だけ見ていると
+# `BASE += '/x'` が素通りして**古い値のまま matched に混ざる**
+# （gate-verifier 1回目の指摘）。
+_REBIND_RE = re.compile(
+    r"(?<![\w.$])(?P<name>[A-Za-z_$][\w$]*)\s*(?:\*\*|[+\-*/%&|^]|<<|>>>?|\|\||&&|\?\?)?=(?!=)")
+# 分割代入（`[BASE] = [...]` / `({BASE} = ...)`）と関数の仮引数。
+# どちらもその名前を別の値に束ね直すので、辿ってはいけない。
+_DESTRUCTURE_RE = re.compile(r"[\[{]([^\]}]*)[\]}]\s*=(?!=)")
+_PARAMS_RE = re.compile(
+    r"(?:function\s*[\w$]*\s*\(([^)]*)\)|\(([^)]*)\)\s*=>|(?<![\w.$])([A-Za-z_$][\w$]*)\s*=>)")
 # `${...}` を1段解いた先がさらに名前を含むことがあるので、有限回で打ち切る。
 _MAX_DEPTH = 4
 _METHOD_RE = re.compile(
@@ -105,6 +137,7 @@ class Verdict(Enum):
     UNRESOLVED_URL = "unresolved_url"
     UNRESOLVED_METHOD = "unresolved_method"
     EXTERNAL_HOST = "external_host"
+    UNSCANNED_FORM = "unscanned_form"
 
 
 # 各判定が「何を確かめ、何を確かめないか」。CLAIM_SEMANTICS と同じ形で
@@ -149,6 +182,20 @@ VERDICT_SEMANTICS: dict[Verdict, dict[str, str]] = {
         "確かめないこと": "その外部サービスが実在するか・応答するか",
         "PASS": "no",
     },
+    Verdict.UNSCANNED_FORM: {
+        "確かめること": f"走査できない形（{'・'.join(UNSCANNED_FORMS)}）で "
+                        "backend を叩いている",
+        "確かめないこと": "その呼び出し先が実在するか（読めていない）",
+        "PASS": "no",
+    },
+}
+
+# 走査している形も機械可読に持つ。散文にだけ書くと、形が増えたときに
+# 「対応していないから見えない」が「問題なし」に混ざる。
+SCAN_SEMANTICS = {
+    "走査する形": list(SCANNED_FORMS),
+    "走査できない形": sorted(UNSCANNED_FORMS),
+    "走査できない形の扱い": "見つけたら unscanned_form の FAIL にする（黙って落とさない）",
 }
 
 
@@ -169,7 +216,10 @@ class FetchSite:
 
     @property
     def passed(self) -> bool:
-        return self.verdict is Verdict.MATCHED
+        # 意味表を唯一の出どころにする。ここを独立に持つと、
+        # 「PASS 扱いを広げた」がラチェットの監視の外で起きる
+        # （gate-verifier 1回目の指摘）。
+        return VERDICT_SEMANTICS[self.verdict]["PASS"] == "yes"
 
     def as_evidence(self) -> str:
         return f"{METHOD}: {self.file}:{self.line} {self.method or '?'} " \
@@ -218,7 +268,15 @@ def _assignments(text: str) -> dict[str, str]:
         name = m.group("name")
         if name in counts and not _is_declaration_at(text, m.start()):
             counts[name] += 1
-    return {n: v for n, v in values.items() if counts.get(n) == 1}
+    # 分割代入と仮引数は「別の値に束ね直す」。辿れば古い値で解決してしまう。
+    rebound = set()
+    for m in _DESTRUCTURE_RE.finditer(text):
+        rebound |= set(re.findall(r"[A-Za-z_$][\w$]*", m.group(1)))
+    for m in _PARAMS_RE.finditer(text):
+        group = next((g for g in m.groups() if g), "")
+        rebound |= set(re.findall(r"[A-Za-z_$][\w$]*", group))
+    return {n: v for n, v in values.items()
+            if counts.get(n) == 1 and n not in rebound}
 
 
 def _is_declaration_at(text: str, name_start: int) -> bool:
@@ -351,6 +409,12 @@ def _resolve_url(expr: str, env: dict[str, str],
     return "".join(out), ""
 
 
+def _receiver_before(text: str, index: int) -> str | None:
+    """`fetch(` の直前の受け側。素の `fetch(` なら None。"""
+    hit = _RECEIVER_RE.search(text[max(0, index - 80):index])
+    return hit.group(1) if hit else None
+
+
 def _cut_query(url: str) -> str:
     return url.split("?", 1)[0].split("#", 1)[0]
 
@@ -383,7 +447,7 @@ def _resolve_method(arg: str | None) -> tuple[str | None, str]:
 
 def _strip_origin(url: str) -> tuple[str | None, str]:
     """絶対 URL からホストを落とす。外部ホストなら (None, 理由)。"""
-    if not url.startswith(("http://", "https://")):
+    if not url.startswith(("http://", "https://", "ws://", "wss://")):
         return url, ""
     rest = url.split("://", 1)[1]
     host, _, tail = rest.partition("/")
@@ -407,7 +471,8 @@ def _param_shape(path: str) -> str:
 
 
 def _version_mounts(app_file: Path,
-                    routers_dir: Path | None = None) -> tuple[str, set[str]]:
+                    routers_dir: Path | None = None,
+                    main_files: list[Path] | None = None) -> tuple[str, set[str]]:
     """`APIRouter(prefix="/api/v1")` 配下に再マウントされたルーターを読む。
 
     EndpointRegistry はルーター自身の prefix しか見ないので、
@@ -416,6 +481,11 @@ def _version_mounts(app_file: Path,
     **プレフィクス付きの APIRouter がこのファイルに1つのときだけ**解決する。
     2つ以上（v1 と v2 など）あればどちらに載ったか静的に決まらないので
     何も返さない——推測して緑にするより、宣言が無いものとして FAIL に落とす。
+
+    **そのルーター自身がアプリに `include_router` されていることも要求する。**
+    ここを見ないと、`app.include_router(v1_router)` を外して全部 404 になっても
+    緑のままになる（gate-verifier 1回目の指摘）。ルーターに載せた事実と
+    アプリに載せた事実は別で、片方だけ見るのは fail-open。
     """
     if not app_file.exists():
         return "", set()
@@ -424,17 +494,25 @@ def _version_mounts(app_file: Path,
     except SyntaxError:
         return "", set()
 
-    prefixes = {
-        kw.value.value
+    prefixed = {
+        node.targets[0].id: kw.value.value
         for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and _callee_name(node.func) == "APIRouter"
-        for kw in node.keywords
+        if isinstance(node, ast.Assign) and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and isinstance(node.value, ast.Call)
+        and _callee_name(node.value.func) == "APIRouter"
+        for kw in node.value.keywords
         if kw.arg == "prefix" and isinstance(kw.value, ast.Constant)
         and isinstance(kw.value.value, str) and kw.value.value
     }
-    if len(prefixes) != 1:
+    if len(set(prefixed.values())) != 1:
         return "", set()
-    prefix = _normalise(prefixes.pop())
+    router_name, raw_prefix = next(iter(prefixed.items()))
+    prefix = _normalise(raw_prefix)
+
+    # そのルーターがアプリ本体に載っているか。載っていなければ配下は全部 404。
+    if not _mounted_on_app(router_name, main_files or []):
+        return "", set()
 
     # `from routers import quality_router` の quality_router がどのモジュールを
     # 指すかは routers/__init__.py にしか書いていない。そこを読まずに別名を
@@ -469,6 +547,31 @@ def _version_mounts(app_file: Path,
     return prefix, mounted
 
 
+def _mounted_on_app(router_name: str, main_files: list[Path]) -> bool:
+    """`app.include_router(<router_name>)` がアプリ本体にあるか。"""
+    for path in main_files:
+        path = Path(path)
+        if not path.exists():
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            if _callee_name(node.func) != "include_router":
+                continue
+            if not (isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "app"):
+                continue
+            if isinstance(node.args[0], ast.Name) \
+                    and node.args[0].id == router_name:
+                return True
+    return False
+
+
 # --- 走査 ---------------------------------------------------------------------
 
 
@@ -490,8 +593,10 @@ class UiApiExecutor:
     @classmethod
     def for_repo(cls) -> UiApiExecutor:
         root = _project_root()
-        prefix, modules = _version_mounts(root / "backend" / "api_versioning.py",
-                                  root / "backend" / "routers")
+        backend = root / "backend"
+        prefix, modules = _version_mounts(
+            backend / "api_versioning.py", backend / "routers",
+            main_files=[backend / "main.py", backend / "api_versioning.py"])
         return cls(frontend_src=root / "frontend" / "src",
                    registry=EndpointRegistry.for_repo(),
                    version_prefix=prefix, version_modules=modules)
@@ -505,9 +610,10 @@ class UiApiExecutor:
             text = path.read_text(encoding="utf-8", errors="replace")
             rel = _display_path(path, self.frontend_src)
             if reachable is not None and path.resolve() not in reachable:
-                for hit in _FETCH_RE.finditer(text):
-                    report.unreachable.append(
-                        f"{rel}:{text.count(chr(10), 0, hit.start()) + 1}")
+                for pattern in (_FETCH_RE, _WEBSOCKET_RE):
+                    for hit in pattern.finditer(text):
+                        report.unreachable.append(
+                            f"{rel}:{text.count(chr(10), 0, hit.start()) + 1}")
                 continue
             report.files_scanned += 1
             for site in self._sites_in(text, _assignments(text), rel, shapes):
@@ -540,21 +646,45 @@ class UiApiExecutor:
     def _sites_in(self, text: str, constants: dict[str, str], rel: str,
                   shapes: dict) -> list[FetchSite]:
         found: list[FetchSite] = []
-        for hit in _FETCH_RE.finditer(text):
-            open_index = hit.end() - 1
-            args = _match_args(text, open_index)
-            line = text.count("\n", 0, hit.start()) + 1
-            if args is None:
-                found.append(FetchSite(rel, line, _short(text[hit.start():hit.start() + 60]),
-                                       None, None, Verdict.UNRESOLVED_URL,
-                                       "引数の括弧が閉じていない"))
-                continue
-            parts = _split_top_level(args)
-            found.append(self._judge(parts, constants, rel, line, shapes))
+
+        def line_of(index: int) -> int:
+            return text.count("\n", 0, index) + 1
+
+        for pattern, method in ((_FETCH_RE, None), (_WEBSOCKET_RE, "WEBSOCKET")):
+            for hit in pattern.finditer(text):
+                open_index = hit.end() - 1
+                line = line_of(hit.start())
+                receiver = _receiver_before(text, hit.start())
+                if receiver is not None and receiver not in _GLOBAL_RECEIVERS:
+                    # `res.fetch(` のような未知の受け側。ネットワーク呼び出しか
+                    # どうかを静的に決められないので、素通りさせずに出す。
+                    found.append(FetchSite(
+                        rel, line, f"{receiver}.fetch(", None, None,
+                        Verdict.UNRESOLVED_URL, f"受け側が未知（{receiver}.fetch）"))
+                    continue
+                args = _match_args(text, open_index)
+                if args is None:
+                    found.append(FetchSite(
+                        rel, line, _short(text[hit.start():hit.start() + 60]),
+                        None, None, Verdict.UNRESOLVED_URL,
+                        "引数の括弧が閉じていない"))
+                    continue
+                parts = _split_top_level(args)
+                found.append(self._judge(parts, constants, rel, line, shapes,
+                                         forced_method=method))
+
+        # 走査できない形。**実在したら FAIL。**「対応していないから見えない」を
+        # 「問題なし」に混ぜない。
+        for name, pattern in UNSCANNED_FORMS.items():
+            for hit in pattern.finditer(text):
+                found.append(FetchSite(
+                    rel, line_of(hit.start()), name, None, None,
+                    Verdict.UNSCANNED_FORM, f"{name} は走査できない"))
         return found
 
     def _judge(self, parts: list[str], constants: dict[str, str], rel: str,
-               line: int, shapes: dict) -> FetchSite:
+               line: int, shapes: dict,
+               forced_method: str | None = None) -> FetchSite:
         raw = _short(parts[0]) if parts else ""
         url, why = _resolve_url(parts[0] if parts else "", constants)
         if url is None:
@@ -565,7 +695,10 @@ class UiApiExecutor:
             return FetchSite(rel, line, raw, None, None, Verdict.EXTERNAL_HOST, why)
         path = _normalise(stripped.split("?", 1)[0].split("#", 1)[0])
 
-        method, why = _resolve_method(parts[1] if len(parts) > 1 else None)
+        if forced_method:
+            method, why = forced_method, ""
+        else:
+            method, why = _resolve_method(parts[1] if len(parts) > 1 else None)
         if method is None:
             return FetchSite(rel, line, raw, path, None,
                              Verdict.UNRESOLVED_METHOD, why)

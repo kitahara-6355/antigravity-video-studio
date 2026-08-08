@@ -61,15 +61,18 @@ def _frontend(tmp_path: Path, source: str, extra: dict | None = None) -> Path:
 
 
 def _run(tmp_path: Path, source: str, *, router_body: str = _DEMO_ROUTER,
-         app_file: Path | None = None, extra: dict | None = None):
+         app_file: Path | None = None, extra: dict | None = None,
+         mount_v1: bool = True):
     routers = _routers(tmp_path, router_body)
     app = tmp_path / "backend" / "main.py"
     app.write_text(
         "from routers import demo_router\n"
-        "app.include_router(demo_router)\n", encoding="utf-8")
+        "app.include_router(demo_router)\n"
+        + ("app.include_router(v1_router)\n" if mount_v1 else ""),
+        encoding="utf-8")
     registry = EndpointRegistry.scan(routers, app_files=[app])
-    prefix, modules = (_version_mounts(app_file, routers) if app_file
-                       else ("", set()))
+    prefix, modules = (_version_mounts(app_file, routers, main_files=[app])
+                       if app_file else ("", set()))
     src = _frontend(tmp_path, source, extra)
     return UiApiExecutor(src, registry, entry=src / "main.jsx",
                          version_prefix=prefix, version_modules=modules).run()
@@ -245,6 +248,92 @@ def test_a_method_hidden_in_a_spread_is_unresolved(tmp_path):
     assert _verdicts(report) == [Verdict.UNRESOLVED_METHOD]
 
 
+def test_a_window_fetch_is_scanned_not_dropped(tmp_path):
+    """`window.fetch` を見落とすと、呼び出しが**列挙から黙って消える**。"""
+    report = _run(tmp_path, """
+        export default function App() {
+          window.fetch('http://localhost:8000/api/demo/nope');
+          globalThis.fetch('http://localhost:8000/api/demo/status');
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED, Verdict.MATCHED]
+
+
+def test_an_unknown_receiver_is_not_silently_dropped(tmp_path):
+    """`res.fetch(` がネットワーク呼び出しかは静的に決まらない。素通りさせない。"""
+    report = _run(tmp_path, """
+        export default function App(client) {
+          client.fetch('http://localhost:8000/api/demo/status');
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+
+
+@pytest.mark.parametrize("rebind", [
+    "API_BASE += '/wrong';",
+    "API_BASE ||= '/wrong';",
+    "[API_BASE] = ['/wrong'];",
+])
+def test_a_compound_or_destructured_rebind_is_not_followed(tmp_path, rebind):
+    """素の `=` だけ見ていると、古い値のまま matched に混ざる。"""
+    report = _run(tmp_path, f"""
+        const API_BASE = "http://localhost:8000";
+        {rebind}
+        export default function App() {{
+          fetch(`${{API_BASE}}/api/demo/status`);
+        }}
+    """)
+
+    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+
+
+def test_a_name_shadowed_by_a_parameter_is_not_followed(tmp_path):
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App(API_BASE) {
+          fetch(`${API_BASE}/api/demo/status`);
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+
+
+@pytest.mark.parametrize("form,call", [
+    ("axios", "axios.post('/api/demo/status', {});"),
+    ("XMLHttpRequest", "const x = new XMLHttpRequest();"),
+    ("EventSource", "const e = new EventSource('/api/demo/status');"),
+    ("sendBeacon", "navigator.sendBeacon('/api/demo/status');"),
+])
+def test_a_form_we_cannot_scan_is_reported_not_ignored(tmp_path, form, call):
+    """『対応していないから見えない』を『問題なし』に混ぜない。"""
+    report = _run(tmp_path, f"""
+        export default function App() {{
+          {call}
+        }}
+    """)
+
+    assert _verdicts(report) == [Verdict.UNSCANNED_FORM]
+    assert report.sites[0].reason.startswith(form)
+
+
+def test_a_websocket_is_matched_against_its_declaration(tmp_path):
+    report = _run(tmp_path, """
+        const WS_BASE = "ws://localhost:8000";
+        export default function App() {
+          const ws = new WebSocket(`${WS_BASE}/api/demo/live`);
+        }
+    """, router_body=_DEMO_ROUTER + """
+    @router.websocket("/live")
+    async def live(ws):
+        return None
+""")
+
+    assert _verdicts(report) == [Verdict.MATCHED]
+    assert report.sites[0].method == "WEBSOCKET"
+
+
 def test_an_external_host_is_not_silently_passed(tmp_path):
     report = _run(tmp_path, """
         export default function App() {
@@ -296,6 +385,25 @@ def test_the_version_prefix_does_not_cover_routers_it_never_mounted(tmp_path):
           fetch(`${API_BASE}/api/v1/api/demo/status`);
         }
     """, app_file=app_file)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_the_version_router_must_itself_be_mounted_on_the_app(tmp_path):
+    """`app.include_router(v1_router)` を外せば配下は全部 404。緑にしない。"""
+    app_file = _versioning(tmp_path, """
+        from fastapi import APIRouter
+        from routers import demo_router
+
+        v1_router = APIRouter(prefix="/api/v1")
+        v1_router.include_router(demo_router)
+    """)
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          fetch(`${API_BASE}/api/v1/api/demo/status`);
+        }
+    """, app_file=app_file, mount_v1=False)
 
     assert _verdicts(report) == [Verdict.NOT_DECLARED]
 
