@@ -539,13 +539,29 @@ def test_an_untypable_slot_requires_an_explicit_note(tmp_path):
 
 
 def test_an_explicit_note_settles_it(tmp_path):
+    """宣言と一致していれば、明記で片が付く。
+
+    `completed` はフィールド名だと宣言しているので、response_field も
+    `completed` でなければ辻褄が合わない（18回目でここも照合するようにした）。
+    """
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="ステータスがcompletedを返す",
+              endpoint="GET /api/x", response_field="completed",
+              value_note="completed はフィールド名で、値の主張ではない"),
+    ]))
+
+    assert report.mismatched == []
+
+
+def test_a_note_does_not_excuse_a_field_that_is_not_declared(tmp_path):
+    """明記があっても、埋め込まれたフィールド名が宣言に無ければ通さない。"""
     report = audit(_stories(tmp_path, [
         _item("O1-L1-01", "response_field", description="ステータスがcompletedを返す",
               endpoint="GET /api/x", response_field="status",
               value_note="completed はフィールド名で、値の主張ではない"),
     ]))
 
-    assert report.mismatched == []
+    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
 
 
 def test_an_ascii_identifier_slot_needs_no_note(tmp_path):
@@ -822,3 +838,46 @@ def test_an_enumeration_must_match_the_declared_literals(tmp_path):
     ]))
 
     assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
+
+
+# --- 名詞句に埋め込まれたフィールド名・経路（gate-verifier 18回目）---------------
+
+
+def test_a_field_name_buried_in_a_noun_phrase_is_matched(tmp_path):
+    """`候補にtimestamp…` の timestamp も宣言と突き合わせる。
+
+    スロット全体が ASCII 識別子のときしか見ていなかったので、`候補に` を
+    足すだけで照合が消えた——同じ主張が書き方の違いで強弱に振れる型。
+    """
+    def _row(field):
+        return audit(_stories(tmp_path, [
+            _item("O1-L1-01", "response_field",
+                  description="候補にtimestampフィールドが存在する",
+                  endpoint="GET /api/smartcut/all-candidates",
+                  response_field=field, value_note="timestamp はフィールド名"),
+        ]))
+
+    assert [r.reason for r in _row("type").mismatched] == ["slot_not_declared"]
+    assert _row("timestamp").mismatched == []
+
+
+def test_an_acronym_is_not_treated_as_a_field_name():
+    """`BGM` `SEO` `API` は名前の一部。小文字スネークだけをフィールド名と読む。"""
+    from backend.ux_verification.claim_audit import _FIELD_LIKE
+
+    assert _FIELD_LIKE.match("timestamp")
+    assert not _FIELD_LIKE.match("BGM")
+    assert not _FIELD_LIKE.match("SEO")
+    assert not _FIELD_LIKE.match("Whisper")
+
+
+def test_a_phrase_must_point_at_its_registered_endpoint(tmp_path):
+    """`動画一覧API` に別の経路を宣言しても通っていた（18回目）。"""
+    def _row(endpoint):
+        return audit(_stories(tmp_path, [
+            _item("O1-L1-01", "route_exists",
+                  description="動画一覧APIが正常応答を返す", endpoint=endpoint),
+        ]))
+
+    assert [r.reason for r in _row("GET /api/health").mismatched] == ["slot_not_declared"]
+    assert _row("GET /api/pipeline/videos").mismatched == []
