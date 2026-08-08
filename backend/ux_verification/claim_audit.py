@@ -212,7 +212,7 @@ DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...], frozenset], ...] =
     ("可能である", rf"^(?P<slot>{_NP})が可能\([^、。]*\)$", ("idempotency",),
      frozenset({"可能"})),
     ("列挙の実在",
-     rf"^(?P<count>\d+)カテゴリ\((?P<slot>[^、。]*)\)が存在する$",
+     r"^(?P<count>\d+)カテゴリ\((?P<slot>[^、。]*)\)が存在する$",
      ("value_constraint",), frozenset()),
     ("経路＋状態遷移",
      rf"^(?P<prefix>{_NP})正常応答し(?P<slot>{_NP})が更新される$", ("state_transition",),

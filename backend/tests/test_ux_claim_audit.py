@@ -624,7 +624,7 @@ def test_an_ascii_identifier_slot_needs_no_note(tmp_path):
 
 
 def test_the_identifier_check_is_ascii_only():
-    """`\w` は Unicode なので日本語も識別子扱いになる。ASCII に限る。"""
+    r"""`\w` は Unicode なので日本語も識別子扱いになる。ASCII に限る。"""
     from backend.ux_verification.claim_audit import needs_value_note
 
     assert not needs_value_note("hook_scoreが返る")
