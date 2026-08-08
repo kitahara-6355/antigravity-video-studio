@@ -285,7 +285,8 @@
       "test_method": "dom_exists",
       "endpoint": "POST /api/youtube/pre-plan",
       "response_field": "success",
-      "claim": "response_field"
+      "claim": "response_value",
+      "expected_value": "true"
     },
     {
       "id": "O11-L1-10",

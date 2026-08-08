@@ -132,7 +132,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/improvement/actions",
       "response_field": "actions",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "actions はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O7-L1-06",

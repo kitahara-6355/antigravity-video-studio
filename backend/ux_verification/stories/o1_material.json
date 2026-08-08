@@ -100,7 +100,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/videos",
       "response_field": "videos",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "videos はレスポンスのフィールド名。「配列」は型の説明で、値の主張ではない"
     },
     {
       "id": "O1-L1-03",
@@ -115,7 +116,8 @@
         "size_mb",
         "modified"
       ],
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「必須フィールド」は値ではなくフィールド名の集合を指す。何が必須かは response_field の宣言（name/path/size_mb/modified）で確定させている"
     },
     {
       "id": "O1-L1-04",
@@ -124,12 +126,12 @@
       "description": "動画リストに対応拡張子のみ含まれる",
       "test_method": "dom_exists",
       "endpoint": "GET /api/pipeline/videos",
-      "claim": "value_constraint",
-      "value_literals": [
-        ".mp4",
-        ".mov",
-        ".mkv",
-        ".avi"
+      "claim": "value_exclusive",
+      "value_set": [
+        "*.mp4",
+        "*.mov",
+        "*.mkv",
+        "*.avi"
       ]
     },
     {
@@ -157,7 +159,8 @@
       "description": "localStorageに履歴キーが存在する",
       "test_method": "dom_exists",
       "claim": "storage_key",
-      "storage_key": "pipeline_recent_videos"
+      "storage_key": "pipeline_recent_videos",
+      "value_note": "「履歴キー」は localStorage のキーの呼び名。実体は storage_key の宣言で確定させている。値の主張ではない"
     },
     {
       "id": "O1-L2-01",

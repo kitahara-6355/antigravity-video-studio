@@ -230,7 +230,8 @@
         "bgm_volume",
         "bgm_ducking"
       ],
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「BGM設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない。実体は response_field の宣言で確定させている"
     },
     {
       "id": "O8-L1-05",
@@ -240,7 +241,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/render/settings",
       "response_field": "lufs_target",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「LUFS設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない"
     },
     {
       "id": "O8-L1-06",
@@ -254,7 +256,8 @@
         "logo_position",
         "logo_opacity"
       ],
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「ロゴ設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない"
     },
     {
       "id": "O8-L1-07",
@@ -268,7 +271,8 @@
         "subtitle_font",
         "subtitle_size"
       ],
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "「字幕設定」はレスポンス内の設定ブロックの呼び名で、値の主張ではない"
     },
     {
       "id": "O8-L1-08",
@@ -287,7 +291,8 @@
       "test_method": "dom_exists",
       "endpoint": "GET /api/render/status/{job_id}",
       "response_field": "stages",
-      "claim": "response_field"
+      "claim": "response_field",
+      "value_note": "stages はレスポンスのフィールド名。値の主張ではない"
     },
     {
       "id": "O8-L1-10",
