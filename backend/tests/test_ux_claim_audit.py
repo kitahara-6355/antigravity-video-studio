@@ -1144,3 +1144,29 @@ def test_the_exemption_never_applies_to_the_prefix():
     from backend.ux_verification.claim_audit import parse_description
 
     assert parse_description("unlock_api正常応答しlocked_segmentsを返す") is None
+
+
+def test_every_declaration_key_is_cross_checked():
+    """宣言キーを1つでも照合から外すと、そこが穴になる（18・22・24・25回目）。
+
+    照合しないと決めているのは `claim`（照合そのもの）、`description`（主語）、
+    `value_note`（人が書く自由記述）、`expected_value`（値の指定が別途照合）の4つだけ。
+    """
+    from backend.ux_verification.claim_audit import DECLARATION_KEYS
+
+    cross_checked = {"testid", "storage_key", "request_field", "response_field",
+                     "value_set", "value_literals", "endpoint"}
+    by_design = {"claim", "description", "value_note", "expected_value"}
+
+    assert set(DECLARATION_KEYS) == cross_checked | by_design
+
+
+def test_a_wrong_value_set_is_caught():
+    from backend.ux_verification.claim_audit import slot_matches_declaration
+
+    item = {"claim": "value_exclusive", "endpoint": "GET /api/pipeline/videos"}
+    assert slot_matches_declaration(
+        "動画リストに対応拡張子のみ含まれる",
+        {**item, "value_set": ["*.mp4", "*.mov", "*.mkv", "*.avi"]})
+    assert not slot_matches_declaration(
+        "動画リストに対応拡張子のみ含まれる", {**item, "value_set": ["*.exe"]})

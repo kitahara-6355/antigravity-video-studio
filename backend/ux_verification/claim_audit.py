@@ -543,6 +543,7 @@ DOM_PHRASES: frozenset = frozenset({
 # 経路（endpoint）にだけ照合を掛けていたので、`ドロップゾーン要素が存在する` に
 # 無関係な testid を宣言しても通った（24回目）。18・22回目と同型。
 PHRASE_TARGETS: dict = {
+    ("〜のみ", "動画リストに対応拡張子", "value_set"): frozenset({'*.avi', '*.mkv', '*.mov', '*.mp4'}),
     ("フィールドの実在", "候補にtimestamp", "response_field"): frozenset({'timestamp'}),
     ("フィールドの実在", "候補にtype", "response_field"): frozenset({'type'}),
     ("フィールドの実在", "推奨セグメントにscore", "response_field"): frozenset({'score'}),
@@ -651,7 +652,10 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
             if declared_ep not in PHRASE_ENDPOINTS.get((name, part), frozenset()):
                 return False
     # 経路以外の照合先も同じ扱い。未登録は不合格。
-    for kind in ("testid", "storage_key", "request_field", "response_field"):
+    # 宣言キーは**すべて**名詞句と突き合わせる。1つでも外すと、そこが
+    # 「名詞句と測る対象が無関係でも通る」経路になる（18・22・24・25回目）。
+    for kind in ("testid", "storage_key", "request_field", "response_field",
+                 "value_set", "value_literals"):
         raw = item.get(kind)
         if not raw:
             continue
