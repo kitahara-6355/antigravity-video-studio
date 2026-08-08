@@ -539,6 +539,45 @@ DOM_PHRASES: frozenset = frozenset({
 })
 
 
+# 名詞句が指す **testid / localStorage キー / リクエストフィールド**。
+# 経路（endpoint）にだけ照合を掛けていたので、`ドロップゾーン要素が存在する` に
+# 無関係な testid を宣言しても通った（24回目）。18・22回目と同型。
+PHRASE_TARGETS: dict = {
+    ("リクエスト契約", "推奨APIが目標尺パラメータ", "request_field"): frozenset({'target_duration_minutes'}),
+    ("件数", "セグメント", "testid"): frozenset({'segment-item-*'}),
+    ("保存キーの実在", "履歴キー", "storage_key"): frozenset({'pipeline_recent_videos'}),
+    ("要素の実在", "CTR予測", "testid"): frozenset({'youtube-ctr-prediction'}),
+    ("要素の実在", "SEOスコア", "testid"): frozenset({'youtube-seo-score'}),
+    ("要素の実在", "SRTエクスポートボタン", "testid"): frozenset({'export-srt-btn'}),
+    ("要素の実在", "TXTエクスポートボタン", "testid"): frozenset({'export-txt-btn'}),
+    ("要素の実在", "Whisperモデルセレクトボックス", "testid"): frozenset({'whisper-model-select'}),
+    ("要素の実在", "diffコンテナ", "testid"): frozenset({'proofreading-diff'}),
+    ("要素の実在", "サムネイル候補", "testid"): frozenset({'youtube-thumbnail-candidates'}),
+    ("要素の実在", "スキップトグル", "testid"): frozenset({'skip-proofreading-toggle'}),
+    ("要素の実在", "セグメント一覧コンテナ", "testid"): frozenset({'segment-list'}),
+    ("要素の実在", "タイトル候補リスト", "testid"): frozenset({'youtube-title-candidates'}),
+    ("要素の実在", "タグリスト", "testid"): frozenset({'youtube-tag-list'}),
+    ("要素の実在", "チャプターリスト", "testid"): frozenset({'youtube-chapter-list'}),
+    ("要素の実在", "ドロップゾーン要素", "testid"): frozenset({'pipeline-drop-zone'}),
+    ("要素の実在", "ハッシュタグ", "testid"): frozenset({'youtube-hashtag-list'}),
+    ("要素の実在", "個別却下ボタン", "testid"): frozenset({'segment-reject-btn-*'}),
+    ("要素の実在", "個別承認ボタン", "testid"): frozenset({'segment-approve-btn-*'}),
+    ("要素の実在", "全却下ボタン", "testid"): frozenset({'reject-all-btn'}),
+    ("要素の実在", "全承認ボタン", "testid"): frozenset({'approve-all-btn'}),
+    ("要素の実在", "差分マーク要素", "testid"): frozenset({'diff-mark-*'}),
+    ("要素の実在", "投稿準備バッジ", "testid"): frozenset({'youtube-publish-readiness'}),
+    ("要素の実在", "推奨モデルバッジ", "testid"): frozenset({'whisper-recommended'}),
+    ("要素の実在", "校閲ステージパネル", "testid"): frozenset({'proofreading-stage-panel'}),
+    ("要素の実在", "校閲進捗バー", "testid"): frozenset({'proofreading-progress'}),
+    ("要素の実在", "比較ビューコンテナ", "testid"): frozenset({'proofreading-comparison'}),
+    ("要素の実在", "経過時間表示", "testid"): frozenset({'transcription-elapsed'}),
+    ("要素の実在", "説明文エリア", "testid"): frozenset({'youtube-description'}),
+    ("要素の実在", "辞書パネル", "testid"): frozenset({'dictionary-panel'}),
+    ("要素の実在", "進捗テキスト(%)", "testid"): frozenset({'transcription-progress-text'}),
+    ("要素の実在", "進捗バー", "testid"): frozenset({'transcription-progress-bar'}),
+}
+
+
 def _prefix_of(description: str) -> str:
     """テンプレートの無名前置（`{prefix}正常応答し…`）を取り出す。"""
     text = (description or "").strip()
@@ -588,6 +627,19 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
             if _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
                 continue  # フィールド名は response_field と突き合わせる
             if declared_ep not in PHRASE_ENDPOINTS.get((name, part), frozenset()):
+                return False
+    # 経路以外の照合先も同じ扱い。未登録は不合格。
+    for kind in ("testid", "storage_key", "request_field"):
+        raw = item.get(kind)
+        if not raw:
+            continue
+        values = {str(v) for v in (raw if isinstance(raw, (list, tuple)) else [raw])}
+        for part in (slot, _prefix_of(description)):
+            if not part:
+                continue
+            if _TYPED_SLOT.match(part) and name in _SLOT_CHECKED_TEMPLATES:
+                continue
+            if not values <= PHRASE_TARGETS.get((name, part, kind), frozenset()):
                 return False
     if name == "列挙の実在":
         # 列挙もスロットが ASCII 識別子に見えるので辞書検査を飛ばしていた。

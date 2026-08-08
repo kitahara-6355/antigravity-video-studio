@@ -38,6 +38,34 @@ _TEST_PHRASES = {
 }
 
 
+class _PermissiveTargets(dict):
+    """合成データの名詞句については、宣言した照合先をそのまま受け入れる。"""
+
+    def get(self, key, default=None):
+        if key in self:
+            return dict.get(self, key)
+        if isinstance(key, tuple) and len(key) == 3 and key[1] in _TEST_PHRASES:
+            return _ANY_TARGET
+        return default
+
+
+class _AnyTarget:
+    """何を宣言しても受け入れる番人。**frozenset を継承しない。**
+
+    継承すると `values <= target` が frozenset の部分集合判定に解決されて
+    しまい、`__ge__` が呼ばれない。
+    """
+
+    def __ge__(self, other):  # noqa: D105
+        return True
+
+    def __contains__(self, item):  # noqa: D105
+        return True
+
+
+_ANY_TARGET = _AnyTarget()
+
+
 class _PermissiveEndpoints(dict):
     """合成データの名詞句については、宣言した経路をそのまま受け入れる。
 
@@ -53,12 +81,7 @@ class _PermissiveEndpoints(dict):
         return default
 
 
-class _AnyEndpoint(frozenset):
-    def __contains__(self, item):  # noqa: D105
-        return True
-
-
-_ANY_ENDPOINT = _AnyEndpoint()
+_ANY_ENDPOINT = _AnyTarget()
 
 
 @pytest.fixture(autouse=True)
@@ -68,6 +91,8 @@ def _extend_vocabulary(monkeypatch):
     monkeypatch.setattr(ca, "NOUN_PHRASES", {**ca.NOUN_PHRASES, **_TEST_PHRASES})
     monkeypatch.setattr(ca, "PHRASE_ENDPOINTS",
                         _PermissiveEndpoints(ca.PHRASE_ENDPOINTS))
+    monkeypatch.setattr(ca, "PHRASE_TARGETS",
+                        _PermissiveTargets(ca.PHRASE_TARGETS))
 
 
 def _stories(tmp_path, items, name="o1_demo.json", ux_id="O-1"):
@@ -686,7 +711,7 @@ def test_a_plain_japanese_ui_name_needs_no_note(tmp_path):
     """ユーザー判断（2026-08-07）: 純粋な UI 名は対象外。"""
     report = audit(_stories(tmp_path, [
         _item("O1-L1-01", "dom_exists", description="進捗バーが存在する",
-              testid="progress-bar"),
+              testid="transcription-progress-bar"),
     ]))
 
     assert report.mismatched == []
@@ -1054,3 +1079,30 @@ def test_an_empty_slot_is_never_accepted():
     for text in ("正常応答する", "を受け付ける", "のみ含まれる",
                  "localStorageにが存在する"):
         assert parse_description(text) is None, text
+
+
+def test_a_phrase_must_point_at_its_registered_testid(tmp_path):
+    """照合を endpoint にしか掛けていなかった（24回目）。
+
+    `ドロップゾーン要素が存在する` に無関係な testid を宣言しても通った。
+    dom_exists 29件 + storage_key 1件 + request_contract 1件が同じ状態だった。
+    """
+    from backend.ux_verification.claim_audit import PHRASE_TARGETS, slot_matches_declaration
+
+    registered = sorted(PHRASE_TARGETS[("要素の実在", "ドロップゾーン要素", "testid")])[0]
+    item_ok = {"claim": "dom_exists", "testid": registered}
+    item_ng = {"claim": "dom_exists", "testid": "whisper-model-select"}
+
+    assert slot_matches_declaration("ドロップゾーン要素が存在する", item_ok)
+    assert not slot_matches_declaration("ドロップゾーン要素が存在する", item_ng)
+
+
+def test_a_storage_key_and_request_field_are_matched_too():
+    from backend.ux_verification.claim_audit import slot_matches_declaration
+
+    assert not slot_matches_declaration(
+        "localStorageに履歴キーが存在する",
+        {"claim": "storage_key", "storage_key": "theme_current"})
+    assert slot_matches_declaration(
+        "localStorageに履歴キーが存在する",
+        {"claim": "storage_key", "storage_key": "pipeline_recent_videos"})
