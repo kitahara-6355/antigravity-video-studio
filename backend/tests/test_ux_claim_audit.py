@@ -665,9 +665,8 @@ def test_an_element_claim_with_an_ascii_token_needs_a_note(tmp_path):
     """`ステータス表示が completed で存在する` ＋ dom_exists ＋ testid で、
     値の主張を要素の実在で緑にできた（5回目の型の DOM 側）。"""
     report = audit(_stories(tmp_path, [
-        _item("O1-L1-01", "dom_exists",
-              description="ステータスがcompletedのバッジが存在する",
-              testid="status-badge"),
+        _item("O1-L1-01", "dom_exists", description="ID表示が存在する",
+              testid="id-label"),
     ]))
 
     assert [r.reason for r in report.mismatched] == ["value_note_required"]
@@ -1009,10 +1008,10 @@ def test_an_unregistered_phrase_cannot_claim_any_endpoint(tmp_path):
     assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
 
 
-def test_a_dom_phrase_cannot_borrow_an_unrelated_endpoint(tmp_path):
-    """先頭が小文字の UI 名（`diffコンテナ`）は dom_exists 固定から外れる。
+def test_a_dom_phrase_cannot_be_measured_as_a_response_field(tmp_path):
+    """`diffコンテナ` は DOM_PHRASES に登録された UI 名。
 
-    その場合でも、経路の登録が無ければ endpoint を宣言できない。
+    レスポンスのフィールドとしては測れない（23回目で dom_exists に固定した）。
     """
     report = audit(_stories(tmp_path, [
         _item("O1-L1-01", "response_field", description="diffコンテナが存在する",
@@ -1020,4 +1019,38 @@ def test_a_dom_phrase_cannot_borrow_an_unrelated_endpoint(tmp_path):
               value_note="diff は UI コンテナの呼び名"),
     ]))
 
-    assert [r.reason for r in report.mismatched] == ["slot_not_declared"]
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+# --- 要素の実在の降格と空スロット（gate-verifier 23回目）------------------------
+
+
+def test_a_response_field_claim_cannot_be_downgraded_to_dom(tmp_path):
+    """`動画一覧にvideos配列が存在する` に dom_exists を貼れば testid 1本で緑だった。
+
+    その経路では埋め込みフィールド名も endpoint も一切照合されない。
+    接尾辞が `配列` か `フィールド` かで強弱が振れていた。
+    """
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "dom_exists", description="動画一覧にvideos配列が存在する",
+              testid="video-list", value_note="videos はフィールド名"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+def test_a_registered_ui_name_may_keep_dom_exists():
+    """`diffコンテナ` の `diff` はフィールド名ではない。登録で決める。"""
+    from backend.ux_verification.claim_audit import DOM_PHRASES, parse_description
+
+    assert "diffコンテナ" in DOM_PHRASES
+    assert parse_description("diffコンテナが存在する")[1] == ("dom_exists",)
+
+
+def test_an_empty_slot_is_never_accepted():
+    """空スロットは辞書にも経路にも掛からない。「空＝無検査」を塞ぐ。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    for text in ("正常応答する", "を受け付ける", "のみ含まれる",
+                 "localStorageにが存在する"):
+        assert parse_description(text) is None, text

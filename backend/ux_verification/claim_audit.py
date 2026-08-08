@@ -500,8 +500,11 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
                 continue
             if name not in NOUN_PHRASES.get(part, frozenset()):
                 return None
-        if name in _FIELD_TEMPLATES and not slot:
-            return None  # `正常応答しを返す` のような空スロットを通さない
+        if not slot:
+            # 空スロットは辞書にも経路にも掛からない（`if not part: continue`）。
+            # 「未登録＝無検査」を塞いだのと同じ場所に「空＝無検査」が残っていた
+            # （23回目）。`正常応答する` だけの description も通さない。
+            return None
         if name == "要素の実在" and not _FIELD_LIKE_TOKEN.search(slot):
             # 純粋な UI 名（`進捗バー` `CTR予測`）は DOM の主張。レスポンスの
             # フィールドを測る claim を貼れば、無関係な API の実在で緑にできた。
@@ -509,6 +512,15 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
             # していたので、大文字の略称を含む名前（CTR / SEO / SRT / TXT /
             # Whisper）だけ固定から漏れていた（21回目）。
             return name, ("dom_exists",), slot
+        if name == "要素の実在" and slot in DOM_PHRASES:
+            return name, ("dom_exists",), slot
+        if name == "要素の実在" and _FIELD_LIKE_TOKEN.search(slot):
+            # 小文字スネークの語（＝コード自身がフィールド名とみなすもの）が
+            # あるなら、それはレスポンスの主張。`dom_exists` を許すと
+            # 埋め込みフィールド名も endpoint も照合されず、testid 1本で
+            # 緑にできた（23回目）。接尾辞が `配列` か `フィールド` かで
+            # 強弱が振れていた。
+            return name, ("response_field",), slot
         if name == "要素の実在" and _TYPED_SLOT.match(slot):
             # `download_url存在` のような ASCII 識別子は、DOM 要素ではなく
             # レスポンスのフィールド名。要素の実在では測れない。
@@ -518,6 +530,13 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
 
 
 _TEMPLATE_BY_NAME = {n: p for n, p, _c, _a in DESCRIPTION_TEMPLATES}
+
+
+# 小文字の語を含むが**UI の呼び名**である名詞句。`diffコンテナ` の `diff` は
+# フィールド名ではない。機械には見分けられないので登録で決める。
+DOM_PHRASES: frozenset = frozenset({
+    "diffコンテナ",
+})
 
 
 def _prefix_of(description: str) -> str:
