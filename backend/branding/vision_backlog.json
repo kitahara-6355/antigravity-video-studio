@@ -417,163 +417,44 @@
   },
   "canonical": "この文書がロードマップ現在地の正典（2026-08-02 決定）。backend/agents/memory/phase_state.json と docs/BACKLOG_MASTER.md は参照資料。",
   "current_phase": {
-    "id": "P3",
-    "title": "Owner UX 保証：主張に対応する判定手段",
-    "axis": "ux_guarantee_owner",
-    "started_at": "2026-08-06",
-    "rationale": "P2 で L1 の 122項目に PASS/FAIL は付ききり SKIP はゼロになったが、PASS のうち 7件は**判定手段が主張に対応していない**。「localStorage に履歴キーが存在する」を data-testid の実在で、「4種プリセットで正常応答する」を経路の実在で測っている。gate-verifier が3回連続でこの型の偽 PASS を見つけており、そのたびに走査範囲の外に新しいポケットが出てきた。ユーザー判断により、閾値を読み替えるのではなく判定手段の側を足す。",
+    "id": "P4",
+    "title": "UI と API の接続：呼び出し先の実在を機械で保証する",
+    "axis": "ui_api_connection",
+    "started_at": "2026-08-08",
+    "rationale": "ui_api_connection は重み15で、値 85 は 2026-05-18 の Browser Agent 目視のまま confidence=not_measured・status=deferred_paid。だが「フロントの呼び出し先が backend に実在するか」は **サーバもブラウザも起動せず静的に判定できる**。P3 で作った EndpointRegistry（ルーター37ファイル / エンドポイント454件、include_router されていないものを区別）に、frontend の fetch 呼び出し 90箇所（到達可能な21ファイル）を突き合わせる。deferred_paid の札は実測前の見積もりで、この範囲には課金経路が無い。",
     "budget_jpy": 0,
-    "budget_note": "予算不要。7件はいずれも frontend ソースとルーター定義の静的走査で判定する。サーバもブラウザも起動せず、Gemini API を叩く経路は無い。",
-    "scope_note": "Owner の L1 122項目のみ。L2〜L5 と Admin（A-*）はスコープ外。L2 以降は動作中のバックエンドを要求し、backend/.env が無いため実行できない（D-20）。",
-    "design_note": "**閾値を終了条件にしない。** P2 の C-2 は「充足率 90% 以上」という**数え方に依存する値**を条件にしたため、検証のたびに偽 PASS が1つ見つかると数字が動き、3回とも未達になった。P3 では「主張と判定手段の対応が取れていない項目がゼロ」を条件にする。充足率は結果として報告するだけで、条件にはしない。",
-    "carried_items": [
-      {
-        "id": "O1-L1-04",
-        "claim": "動画リストに対応拡張子のみ含まれる",
-        "needs": "値の条件"
-      },
-      {
-        "id": "O1-L1-07",
-        "claim": "localStorage に履歴キーが存在する",
-        "needs": "localStorage キーの静的走査"
-      },
-      {
-        "id": "O2-L1-07",
-        "claim": "セグメントが3件以上表示される",
-        "needs": "要素数"
-      },
-      {
-        "id": "O4-L1-04",
-        "claim": "推奨APIが目標尺パラメータを受け付ける",
-        "needs": "リクエスト契約"
-      },
-      {
-        "id": "O4-L1-05",
-        "claim": "4種プリセット(15/30/45/60分)で正常応答する",
-        "needs": "パラメータ網羅"
-      },
-      {
-        "id": "O5-L1-06",
-        "claim": "推奨APIで再計算が可能(undo相当)",
-        "needs": "冪等性・状態遷移"
-      },
-      {
-        "id": "O5-L1-07",
-        "claim": "同一パラメータで再取得が可能(redo相当)",
-        "needs": "同上"
-      }
-    ],
+    "budget_note": "予算不要。frontend ソースの静的走査（AST/正規表現）と、既存の EndpointRegistry のAST 走査だけで判定する。サーバもブラウザも起動せず、Gemini API を叩く経路は無い。テスト実行は net_guard + dummy_key_for_ci で無料。",
+    "scope_note": "**呼び出し先の実在（パスとメソッド）だけ**を対象にする。リクエスト/レスポンスのスキーマ整合、認証、CORS、プロキシ設定、実行時に実際に呼ばれるかは対象外（それぞれ別の判定手段が要る。C-3 で「確かめないこと」として機械可読に固定する）。走査対象は frontend/src のエントリ main.jsx から到達可能なソースのみ。",
+    "design_note": "**P3 の C-3・C-4 とまったく同じ自己言及の罠がある。**「突き合わせが取れた＝繋がっている」は偽で、静的に取れるのは『その URL のハンドラが宣言されている』ことだけ。したがって (1) 閾値を終了条件にしない（『突き合わないものがゼロ』という閉包で書く）、(2) 自然言語ならぬ**動的な URL 式を「検出」しようとしない** — 解決できる形をテンプレートで閉じ、外れたものは `unresolved` として必ず FAIL に落とす（fail-closed）、(3) 走査0件・呼び出しの削除・unresolved の握りつぶしを緑にしない、(4) 何を確かめ何を確かめないかを CLAIM_SEMANTICS と同じ形で機械可読に書く。P3 の教訓（既定値は fail-closed／網羅そのものをテストで固定／保証の置き場所をラチェットに移す）をそのまま適用する。",
     "exit_criteria": [
       {
         "id": "C-1",
-        "condition": "122項目すべての『主張の種類 ↔ 判定手段』の対応が機械可読になり、対応が取れていない項目をコマンド1つで列挙できる",
-        "met": true,
-        "verification": "gate-verifier 5回目（2026-08-07）で met。反証されなかった。走査範囲の一本化を実物で確認（claim_audit.audit() が executor.iter_l1_items() を呼んでおり列挙は1箇所）。CI run 31106675264 のログで Linux 側も 122項目 / 未対応 0 を確認しており、手元 (Windows) と一致するので環境変数欠落による偽の一致ではない。",
-        "evidence": "backend/ux_verification/claim_audit.py（PR #60）。`python -m backend.ux_verification.claim_audit --persona owner` で 122項目の claim 別内訳と、対応が取れていない項目を列挙する。122項目すべてに claim を付与済み（route_exists 47 / response_field 37 / dom_exists 29 / value_constraint 2 / idempotency 2 / storage_key 1 / element_count 1 / request_contract 1 / runtime_behavior 1 / spec_incomplete 1）。**実行系は手作業より2件多く見つけた**（O6-L1-05 と O9-L1-12）。claim を書き忘れた項目は no_claim として必ず出るので、以降の取りこぼしは人間の数え直しに依存しない。"
+        "condition": "到達可能な frontend ソースの fetch 呼び出し先（パス・メソッド）をコマンド1つで列挙でき、URL を静的に解決できない呼び出しは解決済みに混ぜず `unresolved` として必ず出る",
+        "met": false
       },
       {
         "id": "C-2",
-        "condition": "P2 から引き継いだ 7件に、主張に対応する判定手段が入る",
-        "met": true,
-        "verification": "gate-verifier 5回目（2026-08-07）で met。ただし条件文の字面に対しては 3/7。**実際に判定手段が入った引き継ぎ項目は3件**（O1-L1-04 value_found / O1-L1-07 storage_key_found / O4-L1-04 request_field_found）。4件目として数えていた O6-L1-05 は引き継ぎ7件の外（実行系が追加で見つけた2件のうちの1件）。残る4件（O2-L1-07 / O4-L1-05 / O5-L1-06 / O5-L1-07）は判定手段が無く unjudgeable の FAIL。C-3 が事前に定めた処理であり後付けの読み替えではないため met と判定された。",
-        "evidence": "PR #61。引き継いだ 7件＋実行系が追加で見つけた 2件の計 9件を片付けた。判定手段を足したのは4件（storage_key: O1-L1-07 / value_constraint: O1-L1-04・O6-L1-05 / request_contract: O4-L1-04）。値の主張はハンドラ本体だけでは届かず、**ハンドラが実際に参照しているモジュール変数**を辿って解決した（_quality_gate_state → 別モジュールの定数）。残る5件は静的走査では原理的に判定できないと結論し、PASS に逃がさず unjudgeable の FAIL として理由つきで出している。"
+        "condition": "列挙した呼び出し先すべてが EndpointRegistry の宣言と突き合わされ、**突き合わない項目（backend に宣言が無い／メソッド違い／include_router されていない）がゼロになる。**ゼロにできないものは PASS にせず、理由つきの FAIL として残す",
+        "met": false
       },
       {
         "id": "C-3",
-        "condition": "**description の述語と claim の対応**を含めて、対応が取れていない項目がゼロになる。静的に判定できないと結論した項目は PASS にせず FAIL として理由を残す",
-        "met": true,
-        "verification": "gate-verifier 5回目（2026-08-07）で **not_met**。前半（未対応ゼロ・unjudgeable 5件が FAIL）は再現できたが、後半『判定していないものを PASS にしない』が破れている。**claim（主張の種類）は人手で貼るラベルで、description と claim の対応を誰も検証していない。** 弱いラベルを選ぶだけで『対応が取れている』を通過できる。実在の3件: O11-L1-09 は description が `success=true` なのに claim=response_field で、CLAIM_SEMANTICS の確かめない欄が『その値が何であるか』と明記しているとおり true かどうかは見ずに PASS。O1-L1-04 は description の『対応拡張子**のみ**』の『のみ』を確かめない（確かめない欄に明記）まま PASS。O5-L1-05 は『locked_segments が**更新される**』をフィールドの実在だけで PASS。いずれも原理的に判定不能ではない（`success=true` は value_constraint で測れる）。実証: コピーに対し O4-L1-05 を parameter_coverage → response_field:'success' に付け替えると FAIL unjudgeable が PASS field_found になり、claim_audit 未対応 0 件・l1_ratchet 違反 0 件のまま『改善1』として記録された（O5-L1-06 も同様）。",
-        "evidence": "`python -m backend.ux_verification.claim_audit --persona owner --gate` → **✅ 122 項目すべてで対応が取れています**（対応が取れていない項目 0 件 / exit 0）。判定できないと結論した5件は unjudgeable の FAIL として出る（O2-L1-07 element_count / O4-L1-05 runtime_behavior / O5-L1-06・O5-L1-07 idempotency / O9-L1-12 spec_incomplete）。結果としての充足率は 122件 / PASS 109 / FAIL 13 / SKIP 0 = 89.34%。**充足率は条件にしていない**（design_note）。判定していない主張は 9 → 0 件。 gate-verifier の4回目の指摘（route_exists 47件は全件が『正常応答を返す』と主張しているのに経路の実在しか見ておらず、同じ述語の O4-L1-05 だけ判定不能にしていて一貫しない）を受け、**ユーザー判断で (A)「L1 の正常応答は経路の実在と読む」を採用**（2026-08-06）。曖昧なままにしないため、claim ごとの「確かめること／確かめないこと」を CLAIM_SEMANTICS に機械可読で書き、`--semantics` で出せるようにした（claim を足して意味を書き忘れることはテストで禁じている）。O4-L1-05 は runtime_behavior → parameter_coverage へ分類し直した。判定できないのは『正常応答』ではなく『4種プリセットで』という入力値の集合のほうで、受理する値の集合が実装のどこにも宣言されていない。決定の記録は docs/ux_l1_claim_semantics_20260806.md。",
-        "verification_10": "2026-08-07 にユーザー判断で判定基準を確定し、description の述語を**閉じた語彙**（DESCRIPTION_GRAMMAR）で書かせる層を入れた。語彙に無い書き方は `unparsed`、述語が要求するより弱いラベルは `claim_too_weak` として CI で落ちる。実在した3件は個別に読み解いた（O11-L1-09『success=true』→ 値まで測る `response_value`／O1-L1-04『〜のみ』→ 集合一致を測る `value_exclusive`／O5-L1-05『更新される』→ 測れないと結論し `state_transition` の FAIL）。O6-L1-05『4カテゴリ(a/b/c/d)が存在する』は『のみ』と書いていない以上 排他性は主張していないと読み、現状維持。『そもそも測れない』系の claim はどの述語にも貼れる——必ず FAIL に落ちるので偽の緑は作れず、付け替えは substituted が捕まえる。決定の記録は docs/ux_l1_description_grammar_20260807.md。",
-        "measured": "122項目 / PASS 108 / FAIL 14 / SKIP 0。対応が取れていない項目 0 件。O5-L1-05 が PASS → FAIL に落ちたぶん PASS が 109 → 108 に下がった。**充足率は条件にしていない**（design_note）。",
-        "verification_26": "gate-verifier 26回目（2026-08-08）で **met / overall: ready**。10〜25回目は16回すべて『同じ主張が書き方の違いで強弱に振れる』または『照合が1つの宣言キーにしか掛かっていない』で破られた。26回目は迂回4件（未登録の名詞句／prefix の識別子免除／強い述語を括弧・無名前置に逃がす／名詞句と無関係な宣言）がすべて阻止され、判定器が読む item キー10個がすべて DECLARATION_KEYS の中にあることも確認された。残余3件（照合が部分集合・識別子スロットの endpoint 免除・網羅テストのハードコード）は偽の緑に至らないため met。docs に名指しで記録した。"
+        "condition": "この判定が『確かめること／確かめないこと』を機械可読に持ち、静的走査で確かめられない主張（実行時に呼ばれるか・レスポンスの利用・ベース URL の正しさ・スキーマ整合）を PASS に含めない",
+        "met": false
       },
       {
         "id": "C-4",
-        "condition": "『対応ゼロ』と新しい判定手段が CI ゲートで守られ、判定の弱化も検出される",
-        "met": true,
-        "verification_9": "gate-verifier 9回目（2026-08-07）で **met**。5〜8回目で4回連続して同じ型の穴（記録を消せば比較が消える）が出たが、9回目は『ベースラインの記録を偽造・削除せずに弱化を通せる経路』を探して見つからなかった。確認された内容: (1) CI の3ステップはいずれも必須ジョブ『Python テストスイート』内で continue-on-error 無し。(2) 宣言差し替えは PASS→PASS でも FAIL→PASS でも exit 1 `substituted` になり improvements に計上されない。(3) `unpinned_new` の成立条件を満たすには集計欄3値の書き換えが要り、別 id で員数を合わせる細工は `removed` が出て `--update-baseline` が拒否する。(4) `regressed` は `substituted` より前に判定されるので、退行を差し替えに紛れ込ませて `--redeclare` に飲ませられない。(5) `--tighten` の既存の保証は壊れていない。(6) `claim_audit` が相互防御になっており、項目から `response_field` を落とすと `not_declared` で対応ゼロゲートが落ちる。**守れていない範囲は l1_ratchet.py の docstring に名指しで書いた**（下の limits を参照）。",
-        "limits": [
-          "**`reasons` / `declarations` の値は照合していない。** ベースライン側の reasons を1つ field_found → found に書き換えれば、集計欄にも員数にも触れずに違反ゼロで通り、その項目の weakened 検出器が恒久的に無効になる（9回目の実測）。当初 docstring に書いていた『集計欄まで辻褄を合わせれば通る』は実態より緩い見積もりで、辻褄合わせは要らない",
-          "**履歴（tightenings / redeclarations / pins）は check() が一度も読まない。** 3つとも丸ごと消しても違反ゼロ。履歴は検出の記録を人が差分で読むためのもので、検出そのものには効いていない",
-          "いずれも**ベースラインを手で書き換える**ことが前提で、書き換えた事実は必ず PR の差分に現れる。ベースラインを丸ごと消すのと同じ扱いで、差分に出ることをもって歯止めとする。機械で閉じるにはリポジトリの外か git 履歴にアンカーが要り、このモジュールの範囲を超える"
-        ],
-        "verification": "gate-verifier 5回目（2026-08-07）で **not_met**。前半は再現できた（ci.yml の3ステップは `if: always()` のみで continue-on-error 無し。run 31106675264 で3ステップとも success。宣言の削除・claim の削除・項目の削除・走査0件は、実際に落ちることをコピーに対して実証済み）。**破れているのは『判定の弱化も検出される』のほう。弱化の検出が宣言の *削除* と reason カテゴリの *降格* しか見ておらず、宣言の *差し替え* を素通りさせる。** ベースライン snapshots/l1_owner_baseline.json が持つのは items（verdict）と reasons（カテゴリ）だけで、**何を宣言していたか（testid / endpoint / response_field / value_literals / request_field）を記録していない**（構造を実地確認済み）。実証: O11-L1-10 の response_field を 'hook_score' → 'success' に差し替えると FAIL field_not_found が PASS field_found になり、違反0・改善1として記録される。O9-L1-11 の testid を存在する別の testid に差し替えても同じ。description は変えていないので、項目が要求する内容だけが弱くなる。3回目の指摘（宣言を消すと巻き戻る）と同型で、消去は塞いだが差し替えが残っている。副次: ベースラインから reasons ブロックごと消すと `_is_content_judged` が常に False になり weakened 検出が黙って無効化される（`--tighten` にはガードがあるが `--ratchet` には無い）。",
-        "evidence": ".github/workflows/ci.yml の「主張と判定手段の対応ゲート」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たない。項目を1件も読み取れなかった場合も 0 件として通さず失敗にする（ディレクトリを消せば緑、を防ぐ）。判定の弱化は l1_ratchet の weakened 違反が検出する（強い判定 field_found/value_found/request_field_found/storage_key_found/unjudgeable から、経路の実在だけの found へ戻ることを拒否）。CI run 31098362753 で3チェックとも success、テスト 9,383件 失敗0 / カバレッジ 75.7%。"
+        "condition": "この判定が CI ゲートで守られ、判定の弱化を検出する。少なくとも (a) 走査0件で緑、(b) 呼び出しの削除で緑、(c) unresolved の握りつぶし、(d) ベースラインに記録した宣言の差し替えが、いずれも落ちる",
+        "met": false
+      },
+      {
+        "id": "C-5",
+        "condition": "正典の axis_scores.ui_api_connection が実測値に置き換わり、status=deferred_paid と confidence=not_measured の札が剥がれ、evidence にコマンドと出力が入る",
+        "met": false
       }
     ],
-    "note": "**4/4。すべて独立検証済み。** C-4 は9回目、C-3 は26回目で met。C-3 だけで16回作り直している（10〜25回目）。破られ方は2型——(1) 同じ主張が書き方の違いで強弱に振れる、(2) 照合や免除が宣言キー1つにしか掛かっていない。憲法第2条により /gate-report を出してユーザーの判断を待つ。vision_realization_score と axis_scores は自分で採点しないため据え置いた。",
-    "verification_log": [
-      {
-        "round": 5,
-        "date": "2026-08-07",
-        "verified_against": "origin/main 8641c1b / CI run 31104677162・31106675264",
-        "overall": "not_ready",
-        "verdicts": {
-          "C-1": "met",
-          "C-2": "met",
-          "C-3": "not_met",
-          "C-4": "not_met"
-        },
-        "finding": "description ↔ claim の対応が無検証。claim ラベルの貼り替えと宣言の差し替えで、3ゲート緑のまま FAIL→PASS を作れる",
-        "note": "過去4回と同じ型（走査範囲の外にポケットが残る）。1回目=レスポンス本体、2回目=モジュール変数の展開、3回目=宣言の削除、4回目=監査と実行系の走査範囲の不一致、5回目=description と宣言の対応そのもの"
-      },
-      {
-        "round": 6,
-        "date": "2026-08-07",
-        "verified_against": "cc/l1-declaration-ratchet b91216b（PR #66）",
-        "overall": "not_ready",
-        "verdicts": {
-          "C-4": "not_met"
-        },
-        "finding": "宣言の差し替え（substituted）は塞がったが、(1) unpinned の対象が reasons と declarations の2冊だけで items から1行消すと項目が『新しい項目』に化けて比較ループに入らない（exit 0）、(2) unpinned が退行判定より前に短絡し --redeclare が受理する",
-        "fixed_by": "21054ed"
-      },
-      {
-        "round": 7,
-        "date": "2026-08-07",
-        "verified_against": "cc/l1-declaration-ratchet 21054ed（PR #66）",
-        "overall": "not_ready",
-        "verdicts": {
-          "C-4": "not_met"
-        },
-        "finding": "3冊すべてから同じ項目を消せば『新しい項目』に化ける。項目を story から削除し3冊からも削除すると exit 0 / 違反ゼロ。集計欄がどこからも照合されていなかった",
-        "fixed_by": "93db14f"
-      },
-      {
-        "round": 8,
-        "date": "2026-08-07",
-        "verified_against": "cc/l1-declaration-ratchet 914c427（PR #66）",
-        "overall": "not_ready",
-        "verdicts": {
-          "C-4": "not_met"
-        },
-        "finding": "集計欄の照合が `recorded is not None` で欄の欠落を素通りさせた。3キー消すだけで照合が丸ごと消える（辻褄合わせ不要）。弱化が unpinned_new に化けて --update-baseline が無記録で受理。tampered が items としか突き合わせないので reasons/declarations だけ消せば集計欄に触れずに済む",
-        "fixed_by": "a71768c"
-      },
-      {
-        "round": 9,
-        "date": "2026-08-07",
-        "verified_against": "cc/l1-declaration-ratchet a71768c（PR #66）/ CI run 31136382475（93db14f で3チェック success）",
-        "overall": "ready",
-        "verdicts": {
-          "C-4": "met"
-        },
-        "finding": "『記録を偽造・削除せずに弱化を通せる経路』は見つからなかった。反証5パターンすべて exit 1。残る2点（reasons/declarations の値は無照合・履歴は check() が読まない）は検出そのものを壊さないため met とした。docstring の『端』の記述が実態より緩かったので 51a24f3 で訂正",
-        "note": "5〜8回目はすべて同じ型（記録を消せば比較が消える）。9回目で初めて同型の穴が出なかった"
-      },
-      {
-        "round": 26,
-        "date": "2026-08-08",
-        "verified_against": "cc/l1-declaration-ratchet 69e55d0（PR #66）",
-        "overall": "ready",
-        "verdicts": {
-          "C-3": "met"
-        },
-        "finding": "迂回4件すべて阻止。判定器が読む item キーはすべて宣言に含まれ、走査範囲の外にポケットは無い",
-        "note": "C-3 は10〜25回目の16回で破られ続けた。破られ方は2型に集約する——(1) 同じ主張が書き方の違い（空白・句点・読点・接尾辞・活用・大文字小文字）で強弱に振れる、(2) 照合や免除が宣言キー1つ・スロット1箇所にしか掛かっていない。最後は『述語のテンプレート＋名詞句の辞書＋宣言キー全部の突き合わせ』の3点を閉じ、網羅自体をテストで固定した"
-      }
-    ]
+    "note": "2026-08-08 開始。P3 のゲート承認と同時にユーザーが進行を承認した。",
+    "verification_log": []
   },
   "phase_history": [
     {
@@ -716,6 +597,167 @@
       ],
       "completed_at": "2026-08-06",
       "gate": "ユーザー承認済み（2026-08-06）。gate-verifier の独立検証を3回受け、3回とも not_ready だった。指摘はすべて実在の穴で、C-1・C-3・C-4・C-5 は対応して met に到達。C-2 だけは『判定手段が主張に対応していない7件』が残り、これを埋めるには API 契約とは別種の判定手段が要る。選択肢 (a) 読み替えて達成 / (b) 判定手段を足す P3 / (c) 閾値見直し を提示し、**ユーザーが (b) を選択。C-2 は未達のまま P3 へ引き継ぐ。**"
+    },
+    {
+      "id": "P3",
+      "title": "Owner UX 保証：主張に対応する判定手段",
+      "axis": "ux_guarantee_owner",
+      "started_at": "2026-08-06",
+      "rationale": "P2 で L1 の 122項目に PASS/FAIL は付ききり SKIP はゼロになったが、PASS のうち 7件は**判定手段が主張に対応していない**。「localStorage に履歴キーが存在する」を data-testid の実在で、「4種プリセットで正常応答する」を経路の実在で測っている。gate-verifier が3回連続でこの型の偽 PASS を見つけており、そのたびに走査範囲の外に新しいポケットが出てきた。ユーザー判断により、閾値を読み替えるのではなく判定手段の側を足す。",
+      "budget_jpy": 0,
+      "budget_note": "予算不要。7件はいずれも frontend ソースとルーター定義の静的走査で判定する。サーバもブラウザも起動せず、Gemini API を叩く経路は無い。",
+      "scope_note": "Owner の L1 122項目のみ。L2〜L5 と Admin（A-*）はスコープ外。L2 以降は動作中のバックエンドを要求し、backend/.env が無いため実行できない（D-20）。",
+      "design_note": "**閾値を終了条件にしない。** P2 の C-2 は「充足率 90% 以上」という**数え方に依存する値**を条件にしたため、検証のたびに偽 PASS が1つ見つかると数字が動き、3回とも未達になった。P3 では「主張と判定手段の対応が取れていない項目がゼロ」を条件にする。充足率は結果として報告するだけで、条件にはしない。",
+      "carried_items": [
+        {
+          "id": "O1-L1-04",
+          "claim": "動画リストに対応拡張子のみ含まれる",
+          "needs": "値の条件"
+        },
+        {
+          "id": "O1-L1-07",
+          "claim": "localStorage に履歴キーが存在する",
+          "needs": "localStorage キーの静的走査"
+        },
+        {
+          "id": "O2-L1-07",
+          "claim": "セグメントが3件以上表示される",
+          "needs": "要素数"
+        },
+        {
+          "id": "O4-L1-04",
+          "claim": "推奨APIが目標尺パラメータを受け付ける",
+          "needs": "リクエスト契約"
+        },
+        {
+          "id": "O4-L1-05",
+          "claim": "4種プリセット(15/30/45/60分)で正常応答する",
+          "needs": "パラメータ網羅"
+        },
+        {
+          "id": "O5-L1-06",
+          "claim": "推奨APIで再計算が可能(undo相当)",
+          "needs": "冪等性・状態遷移"
+        },
+        {
+          "id": "O5-L1-07",
+          "claim": "同一パラメータで再取得が可能(redo相当)",
+          "needs": "同上"
+        }
+      ],
+      "exit_criteria": [
+        {
+          "id": "C-1",
+          "condition": "122項目すべての『主張の種類 ↔ 判定手段』の対応が機械可読になり、対応が取れていない項目をコマンド1つで列挙できる",
+          "met": true,
+          "verification": "gate-verifier 5回目（2026-08-07）で met。反証されなかった。走査範囲の一本化を実物で確認（claim_audit.audit() が executor.iter_l1_items() を呼んでおり列挙は1箇所）。CI run 31106675264 のログで Linux 側も 122項目 / 未対応 0 を確認しており、手元 (Windows) と一致するので環境変数欠落による偽の一致ではない。",
+          "evidence": "backend/ux_verification/claim_audit.py（PR #60）。`python -m backend.ux_verification.claim_audit --persona owner` で 122項目の claim 別内訳と、対応が取れていない項目を列挙する。122項目すべてに claim を付与済み（route_exists 47 / response_field 37 / dom_exists 29 / value_constraint 2 / idempotency 2 / storage_key 1 / element_count 1 / request_contract 1 / runtime_behavior 1 / spec_incomplete 1）。**実行系は手作業より2件多く見つけた**（O6-L1-05 と O9-L1-12）。claim を書き忘れた項目は no_claim として必ず出るので、以降の取りこぼしは人間の数え直しに依存しない。"
+        },
+        {
+          "id": "C-2",
+          "condition": "P2 から引き継いだ 7件に、主張に対応する判定手段が入る",
+          "met": true,
+          "verification": "gate-verifier 5回目（2026-08-07）で met。ただし条件文の字面に対しては 3/7。**実際に判定手段が入った引き継ぎ項目は3件**（O1-L1-04 value_found / O1-L1-07 storage_key_found / O4-L1-04 request_field_found）。4件目として数えていた O6-L1-05 は引き継ぎ7件の外（実行系が追加で見つけた2件のうちの1件）。残る4件（O2-L1-07 / O4-L1-05 / O5-L1-06 / O5-L1-07）は判定手段が無く unjudgeable の FAIL。C-3 が事前に定めた処理であり後付けの読み替えではないため met と判定された。",
+          "evidence": "PR #61。引き継いだ 7件＋実行系が追加で見つけた 2件の計 9件を片付けた。判定手段を足したのは4件（storage_key: O1-L1-07 / value_constraint: O1-L1-04・O6-L1-05 / request_contract: O4-L1-04）。値の主張はハンドラ本体だけでは届かず、**ハンドラが実際に参照しているモジュール変数**を辿って解決した（_quality_gate_state → 別モジュールの定数）。残る5件は静的走査では原理的に判定できないと結論し、PASS に逃がさず unjudgeable の FAIL として理由つきで出している。"
+        },
+        {
+          "id": "C-3",
+          "condition": "**description の述語と claim の対応**を含めて、対応が取れていない項目がゼロになる。静的に判定できないと結論した項目は PASS にせず FAIL として理由を残す",
+          "met": true,
+          "verification": "gate-verifier 5回目（2026-08-07）で **not_met**。前半（未対応ゼロ・unjudgeable 5件が FAIL）は再現できたが、後半『判定していないものを PASS にしない』が破れている。**claim（主張の種類）は人手で貼るラベルで、description と claim の対応を誰も検証していない。** 弱いラベルを選ぶだけで『対応が取れている』を通過できる。実在の3件: O11-L1-09 は description が `success=true` なのに claim=response_field で、CLAIM_SEMANTICS の確かめない欄が『その値が何であるか』と明記しているとおり true かどうかは見ずに PASS。O1-L1-04 は description の『対応拡張子**のみ**』の『のみ』を確かめない（確かめない欄に明記）まま PASS。O5-L1-05 は『locked_segments が**更新される**』をフィールドの実在だけで PASS。いずれも原理的に判定不能ではない（`success=true` は value_constraint で測れる）。実証: コピーに対し O4-L1-05 を parameter_coverage → response_field:'success' に付け替えると FAIL unjudgeable が PASS field_found になり、claim_audit 未対応 0 件・l1_ratchet 違反 0 件のまま『改善1』として記録された（O5-L1-06 も同様）。",
+          "evidence": "`python -m backend.ux_verification.claim_audit --persona owner --gate` → **✅ 122 項目すべてで対応が取れています**（対応が取れていない項目 0 件 / exit 0）。判定できないと結論した5件は unjudgeable の FAIL として出る（O2-L1-07 element_count / O4-L1-05 runtime_behavior / O5-L1-06・O5-L1-07 idempotency / O9-L1-12 spec_incomplete）。結果としての充足率は 122件 / PASS 109 / FAIL 13 / SKIP 0 = 89.34%。**充足率は条件にしていない**（design_note）。判定していない主張は 9 → 0 件。 gate-verifier の4回目の指摘（route_exists 47件は全件が『正常応答を返す』と主張しているのに経路の実在しか見ておらず、同じ述語の O4-L1-05 だけ判定不能にしていて一貫しない）を受け、**ユーザー判断で (A)「L1 の正常応答は経路の実在と読む」を採用**（2026-08-06）。曖昧なままにしないため、claim ごとの「確かめること／確かめないこと」を CLAIM_SEMANTICS に機械可読で書き、`--semantics` で出せるようにした（claim を足して意味を書き忘れることはテストで禁じている）。O4-L1-05 は runtime_behavior → parameter_coverage へ分類し直した。判定できないのは『正常応答』ではなく『4種プリセットで』という入力値の集合のほうで、受理する値の集合が実装のどこにも宣言されていない。決定の記録は docs/ux_l1_claim_semantics_20260806.md。",
+          "verification_10": "2026-08-07 にユーザー判断で判定基準を確定し、description の述語を**閉じた語彙**（DESCRIPTION_GRAMMAR）で書かせる層を入れた。語彙に無い書き方は `unparsed`、述語が要求するより弱いラベルは `claim_too_weak` として CI で落ちる。実在した3件は個別に読み解いた（O11-L1-09『success=true』→ 値まで測る `response_value`／O1-L1-04『〜のみ』→ 集合一致を測る `value_exclusive`／O5-L1-05『更新される』→ 測れないと結論し `state_transition` の FAIL）。O6-L1-05『4カテゴリ(a/b/c/d)が存在する』は『のみ』と書いていない以上 排他性は主張していないと読み、現状維持。『そもそも測れない』系の claim はどの述語にも貼れる——必ず FAIL に落ちるので偽の緑は作れず、付け替えは substituted が捕まえる。決定の記録は docs/ux_l1_description_grammar_20260807.md。",
+          "measured": "122項目 / PASS 108 / FAIL 14 / SKIP 0。対応が取れていない項目 0 件。O5-L1-05 が PASS → FAIL に落ちたぶん PASS が 109 → 108 に下がった。**充足率は条件にしていない**（design_note）。",
+          "verification_26": "gate-verifier 26回目（2026-08-08）で **met / overall: ready**。10〜25回目は16回すべて『同じ主張が書き方の違いで強弱に振れる』または『照合が1つの宣言キーにしか掛かっていない』で破られた。26回目は迂回4件（未登録の名詞句／prefix の識別子免除／強い述語を括弧・無名前置に逃がす／名詞句と無関係な宣言）がすべて阻止され、判定器が読む item キー10個がすべて DECLARATION_KEYS の中にあることも確認された。残余3件（照合が部分集合・識別子スロットの endpoint 免除・網羅テストのハードコード）は偽の緑に至らないため met。docs に名指しで記録した。"
+        },
+        {
+          "id": "C-4",
+          "condition": "『対応ゼロ』と新しい判定手段が CI ゲートで守られ、判定の弱化も検出される",
+          "met": true,
+          "verification_9": "gate-verifier 9回目（2026-08-07）で **met**。5〜8回目で4回連続して同じ型の穴（記録を消せば比較が消える）が出たが、9回目は『ベースラインの記録を偽造・削除せずに弱化を通せる経路』を探して見つからなかった。確認された内容: (1) CI の3ステップはいずれも必須ジョブ『Python テストスイート』内で continue-on-error 無し。(2) 宣言差し替えは PASS→PASS でも FAIL→PASS でも exit 1 `substituted` になり improvements に計上されない。(3) `unpinned_new` の成立条件を満たすには集計欄3値の書き換えが要り、別 id で員数を合わせる細工は `removed` が出て `--update-baseline` が拒否する。(4) `regressed` は `substituted` より前に判定されるので、退行を差し替えに紛れ込ませて `--redeclare` に飲ませられない。(5) `--tighten` の既存の保証は壊れていない。(6) `claim_audit` が相互防御になっており、項目から `response_field` を落とすと `not_declared` で対応ゼロゲートが落ちる。**守れていない範囲は l1_ratchet.py の docstring に名指しで書いた**（下の limits を参照）。",
+          "limits": [
+            "**`reasons` / `declarations` の値は照合していない。** ベースライン側の reasons を1つ field_found → found に書き換えれば、集計欄にも員数にも触れずに違反ゼロで通り、その項目の weakened 検出器が恒久的に無効になる（9回目の実測）。当初 docstring に書いていた『集計欄まで辻褄を合わせれば通る』は実態より緩い見積もりで、辻褄合わせは要らない",
+            "**履歴（tightenings / redeclarations / pins）は check() が一度も読まない。** 3つとも丸ごと消しても違反ゼロ。履歴は検出の記録を人が差分で読むためのもので、検出そのものには効いていない",
+            "いずれも**ベースラインを手で書き換える**ことが前提で、書き換えた事実は必ず PR の差分に現れる。ベースラインを丸ごと消すのと同じ扱いで、差分に出ることをもって歯止めとする。機械で閉じるにはリポジトリの外か git 履歴にアンカーが要り、このモジュールの範囲を超える"
+          ],
+          "verification": "gate-verifier 5回目（2026-08-07）で **not_met**。前半は再現できた（ci.yml の3ステップは `if: always()` のみで continue-on-error 無し。run 31106675264 で3ステップとも success。宣言の削除・claim の削除・項目の削除・走査0件は、実際に落ちることをコピーに対して実証済み）。**破れているのは『判定の弱化も検出される』のほう。弱化の検出が宣言の *削除* と reason カテゴリの *降格* しか見ておらず、宣言の *差し替え* を素通りさせる。** ベースライン snapshots/l1_owner_baseline.json が持つのは items（verdict）と reasons（カテゴリ）だけで、**何を宣言していたか（testid / endpoint / response_field / value_literals / request_field）を記録していない**（構造を実地確認済み）。実証: O11-L1-10 の response_field を 'hook_score' → 'success' に差し替えると FAIL field_not_found が PASS field_found になり、違反0・改善1として記録される。O9-L1-11 の testid を存在する別の testid に差し替えても同じ。description は変えていないので、項目が要求する内容だけが弱くなる。3回目の指摘（宣言を消すと巻き戻る）と同型で、消去は塞いだが差し替えが残っている。副次: ベースラインから reasons ブロックごと消すと `_is_content_judged` が常に False になり weakened 検出が黙って無効化される（`--tighten` にはガードがあるが `--ratchet` には無い）。",
+          "evidence": ".github/workflows/ci.yml の「主張と判定手段の対応ゲート」ステップ。必須チェック『Python テストスイート (3.13)』内にあり continue-on-error を持たない。項目を1件も読み取れなかった場合も 0 件として通さず失敗にする（ディレクトリを消せば緑、を防ぐ）。判定の弱化は l1_ratchet の weakened 違反が検出する（強い判定 field_found/value_found/request_field_found/storage_key_found/unjudgeable から、経路の実在だけの found へ戻ることを拒否）。CI run 31098362753 で3チェックとも success、テスト 9,383件 失敗0 / カバレッジ 75.7%。"
+        }
+      ],
+      "note": "**4/4。すべて独立検証済み。** C-4 は9回目、C-3 は26回目で met。C-3 だけで16回作り直している（10〜25回目）。破られ方は2型——(1) 同じ主張が書き方の違いで強弱に振れる、(2) 照合や免除が宣言キー1つにしか掛かっていない。憲法第2条により /gate-report を出してユーザーの判断を待つ。vision_realization_score と axis_scores は自分で採点しないため据え置いた。",
+      "verification_log": [
+        {
+          "round": 5,
+          "date": "2026-08-07",
+          "verified_against": "origin/main 8641c1b / CI run 31104677162・31106675264",
+          "overall": "not_ready",
+          "verdicts": {
+            "C-1": "met",
+            "C-2": "met",
+            "C-3": "not_met",
+            "C-4": "not_met"
+          },
+          "finding": "description ↔ claim の対応が無検証。claim ラベルの貼り替えと宣言の差し替えで、3ゲート緑のまま FAIL→PASS を作れる",
+          "note": "過去4回と同じ型（走査範囲の外にポケットが残る）。1回目=レスポンス本体、2回目=モジュール変数の展開、3回目=宣言の削除、4回目=監査と実行系の走査範囲の不一致、5回目=description と宣言の対応そのもの"
+        },
+        {
+          "round": 6,
+          "date": "2026-08-07",
+          "verified_against": "cc/l1-declaration-ratchet b91216b（PR #66）",
+          "overall": "not_ready",
+          "verdicts": {
+            "C-4": "not_met"
+          },
+          "finding": "宣言の差し替え（substituted）は塞がったが、(1) unpinned の対象が reasons と declarations の2冊だけで items から1行消すと項目が『新しい項目』に化けて比較ループに入らない（exit 0）、(2) unpinned が退行判定より前に短絡し --redeclare が受理する",
+          "fixed_by": "21054ed"
+        },
+        {
+          "round": 7,
+          "date": "2026-08-07",
+          "verified_against": "cc/l1-declaration-ratchet 21054ed（PR #66）",
+          "overall": "not_ready",
+          "verdicts": {
+            "C-4": "not_met"
+          },
+          "finding": "3冊すべてから同じ項目を消せば『新しい項目』に化ける。項目を story から削除し3冊からも削除すると exit 0 / 違反ゼロ。集計欄がどこからも照合されていなかった",
+          "fixed_by": "93db14f"
+        },
+        {
+          "round": 8,
+          "date": "2026-08-07",
+          "verified_against": "cc/l1-declaration-ratchet 914c427（PR #66）",
+          "overall": "not_ready",
+          "verdicts": {
+            "C-4": "not_met"
+          },
+          "finding": "集計欄の照合が `recorded is not None` で欄の欠落を素通りさせた。3キー消すだけで照合が丸ごと消える（辻褄合わせ不要）。弱化が unpinned_new に化けて --update-baseline が無記録で受理。tampered が items としか突き合わせないので reasons/declarations だけ消せば集計欄に触れずに済む",
+          "fixed_by": "a71768c"
+        },
+        {
+          "round": 9,
+          "date": "2026-08-07",
+          "verified_against": "cc/l1-declaration-ratchet a71768c（PR #66）/ CI run 31136382475（93db14f で3チェック success）",
+          "overall": "ready",
+          "verdicts": {
+            "C-4": "met"
+          },
+          "finding": "『記録を偽造・削除せずに弱化を通せる経路』は見つからなかった。反証5パターンすべて exit 1。残る2点（reasons/declarations の値は無照合・履歴は check() が読まない）は検出そのものを壊さないため met とした。docstring の『端』の記述が実態より緩かったので 51a24f3 で訂正",
+          "note": "5〜8回目はすべて同じ型（記録を消せば比較が消える）。9回目で初めて同型の穴が出なかった"
+        },
+        {
+          "round": 26,
+          "date": "2026-08-08",
+          "verified_against": "cc/l1-declaration-ratchet 69e55d0（PR #66）",
+          "overall": "ready",
+          "verdicts": {
+            "C-3": "met"
+          },
+          "finding": "迂回4件すべて阻止。判定器が読む item キーはすべて宣言に含まれ、走査範囲の外にポケットは無い",
+          "note": "C-3 は10〜25回目の16回で破られ続けた。破られ方は2型に集約する——(1) 同じ主張が書き方の違い（空白・句点・読点・接尾辞・活用・大文字小文字）で強弱に振れる、(2) 照合や免除が宣言キー1つ・スロット1箇所にしか掛かっていない。最後は『述語のテンプレート＋名詞句の辞書＋宣言キー全部の突き合わせ』の3点を閉じ、網羅自体をテストで固定した"
+        }
+      ],
+      "completed_at": "2026-08-08",
+      "gate": "ユーザー承認済み（2026-08-08）。4/4 とも gate-verifier の独立検証を通過（C-1・C-2 は5回目、C-4 は9回目、C-3 は26回目で met / overall: ready）。merged main 470af40 / CI run 31259150028 で3チェックとも success、テスト 9,495件 失敗0 エラー0 / カバレッジ 75.7%。手元でも 122項目・未対応0 / L1 ラチェット 108→108 / 死蔵コード 10→10 を再現。**ゲート報告時にユーザーが次フェーズ ui_api_connection への進行を承認し、フェーズ終了またはエスカレ事由まで自律実行することも承認した。**"
     }
   ]
 }
