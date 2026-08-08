@@ -940,3 +940,31 @@ def test_a_plain_ui_name_is_a_dom_claim_only(tmp_path):
     ]))
 
     assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+# --- 略称を含む UI 名と列挙の件数（gate-verifier 21回目）------------------------
+
+
+def test_a_ui_name_with_an_acronym_is_still_a_dom_claim(tmp_path):
+    """`CTR予測` `SEOスコア` は UI 名。大文字略称で固定から漏れていた。"""
+    report = audit(_stories(tmp_path, [
+        _item("O1-L1-01", "response_field", description="CTR予測が存在",
+              endpoint="GET /api/pipeline/videos", response_field="videos",
+              value_note="CTR は指標の名前"),
+    ]))
+
+    assert [r.reason for r in report.mismatched] == ["claim_too_weak"]
+
+
+def test_the_enumeration_count_must_match(tmp_path):
+    """先頭の件数がどの層でも照合されず「99カテゴリ」と主張できた。"""
+    def _row(desc):
+        return audit(_stories(tmp_path, [
+            _item("O1-L1-01", "value_constraint", description=desc,
+                  endpoint="GET /api/pipeline/quality-gate/scores",
+                  value_literals=["audio", "video"]),
+        ]))
+
+    assert [r.reason for r in _row("99カテゴリ(audio/video)が存在する").mismatched] == [
+        "slot_not_declared"]
+    assert _row("2カテゴリ(audio/video)が存在する").mismatched == []

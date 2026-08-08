@@ -211,7 +211,8 @@ DESCRIPTION_TEMPLATES: tuple[tuple[str, str, tuple[str, ...], frozenset], ...] =
      ("parameter_coverage",), frozenset()),
     ("可能である", rf"^(?P<slot>{_NP})が可能\([^、。]*\)$", ("idempotency",),
      frozenset({"可能"})),
-    ("列挙の実在", rf"^\d+カテゴリ\((?P<slot>[^、。]*)\)が存在する$",
+    ("列挙の実在",
+     rf"^(?P<count>\d+)カテゴリ\((?P<slot>[^、。]*)\)が存在する$",
      ("value_constraint",), frozenset()),
     ("経路＋状態遷移",
      rf"^(?P<prefix>{_NP})正常応答し(?P<slot>{_NP})が更新される$", ("state_transition",),
@@ -256,6 +257,9 @@ _TYPED_SLOT = re.compile(rf"^{_IDENT}(?:/{_IDENT})*$")
 _ASCII_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # 小文字スネークはフィールド名とみなす。略称・製品名（API/BGM/SEO）は対象外。
 _FIELD_LIKE = re.compile(r"^[a-z][a-z0-9_]*$")
+# 名詞句の中に**小文字スネークの語**があるか。大文字の略称（CTR/SEO）は
+# 名前の一部であってフィールド名ではない。
+_FIELD_LIKE_TOKEN = re.compile(r"(?<![A-Za-z0-9_])[a-z][a-z0-9_]*")
 
 
 # **名詞句の語彙。** ここに無い名詞句は書けない（15回目・ユーザー判断 2026-08-07）。
@@ -498,9 +502,12 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
                 return None
         if name in _FIELD_TEMPLATES and not slot:
             return None  # `正常応答しを返す` のような空スロットを通さない
-        if name == "要素の実在" and not _ASCII_TOKEN.search(slot):
-            # 純粋な UI 名（`進捗バー`）は DOM の主張。レスポンスのフィールドを
-            # 測る claim を貼れば、無関係な API の実在で緑にできた（20回目）。
+        if name == "要素の実在" and not _FIELD_LIKE_TOKEN.search(slot):
+            # 純粋な UI 名（`進捗バー` `CTR予測`）は DOM の主張。レスポンスの
+            # フィールドを測る claim を貼れば、無関係な API の実在で緑にできた。
+            # **判定は小文字スネークの有無で行う。** ASCII トークンの有無に
+            # していたので、大文字の略称を含む名前（CTR / SEO / SRT / TXT /
+            # Whisper）だけ固定から漏れていた（21回目）。
             return name, ("dom_exists",), slot
         if name == "要素の実在" and _TYPED_SLOT.match(slot):
             # `download_url存在` のような ASCII 識別子は、DOM 要素ではなく
@@ -508,6 +515,9 @@ def parse_description(description: str) -> tuple[str, tuple[str, ...], str] | No
             return name, ("response_field",), slot
         return name, claims, slot
     return None
+
+
+_TEMPLATE_BY_NAME = {n: p for n, p, _c, _a in DESCRIPTION_TEMPLATES}
 
 
 def _prefix_of(description: str) -> str:
@@ -555,10 +565,16 @@ def slot_matches_declaration(description: str, item: dict) -> bool:
     if name == "列挙の実在":
         # 列挙もスロットが ASCII 識別子に見えるので辞書検査を飛ばしていた。
         # 宣言した value_literals と集合一致すること（17回目）。
+        # **書かれた件数とも一致すること**——先頭の数値がどの層でも照合されず、
+        # 実装が4種でも「99カテゴリ」と主張したまま緑にできた（21回目）。
         raw = item.get("value_literals")
         declared = ({str(v) for v in raw} if isinstance(raw, (list, tuple))
                     else {str(raw)} if raw else set())
-        return bool(declared) and set(slot.split("/")) == declared
+        if not (declared and set(slot.split("/")) == declared):
+            return False
+        match = re.match(_TEMPLATE_BY_NAME["列挙の実在"], (description or "").strip())
+        written = (match.groupdict().get("count") or "") if match else ""
+        return written.isdigit() and int(written) == len(declared)
     if name not in _FIELD_TEMPLATES or not _TYPED_SLOT.match(slot):
         return True
     declared = {str(f) for f in _declared_fields(item)}
