@@ -22,17 +22,27 @@ from backend.ux_verification.claim_audit import (
 # 名詞句は登録済みのものだけ通る（P3 C-3）。合成データが使う名詞句を足しておく。
 # **実データの語彙は触らない。** 登録外を弾くこと自体を確かめるテストは、
 # ここに無い名詞句を使う。
-_TEST_PHRASES = frozenset({
-    "要素", "API", "履歴キー", "対応拡張子", "パラメータ",
-    "ステータスがcompleted", "ステータスがcompletedのバッジ", "ID表示",
+# 名詞句は「どのテンプレートで使ってよいか」まで登録する。
+_ALL_TEMPLATES = frozenset({
+    "値の指定", "〜のみ", "件数", "プリセット網羅", "可能である", "列挙の実在",
+    "経路＋状態遷移", "保存キーの実在", "経路＋フィールド", "経路のみ",
+    "リクエスト契約", "必須フィールド", "フィールドの実在", "フィールドを返す",
+    "要素の実在",
 })
+_TEST_PHRASES = {
+    p: _ALL_TEMPLATES for p in (
+        "要素", "API", "APIが", "履歴キー", "対応拡張子", "パラメータ",
+        "ステータスがcompleted", "ステータスがcompletedのバッジ", "ID表示",
+        "解除APIが", "事前企画APIが",
+    )
+}
 
 
 @pytest.fixture(autouse=True)
 def _extend_vocabulary(monkeypatch):
     from backend.ux_verification import claim_audit as ca
 
-    monkeypatch.setattr(ca, "NOUN_PHRASES", ca.NOUN_PHRASES | _TEST_PHRASES)
+    monkeypatch.setattr(ca, "NOUN_PHRASES", {**ca.NOUN_PHRASES, **_TEST_PHRASES})
 
 
 def _stories(tmp_path, items, name="o1_demo.json", ux_id="O-1"):
@@ -739,3 +749,30 @@ def test_every_owner_l1_noun_phrase_is_registered():
                 if parse_description(r.description) is None]
 
     assert unparsed == []
+
+
+def test_the_unnamed_prefix_is_checked_too():
+    """「経路＋フィールド」の前置は名前が無く、辞書が掛かっていなかった（16回目）。"""
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description(
+        "セグメントが3つ残った状態で正常応答し hook_score を返す") is None
+    assert parse_description(
+        "全セグメントを巻き戻して正常応答し hook_score を返す") is None
+
+
+def test_a_phrase_cannot_move_to_a_weaker_template():
+    """判定不能の項目のために登録した名詞句を、PASS できる形へ移せた（16回目）。
+
+    辞書は「名詞句 → 使ってよいテンプレート」まで持つ。
+    """
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("推奨APIで再計算が可能(undo相当)") is not None
+    assert parse_description("推奨APIで再計算が正常応答する") is None
+
+
+def test_an_empty_slot_is_not_a_field_claim():
+    from backend.ux_verification.claim_audit import parse_description
+
+    assert parse_description("正常応答しを返す") is None
