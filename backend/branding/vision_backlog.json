@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
-  "last_audit_date": "2026-08-02T00:00",
-  "vision_realization_score": 71.2,
+  "last_audit_date": "2026-08-10T00:00",
+  "vision_realization_score": 61.45,
   "scoring_policy": "コード存在=最大20% / E2E動作確認=50%以上 / 本番動画確認=100%。confidence: measured=今回実測 / partial=一部実測 / carried_over=前回値据え置き / not_measured=未計測。**実測なしにスコアを動かさない。**",
   "score_history": [
     {
@@ -48,6 +48,11 @@
       "date": "2026-08-02T00:00",
       "score": 71.2,
       "trigger": "Phase 0 正典の再建。サマリー欄の不整合（60 → 71.2）を解消し、10軸に confidence と evidence を付与。有料2軸は据え置き。"
+    },
+    {
+      "date": "2026-08-10T00:00",
+      "score": 61.45,
+      "trigger": "P4 完了。ui_api_connection を 85（2026-05-18 の目視・not_measured）から 20（静的な宣言の突き合わせを実測）へ。**接続が悪化したのではなく検証できる範囲が確定した。** scoring_policy の『コード存在=最大20%』を字義どおり適用した値で、方針文と他軸の実態の食い違いはユーザー判断待ち。"
     }
   ],
   "axis_scores": {
@@ -61,13 +66,13 @@
       "evidence": "なし"
     },
     "ui_api_connection": {
-      "score": 85,
+      "score": 20,
       "weight": 15,
-      "status": "deferred_paid",
-      "note": "UI からパイプラインを起動する経路が課金するため据え置き（同上）。値は 2026-05-18 のもの。",
-      "confidence": "not_measured",
-      "measured_at": "2026-05-18",
-      "evidence": "なし"
+      "status": "static_verified",
+      "note": "**P4 で実測した。85 → 20 は接続が悪化したのではなく『いま検証できるのはここまで』という意味。** 85 は 2026-05-18 の Browser Agent 目視で confidence=not_measured だった。P4 が測ったのは静的な宣言の突き合わせなので、scoring_policy の『コード存在=最大20%』に当たる。deferred_paid の札は実測前の見積もりで、実際には課金経路が無かったので剥がした。**ただし scoring_policy と他軸の実態は食い違っている** — tests_pass 止まりの軸（trinity 55 / quality 65 / soul 75 / storage 60 / coverage 77）は方針文どおりなら全部 20 以下のはず。この軸だけ字義どおり適用すると不当に低くなる。**方針文を実態に合わせるか他軸を下げるかはユーザー判断**（ゲート報告で選択肢を提示）。",
+      "confidence": "measured",
+      "measured_at": "2026-08-10",
+      "evidence": "python -m backend.ux_verification.ui_api --gate → 「読み取れた 95 件はすべて宣言と突き合っています（読めなかった 8 件は突き合わせていない）」exit 0。呼び出し 103件 / 走査ファイル 45 / 宣言済みエンドポイント 457件。内訳は matched 95 / unresolved_url 4 / external_host 3 / unscanned_form 1。python -m backend.ux_verification.ui_api_ratchet --ratchet → 「呼び出し先 96 → 96（新規 0）」exit 0。CI の必須ジョブ『Python テストスイート (3.13)』内で両ステップがcontinue-on-error 無しで実行される。テスト 176件。gate-verifier 14回目で overall: ready。"
     },
     "trinity_council": {
       "score": 55,
@@ -430,31 +435,43 @@
       {
         "id": "C-1",
         "condition": "到達可能な frontend ソースの fetch 呼び出し先（パス・メソッド）をコマンド1つで列挙でき、URL を静的に解決できない呼び出しは解決済みに混ぜず `unresolved` として必ず出る",
-        "met": false
+        "met": true,
+        "verification": "gate-verifier 14回目（2026-08-10）で met。1〜13回目はすべて not_met で毎回実測の反例が出た。14回目は『到達可能なソースに数行足して呼び出しを痕跡なく消せるか』を25変種試し、自然な形は12/12すべて可視。消せたのは globalThis['fet'+'ch'] と '/ap'+'i/...' を**同時に**使い呼び出し形と URL トークンの両方を難読化した1形のみ。片方ずつは全部捕まる（計算メンバ→unscanned_form / トークン分割→unattributed / 連結→unresolved_url）。"
       },
       {
         "id": "C-2",
         "condition": "列挙した呼び出し先すべてが EndpointRegistry の宣言と突き合わされ、**突き合わない項目（backend に宣言が無い／メソッド違い／include_router されていない）がゼロになる。**ゼロにできないものは PASS にせず、理由つきの FAIL として残す",
-        "met": false
+        "met": true,
+        "verification": "gate-verifier 14回目で met。突き合わない項目 0件。読めなかった8件は PASS に混ざらずファイル:行と理由つきで別枠に出る。『読めない書き方に逃がしてゼロにする』経路も塞がれていることを実測で確認（メソッド・パスの嘘10変種すべて正しく分類）。"
       },
       {
         "id": "C-3",
         "condition": "この判定が『確かめること／確かめないこと』を機械可読に持ち、静的走査で確かめられない主張（実行時に呼ばれるか・レスポンスの利用・ベース URL の正しさ・スキーマ整合）を PASS に含めない",
-        "met": false
+        "met": true,
+        "verification": "gate-verifier 9回目で met、10〜14回目も維持。VERDICT_SEMANTICS 9判定と SCAN_SEMANTICS が --semantics で出力され、PASS は matched のみ。FetchSite.passed は意味表を唯一の出どころにしている。"
       },
       {
         "id": "C-4",
         "condition": "この判定が CI ゲートで守られ、判定の弱化を検出する。少なくとも (a) 走査0件で緑、(b) 呼び出しの削除で緑、(c) unresolved の握りつぶし、(d) ベースラインに記録した宣言の差し替えが、いずれも落ちる",
-        "met": false
+        "met": true,
+        "verification": "gate-verifier 6回目で met、7〜14回目も維持。(a)〜(d) の4型すべてが実測で exit 1。DECLARATION_KEYS 5欄と scan_boundary 5欄をすべて check() が読む。正規表現の**本体**まで固定し、集合の増減を方向を問わず違反にする。"
       },
       {
         "id": "C-5",
         "condition": "正典の axis_scores.ui_api_connection が実測値に置き換わり、status=deferred_paid と confidence=not_measured の札が剥がれ、evidence にコマンドと出力が入る",
-        "met": false
+        "met": true,
+        "verification": "本コミット。axis_scores.ui_api_connection を実測値に置き換え、deferred_paid と not_measured の札を剥がし、evidence にコマンドと出力を入れた。"
       }
     ],
-    "note": "2026-08-08 開始。P3 のゲート承認と同時にユーザーが進行を承認した。",
-    "verification_log": []
+    "note": "**5/5。すべて独立検証済み。** C-4 は6回目、C-3 は9回目、C-1・C-2 は14回目で met。14回のうち私が原因の穴が7件（修正が新しい沈黙を作った5件、報告と実態の食い違い2件）。指摘は1〜5回目が『呼び出しの形』、6〜8回目が『閉包の構造』、9回目以降はすべて _strip_comments（JS をスキャナで読む部分）に集中した。憲法第2条により /gate-report を出してユーザーの判断を待つ。",
+    "verification_log": [],
+    "completed_at": "2026-08-10",
+    "limits": [
+      "**トークンを途中で割る難読化は捕まらない。** globalThis['fet'+'ch'] と '/ap'+'i/quality/...' を同時に使うと呼び出し形も URL リテラルも残らず、残余の受け皿にも掛からない（14回目の実測）。閉じようとするとリテラル畳み込み → 変数経由の分割 → 配列添字と無限後退する。**片方だけの難読化はすべて捕まる。**",
+      "**`:` の直後に本物の行コメントを書くと誤検出する。** case 'x':// TODO fetch('/api/old') の形でコメント内の記述が実在の呼び出しとして計上される。向きは fail-closed（隠す方向ではなく FAIL を作る方向）で、現ツリーには該当 0件。",
+      "**JavaScript を正規表現とスキャナで読んでいる。** 9〜13回目の指摘は全部ここに集中した。実 JS パーサ（esbuild/acorn 系）に替える案はあるが、CI に Node のステップを足すことになり、フロントに CI が無いという現状の制約に触れる。フェーズ定義に関わるのでユーザー判断。",
+      "**確かめたのは『そのパスとメソッドのハンドラが宣言され、登録されている』ことだけ。** 実行時に呼ばれるか・レスポンスを正しく使えているか・本番のベース URL・スキーマ整合は確かめていない（VERDICT_SEMANTICS の『確かめないこと』に明記）。"
+    ]
   },
   "phase_history": [
     {
