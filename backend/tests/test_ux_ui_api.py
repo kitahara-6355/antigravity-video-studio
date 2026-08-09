@@ -1289,3 +1289,68 @@ def test_duplicate_slashes_are_not_collapsed_on_the_frontend_side(
     report = _run(tmp_path, source)
 
     assert _verdicts(report) == [expected], source
+
+
+# --- gate-verifier 13回目 ------------------------------------------------------
+
+
+def test_a_scheme_slash_is_never_read_as_a_line_comment():
+    """`http://` の `//` を行コメントと読まない砦。
+
+    12回目に入れたと報告したが**実際には入っていなかった**（置換が無言で
+    失敗し、差分で確かめずに完了を報告した）。ここで固定する。
+    """
+    from backend.ux_verification.ui_api import _strip_comments
+
+    stripped = _strip_comments(
+        "<p>Don't</p>\nconst a = 'http://localhost:8000/api/demo/status';")
+
+    assert "/api/demo/status" in stripped
+
+
+@pytest.mark.parametrize("text", ["Don't forget", "Dont forget"])
+def test_an_apostrophe_does_not_change_whether_a_call_is_seen(tmp_path, text):
+    """アポストロフィ1文字の有無で FAIL → 沈黙 に変わってはいけない。"""
+    report = _run(tmp_path, f"""
+        export default function App() {{
+          const label = <p>{text}</p>;
+          window.open('http://localhost:8000/api/demo/nope');
+          return label;
+        }}
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED], text
+
+
+def test_an_unclosed_url_attribute_is_reported_not_skipped(tmp_path):
+    """fetch 分岐は括弧が閉じないとき unresolved_url を出すのに、
+    URL 属性と window.open だけ**黙って continue** していた。"""
+    from backend.ux_verification.ui_api import UiApiExecutor
+
+    routers = _routers(tmp_path, _DEMO_ROUTER)
+    app = tmp_path / "backend" / "main.py"
+    app.write_text("from routers import demo_router\n"
+                   "app.include_router(demo_router)\n", encoding="utf-8")
+    src = _frontend(tmp_path, "export default function App() { return null; }")
+    (src / "broken.jsx").write_text("window.open('/api/demo/nope'\n",
+                                    encoding="utf-8")
+    (src / "App.jsx").write_text(
+        "import './broken.jsx';\nexport default function App() { return null; }",
+        encoding="utf-8")
+
+    report = UiApiExecutor(src, EndpointRegistry.scan(routers, app_files=[app]),
+                           entry=src / "main.jsx").run()
+
+    assert Verdict.UNRESOLVED_URL in _verdicts(report)
+
+
+def test_a_react_data_prop_assignment_is_not_a_url(tmp_path):
+    """`chart.data = [...]` は URL ではない。過検出で FAIL を作らない。"""
+    report = _run(tmp_path, """
+        export default function App(chart) {
+          chart.data = [1, 2, 3];
+          return null;
+        }
+    """)
+
+    assert report.sites == []

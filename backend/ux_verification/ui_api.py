@@ -139,8 +139,10 @@ UNSCANNED_FORMS = {
     "CSS の url()": re.compile(r"url\s*\(\s*[^)\n]*?/api/"),
     # 右辺が変数でも当てる。`img.src = u` が検出器に当たらないと、
     # 残余が消えたときに _masked_away も発火しない（12回目の指摘）。
+    # `data` は React の props でも使う（`chart.data = [...]`）。URL を運ぶ
+    # 属性だけに絞る（gate-verifier 13回目が過検出を実測）。
     "DOM への URL 代入": re.compile(
-        r"\.\s*(?:href|src|action|poster|data)\s*=(?!=)"),
+        r"\.\s*(?:href|src|action|poster)\s*=(?!=)"),
     "$.ajax / ky / superagent": re.compile(
         r"(?<![\w.$])(?:\$\s*\.\s*ajax|ky\s*[.(]|superagent\s*\.)"),
     # 4回目の指摘。走査もされず「走査できない形」にも入っていなかった5形。
@@ -654,7 +656,13 @@ def _strip_comments(text: str) -> str:
             if j < n and text[j] == "/":
                 i = j + 1
                 continue
-        if text.startswith("//", i):
+        # `http://` `ws://` の `//` を行コメントと読まない。**文字列状態の
+        # 判定を誤っても効く砦。** JSX テキスト中のアポストロフィ（`Don't`）が
+        # 文字列状態を開き、直後の `'http://…'` の開き引用符で閉じてしまうと、
+        # この `//` からが行コメントになって呼び出しが消えていた
+        # （gate-verifier 12・13回目の指摘）。行コメントが `:` の直後に
+        # 来ることはまず無い。
+        if text.startswith("//", i) and (i == 0 or text[i - 1] != ":"):
             while i < n and text[i] != "\n":
                 out[i] = " "
                 i += 1
@@ -1170,6 +1178,15 @@ class UiApiExecutor:
                 else:
                     body = _match_args(text, hit.end() - 1)
                     if body is None:
+                        # **黙って continue しない。** fetch 分岐は同じ状況で
+                        # unresolved_url を出すのに、ここだけ無記録だった。
+                        # 文字列状態が壊れて括弧が閉じなくなると、URL 属性と
+                        # window.open だけが痕跡なく消えていた
+                        # （gate-verifier 13回目の指摘）。
+                        found.append(FetchSite(
+                            rel, line, _short(text[hit.start():hit.start() + 60]),
+                            None, None, Verdict.UNRESOLVED_URL,
+                            "引数の括弧が閉じていない"))
                         continue
                     cover(hit.start(), hit.end() + len(body) + 1)
                     expr = _split_top_level(body)[0] if arg_open == "(" else body
