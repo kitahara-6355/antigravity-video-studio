@@ -143,6 +143,11 @@ UNSCANNED_FORMS = {
     "new Worker": re.compile(
         r"(?<![\w.$])new\s+(?:Shared)?Worker\s*\("),
     "素の open()": re.compile(r"(?<![\w.$])open\s*\(\s*['\"`]"),
+    # 文字列リテラルに現れない形で URL を作るもの。残余では捕まらないので
+    # **沈黙ではなく FAIL** にする（gate-verifier 7回目の指摘）。
+    "合成された URL": re.compile(
+        r"(?<![\w.$])(?:atob\s*\(|String\.fromCharCode\s*\(|"
+        r"decodeURIComponent\s*\(|\]\s*\.\s*join\s*\()"),
     "setAttribute で URL": re.compile(
         r"setAttribute\s*\(\s*['\"]"
         r"(?:src|href|action|formaction|data|poster|srcset|content|ping)['\"]",
@@ -164,7 +169,9 @@ _WINDOW_OPEN_RE = re.compile(r"(?<![\w$])window\.open\s*\(")
 # 紐づかなかったものを `unattributed` として必ず出す。
 _URL_LITERAL_RE = re.compile(
     r"""(['"`])(?P<value>(?:(?!\1)[^\\]|\\.)*?)\1""", re.DOTALL)
-_BACKEND_URL_HINT = re.compile(r"(?:^|[^\w])/api/|ws://|wss://|http://localhost")
+_BACKEND_URL_HINT = re.compile(
+    r"(?:^|[^\w])/?api/|wss?://|https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0)",
+    re.IGNORECASE)
 # 残余を数えるときコメントは外す。コメントは実行されないので呼び出しではない。
 _LINE_COMMENT_RE = re.compile(r"//[^\n]*")
 _BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
@@ -454,8 +461,8 @@ def _split_top_level(args: str) -> list[str]:
     return [p.strip() for p in parts]
 
 
-def _resolve_url(expr: str, env: dict[str, str],
-                 depth: int = 0) -> tuple[str | None, str]:
+def _resolve_url(expr: str, env: dict[str, str], depth: int = 0,
+                 used: set[str] | None = None) -> tuple[str | None, str]:
     """URL 式を閉じた文法で解決する。解決できなければ (None, 理由)。
 
     返すのは**クエリ文字列を落としたパス**。`?` 以降は判定対象にしていない
@@ -479,7 +486,9 @@ def _resolve_url(expr: str, env: dict[str, str],
             bound = env.get(expr)
             if bound is None:
                 return None, f"1度しか代入されていない名前ではない（{_short(expr)}）"
-            return _resolve_url(bound, env, depth + 1)
+            if used is not None:
+                used.add(expr)
+            return _resolve_url(bound, env, depth + 1, used)
         return None, f"閉じた文法に無い形（{_short(expr)}）"
     body = expr[1:-1]
     if "`" in body:
@@ -495,7 +504,9 @@ def _resolve_url(expr: str, env: dict[str, str],
             inner = body[i + 2:end].strip()
             bound = env.get(inner)
             if bound is not None:
-                nested, why = _resolve_url(bound, env, depth + 1)
+                if used is not None:
+                    used.add(inner)
+                nested, why = _resolve_url(bound, env, depth + 1, used)
                 if nested is None:
                     return None, why
                 out.append(nested)
@@ -538,6 +549,24 @@ def _all_form_hits(text: str):
             yield label, hit
 
 
+def _form_extent(text: str, hit: re.Match) -> int:
+    """走査できない形が覆う範囲。**行末まで伸ばさない。**
+
+    呼び出しなら括弧の対応まで、代入なら文の末尾まで。行末まで覆うと、
+    同じ行にある別の URL を巻き込んで隠す（gate-verifier 7回目の指摘）。
+    """
+    window = text[hit.start():hit.end() + 2]
+    paren = window.find("(")
+    if paren != -1:
+        args = _match_args(text, hit.start() + paren)
+        if args is not None:
+            return hit.start() + paren + len(args) + 2
+    stop = min(
+        (i for i in (text.find(";", hit.end()), text.find(chr(10), hit.end()))
+         if i != -1), default=len(text))
+    return stop
+
+
 def _strip_comments(text: str) -> str:
     """コメントを同じ長さの空白に置き換える。位置はずらさない。
 
@@ -547,6 +576,7 @@ def _strip_comments(text: str) -> str:
     out = list(text)
     i, n = 0, len(text)
     quote: str | None = None
+    prev = ""  # 直前の意味のある文字。正規表現リテラルの判定に使う
     while i < n:
         ch = text[i]
         if quote:
@@ -561,6 +591,23 @@ def _strip_comments(text: str) -> str:
             quote = ch
             i += 1
             continue
+        # 正規表現リテラル。`/https?:\/\//` の `\/\/` をコメント開始と読むと、
+        # **同じ行にある本物の呼び出しまで消える**（gate-verifier 7回目の指摘）。
+        if ch == "/" and not text.startswith(("//", "/*"), i) \
+                and (prev == "" or prev in "=(,:[!&|?+{};\n" or
+                     text[max(0, i - 6):i].rstrip().endswith("return")):
+            j = i + 1
+            while j < n and text[j] != "\n":
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == "/":
+                    break
+                j += 1
+            if j < n and text[j] == "/":
+                i = j + 1
+                prev = "/"
+                continue
         if text.startswith("//", i):
             while i < n and text[i] != "\n":
                 out[i] = " "
@@ -574,6 +621,8 @@ def _strip_comments(text: str) -> str:
                     out[j] = " "
             i = end
             continue
+        if not ch.isspace():
+            prev = ch
         i += 1
     return "".join(out)
 
@@ -628,10 +677,21 @@ def _resolve_method(arg: str | None,
         return None, f"第2引数がオブジェクトリテラルでない（{_short(arg)}）"
     if _SPREAD_RE.search(arg):
         return None, "スプレッドに隠れてメソッドを静的に読めない"
-    hit = _METHOD_RE.search(arg)
-    if hit:
-        return hit.group("value").upper(), ""
-    if _METHOD_KEY_RE.search(arg):
+    # **トップレベルのキーだけを見る。** 全体検索だと
+    # `{ body: JSON.stringify({method:'GET'}), method: 'POST' }` の
+    # 先頭一致を採って GET と誤読する（gate-verifier 7回目の指摘）。
+    top = _split_top_level(arg[1:-1])
+    keys = [part for part in top if _METHOD_KEY_RE.match(part.strip())
+            or re.fullmatch(r"method", part.strip())]
+    if len(keys) > 1:
+        return None, "method がトップレベルに複数ある"
+    if len(keys) == 1:
+        entry = keys[0].strip()
+        if entry == "method":
+            return None, "method が省略記法で書かれていて値を読めない"
+        hit = _METHOD_RE.search(entry)
+        if hit:
+            return hit.group("value").upper(), ""
         return None, "method がリテラルで書かれていない"
     return "GET", ""
 
@@ -952,10 +1012,8 @@ class UiApiExecutor:
         def cover(start: int, end: int) -> None:
             covered.append((start, end))
 
-        # `const API_BASE = "http://localhost:8000"` は**宣言**であって
-        # 呼び出しではない。解決に使われる値なので残余から外す。
-        for hit in _ASSIGN_RE.finditer(text):
-            cover(hit.start("value"), hit.end("value"))
+        # 解決の過程で実際に引かれた名前。これだけを宣言として残余から外す。
+        used: set[str] = set()
 
         for pattern, method in ((_FETCH_RE, None), (_WEBSOCKET_RE, "WEBSOCKET")):
             for hit in pattern.finditer(text):
@@ -983,7 +1041,7 @@ class UiApiExecutor:
                 parts = _split_top_level(args)
                 found.append(self._judge(parts, constants, rel, line, shapes,
                                          forced_method=method,
-                                         env=constants))
+                                         env=constants, used=used))
 
         # ブラウザが GET を投げる URL 属性と window.open。
         # ローカルの画像などは backend への呼び出しではないので、
@@ -1004,7 +1062,7 @@ class UiApiExecutor:
                         continue
                     cover(hit.start(), hit.end() + len(body) + 1)
                     expr = _split_top_level(body)[0] if arg_open == "(" else body
-                url, why = _resolve_url(expr, constants)
+                url, why = _resolve_url(expr, constants, used=used)
                 if url is None:
                     # **読めないものを「backend ではない」と決めつけない。**
                     # ここで黙って落とすと、SCANNED_FORMS の申告が実際の走査より
@@ -1016,17 +1074,26 @@ class UiApiExecutor:
                 if not _is_backend_url(url):
                     continue  # 解決できて、backend でないと分かったものだけ外す
                 found.append(self._judge([expr], constants, rel, line, shapes,
-                                         forced_method="GET"))
+                                         forced_method="GET", used=used))
 
         # 走査できない形。**実在したら FAIL。**「対応していないから見えない」を
         # 「問題なし」に混ぜない。
         for name, pattern in UNSCANNED_FORMS.items():
             for hit in pattern.finditer(text):
-                end_of_line = text.find(chr(10), hit.start())
-                cover(hit.start(), end_of_line if end_of_line != -1 else len(text))
+                cover(hit.start(), _form_extent(text, hit))
                 found.append(FetchSite(
                     rel, line_of(hit.start()), name, None, None,
                     Verdict.UNSCANNED_FORM, f"{name} は走査できない"))
+
+        # **呼び出しとして読んだ範囲から参照されている名前**の宣言だけを
+        # 残余から外す。無条件に外すと `const u = "/api/x"; sink(u)` の
+        # ように、変数を1つ挟むだけで消える（gate-verifier 7回目の指摘）。
+        referenced = set(used)
+        for lo, hi in covered:
+            referenced |= set(re.findall(r"[A-Za-z_$][\w$]*", text[lo:hi]))
+        for hit in _ASSIGN_RE.finditer(text):
+            if hit.group("name") in referenced:
+                cover(hit.start("value"), hit.end("value"))
 
         found += self._residual(text, covered, rel, line_of)
         return found
@@ -1057,9 +1124,10 @@ class UiApiExecutor:
     def _judge(self, parts: list[str], constants: dict[str, str], rel: str,
                line: int, shapes: dict,
                forced_method: str | None = None,
-               env: dict[str, str] | None = None) -> FetchSite:
+               env: dict[str, str] | None = None,
+               used: set[str] | None = None) -> FetchSite:
         raw = _short(parts[0]) if parts else ""
-        url, why = _resolve_url(parts[0] if parts else "", constants)
+        url, why = _resolve_url(parts[0] if parts else "", constants, used=used)
         if url is None:
             return FetchSite(rel, line, raw, None, None, Verdict.UNRESOLVED_URL, why)
 

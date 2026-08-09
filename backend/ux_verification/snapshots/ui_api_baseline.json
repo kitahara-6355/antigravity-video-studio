@@ -84,6 +84,7 @@
     "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/improve-hook": "matched",
     "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/apply-hook": "matched",
     "src/components/YouTubeOptimizerPanel.jsx|?|thumb.path": "unresolved_url",
+    "src/components/YouTubeOptimizerPanel.jsx|?|合成された URL": "unscanned_form",
     "src/pages/EditorPage.jsx|GET|/api/pipeline/status": "matched",
     "src/pages/EditorPage.jsx|GET|/api/segments": "matched",
     "src/pages/EditorPage.jsx|GET|/api/director/state": "matched",
@@ -178,6 +179,7 @@
     "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
     "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
     "src/components/YouTubeOptimizerPanel.jsx|?|thumb.path": "",
+    "src/components/YouTubeOptimizerPanel.jsx|?|合成された URL": "",
     "src/pages/EditorPage.jsx|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
     "src/pages/EditorPage.jsx|GET|/api/segments": "static_route_scan: routers/segments.py:33 GET /api/segments",
     "src/pages/EditorPage.jsx|GET|/api/director/state": "static_route_scan: routers/legacy_director_router.py:66 GET /api/director/state",
@@ -238,6 +240,7 @@
       "setAttribute で URL": "setAttribute\\s*\\(\\s*['\\\"](?:src|href|action|formaction|data|poster|srcset|content|ping)['\\\"]",
       "srcSet": "(?<![\\w$])srcSet\\s*=\\s*[{'\\\"]",
       "動的 import": "(?<![\\w.$])import\\s*\\(\\s*['\\\"`]",
+      "合成された URL": "(?<![\\w.$])(?:atob\\s*\\(|String\\.fromCharCode\\s*\\(|decodeURIComponent\\s*\\(|\\]\\s*\\.\\s*join\\s*\\()",
       "素の open()": "(?<![\\w.$])open\\s*\\(\\s*['\\\"`]",
       "計算メンバでの fetch": "\\[\\s*['\\\"]fetch['\\\"]\\s*\\]"
     },

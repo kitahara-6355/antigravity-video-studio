@@ -648,6 +648,75 @@ def test_no_second_argument_still_means_get(tmp_path):
     assert report.sites[0].method == "GET"
 
 
+def test_a_regex_literal_does_not_swallow_the_rest_of_the_line(tmp_path):
+    """`/https?:\\/\\//` の `//` をコメント開始と読むと、**同じ行の本物の
+    呼び出しまで消える**。コメント除去は正規表現リテラルを識別すること。"""
+    report = _run(tmp_path, r"""
+        export default function App() {
+          const re = /https?:\/\//;
+          return fetch('/api/demo/nope', { method: 'POST' });
+        }
+    """)
+
+    assert Verdict.NOT_DECLARED in _verdicts(report)
+
+
+def test_a_double_slash_in_jsx_text_does_not_hide_a_call(tmp_path):
+    report = _run(tmp_path, """
+        export default function App() {
+          return <div>see http://example.com</div>;
+        }
+        const Probe = () => fetch('/api/demo/nope');
+    """)
+
+    assert Verdict.NOT_DECLARED in _verdicts(report)
+
+
+@pytest.mark.parametrize("snippet", [
+    "const u = '/api/demo/nope'; const P = () => sink(u);",
+    "const tpl = `/api/demo/nope`; const P = () => sink(tpl);",
+    "const u = 'http://127.0.0.1:8000/health'; const P = (el) => { el.dataset.x = u; };",
+    "const P = () => sink('api/demo/nope');",
+    "const P = () => sink('/API/demo/nope');",
+])
+def test_a_url_that_never_reaches_a_known_sink_is_residual(tmp_path, snippet):
+    """宣言を無条件に残余から外すと、変数を1つ挟むだけで消える。
+
+    **解決の過程で実際に引かれた名前の宣言だけ**を残余から外す。
+    """
+    report = _run(tmp_path, f"""
+        export default function App() {{ return null; }}
+        {snippet}
+    """)
+
+    assert Verdict.UNATTRIBUTED in _verdicts(report), snippet
+
+
+def test_a_shorthand_method_key_is_not_read_as_get(tmp_path):
+    """`{ method }` は値が書かれていない。GET と断定しない。"""
+    from backend.ux_verification.ui_api import _resolve_method
+
+    assert _resolve_method("{ method }")[0] is None
+
+
+def test_a_method_nested_in_the_body_is_not_mistaken_for_the_method():
+    """`{ body: JSON.stringify({method:'GET'}), method: 'POST' }` は POST。
+
+    全体検索だと先頭一致の GET を採ってしまう。トップレベルのキーだけ見る。
+    """
+    from backend.ux_verification.ui_api import _resolve_method
+
+    arg = "{ body: JSON.stringify({method:'GET'}), method: 'POST' }"
+
+    assert _resolve_method(arg)[0] == "POST"
+
+
+def test_two_top_level_method_keys_are_unresolved():
+    from backend.ux_verification.ui_api import _resolve_method
+
+    assert _resolve_method("{ method: 'GET', method: 'POST' }")[0] is None
+
+
 def test_a_react_data_prop_is_not_mistaken_for_an_object_url(tmp_path):
     """`<RadarChart data={...}>` は URL ではない。過検出で FAIL を作らない。"""
     report = _run(tmp_path, """
