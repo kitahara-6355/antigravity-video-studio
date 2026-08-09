@@ -549,6 +549,24 @@ def _all_form_hits(text: str):
             yield label, hit
 
 
+# 直前が「値の終わり」なら `/` は除算、そうでなければ正規表現リテラル。
+# キーワードは値の終わりではない（`return /re/` は正規表現）。
+_VALUE_END_RE = re.compile(r"(?:[\w$\]\)]|\.\d)\s*$")
+_NOT_A_VALUE_KEYWORD = frozenset({
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+    "case", "do", "else", "yield", "await", "throw",
+})
+
+
+def _ends_a_value(text: str, index: int) -> bool:
+    """`text[index]` の `/` の直前が値の終わりか（＝除算か）。"""
+    head = text[:index]
+    if not _VALUE_END_RE.search(head):
+        return False
+    word = re.search(r"[A-Za-z_$][\w$]*\s*$", head)
+    return not (word and word.group(0).strip() in _NOT_A_VALUE_KEYWORD)
+
+
 def _form_extent(text: str, hit: re.Match) -> int:
     """走査できない形が覆う範囲。**行末まで伸ばさない。**
 
@@ -576,7 +594,6 @@ def _strip_comments(text: str) -> str:
     out = list(text)
     i, n = 0, len(text)
     quote: str | None = None
-    prev = ""  # 直前の意味のある文字。正規表現リテラルの判定に使う
     while i < n:
         ch = text[i]
         if quote:
@@ -593,9 +610,14 @@ def _strip_comments(text: str) -> str:
             continue
         # 正規表現リテラル。`/https?:\/\//` の `\/\/` をコメント開始と読むと、
         # **同じ行にある本物の呼び出しまで消える**（gate-verifier 7回目の指摘）。
+        #
+        # 判定は**許可リストではなく除外リスト**にする。7回目の実装は
+        # `= ( , : [ ! & | ? + { } ;` だけを許したので、`=>` `return` `>` `*`
+        # の直後の正規表現を認識できず、同じ穴が別の文脈で残った
+        # （gate-verifier 8回目の指摘）。除算になり得るのは直前が
+        # 「値の終わり」——識別子・数値・`)` `]`——のときだけ。
         if ch == "/" and not text.startswith(("//", "/*"), i) \
-                and (prev == "" or prev in "=(,:[!&|?+{};\n" or
-                     text[max(0, i - 6):i].rstrip().endswith("return")):
+                and not _ends_a_value(text, i):
             j = i + 1
             while j < n and text[j] != "\n":
                 if text[j] == "\\":
@@ -606,7 +628,6 @@ def _strip_comments(text: str) -> str:
                 j += 1
             if j < n and text[j] == "/":
                 i = j + 1
-                prev = "/"
                 continue
         if text.startswith("//", i):
             while i < n and text[i] != "\n":
@@ -621,18 +642,24 @@ def _strip_comments(text: str) -> str:
                     out[j] = " "
             i = end
             continue
-        if not ch.isspace():
-            prev = ch
         i += 1
     return "".join(out)
 
 
-def _is_backend_url(url: str) -> bool:
-    """backend を叩く URL か。ローカル資産と外部リンクを判定に載せない。"""
+def _is_backend_url(url: str, prefixes: frozenset[str] | None = None) -> bool:
+    """backend を叩く URL か。ローカル資産と外部リンクを判定に載せない。
+
+    相対パスの判定は**宣言から導く**。`/api` 決め打ちだと、実在する
+    `/health` `/ws/*` `/themes/*` `/soul/*` の25パスが、解決できているのに
+    判定からも残余からも黙って捨てられる（gate-verifier 8回目の指摘）。
+    """
     if url.startswith(("http://", "https://", "ws://", "wss://")):
         host = url.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
         return host in _LOCAL_HOSTS
-    return url.startswith("/api")
+    if not url.startswith("/"):
+        return False
+    head = url.strip("/").split("/", 1)[0]
+    return head in (prefixes if prefixes is not None else frozenset({"api"}))
 
 
 def _receiver_before(text: str, index: int) -> str | None:
@@ -860,6 +887,11 @@ class UiApiExecutor:
         # ルート直下（/api/...）に載っているモジュール。None なら未判定で、
         # EndpointSite.registered に従う（受け側を問わない緩い判定）。
         self.root_modules = root_modules
+        # 宣言されているパスの先頭セグメント。backend かどうかの判定に使う。
+        self.backend_prefixes = frozenset(
+            path.strip("/").split("/", 1)[0]
+            for _, path in registry.endpoints
+            if path.strip("/")) or frozenset({"api"})
 
     @classmethod
     def for_repo(cls) -> UiApiExecutor:
@@ -942,6 +974,14 @@ class UiApiExecutor:
                 seen.add(path)
                 yield path
 
+    def _hints_backend(self, value: str) -> bool:
+        """宣言されている先頭セグメントで始まる相対パスか。"""
+        stripped = value.strip()
+        if not stripped.startswith("/"):
+            return False
+        head = stripped.strip("/").split("/", 1)[0].split("?", 1)[0]
+        return head in self.backend_prefixes
+
     def _shape_index(self) -> dict[tuple[str, str], list]:
         """(メソッド, 形) → 宣言。パスパラメータ名の違いを吸収する。"""
         index: dict[tuple[str, str], list] = {}
@@ -1005,6 +1045,11 @@ class UiApiExecutor:
         found: list[FetchSite] = []
         # どの範囲を「呼び出しとして読んだ」か。残余の判定に使う。
         covered: list[tuple[int, int]] = []
+        # そのうち**URL が書かれる位置**だけ。宣言を残余から外してよいかは
+        # ここだけで判断する。covered 全体から名前を拾うと、第2引数に
+        # `{ headers: { endpoint: '1' } }` を足すだけで
+        # `const endpoint = '/api/undeclared'` が消える（8回目の指摘）。
+        url_regions: list[tuple[int, int]] = []
 
         def line_of(index: int) -> int:
             return text.count("\n", 0, index) + 1
@@ -1039,6 +1084,8 @@ class UiApiExecutor:
                     continue
                 cover(hit.start(), open_index + len(args) + 2)
                 parts = _split_top_level(args)
+                url_regions.append(
+                    (open_index, open_index + len(parts[0]) + 2))
                 found.append(self._judge(parts, constants, rel, line, shapes,
                                          forced_method=method,
                                          env=constants, used=used))
@@ -1056,12 +1103,15 @@ class UiApiExecutor:
                     quote = hit.group("q")
                     expr = f"{quote}{hit.group('value')}{quote}"
                     cover(hit.start(), hit.end())
+                    url_regions.append((hit.start(), hit.end()))
                 else:
                     body = _match_args(text, hit.end() - 1)
                     if body is None:
                         continue
                     cover(hit.start(), hit.end() + len(body) + 1)
                     expr = _split_top_level(body)[0] if arg_open == "(" else body
+                    url_regions.append(
+                        (hit.end() - 1, hit.end() + len(expr) + 1))
                 url, why = _resolve_url(expr, constants, used=used)
                 if url is None:
                     # **読めないものを「backend ではない」と決めつけない。**
@@ -1071,7 +1121,7 @@ class UiApiExecutor:
                         rel, line, _short(expr), None, None,
                         Verdict.UNRESOLVED_URL, why))
                     continue
-                if not _is_backend_url(url):
+                if not _is_backend_url(url, self.backend_prefixes):
                     continue  # 解決できて、backend でないと分かったものだけ外す
                 found.append(self._judge([expr], constants, rel, line, shapes,
                                          forced_method="GET", used=used))
@@ -1089,7 +1139,7 @@ class UiApiExecutor:
         # 残余から外す。無条件に外すと `const u = "/api/x"; sink(u)` の
         # ように、変数を1つ挟むだけで消える（gate-verifier 7回目の指摘）。
         referenced = set(used)
-        for lo, hi in covered:
+        for lo, hi in url_regions:
             referenced |= set(re.findall(r"[A-Za-z_$][\w$]*", text[lo:hi]))
         for hit in _ASSIGN_RE.finditer(text):
             if hit.group("name") in referenced:
@@ -1098,8 +1148,7 @@ class UiApiExecutor:
         found += self._residual(text, covered, rel, line_of)
         return found
 
-    @staticmethod
-    def _residual(text: str, covered: list[tuple[int, int]], rel: str,
+    def _residual(self, text: str, covered: list[tuple[int, int]], rel: str,
                   line_of) -> list[FetchSite]:
         """**どの呼び出しにも紐づかなかった backend の URL。**
 
@@ -1110,7 +1159,8 @@ class UiApiExecutor:
         out: list[FetchSite] = []
         for hit in _URL_LITERAL_RE.finditer(text):
             value = hit.group("value")
-            if not _BACKEND_URL_HINT.search(value):
+            if not (_BACKEND_URL_HINT.search(value)
+                    or self._hints_backend(value)):
                 continue
             start = hit.start()
             if any(lo <= start <= hi for lo, hi in covered):

@@ -717,6 +717,72 @@ def test_two_top_level_method_keys_are_unresolved():
     assert _resolve_method("{ method: 'GET', method: 'POST' }")[0] is None
 
 
+@pytest.mark.parametrize("before", [
+    "const isAbs = (u) => /^https?:\\/\\//.test(u);",
+    "function f(u) { return /^https?:\\/\\//.test(u); }",
+    "const b = 1 > 2; const r = /a\\/\\/b/;",
+    "const c = 2 * 3; const r = /x\\/\\/y/;",
+    "const t = typeof /a\\/\\/b/;",
+])
+def test_a_regex_literal_in_any_context_does_not_swallow_the_line(
+        tmp_path, before):
+    """許可リストで文脈を数え上げると、必ず数え漏れた文脈で穴が残る。
+
+    除算になり得るのは直前が「値の終わり」のときだけ、と**除外**で書く。
+    """
+    report = _run(tmp_path, f"""
+        {before}
+        export default function App() {{
+          fetch('/api/demo/nope', {{ method: 'DELETE' }});
+        }}
+    """)
+
+    assert Verdict.NOT_DECLARED in _verdicts(report), before
+
+
+def test_a_division_is_not_mistaken_for_a_regex():
+    from backend.ux_verification.ui_api import _strip_comments
+
+    stripped = _strip_comments("const r = a / b / c; // 消える")
+
+    assert stripped.startswith("const r = a / b / c;")
+    assert "消える" not in stripped
+
+
+def test_a_declared_route_outside_api_is_judged(tmp_path):
+    """backend の判定を `/api` 決め打ちにすると、実在する他のルートが
+    解決できているのに黙って捨てられる。**宣言から導く。**"""
+    report = _run(tmp_path, """
+        export default function App() {
+          return <a href="/demo/nope">x</a>;
+        }
+    """, router_body="""
+    from fastapi import APIRouter
+
+    router = APIRouter(prefix="/demo")
+
+    @router.get("/status")
+    async def status():
+        return {"ok": True}
+""")
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_a_same_named_token_elsewhere_does_not_consume_a_declaration(tmp_path):
+    """covered 全体から名前を拾うと、第2引数に同名のキーを足すだけで
+    宣言が残余から外れる。**URL が書かれる位置だけ**で判断する。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        const endpoint = '/api/demo/nope';
+        export default function App() {
+          fetch(`${API_BASE}/api/demo/status`, { headers: { endpoint: '1' } });
+        }
+    """)
+
+    assert Verdict.UNATTRIBUTED in _verdicts(report)
+
+
 def test_a_react_data_prop_is_not_mistaken_for_an_object_url(tmp_path):
     """`<RadarChart data={...}>` は URL ではない。過検出で FAIL を作らない。"""
     report = _run(tmp_path, """
