@@ -156,6 +156,18 @@ _URL_ATTR_RE = re.compile(r"(?<![\w$])(?:src|href|poster)\s*=\s*\{")
 _URL_ATTR_STR_RE = re.compile(
     r"(?<![\w$])(?:src|href|poster)\s*=\s*(?P<q>['\"])(?P<value>(?P=q)|[^'\"]*)(?P=q)")
 _WINDOW_OPEN_RE = re.compile(r"(?<![\w$])window\.open\s*\(")
+
+# **残余の受け皿。** SCANNED（構文で開く）と UNSCANNED（正規表現で検出）の
+# 2つだけで閉包を作ると、その補集合は常に無検査で、しかも痕跡が残らない。
+# 5回連続で同じ型に破られたのはこの構造が原因（gate-verifier 6回目の指摘）。
+# 走査ファイル中の「backend の URL らしき記述」を先に全部数え、どの呼び出しにも
+# 紐づかなかったものを `unattributed` として必ず出す。
+_URL_LITERAL_RE = re.compile(
+    r"""(['"`])(?P<value>(?:(?!\1)[^\\]|\\.)*?)\1""", re.DOTALL)
+_BACKEND_URL_HINT = re.compile(r"(?:^|[^\w])/api/|ws://|wss://|http://localhost")
+# 残余を数えるときコメントは外す。コメントは実行されないので呼び出しではない。
+_LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 # `const API_BASE = "http://localhost:8000";` と
 # `const url = ` + backtick + `${API_BASE}/api/segments?t=${t}` + backtick + `;`。
 # **ファイル内で1度しか代入されていない名前だけ**を辞書に入れる。
@@ -196,6 +208,7 @@ class Verdict(Enum):
     UNRESOLVED_METHOD = "unresolved_method"
     EXTERNAL_HOST = "external_host"
     UNSCANNED_FORM = "unscanned_form"
+    UNATTRIBUTED = "unattributed"
 
 
 # 各判定が「何を確かめ、何を確かめないか」。CLAIM_SEMANTICS と同じ形で
@@ -246,6 +259,12 @@ VERDICT_SEMANTICS: dict[Verdict, dict[str, str]] = {
         "確かめないこと": "その呼び出し先が実在するか（読めていない）",
         "PASS": "no",
     },
+    Verdict.UNATTRIBUTED: {
+        "確かめること": "backend の URL らしき記述があるのに、"
+                        "どの呼び出しにも紐づけられなかった",
+        "確かめないこと": "それが実際に呼ばれるか・どの形で呼ばれるか",
+        "PASS": "no",
+    },
 }
 
 # C-2 が名指しする「突き合わない」3型。**ここがゼロになることが終了条件。**
@@ -266,8 +285,14 @@ SCAN_SEMANTICS = {
     "走査する形": list(SCANNED_FORMS),
     "走査できない形": sorted(UNSCANNED_FORMS),
     "素の呼び出しとして扱う受け側": list(_GLOBAL_RECEIVERS),
-    "走査できない形の扱い": "見つけたら unscanned_form の FAIL にする（黙って落とさない）",
+    "走査できない形の扱い": "unscanned_form の FAIL にする。PASS にはしない。"
+                            "ゲートの exit を決めるのは『突き合わせの対象』の3型で、"
+                            "読めなかったものはラチェットが1件ずつ固定する"
+                            "（新規に増えれば unpinned_new で CI が落ちる）",
     "突き合わせの対象": sorted(v.value for v in MISMATCH_VERDICTS),
+    "残余の扱い": "走査ファイル中の backend URL らしき記述で、どの呼び出しにも"
+                  "紐づかなかったものは unattributed の FAIL にする。"
+                  "**走査する形と走査できない形の補集合を無検査にしない**",
 }
 
 
@@ -513,6 +538,46 @@ def _all_form_hits(text: str):
             yield label, hit
 
 
+def _strip_comments(text: str) -> str:
+    """コメントを同じ長さの空白に置き換える。位置はずらさない。
+
+    **文字列の中の `//` をコメント開始と誤読しない。**
+    `"http://localhost:8000"` を壊すと、以降の引用符の対応が総崩れになる。
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    quote: str | None = None
+    while i < n:
+        ch = text[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in "'\"`":
+            quote = ch
+            i += 1
+            continue
+        if text.startswith("//", i):
+            while i < n and text[i] != "\n":
+                out[i] = " "
+                i += 1
+            continue
+        if text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = n if end == -1 else end + 2
+            for j in range(i, end):
+                if out[j] != "\n":
+                    out[j] = " "
+            i = end
+            continue
+        i += 1
+    return "".join(out)
+
+
 def _is_backend_url(url: str) -> bool:
     """backend を叩く URL か。ローカル資産と外部リンクを判定に載せない。"""
     if url.startswith(("http://", "https://", "ws://", "wss://")):
@@ -543,10 +608,24 @@ def _closing_brace(text: str, open_index: int) -> int | None:
     return None
 
 
-def _resolve_method(arg: str | None) -> tuple[str | None, str]:
-    """第2引数から HTTP メソッドを読む。読めなければ (None, 理由)。"""
+def _resolve_method(arg: str | None,
+                    env: dict[str, str] | None = None) -> tuple[str | None, str]:
+    """第2引数から HTTP メソッドを読む。読めなければ (None, 理由)。
+
+    **オブジェクトリテラルでなければ GET と断定しない。** `fetch(url, opts)` の
+    `opts` を読まずに GET を主張すると、実体が DELETE でも GET の宣言に
+    当たって matched になる（gate-verifier 6回目の指摘）。URL 側は解決できな
+    ければ必ず unresolved に落とすのに、メソッド側だけ既定値を主張していた。
+    """
     if arg is None or not arg.strip():
-        return "GET", ""  # fetch の既定
+        return "GET", ""  # 第2引数が無いときだけが fetch の既定
+    arg = arg.strip()
+    if not (arg.startswith("{") and arg.endswith("}")):
+        # 名前なら、URL と同じく「1度しか代入されていない」ときだけ辿る。
+        bound = (env or {}).get(arg)
+        if bound is not None:
+            return _resolve_method(bound, None)
+        return None, f"第2引数がオブジェクトリテラルでない（{_short(arg)}）"
     if _SPREAD_RE.search(arg):
         return None, "スプレッドに隠れてメソッドを静的に読めない"
     hit = _METHOD_RE.search(arg)
@@ -743,7 +822,10 @@ class UiApiExecutor:
         shapes = self._shape_index()
 
         for path in self._iter_files():
-            text = path.read_text(encoding="utf-8", errors="replace")
+            # **コメントは先に外す。** 検出を生テキストに対して行うと、
+            # コメントアウトされた呼び出しを実在の呼び出しとして数える。
+            text = _strip_comments(
+                path.read_text(encoding="utf-8", errors="replace"))
             rel = _display_path(path, self.frontend_src)
             # モジュールでないもの（index.html・CSS）は import で辿れないので
             # 到達可能性の対象外。**走査しないのではなく、常に走査する。**
@@ -861,9 +943,19 @@ class UiApiExecutor:
     def _sites_in(self, text: str, constants: dict[str, str], rel: str,
                   shapes: dict) -> list[FetchSite]:
         found: list[FetchSite] = []
+        # どの範囲を「呼び出しとして読んだ」か。残余の判定に使う。
+        covered: list[tuple[int, int]] = []
 
         def line_of(index: int) -> int:
             return text.count("\n", 0, index) + 1
+
+        def cover(start: int, end: int) -> None:
+            covered.append((start, end))
+
+        # `const API_BASE = "http://localhost:8000"` は**宣言**であって
+        # 呼び出しではない。解決に使われる値なので残余から外す。
+        for hit in _ASSIGN_RE.finditer(text):
+            cover(hit.start("value"), hit.end("value"))
 
         for pattern, method in ((_FETCH_RE, None), (_WEBSOCKET_RE, "WEBSOCKET")):
             for hit in pattern.finditer(text):
@@ -873,6 +965,9 @@ class UiApiExecutor:
                 if receiver is not None and receiver not in _GLOBAL_RECEIVERS:
                     # `res.fetch(` のような未知の受け側。ネットワーク呼び出しか
                     # どうかを静的に決められないので、素通りさせずに出す。
+                    args = _match_args(text, open_index)
+                    cover(hit.start(),
+                          open_index + len(args or "") + 2)
                     found.append(FetchSite(
                         rel, line, f"{receiver}.fetch(", None, None,
                         Verdict.UNRESOLVED_URL, f"受け側が未知（{receiver}.fetch）"))
@@ -884,9 +979,11 @@ class UiApiExecutor:
                         None, None, Verdict.UNRESOLVED_URL,
                         "引数の括弧が閉じていない"))
                     continue
+                cover(hit.start(), open_index + len(args) + 2)
                 parts = _split_top_level(args)
                 found.append(self._judge(parts, constants, rel, line, shapes,
-                                         forced_method=method))
+                                         forced_method=method,
+                                         env=constants))
 
         # ブラウザが GET を投げる URL 属性と window.open。
         # ローカルの画像などは backend への呼び出しではないので、
@@ -900,10 +997,12 @@ class UiApiExecutor:
                     # 引用符ごと渡す。中身だけ渡すと文字列リテラルに見えない。
                     quote = hit.group("q")
                     expr = f"{quote}{hit.group('value')}{quote}"
+                    cover(hit.start(), hit.end())
                 else:
                     body = _match_args(text, hit.end() - 1)
                     if body is None:
                         continue
+                    cover(hit.start(), hit.end() + len(body) + 1)
                     expr = _split_top_level(body)[0] if arg_open == "(" else body
                 url, why = _resolve_url(expr, constants)
                 if url is None:
@@ -923,14 +1022,42 @@ class UiApiExecutor:
         # 「問題なし」に混ぜない。
         for name, pattern in UNSCANNED_FORMS.items():
             for hit in pattern.finditer(text):
+                end_of_line = text.find(chr(10), hit.start())
+                cover(hit.start(), end_of_line if end_of_line != -1 else len(text))
                 found.append(FetchSite(
                     rel, line_of(hit.start()), name, None, None,
                     Verdict.UNSCANNED_FORM, f"{name} は走査できない"))
+
+        found += self._residual(text, covered, rel, line_of)
         return found
+
+    @staticmethod
+    def _residual(text: str, covered: list[tuple[int, int]], rel: str,
+                  line_of) -> list[FetchSite]:
+        """**どの呼び出しにも紐づかなかった backend の URL。**
+
+        SCANNED と UNSCANNED の2集合だけで閉包を作ると、補集合は常に
+        無検査で痕跡も残らない。ここが残余の受け皿（gate-verifier 6回目の指摘）。
+        コメントは走査の入口で外してあるので、ここには来ない。
+        """
+        out: list[FetchSite] = []
+        for hit in _URL_LITERAL_RE.finditer(text):
+            value = hit.group("value")
+            if not _BACKEND_URL_HINT.search(value):
+                continue
+            start = hit.start()
+            if any(lo <= start <= hi for lo, hi in covered):
+                continue
+            out.append(FetchSite(
+                rel, line_of(start), _short(value), None, None,
+                Verdict.UNATTRIBUTED,
+                "backend の URL らしき記述が、どの呼び出しにも紐づかない"))
+        return out
 
     def _judge(self, parts: list[str], constants: dict[str, str], rel: str,
                line: int, shapes: dict,
-               forced_method: str | None = None) -> FetchSite:
+               forced_method: str | None = None,
+               env: dict[str, str] | None = None) -> FetchSite:
         raw = _short(parts[0]) if parts else ""
         url, why = _resolve_url(parts[0] if parts else "", constants)
         if url is None:
@@ -944,7 +1071,8 @@ class UiApiExecutor:
         if forced_method:
             method, why = forced_method, ""
         else:
-            method, why = _resolve_method(parts[1] if len(parts) > 1 else None)
+            method, why = _resolve_method(
+                parts[1] if len(parts) > 1 else None, env)
         if method is None:
             return FetchSite(rel, line, raw, path, None,
                              Verdict.UNRESOLVED_METHOD, why)

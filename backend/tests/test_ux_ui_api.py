@@ -199,7 +199,11 @@ def test_a_variable_url_that_is_bound_twice_is_unresolved(tmp_path):
         }
     """)
 
-    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+    # 呼び出しは読めない。加えて、再代入側の URL はどの呼び出しにも
+    # 紐づかないので残余として出る。どちらも PASS ではない。
+    assert Verdict.UNRESOLVED_URL in _verdicts(report)
+    assert Verdict.UNATTRIBUTED in _verdicts(report)
+    assert not any(s.passed for s in report.sites)
 
 
 def test_a_computed_url_is_unresolved(tmp_path):
@@ -551,6 +555,97 @@ def test_every_form_in_an_unreachable_file_is_counted(tmp_path):
     assert report.sites == []
     assert len(report.unreachable) >= 3
     assert all("Orphan.jsx" in entry for entry in report.unreachable)
+
+
+@pytest.mark.parametrize("snippet", [
+    "const P = (el, k) => el.setAttribute(k, '/api/demo/nope');",
+    "const P = () => Object.assign(window.location, {href: '/api/demo/nope'});",
+    "const WS = WebSocket; const P = () => new WS('ws://localhost:8000/api/x');",
+    "const api = { get: fetch }; const P = () => api.get('/api/demo/nope');",
+    "const [g] = [fetch]; const P = () => g('/api/demo/nope');",
+])
+def test_the_residual_catches_what_no_detector_matched(tmp_path, snippet):
+    """**補集合を無検査にしない。**
+
+    走査する形と走査できない形の2集合だけで閉包を作ると、その補集合は
+    常に無検査で痕跡も残らない。残余の受け皿がその構造を閉じる。
+    """
+    report = _run(tmp_path, f"""
+        export default function App() {{ return null; }}
+        {snippet}
+    """)
+
+    assert Verdict.UNATTRIBUTED in _verdicts(report), snippet
+
+
+def test_a_base_constant_declaration_is_not_a_residual(tmp_path):
+    """`const API_BASE = "http://localhost:8000"` は宣言であって呼び出しではない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          fetch(`${API_BASE}/api/demo/status`);
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.MATCHED]
+
+
+def test_a_url_inside_a_comment_is_not_a_residual(tmp_path):
+    """コメントは実行されない。呼び出しではない。"""
+    report = _run(tmp_path, """
+        // fetch('/api/demo/nope') はもう使っていない
+        /* '/api/demo/nope' も同様 */
+        export default function App() { return null; }
+    """)
+
+    assert report.sites == []
+
+
+def test_a_double_slash_inside_a_url_is_not_a_comment(tmp_path):
+    """`"http://localhost:8000"` の `//` をコメント開始と誤読すると、
+    以降の引用符の対応が総崩れになる。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          fetch(`${API_BASE}/api/demo/status`);
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.MATCHED]
+
+
+@pytest.mark.parametrize("second_arg", [
+    "opts", "buildOpts('POST')", "init || {}",
+])
+def test_a_method_that_cannot_be_read_is_not_assumed_to_be_get(
+        tmp_path, second_arg):
+    """**第2引数がオブジェクトリテラルでなければ GET と断定しない。**
+
+    実体が DELETE でも GET の宣言に当たって matched になっていた。
+    URL 側は解決できなければ必ず unresolved に落とすのに、
+    メソッド側だけ既定値を主張していた。
+    """
+    report = _run(tmp_path, f"""
+        const API_BASE = "http://localhost:8000";
+        const opts = {{ method: 'DELETE' }};
+        export default function App(init, buildOpts) {{
+          fetch(`${{API_BASE}}/api/demo/status`, {second_arg});
+        }}
+    """)
+
+    assert Verdict.UNRESOLVED_METHOD in _verdicts(report), second_arg
+
+
+def test_no_second_argument_still_means_get(tmp_path):
+    """第2引数が無いときだけが fetch の既定。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          fetch(`${API_BASE}/api/demo/status`);
+        }
+    """)
+
+    assert report.sites[0].method == "GET"
 
 
 def test_a_react_data_prop_is_not_mistaken_for_an_object_url(tmp_path):
