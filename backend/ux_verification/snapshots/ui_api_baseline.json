@@ -209,10 +209,14 @@
       ".css",
       ".html",
       ".js",
+      ".json",
       ".jsx",
       ".mjs",
+      ".svg",
       ".ts",
-      ".tsx"
+      ".tsx",
+      ".webmanifest",
+      ".xml"
     ],
     "scanned_forms": [
       "fetch",

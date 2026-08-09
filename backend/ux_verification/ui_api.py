@@ -77,9 +77,10 @@ _LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0")
 # `.mjs` は到達可能と判定されるのに走査から漏れていた。`index.html` と CSS は
 # 一度も開かれていなかった（gate-verifier 4回目の指摘）。
 SCANNED_SUFFIXES = (".jsx", ".js", ".tsx", ".ts", ".mjs", ".cjs",
-                     ".css", ".html")
+                    ".css", ".html", ".svg", ".json", ".xml", ".webmanifest")
 # import で辿れないので到達可能性の対象外にするもの。**常に走査する。**
-_NON_MODULE_SUFFIXES = (".css", ".html")
+_NON_MODULE_SUFFIXES = (".css", ".html", ".svg", ".json", ".xml",
+                        ".webmanifest")
 _EXCLUDED_DIRS = {"node_modules", "dist", "build", "__pycache__", ".vite"}
 
 # `fetch(` と `window.fetch(` / `globalThis.fetch(` / `self.fetch(`。
@@ -203,7 +204,9 @@ _METHOD_RE = re.compile(
 # `method:` / `'method':` / `["method"]:` のどれでも当たる。素のキーだけ
 # 見ていると、引用符を付けるだけで既定 GET に落ちる（9回目の指摘）。
 _METHOD_KEY_RE = re.compile(
-    r"""^\s*(?:\[\s*)?(?P<q>['"])?method(?(q)(?P=q))\s*(?:\])?\s*:""")
+    r"""^\s*(?:\[\s*)?(?P<q>['"`])?method(?(q)(?P=q))\s*(?:\])?\s*:""")
+# 値の読めない計算キー（`['met'+'hod']:` など）。**GET と断定しない。**
+_COMPUTED_KEY_RE = re.compile(r"""^\s*\[(?!\s*(['"`])method\s*\])""")
 _SPREAD_RE = re.compile(r"\.\.\.")
 
 
@@ -557,7 +560,7 @@ def _all_form_hits(text: str):
 # **引用符とバッククォートも値の終わり。** これを入れないと
 # `` `${a}` / 2 `` の `/` を正規表現の開始と読み、前方走査が次の文字列の
 # 開き引用符を跨いで引用符の対応が反転する（gate-verifier 9回目の指摘）。
-_VALUE_END_RE = re.compile(r"""(?:[\w$\]\)'"`]|\.\d)\s*$""")
+_VALUE_END_RE = re.compile(r"""(?:[\w$\]\)\}'"`]|\.\d)\s*$""")
 _NOT_A_VALUE_KEYWORD = frozenset({
     "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
     "case", "do", "else", "yield", "await", "throw",
@@ -624,21 +627,21 @@ def _strip_comments(text: str) -> str:
         # 「値の終わり」——識別子・数値・`)` `]`——のときだけ。
         if ch == "/" and not text.startswith(("//", "/*"), i) \
                 and not _ends_a_value(text, i):
+            # **引用符を跨いだら諦める、はやらない。** 9回目に入れたその
+            # fail-safe は、`/["']/` のような引用符を含む本物の正規表現を
+            # 除算と読ませ、その引用符が文字列状態を反転させて、直後の
+            # `https://` の `//` が行コメントになり同じ行の fetch が
+            # 消えていた（gate-verifier 10回目の指摘）。
+            # 曖昧さは「値の終わり」の判定側（`}` や引用符を含める）で解く。
             j = i + 1
-            crossed_quote = False
             while j < n and text[j] != "\n":
                 if text[j] == "\\":
                     j += 2
                     continue
                 if text[j] == "/":
                     break
-                if text[j] in "'\"`":
-                    crossed_quote = True
                 j += 1
-            # 引用符を跨いだ前方走査は、正規表現ではなく除算を誤読している
-            # 可能性が高い。跨いだら正規表現とみなさない（fail-safe）。
-            # JSX の `{done} / {total} <a href="...">` がこれに当たる。
-            if j < n and text[j] == "/" and not crossed_quote:
+            if j < n and text[j] == "/":
                 i = j + 1
                 continue
         if text.startswith("//", i):
@@ -662,7 +665,7 @@ def _strip_comments(text: str) -> str:
 _ASSET_SUFFIXES = (
     ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
     ".css", ".js", ".mjs", ".map", ".woff", ".woff2", ".ttf", ".otf",
-    ".mp4", ".webm", ".mp3", ".wav", ".pdf", ".txt", ".json",
+    ".mp4", ".webm", ".mp3", ".wav", ".pdf",
     ".jsx", ".tsx", ".ts", ".html",
 )
 
@@ -735,6 +738,9 @@ def _resolve_method(arg: str | None,
     top = _split_top_level(arg[1:-1])
     keys = [part for part in top if _METHOD_KEY_RE.match(part)
             or re.fullmatch(r"method", part.strip())]
+    if any(_COMPUTED_KEY_RE.match(part) and not _METHOD_KEY_RE.match(part)
+           for part in top):
+        return None, "計算キーがあり method かどうか決められない"
     if len(keys) > 1:
         return None, "method がトップレベルに複数ある"
     if len(keys) == 1:

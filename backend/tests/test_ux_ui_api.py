@@ -1113,3 +1113,67 @@ def test_an_external_host_in_an_attribute_is_classified_as_external(tmp_path):
     """)
 
     assert _verdicts(report) == [Verdict.EXTERNAL_HOST]
+
+
+# --- gate-verifier 10回目 ------------------------------------------------------
+
+
+@pytest.mark.parametrize("before", [
+    # 引用符を含む本物の正規表現。除算と読むとその引用符が状態を反転させる。
+    'const sanitize = (s) => String(s).replace(/["\']/g, "");',
+    r'const re = /https?:\/\//;',
+    'const a = 1, t = 2; const r = `${a}` / t;',
+    'const C = ({d, t}) => <span>{d} / {t}</span>;',
+    'const q = x / y / z;',
+])
+def test_a_slash_never_hides_a_call_on_the_following_line(tmp_path, before):
+    """正規表現か除算かの判定を誤ると、直後の `https://` の `//` が
+    行コメントになり、同じ行・次の行の呼び出しが無記録で消える。
+    """
+    report = _run(tmp_path, f"""
+        const x = 1, y = 2, z = 3;
+        {before}
+        const HELP = "https://docs.example.com/help";
+        export default function App() {{
+          fetch('/api/demo/nope');
+        }}
+    """)
+
+    assert Verdict.NOT_DECLARED in _verdicts(report), before
+
+
+@pytest.mark.parametrize("second_arg,expected", [
+    ("{ [`method`]: 'DELETE' }", "DELETE"),
+    ("{ ['met' + 'hod']: 'DELETE' }", None),
+    ("{ [x]: 1 }", None),
+])
+def test_a_computed_method_key_is_not_assumed_to_be_get(second_arg, expected):
+    """読めない計算キーを GET と断定すると、実在のメソッド違いが PASS になる。"""
+    from backend.ux_verification.ui_api import _resolve_method
+
+    assert _resolve_method(second_arg)[0] == expected, second_arg
+
+
+@pytest.mark.parametrize("name,body", [
+    ("probe.svg", '<svg><image href="/api/demo/nope" /></svg>'),
+    ("probe.json", '{"api": "/api/demo/nope"}'),
+])
+def test_a_data_file_carrying_a_backend_url_is_scanned(tmp_path, name, body):
+    """`.svg` `.json` は走査対象にも「走査できない形」にも無く、無痕跡だった。"""
+    report = _run(tmp_path, """
+        export default function App() { return null; }
+    """, extra={name: body})
+
+    assert report.sites, name
+    assert not any(s.passed for s in report.sites)
+
+
+def test_a_json_extension_does_not_make_a_path_a_static_asset(tmp_path):
+    """`/reports/export.json` は backend の応答かもしれない。資産と断定しない。"""
+    report = _run(tmp_path, """
+        export default function App() {
+          return <a href="/reports/export.json">A</a>;
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
