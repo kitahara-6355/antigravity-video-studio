@@ -121,6 +121,46 @@ def test_the_passing_verdicts_pinned_today_are_exactly_matched():
     assert passing_verdicts() == ["matched"]
 
 
+@pytest.mark.parametrize("field_name", [
+    "scanned_files", "scanned_forms", "global_receivers", "mismatch_verdicts",
+])
+def test_any_change_to_the_scan_closure_is_a_violation(tmp_path, field_name):
+    """**どちらに動いても違反。** 増えれば読めなかったものが読めたことになり、
+    減れば見えていたものが見えなくなる。片方向だけ見ると縮小が素通りする。"""
+    for mutate in (lambda v: [*v, "余計なもの"], lambda v: v[:-1]):
+        baseline = _pinned(tmp_path, _report(_site()))
+        baseline["scan_boundary"][field_name] = mutate(
+            baseline["scan_boundary"][field_name])
+
+        result = UiApiRatchet().check(_report(_site()), baseline)
+
+        assert not result.valid, field_name
+        assert [v.kind for v in result.violations] == ["scan_widened"], field_name
+
+
+def test_replacing_an_unscannable_pattern_body_is_a_violation(tmp_path):
+    """キー名だけ固定していると、正規表現を無効なものに差し替えるだけで
+    その形の検出が黙って消える。**本体まで固定する。**"""
+    baseline = _pinned(tmp_path, _report(_site()))
+    forms = baseline["scan_boundary"]["unscanned_forms"]
+    name = next(iter(forms))
+    forms[name] = "(?!x)x"          # 絶対に当たらない正規表現
+
+    result = UiApiRatchet().check(_report(_site()), baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["scan_widened"]
+
+
+def test_the_unscannable_forms_are_pinned_by_pattern_not_by_name():
+    from backend.ux_verification.ui_api_ratchet import scan_boundary
+
+    forms = scan_boundary()["unscanned_forms"]
+
+    assert isinstance(forms, dict)
+    assert all(isinstance(v, str) and v for v in forms.values())
+
+
 # --- 4. 宣言の差し替え --------------------------------------------------------
 
 
@@ -234,6 +274,27 @@ def test_widening_passed_requires_widening_the_semantics_table():
     for verdict in Verdict:
         site = _site(verdict=verdict)
         assert site.passed is (VERDICT_SEMANTICS[verdict]["PASS"] == "yes"), verdict
+
+
+def test_deleting_a_nested_scan_boundary_key_is_a_violation(tmp_path):
+    """入れ子の欄を1つ消せばその欄だけ無検査になる、を塞ぐ。"""
+    baseline = _pinned(tmp_path, _report(_site()))
+    baseline["scan_boundary"].pop("global_receivers")
+
+    result = UiApiRatchet().check(_report(_site()), baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["tampered"]
+
+
+def test_blanking_the_declaration_on_the_executor_side_is_a_violation(tmp_path):
+    """ベースライン側だけ塞いでも、実行側に同じ「空＝無検査」が残る。"""
+    baseline = _pinned(tmp_path, _report(_site(declared="routers/a.py:10")))
+
+    result = UiApiRatchet().check(_report(_site(declared="")), baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["substituted"]
 
 
 def test_an_unparsable_baseline_is_treated_as_missing(tmp_path):

@@ -55,7 +55,6 @@ from backend.ux_verification.api_contract import (
 )
 from backend.ux_verification.executor import (
     _display_path,
-    _iter_source_files,
     _project_root,
     _reachable_files,
 )
@@ -74,22 +73,37 @@ _PARAM = "{}"
 # SKIP にはしない（確かめていないものを緑にしない）。
 _LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0")
 
+# 走査するファイル。executor の `_SOURCE_SUFFIXES` は .jsx/.js/.tsx/.ts だけで、
+# `.mjs` は到達可能と判定されるのに走査から漏れていた。`index.html` と CSS は
+# 一度も開かれていなかった（gate-verifier 4回目の指摘）。
+SCANNED_SUFFIXES = (".jsx", ".js", ".tsx", ".ts", ".mjs", ".cjs",
+                    ".css", ".html", ".svg", ".json", ".xml", ".webmanifest")
+# import で辿れないので到達可能性の対象外にするもの。**常に走査する。**
+_NON_MODULE_SUFFIXES = (".css", ".html", ".svg", ".json", ".xml",
+                        ".webmanifest")
+_EXCLUDED_DIRS = {"node_modules", "dist", "build", "__pycache__", ".vite"}
+
 # `fetch(` と `window.fetch(` / `globalThis.fetch(` / `self.fetch(`。
 # 素の `fetch` だけを見ていると `window.fetch('/api/x')` が走査から**黙って消える**
 # （gate-verifier 1回目の指摘）。受け側を閉じた集合にし、それ以外の `X.fetch(` は
 # 素通りさせず unresolved_url として出す。
-_FETCH_RE = re.compile(r"(?<![\w$])fetch\s*\(")
-# `fetch(` の直前にある受け側（`window.` など）を読む。
-_RECEIVER_RE = re.compile(r"([\w$]+(?:\.[\w$]+)*)\.\s*$")
+_FETCH_RE = re.compile(r"(?<![\w$])fetch\s*(?:\?\.)?\s*\(")
+# `fetch(` の直前にある受け側（`window.` など）を読む。`?.` と改行も跨ぐ——
+# `client?.fetch(...)` や改行を挟んだ `.fetch(` を見落とすと、未知の受け側が
+# 素の呼び出しに化ける（gate-verifier 2回目の指摘）。
+_RECEIVER_RE = re.compile(r"([\w$]+(?:\s*\??\.\s*[\w$]+)*)\s*\??\.\s*$", re.DOTALL)
 _GLOBAL_RECEIVERS = ("window", "globalThis", "self")
 # WebSocket も UI から backend を叩く経路。`@router.websocket` の宣言と
 # 突き合わせる。`fetch` だけ見て「全部見た」と言わない。
-_WEBSOCKET_RE = re.compile(r"(?<![\w.$])new\s+WebSocket\s*\(")
+_WEBSOCKET_RE = re.compile(
+    r"(?<![\w.$])new\s+(?:(?:window|globalThis|self)\s*\.\s*)?WebSocket\s*\(")
 
 # 走査している呼び出しの形。**機械可読にする** — ここに無い形は
 # 「確かめていない」であって「無い」ではない（gate-verifier 1回目の指摘）。
 SCANNED_FORMS = ("fetch", "window.fetch", "globalThis.fetch", "self.fetch",
-                 "new WebSocket")
+                 "new WebSocket", "window.open",
+                 "src={...}", "href={...}", "poster={...}",
+                 'src="..."', 'href="..."', 'poster="..."')
 # 走査できない形。実在したら unscanned_form として FAIL にする。
 # 「対応していないから見えない」を「問題なし」に混ぜない。
 UNSCANNED_FORMS = {
@@ -97,7 +111,76 @@ UNSCANNED_FORMS = {
     "XMLHttpRequest": re.compile(r"(?<![\w.$])new\s+XMLHttpRequest\s*\("),
     "EventSource": re.compile(r"(?<![\w.$])new\s+EventSource\s*\("),
     "sendBeacon": re.compile(r"(?<![\w.$])navigator\.sendBeacon\s*\("),
+    # `const f = window.fetch` のような別名束縛と `api['fetch']`。
+    # どちらも呼び出し地点に `fetch(` が現れないので走査から消える。
+    "fetch の別名束縛": re.compile(
+        r"=\s*(?:window|globalThis|self)?\.?\s*fetch\s*(?![\s(])"),
+    "計算メンバでの fetch": re.compile(r"\[\s*['\"]fetch['\"]\s*\]"),
+    # `fetch.call(null, url)` / `fetch.apply(...)`。`fetch(` に当たらないので
+    # 走査からも別名束縛からも漏れる（gate-verifier 3回目の指摘）。
+    "fetch.call / fetch.apply": re.compile(
+        r"(?<![\w$])fetch\s*\.\s*(?:call|apply|bind)\s*\("),
+    # ブラウザ遷移。backend のパスを渡せば GET が飛ぶ。
+    # 受け側（window/top/parent/document/self）の有無と、代入・メソッドの
+    # どちらでも当たるようにする。`window.location =` と
+    # `document.location =` を別々の正規表現で書くと隙間ができる
+    # （gate-verifier 5回目の指摘）。
+    "location 遷移": re.compile(
+        r"(?<![\w$])(?:(?:window|globalThis|self|top|parent|document)\s*\.\s*)?"
+        r"location\s*(?:\.\s*(?:assign|replace)\s*\(|\.\s*href\s*=(?!=)|=(?!=))"),
+    "動的 import": re.compile(r"(?<![\w.$])import\s*\(\s*['\"`]"),
+    "Service Worker": re.compile(r"serviceWorker\s*\.\s*register\s*\("),
+    # URL を運ぶが走査していない属性・記法。
+    "form action": re.compile(r"(?<![\w$])(?:form)?[Aa]ction\s*=\s*[{'\"]"),
+    # `<object data=...>` だけ。素の `data={...}` は React の props で URL ではない。
+    "object の data": re.compile(r"<object\b[^>]*?\bdata\s*=\s*[{'\"]", re.DOTALL),
+    "srcSet": re.compile(r"(?<![\w$])srcSet\s*=\s*[{'\"]"),
+    # `url(${API_BASE}/api/x)` のように途中に式が挟まる形も拾う。
+    "CSS の url()": re.compile(r"url\s*\(\s*[^)\n]*?/api/"),
+    # 右辺が変数でも当てる。`img.src = u` が検出器に当たらないと、
+    # 残余が消えたときに _masked_away も発火しない（12回目の指摘）。
+    # `data` は React の props でも使う（`chart.data = [...]`）。URL を運ぶ
+    # 属性だけに絞る（gate-verifier 13回目が過検出を実測）。
+    "DOM への URL 代入": re.compile(
+        r"\.\s*(?:href|src|action|poster)\s*=(?!=)"),
+    "$.ajax / ky / superagent": re.compile(
+        r"(?<![\w.$])(?:\$\s*\.\s*ajax|ky\s*[.(]|superagent\s*\.)"),
+    # 4回目の指摘。走査もされず「走査できない形」にも入っていなかった5形。
+    "new Worker": re.compile(
+        r"(?<![\w.$])new\s+(?:Shared)?Worker\s*\("),
+    "素の open()": re.compile(r"(?<![\w.$])open\s*\(\s*['\"`]"),
+    # 文字列リテラルに現れない形で URL を作るもの。残余では捕まらないので
+    # **沈黙ではなく FAIL** にする（gate-verifier 7回目の指摘）。
+    "合成された URL": re.compile(
+        r"(?<![\w.$])(?:atob\s*\(|String\.fromCharCode\s*\(|"
+        r"decodeURIComponent\s*\(|\]\s*\.\s*join\s*\()"),
+    "setAttribute で URL": re.compile(
+        r"setAttribute\s*\(\s*['\"]"
+        r"(?:src|href|action|formaction|data|poster|srcset|content|ping)['\"]",
+        re.IGNORECASE),
 }
+
+# JSX の URL 属性と `window.open`。ブラウザはこれも backend に GET を投げる。
+# `fetch` だけ見て「全部見た」と言わない（gate-verifier 2回目の指摘）。
+_URL_ATTR_RE = re.compile(r"(?<![\w$])(?:src|href|poster)\s*=\s*\{")
+# 波括弧なしの素の文字列（`<a href="/api/x">`）。これも走査から消えていた。
+_URL_ATTR_STR_RE = re.compile(
+    r"(?<![\w$])(?:src|href|poster)\s*=\s*(?P<q>['\"])(?P<value>(?P=q)|[^'\"]*)(?P=q)")
+_WINDOW_OPEN_RE = re.compile(r"(?<![\w$])window\.open\s*\(")
+
+# **残余の受け皿。** SCANNED（構文で開く）と UNSCANNED（正規表現で検出）の
+# 2つだけで閉包を作ると、その補集合は常に無検査で、しかも痕跡が残らない。
+# 5回連続で同じ型に破られたのはこの構造が原因（gate-verifier 6回目の指摘）。
+# 走査ファイル中の「backend の URL らしき記述」を先に全部数え、どの呼び出しにも
+# 紐づかなかったものを `unattributed` として必ず出す。
+_URL_LITERAL_RE = re.compile(
+    r"""(['"`])(?P<value>(?:(?!\1)[^\\]|\\.)*?)\1""", re.DOTALL)
+_BACKEND_URL_HINT = re.compile(
+    r"(?:^|[^\w])/?api/|wss?://|https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0)",
+    re.IGNORECASE)
+# 残余を数えるときコメントは外す。コメントは実行されないので呼び出しではない。
+_LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 # `const API_BASE = "http://localhost:8000";` と
 # `const url = ` + backtick + `${API_BASE}/api/segments?t=${t}` + backtick + `;`。
 # **ファイル内で1度しか代入されていない名前だけ**を辞書に入れる。
@@ -123,7 +206,12 @@ _METHOD_RE = re.compile(
     r"(?<![\w.$])method\s*:\s*(?P<quote>['\"`])(?P<value>[A-Za-z]+)(?P=quote)"
 )
 # `method:` があるのにリテラルで書かれていない形。`...opts` も同じ扱い。
-_METHOD_KEY_RE = re.compile(r"(?<![\w.$])method\s*:")
+# `method:` / `'method':` / `["method"]:` のどれでも当たる。素のキーだけ
+# 見ていると、引用符を付けるだけで既定 GET に落ちる（9回目の指摘）。
+_METHOD_KEY_RE = re.compile(
+    r"""^\s*(?:\[\s*)?(?P<q>['"`])?method(?(q)(?P=q))\s*(?:\])?\s*:""")
+# 値の読めない計算キー（`['met'+'hod']:` など）。**GET と断定しない。**
+_COMPUTED_KEY_RE = re.compile(r"""^\s*\[(?!\s*(['"`])method\s*\])""")
 _SPREAD_RE = re.compile(r"\.\.\.")
 
 
@@ -138,6 +226,8 @@ class Verdict(Enum):
     UNRESOLVED_METHOD = "unresolved_method"
     EXTERNAL_HOST = "external_host"
     UNSCANNED_FORM = "unscanned_form"
+    UNATTRIBUTED = "unattributed"
+    COMMENT_MASKED = "comment_masked"
 
 
 # 各判定が「何を確かめ、何を確かめないか」。CLAIM_SEMANTICS と同じ形で
@@ -188,14 +278,46 @@ VERDICT_SEMANTICS: dict[Verdict, dict[str, str]] = {
         "確かめないこと": "その呼び出し先が実在するか（読めていない）",
         "PASS": "no",
     },
+    Verdict.COMMENT_MASKED: {
+        "確かめること": "コメント除去で消えた記述があり、"
+                        "本当にコメントなのか判定の誤りなのか決められない",
+        "確かめないこと": "その記述が実行される経路にあるか",
+        "PASS": "no",
+    },
+    Verdict.UNATTRIBUTED: {
+        "確かめること": "backend の URL らしき記述があるのに、"
+                        "どの呼び出しにも紐づけられなかった",
+        "確かめないこと": "それが実際に呼ばれるか・どの形で呼ばれるか",
+        "PASS": "no",
+    },
 }
+
+# C-2 が名指しする「突き合わない」3型。**ここがゼロになることが終了条件。**
+# 「読めなかった」（unresolved_*・unscanned_form・external_host）は別枠にする——
+# 同じ袋に入れると、読めない書き方に逃がすだけでゼロにできてしまう。
+MISMATCH_VERDICTS = frozenset({
+    Verdict.NOT_DECLARED, Verdict.METHOD_MISMATCH, Verdict.NOT_REGISTERED,
+})
 
 # 走査している形も機械可読に持つ。散文にだけ書くと、形が増えたときに
 # 「対応していないから見えない」が「問題なし」に混ざる。
+# **この3つはラチェットのベースラインに固定する** — 緩めるだけで unresolved を
+# matched に変えられてはいけない（gate-verifier 2回目の指摘）。
 SCAN_SEMANTICS = {
+    "走査するファイル": [f"frontend/src/**/*{s}" for s in SCANNED_SUFFIXES]
+                        + ["frontend/index.html", "frontend/vite.config.*",
+                           "frontend/public/**"],
     "走査する形": list(SCANNED_FORMS),
     "走査できない形": sorted(UNSCANNED_FORMS),
-    "走査できない形の扱い": "見つけたら unscanned_form の FAIL にする（黙って落とさない）",
+    "素の呼び出しとして扱う受け側": list(_GLOBAL_RECEIVERS),
+    "走査できない形の扱い": "unscanned_form の FAIL にする。PASS にはしない。"
+                            "ゲートの exit を決めるのは『突き合わせの対象』の3型で、"
+                            "読めなかったものはラチェットが1件ずつ固定する"
+                            "（新規に増えれば unpinned_new で CI が落ちる）",
+    "突き合わせの対象": sorted(v.value for v in MISMATCH_VERDICTS),
+    "残余の扱い": "走査ファイル中の backend URL らしき記述で、どの呼び出しにも"
+                  "紐づかなかったものは unattributed の FAIL にする。"
+                  "**走査する形と走査できない形の補集合を無検査にしない**",
 }
 
 
@@ -238,8 +360,19 @@ class UiApiReport:
 
     @property
     def mismatched(self) -> list[FetchSite]:
-        """突き合わなかったもの。**ゼロになることが P4 C-2 の終了条件。**"""
-        return [s for s in self.sites if not s.passed]
+        """**突き合わせた結果、合わなかったもの。ゼロになることが C-2。**
+
+        「読めなかったもの」は別（`unresolved`）。混ぜると、読めない書き方に
+        逃がすだけでゼロにできてしまう。
+        """
+        return [s for s in self.sites if s.verdict in MISMATCH_VERDICTS]
+
+    @property
+    def unresolved(self) -> list[FetchSite]:
+        """**読めなかったもの。** PASS ではない。ゼロは要求しないが、
+        ラチェットで1件ずつ固定して黙って増減できないようにする。"""
+        return [s for s in self.sites
+                if not s.passed and s.verdict not in MISMATCH_VERDICTS]
 
     def by_verdict(self) -> dict[Verdict, int]:
         counts: dict[Verdict, int] = {}
@@ -346,8 +479,8 @@ def _split_top_level(args: str) -> list[str]:
     return [p.strip() for p in parts]
 
 
-def _resolve_url(expr: str, env: dict[str, str],
-                 depth: int = 0) -> tuple[str | None, str]:
+def _resolve_url(expr: str, env: dict[str, str], depth: int = 0,
+                 used: set[str] | None = None) -> tuple[str | None, str]:
     """URL 式を閉じた文法で解決する。解決できなければ (None, 理由)。
 
     返すのは**クエリ文字列を落としたパス**。`?` 以降は判定対象にしていない
@@ -371,7 +504,9 @@ def _resolve_url(expr: str, env: dict[str, str],
             bound = env.get(expr)
             if bound is None:
                 return None, f"1度しか代入されていない名前ではない（{_short(expr)}）"
-            return _resolve_url(bound, env, depth + 1)
+            if used is not None:
+                used.add(expr)
+            return _resolve_url(bound, env, depth + 1, used)
         return None, f"閉じた文法に無い形（{_short(expr)}）"
     body = expr[1:-1]
     if "`" in body:
@@ -387,7 +522,9 @@ def _resolve_url(expr: str, env: dict[str, str],
             inner = body[i + 2:end].strip()
             bound = env.get(inner)
             if bound is not None:
-                nested, why = _resolve_url(bound, env, depth + 1)
+                if used is not None:
+                    used.add(inner)
+                nested, why = _resolve_url(bound, env, depth + 1, used)
                 if nested is None:
                     return None, why
                 out.append(nested)
@@ -409,10 +546,186 @@ def _resolve_url(expr: str, env: dict[str, str],
     return "".join(out), ""
 
 
+def _all_form_hits(text: str):
+    """走査対象・走査できない形を問わず、URL を運びうる記述をすべて拾う。
+
+    到達不能ファイルの計上に使う。ここが走査側と別の集合になっていると、
+    「到達不能にすれば消える」経路がそのまま残る。
+    """
+    detectors = [
+        ("fetch", _FETCH_RE), ("WebSocket", _WEBSOCKET_RE),
+        ("window.open", _WINDOW_OPEN_RE),
+        ("URL 属性", _URL_ATTR_RE), ("URL 属性", _URL_ATTR_STR_RE),
+        *UNSCANNED_FORMS.items(),
+    ]
+    seen: set[tuple[str, int]] = set()
+    for label, pattern in detectors:
+        for hit in pattern.finditer(text):
+            if (label, hit.start()) in seen:
+                continue
+            seen.add((label, hit.start()))
+            yield label, hit
+
+
+# 直前が「値の終わり」なら `/` は除算、そうでなければ正規表現リテラル。
+# キーワードは値の終わりではない（`return /re/` は正規表現）。
+# **引用符とバッククォートも値の終わり。** これを入れないと
+# `` `${a}` / 2 `` の `/` を正規表現の開始と読み、前方走査が次の文字列の
+# 開き引用符を跨いで引用符の対応が反転する（gate-verifier 9回目の指摘）。
+_VALUE_END_RE = re.compile(r"""(?:[\w$\]\)\}'"`]|\.\d)\s*$""")
+_NOT_A_VALUE_KEYWORD = frozenset({
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+    "case", "do", "else", "yield", "await", "throw",
+})
+
+
+def _ends_a_value(text: str, index: int) -> bool:
+    """`text[index]` の `/` の直前が値の終わりか（＝除算か）。"""
+    head = text[:index]
+    if not _VALUE_END_RE.search(head):
+        return False
+    word = re.search(r"[A-Za-z_$][\w$]*\s*$", head)
+    return not (word and word.group(0).strip() in _NOT_A_VALUE_KEYWORD)
+
+
+def _form_extent(text: str, hit: re.Match) -> int:
+    """走査できない形が覆う範囲。**行末まで伸ばさない。**
+
+    呼び出しなら括弧の対応まで、代入なら文の末尾まで。行末まで覆うと、
+    同じ行にある別の URL を巻き込んで隠す（gate-verifier 7回目の指摘）。
+    """
+    window = text[hit.start():hit.end() + 2]
+    paren = window.find("(")
+    if paren != -1:
+        args = _match_args(text, hit.start() + paren)
+        if args is not None:
+            return hit.start() + paren + len(args) + 2
+    stop = min(
+        (i for i in (text.find(";", hit.end()), text.find(chr(10), hit.end()))
+         if i != -1), default=len(text))
+    return stop
+
+
+def _strip_comments(text: str) -> str:
+    """コメントを同じ長さの空白に置き換える。位置はずらさない。
+
+    **文字列の中の `//` をコメント開始と誤読しない。**
+    `"http://localhost:8000"` を壊すと、以降の引用符の対応が総崩れになる。
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    quote: str | None = None
+    while i < n:
+        ch = text[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in "'\"`":
+            quote = ch
+            i += 1
+            continue
+        # 正規表現リテラル。`/https?:\/\//` の `\/\/` をコメント開始と読むと、
+        # **同じ行にある本物の呼び出しまで消える**（gate-verifier 7回目の指摘）。
+        #
+        # 判定は**許可リストではなく除外リスト**にする。7回目の実装は
+        # `= ( , : [ ! & | ? + { } ;` だけを許したので、`=>` `return` `>` `*`
+        # の直後の正規表現を認識できず、同じ穴が別の文脈で残った
+        # （gate-verifier 8回目の指摘）。除算になり得るのは直前が
+        # 「値の終わり」——識別子・数値・`)` `]`——のときだけ。
+        if ch == "/" and not text.startswith(("//", "/*"), i) \
+                and not _ends_a_value(text, i):
+            # **引用符を跨いだら諦める、はやらない。** 9回目に入れたその
+            # fail-safe は、`/["']/` のような引用符を含む本物の正規表現を
+            # 除算と読ませ、その引用符が文字列状態を反転させて、直後の
+            # `https://` の `//` が行コメントになり同じ行の fetch が
+            # 消えていた（gate-verifier 10回目の指摘）。
+            # 曖昧さは「値の終わり」の判定側（`}` や引用符を含める）で解く。
+            j = i + 1
+            while j < n and text[j] != "\n":
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == "/":
+                    break
+                j += 1
+            if j < n and text[j] == "/":
+                i = j + 1
+                continue
+        # `http://` `ws://` の `//` を行コメントと読まない。**文字列状態の
+        # 判定を誤っても効く砦。** JSX テキスト中のアポストロフィ（`Don't`）が
+        # 文字列状態を開き、直後の `'http://…'` の開き引用符で閉じてしまうと、
+        # この `//` からが行コメントになって呼び出しが消えていた
+        # （gate-verifier 12・13回目の指摘）。行コメントが `:` の直後に
+        # 来ることはまず無い。
+        if text.startswith("//", i) and (i == 0 or text[i - 1] != ":"):
+            while i < n and text[i] != "\n":
+                out[i] = " "
+                i += 1
+            continue
+        if text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = n if end == -1 else end + 2
+            for j in range(i, end):
+                if out[j] != "\n":
+                    out[j] = " "
+            i = end
+            continue
+        i += 1
+    return "".join(out)
+
+
+# 静的資産として positively 判定できる拡張子。**これ以外は捨てない。**
+_ASSET_SUFFIXES = (
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
+    ".css", ".js", ".mjs", ".map", ".woff", ".woff2", ".ttf", ".otf",
+    ".mp4", ".webm", ".mp3", ".wav", ".pdf",
+    ".jsx", ".tsx", ".ts", ".html",
+)
+
+
+def _looks_like_static_asset(url: str) -> bool:
+    return url.split("?", 1)[0].lower().endswith(_ASSET_SUFFIXES)
+
+
+def _is_backend_url(url: str, prefixes: frozenset[str] | None = None) -> bool:
+    """backend を叩く URL か。ローカル資産と外部リンクを判定に載せない。
+
+    相対パスの判定は**宣言から導く**。`/api` 決め打ちだと、実在する
+    `/health` `/ws/*` `/themes/*` `/soul/*` の25パスが、解決できているのに
+    判定からも残余からも黙って捨てられる（gate-verifier 8回目の指摘）。
+    """
+    if url.startswith(("http://", "https://", "ws://", "wss://")):
+        host = url.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
+        return host in _LOCAL_HOSTS
+    if not url.startswith("/"):
+        return False
+    head = url.strip("/").split("/", 1)[0]
+    return head in (prefixes if prefixes is not None else frozenset({"api"}))
+
+
 def _receiver_before(text: str, index: int) -> str | None:
     """`fetch(` の直前の受け側。素の `fetch(` なら None。"""
     hit = _RECEIVER_RE.search(text[max(0, index - 80):index])
     return hit.group(1) if hit else None
+
+
+def _front_path(url: str) -> str:
+    """フロントが**実際に叩くパス**。宣言側の正規化を適用しない。
+
+    `_normalise` は `//` を `/` に潰す。宣言の表記ゆれを吸収するには
+    正しいが、フロントの生パスに適用すると、実行時に 404 になる
+    `//api/task/9` が `/api/task/9` の宣言に当たって matched になる
+    （gate-verifier 12回目の実測。FastAPI TestClient で 404 を確認済み）。
+    """
+    url = url.split("?", 1)[0].split("#", 1)[0]
+    if not url.startswith("/"):
+        url = "/" + url
+    return url if url == "/" else url.rstrip("/") or "/"
 
 
 def _cut_query(url: str) -> str:
@@ -431,16 +744,46 @@ def _closing_brace(text: str, open_index: int) -> int | None:
     return None
 
 
-def _resolve_method(arg: str | None) -> tuple[str | None, str]:
-    """第2引数から HTTP メソッドを読む。読めなければ (None, 理由)。"""
+def _resolve_method(arg: str | None,
+                    env: dict[str, str] | None = None) -> tuple[str | None, str]:
+    """第2引数から HTTP メソッドを読む。読めなければ (None, 理由)。
+
+    **オブジェクトリテラルでなければ GET と断定しない。** `fetch(url, opts)` の
+    `opts` を読まずに GET を主張すると、実体が DELETE でも GET の宣言に
+    当たって matched になる（gate-verifier 6回目の指摘）。URL 側は解決できな
+    ければ必ず unresolved に落とすのに、メソッド側だけ既定値を主張していた。
+    """
     if arg is None or not arg.strip():
-        return "GET", ""  # fetch の既定
+        return "GET", ""  # 第2引数が無いときだけが fetch の既定
+    arg = arg.strip()
+    if not (arg.startswith("{") and arg.endswith("}")):
+        # 名前なら、URL と同じく「1度しか代入されていない」ときだけ辿る。
+        bound = (env or {}).get(arg)
+        if bound is not None:
+            return _resolve_method(bound, None)
+        return None, f"第2引数がオブジェクトリテラルでない（{_short(arg)}）"
     if _SPREAD_RE.search(arg):
         return None, "スプレッドに隠れてメソッドを静的に読めない"
-    hit = _METHOD_RE.search(arg)
-    if hit:
-        return hit.group("value").upper(), ""
-    if _METHOD_KEY_RE.search(arg):
+    # **トップレベルのキーだけを見る。** 全体検索だと
+    # `{ body: JSON.stringify({method:'GET'}), method: 'POST' }` の
+    # 先頭一致を採って GET と誤読する（gate-verifier 7回目の指摘）。
+    top = _split_top_level(arg[1:-1])
+    keys = [part for part in top if _METHOD_KEY_RE.match(part)
+            or re.fullmatch(r"method", part.strip())]
+    if any(_COMPUTED_KEY_RE.match(part) and not _METHOD_KEY_RE.match(part)
+           for part in top):
+        return None, "計算キーがあり method かどうか決められない"
+    if len(keys) > 1:
+        return None, "method がトップレベルに複数ある"
+    if len(keys) == 1:
+        entry = keys[0].strip()
+        if entry == "method":
+            return None, "method が省略記法で書かれていて値を読めない"
+        # キーの書き方（素・引用符付き・計算キー）に関わらず、値だけを読む。
+        value = entry.split(":", 1)[1].strip() if ":" in entry else ""
+        hit = re.fullmatch(r"(['\"`])(?P<value>[A-Za-z]+)\1", value)
+        if hit:
+            return hit.group("value").upper(), ""
         return None, "method がリテラルで書かれていない"
     return "GET", ""
 
@@ -547,8 +890,16 @@ def _version_mounts(app_file: Path,
     return prefix, mounted
 
 
-def _mounted_on_app(router_name: str, main_files: list[Path]) -> bool:
-    """`app.include_router(<router_name>)` がアプリ本体にあるか。"""
+def _app_mounted(main_files: list[Path]) -> set[str]:
+    """`app.include_router(x)` の x を集める。**受け側を app に限る。**
+
+    `EndpointSite.registered` は受け側を問わず `*.include_router()` を数えるので、
+    `v1.include_router(pipeline_router)` があるだけで「/api/... にも登録済み」に
+    なってしまう。`app.include_router(pipeline_router)` を消しても
+    /api/pipeline/... が緑のままだった（gate-verifier 2回目の指摘・83件中51件）。
+    ルート直下に載っている事実と、バージョン配下に載っている事実は別物。
+    """
+    mounted: set[str] = set()
     for path in main_files:
         path = Path(path)
         if not path.exists():
@@ -566,10 +917,18 @@ def _mounted_on_app(router_name: str, main_files: list[Path]) -> bool:
                     and isinstance(node.func.value, ast.Name)
                     and node.func.value.id == "app"):
                 continue
-            if isinstance(node.args[0], ast.Name) \
-                    and node.args[0].id == router_name:
-                return True
-    return False
+            if isinstance(node.args[0], ast.Name):
+                mounted.add(node.args[0].id)
+    return mounted
+
+
+def _mounted_on_app(router_name: str, main_files: list[Path]) -> bool:
+    return router_name in _app_mounted(main_files)
+
+
+def _module_aliases(routers_dir: Path) -> dict[str, str]:
+    """{モジュール名: 別名}。別名でしかマウントを書けないので要る。"""
+    return _router_aliases(Path(routers_dir) / "__init__.py")
 
 
 # --- 走査 ---------------------------------------------------------------------
@@ -580,7 +939,8 @@ class UiApiExecutor:
 
     def __init__(self, frontend_src: Path, registry: EndpointRegistry,
                  entry: Path | None = None,
-                 version_prefix: str = "", version_modules: set[str] | None = None):
+                 version_prefix: str = "", version_modules: set[str] | None = None,
+                 root_modules: set[str] | None = None):
         self.frontend_src = Path(frontend_src)
         self.registry = registry
         if entry is None:
@@ -589,36 +949,107 @@ class UiApiExecutor:
         self.entry = entry
         self.version_prefix = version_prefix
         self.version_modules = version_modules or set()
+        # ルート直下（/api/...）に載っているモジュール。None なら未判定で、
+        # EndpointSite.registered に従う（受け側を問わない緩い判定）。
+        self.root_modules = root_modules
+        # 宣言されているパスの先頭セグメント。backend かどうかの判定に使う。
+        self.backend_prefixes = frozenset(
+            path.strip("/").split("/", 1)[0]
+            for _, path in registry.endpoints
+            if path.strip("/")) or frozenset({"api"})
 
     @classmethod
     def for_repo(cls) -> UiApiExecutor:
         root = _project_root()
         backend = root / "backend"
+        mains = [backend / "main.py", backend / "api_versioning.py"]
         prefix, modules = _version_mounts(
-            backend / "api_versioning.py", backend / "routers",
-            main_files=[backend / "main.py", backend / "api_versioning.py"])
+            backend / "api_versioning.py", backend / "routers", main_files=mains)
+        mounted = _app_mounted(mains)
+        aliases = _module_aliases(backend / "routers")
         return cls(frontend_src=root / "frontend" / "src",
                    registry=EndpointRegistry.for_repo(),
-                   version_prefix=prefix, version_modules=modules)
+                   version_prefix=prefix, version_modules=modules,
+                   root_modules={module for module, alias in aliases.items()
+                                 if alias in mounted})
 
     def run(self) -> UiApiReport:
         report = UiApiReport(endpoints_scanned=len(self.registry.endpoints))
         reachable = _reachable_files(self.entry) if self.entry else None
         shapes = self._shape_index()
 
-        for path in _iter_source_files(self.frontend_src):
-            text = path.read_text(encoding="utf-8", errors="replace")
+        for path in self._iter_files():
+            # **コメントは先に外す。** 検出を生テキストに対して行うと、
+            # コメントアウトされた呼び出しを実在の呼び出しとして数える。
+            raw = path.read_text(encoding="utf-8", errors="replace")
+            text = _strip_comments(raw)
             rel = _display_path(path, self.frontend_src)
+            # モジュールでないもの（index.html・CSS）は import で辿れないので
+            # 到達可能性の対象外。**走査しないのではなく、常に走査する。**
+            if path.suffix in _NON_MODULE_SUFFIXES:
+                report.files_scanned += 1
+                report.sites += self._sites_in(text, _assignments(text), rel,
+                                               shapes)
+                report.sites += self._masked_away(
+                    raw, text, rel,
+                    lambda i, r=raw: r.count(chr(10), 0, i) + 1)
+                continue
             if reachable is not None and path.resolve() not in reachable:
-                for pattern in (_FETCH_RE, _WEBSOCKET_RE):
-                    for hit in pattern.finditer(text):
-                        report.unreachable.append(
-                            f"{rel}:{text.count(chr(10), 0, hit.start()) + 1}")
+                # **走査するすべての形を数える。** fetch と WebSocket だけを
+                # 数えていたので、到達不能ファイルに置いた URL 属性・
+                # window.open・走査できない形は unreachable にすら計上されず
+                # 無痕跡で消えていた（gate-verifier 5回目の指摘）。
+                for label, hit in _all_form_hits(text):
+                    report.unreachable.append(
+                        f"{rel}:{text.count(chr(10), 0, hit.start()) + 1}"
+                        f"  {label}")
                 continue
             report.files_scanned += 1
-            for site in self._sites_in(text, _assignments(text), rel, shapes):
-                report.sites.append(site)
+            report.sites += self._sites_in(text, _assignments(text), rel, shapes)
+            report.sites += self._masked_away(
+                raw, text, rel, lambda i, r=raw: r.count(chr(10), 0, i) + 1)
         return report
+
+    def _iter_files(self):
+        """走査するファイル。**executor の走査範囲より広い。**
+
+        `.mjs` は `_reachable_files` が到達可能と判定するのに
+        `_iter_source_files` の拡張子リストから漏れて完全に消えていた。
+        `index.html` と CSS は一度も開かれておらず、`SCAN_SEMANTICS` が
+        「CSS の url() は走査できない形」と宣言しているのに CSS を読んでも
+        いなかった（gate-verifier 4回目の指摘）。
+        """
+        seen = set()
+        for suffix in SCANNED_SUFFIXES:
+            for path in sorted(self.frontend_src.rglob(f"*{suffix}")):
+                if not path.is_file() or _EXCLUDED_DIRS & set(path.parts):
+                    continue
+                seen.add(path)
+                yield path
+        # src の外。エントリ HTML・ビルド設定（proxy や define で URL を
+        # 注入できる）・public 配下。走査対象でも「走査できない形」でもない
+        # 未申告領域を作らない（gate-verifier 5回目の指摘）。
+        root = self.frontend_src.parent
+        for name in ("index.html", "vite.config.js", "vite.config.ts",
+                     "vite.config.mjs", "vite.config.cjs"):
+            candidate = root / name
+            if candidate.is_file() and candidate not in seen:
+                seen.add(candidate)
+                yield candidate
+        for path in sorted((root / "public").rglob("*")):
+            if (path.is_file() and path.suffix in SCANNED_SUFFIXES
+                    and not _EXCLUDED_DIRS & set(path.parts)
+                    and path not in seen):
+                seen.add(path)
+                yield path
+
+    def _hints_backend(self, value: str) -> bool:
+        """宣言されている先頭セグメントで始まる相対パスか。"""
+        stripped = value.strip()
+        if not stripped.startswith("/"):
+            return False
+        head = stripped.strip("/").split("/", 1)[0].split("?", 1)[0]
+        return head in self.backend_prefixes
 
     def _shape_index(self) -> dict[tuple[str, str], list]:
         """(メソッド, 形) → 宣言。パスパラメータ名の違いを吸収する。"""
@@ -626,6 +1057,43 @@ class UiApiExecutor:
         for (method, path), endpoint in self.registry.endpoints.items():
             index.setdefault((method, _param_shape(path)), []).append(endpoint)
         return index
+
+    @staticmethod
+    def _lookup(shapes: dict, method: str, shape: str) -> list:
+        """宣言を探す。**セグメント単位で、非対称に照合する。**
+
+        - フロントのリテラルは、同じリテラルにも宣言のパラメータにも当たる
+          （`/stream/preview` は `/stream/{video_type}` で実際に応答する）
+        - フロントのプレースホルダは**宣言のパラメータにしか当たらない**。
+          リテラルのセグメントには化けさせない
+
+        完全一致を先に見て、無ければパラメータ込みで探す。より具体的な
+        （リテラルが多く一致する）宣言を優先する。
+        """
+        exact = shapes.get((method, shape))
+        if exact:
+            return exact
+        # `strip("/")` だと `//api/x` と `/api/x` が同じ形になる。
+        # 実行時は前者が 404 なので、空セグメントも数える（12回目の指摘）。
+        wanted = shape.split("/")
+        best: tuple[int, list] | None = None
+        for (m, candidate), hits in shapes.items():
+            if m != method:
+                continue
+            parts = candidate.split("/")
+            if len(parts) != len(wanted):
+                continue
+            literals = 0
+            for front, declared in zip(wanted, parts):
+                if declared == _PARAM:
+                    continue  # 宣言側がパラメータなら何でも受ける
+                if front == _PARAM or front != declared:
+                    break     # プレースホルダはリテラルに当たらない
+                literals += 1
+            else:
+                if best is None or literals > best[0]:
+                    best = (literals, hits)
+        return best[1] if best else []
 
     def _under_version(self, shape: str, method: str,
                        shapes: dict) -> tuple[list, str]:
@@ -639,16 +1107,29 @@ class UiApiExecutor:
         if not prefix or not shape.startswith(prefix + "/"):
             return [], shape
         bare = shape[len(prefix):]
-        hits = [e for e in shapes.get((method, bare), [])
+        hits = [e for e in self._lookup(shapes, method, bare)
                 if e.module in self.version_modules]
         return hits, bare if hits else shape
 
     def _sites_in(self, text: str, constants: dict[str, str], rel: str,
                   shapes: dict) -> list[FetchSite]:
         found: list[FetchSite] = []
+        # どの範囲を「呼び出しとして読んだ」か。残余の判定に使う。
+        covered: list[tuple[int, int]] = []
+        # そのうち**URL が書かれる位置**だけ。宣言を残余から外してよいかは
+        # ここだけで判断する。covered 全体から名前を拾うと、第2引数に
+        # `{ headers: { endpoint: '1' } }` を足すだけで
+        # `const endpoint = '/api/undeclared'` が消える（8回目の指摘）。
+        url_regions: list[tuple[int, int]] = []
 
         def line_of(index: int) -> int:
             return text.count("\n", 0, index) + 1
+
+        def cover(start: int, end: int) -> None:
+            covered.append((start, end))
+
+        # 解決の過程で実際に引かれた名前。これだけを宣言として残余から外す。
+        used: set[str] = set()
 
         for pattern, method in ((_FETCH_RE, None), (_WEBSOCKET_RE, "WEBSOCKET")):
             for hit in pattern.finditer(text):
@@ -658,6 +1139,9 @@ class UiApiExecutor:
                 if receiver is not None and receiver not in _GLOBAL_RECEIVERS:
                     # `res.fetch(` のような未知の受け側。ネットワーク呼び出しか
                     # どうかを静的に決められないので、素通りさせずに出す。
+                    args = _match_args(text, open_index)
+                    cover(hit.start(),
+                          open_index + len(args or "") + 2)
                     found.append(FetchSite(
                         rel, line, f"{receiver}.fetch(", None, None,
                         Verdict.UNRESOLVED_URL, f"受け側が未知（{receiver}.fetch）"))
@@ -669,44 +1153,179 @@ class UiApiExecutor:
                         None, None, Verdict.UNRESOLVED_URL,
                         "引数の括弧が閉じていない"))
                     continue
+                cover(hit.start(), open_index + len(args) + 2)
                 parts = _split_top_level(args)
+                url_regions.append(
+                    (open_index, open_index + len(parts[0]) + 2))
                 found.append(self._judge(parts, constants, rel, line, shapes,
-                                         forced_method=method))
+                                         forced_method=method,
+                                         env=constants, used=used))
+
+        # ブラウザが GET を投げる URL 属性と window.open。
+        # ローカルの画像などは backend への呼び出しではないので、
+        # **backend のパスに解決できたものだけ**を判定に載せる。
+        # 解決できないものは「backend かもしれない」ので unresolved に落とす。
+        for pattern, arg_open in ((_URL_ATTR_RE, "{"), (_WINDOW_OPEN_RE, "("),
+                                  (_URL_ATTR_STR_RE, "s")):
+            for hit in pattern.finditer(text):
+                line = line_of(hit.start())
+                if arg_open == "s":
+                    # 引用符ごと渡す。中身だけ渡すと文字列リテラルに見えない。
+                    quote = hit.group("q")
+                    expr = f"{quote}{hit.group('value')}{quote}"
+                    cover(hit.start(), hit.end())
+                    url_regions.append((hit.start(), hit.end()))
+                else:
+                    body = _match_args(text, hit.end() - 1)
+                    if body is None:
+                        # **黙って continue しない。** fetch 分岐は同じ状況で
+                        # unresolved_url を出すのに、ここだけ無記録だった。
+                        # 文字列状態が壊れて括弧が閉じなくなると、URL 属性と
+                        # window.open だけが痕跡なく消えていた
+                        # （gate-verifier 13回目の指摘）。
+                        found.append(FetchSite(
+                            rel, line, _short(text[hit.start():hit.start() + 60]),
+                            None, None, Verdict.UNRESOLVED_URL,
+                            "引数の括弧が閉じていない"))
+                        continue
+                    cover(hit.start(), hit.end() + len(body) + 1)
+                    expr = _split_top_level(body)[0] if arg_open == "(" else body
+                    url_regions.append(
+                        (hit.end() - 1, hit.end() + len(expr) + 1))
+                url, why = _resolve_url(expr, constants, used=used)
+                if url is None:
+                    # **読めないものを「backend ではない」と決めつけない。**
+                    # ここで黙って落とすと、SCANNED_FORMS の申告が実際の走査より
+                    # 広くなる（gate-verifier 3回目の指摘）。
+                    found.append(FetchSite(
+                        rel, line, _short(expr), None, None,
+                        Verdict.UNRESOLVED_URL, why))
+                    continue
+                if not _is_backend_url(url, self.backend_prefixes):
+                    if not url.strip() or _looks_like_static_asset(url):
+                        continue  # 空・画像などのローカル資産。backend ではない
+                    if url.startswith(("http://", "https://", "ws://", "wss://")):
+                        found.append(FetchSite(
+                            rel, line, _short(expr), url, "GET",
+                            Verdict.EXTERNAL_HOST, "backend 以外のホスト"))
+                        continue
+                    # 宣言に無い相対パスを**黙って捨てない**。`/reports/export`
+                    # のように backend かどうか決められないものが、判定にも
+                    # 残余にも出ずに消えていた（gate-verifier 9回目の指摘）。
+                    found.append(FetchSite(
+                        rel, line, _short(expr), url, "GET",
+                        Verdict.NOT_DECLARED, "どのルーターにも宣言が無い"))
+                    continue
+                found.append(self._judge([expr], constants, rel, line, shapes,
+                                         forced_method="GET", used=used))
 
         # 走査できない形。**実在したら FAIL。**「対応していないから見えない」を
         # 「問題なし」に混ぜない。
         for name, pattern in UNSCANNED_FORMS.items():
             for hit in pattern.finditer(text):
+                cover(hit.start(), _form_extent(text, hit))
                 found.append(FetchSite(
                     rel, line_of(hit.start()), name, None, None,
                     Verdict.UNSCANNED_FORM, f"{name} は走査できない"))
+
+        # **呼び出しとして読んだ範囲から参照されている名前**の宣言だけを
+        # 残余から外す。無条件に外すと `const u = "/api/x"; sink(u)` の
+        # ように、変数を1つ挟むだけで消える（gate-verifier 7回目の指摘）。
+        referenced = set(used)
+        for lo, hi in url_regions:
+            referenced |= set(re.findall(r"[A-Za-z_$][\w$]*", text[lo:hi]))
+        for hit in _ASSIGN_RE.finditer(text):
+            if hit.group("name") in referenced:
+                cover(hit.start("value"), hit.end("value"))
+
+        found += self._residual(text, covered, rel, line_of)
         return found
+
+    @staticmethod
+    def _masked_away(raw: str, masked: str, rel: str, line_of) -> list[FetchSite]:
+        """**コメント除去で消えた検出対象を、黙って落とさない。**
+
+        正規表現か除算かの判定は、まともな JS パーサ無しには堅牢にできない。
+        9・10・11回目と3回続けて、この判定の誤りが文字列状態を反転させ、
+        `//` や `/*` の誤認で**実在の呼び出しを痕跡なく消していた**。
+
+        判定の精度を上げ続けるのをやめ、**判定を誤っても沈黙にならない
+        構造**にする。除去前に見えていて除去後に見えないものは、
+        本当にコメントなのか判定ミスなのかを区別せず FAIL にする。
+        コメントアウトされた呼び出しもここに出るが、それは
+        「判定していないものを PASS にしない」の通りの姿。
+
+        対象は**検出器のヒットだけ**にする。生テキストの文字列リテラルまで
+        数えると、コメント内のアポストロフィで引用符の対応が崩れて
+        無関係な範囲が「消えた」ことになる。
+        """
+        out: list[FetchSite] = []
+        seen: set[int] = set()
+        for label, hit in _all_form_hits(raw):
+            if masked[hit.start():hit.end()] == raw[hit.start():hit.end()]:
+                continue
+            if hit.start() in seen:
+                continue
+            seen.add(hit.start())
+            out.append(FetchSite(
+                rel, line_of(hit.start()), label, None, None,
+                Verdict.COMMENT_MASKED,
+                f"コメント除去で消えた（{label}）"))
+        return out
+
+    def _residual(self, text: str, covered: list[tuple[int, int]], rel: str,
+                  line_of) -> list[FetchSite]:
+        """**どの呼び出しにも紐づかなかった backend の URL。**
+
+        SCANNED と UNSCANNED の2集合だけで閉包を作ると、補集合は常に
+        無検査で痕跡も残らない。ここが残余の受け皿（gate-verifier 6回目の指摘）。
+        コメントは走査の入口で外してあるので、ここには来ない。
+        """
+        out: list[FetchSite] = []
+        for hit in _URL_LITERAL_RE.finditer(text):
+            value = hit.group("value")
+            if not (_BACKEND_URL_HINT.search(value)
+                    or self._hints_backend(value)):
+                continue
+            start = hit.start()
+            if any(lo <= start <= hi for lo, hi in covered):
+                continue
+            out.append(FetchSite(
+                rel, line_of(start), _short(value), None, None,
+                Verdict.UNATTRIBUTED,
+                "backend の URL らしき記述が、どの呼び出しにも紐づかない"))
+        return out
 
     def _judge(self, parts: list[str], constants: dict[str, str], rel: str,
                line: int, shapes: dict,
-               forced_method: str | None = None) -> FetchSite:
+               forced_method: str | None = None,
+               env: dict[str, str] | None = None,
+               used: set[str] | None = None) -> FetchSite:
         raw = _short(parts[0]) if parts else ""
-        url, why = _resolve_url(parts[0] if parts else "", constants)
+        url, why = _resolve_url(parts[0] if parts else "", constants, used=used)
         if url is None:
             return FetchSite(rel, line, raw, None, None, Verdict.UNRESOLVED_URL, why)
 
         stripped, why = _strip_origin(url)
         if stripped is None:
             return FetchSite(rel, line, raw, None, None, Verdict.EXTERNAL_HOST, why)
-        path = _normalise(stripped.split("?", 1)[0].split("#", 1)[0])
+        path = _front_path(stripped)
 
         if forced_method:
             method, why = forced_method, ""
         else:
-            method, why = _resolve_method(parts[1] if len(parts) > 1 else None)
+            method, why = _resolve_method(
+                parts[1] if len(parts) > 1 else None, env)
         if method is None:
             return FetchSite(rel, line, raw, path, None,
                              Verdict.UNRESOLVED_METHOD, why)
 
         shape = _param_shape(path)
-        hits = shapes.get((method, shape))
+        hits = self._lookup(shapes, method, shape)
+        under_version = False
         if not hits:
             hits, shape = self._under_version(shape, method, shapes)
+            under_version = bool(hits)
         if not hits:
             other = sorted({m for (m, s) in shapes if s == shape})
             if other:
@@ -716,13 +1335,28 @@ class UiApiExecutor:
             return FetchSite(rel, line, raw, path, method, Verdict.NOT_DECLARED,
                              "どのルーターにも宣言が無い")
 
-        registered = [e for e in hits if e.registered is not False]
+        registered = [e for e in hits if self._registered(e, under_version)]
         if not registered:
+            where = (f"{self.version_prefix} 配下" if under_version else "ルート直下")
             return FetchSite(rel, line, raw, path, method, Verdict.NOT_REGISTERED,
-                             f"{hits[0].module} が include_router されていない",
+                             f"{hits[0].module} が {where}に登録されていない",
                              hits[0].as_evidence())
         return FetchSite(rel, line, raw, path, method, Verdict.MATCHED, "",
                          registered[0].as_evidence())
+
+    def _registered(self, endpoint, under_version: bool) -> bool:
+        """**そのパスで呼べるように登録されているか。**
+
+        `/api/v1/...` は再マウント先に、`/api/...` はルート直下に載っている
+        必要がある。どちらか一方に載っていれば良い、にすると
+        `app.include_router(pipeline_router)` を消しても
+        `/api/pipeline/...` が緑のままになる（gate-verifier 2回目の指摘）。
+        """
+        if under_version:
+            return endpoint.module in self.version_modules
+        if self.root_modules is None:
+            return endpoint.registered is not False
+        return endpoint.module in self.root_modules
 
 
 # --- CLI ---------------------------------------------------------------------
@@ -747,14 +1381,41 @@ def _format(report: UiApiReport) -> str:
             lines.append(f"    {site}")
         lines.append("")
 
+    def detail(site: FetchSite) -> list[str]:
+        return [f"    {site.file}:{site.line}  {site.verdict.value}",
+                f"      {site.method or '?'} {site.path or site.raw_url}"
+                + (f"  — {site.reason}" if site.reason else "")]
+
+    unread = report.unresolved
+    if unread:
+        lines.append(f"  読めなかった呼び出し: {len(unread)} 件（PASS にしていない）")
+        for site in unread:
+            lines += detail(site)
+        lines.append("")
+
     bad = report.mismatched
     lines.append(f"  突き合わない呼び出し: {len(bad)} 件")
     if not bad:
         lines.append("    なし。すべての呼び出し先が、宣言され登録されたハンドラに届いている。")
     for site in bad:
-        lines.append(f"    {site.file}:{site.line}  {site.verdict.value}")
-        lines.append(f"      {site.method or '?'} {site.path or site.raw_url}"
-                     f"{'  — ' + site.reason if site.reason else ''}")
+        lines += detail(site)
+    return "\n".join(lines)
+
+
+def _format_list(report: UiApiReport) -> str:
+    """**列挙そのものを出す。** 集計だけでは何を測ったか読めない。"""
+    lines = [f"呼び出し先 {len(report.sites)} 件", ""]
+    for site in sorted(report.sites, key=lambda s: (s.file, s.line)):
+        lines.append(
+            f"  {site.file}:{site.line:<5} {site.verdict.value:<16} "
+            f"{site.method or '?':<9} {site.path or site.raw_url}")
+        if site.declared_at:
+            lines.append(f"      ← {site.declared_at}")
+        elif site.reason:
+            lines.append(f"      — {site.reason}")
+    if report.unreachable:
+        lines += ["", f"到達不能で判定していない: {len(report.unreachable)} 件"]
+        lines += [f"  {site}" for site in report.unreachable]
     return "\n".join(lines)
 
 
@@ -765,6 +1426,12 @@ def _format_semantics() -> str:
         lines.append(f"    確かめる  : {meaning['確かめること']}")
         lines.append(f"    確かめない: {meaning['確かめないこと']}")
         lines.append("")
+    # 走査の境界も出す。持っているだけでどこも読まないなら、
+    # 機械可読とは言えない（gate-verifier 2回目の指摘）。
+    lines.append("走査の境界")
+    for key, value in SCAN_SEMANTICS.items():
+        rendered = "・".join(value) if isinstance(value, list) else value
+        lines.append(f"    {key}: {rendered}")
     return "\n".join(lines)
 
 
@@ -772,8 +1439,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="UI と API の接続を静的に突き合わせる")
     parser.add_argument("--gate", action="store_true",
                         help="突き合わない呼び出しが1件でもあれば exit 1")
+    parser.add_argument("--list", action="store_true", dest="list_sites",
+                        help="読み取った呼び出し先を1件ずつ列挙する")
     parser.add_argument("--semantics", action="store_true",
-                        help="判定ごとの『確かめること／確かめないこと』を出す")
+                        help="判定ごとの『確かめること／確かめないこと』と走査の境界を出す")
     args = parser.parse_args(argv)
 
     if args.semantics:
@@ -781,7 +1450,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     report = UiApiExecutor.for_repo().run()
-    print(_format(report))
+    print(_format_list(report) if args.list_sites else _format(report))
 
     # 走査0件を緑にしない。ディレクトリを消せば通る、を塞ぐ。
     if not report.sites:
@@ -795,7 +1464,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n⛔ 突き合わない呼び出しが {len(report.mismatched)} 件あります。")
         return 1
     if args.gate:
-        print(f"\n✅ {len(report.sites)} 件すべての呼び出し先が宣言と突き合っています。")
+        # **「全部 OK」と言わない。** 読めなかったものは突き合わせていない。
+        matched = len(report.sites) - len(report.unresolved)
+        note = (f"（読めなかった {len(report.unresolved)} 件は突き合わせていない）"
+                if report.unresolved else "")
+        print(f"\n✅ 読み取れた {matched} 件はすべて宣言と突き合っています{note}。")
     return 0
 
 

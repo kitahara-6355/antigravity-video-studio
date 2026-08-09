@@ -2,18 +2,20 @@
 
 `ui_api --gate` は「いま突き合わないものがゼロか」しか見ない。**呼び出しを
 消せばゼロのまま緑になる。** ゲートだけでは判定の弱化を止められないので、
-呼び出し先の一覧をベースラインに固定し、次の4つを落とす:
+呼び出し先の一覧をベースラインに固定し、次の5つを落とす:
 
 1. **走査0件で緑** — ベースラインが無い / 呼び出しを1件も読めない
 2. **呼び出しの削除** — ベースラインにある呼び出しが消えた（`removed`）
-3. **unresolved の握りつぶし** — PASS する判定を `matched` 以外に広げた
-   （`semantics_widened`）。判定そのものの弱化はここでしか見えない
+3. **unresolved の握りつぶし** — 2経路ある。PASS する判定を `matched` 以外に
+   広げる（`semantics_widened`）と、**走査の閉包そのものを緩める**
+   （`scan_widened`）。後者は判定表の外なので、判定表だけ見ていると通る
 4. **宣言の差し替え** — 同じ呼び出しが別の宣言に当たるようになった
    （`substituted`）。パスもメソッドも変えずに、当たり先だけ入れ替わる
+5. **判定の対象から外す** — ファイルを到達不能にする（`unreachable_grew`）
 
 P3 の C-4 が残した穴（集計欄と本体を突き合わせていない）はここでは作らない。
 **照合しない欄はそもそも書かない。** ベースラインに載っているのは
-`DECLARATION_KEYS` の4つだけで、その全部を check() が読む。
+`DECLARATION_KEYS` の5つだけで、その全部を check() が読む。
 
 ## 守れない範囲（隠さずに書く）
 
@@ -37,6 +39,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from backend.ux_verification.ui_api import (
+    _GLOBAL_RECEIVERS,
+    MISMATCH_VERDICTS,
+    SCANNED_FORMS,
+    SCANNED_SUFFIXES,
+    UNSCANNED_FORMS,
     VERDICT_SEMANTICS,
     UiApiExecutor,
     UiApiReport,
@@ -48,7 +55,8 @@ BASELINE = BASELINE_DIR / "ui_api_baseline.json"
 
 # ベースラインに固定するキー。ここに無い欄は check() が読まない＝守られない。
 # 欄を足したら必ずここにも足す。**足し忘れをテストで禁じる。**
-DECLARATION_KEYS = ("sites", "declarations", "unreachable", "passing_verdicts")
+DECLARATION_KEYS = ("sites", "declarations", "unreachable", "passing_verdicts",
+                    "scan_boundary")
 
 
 def site_key(site) -> str:
@@ -60,6 +68,34 @@ def passing_verdicts() -> list[str]:
     """いま PASS 扱いになっている判定。**広がったらそれ自体が違反。**"""
     return sorted(v.value for v, m in VERDICT_SEMANTICS.items()
                   if m["PASS"] == "yes")
+
+
+def _render(value) -> str:
+    if isinstance(value, dict):
+        return "/".join(sorted(value))
+    if isinstance(value, (list, tuple, set)):
+        return "/".join(sorted(str(v) for v in value))
+    return str(value)
+
+
+def scan_boundary() -> dict:
+    """走査の閉包そのもの。**緩めたらそれ自体が違反。**
+
+    受け側の集合を広げる・走査できない形の一覧から1つ落とす、だけで
+    unresolved を matched に変えられる。判定の弱化は判定表の外にもある
+    （gate-verifier 2回目の指摘）。
+    """
+    return {
+        "scanned_files": sorted(SCANNED_SUFFIXES),
+        "scanned_forms": sorted(SCANNED_FORMS),
+        # **正規表現の本体まで固定する。** キー名だけを固定していると、
+        # パターンを絶対に当たらないものに差し替えるだけで、その形の検出が
+        # 黙って無効になる（gate-verifier 4回目の指摘）。
+        "unscanned_forms": {name: pattern.pattern
+                            for name, pattern in sorted(UNSCANNED_FORMS.items())},
+        "global_receivers": sorted(_GLOBAL_RECEIVERS),
+        "mismatch_verdicts": sorted(v.value for v in MISMATCH_VERDICTS),
+    }
 
 
 def write_baseline(report: UiApiReport, path: Path,
@@ -77,6 +113,8 @@ def write_baseline(report: UiApiReport, path: Path,
         "unreachable": sorted(report.unreachable),
         # PASS 扱いの判定。ここが広がることが「unresolved の握りつぶし」。
         "passing_verdicts": passing_verdicts(),
+        # 走査の閉包。緩めれば読めなかったものが読めたことになる。
+        "scan_boundary": scan_boundary(),
     }
     if redeclarations:
         payload["redeclarations"] = redeclarations
@@ -99,7 +137,7 @@ def load_baseline(path: Path) -> dict | None:
 @dataclass
 class Violation:
     kind: str  # removed | weakened | substituted | unpinned_new
-               # | unreachable_grew | semantics_widened | tampered
+               # | unreachable_grew | semantics_widened | scan_widened | tampered
     key: str
     before: str = ""
     after: str = ""
@@ -118,6 +156,9 @@ class Violation:
         if self.kind == "unreachable_grew":
             return (f"[到達不能が増えた] {self.key}"
                     "（判定の対象から外れた。到達可能にするか理由を残してください）")
+        if self.kind == "scan_widened":
+            return (f"[走査の閉包が緩んだ] {self.key}: {self.before} → {self.after}"
+                    "（読めなかったものが読めたことになる）")
         if self.kind == "semantics_widened":
             return (f"[判定の握りつぶし] PASS 扱いの判定が {self.before} から "
                     f"{self.after} に広がった")
@@ -175,6 +216,28 @@ class UiApiRatchet:
                                         "/".join(before_pass_kinds),
                                         "/".join(now_kinds)))
 
+        # 走査の閉包が緩んでいないか。**呼び出しを1件も見ずに分かる弱化。**
+        before_scan = baseline["scan_boundary"]
+        now_scan = scan_boundary()
+        # 入れ子の欄を1つ消せば、その欄だけ無検査になる。トップレベルの有無だけ
+        # 見ていると素通りする（gate-verifier 3回目の指摘）。
+        missing = [k for k in now_scan if k not in before_scan]
+        if missing:
+            violations.append(Violation(
+                "tampered", "scan_boundary",
+                f"入れ子の欄が無い（{'/'.join(sorted(missing))}）"))
+            return RatchetResult(False, violations, after=now_pass)
+        for field_name, before_values in before_scan.items():
+            after = now_scan.get(field_name)
+            # **どちらに動いても違反にする。** 増えれば「読めなかったものが
+            # 読めたことになる」、減れば「見えていたものが見えなくなる」。
+            # 片方向だけ見ていると、集合を縮める経路が素通りする
+            # （gate-verifier 4回目の指摘: mismatch_verdicts の縮小）。
+            if before_values != after:
+                violations.append(Violation(
+                    "scan_widened", field_name, _render(before_values),
+                    _render(after)))
+
         current = {site_key(s): s for s in report.sites}
         base_sites: dict = baseline["sites"]
         base_decls: dict = baseline["declarations"]
@@ -194,9 +257,12 @@ class UiApiRatchet:
                 violations.append(Violation("tampered", key,
                                             "PASS なのに宣言の記録が空"))
                 continue
-            if declared and site.declared_at and declared != site.declared_at:
+            if declared and declared != site.declared_at:
+                # 実行側で空にしても差し替え扱いにする。「空＝無検査」を
+                # ベースライン側だけ塞いでも、実行側に同じ穴が残る
+                # （gate-verifier 3回目の指摘）。
                 violations.append(Violation("substituted", key, declared,
-                                            site.declared_at))
+                                            site.declared_at or "（記録なし）"))
 
         added = sorted(set(current) - set(base_sites))
         violations += [Violation("unpinned_new", key) for key in added]
