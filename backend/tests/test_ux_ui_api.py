@@ -334,6 +334,192 @@ def test_a_websocket_is_matched_against_its_declaration(tmp_path):
     assert report.sites[0].method == "WEBSOCKET"
 
 
+@pytest.mark.parametrize("call", [
+    "client?.fetch('http://localhost:8000/api/demo/status');",
+    "client\n            .fetch('http://localhost:8000/api/demo/status');",
+])
+def test_an_unknown_receiver_survives_optional_chaining_and_newlines(tmp_path, call):
+    """`?.` や改行を跨げないと、未知の受け側が素の呼び出しに化ける。"""
+    report = _run(tmp_path, f"""
+        export default function App(client) {{
+          {call}
+        }}
+    """)
+
+    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+
+
+@pytest.mark.parametrize("call", [
+    "const f = window.fetch; f('/api/demo/status');",
+    "api['fetch']('/api/demo/status');",
+])
+def test_fetch_reached_without_a_call_site_is_reported(tmp_path, call):
+    """別名束縛・計算メンバは呼び出し地点に `fetch(` が現れず、走査から消える。"""
+    report = _run(tmp_path, f"""
+        export default function App(api) {{
+          {call}
+        }}
+    """)
+
+    assert Verdict.UNSCANNED_FORM in _verdicts(report)
+
+
+def test_a_jsx_url_attribute_hitting_the_backend_is_judged(tmp_path):
+    """ブラウザは `<a href>` にも GET を投げる。fetch だけ見て全部見たと言わない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          return <a href={`${API_BASE}/api/demo/status`}>x</a>;
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.MATCHED]
+
+
+def test_window_open_hitting_the_backend_is_judged(tmp_path):
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          window.open(`${API_BASE}/api/demo/nope`, '_blank');
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_an_unreadable_url_attribute_is_not_assumed_to_be_a_local_asset(tmp_path):
+    """**読めないものを「backend ではない」と決めつけない。**
+
+    ここで黙って落とすと、走査すると宣言した形が実際には走査されず、
+    SCANNED_FORMS の申告が実際の走査範囲より広くなる。
+    """
+    report = _run(tmp_path, """
+        export default function App(scene) {
+          return <img src={scene.image} />;
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+
+
+def test_a_resolved_non_backend_url_is_not_a_call(tmp_path):
+    """解決できて backend でないと**分かった**ものだけ対象から外す。"""
+    report = _run(tmp_path, """
+        export default function App() {
+          return <img src="/assets/logo.png" />;
+        }
+    """)
+
+    assert report.sites == []
+
+
+def test_a_plain_string_url_attribute_is_scanned(tmp_path):
+    """`<a href="/api/x">` は波括弧が無いだけで、ブラウザは GET を投げる。"""
+    report = _run(tmp_path, """
+        export default function App() {
+          return <a href="/api/demo/nope">x</a>;
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+@pytest.mark.parametrize("snippet", [
+    "fetch.call(null, '/api/demo/status');",
+    "fetch.apply(null, ['/api/demo/status']);",
+    "location.assign('/api/demo/status');",
+    "location.href = '/api/demo/status';",
+    "import('/api/demo/status');",
+    "navigator.serviceWorker.register('/api/demo/status');",
+])
+def test_a_navigation_or_indirect_call_does_not_vanish(tmp_path, snippet):
+    """`fetch(` に当たらない呼び出しが、走査からも一覧からも消えないこと。"""
+    report = _run(tmp_path, f"""
+        export default function App() {{
+          {snippet}
+        }}
+    """)
+
+    assert Verdict.UNSCANNED_FORM in _verdicts(report)
+
+
+def test_a_react_data_prop_is_not_mistaken_for_an_object_url(tmp_path):
+    """`<RadarChart data={...}>` は URL ではない。過検出で FAIL を作らない。"""
+    report = _run(tmp_path, """
+        export default function App(radarData) {
+          return <RadarChart data={radarData} />;
+        }
+    """)
+
+    assert report.sites == []
+
+
+def test_a_literal_segment_matches_a_declared_path_parameter(tmp_path):
+    """`/entries/abc` は `/entries/{entry_id}` で実際に応答する。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          fetch(`${API_BASE}/api/demo/entries/abc`, { method: 'PUT' });
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.MATCHED]
+
+
+def test_a_placeholder_still_never_matches_a_literal_segment(tmp_path):
+    """逆向きは許さない。プレースホルダはリテラルに化けない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App(name) {
+          fetch(`${API_BASE}/api/demo/${name}`);
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_the_root_mount_is_checked_separately_from_the_version_mount(tmp_path):
+    """v1 に載っているだけでは /api/... で呼べない。片方で緑にしない。"""
+    app_file = _versioning(tmp_path, """
+        from fastapi import APIRouter
+        from routers import demo_router
+
+        v1_router = APIRouter(prefix="/api/v1")
+        v1_router.include_router(demo_router)
+    """)
+    routers = _routers(tmp_path, _DEMO_ROUTER)
+    app = tmp_path / "backend" / "main.py"
+    # v1 だけ載せ、ルート直下には載せない
+    app.write_text("app.include_router(v1_router)\n", encoding="utf-8")
+    registry = EndpointRegistry.scan(routers, app_files=[app, app_file])
+    prefix, modules = _version_mounts(app_file, routers, main_files=[app])
+    src = _frontend(tmp_path, """
+        export default function App() {
+          fetch('http://localhost:8000/api/demo/status');
+        }
+    """)
+
+    report = UiApiExecutor(src, registry, entry=src / "main.jsx",
+                          version_prefix=prefix, version_modules=modules,
+                          root_modules=set()).run()
+
+    assert _verdicts(report) == [Verdict.NOT_REGISTERED]
+
+
+def test_the_report_separates_mismatches_from_unreadable_calls(tmp_path):
+    """読めない書き方に逃がすだけで『ゼロ』にできてはいけない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App(url) {
+          fetch(`${API_BASE}/api/demo/nope`);
+          fetch(url);
+        }
+    """)
+
+    assert [s.verdict for s in report.mismatched] == [Verdict.NOT_DECLARED]
+    assert [s.verdict for s in report.unresolved] == [Verdict.UNRESOLVED_URL]
+
+
 def test_an_external_host_is_not_silently_passed(tmp_path):
     report = _run(tmp_path, """
         export default function App() {

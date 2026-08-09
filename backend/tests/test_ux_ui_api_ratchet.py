@@ -121,6 +121,34 @@ def test_the_passing_verdicts_pinned_today_are_exactly_matched():
     assert passing_verdicts() == ["matched"]
 
 
+@pytest.mark.parametrize("field_name,value", [
+    ("global_receivers", ["window", "globalThis", "self", "api"]),
+    ("scanned_forms", ["fetch", "eval"]),
+])
+def test_widening_the_scan_closure_is_a_violation(tmp_path, field_name, value):
+    """判定の弱化は判定表の外にもある。閉包を緩めるだけで unresolved が消える。"""
+    baseline = _pinned(tmp_path, _report(_site()))
+    baseline["scan_boundary"][field_name] = sorted(
+        set(baseline["scan_boundary"][field_name]) - set(value))
+
+    result = UiApiRatchet().check(_report(_site()), baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["scan_widened"]
+
+
+def test_dropping_an_unscannable_form_is_a_violation(tmp_path):
+    """走査できない形を一覧から落とせば、その呼び出しは黙って消える。"""
+    baseline = _pinned(tmp_path, _report(_site()))
+    baseline["scan_boundary"]["unscanned_forms"] = sorted(
+        set(baseline["scan_boundary"]["unscanned_forms"]) | {"未知のクライアント"})
+
+    result = UiApiRatchet().check(_report(_site()), baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["scan_widened"]
+
+
 # --- 4. 宣言の差し替え --------------------------------------------------------
 
 
@@ -234,6 +262,27 @@ def test_widening_passed_requires_widening_the_semantics_table():
     for verdict in Verdict:
         site = _site(verdict=verdict)
         assert site.passed is (VERDICT_SEMANTICS[verdict]["PASS"] == "yes"), verdict
+
+
+def test_deleting_a_nested_scan_boundary_key_is_a_violation(tmp_path):
+    """入れ子の欄を1つ消せばその欄だけ無検査になる、を塞ぐ。"""
+    baseline = _pinned(tmp_path, _report(_site()))
+    baseline["scan_boundary"].pop("global_receivers")
+
+    result = UiApiRatchet().check(_report(_site()), baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["tampered"]
+
+
+def test_blanking_the_declaration_on_the_executor_side_is_a_violation(tmp_path):
+    """ベースライン側だけ塞いでも、実行側に同じ「空＝無検査」が残る。"""
+    baseline = _pinned(tmp_path, _report(_site(declared="routers/a.py:10")))
+
+    result = UiApiRatchet().check(_report(_site(declared="")), baseline)
+
+    assert not result.valid
+    assert [v.kind for v in result.violations] == ["substituted"]
 
 
 def test_an_unparsable_baseline_is_treated_as_missing(tmp_path):
