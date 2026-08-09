@@ -1226,3 +1226,66 @@ def test_a_commented_out_call_is_reported_not_silently_dropped(tmp_path):
 
 def test_comment_masked_is_not_a_passing_verdict():
     assert VERDICT_SEMANTICS[Verdict.COMMENT_MASKED]["PASS"] == "no"
+
+
+# --- gate-verifier 12回目 ------------------------------------------------------
+
+
+def test_an_apostrophe_in_jsx_text_does_not_hide_a_url(tmp_path):
+    """JSX テキストの `Don't` の `'` が文字列状態を開き、直後の
+    `'http://…'` の**開き**引用符で閉じると、`http:` の後の `//` が
+    行コメントになって行ごと消える（12回目の指摘）。
+
+    スキームの `//` を行コメントと読まないことで、文字列状態の判定を
+    誤っても呼び出しが消えない。
+    """
+    report = _run(tmp_path, """
+        export default function App() {
+          const label = <p>Don't stop</p>;
+          const u = 'http://localhost:8000/api/demo/nope';
+          const img = new Image();
+          img.src = u;
+          return label;
+        }
+    """)
+
+    assert report.sites, "呼び出しが1件も出ていない"
+    assert not any(s.passed for s in report.sites)
+
+
+def test_a_url_assigned_to_a_dom_property_from_a_variable_is_detected(tmp_path):
+    """`img.src = u` は右辺が変数なので検出器に当たらず、残余が消えると
+    _masked_away も発火しなかった。右辺を問わず検出する。"""
+    report = _run(tmp_path, """
+        export default function App(form) {
+          const u = '/api/demo/nope';
+          form.action = u;
+          return null;
+        }
+    """)
+
+    assert Verdict.UNSCANNED_FORM in _verdicts(report)
+
+
+_TRAILING_SLASH_BASE = (
+    "const B = 'http://localhost:8000/';\n"
+    "export default function App() { fetch(`${B}/api/demo/status`); }")
+_DOUBLE_SLASH_PATH = (
+    "export default function App() { fetch('/api//demo/status'); }")
+_CLEAN_BASE = (
+    "const B = 'http://localhost:8000';\n"
+    "export default function App() { fetch(`${B}/api/demo/status`); }")
+
+
+@pytest.mark.parametrize("source,expected", [
+    (_TRAILING_SLASH_BASE, Verdict.NOT_DECLARED),
+    (_DOUBLE_SLASH_PATH, Verdict.NOT_DECLARED),
+    (_CLEAN_BASE, Verdict.MATCHED),
+])
+def test_duplicate_slashes_are_not_collapsed_on_the_frontend_side(
+        tmp_path, source, expected):
+    """`//api/x` は実行時 404。宣言側の正規化をフロントの生パスに当てると
+    404 になるパスが matched になる（FastAPI で 404 を実測済み）。"""
+    report = _run(tmp_path, source)
+
+    assert _verdicts(report) == [expected], source

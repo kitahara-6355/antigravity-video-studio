@@ -235,7 +235,7 @@
     "unscanned_forms": {
       "$.ajax / ky / superagent": "(?<![\\w.$])(?:\\$\\s*\\.\\s*ajax|ky\\s*[.(]|superagent\\s*\\.)",
       "CSS の url()": "url\\s*\\(\\s*[^)\\n]*?/api/",
-      "DOM への URL 代入": "\\.\\s*(?:href|src)\\s*=\\s*[`'\\\"]",
+      "DOM への URL 代入": "\\.\\s*(?:href|src|action|poster|data)\\s*=(?!=)",
       "EventSource": "(?<![\\w.$])new\\s+EventSource\\s*\\(",
       "Service Worker": "serviceWorker\\s*\\.\\s*register\\s*\\(",
       "XMLHttpRequest": "(?<![\\w.$])new\\s+XMLHttpRequest\\s*\\(",

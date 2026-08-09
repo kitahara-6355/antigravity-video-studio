@@ -137,7 +137,10 @@ UNSCANNED_FORMS = {
     "srcSet": re.compile(r"(?<![\w$])srcSet\s*=\s*[{'\"]"),
     # `url(${API_BASE}/api/x)` のように途中に式が挟まる形も拾う。
     "CSS の url()": re.compile(r"url\s*\(\s*[^)\n]*?/api/"),
-    "DOM への URL 代入": re.compile(r"\.\s*(?:href|src)\s*=\s*[`'\"]"),
+    # 右辺が変数でも当てる。`img.src = u` が検出器に当たらないと、
+    # 残余が消えたときに _masked_away も発火しない（12回目の指摘）。
+    "DOM への URL 代入": re.compile(
+        r"\.\s*(?:href|src|action|poster|data)\s*=(?!=)"),
     "$.ajax / ky / superagent": re.compile(
         r"(?<![\w.$])(?:\$\s*\.\s*ajax|ky\s*[.(]|superagent\s*\.)"),
     # 4回目の指摘。走査もされず「走査できない形」にも入っていなかった5形。
@@ -703,6 +706,20 @@ def _receiver_before(text: str, index: int) -> str | None:
     return hit.group(1) if hit else None
 
 
+def _front_path(url: str) -> str:
+    """フロントが**実際に叩くパス**。宣言側の正規化を適用しない。
+
+    `_normalise` は `//` を `/` に潰す。宣言の表記ゆれを吸収するには
+    正しいが、フロントの生パスに適用すると、実行時に 404 になる
+    `//api/task/9` が `/api/task/9` の宣言に当たって matched になる
+    （gate-verifier 12回目の実測。FastAPI TestClient で 404 を確認済み）。
+    """
+    url = url.split("?", 1)[0].split("#", 1)[0]
+    if not url.startswith("/"):
+        url = "/" + url
+    return url if url == "/" else url.rstrip("/") or "/"
+
+
 def _cut_query(url: str) -> str:
     return url.split("?", 1)[0].split("#", 1)[0]
 
@@ -1048,12 +1065,14 @@ class UiApiExecutor:
         exact = shapes.get((method, shape))
         if exact:
             return exact
-        wanted = shape.strip("/").split("/")
+        # `strip("/")` だと `//api/x` と `/api/x` が同じ形になる。
+        # 実行時は前者が 404 なので、空セグメントも数える（12回目の指摘）。
+        wanted = shape.split("/")
         best: tuple[int, list] | None = None
         for (m, candidate), hits in shapes.items():
             if m != method:
                 continue
-            parts = candidate.strip("/").split("/")
+            parts = candidate.split("/")
             if len(parts) != len(wanted):
                 continue
             literals = 0
@@ -1273,7 +1292,7 @@ class UiApiExecutor:
         stripped, why = _strip_origin(url)
         if stripped is None:
             return FetchSite(rel, line, raw, None, None, Verdict.EXTERNAL_HOST, why)
-        path = _normalise(stripped.split("?", 1)[0].split("#", 1)[0])
+        path = _front_path(stripped)
 
         if forced_method:
             method, why = forced_method, ""
