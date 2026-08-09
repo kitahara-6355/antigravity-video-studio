@@ -79,8 +79,10 @@ _LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0")
 # （gate-verifier 1回目の指摘）。受け側を閉じた集合にし、それ以外の `X.fetch(` は
 # 素通りさせず unresolved_url として出す。
 _FETCH_RE = re.compile(r"(?<![\w$])fetch\s*\(")
-# `fetch(` の直前にある受け側（`window.` など）を読む。
-_RECEIVER_RE = re.compile(r"([\w$]+(?:\.[\w$]+)*)\.\s*$")
+# `fetch(` の直前にある受け側（`window.` など）を読む。`?.` と改行も跨ぐ——
+# `client?.fetch(...)` や改行を挟んだ `.fetch(` を見落とすと、未知の受け側が
+# 素の呼び出しに化ける（gate-verifier 2回目の指摘）。
+_RECEIVER_RE = re.compile(r"([\w$]+(?:\s*\??\.\s*[\w$]+)*)\s*\??\.\s*$", re.DOTALL)
 _GLOBAL_RECEIVERS = ("window", "globalThis", "self")
 # WebSocket も UI から backend を叩く経路。`@router.websocket` の宣言と
 # 突き合わせる。`fetch` だけ見て「全部見た」と言わない。
@@ -89,7 +91,7 @@ _WEBSOCKET_RE = re.compile(r"(?<![\w.$])new\s+WebSocket\s*\(")
 # 走査している呼び出しの形。**機械可読にする** — ここに無い形は
 # 「確かめていない」であって「無い」ではない（gate-verifier 1回目の指摘）。
 SCANNED_FORMS = ("fetch", "window.fetch", "globalThis.fetch", "self.fetch",
-                 "new WebSocket")
+                 "new WebSocket", "window.open", "src={...}", "href={...}")
 # 走査できない形。実在したら unscanned_form として FAIL にする。
 # 「対応していないから見えない」を「問題なし」に混ぜない。
 UNSCANNED_FORMS = {
@@ -97,7 +99,17 @@ UNSCANNED_FORMS = {
     "XMLHttpRequest": re.compile(r"(?<![\w.$])new\s+XMLHttpRequest\s*\("),
     "EventSource": re.compile(r"(?<![\w.$])new\s+EventSource\s*\("),
     "sendBeacon": re.compile(r"(?<![\w.$])navigator\.sendBeacon\s*\("),
+    # `const f = window.fetch` のような別名束縛と `api['fetch']`。
+    # どちらも呼び出し地点に `fetch(` が現れないので走査から消える。
+    "fetch の別名束縛": re.compile(
+        r"=\s*(?:window|globalThis|self)?\.?\s*fetch\s*(?![\s(])"),
+    "計算メンバでの fetch": re.compile(r"\[\s*['\"]fetch['\"]\s*\]"),
 }
+
+# JSX の URL 属性と `window.open`。ブラウザはこれも backend に GET を投げる。
+# `fetch` だけ見て「全部見た」と言わない（gate-verifier 2回目の指摘）。
+_URL_ATTR_RE = re.compile(r"(?<![\w$])(?:src|href)\s*=\s*\{")
+_WINDOW_OPEN_RE = re.compile(r"(?<![\w$])window\.open\s*\(")
 # `const API_BASE = "http://localhost:8000";` と
 # `const url = ` + backtick + `${API_BASE}/api/segments?t=${t}` + backtick + `;`。
 # **ファイル内で1度しか代入されていない名前だけ**を辞書に入れる。
@@ -190,12 +202,23 @@ VERDICT_SEMANTICS: dict[Verdict, dict[str, str]] = {
     },
 }
 
+# C-2 が名指しする「突き合わない」3型。**ここがゼロになることが終了条件。**
+# 「読めなかった」（unresolved_*・unscanned_form・external_host）は別枠にする——
+# 同じ袋に入れると、読めない書き方に逃がすだけでゼロにできてしまう。
+MISMATCH_VERDICTS = frozenset({
+    Verdict.NOT_DECLARED, Verdict.METHOD_MISMATCH, Verdict.NOT_REGISTERED,
+})
+
 # 走査している形も機械可読に持つ。散文にだけ書くと、形が増えたときに
 # 「対応していないから見えない」が「問題なし」に混ざる。
+# **この3つはラチェットのベースラインに固定する** — 緩めるだけで unresolved を
+# matched に変えられてはいけない（gate-verifier 2回目の指摘）。
 SCAN_SEMANTICS = {
     "走査する形": list(SCANNED_FORMS),
     "走査できない形": sorted(UNSCANNED_FORMS),
+    "素の呼び出しとして扱う受け側": list(_GLOBAL_RECEIVERS),
     "走査できない形の扱い": "見つけたら unscanned_form の FAIL にする（黙って落とさない）",
+    "突き合わせの対象": sorted(v.value for v in MISMATCH_VERDICTS),
 }
 
 
@@ -238,8 +261,19 @@ class UiApiReport:
 
     @property
     def mismatched(self) -> list[FetchSite]:
-        """突き合わなかったもの。**ゼロになることが P4 C-2 の終了条件。**"""
-        return [s for s in self.sites if not s.passed]
+        """**突き合わせた結果、合わなかったもの。ゼロになることが C-2。**
+
+        「読めなかったもの」は別（`unresolved`）。混ぜると、読めない書き方に
+        逃がすだけでゼロにできてしまう。
+        """
+        return [s for s in self.sites if s.verdict in MISMATCH_VERDICTS]
+
+    @property
+    def unresolved(self) -> list[FetchSite]:
+        """**読めなかったもの。** PASS ではない。ゼロは要求しないが、
+        ラチェットで1件ずつ固定して黙って増減できないようにする。"""
+        return [s for s in self.sites
+                if not s.passed and s.verdict not in MISMATCH_VERDICTS]
 
     def by_verdict(self) -> dict[Verdict, int]:
         counts: dict[Verdict, int] = {}
@@ -409,6 +443,23 @@ def _resolve_url(expr: str, env: dict[str, str],
     return "".join(out), ""
 
 
+def _is_backend_url(url: str) -> bool:
+    """backend を叩く URL か。ローカル資産と外部リンクを判定に載せない。"""
+    if url.startswith(("http://", "https://", "ws://", "wss://")):
+        host = url.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
+        return host in _LOCAL_HOSTS
+    return url.startswith("/api")
+
+
+def _looks_like_asset(expr: str) -> bool:
+    """`<img src={scene.image}>` のような、URL 文字列ですらない式。
+
+    **リテラルを含む式は対象外にしない。** ここで拾いすぎると
+    「読めないから backend ではない」という逆向きの言い訳になる。
+    """
+    return bool(re.fullmatch(r"[\w$]+(?:\??\.[\w$]+)*", expr.strip()))
+
+
 def _receiver_before(text: str, index: int) -> str | None:
     """`fetch(` の直前の受け側。素の `fetch(` なら None。"""
     hit = _RECEIVER_RE.search(text[max(0, index - 80):index])
@@ -547,8 +598,16 @@ def _version_mounts(app_file: Path,
     return prefix, mounted
 
 
-def _mounted_on_app(router_name: str, main_files: list[Path]) -> bool:
-    """`app.include_router(<router_name>)` がアプリ本体にあるか。"""
+def _app_mounted(main_files: list[Path]) -> set[str]:
+    """`app.include_router(x)` の x を集める。**受け側を app に限る。**
+
+    `EndpointSite.registered` は受け側を問わず `*.include_router()` を数えるので、
+    `v1.include_router(pipeline_router)` があるだけで「/api/... にも登録済み」に
+    なってしまう。`app.include_router(pipeline_router)` を消しても
+    /api/pipeline/... が緑のままだった（gate-verifier 2回目の指摘・83件中51件）。
+    ルート直下に載っている事実と、バージョン配下に載っている事実は別物。
+    """
+    mounted: set[str] = set()
     for path in main_files:
         path = Path(path)
         if not path.exists():
@@ -566,10 +625,18 @@ def _mounted_on_app(router_name: str, main_files: list[Path]) -> bool:
                     and isinstance(node.func.value, ast.Name)
                     and node.func.value.id == "app"):
                 continue
-            if isinstance(node.args[0], ast.Name) \
-                    and node.args[0].id == router_name:
-                return True
-    return False
+            if isinstance(node.args[0], ast.Name):
+                mounted.add(node.args[0].id)
+    return mounted
+
+
+def _mounted_on_app(router_name: str, main_files: list[Path]) -> bool:
+    return router_name in _app_mounted(main_files)
+
+
+def _module_aliases(routers_dir: Path) -> dict[str, str]:
+    """{モジュール名: 別名}。別名でしかマウントを書けないので要る。"""
+    return _router_aliases(Path(routers_dir) / "__init__.py")
 
 
 # --- 走査 ---------------------------------------------------------------------
@@ -580,7 +647,8 @@ class UiApiExecutor:
 
     def __init__(self, frontend_src: Path, registry: EndpointRegistry,
                  entry: Path | None = None,
-                 version_prefix: str = "", version_modules: set[str] | None = None):
+                 version_prefix: str = "", version_modules: set[str] | None = None,
+                 root_modules: set[str] | None = None):
         self.frontend_src = Path(frontend_src)
         self.registry = registry
         if entry is None:
@@ -589,17 +657,24 @@ class UiApiExecutor:
         self.entry = entry
         self.version_prefix = version_prefix
         self.version_modules = version_modules or set()
+        # ルート直下（/api/...）に載っているモジュール。None なら未判定で、
+        # EndpointSite.registered に従う（受け側を問わない緩い判定）。
+        self.root_modules = root_modules
 
     @classmethod
     def for_repo(cls) -> UiApiExecutor:
         root = _project_root()
         backend = root / "backend"
+        mains = [backend / "main.py", backend / "api_versioning.py"]
         prefix, modules = _version_mounts(
-            backend / "api_versioning.py", backend / "routers",
-            main_files=[backend / "main.py", backend / "api_versioning.py"])
+            backend / "api_versioning.py", backend / "routers", main_files=mains)
+        mounted = _app_mounted(mains)
+        aliases = _module_aliases(backend / "routers")
         return cls(frontend_src=root / "frontend" / "src",
                    registry=EndpointRegistry.for_repo(),
-                   version_prefix=prefix, version_modules=modules)
+                   version_prefix=prefix, version_modules=modules,
+                   root_modules={module for module, alias in aliases.items()
+                                 if alias in mounted})
 
     def run(self) -> UiApiReport:
         report = UiApiReport(endpoints_scanned=len(self.registry.endpoints))
@@ -627,6 +702,41 @@ class UiApiExecutor:
             index.setdefault((method, _param_shape(path)), []).append(endpoint)
         return index
 
+    @staticmethod
+    def _lookup(shapes: dict, method: str, shape: str) -> list:
+        """宣言を探す。**セグメント単位で、非対称に照合する。**
+
+        - フロントのリテラルは、同じリテラルにも宣言のパラメータにも当たる
+          （`/stream/preview` は `/stream/{video_type}` で実際に応答する）
+        - フロントのプレースホルダは**宣言のパラメータにしか当たらない**。
+          リテラルのセグメントには化けさせない
+
+        完全一致を先に見て、無ければパラメータ込みで探す。より具体的な
+        （リテラルが多く一致する）宣言を優先する。
+        """
+        exact = shapes.get((method, shape))
+        if exact:
+            return exact
+        wanted = shape.strip("/").split("/")
+        best: tuple[int, list] | None = None
+        for (m, candidate), hits in shapes.items():
+            if m != method:
+                continue
+            parts = candidate.strip("/").split("/")
+            if len(parts) != len(wanted):
+                continue
+            literals = 0
+            for front, declared in zip(wanted, parts):
+                if declared == _PARAM:
+                    continue  # 宣言側がパラメータなら何でも受ける
+                if front == _PARAM or front != declared:
+                    break     # プレースホルダはリテラルに当たらない
+                literals += 1
+            else:
+                if best is None or literals > best[0]:
+                    best = (literals, hits)
+        return best[1] if best else []
+
     def _under_version(self, shape: str, method: str,
                        shapes: dict) -> tuple[list, str]:
         """`/api/v1/...` を、再マウント元のルーターの宣言として解く。
@@ -639,7 +749,7 @@ class UiApiExecutor:
         if not prefix or not shape.startswith(prefix + "/"):
             return [], shape
         bare = shape[len(prefix):]
-        hits = [e for e in shapes.get((method, bare), [])
+        hits = [e for e in self._lookup(shapes, method, bare)
                 if e.module in self.version_modules]
         return hits, bare if hits else shape
 
@@ -673,6 +783,30 @@ class UiApiExecutor:
                 found.append(self._judge(parts, constants, rel, line, shapes,
                                          forced_method=method))
 
+        # ブラウザが GET を投げる URL 属性と window.open。
+        # ローカルの画像などは backend への呼び出しではないので、
+        # **backend のパスに解決できたものだけ**を判定に載せる。
+        # 解決できないものは「backend かもしれない」ので unresolved に落とす。
+        for pattern, arg_open in ((_URL_ATTR_RE, "{"), (_WINDOW_OPEN_RE, "(")):
+            for hit in pattern.finditer(text):
+                body = _match_args(text, hit.end() - 1)
+                if body is None:
+                    continue
+                expr = _split_top_level(body)[0] if arg_open == "(" else body
+                url, why = _resolve_url(expr, constants)
+                line = line_of(hit.start())
+                if url is None:
+                    if _looks_like_asset(expr):
+                        continue  # 画像などのローカル資産。backend ではない
+                    found.append(FetchSite(
+                        rel, line, _short(expr), None, None,
+                        Verdict.UNRESOLVED_URL, why))
+                    continue
+                if not _is_backend_url(url):
+                    continue
+                found.append(self._judge([expr], constants, rel, line, shapes,
+                                         forced_method="GET"))
+
         # 走査できない形。**実在したら FAIL。**「対応していないから見えない」を
         # 「問題なし」に混ぜない。
         for name, pattern in UNSCANNED_FORMS.items():
@@ -704,9 +838,11 @@ class UiApiExecutor:
                              Verdict.UNRESOLVED_METHOD, why)
 
         shape = _param_shape(path)
-        hits = shapes.get((method, shape))
+        hits = self._lookup(shapes, method, shape)
+        under_version = False
         if not hits:
             hits, shape = self._under_version(shape, method, shapes)
+            under_version = bool(hits)
         if not hits:
             other = sorted({m for (m, s) in shapes if s == shape})
             if other:
@@ -716,13 +852,28 @@ class UiApiExecutor:
             return FetchSite(rel, line, raw, path, method, Verdict.NOT_DECLARED,
                              "どのルーターにも宣言が無い")
 
-        registered = [e for e in hits if e.registered is not False]
+        registered = [e for e in hits if self._registered(e, under_version)]
         if not registered:
+            where = (f"{self.version_prefix} 配下" if under_version else "ルート直下")
             return FetchSite(rel, line, raw, path, method, Verdict.NOT_REGISTERED,
-                             f"{hits[0].module} が include_router されていない",
+                             f"{hits[0].module} が {where}に登録されていない",
                              hits[0].as_evidence())
         return FetchSite(rel, line, raw, path, method, Verdict.MATCHED, "",
                          registered[0].as_evidence())
+
+    def _registered(self, endpoint, under_version: bool) -> bool:
+        """**そのパスで呼べるように登録されているか。**
+
+        `/api/v1/...` は再マウント先に、`/api/...` はルート直下に載っている
+        必要がある。どちらか一方に載っていれば良い、にすると
+        `app.include_router(pipeline_router)` を消しても
+        `/api/pipeline/...` が緑のままになる（gate-verifier 2回目の指摘）。
+        """
+        if under_version:
+            return endpoint.module in self.version_modules
+        if self.root_modules is None:
+            return endpoint.registered is not False
+        return endpoint.module in self.root_modules
 
 
 # --- CLI ---------------------------------------------------------------------
@@ -747,14 +898,41 @@ def _format(report: UiApiReport) -> str:
             lines.append(f"    {site}")
         lines.append("")
 
+    def detail(site: FetchSite) -> list[str]:
+        return [f"    {site.file}:{site.line}  {site.verdict.value}",
+                f"      {site.method or '?'} {site.path or site.raw_url}"
+                + (f"  — {site.reason}" if site.reason else "")]
+
+    unread = report.unresolved
+    if unread:
+        lines.append(f"  読めなかった呼び出し: {len(unread)} 件（PASS にしていない）")
+        for site in unread:
+            lines += detail(site)
+        lines.append("")
+
     bad = report.mismatched
     lines.append(f"  突き合わない呼び出し: {len(bad)} 件")
     if not bad:
         lines.append("    なし。すべての呼び出し先が、宣言され登録されたハンドラに届いている。")
     for site in bad:
-        lines.append(f"    {site.file}:{site.line}  {site.verdict.value}")
-        lines.append(f"      {site.method or '?'} {site.path or site.raw_url}"
-                     f"{'  — ' + site.reason if site.reason else ''}")
+        lines += detail(site)
+    return "\n".join(lines)
+
+
+def _format_list(report: UiApiReport) -> str:
+    """**列挙そのものを出す。** 集計だけでは何を測ったか読めない。"""
+    lines = [f"呼び出し先 {len(report.sites)} 件", ""]
+    for site in sorted(report.sites, key=lambda s: (s.file, s.line)):
+        lines.append(
+            f"  {site.file}:{site.line:<5} {site.verdict.value:<16} "
+            f"{site.method or '?':<9} {site.path or site.raw_url}")
+        if site.declared_at:
+            lines.append(f"      ← {site.declared_at}")
+        elif site.reason:
+            lines.append(f"      — {site.reason}")
+    if report.unreachable:
+        lines += ["", f"到達不能で判定していない: {len(report.unreachable)} 件"]
+        lines += [f"  {site}" for site in report.unreachable]
     return "\n".join(lines)
 
 
@@ -765,6 +943,12 @@ def _format_semantics() -> str:
         lines.append(f"    確かめる  : {meaning['確かめること']}")
         lines.append(f"    確かめない: {meaning['確かめないこと']}")
         lines.append("")
+    # 走査の境界も出す。持っているだけでどこも読まないなら、
+    # 機械可読とは言えない（gate-verifier 2回目の指摘）。
+    lines.append("走査の境界")
+    for key, value in SCAN_SEMANTICS.items():
+        rendered = "・".join(value) if isinstance(value, list) else value
+        lines.append(f"    {key}: {rendered}")
     return "\n".join(lines)
 
 
@@ -772,8 +956,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="UI と API の接続を静的に突き合わせる")
     parser.add_argument("--gate", action="store_true",
                         help="突き合わない呼び出しが1件でもあれば exit 1")
+    parser.add_argument("--list", action="store_true", dest="list_sites",
+                        help="読み取った呼び出し先を1件ずつ列挙する")
     parser.add_argument("--semantics", action="store_true",
-                        help="判定ごとの『確かめること／確かめないこと』を出す")
+                        help="判定ごとの『確かめること／確かめないこと』と走査の境界を出す")
     args = parser.parse_args(argv)
 
     if args.semantics:
@@ -781,7 +967,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     report = UiApiExecutor.for_repo().run()
-    print(_format(report))
+    print(_format_list(report) if args.list_sites else _format(report))
 
     # 走査0件を緑にしない。ディレクトリを消せば通る、を塞ぐ。
     if not report.sites:

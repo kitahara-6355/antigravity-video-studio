@@ -334,6 +334,136 @@ def test_a_websocket_is_matched_against_its_declaration(tmp_path):
     assert report.sites[0].method == "WEBSOCKET"
 
 
+@pytest.mark.parametrize("call", [
+    "client?.fetch('http://localhost:8000/api/demo/status');",
+    "client\n            .fetch('http://localhost:8000/api/demo/status');",
+])
+def test_an_unknown_receiver_survives_optional_chaining_and_newlines(tmp_path, call):
+    """`?.` や改行を跨げないと、未知の受け側が素の呼び出しに化ける。"""
+    report = _run(tmp_path, f"""
+        export default function App(client) {{
+          {call}
+        }}
+    """)
+
+    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+
+
+@pytest.mark.parametrize("call", [
+    "const f = window.fetch; f('/api/demo/status');",
+    "api['fetch']('/api/demo/status');",
+])
+def test_fetch_reached_without_a_call_site_is_reported(tmp_path, call):
+    """別名束縛・計算メンバは呼び出し地点に `fetch(` が現れず、走査から消える。"""
+    report = _run(tmp_path, f"""
+        export default function App(api) {{
+          {call}
+        }}
+    """)
+
+    assert Verdict.UNSCANNED_FORM in _verdicts(report)
+
+
+def test_a_jsx_url_attribute_hitting_the_backend_is_judged(tmp_path):
+    """ブラウザは `<a href>` にも GET を投げる。fetch だけ見て全部見たと言わない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          return <a href={`${API_BASE}/api/demo/status`}>x</a>;
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.MATCHED]
+
+
+def test_window_open_hitting_the_backend_is_judged(tmp_path):
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          window.open(`${API_BASE}/api/demo/nope`, '_blank');
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_a_local_asset_attribute_is_not_a_backend_call(tmp_path):
+    """`<img src={scene.image}>` は backend への呼び出しではない。"""
+    report = _run(tmp_path, """
+        export default function App(scene) {
+          return <img src={scene.image} />;
+        }
+    """)
+
+    assert report.sites == []
+
+
+def test_a_literal_segment_matches_a_declared_path_parameter(tmp_path):
+    """`/entries/abc` は `/entries/{entry_id}` で実際に応答する。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          fetch(`${API_BASE}/api/demo/entries/abc`, { method: 'PUT' });
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.MATCHED]
+
+
+def test_a_placeholder_still_never_matches_a_literal_segment(tmp_path):
+    """逆向きは許さない。プレースホルダはリテラルに化けない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App(name) {
+          fetch(`${API_BASE}/api/demo/${name}`);
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_the_root_mount_is_checked_separately_from_the_version_mount(tmp_path):
+    """v1 に載っているだけでは /api/... で呼べない。片方で緑にしない。"""
+    app_file = _versioning(tmp_path, """
+        from fastapi import APIRouter
+        from routers import demo_router
+
+        v1_router = APIRouter(prefix="/api/v1")
+        v1_router.include_router(demo_router)
+    """)
+    routers = _routers(tmp_path, _DEMO_ROUTER)
+    app = tmp_path / "backend" / "main.py"
+    # v1 だけ載せ、ルート直下には載せない
+    app.write_text("app.include_router(v1_router)\n", encoding="utf-8")
+    registry = EndpointRegistry.scan(routers, app_files=[app, app_file])
+    prefix, modules = _version_mounts(app_file, routers, main_files=[app])
+    src = _frontend(tmp_path, """
+        export default function App() {
+          fetch('http://localhost:8000/api/demo/status');
+        }
+    """)
+
+    report = UiApiExecutor(src, registry, entry=src / "main.jsx",
+                          version_prefix=prefix, version_modules=modules,
+                          root_modules=set()).run()
+
+    assert _verdicts(report) == [Verdict.NOT_REGISTERED]
+
+
+def test_the_report_separates_mismatches_from_unreadable_calls(tmp_path):
+    """読めない書き方に逃がすだけで『ゼロ』にできてはいけない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App(url) {
+          fetch(`${API_BASE}/api/demo/nope`);
+          fetch(url);
+        }
+    """)
+
+    assert [s.verdict for s in report.mismatched] == [Verdict.NOT_DECLARED]
+    assert [s.verdict for s in report.unresolved] == [Verdict.UNRESOLVED_URL]
+
+
 def test_an_external_host_is_not_silently_passed(tmp_path):
     report = _run(tmp_path, """
         export default function App() {
