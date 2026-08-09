@@ -86,7 +86,7 @@ _EXCLUDED_DIRS = {"node_modules", "dist", "build", "__pycache__", ".vite"}
 # 素の `fetch` だけを見ていると `window.fetch('/api/x')` が走査から**黙って消える**
 # （gate-verifier 1回目の指摘）。受け側を閉じた集合にし、それ以外の `X.fetch(` は
 # 素通りさせず unresolved_url として出す。
-_FETCH_RE = re.compile(r"(?<![\w$])fetch\s*\(")
+_FETCH_RE = re.compile(r"(?<![\w$])fetch\s*(?:\?\.)?\s*\(")
 # `fetch(` の直前にある受け側（`window.` など）を読む。`?.` と改行も跨ぐ——
 # `client?.fetch(...)` や改行を挟んだ `.fetch(` を見落とすと、未知の受け側が
 # 素の呼び出しに化ける（gate-verifier 2回目の指摘）。
@@ -101,7 +101,8 @@ _WEBSOCKET_RE = re.compile(
 # 「確かめていない」であって「無い」ではない（gate-verifier 1回目の指摘）。
 SCANNED_FORMS = ("fetch", "window.fetch", "globalThis.fetch", "self.fetch",
                  "new WebSocket", "window.open",
-                 "src={...}", "href={...}", 'src="..."', 'href="..."')
+                 "src={...}", "href={...}", "poster={...}",
+                 'src="..."', 'href="..."', 'poster="..."')
 # 走査できない形。実在したら unscanned_form として FAIL にする。
 # 「対応していないから見えない」を「問題なし」に混ぜない。
 UNSCANNED_FORMS = {
@@ -119,35 +120,41 @@ UNSCANNED_FORMS = {
     "fetch.call / fetch.apply": re.compile(
         r"(?<![\w$])fetch\s*\.\s*(?:call|apply|bind)\s*\("),
     # ブラウザ遷移。backend のパスを渡せば GET が飛ぶ。
+    # 受け側（window/top/parent/document/self）の有無と、代入・メソッドの
+    # どちらでも当たるようにする。`window.location =` と
+    # `document.location =` を別々の正規表現で書くと隙間ができる
+    # （gate-verifier 5回目の指摘）。
     "location 遷移": re.compile(
-        r"(?<![\w$])location\s*(?:\.\s*(?:assign|replace)\s*\(|\.\s*href\s*=)"),
+        r"(?<![\w$])(?:(?:window|globalThis|self|top|parent|document)\s*\.\s*)?"
+        r"location\s*(?:\.\s*(?:assign|replace)\s*\(|\.\s*href\s*=(?!=)|=(?!=))"),
     "動的 import": re.compile(r"(?<![\w.$])import\s*\(\s*['\"`]"),
     "Service Worker": re.compile(r"serviceWorker\s*\.\s*register\s*\("),
     # URL を運ぶが走査していない属性・記法。
-    "form action": re.compile(r"(?<![\w$])action\s*=\s*[{'\"]"),
+    "form action": re.compile(r"(?<![\w$])(?:form)?[Aa]ction\s*=\s*[{'\"]"),
     # `<object data=...>` だけ。素の `data={...}` は React の props で URL ではない。
     "object の data": re.compile(r"<object\b[^>]*?\bdata\s*=\s*[{'\"]", re.DOTALL),
     "srcSet": re.compile(r"(?<![\w$])srcSet\s*=\s*[{'\"]"),
-    "CSS の url()": re.compile(r"url\s*\(\s*['\"]?/api/"),
+    # `url(${API_BASE}/api/x)` のように途中に式が挟まる形も拾う。
+    "CSS の url()": re.compile(r"url\s*\(\s*[^)\n]*?/api/"),
     "DOM への URL 代入": re.compile(r"\.\s*(?:href|src)\s*=\s*[`'\"]"),
     "$.ajax / ky / superagent": re.compile(
         r"(?<![\w.$])(?:\$\s*\.\s*ajax|ky\s*[.(]|superagent\s*\.)"),
     # 4回目の指摘。走査もされず「走査できない形」にも入っていなかった5形。
-    "document.location 代入": re.compile(
-        r"(?<![\w$])document\s*\.\s*location\s*=(?!=)"),
     "new Worker": re.compile(
         r"(?<![\w.$])new\s+(?:Shared)?Worker\s*\("),
     "素の open()": re.compile(r"(?<![\w.$])open\s*\(\s*['\"`]"),
     "setAttribute で URL": re.compile(
-        r"setAttribute\s*\(\s*['\"](?:src|href|action|data)['\"]"),
+        r"setAttribute\s*\(\s*['\"]"
+        r"(?:src|href|action|formaction|data|poster|srcset|content|ping)['\"]",
+        re.IGNORECASE),
 }
 
 # JSX の URL 属性と `window.open`。ブラウザはこれも backend に GET を投げる。
 # `fetch` だけ見て「全部見た」と言わない（gate-verifier 2回目の指摘）。
-_URL_ATTR_RE = re.compile(r"(?<![\w$])(?:src|href)\s*=\s*\{")
+_URL_ATTR_RE = re.compile(r"(?<![\w$])(?:src|href|poster)\s*=\s*\{")
 # 波括弧なしの素の文字列（`<a href="/api/x">`）。これも走査から消えていた。
 _URL_ATTR_STR_RE = re.compile(
-    r"(?<![\w$])(?:src|href)\s*=\s*(?P<q>['\"])(?P<value>(?P=q)|[^'\"]*)(?P=q)")
+    r"(?<![\w$])(?:src|href|poster)\s*=\s*(?P<q>['\"])(?P<value>(?P=q)|[^'\"]*)(?P=q)")
 _WINDOW_OPEN_RE = re.compile(r"(?<![\w$])window\.open\s*\(")
 # `const API_BASE = "http://localhost:8000";` と
 # `const url = ` + backtick + `${API_BASE}/api/segments?t=${t}` + backtick + `;`。
@@ -254,7 +261,8 @@ MISMATCH_VERDICTS = frozenset({
 # matched に変えられてはいけない（gate-verifier 2回目の指摘）。
 SCAN_SEMANTICS = {
     "走査するファイル": [f"frontend/src/**/*{s}" for s in SCANNED_SUFFIXES]
-                        + ["frontend/index.html"],
+                        + ["frontend/index.html", "frontend/vite.config.*",
+                           "frontend/public/**"],
     "走査する形": list(SCANNED_FORMS),
     "走査できない形": sorted(UNSCANNED_FORMS),
     "素の呼び出しとして扱う受け側": list(_GLOBAL_RECEIVERS),
@@ -482,6 +490,27 @@ def _resolve_url(expr: str, env: dict[str, str],
         out.append(body[i])
         i += 1
     return "".join(out), ""
+
+
+def _all_form_hits(text: str):
+    """走査対象・走査できない形を問わず、URL を運びうる記述をすべて拾う。
+
+    到達不能ファイルの計上に使う。ここが走査側と別の集合になっていると、
+    「到達不能にすれば消える」経路がそのまま残る。
+    """
+    detectors = [
+        ("fetch", _FETCH_RE), ("WebSocket", _WEBSOCKET_RE),
+        ("window.open", _WINDOW_OPEN_RE),
+        ("URL 属性", _URL_ATTR_RE), ("URL 属性", _URL_ATTR_STR_RE),
+        *UNSCANNED_FORMS.items(),
+    ]
+    seen: set[tuple[str, int]] = set()
+    for label, pattern in detectors:
+        for hit in pattern.finditer(text):
+            if (label, hit.start()) in seen:
+                continue
+            seen.add((label, hit.start()))
+            yield label, hit
 
 
 def _is_backend_url(url: str) -> bool:
@@ -724,10 +753,14 @@ class UiApiExecutor:
                     report.sites.append(site)
                 continue
             if reachable is not None and path.resolve() not in reachable:
-                for pattern in (_FETCH_RE, _WEBSOCKET_RE):
-                    for hit in pattern.finditer(text):
-                        report.unreachable.append(
-                            f"{rel}:{text.count(chr(10), 0, hit.start()) + 1}")
+                # **走査するすべての形を数える。** fetch と WebSocket だけを
+                # 数えていたので、到達不能ファイルに置いた URL 属性・
+                # window.open・走査できない形は unreachable にすら計上されず
+                # 無痕跡で消えていた（gate-verifier 5回目の指摘）。
+                for label, hit in _all_form_hits(text):
+                    report.unreachable.append(
+                        f"{rel}:{text.count(chr(10), 0, hit.start()) + 1}"
+                        f"  {label}")
                 continue
             report.files_scanned += 1
             for site in self._sites_in(text, _assignments(text), rel, shapes):
@@ -750,11 +783,22 @@ class UiApiExecutor:
                     continue
                 seen.add(path)
                 yield path
-        # アプリのエントリ HTML。src の外にあるので rglob では拾えない。
-        for name in ("index.html",):
-            candidate = self.frontend_src.parent / name
+        # src の外。エントリ HTML・ビルド設定（proxy や define で URL を
+        # 注入できる）・public 配下。走査対象でも「走査できない形」でもない
+        # 未申告領域を作らない（gate-verifier 5回目の指摘）。
+        root = self.frontend_src.parent
+        for name in ("index.html", "vite.config.js", "vite.config.ts",
+                     "vite.config.mjs", "vite.config.cjs"):
+            candidate = root / name
             if candidate.is_file() and candidate not in seen:
+                seen.add(candidate)
                 yield candidate
+        for path in sorted((root / "public").rglob("*")):
+            if (path.is_file() and path.suffix in SCANNED_SUFFIXES
+                    and not _EXCLUDED_DIRS & set(path.parts)
+                    and path not in seen):
+                seen.add(path)
+                yield path
 
     def _shape_index(self) -> dict[tuple[str, str], list]:
         """(メソッド, 形) → 宣言。パスパラメータ名の違いを吸収する。"""

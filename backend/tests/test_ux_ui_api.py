@@ -500,6 +500,59 @@ def test_a_navigation_form_inside_a_scanned_file_does_not_vanish(
     assert expected in _verdicts(report)
 
 
+@pytest.mark.parametrize("snippet,expected", [
+    # `fetch` は SCANNED_FORMS が「走査する」と宣言している当の形。
+    ("fetch?.('http://localhost:8000/api/demo/nope');", Verdict.NOT_DECLARED),
+    ('return <video poster="/api/demo/nope" />;', Verdict.NOT_DECLARED),
+    ("window.location = '/api/demo/status';", Verdict.UNSCANNED_FORM),
+    ("top.location = '/api/demo/status';", Verdict.UNSCANNED_FORM),
+    ('return <button formAction="/api/demo/status" />;', Verdict.UNSCANNED_FORM),
+    ("el.setAttribute('poster', '/api/demo/status');", Verdict.UNSCANNED_FORM),
+])
+def test_a_url_bearing_form_does_not_vanish(tmp_path, snippet, expected):
+    """走査にも unresolved にも unscanned_form にも出ない形を作らない。"""
+    report = _run(tmp_path, f"""
+        export default function App(el) {{
+          {snippet}
+        }}
+    """)
+
+    assert expected in _verdicts(report), snippet
+
+
+def test_an_inline_style_url_with_an_expression_is_reported(tmp_path):
+    """`url(${BASE}/api/x)` は `url(` の直後が `/api/` ではない。"""
+    report = _run(tmp_path, """
+        const API_BASE = "http://localhost:8000";
+        export default function App() {
+          return <div style={{ backgroundImage: `url(${API_BASE}/api/demo/status)` }} />;
+        }
+    """)
+
+    assert Verdict.UNSCANNED_FORM in _verdicts(report)
+
+
+def test_every_form_in_an_unreachable_file_is_counted(tmp_path):
+    """到達不能にすれば消える、を塞ぐ。**走査するすべての形を数える。**
+
+    fetch と WebSocket だけを数えていたので、URL 属性・window.open・
+    走査できない形は unreachable にすら計上されず無痕跡で消えていた。
+    """
+    report = _run(tmp_path, """
+        export default function App() { return null; }
+    """, extra={"Orphan.jsx": """
+        export const O = () => {
+          window.open('/api/demo/status');
+          axios.get('/api/demo/status');
+          return <a href="/api/demo/status">x</a>;
+        };
+    """})
+
+    assert report.sites == []
+    assert len(report.unreachable) >= 3
+    assert all("Orphan.jsx" in entry for entry in report.unreachable)
+
+
 def test_a_react_data_prop_is_not_mistaken_for_an_object_url(tmp_path):
     """`<RadarChart data={...}>` は URL ではない。過検出で FAIL を作らない。"""
     report = _run(tmp_path, """

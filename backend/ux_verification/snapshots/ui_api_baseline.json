@@ -189,8 +189,8 @@
     "src/pages/EditorPage.jsx|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video"
   },
   "unreachable": [
-    "src/components/ModelQuotaDashboard.jsx:25",
-    "src/components/ModelQuotaDashboard.jsx:37"
+    "src/components/ModelQuotaDashboard.jsx:25  fetch",
+    "src/components/ModelQuotaDashboard.jsx:37  fetch"
   ],
   "passing_verdicts": [
     "matched"
@@ -212,6 +212,8 @@
       "href=\"...\"",
       "href={...}",
       "new WebSocket",
+      "poster=\"...\"",
+      "poster={...}",
       "self.fetch",
       "src=\"...\"",
       "src={...}",
@@ -220,21 +222,20 @@
     ],
     "unscanned_forms": {
       "$.ajax / ky / superagent": "(?<![\\w.$])(?:\\$\\s*\\.\\s*ajax|ky\\s*[.(]|superagent\\s*\\.)",
-      "CSS の url()": "url\\s*\\(\\s*['\\\"]?/api/",
+      "CSS の url()": "url\\s*\\(\\s*[^)\\n]*?/api/",
       "DOM への URL 代入": "\\.\\s*(?:href|src)\\s*=\\s*[`'\\\"]",
       "EventSource": "(?<![\\w.$])new\\s+EventSource\\s*\\(",
       "Service Worker": "serviceWorker\\s*\\.\\s*register\\s*\\(",
       "XMLHttpRequest": "(?<![\\w.$])new\\s+XMLHttpRequest\\s*\\(",
       "axios": "(?<![\\w.$])axios\\s*[.(]",
-      "document.location 代入": "(?<![\\w$])document\\s*\\.\\s*location\\s*=(?!=)",
       "fetch の別名束縛": "=\\s*(?:window|globalThis|self)?\\.?\\s*fetch\\s*(?![\\s(])",
       "fetch.call / fetch.apply": "(?<![\\w$])fetch\\s*\\.\\s*(?:call|apply|bind)\\s*\\(",
-      "form action": "(?<![\\w$])action\\s*=\\s*[{'\\\"]",
-      "location 遷移": "(?<![\\w$])location\\s*(?:\\.\\s*(?:assign|replace)\\s*\\(|\\.\\s*href\\s*=)",
+      "form action": "(?<![\\w$])(?:form)?[Aa]ction\\s*=\\s*[{'\\\"]",
+      "location 遷移": "(?<![\\w$])(?:(?:window|globalThis|self|top|parent|document)\\s*\\.\\s*)?location\\s*(?:\\.\\s*(?:assign|replace)\\s*\\(|\\.\\s*href\\s*=(?!=)|=(?!=))",
       "new Worker": "(?<![\\w.$])new\\s+(?:Shared)?Worker\\s*\\(",
       "object の data": "<object\\b[^>]*?\\bdata\\s*=\\s*[{'\\\"]",
       "sendBeacon": "(?<![\\w.$])navigator\\.sendBeacon\\s*\\(",
-      "setAttribute で URL": "setAttribute\\s*\\(\\s*['\\\"](?:src|href|action|data)['\\\"]",
+      "setAttribute で URL": "setAttribute\\s*\\(\\s*['\\\"](?:src|href|action|formaction|data|poster|srcset|content|ping)['\\\"]",
       "srcSet": "(?<![\\w$])srcSet\\s*=\\s*[{'\\\"]",
       "動的 import": "(?<![\\w.$])import\\s*\\(\\s*['\\\"`]",
       "素の open()": "(?<![\\w.$])open\\s*\\(\\s*['\\\"`]",
