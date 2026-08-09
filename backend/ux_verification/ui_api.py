@@ -222,6 +222,7 @@ class Verdict(Enum):
     EXTERNAL_HOST = "external_host"
     UNSCANNED_FORM = "unscanned_form"
     UNATTRIBUTED = "unattributed"
+    COMMENT_MASKED = "comment_masked"
 
 
 # 各判定が「何を確かめ、何を確かめないか」。CLAIM_SEMANTICS と同じ形で
@@ -270,6 +271,12 @@ VERDICT_SEMANTICS: dict[Verdict, dict[str, str]] = {
         "確かめること": f"走査できない形（{'・'.join(UNSCANNED_FORMS)}）で "
                         "backend を叩いている",
         "確かめないこと": "その呼び出し先が実在するか（読めていない）",
+        "PASS": "no",
+    },
+    Verdict.COMMENT_MASKED: {
+        "確かめること": "コメント除去で消えた記述があり、"
+                        "本当にコメントなのか判定の誤りなのか決められない",
+        "確かめないこと": "その記述が実行される経路にあるか",
         "PASS": "no",
     },
     Verdict.UNATTRIBUTED: {
@@ -949,15 +956,18 @@ class UiApiExecutor:
         for path in self._iter_files():
             # **コメントは先に外す。** 検出を生テキストに対して行うと、
             # コメントアウトされた呼び出しを実在の呼び出しとして数える。
-            text = _strip_comments(
-                path.read_text(encoding="utf-8", errors="replace"))
+            raw = path.read_text(encoding="utf-8", errors="replace")
+            text = _strip_comments(raw)
             rel = _display_path(path, self.frontend_src)
             # モジュールでないもの（index.html・CSS）は import で辿れないので
             # 到達可能性の対象外。**走査しないのではなく、常に走査する。**
             if path.suffix in _NON_MODULE_SUFFIXES:
                 report.files_scanned += 1
-                for site in self._sites_in(text, _assignments(text), rel, shapes):
-                    report.sites.append(site)
+                report.sites += self._sites_in(text, _assignments(text), rel,
+                                               shapes)
+                report.sites += self._masked_away(
+                    raw, text, rel,
+                    lambda i, r=raw: r.count(chr(10), 0, i) + 1)
                 continue
             if reachable is not None and path.resolve() not in reachable:
                 # **走査するすべての形を数える。** fetch と WebSocket だけを
@@ -970,8 +980,9 @@ class UiApiExecutor:
                         f"  {label}")
                 continue
             report.files_scanned += 1
-            for site in self._sites_in(text, _assignments(text), rel, shapes):
-                report.sites.append(site)
+            report.sites += self._sites_in(text, _assignments(text), rel, shapes)
+            report.sites += self._masked_away(
+                raw, text, rel, lambda i, r=raw: r.count(chr(10), 0, i) + 1)
         return report
 
     def _iter_files(self):
@@ -1193,6 +1204,38 @@ class UiApiExecutor:
 
         found += self._residual(text, covered, rel, line_of)
         return found
+
+    @staticmethod
+    def _masked_away(raw: str, masked: str, rel: str, line_of) -> list[FetchSite]:
+        """**コメント除去で消えた検出対象を、黙って落とさない。**
+
+        正規表現か除算かの判定は、まともな JS パーサ無しには堅牢にできない。
+        9・10・11回目と3回続けて、この判定の誤りが文字列状態を反転させ、
+        `//` や `/*` の誤認で**実在の呼び出しを痕跡なく消していた**。
+
+        判定の精度を上げ続けるのをやめ、**判定を誤っても沈黙にならない
+        構造**にする。除去前に見えていて除去後に見えないものは、
+        本当にコメントなのか判定ミスなのかを区別せず FAIL にする。
+        コメントアウトされた呼び出しもここに出るが、それは
+        「判定していないものを PASS にしない」の通りの姿。
+
+        対象は**検出器のヒットだけ**にする。生テキストの文字列リテラルまで
+        数えると、コメント内のアポストロフィで引用符の対応が崩れて
+        無関係な範囲が「消えた」ことになる。
+        """
+        out: list[FetchSite] = []
+        seen: set[int] = set()
+        for label, hit in _all_form_hits(raw):
+            if masked[hit.start():hit.end()] == raw[hit.start():hit.end()]:
+                continue
+            if hit.start() in seen:
+                continue
+            seen.add(hit.start())
+            out.append(FetchSite(
+                rel, line_of(hit.start()), label, None, None,
+                Verdict.COMMENT_MASKED,
+                f"コメント除去で消えた（{label}）"))
+        return out
 
     def _residual(self, text: str, covered: list[tuple[int, int]], rel: str,
                   line_of) -> list[FetchSite]:

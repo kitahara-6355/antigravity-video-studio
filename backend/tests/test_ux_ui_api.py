@@ -590,15 +590,20 @@ def test_a_base_constant_declaration_is_not_a_residual(tmp_path):
     assert _verdicts(report) == [Verdict.MATCHED]
 
 
-def test_a_url_inside_a_comment_is_not_a_residual(tmp_path):
-    """コメントは実行されない。呼び出しではない。"""
+def test_a_url_inside_a_comment_is_not_judged_as_a_call(tmp_path):
+    """コメントは実行されないので**突き合わせない**。
+
+    ただし黙って落としもしない。コメント除去で消えた検出対象は
+    comment_masked として出る（11回目の指摘への対応）。
+    """
     report = _run(tmp_path, """
         // fetch('/api/demo/nope') はもう使っていない
         /* '/api/demo/nope' も同様 */
         export default function App() { return null; }
     """)
 
-    assert report.sites == []
+    assert report.mismatched == []
+    assert all(s.verdict is Verdict.COMMENT_MASKED for s in report.sites)
 
 
 def test_a_double_slash_inside_a_url_is_not_a_comment(tmp_path):
@@ -1177,3 +1182,47 @@ def test_a_json_extension_does_not_make_a_path_a_static_asset(tmp_path):
     """)
 
     assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+# --- gate-verifier 11回目 ------------------------------------------------------
+
+
+def test_a_call_hidden_by_a_comment_misjudgement_is_reported(tmp_path):
+    """**判定を誤っても沈黙にならないこと。**
+
+    正規表現か除算かの判別は、まともな JS パーサ無しには堅牢にできない。
+    9・10・11回目と3回続けて、この判別の誤りが文字列状態を反転させ
+    実在の呼び出しを痕跡なく消していた。判別の精度を上げ続けるのではなく、
+    **除去前に見えていて除去後に見えないものを FAIL にする**。
+    """
+    report = _run(tmp_path, """
+        export default function App() {
+          const opts = { keep: true }
+          /["']/.test(String(opts))
+          const glob = "assets/*"
+          fetch('/api/demo/nope', { method: 'POST' });
+          return glob;
+        }
+    """)
+
+    masked = [s for s in report.sites if s.verdict is Verdict.COMMENT_MASKED]
+    assert masked, "判定ミスで消えた呼び出しが報告されていない"
+    assert not any(s.passed for s in report.sites)
+
+
+def test_a_commented_out_call_is_reported_not_silently_dropped(tmp_path):
+    """コメントアウトされた呼び出しも FAIL に出る。
+
+    「本当にコメント」と「判定ミス」を区別せずに扱う。区別しようとした
+    結果が3回分の穴だった。数は増えるが、増えた分は本当のこと。
+    """
+    report = _run(tmp_path, """
+        // fetch('/api/demo/nope') はもう使っていない
+        export default function App() { return null; }
+    """)
+
+    assert Verdict.COMMENT_MASKED in _verdicts(report)
+
+
+def test_comment_masked_is_not_a_passing_verdict():
+    assert VERDICT_SEMANTICS[Verdict.COMMENT_MASKED]["PASS"] == "no"
