@@ -200,7 +200,10 @@ _METHOD_RE = re.compile(
     r"(?<![\w.$])method\s*:\s*(?P<quote>['\"`])(?P<value>[A-Za-z]+)(?P=quote)"
 )
 # `method:` があるのにリテラルで書かれていない形。`...opts` も同じ扱い。
-_METHOD_KEY_RE = re.compile(r"(?<![\w.$])method\s*:")
+# `method:` / `'method':` / `["method"]:` のどれでも当たる。素のキーだけ
+# 見ていると、引用符を付けるだけで既定 GET に落ちる（9回目の指摘）。
+_METHOD_KEY_RE = re.compile(
+    r"""^\s*(?:\[\s*)?(?P<q>['"])?method(?(q)(?P=q))\s*(?:\])?\s*:""")
 _SPREAD_RE = re.compile(r"\.\.\.")
 
 
@@ -551,7 +554,10 @@ def _all_form_hits(text: str):
 
 # 直前が「値の終わり」なら `/` は除算、そうでなければ正規表現リテラル。
 # キーワードは値の終わりではない（`return /re/` は正規表現）。
-_VALUE_END_RE = re.compile(r"(?:[\w$\]\)]|\.\d)\s*$")
+# **引用符とバッククォートも値の終わり。** これを入れないと
+# `` `${a}` / 2 `` の `/` を正規表現の開始と読み、前方走査が次の文字列の
+# 開き引用符を跨いで引用符の対応が反転する（gate-verifier 9回目の指摘）。
+_VALUE_END_RE = re.compile(r"""(?:[\w$\]\)'"`]|\.\d)\s*$""")
 _NOT_A_VALUE_KEYWORD = frozenset({
     "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
     "case", "do", "else", "yield", "await", "throw",
@@ -619,14 +625,20 @@ def _strip_comments(text: str) -> str:
         if ch == "/" and not text.startswith(("//", "/*"), i) \
                 and not _ends_a_value(text, i):
             j = i + 1
+            crossed_quote = False
             while j < n and text[j] != "\n":
                 if text[j] == "\\":
                     j += 2
                     continue
                 if text[j] == "/":
                     break
+                if text[j] in "'\"`":
+                    crossed_quote = True
                 j += 1
-            if j < n and text[j] == "/":
+            # 引用符を跨いだ前方走査は、正規表現ではなく除算を誤読している
+            # 可能性が高い。跨いだら正規表現とみなさない（fail-safe）。
+            # JSX の `{done} / {total} <a href="...">` がこれに当たる。
+            if j < n and text[j] == "/" and not crossed_quote:
                 i = j + 1
                 continue
         if text.startswith("//", i):
@@ -644,6 +656,19 @@ def _strip_comments(text: str) -> str:
             continue
         i += 1
     return "".join(out)
+
+
+# 静的資産として positively 判定できる拡張子。**これ以外は捨てない。**
+_ASSET_SUFFIXES = (
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
+    ".css", ".js", ".mjs", ".map", ".woff", ".woff2", ".ttf", ".otf",
+    ".mp4", ".webm", ".mp3", ".wav", ".pdf", ".txt", ".json",
+    ".jsx", ".tsx", ".ts", ".html",
+)
+
+
+def _looks_like_static_asset(url: str) -> bool:
+    return url.split("?", 1)[0].lower().endswith(_ASSET_SUFFIXES)
 
 
 def _is_backend_url(url: str, prefixes: frozenset[str] | None = None) -> bool:
@@ -708,7 +733,7 @@ def _resolve_method(arg: str | None,
     # `{ body: JSON.stringify({method:'GET'}), method: 'POST' }` の
     # 先頭一致を採って GET と誤読する（gate-verifier 7回目の指摘）。
     top = _split_top_level(arg[1:-1])
-    keys = [part for part in top if _METHOD_KEY_RE.match(part.strip())
+    keys = [part for part in top if _METHOD_KEY_RE.match(part)
             or re.fullmatch(r"method", part.strip())]
     if len(keys) > 1:
         return None, "method がトップレベルに複数ある"
@@ -716,7 +741,9 @@ def _resolve_method(arg: str | None,
         entry = keys[0].strip()
         if entry == "method":
             return None, "method が省略記法で書かれていて値を読めない"
-        hit = _METHOD_RE.search(entry)
+        # キーの書き方（素・引用符付き・計算キー）に関わらず、値だけを読む。
+        value = entry.split(":", 1)[1].strip() if ":" in entry else ""
+        hit = re.fullmatch(r"(['\"`])(?P<value>[A-Za-z]+)\1", value)
         if hit:
             return hit.group("value").upper(), ""
         return None, "method がリテラルで書かれていない"
@@ -1122,7 +1149,20 @@ class UiApiExecutor:
                         Verdict.UNRESOLVED_URL, why))
                     continue
                 if not _is_backend_url(url, self.backend_prefixes):
-                    continue  # 解決できて、backend でないと分かったものだけ外す
+                    if not url.strip() or _looks_like_static_asset(url):
+                        continue  # 空・画像などのローカル資産。backend ではない
+                    if url.startswith(("http://", "https://", "ws://", "wss://")):
+                        found.append(FetchSite(
+                            rel, line, _short(expr), url, "GET",
+                            Verdict.EXTERNAL_HOST, "backend 以外のホスト"))
+                        continue
+                    # 宣言に無い相対パスを**黙って捨てない**。`/reports/export`
+                    # のように backend かどうか決められないものが、判定にも
+                    # 残余にも出ずに消えていた（gate-verifier 9回目の指摘）。
+                    found.append(FetchSite(
+                        rel, line, _short(expr), url, "GET",
+                        Verdict.NOT_DECLARED, "どのルーターにも宣言が無い"))
+                    continue
                 found.append(self._judge([expr], constants, rel, line, shapes,
                                          forced_method="GET", used=used))
 

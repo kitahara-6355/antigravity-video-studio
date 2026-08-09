@@ -1044,3 +1044,72 @@ def test_an_unknown_name_does_not_resolve():
 
     assert url is None
     assert why
+
+
+# --- gate-verifier 9回目 -------------------------------------------------------
+
+
+@pytest.mark.parametrize("before", [
+    'const ratio = `${a}` / total, doc = "https://example.com/guide";',
+    'const q = "10" / 2, u = "https://ex.com/x/y";',
+    'const C = ({d, t}) => <span>{d} / {t} <a href="https://ex.com/g">g</a></span>;',
+])
+def test_a_division_after_a_string_does_not_invert_quote_pairing(
+        tmp_path, before):
+    """`/` を正規表現の開始と誤読すると、前方走査が次の文字列の開き引用符を
+    跨いで対応が反転し、以降の `word//` が行コメントになって呼び出しが消える。
+    """
+    report = _run(tmp_path, f"""
+        const a = 1, total = 2;
+        {before}
+        const note = "step1//step2";
+        export default function App() {{
+          fetch('/api/demo/nope', {{ method: 'POST' }});
+        }}
+    """)
+
+    assert Verdict.NOT_DECLARED in _verdicts(report), before
+
+
+@pytest.mark.parametrize("second_arg,expected", [
+    ("{ 'method': 'DELETE', body: '{}' }", "DELETE"),
+    ("{ [\"method\"]: 'POST' }", "POST"),
+    ("{ method: 'POST' }", "POST"),
+    ("{ headers: {} }", "GET"),
+])
+def test_the_method_is_read_whatever_the_key_looks_like(second_arg, expected):
+    """引用符を付けるだけで既定 GET に落ちるのは fail-open。"""
+    from backend.ux_verification.ui_api import _resolve_method
+
+    assert _resolve_method(second_arg)[0] == expected, second_arg
+
+
+def test_a_relative_url_outside_the_declarations_is_not_dropped(tmp_path):
+    """`/reports/export` は backend か決められない。**黙って捨てない。**"""
+    report = _run(tmp_path, """
+        export default function App() {
+          return <a href="/reports/export">x</a>;
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_a_static_asset_is_still_not_a_backend_call(tmp_path):
+    report = _run(tmp_path, """
+        export default function App() {
+          return <img src="/assets/logo.png" />;
+        }
+    """)
+
+    assert report.sites == []
+
+
+def test_an_external_host_in_an_attribute_is_classified_as_external(tmp_path):
+    report = _run(tmp_path, """
+        export default function App() {
+          return <link href="https://fonts.googleapis.com/css2" />;
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.EXTERNAL_HOST]

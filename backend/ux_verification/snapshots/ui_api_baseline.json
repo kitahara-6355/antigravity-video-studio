@@ -93,7 +93,10 @@
     "src/pages/EditorPage.jsx|POST|/api/director/state": "matched",
     "src/pages/EditorPage.jsx|POST|/api/director/verify-quality": "matched",
     "src/pages/EditorPage.jsx|POST|/api/render": "matched",
-    "src/pages/EditorPage.jsx|GET|/api/video": "matched"
+    "src/pages/EditorPage.jsx|GET|/api/video": "matched",
+    "index.html|GET|https://fonts.googleapis.com": "external_host",
+    "index.html|GET|https://fonts.gstatic.com": "external_host",
+    "index.html|GET|https://fonts.googleapis.com/css2": "external_host"
   },
   "declarations": {
     "src/components/AISuggestionCard.jsx|POST|/api/quality/apply-suggestion": "static_route_scan: routers/quality.py:157 POST /api/quality/apply-suggestion",
@@ -188,7 +191,10 @@
     "src/pages/EditorPage.jsx|POST|/api/director/state": "static_route_scan: routers/legacy_director_router.py:79 POST /api/director/state",
     "src/pages/EditorPage.jsx|POST|/api/director/verify-quality": "static_route_scan: routers/legacy_director_router.py:96 POST /api/director/verify-quality",
     "src/pages/EditorPage.jsx|POST|/api/render": "static_route_scan: routers/render.py:386 POST /api/render",
-    "src/pages/EditorPage.jsx|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video"
+    "src/pages/EditorPage.jsx|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
+    "index.html|GET|https://fonts.googleapis.com": "",
+    "index.html|GET|https://fonts.gstatic.com": "",
+    "index.html|GET|https://fonts.googleapis.com/css2": ""
   },
   "unreachable": [
     "src/components/ModelQuotaDashboard.jsx:25  fetch",
