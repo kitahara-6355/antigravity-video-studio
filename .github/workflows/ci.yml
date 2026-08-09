@@ -189,6 +189,24 @@ jobs:
           GOOGLE_API_KEY: "dummy_key_for_ci"
         run: python -m backend.ux_verification.dead_code --ratchet
 
+      # フロントが叩く URL に対応するハンドラが宣言され、include_router されて
+      # いるか。突き合わせが取れることは「繋がっている」ことを意味しないが、
+      # **取れないことは確実に壊れている**（呼べば 404）。
+      - name: UI と API の接続ゲート（呼び出し先が宣言と突き合う）
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+        run: python -m backend.ux_verification.ui_api --gate
+
+      # ゲートは「いま突き合わないものがゼロか」しか見ないので、呼び出しを
+      # 消せばゼロのまま緑になる。呼び出し先の一覧をベースラインに固定し、
+      # 削除・判定の弱化・当たり先の差し替え・到達不能化を落とす。
+      - name: UI-API ラチェット（呼び出しの削除・判定の弱化を許さない）
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+        run: python -m backend.ux_verification.ui_api_ratchet --ratchet
+
       - name: テスト結果アップロード
         if: always()
         uses: actions/upload-artifact@v4
