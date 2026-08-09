@@ -42,6 +42,7 @@ from backend.ux_verification.ui_api import (
     _GLOBAL_RECEIVERS,
     MISMATCH_VERDICTS,
     SCANNED_FORMS,
+    SCANNED_SUFFIXES,
     UNSCANNED_FORMS,
     VERDICT_SEMANTICS,
     UiApiExecutor,
@@ -69,6 +70,14 @@ def passing_verdicts() -> list[str]:
                   if m["PASS"] == "yes")
 
 
+def _render(value) -> str:
+    if isinstance(value, dict):
+        return "/".join(sorted(value))
+    if isinstance(value, (list, tuple, set)):
+        return "/".join(sorted(str(v) for v in value))
+    return str(value)
+
+
 def scan_boundary() -> dict:
     """走査の閉包そのもの。**緩めたらそれ自体が違反。**
 
@@ -77,8 +86,13 @@ def scan_boundary() -> dict:
     （gate-verifier 2回目の指摘）。
     """
     return {
+        "scanned_files": sorted(SCANNED_SUFFIXES),
         "scanned_forms": sorted(SCANNED_FORMS),
-        "unscanned_forms": sorted(UNSCANNED_FORMS),
+        # **正規表現の本体まで固定する。** キー名だけを固定していると、
+        # パターンを絶対に当たらないものに差し替えるだけで、その形の検出が
+        # 黙って無効になる（gate-verifier 4回目の指摘）。
+        "unscanned_forms": {name: pattern.pattern
+                            for name, pattern in sorted(UNSCANNED_FORMS.items())},
         "global_receivers": sorted(_GLOBAL_RECEIVERS),
         "mismatch_verdicts": sorted(v.value for v in MISMATCH_VERDICTS),
     }
@@ -214,18 +228,15 @@ class UiApiRatchet:
                 f"入れ子の欄が無い（{'/'.join(sorted(missing))}）"))
             return RatchetResult(False, violations, after=now_pass)
         for field_name, before_values in before_scan.items():
-            after = set(now_scan.get(field_name, []))
-            before_set = set(before_values)
-            # 走査できない形は**減る**と緩む（見えていたものが見えなくなる）。
-            # 他の欄は**増える**と緩む（読めなかったものが読めたことになる）。
-            if field_name == "unscanned_forms":
-                widened = before_set - after
-            else:
-                widened = after - before_set
-            if widened:
+            after = now_scan.get(field_name)
+            # **どちらに動いても違反にする。** 増えれば「読めなかったものが
+            # 読めたことになる」、減れば「見えていたものが見えなくなる」。
+            # 片方向だけ見ていると、集合を縮める経路が素通りする
+            # （gate-verifier 4回目の指摘: mismatch_verdicts の縮小）。
+            if before_values != after:
                 violations.append(Violation(
-                    "scan_widened", field_name, "/".join(sorted(before_set)),
-                    "/".join(sorted(after))))
+                    "scan_widened", field_name, _render(before_values),
+                    _render(after)))
 
         current = {site_key(s): s for s in report.sites}
         base_sites: dict = baseline["sites"]

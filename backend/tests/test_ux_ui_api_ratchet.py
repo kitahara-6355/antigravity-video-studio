@@ -121,15 +121,30 @@ def test_the_passing_verdicts_pinned_today_are_exactly_matched():
     assert passing_verdicts() == ["matched"]
 
 
-@pytest.mark.parametrize("field_name,value", [
-    ("global_receivers", ["window", "globalThis", "self", "api"]),
-    ("scanned_forms", ["fetch", "eval"]),
+@pytest.mark.parametrize("field_name", [
+    "scanned_files", "scanned_forms", "global_receivers", "mismatch_verdicts",
 ])
-def test_widening_the_scan_closure_is_a_violation(tmp_path, field_name, value):
-    """判定の弱化は判定表の外にもある。閉包を緩めるだけで unresolved が消える。"""
+def test_any_change_to_the_scan_closure_is_a_violation(tmp_path, field_name):
+    """**どちらに動いても違反。** 増えれば読めなかったものが読めたことになり、
+    減れば見えていたものが見えなくなる。片方向だけ見ると縮小が素通りする。"""
+    for mutate in (lambda v: [*v, "余計なもの"], lambda v: v[:-1]):
+        baseline = _pinned(tmp_path, _report(_site()))
+        baseline["scan_boundary"][field_name] = mutate(
+            baseline["scan_boundary"][field_name])
+
+        result = UiApiRatchet().check(_report(_site()), baseline)
+
+        assert not result.valid, field_name
+        assert [v.kind for v in result.violations] == ["scan_widened"], field_name
+
+
+def test_replacing_an_unscannable_pattern_body_is_a_violation(tmp_path):
+    """キー名だけ固定していると、正規表現を無効なものに差し替えるだけで
+    その形の検出が黙って消える。**本体まで固定する。**"""
     baseline = _pinned(tmp_path, _report(_site()))
-    baseline["scan_boundary"][field_name] = sorted(
-        set(baseline["scan_boundary"][field_name]) - set(value))
+    forms = baseline["scan_boundary"]["unscanned_forms"]
+    name = next(iter(forms))
+    forms[name] = "(?!x)x"          # 絶対に当たらない正規表現
 
     result = UiApiRatchet().check(_report(_site()), baseline)
 
@@ -137,16 +152,13 @@ def test_widening_the_scan_closure_is_a_violation(tmp_path, field_name, value):
     assert [v.kind for v in result.violations] == ["scan_widened"]
 
 
-def test_dropping_an_unscannable_form_is_a_violation(tmp_path):
-    """走査できない形を一覧から落とせば、その呼び出しは黙って消える。"""
-    baseline = _pinned(tmp_path, _report(_site()))
-    baseline["scan_boundary"]["unscanned_forms"] = sorted(
-        set(baseline["scan_boundary"]["unscanned_forms"]) | {"未知のクライアント"})
+def test_the_unscannable_forms_are_pinned_by_pattern_not_by_name():
+    from backend.ux_verification.ui_api_ratchet import scan_boundary
 
-    result = UiApiRatchet().check(_report(_site()), baseline)
+    forms = scan_boundary()["unscanned_forms"]
 
-    assert not result.valid
-    assert [v.kind for v in result.violations] == ["scan_widened"]
+    assert isinstance(forms, dict)
+    assert all(isinstance(v, str) and v for v in forms.values())
 
 
 # --- 4. 宣言の差し替え --------------------------------------------------------

@@ -443,6 +443,63 @@ def test_a_navigation_or_indirect_call_does_not_vanish(tmp_path, snippet):
     assert Verdict.UNSCANNED_FORM in _verdicts(report)
 
 
+def test_an_mjs_module_is_scanned(tmp_path):
+    """`.mjs` は到達可能と判定されるのに走査対象から漏れていた。"""
+    report = _run(tmp_path, """
+        import './helper.mjs';
+        export default function App() { return null; }
+    """, extra={"helper.mjs": """
+        fetch('http://localhost:8000/api/demo/nope');
+    """})
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+def test_a_css_file_is_scanned(tmp_path):
+    """`CSS の url()` を「走査できない形」と宣言しながら CSS を開いていなかった。"""
+    report = _run(tmp_path, """
+        export default function App() { return null; }
+    """, extra={"index.css": "body { background: url(/api/demo/status); }"})
+
+    assert _verdicts(report) == [Verdict.UNSCANNED_FORM]
+
+
+def test_the_entry_html_is_scanned(tmp_path):
+    """`index.html` はアプリのエントリなのに一度も開かれていなかった。"""
+    src = _frontend(tmp_path, "export default function App() { return null; }")
+    (src.parent / "index.html").write_text(
+        '<a href="/api/demo/nope">x</a>\n', encoding="utf-8")
+    routers = _routers(tmp_path, _DEMO_ROUTER)
+    app = tmp_path / "backend" / "main.py"
+    app.write_text("from routers import demo_router\n"
+                   "app.include_router(demo_router)\n", encoding="utf-8")
+
+    report = UiApiExecutor(src, EndpointRegistry.scan(routers, app_files=[app]),
+                           entry=src / "main.jsx").run()
+
+    assert _verdicts(report) == [Verdict.NOT_DECLARED]
+
+
+@pytest.mark.parametrize("snippet,expected", [
+    ("new window.WebSocket('ws://localhost:8000/api/demo/nope');",
+     Verdict.NOT_DECLARED),
+    ("document.location = '/api/demo/status';", Verdict.UNSCANNED_FORM),
+    ("new Worker('/api/demo/status');", Verdict.UNSCANNED_FORM),
+    ("open('/api/demo/status');", Verdict.UNSCANNED_FORM),
+    ("el.setAttribute('src', '/api/demo/status');", Verdict.UNSCANNED_FORM),
+])
+def test_a_navigation_form_inside_a_scanned_file_does_not_vanish(
+        tmp_path, snippet, expected):
+    """走査しているファイルの中でも、走査も申告もされない形があった。"""
+    report = _run(tmp_path, f"""
+        export default function App(el) {{
+          {snippet}
+        }}
+    """)
+
+    assert expected in _verdicts(report)
+
+
 def test_a_react_data_prop_is_not_mistaken_for_an_object_url(tmp_path):
     """`<RadarChart data={...}>` は URL ではない。過検出で FAIL を作らない。"""
     report = _run(tmp_path, """

@@ -196,6 +196,16 @@
     "matched"
   ],
   "scan_boundary": {
+    "scanned_files": [
+      ".cjs",
+      ".css",
+      ".html",
+      ".js",
+      ".jsx",
+      ".mjs",
+      ".ts",
+      ".tsx"
+    ],
     "scanned_forms": [
       "fetch",
       "globalThis.fetch",
@@ -208,24 +218,28 @@
       "window.fetch",
       "window.open"
     ],
-    "unscanned_forms": [
-      "$.ajax / ky / superagent",
-      "CSS の url()",
-      "DOM への URL 代入",
-      "EventSource",
-      "Service Worker",
-      "XMLHttpRequest",
-      "axios",
-      "fetch の別名束縛",
-      "fetch.call / fetch.apply",
-      "form action",
-      "location 遷移",
-      "object の data",
-      "sendBeacon",
-      "srcSet",
-      "動的 import",
-      "計算メンバでの fetch"
-    ],
+    "unscanned_forms": {
+      "$.ajax / ky / superagent": "(?<![\\w.$])(?:\\$\\s*\\.\\s*ajax|ky\\s*[.(]|superagent\\s*\\.)",
+      "CSS の url()": "url\\s*\\(\\s*['\\\"]?/api/",
+      "DOM への URL 代入": "\\.\\s*(?:href|src)\\s*=\\s*[`'\\\"]",
+      "EventSource": "(?<![\\w.$])new\\s+EventSource\\s*\\(",
+      "Service Worker": "serviceWorker\\s*\\.\\s*register\\s*\\(",
+      "XMLHttpRequest": "(?<![\\w.$])new\\s+XMLHttpRequest\\s*\\(",
+      "axios": "(?<![\\w.$])axios\\s*[.(]",
+      "document.location 代入": "(?<![\\w$])document\\s*\\.\\s*location\\s*=(?!=)",
+      "fetch の別名束縛": "=\\s*(?:window|globalThis|self)?\\.?\\s*fetch\\s*(?![\\s(])",
+      "fetch.call / fetch.apply": "(?<![\\w$])fetch\\s*\\.\\s*(?:call|apply|bind)\\s*\\(",
+      "form action": "(?<![\\w$])action\\s*=\\s*[{'\\\"]",
+      "location 遷移": "(?<![\\w$])location\\s*(?:\\.\\s*(?:assign|replace)\\s*\\(|\\.\\s*href\\s*=)",
+      "new Worker": "(?<![\\w.$])new\\s+(?:Shared)?Worker\\s*\\(",
+      "object の data": "<object\\b[^>]*?\\bdata\\s*=\\s*[{'\\\"]",
+      "sendBeacon": "(?<![\\w.$])navigator\\.sendBeacon\\s*\\(",
+      "setAttribute で URL": "setAttribute\\s*\\(\\s*['\\\"](?:src|href|action|data)['\\\"]",
+      "srcSet": "(?<![\\w$])srcSet\\s*=\\s*[{'\\\"]",
+      "動的 import": "(?<![\\w.$])import\\s*\\(\\s*['\\\"`]",
+      "素の open()": "(?<![\\w.$])open\\s*\\(\\s*['\\\"`]",
+      "計算メンバでの fetch": "\\[\\s*['\\\"]fetch['\\\"]\\s*\\]"
+    },
     "global_receivers": [
       "globalThis",
       "self",

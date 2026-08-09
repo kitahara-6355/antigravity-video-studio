@@ -55,7 +55,6 @@ from backend.ux_verification.api_contract import (
 )
 from backend.ux_verification.executor import (
     _display_path,
-    _iter_source_files,
     _project_root,
     _reachable_files,
 )
@@ -74,6 +73,15 @@ _PARAM = "{}"
 # SKIP にはしない（確かめていないものを緑にしない）。
 _LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0")
 
+# 走査するファイル。executor の `_SOURCE_SUFFIXES` は .jsx/.js/.tsx/.ts だけで、
+# `.mjs` は到達可能と判定されるのに走査から漏れていた。`index.html` と CSS は
+# 一度も開かれていなかった（gate-verifier 4回目の指摘）。
+SCANNED_SUFFIXES = (".jsx", ".js", ".tsx", ".ts", ".mjs", ".cjs",
+                     ".css", ".html")
+# import で辿れないので到達可能性の対象外にするもの。**常に走査する。**
+_NON_MODULE_SUFFIXES = (".css", ".html")
+_EXCLUDED_DIRS = {"node_modules", "dist", "build", "__pycache__", ".vite"}
+
 # `fetch(` と `window.fetch(` / `globalThis.fetch(` / `self.fetch(`。
 # 素の `fetch` だけを見ていると `window.fetch('/api/x')` が走査から**黙って消える**
 # （gate-verifier 1回目の指摘）。受け側を閉じた集合にし、それ以外の `X.fetch(` は
@@ -86,7 +94,8 @@ _RECEIVER_RE = re.compile(r"([\w$]+(?:\s*\??\.\s*[\w$]+)*)\s*\??\.\s*$", re.DOTA
 _GLOBAL_RECEIVERS = ("window", "globalThis", "self")
 # WebSocket も UI から backend を叩く経路。`@router.websocket` の宣言と
 # 突き合わせる。`fetch` だけ見て「全部見た」と言わない。
-_WEBSOCKET_RE = re.compile(r"(?<![\w.$])new\s+WebSocket\s*\(")
+_WEBSOCKET_RE = re.compile(
+    r"(?<![\w.$])new\s+(?:(?:window|globalThis|self)\s*\.\s*)?WebSocket\s*\(")
 
 # 走査している呼び出しの形。**機械可読にする** — ここに無い形は
 # 「確かめていない」であって「無い」ではない（gate-verifier 1回目の指摘）。
@@ -123,6 +132,14 @@ UNSCANNED_FORMS = {
     "DOM への URL 代入": re.compile(r"\.\s*(?:href|src)\s*=\s*[`'\"]"),
     "$.ajax / ky / superagent": re.compile(
         r"(?<![\w.$])(?:\$\s*\.\s*ajax|ky\s*[.(]|superagent\s*\.)"),
+    # 4回目の指摘。走査もされず「走査できない形」にも入っていなかった5形。
+    "document.location 代入": re.compile(
+        r"(?<![\w$])document\s*\.\s*location\s*=(?!=)"),
+    "new Worker": re.compile(
+        r"(?<![\w.$])new\s+(?:Shared)?Worker\s*\("),
+    "素の open()": re.compile(r"(?<![\w.$])open\s*\(\s*['\"`]"),
+    "setAttribute で URL": re.compile(
+        r"setAttribute\s*\(\s*['\"](?:src|href|action|data)['\"]"),
 }
 
 # JSX の URL 属性と `window.open`。ブラウザはこれも backend に GET を投げる。
@@ -236,6 +253,8 @@ MISMATCH_VERDICTS = frozenset({
 # **この3つはラチェットのベースラインに固定する** — 緩めるだけで unresolved を
 # matched に変えられてはいけない（gate-verifier 2回目の指摘）。
 SCAN_SEMANTICS = {
+    "走査するファイル": [f"frontend/src/**/*{s}" for s in SCANNED_SUFFIXES]
+                        + ["frontend/index.html"],
     "走査する形": list(SCANNED_FORMS),
     "走査できない形": sorted(UNSCANNED_FORMS),
     "素の呼び出しとして扱う受け側": list(_GLOBAL_RECEIVERS),
@@ -694,9 +713,16 @@ class UiApiExecutor:
         reachable = _reachable_files(self.entry) if self.entry else None
         shapes = self._shape_index()
 
-        for path in _iter_source_files(self.frontend_src):
+        for path in self._iter_files():
             text = path.read_text(encoding="utf-8", errors="replace")
             rel = _display_path(path, self.frontend_src)
+            # モジュールでないもの（index.html・CSS）は import で辿れないので
+            # 到達可能性の対象外。**走査しないのではなく、常に走査する。**
+            if path.suffix in _NON_MODULE_SUFFIXES:
+                report.files_scanned += 1
+                for site in self._sites_in(text, _assignments(text), rel, shapes):
+                    report.sites.append(site)
+                continue
             if reachable is not None and path.resolve() not in reachable:
                 for pattern in (_FETCH_RE, _WEBSOCKET_RE):
                     for hit in pattern.finditer(text):
@@ -707,6 +733,28 @@ class UiApiExecutor:
             for site in self._sites_in(text, _assignments(text), rel, shapes):
                 report.sites.append(site)
         return report
+
+    def _iter_files(self):
+        """走査するファイル。**executor の走査範囲より広い。**
+
+        `.mjs` は `_reachable_files` が到達可能と判定するのに
+        `_iter_source_files` の拡張子リストから漏れて完全に消えていた。
+        `index.html` と CSS は一度も開かれておらず、`SCAN_SEMANTICS` が
+        「CSS の url() は走査できない形」と宣言しているのに CSS を読んでも
+        いなかった（gate-verifier 4回目の指摘）。
+        """
+        seen = set()
+        for suffix in SCANNED_SUFFIXES:
+            for path in sorted(self.frontend_src.rglob(f"*{suffix}")):
+                if not path.is_file() or _EXCLUDED_DIRS & set(path.parts):
+                    continue
+                seen.add(path)
+                yield path
+        # アプリのエントリ HTML。src の外にあるので rglob では拾えない。
+        for name in ("index.html",):
+            candidate = self.frontend_src.parent / name
+            if candidate.is_file() and candidate not in seen:
+                yield candidate
 
     def _shape_index(self) -> dict[tuple[str, str], list]:
         """(メソッド, 形) → 宣言。パスパラメータ名の違いを吸収する。"""
