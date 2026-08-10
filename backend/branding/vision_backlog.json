@@ -1,8 +1,8 @@
 {
   "version": "2.0.0",
   "last_audit_date": "2026-08-10T00:00",
-  "vision_realization_score": 61.45,
-  "scoring_policy": "コード存在=最大20% / E2E動作確認=50%以上 / 本番動画確認=100%。confidence: measured=今回実測 / partial=一部実測 / carried_over=前回値据え置き / not_measured=未計測。**実測なしにスコアを動かさない。**",
+  "vision_realization_score": 65.95,
+  "scoring_policy": "コード存在=最大20% / **テスト通過=最大40%** / **静的検証+CI ゲート=最大50%**（判定手段が主張に対応し、弱化が CI で検出される） / E2E動作確認=50%以上 / 本番動画確認=100%。confidence: measured=今回実測 / partial=一部実測 / carried_over=前回値据え置き / not_measured=未計測。**実測なしにスコアを動かさない。** 2026-08-10 改訂 — 旧版は『コード存在=最大20% / E2E動作確認=50%以上 / 本番動画確認=100%』の3段で、tests_pass 止まりの5軸（55〜77）が方針文どおりなら 全部 20 以下になるという食い違いがあった。**方針文が実態を表していなかった**ので、実際に運用している段を明文化した（ユーザー判断）。既存の軸スコアは動かしていない。",
   "score_history": [
     {
       "date": "2026-04-15",
@@ -51,8 +51,8 @@
     },
     {
       "date": "2026-08-10T00:00",
-      "score": 61.45,
-      "trigger": "P4 完了。ui_api_connection を 85（2026-05-18 の目視・not_measured）から 20（静的な宣言の突き合わせを実測）へ。**接続が悪化したのではなく検証できる範囲が確定した。** scoring_policy の『コード存在=最大20%』を字義どおり適用した値で、方針文と他軸の実態の食い違いはユーザー判断待ち。"
+      "score": 65.95,
+      "trigger": "P4 完了。ui_api_connection を 85（2026-05-18 の目視・not_measured）から 50（静的な宣言の突き合わせを実測・CI ゲートで固定）へ。**接続が悪化したのではなく検証できる範囲が確定した。** あわせて scoring_policy に『テスト通過=最大40%』『静的検証+CI ゲート=最大50%』の段を追加し、方針文を実態に合わせた（ユーザー判断）。既存の軸スコアは動かしていない。"
     }
   ],
   "axis_scores": {
@@ -66,10 +66,10 @@
       "evidence": "なし"
     },
     "ui_api_connection": {
-      "score": 20,
+      "score": 50,
       "weight": 15,
       "status": "static_verified",
-      "note": "**P4 で実測した。85 → 20 は接続が悪化したのではなく『いま検証できるのはここまで』という意味。** 85 は 2026-05-18 の Browser Agent 目視で confidence=not_measured だった。P4 が測ったのは静的な宣言の突き合わせなので、scoring_policy の『コード存在=最大20%』に当たる。deferred_paid の札は実測前の見積もりで、実際には課金経路が無かったので剥がした。**ただし scoring_policy と他軸の実態は食い違っている** — tests_pass 止まりの軸（trinity 55 / quality 65 / soul 75 / storage 60 / coverage 77）は方針文どおりなら全部 20 以下のはず。この軸だけ字義どおり適用すると不当に低くなる。**方針文を実態に合わせるか他軸を下げるかはユーザー判断**（ゲート報告で選択肢を提示）。",
+      "note": "**P4 で実測した。85 → 50 は接続が悪化したのではなく『いま検証できる範囲が確定した』という意味。** 85 は 2026-05-18 の Browser Agent 目視で confidence=not_measured だった。P4 が測ったのは静的な宣言の突き合わせで、改訂後の scoring_policy の『静的検証+CI ゲート=最大50%』に当たる（判定手段が主張に対応し、弱化が CI で検出される）。E2E ではないので 50 が上限。deferred_paid の札は実測前の見積もりで、実際には課金経路が無かったので剥がした。スコアの決定と方針文の改訂はユーザー判断（2026-08-10）。",
       "confidence": "measured",
       "measured_at": "2026-08-10",
       "evidence": "python -m backend.ux_verification.ui_api --gate → 「読み取れた 95 件はすべて宣言と突き合っています（読めなかった 8 件は突き合わせていない）」exit 0。呼び出し 103件 / 走査ファイル 45 / 宣言済みエンドポイント 457件。内訳は matched 95 / unresolved_url 4 / external_host 3 / unscanned_form 1。python -m backend.ux_verification.ui_api_ratchet --ratchet → 「呼び出し先 96 → 96（新規 0）」exit 0。CI の必須ジョブ『Python テストスイート (3.13)』内で両ステップがcontinue-on-error 無しで実行される。テスト 176件。gate-verifier 14回目で overall: ready。"
