@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Award, Zap, History, Sparkles, X, ChevronRight } from 'lucide-react';
+import { apiFetch } from '../api/client.js';
 
 export default function SoulPassport({ onClose }) {
     const [evolutionData, setEvolutionData] = useState(null);
@@ -10,12 +11,12 @@ export default function SoulPassport({ onClose }) {
         const fetchData = async () => {
             try {
                 // Fetch Evolution Log
-                const evoRes = await fetch('http://localhost:8000/api/director/evolution');
+                const evoRes = await apiFetch('getDirectorEvolution');
                 const evoData = await evoRes.json();
                 setEvolutionData(evoData);
 
                 // Fetch Trinity Status
-                const statusRes = await fetch('http://localhost:8000/api/status');
+                const statusRes = await apiFetch('getStatus');
                 const sData = await statusRes.json();
                 setStatusData(sData);
 

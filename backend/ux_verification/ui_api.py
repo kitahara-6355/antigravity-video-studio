@@ -160,6 +160,42 @@ UNSCANNED_FORMS = {
         re.IGNORECASE),
 }
 
+# --- 呼び出し口（P5） --------------------------------------------------------
+#
+# フロントから backend へ出る唯一の扉。ここより外に呼び出しを書かせないことで、
+# 外側の判定を「解決」から「禁止」に変える（閉包は ui_api_closure が守る）。
+#
+# **この 3 つは常に走査する。** 到達可能性の対象にすると、
+# 「呼び出し口を import しない」だけでカタログの突き合わせごと消える。
+# パスは `frontend/` からの相対（`_display_path` の出力に合わせる）。
+GATEWAY_DIR = "src/api"
+CATALOGUE_REL = "src/api/endpoints.js"
+CLIENT_REL = "src/api/client.js"
+
+# カタログ1項目の**閉じた文法**。ここから外れた書き方は解決済みに混ぜない。
+# 変数・連結・テンプレートリテラルを許すと、カタログが「叩ける先の全部」で
+# なくなる。外れた行に URL リテラルがあれば残余（unattributed）が拾い、
+# リテラルすら無ければ ui_api_closure の C-2 が落とす。
+_CATALOGUE_ENTRY_RE = re.compile(
+    r"^\s*(?P<key>[A-Za-z_$][\w$]*)\s*:\s*\{\s*"
+    r"method\s*:\s*'(?P<method>[A-Z]+)'\s*,\s*"
+    r"path\s*:\s*'(?P<path>/[^']*)'\s*\}\s*,\s*$")
+
+# 呼び出し口の内側にだけ許す URL リテラル: **パスを持たない素のオリジン**。
+# ベース URL の宣言そのものは呼び出しではないので残余に出さない
+# （「ベース URL が正しいか」は元から確かめないと宣言している）。
+# パスが1文字でも付けば当たらない — `'http://localhost:8000/api/x'` は
+# 残余に落ちて FAIL になる。ここを緩めると呼び出し口が第2のカタログになる。
+_PURE_ORIGIN_RE = re.compile(r"^(?:https?|wss?)://[A-Za-z0-9.\-]+(?::\d+)?/?$")
+
+# `import { apiFetch } from '../api/client.js'` の指定子。**呼び出しではない。**
+# 呼び出し口が `src/api/` にある以上、そこを import する行はすべて `/api/`
+# を含み、残余がまるごと誤検出する。**相対指定子だけ**、しかも `from` /
+# `import(` の直後にあるものだけを外す — `from '/api/x'` は外さない。
+# 動的 import は UNSCANNED_FORMS の「動的 import」が別に捕まえている。
+_RELATIVE_SPEC_RE = re.compile(r"^\.\.?/")
+_IMPORT_BEFORE_RE = re.compile(r"(?:^|[^\w])(?:from|import)\s*\(?\s*$")
+
 # JSX の URL 属性と `window.open`。ブラウザはこれも backend に GET を投げる。
 # `fetch` だけ見て「全部見た」と言わない（gate-verifier 2回目の指摘）。
 _URL_ATTR_RE = re.compile(r"(?<![\w$])(?:src|href|poster)\s*=\s*\{")
@@ -228,6 +264,7 @@ class Verdict(Enum):
     UNSCANNED_FORM = "unscanned_form"
     UNATTRIBUTED = "unattributed"
     COMMENT_MASKED = "comment_masked"
+    GATEWAY_DISPATCH = "gateway_dispatch"
 
 
 # 各判定が「何を確かめ、何を確かめないか」。CLAIM_SEMANTICS と同じ形で
@@ -290,6 +327,14 @@ VERDICT_SEMANTICS: dict[Verdict, dict[str, str]] = {
         "確かめないこと": "それが実際に呼ばれるか・どの形で呼ばれるか",
         "PASS": "no",
     },
+    Verdict.GATEWAY_DISPATCH: {
+        "確かめること": f"呼び出し口（frontend/{GATEWAY_DIR}/）の内側にある実呼び出しで、"
+                        "宛先はカタログの項目から実行時に決まる",
+        "確かめないこと": "この1呼び出しがどの項目を叩くか（実行時に決まる）。"
+                          "**叩ける先の全部はカタログ側が判定されている** — "
+                          "カタログ以外の宛先を作れないことは ui_api_closure が守る",
+        "PASS": "no",
+    },
 }
 
 # C-2 が名指しする「突き合わない」3型。**ここがゼロになることが終了条件。**
@@ -318,6 +363,15 @@ SCAN_SEMANTICS = {
     "残余の扱い": "走査ファイル中の backend URL らしき記述で、どの呼び出しにも"
                   "紐づかなかったものは unattributed の FAIL にする。"
                   "**走査する形と走査できない形の補集合を無検査にしない**",
+    "呼び出し口": f"frontend/{GATEWAY_DIR}/ は**常に走査する**"
+                  "（到達可能性の対象にしない）。"
+                  f"{CATALOGUE_REL} は閉じた文法の1行1項目として列挙し、"
+                  "通常の呼び出しと同じ判定を通す。文法から外れた行は項目にならず、"
+                  "URL リテラルがあれば残余が拾う。"
+                  f"{CLIENT_REL} の実呼び出しは宛先が実行時に決まるので "
+                  "gateway_dispatch にする（PASS ではない）。"
+                  "**カタログ以外の宛先を作れないことはこのモジュールでは"
+                  "確かめない** — ui_api_closure の担当",
 }
 
 
@@ -984,6 +1038,21 @@ class UiApiExecutor:
             raw = path.read_text(encoding="utf-8", errors="replace")
             text = _strip_comments(raw)
             rel = _display_path(path, self.frontend_src)
+            # 呼び出し口は**常に走査する**。到達可能性の対象にすると、
+            # 「呼び出し口を import しない」だけでカタログの突き合わせが
+            # まるごと消える（＝叩ける先が1件も判定されなくなる）。
+            if rel == CATALOGUE_REL:
+                report.files_scanned += 1
+                report.sites += self._catalogue_sites(raw, rel, shapes)
+                continue
+            if self._in_gateway(rel):
+                report.files_scanned += 1
+                report.sites += self._sites_in(text, _assignments(text), rel,
+                                               shapes)
+                report.sites += self._masked_away(
+                    raw, text, rel,
+                    lambda i, r=raw: r.count(chr(10), 0, i) + 1)
+                continue
             # モジュールでないもの（index.html・CSS）は import で辿れないので
             # 到達可能性の対象外。**走査しないのではなく、常に走査する。**
             if path.suffix in _NON_MODULE_SUFFIXES:
@@ -1042,6 +1111,55 @@ class UiApiExecutor:
                     and path not in seen):
                 seen.add(path)
                 yield path
+
+    @staticmethod
+    def _in_gateway(rel: str) -> bool:
+        """呼び出し口の内側か。`rel` は frontend/src からの相対パス。"""
+        return rel.replace("\\", "/").startswith(GATEWAY_DIR + "/")
+
+    def _unreadable(self, rel: str, line: int, raw: str, why: str) -> FetchSite:
+        """URL を解決できなかった呼び出し。
+
+        呼び出し口の内側だけは `gateway_dispatch` として別に出す。宛先が
+        カタログから実行時に決まるのは**設計どおり**で、`unresolved_url` と
+        同じ札を貼ると「解決できていない4件」と区別がつかなくなる。
+
+        **PASS ではない点は同じ。** 甘くしたのではなく、名前を分けただけ。
+        呼び出し口の外でこの札は付かない（付けば閉包の意味が消える）。
+        """
+        if self._in_gateway(rel):
+            return FetchSite(rel, line, raw, None, None,
+                             Verdict.GATEWAY_DISPATCH,
+                             "呼び出し口の内側。宛先はカタログが決める")
+        return FetchSite(rel, line, raw, None, None, Verdict.UNRESOLVED_URL, why)
+
+    def _catalogue_sites(self, raw: str, rel: str,
+                         shapes: dict) -> list[FetchSite]:
+        """カタログの各項目を1件の呼び出し先として突き合わせる。
+
+        **ここが P5 の要。** 散らばった呼び出しの URL を1件ずつ解決するのを
+        やめ、閉じたリテラル表を列挙して突き合わせる。読み解きではないので
+        読み違いようがない — 文法から外れた行はそもそも項目にならず、
+        URL リテラルがあれば残余が、無ければ ui_api_closure が落とす。
+
+        判定は通常の呼び出しとまったく同じ `_judge` を通す。カタログ専用の
+        甘い判定を作らない（作れば、そこが唯一の抜け道になる）。
+        """
+        found: list[FetchSite] = []
+        covered: list[tuple[int, int]] = []
+        offset = 0
+        for number, line in enumerate(raw.split("\n"), start=1):
+            hit = _CATALOGUE_ENTRY_RE.match(line)
+            if hit:
+                covered.append((offset, offset + len(line)))
+                found.append(self._judge(
+                    [f"'{hit.group('path')}'"], {}, rel, number, shapes,
+                    forced_method=hit.group("method")))
+            offset += len(line) + 1
+        # 項目にならなかった行に backend の URL リテラルがあれば残余で出る。
+        found += self._residual(
+            raw, covered, rel, lambda i: raw.count("\n", 0, i) + 1)
+        return found
 
     def _hints_backend(self, value: str) -> bool:
         """宣言されている先頭セグメントで始まる相対パスか。"""
@@ -1197,9 +1315,7 @@ class UiApiExecutor:
                     # **読めないものを「backend ではない」と決めつけない。**
                     # ここで黙って落とすと、SCANNED_FORMS の申告が実際の走査より
                     # 広くなる（gate-verifier 3回目の指摘）。
-                    found.append(FetchSite(
-                        rel, line, _short(expr), None, None,
-                        Verdict.UNRESOLVED_URL, why))
+                    found.append(self._unreadable(rel, line, _short(expr), why))
                     continue
                 if not _is_backend_url(url, self.backend_prefixes):
                     if not url.strip() or _looks_like_static_asset(url):
@@ -1287,7 +1403,12 @@ class UiApiExecutor:
             if not (_BACKEND_URL_HINT.search(value)
                     or self._hints_backend(value)):
                 continue
+            if self._in_gateway(rel) and _PURE_ORIGIN_RE.match(value.strip()):
+                continue  # 呼び出し口のベース URL 宣言。呼び出しではない
             start = hit.start()
+            if (_RELATIVE_SPEC_RE.match(value.strip())
+                    and _IMPORT_BEFORE_RE.search(text[max(0, start - 40):start])):
+                continue  # `from '../api/client.js'`。モジュール指定子
             if any(lo <= start <= hi for lo, hi in covered):
                 continue
             out.append(FetchSite(
@@ -1304,7 +1425,7 @@ class UiApiExecutor:
         raw = _short(parts[0]) if parts else ""
         url, why = _resolve_url(parts[0] if parts else "", constants, used=used)
         if url is None:
-            return FetchSite(rel, line, raw, None, None, Verdict.UNRESOLVED_URL, why)
+            return self._unreadable(rel, line, raw, why)
 
         stripped, why = _strip_origin(url)
         if stripped is None:

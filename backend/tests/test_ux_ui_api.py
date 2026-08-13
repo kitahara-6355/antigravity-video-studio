@@ -56,7 +56,11 @@ def _frontend(tmp_path: Path, source: str, extra: dict | None = None) -> Path:
         'import App from "./App";\n', encoding="utf-8")
     (src / "App.jsx").write_text(textwrap.dedent(source), encoding="utf-8")
     for name, text in (extra or {}).items():
-        (src / name).write_text(textwrap.dedent(text), encoding="utf-8")
+        target = src / name
+        # 呼び出し口は `api/` の下に置く。サブディレクトリを作れないと
+        # 閉包側のテストが1つも書けない。
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(textwrap.dedent(text), encoding="utf-8")
     return src
 
 
@@ -1354,3 +1358,179 @@ def test_a_react_data_prop_assignment_is_not_a_url(tmp_path):
     """)
 
     assert report.sites == []
+
+
+# --- 呼び出し口とカタログ（P5 C-2） -------------------------------------------
+#
+# **主眼は「カタログを緑にできないこと」。** カタログ専用の甘い判定を作れば、
+# そこが唯一の抜け道になる。通常の呼び出しとまったく同じ `_judge` を通ること、
+# 文法から外れた書き方が項目にならないこと、呼び出し口を import しなくても
+# 判定が消えないことを固定する。
+
+
+_CATALOGUE_HEAD = "export const ENDPOINTS = {\n"
+
+
+def _with_catalogue(tmp_path: Path, entries: str, *, source: str = "",
+                    client: str = "", extra: dict | None = None):
+    """カタログを置いた frontend で走らせる。"""
+    files = dict(extra or {})
+    files["api/endpoints.js"] = _CATALOGUE_HEAD + entries + "};\n"
+    if client:
+        files["api/client.js"] = client
+    return _run(tmp_path, source or "export default function App() { return null; }",
+                extra=files)
+
+
+def _catalogue_sites(report):
+    return [s for s in report.sites if s.file.endswith("api/endpoints.js")]
+
+
+def test_a_catalogue_entry_is_matched_like_any_other_call(tmp_path):
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n")
+
+    sites = _catalogue_sites(report)
+    assert [s.verdict for s in sites] == [Verdict.MATCHED]
+    assert (sites[0].method, sites[0].path) == ("GET", "/api/demo/status")
+
+
+def test_a_catalogue_entry_for_an_undeclared_path_fails_the_gate(tmp_path):
+    """**カタログに書けば通る、にしない。** 宣言が無ければ突き合わない。"""
+    report = _with_catalogue(
+        tmp_path, "  getGhost: { method: 'GET', path: '/api/demo/ghost' },\n")
+
+    assert [s.verdict for s in _catalogue_sites(report)] == [Verdict.NOT_DECLARED]
+    assert report.mismatched
+
+
+def test_a_catalogue_entry_with_the_wrong_method_fails_the_gate(tmp_path):
+    report = _with_catalogue(
+        tmp_path, "  postStatus: { method: 'POST', path: '/api/demo/status' },\n")
+
+    assert [s.verdict for s in _catalogue_sites(report)] == [Verdict.METHOD_MISMATCH]
+    assert report.mismatched
+
+
+def test_a_catalogue_path_placeholder_matches_a_declared_parameter(tmp_path):
+    report = _with_catalogue(
+        tmp_path,
+        "  putEntry: { method: 'PUT', path: '/api/demo/entries/{entry_id}' },\n")
+
+    assert [s.verdict for s in _catalogue_sites(report)] == [Verdict.MATCHED]
+
+
+@pytest.mark.parametrize("entry", [
+    # 変数経由。カタログが「叩ける先の全部」でなくなる書き方。
+    "  getStatus: { method: 'GET', path: PATH },\n",
+    # 連結。
+    "  getStatus: { method: 'GET', path: '/api/demo' + '/status' },\n",
+    # テンプレートリテラル。
+    "  getStatus: { method: 'GET', path: `/api/demo/status` },\n",
+    # ダブルクォート。閉じた文法はシングルクォートだけ。
+    '  getStatus: { method: "GET", path: "/api/demo/status" },\n',
+    # 1行に2項目。行単位の列挙から片方が消える書き方。
+    ("  a: { method: 'GET', path: '/api/demo/status' }, b: { method: 'GET', "
+     "path: '/api/demo/status' },\n"),
+])
+def test_a_catalogue_entry_outside_the_closed_grammar_is_not_an_entry(tmp_path, entry):
+    """**文法から外れた行を項目にしない。**
+
+    項目にならなかった行に URL リテラルがあれば残余（unattributed）が拾う。
+    リテラルすら無い形（変数経由）はここでは見えず、ui_api_closure の C-2 が落とす。
+    どちらにせよ **matched には決してならない。**
+    """
+    report = _with_catalogue(tmp_path, entry)
+
+    assert Verdict.MATCHED not in [s.verdict for s in _catalogue_sites(report)]
+
+
+def test_a_catalogue_line_that_is_not_an_entry_still_shows_its_url(tmp_path):
+    """残余の受け皿はカタログにも掛かる。"""
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo' + '/status' },\n")
+
+    assert Verdict.UNATTRIBUTED in [s.verdict for s in _catalogue_sites(report)]
+
+
+def test_the_catalogue_is_scanned_even_when_nothing_imports_it(tmp_path):
+    """**呼び出し口は常に走査する。**
+
+    到達可能性の対象にすると、`import` を1行消すだけで
+    「叩ける先の全部」が判定から丸ごと消える。
+    """
+    report = _with_catalogue(
+        tmp_path, "  getGhost: { method: 'GET', path: '/api/demo/ghost' },\n")
+
+    # App.jsx はカタログを import していない。それでも判定されている。
+    assert _catalogue_sites(report)
+    assert report.mismatched
+
+
+def test_a_dispatch_inside_the_gateway_is_not_an_unresolved_url(tmp_path):
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n",
+        client="export function go(name) { return fetch(apiUrl(name)); }\n")
+
+    dispatch = [s for s in report.sites if s.file.endswith("api/client.js")]
+    assert [s.verdict for s in dispatch] == [Verdict.GATEWAY_DISPATCH]
+    assert dispatch[0].passed is False
+
+
+def test_gateway_dispatch_never_applies_outside_the_gateway(tmp_path):
+    """**閉包の外でこの札を付けない。** 付けば「読めない＝問題なし」に戻る。"""
+    report = _run(tmp_path, """
+        export default function App(name) {
+          fetch(apiUrl(name));
+        }
+    """)
+
+    assert _verdicts(report) == [Verdict.UNRESOLVED_URL]
+
+
+def test_a_bare_origin_in_the_gateway_is_not_residual(tmp_path):
+    """ベース URL の宣言は呼び出しではない。パスが付けば呼び出しになる。"""
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n",
+        client="const ORIGIN = 'http://localhost:8000';\nexport default ORIGIN;\n")
+
+    assert [s for s in report.sites if s.file.endswith("api/client.js")] == []
+
+
+def test_an_origin_with_a_path_in_the_gateway_is_residual(tmp_path):
+    """**呼び出し口を第2のカタログにしない。** パス付きのリテラルは残余に落ちる。"""
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n",
+        client="const ORIGIN = 'http://localhost:8000/api/demo/ghost';\n"
+               "export default ORIGIN;\n")
+
+    inside = [s for s in report.sites if s.file.endswith("api/client.js")]
+    assert [s.verdict for s in inside] == [Verdict.UNATTRIBUTED]
+
+
+def test_a_relative_import_specifier_is_not_a_backend_url(tmp_path):
+    """**呼び出し口を import する行を残余で誤検出しない。**
+
+    呼び出し口は `src/api/` にあるので、それを import する行はすべて
+    `/api/` を含む。ここを外さないと、移行したファイル1つにつき
+    unattributed が1件ずつ増える（実測で見つけた）。
+    """
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n",
+        source="""
+            import { apiFetch } from '../api/client.js';
+            export default function App() { return apiFetch('getStatus'); }
+        """,
+        client="export function apiFetch(name) { return fetch(apiUrl(name)); }\n")
+
+    assert [s for s in report.sites if s.file.endswith("App.jsx")] == []
+
+
+def test_an_absolute_specifier_after_from_is_still_residual(tmp_path):
+    """**外すのは相対指定子だけ。** `from '/api/x'` は黙って消さない。"""
+    report = _run(tmp_path, """
+        import thing from '/api/demo/status';
+        export default function App() { return thing; }
+    """)
+
+    assert _verdicts(report) == [Verdict.UNATTRIBUTED]

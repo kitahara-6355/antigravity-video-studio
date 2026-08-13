@@ -5,7 +5,11 @@
 呼び出し先の一覧をベースラインに固定し、次の5つを落とす:
 
 1. **走査0件で緑** — ベースラインが無い / 呼び出しを1件も読めない
-2. **呼び出しの削除** — ベースラインにある呼び出しが消えた（`removed`）
+2. **呼び出しの削除** — ベースラインにある呼び出しが消えた（`removed`）。
+   呼び出し口への移行（P5）だけは `--migrate` で受理するが、**受理するのは
+   「同じ backend の宣言にカタログ経由でいまも届いている」ものだけ**で、
+   届いていない削除は受理しない。受理した分は `migrations` に理由つきで残り、
+   PR の差分に必ず出る
 3. **unresolved の握りつぶし** — 2経路ある。PASS する判定を `matched` 以外に
    広げる（`semantics_widened`）と、**走査の閉包そのものを緩める**
    （`scan_widened`）。後者は判定表の外なので、判定表だけ見ていると通る
@@ -30,6 +34,7 @@ P3 の C-4 が残した穴（集計欄と本体を突き合わせていない）
     python -m backend.ux_verification.ui_api_ratchet --ratchet
     python -m backend.ux_verification.ui_api_ratchet --update-baseline
     python -m backend.ux_verification.ui_api_ratchet --redeclare "理由"
+    python -m backend.ux_verification.ui_api_ratchet --migrate "理由"
 """
 from __future__ import annotations
 
@@ -40,6 +45,7 @@ from pathlib import Path
 
 from backend.ux_verification.ui_api import (
     _GLOBAL_RECEIVERS,
+    CATALOGUE_REL,
     MISMATCH_VERDICTS,
     SCANNED_FORMS,
     SCANNED_SUFFIXES,
@@ -99,7 +105,8 @@ def scan_boundary() -> dict:
 
 
 def write_baseline(report: UiApiReport, path: Path,
-                   redeclarations: list | None = None) -> Path:
+                   redeclarations: list | None = None,
+                   migrations: list | None = None) -> Path:
     """呼び出しごとに書き出す。タイムスタンプは入れない。"""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -118,6 +125,9 @@ def write_baseline(report: UiApiReport, path: Path,
     }
     if redeclarations:
         payload["redeclarations"] = redeclarations
+    if migrations:
+        # 呼び出し口への移行で消えた呼び出しの履歴。**差分に必ず出す。**
+        payload["migrations"] = migrations
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
         f.write("\n")
@@ -283,7 +293,57 @@ class UiApiRatchet:
                 "違反が残っているので更新できません:\n"
                 + "\n".join(f"  {v}" for v in blocking))
         return write_baseline(report, path,
-                              (baseline or {}).get("redeclarations"))
+                              (baseline or {}).get("redeclarations"),
+                              migrations=(baseline or {}).get("migrations"))
+
+    def migrate(self, report: UiApiReport, path: Path, reason: str) -> Path:
+        """呼び出し口への移行で消えた呼び出しを、理由つきで受理する（P5）。
+
+        **無条件の削除は受理しない。** 受理するのは「同じ backend の宣言に、
+        カタログ経由でいまも届いている」ものだけ。届いていないものは移行では
+        なく削除なので、`removed` のまま残す。
+
+        判定に使うのはベースラインが持つ `declarations`（当たった宣言の場所）。
+        パスの表記は移行で変わる（`/stream/preview` → `/stream/{video_type}`）
+        ので、パス文字列で照合すると本当の移行まで弾く。**当たり先で照合する。**
+        """
+        if not reason.strip():
+            raise ValueError("--migrate には理由が要ります")
+        baseline = load_baseline(path)
+        if baseline is None:
+            raise ValueError("ベースラインがありません")
+        result = self.check(report, baseline)
+
+        # いまカタログ経由で届いている宣言。ここに載っていない削除は削除。
+        reachable = {s.declared_at for s in report.sites
+                     if s.passed and s.file.endswith(CATALOGUE_REL.split("/")[-1])
+                     and s.declared_at}
+        base_decls: dict = baseline.get("declarations") or {}
+        moved, lost = [], []
+        for violation in result.violations:
+            if violation.kind != "removed":
+                continue
+            (moved if base_decls.get(violation.key) in reachable
+             else lost).append(violation)
+        if lost:
+            raise ValueError(
+                "カタログに届いていない削除があります（移行ではありません）:\n"
+                + "\n".join(f"  {v}" for v in lost))
+
+        blocking = [v for v in result.violations
+                    if v.kind not in ("removed", "unpinned_new")]
+        if blocking:
+            raise ValueError(
+                "移行以外の違反が残っています:\n"
+                + "\n".join(f"  {v}" for v in blocking))
+
+        history = list(baseline.get("migrations") or [])
+        history += [{"key": v.key, "was": v.before,
+                     "now_via": base_decls.get(v.key, ""),
+                     "reason": reason.strip()} for v in moved]
+        return write_baseline(report, path,
+                              (baseline or {}).get("redeclarations"),
+                              migrations=history)
 
     def redeclare(self, report: UiApiReport, path: Path, reason: str) -> Path:
         """当たり先の差し替えを理由つきで受理する。"""
@@ -303,7 +363,8 @@ class UiApiRatchet:
         history += [{"key": v.key, "before": v.before, "after": v.after,
                      "reason": reason.strip()}
                     for v in result.violations if v.kind == "substituted"]
-        return write_baseline(report, path, history)
+        return write_baseline(report, path, history,
+                              migrations=baseline.get("migrations"))
 
 
 # --- CLI ---------------------------------------------------------------------
@@ -317,6 +378,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="新しい呼び出しをピンする")
     parser.add_argument("--redeclare", metavar="理由",
                         help="当たり先の差し替えを理由つきで受理する")
+    parser.add_argument("--migrate", metavar="理由",
+                        help="呼び出し口への移行で消えた呼び出しを理由つきで受理する"
+                             "（カタログ経由で同じ宣言に届いているものだけ）")
     args = parser.parse_args(argv)
 
     report = UiApiExecutor.for_repo().run()
@@ -328,6 +392,9 @@ def main(argv: list[str] | None = None) -> int:
         print("🚫 fetch 呼び出しを1件も読み取れませんでした。")
         return 1
 
+    if args.migrate is not None:
+        print(f"✅ 移行を受理しました: {ratchet.migrate(report, BASELINE, args.migrate)}")
+        return 0
     if args.redeclare is not None:
         print(f"✅ 差し替えを受理しました: {ratchet.redeclare(report, BASELINE, args.redeclare)}")
         return 0

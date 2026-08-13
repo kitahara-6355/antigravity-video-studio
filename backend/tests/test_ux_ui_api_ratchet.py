@@ -322,3 +322,89 @@ def test_the_repository_baseline_exists_and_pins_every_key():
         assert key in baseline, key
     assert baseline["passing_verdicts"] == ["matched"]
     assert json.dumps(baseline)  # 直列化できる
+
+
+# --- 呼び出し口への移行（P5） -------------------------------------------------
+#
+# `--migrate` は削除を受理する唯一の経路。**受理条件を緩めれば、そこが
+# 「呼び出しを消して緑にする」抜け道になる。** 条件そのものを固定する。
+
+
+_CATALOGUE = "src/api/endpoints.js"
+
+
+def test_a_migration_is_accepted_when_the_catalogue_reaches_the_same_declaration(tmp_path):
+    """呼び出しは消えたが、同じ宣言にカタログ経由で届いている。"""
+    before = _report(_site(file="src/App.jsx", declared="routers/demo.py:10"))
+    _pinned(tmp_path, before)
+    after = _report(_site(file=_CATALOGUE, declared="routers/demo.py:10"))
+
+    UiApiRatchet().migrate(after, tmp_path / "baseline.json", "P5 の移行")
+
+    result = UiApiRatchet().check(after, load_baseline(tmp_path / "baseline.json"))
+    assert result.valid
+
+
+def test_a_migration_is_refused_when_the_catalogue_does_not_reach_it(tmp_path):
+    """**届いていない削除は移行ではない。** ここを緩めると削除が通る。"""
+    before = _report(_site(file="src/App.jsx", declared="routers/demo.py:10"),
+                     _site(path="/api/y", file="src/App.jsx",
+                           declared="routers/demo.py:20"))
+    _pinned(tmp_path, before)
+    # `/api/y` はカタログにも無い＝ただ消えた
+    after = _report(_site(file=_CATALOGUE, declared="routers/demo.py:10"))
+
+    with pytest.raises(ValueError, match="カタログに届いていない削除"):
+        UiApiRatchet().migrate(after, tmp_path / "baseline.json", "P5 の移行")
+
+
+def test_a_migration_needs_a_reason(tmp_path):
+    _pinned(tmp_path, _report(_site(file="src/App.jsx")))
+    after = _report(_site(file=_CATALOGUE))
+
+    with pytest.raises(ValueError, match="理由が要ります"):
+        UiApiRatchet().migrate(after, tmp_path / "baseline.json", "   ")
+
+
+def test_a_migration_does_not_launder_a_weakened_verdict(tmp_path):
+    """**移行のついでに判定を弱められない。** 削除以外の違反は受理しない。"""
+    _pinned(tmp_path, _report(
+        _site(file="src/App.jsx", declared="routers/demo.py:10"),
+        _site(path="/api/y", file="src/Other.jsx", declared="routers/demo.py:20")))
+    after = _report(
+        _site(file=_CATALOGUE, declared="routers/demo.py:10"),
+        # 同じ鍵のまま matched → not_declared に落ちた
+        _site(path="/api/y", file="src/Other.jsx", verdict=Verdict.NOT_DECLARED,
+              declared=""))
+
+    with pytest.raises(ValueError, match="移行以外の違反"):
+        UiApiRatchet().migrate(after, tmp_path / "baseline.json", "P5 の移行")
+
+
+def test_a_migration_is_recorded_in_the_baseline_diff(tmp_path):
+    """**受理した移行は必ず差分に出す。** 黙って消えた、を残さない。"""
+    _pinned(tmp_path, _report(_site(file="src/App.jsx",
+                                    declared="routers/demo.py:10")))
+    after = _report(_site(file=_CATALOGUE, declared="routers/demo.py:10"))
+
+    UiApiRatchet().migrate(after, tmp_path / "baseline.json", "P5 の移行")
+
+    recorded = load_baseline(tmp_path / "baseline.json")["migrations"]
+    assert [m["key"] for m in recorded] == ["src/App.jsx|GET|/api/x"]
+    assert recorded[0]["reason"] == "P5 の移行"
+    assert recorded[0]["now_via"] == "routers/demo.py:10"
+
+
+def test_updating_the_baseline_keeps_the_migration_history(tmp_path):
+    """履歴が `--update-baseline` で消えたら、移行の記録は歯止めにならない。"""
+    _pinned(tmp_path, _report(_site(file="src/App.jsx",
+                                    declared="routers/demo.py:10")))
+    after = _report(_site(file=_CATALOGUE, declared="routers/demo.py:10"))
+    UiApiRatchet().migrate(after, tmp_path / "baseline.json", "P5 の移行")
+
+    grown = _report(_site(file=_CATALOGUE, declared="routers/demo.py:10"),
+                    _site(path="/api/new", file=_CATALOGUE,
+                          declared="routers/demo.py:30"))
+    UiApiRatchet().update(grown, tmp_path / "baseline.json")
+
+    assert load_baseline(tmp_path / "baseline.json")["migrations"]
