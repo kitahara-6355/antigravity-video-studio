@@ -196,6 +196,12 @@ _PURE_ORIGIN_RE = re.compile(r"^(?:https?|wss?)://[A-Za-z0-9.\-]+(?::\d+)?/?$")
 _RELATIVE_SPEC_RE = re.compile(r"^\.\.?/")
 _IMPORT_BEFORE_RE = re.compile(r"(?:^|[^\w])(?:from|import)\s*\(?\s*$")
 
+# `src={apiUrl('getVideo', …)}` — URL 属性から呼び出し口を使う形。
+# **宛先はリテラルのキーで決まる**ので静的に解決できる。解決してカタログの
+# 項目として判定する。キーがカタログに無ければ `not_declared` に落とす
+# （読めないのではなく、実在しない先を指している）。
+_GATEWAY_URL_RE = re.compile(r"^\s*apiUrl\s*\(\s*'(?P<key>[A-Za-z_$][\w$]*)'")
+
 # JSX の URL 属性と `window.open`。ブラウザはこれも backend に GET を投げる。
 # `fetch` だけ見て「全部見た」と言わない（gate-verifier 2回目の指摘）。
 _URL_ATTR_RE = re.compile(r"(?<![\w$])(?:src|href|poster)\s*=\s*\{")
@@ -1133,6 +1139,18 @@ class UiApiExecutor:
                              "呼び出し口の内側。宛先はカタログが決める")
         return FetchSite(rel, line, raw, None, None, Verdict.UNRESOLVED_URL, why)
 
+    def catalogue_entries(self) -> dict[str, tuple[str, str]]:
+        """カタログのキー -> (メソッド, パス)。閉じた文法の行だけ。"""
+        path = self.frontend_src / CATALOGUE_REL.split("/", 1)[1]
+        if not path.is_file():
+            return {}
+        entries: dict[str, tuple[str, str]] = {}
+        for line in path.read_text(encoding="utf-8", errors="replace").split("\n"):
+            hit = _CATALOGUE_ENTRY_RE.match(line)
+            if hit:
+                entries[hit.group("key")] = (hit.group("method"), hit.group("path"))
+        return entries
+
     def _catalogue_sites(self, raw: str, rel: str,
                          shapes: dict) -> list[FetchSite]:
         """カタログの各項目を1件の呼び出し先として突き合わせる。
@@ -1310,6 +1328,22 @@ class UiApiExecutor:
                     expr = _split_top_level(body)[0] if arg_open == "(" else body
                     url_regions.append(
                         (hit.end() - 1, hit.end() + len(expr) + 1))
+                # `src={apiUrl('getVideo', …)}`。宛先はリテラルのキーで決まる。
+                gateway = _GATEWAY_URL_RE.match(expr)
+                if gateway:
+                    key = gateway.group("key")
+                    entry = self.catalogue_entries().get(key)
+                    if entry is None:
+                        found.append(FetchSite(
+                            rel, line, _short(expr), None, None,
+                            Verdict.NOT_DECLARED,
+                            f"カタログに無いキー（{key}）"))
+                        continue
+                    method, catalogue_path = entry
+                    found.append(self._judge(
+                        [f"'{catalogue_path}'"], {}, rel, line, shapes,
+                        forced_method=method))
+                    continue
                 url, why = _resolve_url(expr, constants, used=used)
                 if url is None:
                     # **読めないものを「backend ではない」と決めつけない。**

@@ -3,8 +3,8 @@ import './ImageDirector.css'; // Reuse styles
 import '../App.css';
 import YouTubeOptimizerPanel from './YouTubeOptimizerPanel';
 import SmartCutPanel from './SmartCutPanel';
+import { apiFetch } from '../api/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes, onOpenBoardroom }) {
     const [step, setStep] = useState('analyzing'); // analyzing | briefing | planning | generating
@@ -38,11 +38,7 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
         const fullText = segments.map(s => s.text).join('\n');
 
         try {
-            const res = await fetch(`${API_BASE}/api/director/analyze-resources`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ full_text: fullText })
-            });
+            const res = await apiFetch('postDirectorAnalyzeResources', { body: { full_text: fullText } });
             const data = await res.json();
             setRequiredResources(data);
 
@@ -75,11 +71,7 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
         const fullText = segments.map(s => s.text).join('\n');
 
         try {
-            const res = await fetch(`${API_BASE}/api/director/analyze-script`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ full_text: fullText })
-            });
+            const res = await apiFetch('postDirectorAnalyzeScript', { body: { full_text: fullText } });
             const data = await res.json();
             setStyleOptions(data);
             setStep('briefing');
@@ -105,11 +97,7 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
         setStep('quality_gate_loading');
         // Call Quality Score API
         try {
-            const res = await fetch(`${API_BASE}/api/director/quality-score`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ storyboard_plan: storyboardPlan })
-            });
+            const res = await apiFetch('postDirectorQualityScore', { body: { storyboard_plan: storyboardPlan } });
             const score = await res.json();
             setQualityScore(score);
             setStep('quality_gate');
@@ -131,15 +119,11 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
         setStep('planning_loading');
         try {
             const fullText = segments.map(s => s.text).join('\n');
-            const res = await fetch(`${API_BASE}/api/director/plan-storyboard`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const res = await apiFetch('postDirectorPlanStoryboard', { body: {
                     full_text: fullText,
                     scenes: scenes,
                     selected_style: style
-                })
-            });
+                } });
             const plan = await res.json();
             setStoryboardPlan(plan);
             setStep('planning');
@@ -177,14 +161,10 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
             // We need to SAVE the Rationale to the scenes regardless of generation.
             applyPlanToScenes();
 
-            const res = await fetch(`${API_BASE}/api/director/batch-generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const res = await apiFetch('postDirectorBatchGenerate', { body: {
                     scenes: scenes,
                     style_prompt: selectedStyle.visual_prompt
-                })
-            });
+                } });
             const data = await res.json();
             pollProgress(data.task_id);
         } catch (e) {
@@ -213,7 +193,7 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
     const pollProgress = (taskId) => {
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/director/tasks/${taskId}`);
+                const res = await apiFetch('getDirectorTasks', { params: { task_id: taskId } });
                 const task = await res.json();
 
                 if (task.status === 'processing') {
@@ -240,15 +220,11 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
     const wrapUpSession = async () => {
         setStep('debrief_loading');
         try {
-            const res = await fetch(`${API_BASE}/api/director/generate-report`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const res = await apiFetch('postDirectorGenerateReport', { body: {
                     storyboard_plan: storyboardPlan,
                     quality_score: qualityScore || { score: 50 }, // fallback if skipped
                     biz_rank: 'Novice' // Should come from props/context ideally
-                })
-            });
+                } });
             const data = await res.json();
             setFinalReport(data);
             setStep('debrief');

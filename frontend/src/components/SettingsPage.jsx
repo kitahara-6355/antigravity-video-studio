@@ -4,6 +4,7 @@ import { useDropzone } from 'react-dropzone';
 import PreProductionPlanner from './PreProductionPlanner';
 import OperationsDashboard from './OperationsDashboard';
 import ShortsGenerator from './ShortsGenerator';
+import { apiFetch } from '../api/client.js';
 
 export default function SettingsPage({ onClose }) {
     const [activeTab, setActiveTab] = useState('soul');
@@ -28,7 +29,7 @@ export default function SettingsPage({ onClose }) {
 
     const fetchConfig = () => {
         setLoading(true);
-        fetch('http://localhost:8000/api/settings')
+        apiFetch('getSettings')
             .then(res => res.json())
             .then(data => {
                 setConfig(data);
@@ -59,10 +60,7 @@ export default function SettingsPage({ onClose }) {
         const formData = new FormData();
         formData.append('file', file);
 
-        fetch('http://localhost:8000/api/settings/video', {
-            method: 'POST',
-            body: formData
-        })
+        apiFetch('postSettingsVideo', { body: formData })
             .then(res => res.json())
             .then(data => {
                 setSuccessMessage("動画が正常にアップロードされました！ (Original: " + file.name + ")");
@@ -87,11 +85,7 @@ export default function SettingsPage({ onClose }) {
     const saveIdentity = () => {
         setSaving(true);
         setErrorMessage(null);
-        fetch('http://localhost:8000/api/settings/identity', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(identityForm)
-        })
+        apiFetch('postSettingsIdentity', { body: identityForm })
             .then(res => res.json())
             .then(data => {
                 setSaving(false);
@@ -108,7 +102,7 @@ export default function SettingsPage({ onClose }) {
 
     // Define checkStatus outside useEffect so it can be reused
     const checkStatus = () => {
-        fetch('http://localhost:8000/api/transcribe/status')
+        apiFetch('getTranscribeStatus')
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'processing' || data.status === 'starting') {
@@ -157,7 +151,7 @@ export default function SettingsPage({ onClose }) {
         setSuccessMessage(null);
         setErrorMessage(null);
 
-        fetch('http://localhost:8000/api/transcribe', { method: 'POST' })
+        apiFetch('postTranscribe')
             .then(async res => {
                 if (!res.ok) {
                     const text = await res.text();
@@ -184,7 +178,7 @@ export default function SettingsPage({ onClose }) {
         setErrorMessage(null);
         setSuccessMessage(null);
 
-        fetch('http://localhost:8000/api/settings/reset', { method: 'POST' })
+        apiFetch('postSettingsReset')
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success') {

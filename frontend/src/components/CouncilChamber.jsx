@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Target, Activity, Gavel, HelpCircle, FileText } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { apiFetch } from '../api/client.js';
 
 // --- STANCE CARD COMPONENT ---
 const StanceCard = ({ response }) => {
@@ -91,9 +92,7 @@ export default function CouncilChamber({ initialQuery }) {
         setSynthesis(null);
 
         try {
-            const res = await fetch(`http://localhost:8000/api/council/session?query=${encodeURIComponent(q)}`, {
-                method: 'POST'
-            });
+            const res = await apiFetch('postCouncilSession', { query: { query: q } });
             const data = await res.json();
 
             // Simulating sequential debate for visual effect
@@ -120,15 +119,11 @@ export default function CouncilChamber({ initialQuery }) {
         // alert(`議長決裁: ${action === 'APPROVE' ? '承認' : '却下'}\nセッション: ${sessionId.substring(0,8)}...`);
 
         try {
-            await fetch('http://localhost:8000/api/council/decision', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            await apiFetch('postCouncilDecision', { body: {
                     session_id: sessionId,
                     outcome: action,
                     debate_flow: debateFlow
-                })
-            });
+                } });
             if (action === 'APPROVE') {
                 confetti({
                     particleCount: 100,

@@ -16,8 +16,8 @@ import {
     ChevronRight, ChevronLeft, AlertCircle, ThumbsUp
 } from 'lucide-react';
 import './StepReview.css';
+import { apiFetch } from '../api/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 const REVIEW_STAGES = [
     {
@@ -171,11 +171,7 @@ const StepReviewPanel = ({ isOpen, onClose, onApprove, reviewData }) => {
         };
 
         try {
-            await fetch(`${API_BASE}/api/quality/review/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(result),
-            });
+            await apiFetch('postQualityReviewApprove', { body: result });
         } catch (err) {
             console.warn('Review approval sync failed:', err);
         }

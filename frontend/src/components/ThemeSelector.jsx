@@ -13,8 +13,8 @@ import {
     Tv, Film, Mic, Coffee
 } from 'lucide-react';
 import './ThemeSelector.css';
+import { apiFetch } from '../api/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 // テンプレート（レイヤー1: 業界基準）
 const TEMPLATE_PRESETS = [
@@ -101,11 +101,7 @@ const ThemeSelector = ({ onApply, isOpen = true, onClose, segments = [] }) => {
     const handleAutoRecommend = useCallback(async () => {
         setRecommending(true);
         try {
-            const res = await fetch(`${API_BASE}/api/v1/themes/recommend`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ segments, total_duration_seconds: 0 }),
-            });
+            const res = await apiFetch('postV1ThemesRecommend', { body: { segments, total_duration_seconds: 0 } });
             if (res.ok) {
                 const data = await res.json();
                 if (data.recommended) {
@@ -145,14 +141,10 @@ const ThemeSelector = ({ onApply, isOpen = true, onClose, segments = [] }) => {
         setApplying(true);
 
         try {
-            const res = await fetch(`${API_BASE}/api/v1/themes/apply`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const res = await apiFetch('postV1ThemesApply', { body: {
                     template_id: selectedTemplate,
                     theme_id: selectedTheme,
-                }),
-            });
+                } });
 
             if (res.ok) {
                 const data = await res.json();

@@ -9,8 +9,8 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import './SmartCut.css';
+import { apiFetch } from '../api/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 const SmartCutPanel = ({ isOpen, onClose, segments, onFinalize }) => {
     const [targetDuration, setTargetDuration] = useState(15);
@@ -31,15 +31,11 @@ const SmartCutPanel = ({ isOpen, onClose, segments, onFinalize }) => {
     const initSmartCut = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/api/smartcut/init`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const response = await apiFetch('postSmartcutInit', { body: {
                     segments: segments || [],
                     opening_duration: 10,
                     ending_duration: 20
-                })
-            });
+                } });
 
             if (response.ok) {
                 const data = await response.json();
@@ -47,7 +43,7 @@ const SmartCutPanel = ({ isOpen, onClose, segments, onFinalize }) => {
                 setLockedSegments(data.recommendation.locked_segments || []);
 
                 // 全候補を取得
-                const candResponse = await fetch(`${API_BASE}/api/smartcut/all-candidates`);
+                const candResponse = await apiFetch('getSmartcutAllCandidates');
                 if (candResponse.ok) {
                     const candData = await candResponse.json();
                     setAllCandidates(candData.candidates);
@@ -66,11 +62,7 @@ const SmartCutPanel = ({ isOpen, onClose, segments, onFinalize }) => {
         setLoading(true);
 
         try {
-            const response = await fetch(`${API_BASE}/api/smartcut/recommend`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_duration_minutes: minutes })
-            });
+            const response = await apiFetch('postSmartcutRecommend', { body: { target_duration_minutes: minutes } });
 
             if (response.ok) {
                 const data = await response.json();
@@ -86,17 +78,13 @@ const SmartCutPanel = ({ isOpen, onClose, segments, onFinalize }) => {
     // シーン固定
     const handleLockSegment = async (highlight) => {
         try {
-            const response = await fetch(`${API_BASE}/api/smartcut/lock`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const response = await apiFetch('postSmartcutLock', { body: {
                     segment_id: `locked_${Date.now()}`,
                     title: highlight.text_snippet?.substring(0, 30) || 'シーン',
                     start_time: highlight.timestamp || 0,
                     end_time: (highlight.timestamp || 0) + 30,
                     reason: "ユーザーが固定"
-                })
-            });
+                } });
 
             if (response.ok) {
                 const data = await response.json();
@@ -111,11 +99,7 @@ const SmartCutPanel = ({ isOpen, onClose, segments, onFinalize }) => {
     // 固定解除
     const handleUnlockSegment = async (segmentId) => {
         try {
-            const response = await fetch(`${API_BASE}/api/smartcut/unlock`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ segment_id: segmentId })
-            });
+            const response = await apiFetch('postSmartcutUnlock', { body: { segment_id: segmentId } });
 
             if (response.ok) {
                 const data = await response.json();
@@ -130,9 +114,7 @@ const SmartCutPanel = ({ isOpen, onClose, segments, onFinalize }) => {
     // 確定
     const handleFinalize = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/smartcut/finalize`, {
-                method: 'POST'
-            });
+            const response = await apiFetch('postSmartcutFinalize');
 
             if (response.ok) {
                 const data = await response.json();

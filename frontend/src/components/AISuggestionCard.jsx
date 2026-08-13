@@ -13,8 +13,8 @@
  */
 import React, { useState, useCallback } from 'react';
 import { Wand2, Undo2, Check, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { apiFetch } from '../api/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 const AISuggestionCard = ({ suggestions = [], onApply, onUndo }) => {
     const [appliedItems, setAppliedItems] = useState(new Set());
@@ -29,11 +29,7 @@ const AISuggestionCard = ({ suggestions = [], onApply, onUndo }) => {
 
         try {
             // バックエンドに適用通知
-            await fetch(`${API_BASE}/api/quality/apply-suggestion`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ suggestion, index }),
-            });
+            await apiFetch('postQualityApplySuggestion', { body: { suggestion, index } });
 
             setAppliedItems(prev => new Set([...prev, index]));
             setUndoStack(prev => [...prev, { suggestion, index }]);
@@ -55,11 +51,7 @@ const AISuggestionCard = ({ suggestions = [], onApply, onUndo }) => {
         const last = undoStack[undoStack.length - 1];
 
         try {
-            await fetch(`${API_BASE}/api/quality/undo-suggestion`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ suggestion: last.suggestion, index: last.index }),
-            });
+            await apiFetch('postQualityUndoSuggestion', { body: { suggestion: last.suggestion, index: last.index } });
         } catch (err) {
             console.warn('Undo sync failed:', err);
         }

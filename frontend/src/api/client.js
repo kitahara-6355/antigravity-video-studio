@@ -65,14 +65,21 @@ export function apiUrl(name, { params, query } = {}) {
  *
  * body にオブジェクトを渡すと JSON にして Content-Type を付ける。
  * 文字列をそのまま送りたいときは呼び出し側で JSON.stringify しない。
+ *
+ * async にしてあるのは、未宣言のキーで投げるときも**同期例外ではなく
+ * reject** にするため。呼び出し側の `.catch(() => null)` が素通りされない。
  */
-export function apiFetch(name, { params, query, body, headers, signal } = {}) {
+export async function apiFetch(name, { params, query, body, headers, signal } = {}) {
   const entry = entryOf(name);
   if (entry.method === 'WEBSOCKET') {
     throw new Error(`${name} は WebSocket です。apiSocket を使ってください`);
   }
   const init = { method: entry.method };
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    // Content-Type は付けない。boundary はブラウザが決める。
+    init.body = body;
+    if (headers) init.headers = headers;
+  } else if (body !== undefined) {
     init.body = typeof body === 'string' ? body : JSON.stringify(body);
     init.headers = { 'Content-Type': 'application/json', ...(headers || {}) };
   } else if (headers) {
@@ -80,15 +87,6 @@ export function apiFetch(name, { params, query, body, headers, signal } = {}) {
   }
   if (signal) init.signal = signal;
   return fetch(apiUrl(name, { params, query }), init);
-}
-
-/** 叩いて JSON にする。res.ok を見ない呼び出しが散らばるのを避ける。 */
-export async function apiJson(name, options) {
-  const res = await apiFetch(name, options);
-  if (!res.ok) {
-    throw new Error(`${name} が ${res.status} を返しました`);
-  }
-  return res.json();
 }
 
 /** WebSocket を開く。 */

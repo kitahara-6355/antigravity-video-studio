@@ -1534,3 +1534,65 @@ def test_an_absolute_specifier_after_from_is_still_residual(tmp_path):
     """)
 
     assert _verdicts(report) == [Verdict.UNATTRIBUTED]
+
+
+def test_a_url_attribute_that_calls_the_gateway_is_resolved(tmp_path):
+    """`src={apiUrl('key')}` は解決できる。**読めない扱いにしない。**"""
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n",
+        source="""
+            import { apiUrl } from '../api/client.js';
+            export default function App() {
+              return <img src={apiUrl('getStatus')} />;
+            }
+        """)
+
+    attr = [s for s in report.sites if s.file.endswith("App.jsx")]
+    assert [s.verdict for s in attr] == [Verdict.MATCHED]
+    assert attr[0].path == "/api/demo/status"
+
+
+def test_a_url_attribute_with_an_unknown_key_fails_the_gate(tmp_path):
+    """**カタログに無いキーは「読めない」ではなく「実在しない」。**"""
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n",
+        source="""
+            import { apiUrl } from '../api/client.js';
+            export default function App() {
+              return <img src={apiUrl('getGhost')} />;
+            }
+        """)
+
+    attr = [s for s in report.sites if s.file.endswith("App.jsx")]
+    assert [s.verdict for s in attr] == [Verdict.NOT_DECLARED]
+    assert report.mismatched
+
+
+def test_a_url_attribute_with_a_computed_key_is_not_resolved(tmp_path):
+    """キーがリテラルでなければ解決しない（fail-closed）。"""
+    report = _with_catalogue(
+        tmp_path, "  getStatus: { method: 'GET', path: '/api/demo/status' },\n",
+        source="""
+            import { apiUrl } from '../api/client.js';
+            export default function App(name) {
+              return <img src={apiUrl(name)} />;
+            }
+        """)
+
+    attr = [s for s in report.sites if s.file.endswith("App.jsx")]
+    assert [s.verdict for s in attr] == [Verdict.UNRESOLVED_URL]
+
+
+def test_a_url_attribute_through_the_gateway_still_checks_the_declaration(tmp_path):
+    """**カタログ経由でも宣言は確かめる。** キーが在れば通る、にしない。"""
+    report = _with_catalogue(
+        tmp_path, "  getGhost: { method: 'GET', path: '/api/demo/ghost' },\n",
+        source="""
+            import { apiUrl } from '../api/client.js';
+            export default function App() {
+              return <img src={apiUrl('getGhost')} />;
+            }
+        """)
+
+    attr = [s for s in report.sites if s.file.endswith("App.jsx")]
+    assert [s.verdict for s in attr] == [Verdict.NOT_DECLARED]
