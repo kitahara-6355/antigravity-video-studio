@@ -7,9 +7,8 @@ import QualityGate from './QualityGate';
 import AISuggestionCard from './AISuggestionCard';
 import YouTubeOptimizerPanel from './YouTubeOptimizerPanel';
 import './ProductionPipeline.css';
+import { apiFetch, apiSocket, apiUrl, openApiUrl } from '../gateway/client.js';
 
-const API_BASE = "http://localhost:8000";
-const WS_BASE = "ws://localhost:8000";
 const POLL_INTERVAL = 5000; // WebSocket接続時はフォールバック用（5秒に延長）
 const POLL_INTERVAL_NO_WS = 2000; // WebSocket未接続時は2秒ポーリング
 
@@ -56,11 +55,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
   const fetchMetadata = useCallback(async (video) => {
     if (videoMetadata[video.path]) return;
     try {
-      const res = await fetch(`${API_BASE}/api/pipeline/videos/metadata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_path: video.path }),
-      });
+      const res = await apiFetch('postPipelineVideosMetadata', { body: { video_path: video.path } });
       if (res.ok) {
         const data = await res.json();
         setVideoMetadata(prev => ({ ...prev, [video.path]: data }));
@@ -103,7 +98,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
     const connectWebSocket = () => {
       if (!mounted) return;
       try {
-        const ws = new WebSocket(`${WS_BASE}/api/pipeline/ws/pipeline`);
+        const ws = apiSocket('wsPipeline');
         wsRef.current = ws;
 
         ws.onopen = () => {
@@ -120,7 +115,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
             // WebSocketメッセージ種別に応じてステータスを更新
             if (data.type === "pipeline_start") {
               // パイプライン開始 → ステータスをポーリングで取得
-              fetch(`${API_BASE}/api/pipeline/status`)
+              apiFetch('getPipelineStatus')
                 .then(r => r.json())
                 .then(s => mounted && setPipelineStatus(s))
                 .catch(() => {});
@@ -135,7 +130,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                 }));
               } else {
                 // 結果が無い場合はステータスを取得
-                fetch(`${API_BASE}/api/pipeline/status`)
+                apiFetch('getPipelineStatus')
                   .then(r => r.json())
                   .then(s => mounted && setPipelineStatus(s))
                   .catch(() => {});
@@ -220,7 +215,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
 
   // ━━━ UX-6: テンプレート選択状態を確認 ━━━
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/themes/current/active`)
+    apiFetch('getV1ThemesCurrentActive')
       .then(res => res.json())
       .then(data => setTemplateSelected(!!data.template))
       .catch(() => setTemplateSelected(false));
@@ -228,7 +223,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
 
   // 動画リスト取得
   useEffect(() => {
-    fetch(`${API_BASE}/api/pipeline/videos`)
+    apiFetch('getPipelineVideos')
       .then(res => res.json())
       .then(data => {
         setVideos(data.videos || []);
@@ -241,7 +236,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
 
   // 起動時にステータスを取得（再開対応）
   useEffect(() => {
-    fetch(`${API_BASE}/api/pipeline/status`)
+    apiFetch('getPipelineStatus')
       .then(res => res.json())
       .then(data => {
         if (data.status !== "idle") {
@@ -256,7 +251,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
     if (pipelineStatus?.status === "running") {
       const interval = wsConnected ? POLL_INTERVAL : POLL_INTERVAL_NO_WS;
       pollingRef.current = setInterval(() => {
-        fetch(`${API_BASE}/api/pipeline/status`)
+        apiFetch('getPipelineStatus')
           .then(res => res.json())
           .then(data => setPipelineStatus(data))
           .catch(() => {});
@@ -283,18 +278,14 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
 
     // ━━━ UX-2修正: テンプレート選択チェック（警告バナーのみ、ブロックしない） ━━━
     try {
-      const tmplCheck = await fetch(`${API_BASE}/api/v1/themes/current/active`);
+      const tmplCheck = await apiFetch('getV1ThemesCurrentActive');
       const tmplData = await tmplCheck.json();
       setTemplateSelected(!!tmplData.template);
     } catch {}
 
     // ━━━ O1-CF-03: バリデーション ━━━
     try {
-      const valRes = await fetch(`${API_BASE}/api/pipeline/videos/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_paths: selectedVideos.map(v => v.path) }),
-      });
+      const valRes = await apiFetch('postPipelineVideosValidate', { body: { video_paths: selectedVideos.map(v => v.path) } });
       if (valRes.ok) {
         const valData = await valRes.json();
         const errs = {};
@@ -312,17 +303,13 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/pipeline/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await apiFetch('postPipelineStart', { body: {
           video_paths: selectedVideos.map(v => v.path),
           target_minutes: targetMinutes,
-        }),
-      });
+        } });
       const data = await res.json();
       if (res.ok) {
-        const statusRes = await fetch(`${API_BASE}/api/pipeline/status`);
+        const statusRes = await apiFetch('getPipelineStatus');
         setPipelineStatus(await statusRes.json());
       } else {
         alert(friendlyError(data.detail));
@@ -729,8 +716,8 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                             onClick={async () => {
                               try {
                                 const [statusRes, improveRes] = await Promise.all([
-                                  fetch(`${API_BASE}/api/pipeline/quality-gate/status`),
-                                  fetch(`${API_BASE}/api/pipeline/quality-gate/improve`, { method: 'POST' }),
+                                  apiFetch('getPipelineQualityGateStatus'),
+                                  apiFetch('postPipelineQualityGateImprove'),
                                 ]);
                                 const statusData = statusRes.ok ? await statusRes.json() : {};
                                 const improveData = improveRes.ok ? await improveRes.json() : {};
@@ -884,7 +871,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                     <video
                       controls
                       style={{ width: '100%', maxHeight: 360, display: 'block' }}
-                      src={`${API_BASE}/api/pipeline/stream/preview`}
+                      src={apiUrl('getPipelineStream', { params: { video_type: 'preview' } })}
                       poster=""
                     >
                       お使いのブラウザは動画再生に対応していません
@@ -894,7 +881,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                       padding: '8px 12px', background: 'var(--bg-primary)',
                     }}>
                       <button
-                        onClick={() => fetch(`${API_BASE}/api/pipeline/open-folder`).catch(() => {})}
+                        onClick={() => apiFetch('getPipelineOpenFolder').catch(() => {})}
                         style={{
                           background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
                           border: '1px solid var(--border-color)', borderRadius: 6,
@@ -904,7 +891,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                         📂 出力フォルダ
                       </button>
                       <button
-                        onClick={() => window.open(`${API_BASE}/api/pipeline/stream/preview`, '_blank')}
+                        onClick={() => openApiUrl('getPipelineStream', { params: { video_type: 'preview' } })}
                         style={{
                           background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
                           border: '1px solid var(--border-color)', borderRadius: 6,
@@ -914,7 +901,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                         📥 プレビュー DL
                       </button>
                       <button
-                        onClick={() => window.open(`${API_BASE}/api/pipeline/stream/final`, '_blank')}
+                        onClick={() => openApiUrl('getPipelineStream', { params: { video_type: 'final' } })}
                         style={{
                           background: 'var(--accent-primary)', color: 'white',
                           border: 'none', borderRadius: 6,
@@ -1025,11 +1012,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
         onConfirm={() => {
           setShowQualityGate(false);
           // レンダリング開始 or 強制書出
-          fetch(`${API_BASE}/api/render/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ force_render: !qualityGateData?.is_ready }),
-          }).catch(err => console.error('Render start failed:', err));
+          apiFetch('postRenderStart', { body: { force_render: !qualityGateData?.is_ready } }).catch(err => console.error('Render start failed:', err));
         }}
         data={qualityGateData}
       />

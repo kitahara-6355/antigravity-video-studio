@@ -9,8 +9,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, Pause, ChevronRight, Undo2, Sparkles } from 'lucide-react';
 import './QuickDecision.css';
+import { apiFetch } from '../gateway/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 const QuickDecisionBar = ({ items = [], onDecisionComplete, onClose }) => {
     const [queue, setQueue] = useState(items);
@@ -50,11 +50,7 @@ const QuickDecisionBar = ({ items = [], onDecisionComplete, onClose }) => {
         setUndoStack(prev => [...prev, { index: currentIndex, item: currentItem, decision }]);
 
         try {
-            await fetch(`${API_BASE}/api/quality/decision/quick`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(decision),
-            });
+            await apiFetch('postQualityDecisionQuick', { body: decision });
         } catch (err) {
             console.warn('Decision sync failed (offline ok):', err);
         }

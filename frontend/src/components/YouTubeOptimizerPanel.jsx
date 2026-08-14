@@ -9,8 +9,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import './YouTubeOptimizer.css';
+import { apiFetch } from '../gateway/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 // === サブコンポーネント ===
 
@@ -340,15 +340,11 @@ const YouTubeOptimizerPanel = ({ isOpen, onClose, segments, topics }) => {
     const runOptimization = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/api/youtube/optimize`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const response = await apiFetch('postYoutubeOptimize', { body: {
                     segments: segments || [],
                     topics: topics || [],
                     context: { topic: topics?.[0] || '' }
-                })
-            });
+                } });
 
             if (response.ok) {
                 const data = await response.json();
@@ -371,17 +367,13 @@ const YouTubeOptimizerPanel = ({ isOpen, onClose, segments, topics }) => {
         setSelectedThumbnailId(thumbId);
 
         try {
-            await fetch(`${API_BASE}/api/thumbnail/select`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            await apiFetch('postThumbnailSelect', { body: {
                     video_id: optimizationData?.task_id || `video_${Date.now()}`,
                     selected_index: index,
                     thumbnail_concepts: thumbnails.map(t => t.concept),
                     predicted_ctrs: thumbnails.map(t => t.predicted_ctr),
                     reason: "ユーザー選択"
-                })
-            });
+                } });
             console.log('Thumbnail selection recorded');
         } catch (error) {
             console.error('Failed to record thumbnail selection:', error);
@@ -402,16 +394,12 @@ const YouTubeOptimizerPanel = ({ isOpen, onClose, segments, topics }) => {
 
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/api/youtube/improve-hook`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const response = await apiFetch('postYoutubeImproveHook', { body: {
                     hook_text: optimizationData.hook_analysis.first_5_seconds_text || '',
                     current_score: optimizationData.hook_score || 0,
                     hook_analysis: optimizationData.hook_analysis,
                     video_topic: topics?.[0] || ''
-                })
-            });
+                } });
 
             if (response.ok) {
                 const data = await response.json();
@@ -431,17 +419,13 @@ const YouTubeOptimizerPanel = ({ isOpen, onClose, segments, topics }) => {
                         if (num >= 1 && num <= data.improvements.length) {
                             const selected = data.improvements[num - 1];
                             // ワンクリック適用
-                            const applyRes = await fetch(`${API_BASE}/api/youtube/apply-hook`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
+                            const applyRes = await apiFetch('postYoutubeApplyHook', { body: {
                                     task_id: optimizationData?.task_id || `task_${Date.now()}`,
                                     improvement_type: selected.type,
                                     improved_text: selected.improved_text,
                                     original_text: selected.original_text,
                                     expected_score_boost: selected.expected_score_boost
-                                })
-                            });
+                                } });
                             if (applyRes.ok) {
                                 const result = await applyRes.json();
                                 alert(`✅ ${result.message}\n\n適用されたテキスト:\n「${selected.improved_text}」`);

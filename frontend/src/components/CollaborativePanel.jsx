@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './CollaborativePanel.css';
+import { apiFetch } from '../gateway/client.js';
 
 const CollaborativePanel = ({ isOpen, onClose, currentRole, onRoleChange }) => {
     const [journal, setJournal] = useState("");
@@ -18,7 +19,7 @@ const CollaborativePanel = ({ isOpen, onClose, currentRole, onRoleChange }) => {
 
     const fetchJournal = async () => {
         try {
-            const res = await fetch('http://localhost:8000/api/collaboration/journal');
+            const res = await apiFetch('getCollaborationJournal');
             const data = await res.json();
             setJournal(data.notes || "履歴はありません。");
         } catch (err) {
@@ -30,10 +31,8 @@ const CollaborativePanel = ({ isOpen, onClose, currentRole, onRoleChange }) => {
         if (!newEntry.trim()) return;
         setIsSubmitting(true);
         try {
-            const res = await fetch('http://localhost:8000/api/collaboration/journal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ author: currentRole, content: newEntry })
+            const res = await apiFetch('postCollaborationJournal', {
+                body: { author: currentRole, content: newEntry }
             });
             if (res.ok) {
                 setNewEntry("");
@@ -48,15 +47,13 @@ const CollaborativePanel = ({ isOpen, onClose, currentRole, onRoleChange }) => {
 
     const handleFeedback = async (id, action) => {
         try {
-            const res = await fetch('http://localhost:8000/api/collaboration/feedback', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const res = await apiFetch('postCollaborationFeedback', {
+                body: {
                     suggestion_id: id,
                     action: action,
                     role: currentRole,
                     comment: ""
-                })
+                }
             });
             if (res.ok) {
                 setSuggestions(prev => prev.filter(s => s.id !== id));

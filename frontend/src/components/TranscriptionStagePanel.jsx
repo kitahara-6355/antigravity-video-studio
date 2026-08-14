@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-const API_BASE = "http://localhost:8000";
+import { apiFetch } from '../gateway/client.js';
 
 const TranscriptionStagePanel = ({ stageData, isActive }) => {
   const [models, setModels] = useState([]);
@@ -14,7 +14,7 @@ const TranscriptionStagePanel = ({ stageData, isActive }) => {
   const [editText, setEditText] = useState("");
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/pipeline/transcription/models`)
+    apiFetch('getPipelineTranscriptionModels')
       .then(r => r.json())
       .then(data => {
         setModels(data.models || []);
@@ -24,7 +24,7 @@ const TranscriptionStagePanel = ({ stageData, isActive }) => {
   }, []);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/pipeline/transcription/segments`)
+    apiFetch('getPipelineTranscriptionSegments')
       .then(r => r.json())
       .then(data => setSegments(data.segments || []))
       .catch(() => {});
@@ -32,7 +32,7 @@ const TranscriptionStagePanel = ({ stageData, isActive }) => {
 
   useEffect(() => {
     const poll = setInterval(() => {
-      fetch(`${API_BASE}/api/pipeline/transcription/status`)
+      apiFetch('getPipelineTranscriptionStatus')
         .then(r => r.json())
         .then(data => {
           setStatus(data.status); setProgress(data.progress);
@@ -45,10 +45,7 @@ const TranscriptionStagePanel = ({ stageData, isActive }) => {
 
   const handleModelChange = useCallback(async (modelId) => {
     try {
-      const res = await fetch(`${API_BASE}/api/pipeline/transcription/model`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: modelId }),
-      });
+      const res = await apiFetch('postPipelineTranscriptionModel', { body: { model: modelId } });
       if (res.ok) setCurrentModel(modelId);
     } catch {}
   }, []);
@@ -57,10 +54,7 @@ const TranscriptionStagePanel = ({ stageData, isActive }) => {
 
   const saveEdit = async (segId) => {
     try {
-      const res = await fetch(`${API_BASE}/api/pipeline/transcription/segments/${segId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: editText }),
-      });
+      const res = await apiFetch('putPipelineTranscriptionSegments', { params: { segment_id: segId }, body: { text: editText } });
       if (res.ok) {
         setSegments(prev => prev.map(s => s.id === segId ? { ...s, text: editText } : s));
         setEditingId(null);
