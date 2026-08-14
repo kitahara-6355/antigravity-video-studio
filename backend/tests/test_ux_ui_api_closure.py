@@ -26,6 +26,7 @@ from backend.ux_verification.ui_api_closure import (
     check_ratchet,
     load_baseline,
     snapshot,
+    unpinned_assets,
     write_baseline,
 )
 
@@ -1209,7 +1210,7 @@ def test_an_unpinned_binary_is_a_ratchet_violation(tmp_path):
             bytes.fromhex("89504e470d0a1a0a")
             + b"export const boom = () => fetch('/api/demo/status');")
 
-    assert any("未ピンのバイナリ" in v
+    assert any("未ピンの非走査ファイル" in v
                for v in check_ratchet(executor.run(), baseline))
 
 
@@ -1222,7 +1223,7 @@ def test_replacing_a_pinned_binary_is_a_ratchet_violation(tmp_path):
     _binary(executor, "src/real.png",
             bytes.fromhex("89504e470d0a1a0a") + b"fetch('/api/demo/status')")
 
-    assert any("バイナリが差し替わった" in v
+    assert any("非走査ファイルが差し替わった" in v
                for v in check_ratchet(executor.run(), baseline))
 
 
@@ -1233,7 +1234,7 @@ def test_a_pinned_binary_that_disappears_is_a_ratchet_violation(tmp_path):
 
     (executor.frontend / "src" / "real.png").unlink()
 
-    assert any("バイナリが消えた" in v
+    assert any("非走査ファイルが消えた" in v
                for v in check_ratchet(executor.run(), baseline))
 
 
@@ -1273,3 +1274,157 @@ def test_the_semantics_do_not_claim_magic_bytes_are_enough():
 
     assert "1バイトも変わっていない" in checked
     assert "それだけでは足りない" in checked
+
+
+# --- gate-verifier 8回目の反例 -----------------------------------------------
+#
+# `package-lock.json` は**走査からも外れ、ハッシュ固定もされない唯一のファイル**
+# だった。除外の条件（`rel in CLOSURE_EXCLUDED_FILES`）と固定の条件
+# （`suffix in CLOSURE_BINARY_SUFFIXES`）が**別々に書かれていて**、両方から
+# 落ちる場所ができていた。lockfile を有効な JSON のまま1キー足して JS を埋め、
+# `import.meta.glob({as:'raw'})` → `JSON.parse` → `Blob` →
+# `URL.createObjectURL` → 変数引数の `import()` で実行すると、
+# 禁止語彙に1つも触れずに4ゲート全緑のまま dist に生の fetch が出た。
+#
+# **走査から外したものは、例外なく sha256 を固定する。**
+# 条件を1つ（走査した一覧との差集合）にすれば、ずれようがない。
+
+_LOCK_PAYLOAD = json.dumps({
+    "name": "frontend", "lockfileVersion": 3,
+    "packages": {},
+    # 有効な JSON のまま JS を運ぶ。lockfile を読まないなら中身は何でもよい。
+    "_x": "export const boom = () => fetch('/api/demo/status');",
+}, ensure_ascii=False)
+
+
+def _lockfile(executor, body: str = '{"name":"frontend"}') -> None:
+    (executor.frontend / "package-lock.json").write_text(body, encoding="utf-8")
+
+
+def test_every_unscanned_file_is_pinned(tmp_path):
+    """**走査した一覧との差集合が、そのまま固定の対象。**
+
+    「読まない理由」が何であれ（除外ファイル・バイナリ拡張子・これから
+    足されるかもしれない別の理由）、読まなかったファイルは必ずここに載る。
+    2つの条件を別々に書くのをやめたので、ずれようがない。
+    """
+    executor = _build(tmp_path)
+    _lockfile(executor)
+    _binary(executor, "public/logo.png",
+            bytes.fromhex("89504e470d0a1a0a") + b"\x01" * 8)
+    report = executor.run()
+
+    present = {executor._rel(p) for p in executor.frontend.rglob("*")
+               if p.is_file()}
+
+    assert set(report.scanned_files) | set(report.unscanned_assets) == present
+    assert not set(report.scanned_files) & set(report.unscanned_assets)
+    assert set(report.unscanned_assets) == {"package-lock.json",
+                                            "public/logo.png"}
+
+
+def test_the_declared_lock_file_is_pinned(tmp_path):
+    """読まないと宣言したのだから、**中身は動かないことを固定する。**"""
+    executor = _build(tmp_path)
+    _lockfile(executor)
+
+    assert "package-lock.json" in executor.run().unscanned_assets
+
+
+def test_replacing_the_lock_file_is_a_ratchet_violation(tmp_path):
+    """8回目の反例そのもの。JS を埋めた lockfile はラチェットで落ちる。"""
+    executor = _build(tmp_path)
+    _lockfile(executor)
+    baseline = _pinned(tmp_path, executor)
+
+    _lockfile(executor, _LOCK_PAYLOAD)
+
+    assert executor.run().findings == []  # ゲートは中身を読まない（非対称）
+    assert any("非走査ファイルが差し替わった" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_adding_a_lock_file_is_a_ratchet_violation(tmp_path):
+    """既存のツリーに置くだけの形も、未ピンとして落ちる。"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+
+    _lockfile(executor, _LOCK_PAYLOAD)
+
+    assert any("未ピンの非走査ファイル" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_a_new_unscanned_file_needs_a_reason(tmp_path):
+    """**`--update-baseline` が唯一の運用手順で、そこが抜け道だった。**
+
+    違反0でありさえすれば何でも固定できたので、マジックバイトだけ本物の
+    偽画像を置けば gate 0 → `--update-baseline` 0 → 4ゲート全緑になった。
+    `--migrate` / `--resolve` と同じく理由を要求する。
+    """
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+
+    assert unpinned_assets(executor.run(), baseline) == []
+
+    _binary(executor, "src/payload.png",
+            bytes.fromhex("89504e470d0a1a0a")
+            + b"export const boom = () => fetch('/api/demo/status');")
+
+    assert [rel for rel, _, _ in unpinned_assets(executor.run(), baseline)] == [
+        "src/payload.png"]
+
+
+def test_swapping_a_pinned_file_also_needs_a_reason(tmp_path):
+    """新規追加だけでなく**差し替えも**理由が要る（同じ抜け道の裏返し）。"""
+    executor = _build(tmp_path)
+    _binary(executor, "src/real.png",
+            bytes.fromhex("89504e470d0a1a0a") + b"\x01" * 8)
+    baseline = _pinned(tmp_path, executor)
+
+    _binary(executor, "src/real.png",
+            bytes.fromhex("89504e470d0a1a0a") + b"fetch('/api/demo/status')")
+
+    pending = unpinned_assets(executor.run(), baseline)
+
+    assert [rel for rel, _, _ in pending] == ["src/real.png"]
+    assert pending[0][1] and pending[0][1] != pending[0][2]  # 前と後が出る
+
+
+def test_a_pin_reason_is_kept_in_the_baseline(tmp_path):
+    """受理の理由は台帳に残り、PR の差分に出る。"""
+    executor = _build(tmp_path)
+    path = tmp_path / "closure.json"
+    write_baseline(executor.run(), path,
+                   pins=[{"file": "public/logo.png", "was": "（新規）",
+                          "now": "abc", "reason": "サンプル画像を追加"}])
+
+    assert load_baseline(path)["pins"][0]["reason"] == "サンプル画像を追加"
+
+
+def test_a_baseline_without_pins_is_a_ratchet_violation(tmp_path):
+    """台帳ごと消せば理由の要求が消える。**消したら落ちる。**"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    del baseline["pins"]
+
+    assert any("記録の欠落" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_the_semantics_say_the_lock_file_is_pinned_but_unread(tmp_path):
+    """**実装を変えたら意味表も同じコミットで直す**（3型目の失敗）。"""
+    checked = "".join(CLOSURE_SEMANTICS["確かめること"])
+    not_checked = "".join(CLOSURE_SEMANTICS["確かめないこと"])
+
+    assert "走査しなかったファイルの中身が、1バイトも変わっていない" in checked
+    assert "--pin" in checked
+    assert "`package-lock.json` の中身" in not_checked
+
+
+def test_the_semantics_admit_the_pin_does_not_work_in_the_gate():
+    """ハッシュ固定は**ラチェットだけ**。ゲート単体では効かない。"""
+    not_checked = "".join(CLOSURE_SEMANTICS["確かめないこと"])
+
+    assert "ハッシュ固定はゲートでは効かない" in not_checked
+    assert "`node_modules` / `dist` の中身" in not_checked

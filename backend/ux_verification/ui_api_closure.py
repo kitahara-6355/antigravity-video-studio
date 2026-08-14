@@ -44,6 +44,7 @@ PASS になる。
     python -m backend.ux_verification.ui_api_closure --gate
     python -m backend.ux_verification.ui_api_closure --ratchet
     python -m backend.ux_verification.ui_api_closure --update-baseline
+    python -m backend.ux_verification.ui_api_closure --pin "理由"
     python -m backend.ux_verification.ui_api_closure --semantics
 """
 from __future__ import annotations
@@ -98,6 +99,15 @@ CLOSURE_EXCLUDED = frozenset({"node_modules", "dist"})
 # ので、`src/components/package-lock.json` を置くだけで黙って読まれなくなって
 # いた（gate-verifier 7回目の指摘。5回目にディレクトリ側で塞いだ穴が
 # ファイル側に残っていた）。
+#
+# **ここに書いても「無検査」にはならない。** 読まない代わりに中身の sha256 を
+# ベースラインに固定する（`unscanned_assets`）。かつては固定の対象が
+# 「拡張子がバイナリのもの」だけで、この除外とずれていた —
+# `package-lock.json` は**走査からも外れ、ハッシュも固定されない唯一の
+# ファイル**で、有効な JSON のまま JS を埋めて `import.meta.glob` +
+# `Blob` + 変数引数の動的 `import()` で実行できた（gate-verifier 8回目の
+# 実測反例。禁止語彙に1つも触れずに4ゲート全緑のまま dist に生の fetch が
+# 出た）。**いまは「走査した一覧の差集合」で固定するので、ずれようがない。**
 CLOSURE_EXCLUDED_FILES = frozenset({"package-lock.json"})
 # **バイナリとして宣言した拡張子。** 中身は走査しないが、**本当にその形式で
 # あることを先頭バイトで確かめる。**
@@ -237,10 +247,17 @@ CLOSURE_SEMANTICS = {
          "取り出せた"),
         ("frontend/ の下に symlink が無い（走査が降りないので、"
          "あれば違反にする）"),
-        ("**走査から外したバイナリの中身が、1バイトも変わっていない**"
-         "（内容の sha256 をベースラインに固定する）。新規追加も差し替えも"
-         "ラチェットが落とす。先頭バイトが既知の画像マジックであることも"
-         "見るが、**それだけでは足りない** — マジックの後ろに JS を置いた"
+        ("**走査しなかったファイルの中身が、1バイトも変わっていない**"
+         "（内容の sha256 をベースラインに固定する）。**バイナリだけではない** — "
+         "`package-lock.json` のように別の理由で読まないものも例外なく入る。"
+         "対象は「全ファイル − 走査したファイル」の**差集合**なので、"
+         "どんな理由で読まないことにしても固定から漏れない"
+         "（除外の条件と固定の条件が別々に書かれていて、lockfile だけが"
+         "両方から落ちていた。8回目の実測）。新規追加も差し替えも"
+         "ラチェットが落とし、**固定を増やすには `--pin \"理由\"` が要る**"
+         "（`--update-baseline` は理由なしにピンを増やせない）。"
+         "先頭バイトが既知の画像マジックであることも見るが、"
+         "**それだけでは足りない** — マジックの後ろに JS を置いた"
          "ファイルが「画像」と判定されて素通りした（7回目の実測）"),
         ("走査したファイルの一覧が固定されている"
          "（走査から外せば、そこの呼び出しは何も出ない）"),
@@ -287,6 +304,16 @@ CLOSURE_SEMANTICS = {
         ("**走査から外したバイナリの中身**（既知の画像マジックで始まる "
          "`.png`）。中身は読まないが、**sha256 をベースラインに固定**して"
          "あるので、差し替えも新規追加もラチェットが落とす"),
+        ("**`package-lock.json` の中身**（依存の正しさも、そこに何が"
+         "書かれているかも見ない）。読まないが sha256 で固定するので、"
+         "差し替えはラチェットが落とす"),
+        ("**ハッシュ固定はゲートでは効かない。** 固定はベースラインとの"
+         "突き合わせなので `--ratchet` の担当で、`--gate` 単体では"
+         "差し替えを検出しない（CI は両方走らせる。この非対称は穴なので"
+         "ここに書いてある）"),
+        ("**`node_modules` / `dist` の中身。** gitignore 対象のビルド生成物で"
+         "CI に存在しないため、走査もハッシュ固定もしない"
+         "**唯一の場所**。ここに置いたものについては何も言わない"),
     ],
     "判定の性質": "禁止であって解決ではない。誤検出は FAIL を増やすだけで"
                   "沈黙にならないので、コメント除去のような前処理を持たない",
@@ -318,8 +345,9 @@ class ClosureReport:
     scanned_files: list[str] = field(default_factory=list)
     # backend URL を見つける検出器の本体。差し替えを検出するために持つ。
     backend_token_pattern: str = ""
-    # 走査から外したバイナリの中身。**マジックバイトの先だけでは足りない。**
-    binary_assets: dict[str, str] = field(default_factory=dict)
+    # **走査しなかったファイル全部**の内容ハッシュ。バイナリだけではない
+    # （`package-lock.json` も入る）。マジックバイトの先だけでは足りない。
+    unscanned_assets: dict[str, str] = field(default_factory=dict)
 
     @property
     def closed(self) -> bool:
@@ -352,6 +380,17 @@ class ClosureExecutor:
         """`frontend/` からの相対パス。表示にもベースラインの鍵にも使う。"""
         return path.relative_to(self.frontend).as_posix()
 
+    def _is_build_output(self, rel: str) -> bool:
+        """`node_modules` / `dist`。**ここだけはハッシュ固定の対象外。**
+
+        gitignore 対象のビルド生成物で CI には存在しない。存在を要求すると
+        偽の赤になるし、ハッシュを固定すればビルドのたびに落ちる。
+        **唯一「中身について何も言わない」場所**なので `CLOSURE_SEMANTICS` の
+        『確かめないこと』に書いてある。
+        """
+        return any(rel == name or rel.startswith(name + "/")
+                   for name in CLOSURE_EXCLUDED)
+
     def _iter_files(self):
         """**frontend/ の下を全部読む。**
 
@@ -364,11 +403,12 @@ class ClosureExecutor:
 
         読まない場所は `CLOSURE_EXCLUDED` / `CLOSURE_EXCLUDED_FILES` に宣言し、
         ベースラインに固定する。**1つ足せばラチェットが落ちる。**
+        ここで読まなかったファイルは、`_boundary_findings` が**差集合として**
+        拾って sha256 を固定する。
         """
         for path in sorted(self.frontend.rglob("*")):
             rel = self._rel(path)
-            if any(rel == name or rel.startswith(name + "/")
-                   for name in CLOSURE_EXCLUDED):
+            if self._is_build_output(rel):
                 continue
             if not path.is_file():
                 continue
@@ -381,33 +421,30 @@ class ClosureExecutor:
     def _boundary_findings(self, assets: dict[str, str]) -> list[Finding]:
         """走査範囲そのものの異常。**読まなかった事実を残す。**
 
-        `assets` には、走査から外したバイナリの内容ハッシュを入れて返す。
+        `assets` には、**走査しなかったファイル全部**の内容ハッシュを入れて返す。
+
+        **「読まなかった」を差集合で決める。** かつては除外の条件が2か所に
+        分かれていて、`_iter_files()` は `rel in CLOSURE_EXCLUDED_FILES` で
+        外し、ここは `path.suffix in CLOSURE_BINARY_SUFFIXES` で拾っていた。
+        2つの条件がずれるので `package-lock.json` が**走査からも外れ、
+        ハッシュも固定されない**穴になっていた（gate-verifier 8回目の実測反例）。
+        条件を1つにすれば、**どんな理由で読まないことにしても必ず固定される**。
         """
         findings: list[Finding] = []
-        # symlink は降りない（Path.rglob の既定）。降りないなら**違反にする** —
-        # 黙って読み飛ばすと、リンク先に何を置いても見えない
-        # （gate-verifier 5回目の実測反例）。
+        scanned = {self._rel(path) for path in self._iter_files()}
         for path in sorted(self.frontend.rglob("*")):
             rel = self._rel(path)
-            if any(rel == name or rel.startswith(name + "/")
-                   for name in CLOSURE_EXCLUDED):
+            if self._is_build_output(rel):
                 continue
+            # symlink は降りない（Path.rglob の既定）。降りないなら**違反にする** —
+            # 黙って読み飛ばすと、リンク先に何を置いても見えない
+            # （gate-verifier 5回目の実測反例）。
             if path.is_symlink():
                 findings.append(Finding(
                     "symlinked_path", rel, 0, "",
                     "frontend/ の下に symlink があります。走査が降りないので"
                     "リンク先が無検査になります"))
-        # **バイナリと宣言した拡張子が、本当にその形式か。**
-        # ここが「読まない」ことの唯一の根拠なので、根拠のほうを確かめる。
-        # JS を書いた `.png` はここで落ちる（gate-verifier 6回目の反例）。
-        for path in sorted(self.frontend.rglob("*")):
-            rel = self._rel(path)
-            if any(rel == name or rel.startswith(name + "/")
-                   for name in CLOSURE_EXCLUDED):
-                continue
-            if path.suffix.lower() not in CLOSURE_BINARY_SUFFIXES:
-                continue
-            if not path.is_file():
+            if not path.is_file() or rel in scanned:
                 continue
             data = path.read_bytes()
             # **中身をハッシュで固定する。** マジックバイトの検証は先頭8バイトの
@@ -418,6 +455,13 @@ class ClosureExecutor:
             # 深さを増やしても PNG の tEXt チャンクなどで同じことができる。
             # **中身そのものを固定し、変更も新規追加もラチェットで落とす。**
             assets[rel] = hashlib.sha256(data).hexdigest()
+            # **バイナリと宣言した拡張子が、本当にその形式か。**
+            # 「バイナリだから読まない」という根拠のほうを確かめる
+            # （gate-verifier 6回目の反例）。バイナリ以外の理由で読まない
+            # ファイル（`package-lock.json`）は形式を主張していないので、
+            # ハッシュ固定だけが根拠になる。
+            if path.suffix.lower() not in CLOSURE_BINARY_SUFFIXES:
+                continue
             head = data[:16]
             if not any(head.startswith(bytes.fromhex(magic))
                        for magic in CLOSURE_BINARY_MAGICS.values()):
@@ -715,7 +759,7 @@ class ClosureExecutor:
                    and isinstance(e.get("url"), str)}
         hit_allowed: set[tuple[str, str]] = set()
 
-        report.findings += self._boundary_findings(report.binary_assets)
+        report.findings += self._boundary_findings(report.unscanned_assets)
 
         gateway_seen: set[str] = set()
         for path in self._iter_files():
@@ -789,9 +833,13 @@ class ClosureExecutor:
 DECLARATION_KEYS = ("forbidden_forms", "gateway_files", "scanned_suffixes",
                     "excluded_dirs", "closure_excluded",
                     "closure_excluded_files", "closure_binary_suffixes",
-                    "closure_binary_magics", "binary_assets",
+                    "closure_binary_magics", "unscanned_assets",
                     "detectors", "scanned_files",
                     "allowlist", "usages", "entries")
+# 判定から導かれるのではなく、**受理の履歴**として持ち越す欄。
+# 走査から外したファイルを新しく固定するには理由が要る（`--pin`）。
+HISTORY_KEYS = ("pins",)
+BASELINE_KEYS = DECLARATION_KEYS + HISTORY_KEYS
 
 
 def declaration() -> dict:
@@ -836,8 +884,8 @@ def snapshot(report: ClosureReport) -> dict:
     # 走査範囲を狭める道は他にもある（拡張子・到達可能性・rglob の起点）。
     # 「前は読んでいたのに読まなくなった」を直接見る。
     payload["scanned_files"] = sorted(report.scanned_files)
-    # 走査から外したバイナリの中身。**新規追加も差し替えも違反にする。**
-    payload["binary_assets"] = dict(sorted(report.binary_assets.items()))
+    # 走査しなかったファイルの中身。**新規追加も差し替えも違反にする。**
+    payload["unscanned_assets"] = dict(sorted(report.unscanned_assets.items()))
     payload["detectors"] = dict(payload["detectors"])
     payload["detectors"]["backend_token"] = report.backend_token_pattern
     payload["allowlist"] = sorted(
@@ -852,13 +900,34 @@ def snapshot(report: ClosureReport) -> dict:
     return payload
 
 
-def write_baseline(report: ClosureReport, path: Path) -> Path:
+def write_baseline(report: ClosureReport, path: Path,
+                   pins: list[dict] | None = None) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    payload = snapshot(report)
+    # **走査から外したファイルを固定した理由。** 判定には使わないが、
+    # `--pin` を通らずにピンを増やす道を無くすための台帳で、PR の差分に出る。
+    payload["pins"] = [dict(pin) for pin in (pins or [])]
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        json.dump(snapshot(report), fh, ensure_ascii=False, indent=2)
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
         fh.write("\n")
     return path
+
+
+def unpinned_assets(report: ClosureReport,
+                    baseline: dict | None) -> list[tuple[str, str, str]]:
+    """**理由なしには固定できないもの。** (パス, 前, 後) を返す。
+
+    新規追加だけでなく**差し替えも**含む。`--update-baseline` は
+    「違反0なら何でも固定する」ので、マジックバイトだけ本物の偽画像を置けば
+    gate 0 →`--update-baseline` 0 → 4ゲート全緑になっていた。
+    **新規バイナリを追加する唯一の運用手順がそのまま抜け道**だったので、
+    `--migrate` / `--resolve` と同じく理由を要求する。
+    """
+    before = (baseline or {}).get("unscanned_assets") or {}
+    return [(rel, before.get(rel, ""), digest)
+            for rel, digest in sorted(report.unscanned_assets.items())
+            if before.get(rel, "") != digest]
 
 
 def load_baseline(path: Path) -> dict | None:
@@ -877,7 +946,7 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
         return [("ベースラインがありません。--update-baseline で作ってください。"
                  "**無い状態を緑にしない** — 消すだけでラチェットが無効になります")]
     violations: list[str] = []
-    for key in DECLARATION_KEYS:
+    for key in BASELINE_KEYS:
         if key not in baseline:
             violations.append(f"[記録の欠落] {key} がベースラインにありません")
     if violations:
@@ -886,20 +955,22 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
     now = snapshot(report)
     # 判定の本体。**どちらに動いても違反。** 増やすのも「見えていたものが
     # 見えなくなる」経路（正規表現の差し替え）になりうる。
-    # **走査から外したバイナリの中身。** 新規追加も差し替えも違反にする。
-    # マジックバイトを付けただけの偽画像は、ここで「未ピン」として落ちる。
-    for rel, digest in sorted(now["binary_assets"].items()):
-        before = baseline["binary_assets"].get(rel)
+    # **走査しなかったファイルの中身。** 新規追加も差し替えも違反にする。
+    # マジックバイトを付けただけの偽画像も、JS を埋めた lockfile も、
+    # ここで「未ピン」として落ちる。
+    for rel, digest in sorted(now["unscanned_assets"].items()):
+        before = baseline["unscanned_assets"].get(rel)
         if before is None:
             violations.append(
-                f"[未ピンのバイナリ] {rel} が走査から外れていますが、"
+                f"[未ピンの非走査ファイル] {rel} が走査から外れていますが、"
                 "中身がベースラインに固定されていません")
         elif before != digest:
             violations.append(
-                f"[バイナリが差し替わった] {rel}: {before[:12]}… → {digest[:12]}…")
-    for rel in sorted(baseline["binary_assets"]):
-        if rel not in now["binary_assets"]:
-            violations.append(f"[バイナリが消えた] {rel}")
+                f"[非走査ファイルが差し替わった] {rel}: "
+                f"{before[:12]}… → {digest[:12]}…")
+    for rel in sorted(baseline["unscanned_assets"]):
+        if rel not in now["unscanned_assets"]:
+            violations.append(f"[非走査ファイルが消えた] {rel}")
 
     # 前は読んでいたのに読まなくなったファイル。**除外ディレクトリの追加**が
     # ここに出る（C-5 が名指しした弱化。1回目の検証で素通りしていた）。
@@ -998,6 +1069,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ratchet", action="store_true",
                         help="判定・使用・許可の弱化を検出して exit 1")
     parser.add_argument("--update-baseline", action="store_true")
+    parser.add_argument("--pin", metavar="理由",
+                        help="走査から外したファイルの中身を理由つきで固定する"
+                             "（新規追加・差し替えの受理）")
     parser.add_argument("--semantics", action="store_true",
                         help="確かめること／確かめないことを出す")
     args = parser.parse_args(argv)
@@ -1008,13 +1082,35 @@ def main(argv: list[str] | None = None) -> int:
 
     report = ClosureExecutor.for_repo().run()
 
-    if args.update_baseline:
+    if args.update_baseline or args.pin is not None:
         if not report.closed:
             print("🚫 違反が残っているのでベースラインを更新できません。")
             print(_format(report))
             return 1
+        baseline = load_baseline(BASELINE)
+        pending = unpinned_assets(report, baseline)
+        history = list((baseline or {}).get("pins") or [])
+        if args.pin is not None:
+            if not args.pin.strip():
+                print("🚫 --pin には理由が要ります。")
+                return 1
+            history += [{"file": rel, "was": was or "（新規）", "now": digest,
+                         "reason": args.pin.strip()}
+                        for rel, was, digest in pending]
+            if not pending:
+                print("（新しく固定するものはありません）")
+        elif pending:
+            # **ここが最後の運用上の抜け道だった。** 違反0でありさえすれば
+            # `--update-baseline` が何でも固定するので、マジックバイトだけ
+            # 本物の偽画像を置けば全部緑にできた。理由を要求する。
+            print("🚫 走査から外したファイルの中身が、理由なしに固定されようと"
+                  "しています。`--pin \"理由\"` で受理してください:")
+            for rel, was, digest in pending:
+                print(f"    {rel}: "
+                      f"{was[:12] + '…' if was else '（新規）'} → {digest[:12]}…")
+            return 1
         print(f"✅ ベースラインを更新しました: "
-              f"{write_baseline(report, BASELINE)}")
+              f"{write_baseline(report, BASELINE, pins=history)}")
         return 0
 
     if args.ratchet:

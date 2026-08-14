@@ -139,7 +139,8 @@
     "src/tokens.css",
     "vite.config.js"
   ],
-  "binary_assets": {
+  "unscanned_assets": {
+    "package-lock.json": "9a9be06ea440314991f20d32ceafd27bd4b141603b42328ac1e6e036a54ea235",
     "public/assets/samples/sample_ending.png": "15e2166150adfd75ced2b7485c324adacd0b6d1da4e2447e29ff2da7383da4d0",
     "public/assets/samples/sample_talk.png": "457afd59f1906a9d38f5377732d875a302c6d7a31722b8357b129eb3e70cde76",
     "public/assets/samples/sample_thumbnail.png": "004f454761eb996ba360777a359d92943bdcbb79b8cca6b841f9b39fff109097"
@@ -381,5 +382,31 @@
     "postYoutubePrePlan": "POST /api/youtube/pre-plan",
     "putPipelineTranscriptionSegments": "PUT /api/pipeline/transcription/segments/{segment_id}",
     "wsPipeline": "WEBSOCKET /api/pipeline/ws/pipeline"
-  }
+  },
+  "pins": [
+    {
+      "file": "package-lock.json",
+      "was": "（新規）",
+      "now": "9a9be06ea440314991f20d32ceafd27bd4b141603b42328ac1e6e036a54ea235",
+      "reason": "走査から外したファイルを差集合で固定する変更（8回目の反例）に伴う初回のピン。既存のサンプル画像3点と package-lock.json（いずれも移行前から存在し、中身は変えていない）"
+    },
+    {
+      "file": "public/assets/samples/sample_ending.png",
+      "was": "（新規）",
+      "now": "15e2166150adfd75ced2b7485c324adacd0b6d1da4e2447e29ff2da7383da4d0",
+      "reason": "走査から外したファイルを差集合で固定する変更（8回目の反例）に伴う初回のピン。既存のサンプル画像3点と package-lock.json（いずれも移行前から存在し、中身は変えていない）"
+    },
+    {
+      "file": "public/assets/samples/sample_talk.png",
+      "was": "（新規）",
+      "now": "457afd59f1906a9d38f5377732d875a302c6d7a31722b8357b129eb3e70cde76",
+      "reason": "走査から外したファイルを差集合で固定する変更（8回目の反例）に伴う初回のピン。既存のサンプル画像3点と package-lock.json（いずれも移行前から存在し、中身は変えていない）"
+    },
+    {
+      "file": "public/assets/samples/sample_thumbnail.png",
+      "was": "（新規）",
+      "now": "004f454761eb996ba360777a359d92943bdcbb79b8cca6b841f9b39fff109097",
+      "reason": "走査から外したファイルを差集合で固定する変更（8回目の反例）に伴う初回のピン。既存のサンプル画像3点と package-lock.json（いずれも移行前から存在し、中身は変えていない）"
+    }
+  ]
 }
