@@ -70,12 +70,12 @@ _APP = """
 
 def _build(tmp_path: Path, *, app: str = _APP, catalogue: str = _CATALOGUE,
            client: str = _CLIENT, allowlist: list | None = None,
-           extra: dict | None = None) -> ClosureExecutor:
+           extra: dict | None = None, router: str = _ROUTER) -> ClosureExecutor:
     routers = tmp_path / "backend" / "routers"
     routers.mkdir(parents=True)
     (routers / "__init__.py").write_text(
         "from .demo import router as demo_router\n", encoding="utf-8")
-    (routers / "demo.py").write_text(textwrap.dedent(_ROUTER), encoding="utf-8")
+    (routers / "demo.py").write_text(textwrap.dedent(router), encoding="utf-8")
     app_file = tmp_path / "backend" / "main.py"
     app_file.write_text("from routers import demo_router\n"
                         "app.include_router(demo_router)\n", encoding="utf-8")
@@ -659,3 +659,151 @@ def test_the_success_message_does_not_claim_more_than_it_measured():
     # すり抜ける道が確かめないことに実在する
     assert "変数を挟んで組み立てた URL" in not_checked
     assert "URL 属性の式" in not_checked
+
+
+# --- gate-verifier 2回目の反例 -----------------------------------------------
+#
+# 1回目の修正が**新しい沈黙を3つ作っていた**。同じ型を繰り返さないよう固定する。
+
+
+def test_a_single_segment_backend_path_is_a_violation(tmp_path):
+    """`/health` は登録済みのエンドポイント。**修正前は捕まえていた。**
+
+    字句スキャンに置き換えたとき、プレフィクスの直後に `/` を必須にしたので
+    `/health` が黙って見えなくなっていた（2回目の反例）。
+    **修正が新しい沈黙を作る**の典型。
+    """
+    report = _build(tmp_path, router="""
+        from fastapi import APIRouter
+
+        router = APIRouter()
+
+        @router.get("/health")
+        async def health():
+            return {"ok": True}
+
+        @router.get("/api/demo/status")
+        async def status():
+            return {"ok": True}
+    """, extra={
+        "components/Link.jsx": """
+            export const Status = () => <a href="/health">status</a>;
+        """}).run()
+
+    assert "backend_url" in _kinds(report)
+
+
+def test_a_word_that_merely_starts_with_a_prefix_is_not_a_violation(tmp_path):
+    """`/healthy` は別のパス。過検出で FAIL を作らない。"""
+    report = _build(tmp_path, extra={
+        "components/Link.jsx": """
+            export const A = () => <a href="/healthy-living">x</a>;
+        """}).run()
+
+    assert "backend_url" not in _kinds(report)
+
+
+def test_a_multiline_gateway_import_is_still_analysed(tmp_path):
+    """**prettier が折るだけで使用判定が丸ごと消えていた。**
+
+    行単位で import 行を探していたので、複数行 import のファイルは
+    computed_key も unknown_key も一度も評価されなかった（2回目の反例）。
+    """
+    report = _build(tmp_path, app="""
+        import {
+            apiFetch,
+        } from '../gateway/client.js';
+
+        export default function App(kind) {
+          return apiFetch(kind);
+        }
+    """).run()
+
+    assert "computed_key" in _kinds(report)
+
+
+def test_a_multiline_import_with_a_literal_key_is_counted_as_a_usage(tmp_path):
+    """折られた import でも、正当な使用はちゃんと使用として数える。"""
+    report = _build(tmp_path, app="""
+        import {
+            apiFetch,
+        } from '../gateway/client.js';
+
+        export default function App() {
+          return apiFetch('getStatus');
+        }
+    """).run()
+
+    assert report.findings == []
+    assert report.usages == {"src/components/App.jsx": ["getStatus"]}
+
+
+def test_a_re_export_shim_is_a_violation(tmp_path):
+    """`export { apiFetch } from '…/client.js'` は `import` 語を含まないので
+    import の検査を素通りし、別ファイル経由の呼び出しを作れていた（2回目の反例）。"""
+    report = _build(tmp_path, extra={
+        "utils/apiShim.js": """
+            export { apiFetch } from '../gateway/client.js';
+        """}).run()
+
+    assert "bad_import" in _kinds(report)
+
+
+def test_mentioning_the_gateway_in_a_comment_is_a_violation(tmp_path):
+    """例外を作れば、そこが精度を要求する場所になる。**言及も禁止する。**"""
+    report = _build(tmp_path, extra={
+        "components/Note.jsx": """
+            // 詳しくは gateway/endpoints.js を見よ
+            export const Note = () => null;
+        """}).run()
+
+    assert "bad_import" in _kinds(report)
+
+
+def test_swapping_a_detector_body_is_a_ratchet_violation(tmp_path):
+    """**検出器を無効化しても4ゲートが緑だった**（2回目の反例）。
+
+    落ちるのはテストだけで、そのテストは testpaths に無く CI で走っていなかった。
+    P4 で `unscanned_forms` に適用した「正規表現の本体まで固定する」を
+    このモジュール自身にも適用する。
+    """
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    baseline["detectors"]["backend_token"] = "(?!x)x"
+
+    assert any("判定が動いた" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_every_detector_is_pinned(tmp_path):
+    """欄を足したら固定も足す。**足し忘れを禁じる。**"""
+    taken = snapshot(_build(tmp_path).run())
+
+    assert set(taken["detectors"]) == {
+        "absolute_url", "backend_token", "call_after", "catalogue_entry",
+        "gateway_import", "joined_literals", "one_literal"}
+
+
+def test_this_file_is_registered_in_testpaths():
+    """**テストが CI で走っていることを、テスト自身が要求する。**
+
+    このファイルは追加した当初 `pytest.ini` の testpaths に入っておらず、
+    52件が CI で1度も実行されていなかった（gate-verifier 2回目の指摘）。
+    ゲートの弱化を止める受け皿がそもそも動いていなかったということ。
+
+    対象は UI-API の系列に絞る。`backend/tests/test_ux_snapshot.py` も
+    未登録だが、登録すると1件落ちる（P5 と無関係の既存の負債なので
+    バックログに回す）。`backend/tests/test_ux_ratchet.py` は
+    `tests/test_ux_ratchet.py` と同内容の重複で、後者が登録済み。
+    """
+    root = Path(__file__).resolve().parents[2]
+    registered = {line.strip()
+                  for line in (root / "pytest.ini").read_text(encoding="utf-8")
+                  .splitlines() if line.strip().endswith(".py")}
+
+    missing = sorted(
+        f"backend/tests/{p.name}"
+        for p in (root / "backend" / "tests").glob("test_ux_ui_api*.py")
+        if f"backend/tests/{p.name}" not in registered)
+
+    assert missing == [], f"testpaths に無い UI-API 検証テスト: {missing}"

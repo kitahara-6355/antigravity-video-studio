@@ -212,6 +212,8 @@ class ClosureReport:
     allowlist: list[dict] = field(default_factory=list)
     # 実際に読んだファイル。**走査から外れたことを直接見る**ために持つ。
     scanned_files: list[str] = field(default_factory=list)
+    # backend URL を見つける検出器の本体。差し替えを検出するために持つ。
+    backend_token_pattern: str = ""
 
     @property
     def closed(self) -> bool:
@@ -385,7 +387,16 @@ class ClosureExecutor:
         if self._token_re is None:
             names = "|".join(sorted(re.escape(p) for p in self.prefixes))
             self._token_re = re.compile(
-                rf"(?<![\w./\-])/?(?:{names})/[\w\-./{{}}]*")
+                # 先頭に `/` があるなら、プレフィクス1つで完結していてもよい
+                # （`/health` は実在の登録済みエンドポイント）。
+                # **`/` を後ろに必須にしていたので `/health` を取りこぼした** —
+                # 直前のコミットでは捕まえていたものを、修正が黙って見えなく
+                # していた（gate-verifier 2回目の実測反例）。
+                rf"(?<![\w./\-])(?:/(?:{names})(?![\w\-])"
+                # 先頭に `/` が無いなら、後ろに `/` を要求する。
+                # `health` `soul` `themes` は普通の英単語なので、単語1つでは
+                # 落とさない（この非対称は CLOSURE_SEMANTICS に書いてある）。
+                rf"|(?:{names})/)[\w\-./{{}}]*")
         return self._token_re
 
     def _check_joined_literals(self, raw: str, rel: str) -> list[Finding]:
@@ -419,34 +430,41 @@ class ClosureExecutor:
                      entries: dict[str, str]) -> tuple[list[str], list[Finding]]:
         findings: list[Finding] = []
         names: list[str] = []
-        # import 文が占める範囲。そこに現れる名前は「使用」ではない。
+
+        # **行単位で見ない。** prettier が標準で折る複数行 import
+        #     import {
+        #         apiFetch,
+        #     } from '../gateway/client.js';
+        # を「import 行ではない」と判定してしまい、そのファイルの使用判定が
+        # 丸ごと走らなかった（gate-verifier 2回目の実測反例。未知のキーでも
+        # 変数キーでも4ゲート全緑だった）。**本文全体に対して照合する。**
         import_spans: set[int] = set()
-        offset = 0
-        for line in raw.split("\n"):
-            if _GATEWAY_MENTION in line and _IMPORTS_SOMETHING_RE.search(line):
-                import_spans |= set(range(offset, offset + len(line) + 1))
-            offset += len(line) + 1
-        for number, line in enumerate(raw.split("\n"), start=1):
-            if _GATEWAY_MENTION not in line or not _IMPORTS_SOMETHING_RE.search(line):
-                continue
-            hit = _GATEWAY_IMPORT_RE.search(line)
-            if not hit:
-                # `import * as api from '../gateway/client.js'` など。
-                # 別名を許すと、使用の検出が名前の追跡になる。
-                findings.append(Finding(
-                    "bad_import", rel, number, line.strip()[:70],
-                    "扉の import は `import { … } from '…/client.js'` の形だけです"))
-                continue
+        for hit in _GATEWAY_IMPORT_RE.finditer(raw):
+            import_spans |= set(range(hit.start(), hit.end()))
             for piece in hit.group("names").split(","):
                 piece = piece.strip()
                 if not piece:
                     continue
                 if not _IMPORT_NAME_RE.match(piece):
                     findings.append(Finding(
-                        "bad_import", rel, number, piece,
+                        "bad_import", rel, _line_of(raw, hit.start()), piece,
                         "扉からの import は名前つきのみ（別名・`import *` は不可）"))
                     continue
                 names.append(piece)
+
+        # **扉に言及してよいのは、正当な import の内側だけ。**
+        # `export { apiFetch } from '../gateway/client.js'` のような再輸出は
+        # `import` という語を含まないので import の検査を素通りし、
+        # 別ファイル経由の呼び出しを作れていた（同じく2回目の実測反例）。
+        # コメントでの言及も違反にする — 例外を作れば、そこが精度を要求する。
+        for hit in re.finditer(re.escape(_GATEWAY_MENTION), raw):
+            if hit.start() in import_spans:
+                continue
+            findings.append(Finding(
+                "bad_import", rel, _line_of(raw, hit.start()),
+                raw[hit.start():hit.start() + 60].split("\n")[0],
+                "呼び出し口への言及は `import { … } from '…/client.js'` の"
+                "形だけです（再輸出・別名・コメントでの言及も不可）"))
 
         used: list[str] = []
         for name in names:
@@ -487,7 +505,8 @@ class ClosureExecutor:
     # --- 実行 ---------------------------------------------------------------
 
     def run(self) -> ClosureReport:
-        report = ClosureReport()
+        report = ClosureReport(
+            backend_token_pattern=self._backend_token_re().pattern)
         allowlist, findings = self._allowlist()
         report.allowlist = allowlist
         report.findings += findings
@@ -564,8 +583,8 @@ class ClosureExecutor:
 # --- ラチェット（C-5） --------------------------------------------------------
 
 DECLARATION_KEYS = ("forbidden_forms", "gateway_files", "scanned_suffixes",
-                    "excluded_dirs", "scanned_files", "allowlist", "usages",
-                    "entries")
+                    "excluded_dirs", "detectors", "scanned_files", "allowlist",
+                    "usages", "entries")
 
 
 def declaration() -> dict:
@@ -580,6 +599,21 @@ def declaration() -> dict:
         # 「除外ディレクトリの追加」がこれで、固定していなかったので
         # 4ゲート＋テストのすべてを素通りしていた（gate-verifier 1回目）。
         "excluded_dirs": sorted(_EXCLUDED_DIRS),
+        # **このモジュール自身の検出器の本体。** `_backend_token_re` を
+        # 絶対に当たらないパターンに差し替えるだけで backend URL の検出が
+        # 丸ごと無効になるのに、ラチェットは何も言わなかった
+        # （gate-verifier 2回目の実測。落ちたのはテストだけで、
+        # そのテストは testpaths に無く CI で走っていなかった）。
+        # P4 で `unscanned_forms` に適用した「正規表現の本体まで固定する」を
+        # 自分自身にも適用する。
+        "detectors": {
+            "absolute_url": _ABSOLUTE_URL_RE.pattern,
+            "joined_literals": _JOINED_LITERALS_RE.pattern,
+            "one_literal": _ONE_LITERAL_RE.pattern,
+            "catalogue_entry": _CATALOGUE_ENTRY_RE.pattern,
+            "gateway_import": _GATEWAY_IMPORT_RE.pattern,
+            "call_after": _CALL_AFTER_RE.pattern,
+        },
     }
 
 
@@ -589,6 +623,8 @@ def snapshot(report: ClosureReport) -> dict:
     # 走査範囲を狭める道は他にもある（拡張子・到達可能性・rglob の起点）。
     # 「前は読んでいたのに読まなくなった」を直接見る。
     payload["scanned_files"] = sorted(report.scanned_files)
+    payload["detectors"] = dict(payload["detectors"])
+    payload["detectors"]["backend_token"] = report.backend_token_pattern
     payload["allowlist"] = sorted(
         f"{e.get('file')}|{e.get('url')}" for e in report.allowlist)
     payload["usages"] = {rel: sorted(keys)
@@ -639,7 +675,7 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
                 f"[走査から外れた] {rel} を読まなくなりました"
                 "（除外ディレクトリ・拡張子・到達可能性のどれかが狭まった）")
     for key in ("forbidden_forms", "gateway_files", "scanned_suffixes",
-                "excluded_dirs"):
+                "excluded_dirs", "detectors"):
         if baseline[key] != now[key]:
             violations.append(
                 f"[判定が動いた] {key}: {_render(baseline[key])} → {_render(now[key])}"

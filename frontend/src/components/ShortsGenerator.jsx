@@ -8,7 +8,7 @@
  * - まとめ部分（終盤20%）
  *
  * バックエンド: カタログの postShortsCandidates（候補抽出）と
- *   postShortsRender（縦型レンダリング）。パスは gateway/endpoints.js
+ *   postShortsRender（縦型レンダリング）
  */
 import React, { useState } from 'react';
 import { apiFetch } from '../gateway/client.js';

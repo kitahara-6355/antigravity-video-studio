@@ -50,6 +50,15 @@
     "dist",
     "node_modules"
   ],
+  "detectors": {
+    "absolute_url": "[A-Za-z][A-Za-z0-9+.\\-]*://[^\\s'\\\"`)<>]*",
+    "joined_literals": "(['\"])(?:(?!\\1)[^\\\\]|\\\\.)*\\1(?:\\s*\\+\\s*(['\"])(?:(?!\\2)[^\\\\]|\\\\.)*\\2)+",
+    "one_literal": "(['\"])((?:(?!\\1)[^\\\\]|\\\\.)*)\\1",
+    "catalogue_entry": "^\\s*(?P<key>[A-Za-z_$][\\w$]*)\\s*:\\s*\\{\\s*method\\s*:\\s*'(?P<method>[A-Z]+)'\\s*,\\s*path\\s*:\\s*'(?P<path>/[^']*)'\\s*\\}\\s*,\\s*$",
+    "gateway_import": "import\\s*\\{(?P<names>[^}]*)\\}\\s*from\\s*'(?P<spec>(?:\\.\\./|\\./)*gateway/client\\.js)'",
+    "call_after": "\\s*\\(",
+    "backend_token": "(?<![\\w./\\-])(?:/(?:api|health|soul|themes|ws)(?![\\w\\-])|(?:api|health|soul|themes|ws)/)[\\w\\-./{}]*"
+  },
   "scanned_files": [
     "index.html",
     "public/vite.svg",
