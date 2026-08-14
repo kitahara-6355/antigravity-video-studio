@@ -1009,3 +1009,90 @@ def test_nothing_decides_what_to_read_by_content():
 
     assert "_BINARY_HINT" not in source
     assert not hasattr(ui_api_closure, "_BINARY_HINT")
+
+
+# --- gate-verifier 5回目の反例 -----------------------------------------------
+#
+# 4回目までは「中身」側の穴だった。5回目は**場所**側で、
+# しかも**コードもベースラインも一切触らずに**通るものだった。
+
+
+def test_a_directory_named_like_an_exclusion_is_still_scanned(tmp_path):
+    """`src/components/build/` を作るだけで無検査になっていた。
+
+    除外をディレクトリ名で任意階層に効かせていたのが原因。
+    **frontend からの相対パスの完全一致**にした。
+    """
+    executor = _build(tmp_path)
+    nested = executor.frontend / "src" / "components" / "build"
+    nested.mkdir()
+    (nested / "api.js").write_text(
+        "export const raw = () => fetch('/api/demo/status');\n", encoding="utf-8")
+
+    assert "forbidden_form" in _kinds(executor.run())
+
+
+def test_a_top_level_excluded_directory_is_skipped(tmp_path):
+    """トップレベルの `dist` は読まない（宣言どおり）。"""
+    executor = _build(tmp_path)
+    dist = executor.frontend / "dist"
+    dist.mkdir()
+    (dist / "bundle.js").write_text("fetch('/api/demo/status');\n", encoding="utf-8")
+
+    assert executor.run().findings == []
+
+
+def test_a_symlink_in_the_frontend_is_a_violation(tmp_path):
+    """**降りないなら違反にする。** 黙って読み飛ばすとリンク先が無検査になる。"""
+    executor = _build(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "x.js").write_text(
+        "export const r = () => fetch('/api/demo/status');\n", encoding="utf-8")
+    try:
+        (executor.frontend / "src" / "vendor").symlink_to(
+            outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("この環境では symlink を作れない")
+
+    assert "symlinked_path" in _kinds(executor.run())
+
+
+def test_a_raw_import_is_a_violation(tmp_path):
+    """走査から外した拡張子の中身を、文字列として持ち出す道を塞ぐ。"""
+    report = _build(tmp_path, extra={
+        "loader.js": "import p from './payload.png?raw';\nexport default p;\n",
+    }).run()
+
+    assert "forbidden_form" in _kinds(report)
+
+
+@pytest.mark.parametrize("source", [
+    "export const go = (p) => new Function(p)();",
+    "export const go = (p) => eval(p);",
+])
+def test_turning_a_string_into_code_is_a_violation(tmp_path, source):
+    """`.png` に書いた JS を実行する道。**除外した中身をコードに戻せない。**"""
+    report = _build(tmp_path, extra={"run.js": source + "\n"}).run()
+
+    assert "forbidden_form" in _kinds(report)
+
+
+def test_an_uppercase_excluded_suffix_is_also_skipped(tmp_path):
+    """`.PNG` で宣言をすり抜けられない（大文字小文字を問わない）。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "IMAGE.PNG").write_bytes(b"\x89PNG\x00\x00")
+
+    assert executor.run().findings == []
+
+
+def test_the_closure_is_green_without_node_modules(tmp_path):
+    """**gitignore 対象の除外が実在しなくても緑。**
+
+    「実在しない除外は違反」を一度入れたが、`node_modules` と `dist` は
+    CI に存在しないので偽の赤になった。除外の追加はラチェットが落とすので
+    保護は減らない。
+    """
+    executor = _build(tmp_path)  # node_modules も dist も作っていない
+
+    assert executor.run().findings == []

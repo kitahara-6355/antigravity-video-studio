@@ -82,10 +82,16 @@ BASELINE = BASELINE_DIR / "ui_api_closure_baseline.json"
 #
 # 読まない場所は**宣言してベースラインに固定する**。ここに1つ足せば
 # ラチェットが落ちる。
-CLOSURE_EXCLUDED = frozenset({
-    "node_modules", "dist", "build", ".vite", "__pycache__", ".git",
-    "coverage",
-})
+# **frontend からの相対パスの完全一致**で宣言する。ディレクトリ名で
+# 任意階層に効かせていたので、`frontend/src/components/build/` を作るだけで
+# そこが無検査になっていた（gate-verifier 5回目の実測反例。**コードも
+# ベースラインも一切触らずに**4ゲート全緑、vite build も成功して
+# dist に生の fetch が出た）。
+#
+# 足せばラチェット（`closure_excluded`）が落とす。実在しない名前を足すことも
+# 同じく落ちるので、「実在しない除外は違反」という判定は置かない
+# （`node_modules` / `dist` は gitignore 対象で CI に存在せず、偽の赤になる）。
+CLOSURE_EXCLUDED = frozenset({"node_modules", "dist"})
 # ファイル単位の除外。**ソースとして実行されないもの**だけ。
 CLOSURE_EXCLUDED_FILES = frozenset({"package-lock.json"})
 # 拡張子単位の除外。**中身では決めない。**
@@ -130,11 +136,24 @@ GATEWAY_FILES = (CATALOGUE_REL, CLIENT_REL, ALLOWLIST_REL)
 # 誤検出（URL と無関係な `String.fromCharCode(65 + i)` など）は起きるが、
 # **それは FAIL が増えるだけで沈黙にはならない。** 禁止をすり抜ける方が重い。
 _NOT_A_CALL_FORM: tuple[str, ...] = ()
+
+# 閉包にだけある禁止。**走査から外した中身を、コードに戻す道を塞ぐ。**
+# `.png` を読まない宣言をしたので、そこに JS を書いて
+# `import payload from './x.png?raw'` + `new Function(payload)` で実行できた
+# （gate-verifier 5回目の実測反例。vite build が通り dist に fetch が出た）。
+# 除外した拡張子を読むようにすると誤検出だらけになるので、
+# **中身を文字列として持ち出す道と、文字列をコードにする道**を禁止する。
+_CLOSURE_ONLY_FORMS: dict[str, re.Pattern] = {
+    "?raw インポート": re.compile(r"\?raw(?![\w])"),
+    "文字列をコードにする": re.compile(
+        r"(?<![\w.$])(?:new\s+Function\s*\(|eval\s*\()"),
+}
 FORBIDDEN_FORMS: dict[str, re.Pattern] = {
     "fetch": _FETCH_RE,
     "new WebSocket": _WEBSOCKET_RE,
     "window.open": _WINDOW_OPEN_RE,
     **UNSCANNED_FORMS,
+    **_CLOSURE_ONLY_FORMS,
 }
 
 # 絶対 URL。スキームがあるものは全部。**backend も外部も区別しない** —
@@ -197,9 +216,15 @@ CLOSURE_SEMANTICS = {
         ("呼び出し口の関数が、呼び出す以外の使われ方をしていない"
          "（変数に束ね直す・引数として渡す、は使用が判定から消えるので違反）"),
         ("**frontend/ の下を全部読んでいる。** 読むかどうかは**場所と拡張子だけ**で"
-         "決めており、**中身では決めない**（node_modules・dist・build・.vite・"
-         "__pycache__・.git・coverage / package-lock.json / `.md`・`.png`）。"
+         "決めており、**中身では決めない**。読まないのは frontend 直下の "
+         "`node_modules` と `dist`（**相対パスの完全一致**。ディレクトリ名で"
+         "任意階層に効かせていたので `src/components/build/` を作るだけで"
+         "無検査になっていた）、`package-lock.json`、`.md` と `.png`。"
          "宣言はベースラインに固定してあり、1つ足せばラチェットが落ちる"),
+        ("frontend/ の下に symlink が無い（走査が降りないので、"
+         "あれば違反にする）"),
+        ("走査から外した拡張子の中身を、コードに戻す道が無い"
+         "（`?raw` インポート・`new Function`・`eval` を禁止する）"),
         ("走査したファイルの一覧が固定されている"
          "（走査から外せば、そこの呼び出しは何も出ない）"),
         ("扉の関数の使用が**回数まで**固定されている"
@@ -312,15 +337,39 @@ class ClosureExecutor:
         ベースラインに固定する。**1つ足せばラチェットが落ちる。**
         """
         for path in sorted(self.frontend.rglob("*")):
-            if not path.is_file():
+            rel = self._rel(path)
+            if any(rel == name or rel.startswith(name + "/")
+                   for name in CLOSURE_EXCLUDED):
                 continue
-            if CLOSURE_EXCLUDED & set(path.parts):
+            if not path.is_file():
                 continue
             if path.name in CLOSURE_EXCLUDED_FILES:
                 continue
-            if path.suffix in CLOSURE_EXCLUDED_SUFFIXES:
+            if path.suffix.lower() in CLOSURE_EXCLUDED_SUFFIXES:
                 continue
             yield path
+
+    def _boundary_findings(self) -> list[Finding]:
+        """走査範囲そのものの異常。**読まなかった事実を残す。**"""
+        findings: list[Finding] = []
+        # symlink は降りない（Path.rglob の既定）。降りないなら**違反にする** —
+        # 黙って読み飛ばすと、リンク先に何を置いても見えない
+        # （gate-verifier 5回目の実測反例）。
+        for path in sorted(self.frontend.rglob("*")):
+            rel = self._rel(path)
+            if any(rel == name or rel.startswith(name + "/")
+                   for name in CLOSURE_EXCLUDED):
+                continue
+            if path.is_symlink():
+                findings.append(Finding(
+                    "symlinked_path", rel, 0, "",
+                    "frontend/ の下に symlink があります。走査が降りないので"
+                    "リンク先が無検査になります"))
+        # **「実在しない除外は違反」は入れない。** 一度入れたが、
+        # `node_modules` と `dist` は gitignore 対象で CI には存在しないため
+        # 偽の赤になる（実測）。除外を1つ足すことはラチェットの
+        # `closure_excluded` が既に落とすので、保護は減らない。
+        return findings
 
     # --- 許可リスト ---------------------------------------------------------
 
@@ -604,6 +653,8 @@ class ClosureExecutor:
                    if isinstance(e.get("file"), str)
                    and isinstance(e.get("url"), str)}
         hit_allowed: set[tuple[str, str]] = set()
+
+        report.findings += self._boundary_findings()
 
         gateway_seen: set[str] = set()
         for path in self._iter_files():

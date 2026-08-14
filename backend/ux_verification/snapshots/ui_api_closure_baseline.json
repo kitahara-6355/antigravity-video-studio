@@ -1,6 +1,7 @@
 {
   "forbidden_forms": {
     "$.ajax / ky / superagent": "(?<![\\w.$])(?:\\$\\s*\\.\\s*ajax|ky\\s*[.(]|superagent\\s*\\.)",
+    "?raw インポート": "\\?raw(?![\\w])",
     "CSS の url()": "url\\s*\\(\\s*[^)\\n]*?/api/",
     "DOM への URL 代入": "\\.\\s*(?:href|src|action|poster)\\s*=(?!=)",
     "EventSource": "(?<![\\w.$])new\\s+EventSource\\s*\\(",
@@ -21,6 +22,7 @@
     "window.open": "(?<![\\w$])window\\.open\\s*\\(",
     "動的 import": "(?<![\\w.$])import\\s*\\(\\s*['\\\"`]",
     "合成された URL": "(?<![\\w.$])(?:atob\\s*\\(|String\\.fromCharCode\\s*\\(|decodeURIComponent\\s*\\(|\\]\\s*\\.\\s*join\\s*\\()",
+    "文字列をコードにする": "(?<![\\w.$])(?:new\\s+Function\\s*\\(|eval\\s*\\()",
     "素の open()": "(?<![\\w.$])open\\s*\\(\\s*['\\\"`]",
     "計算メンバでの fetch": "\\[\\s*['\\\"]fetch['\\\"]\\s*\\]"
   },
@@ -51,11 +53,6 @@
     "node_modules"
   ],
   "closure_excluded": [
-    ".git",
-    ".vite",
-    "__pycache__",
-    "build",
-    "coverage",
     "dist",
     "node_modules"
   ],
