@@ -111,6 +111,9 @@ backend/archives/
 # Session files (auto-generated)
 backend/data/sessions/*.json
 
+# テスト実行が吐くトレース（`pytest` を1回走らせるだけで生成される）
+backend/data/traces/
+
 # Claude Code (local only)
 .claude/settings.local.json
 CLAUDE.local.md
