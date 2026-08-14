@@ -45,6 +45,51 @@
       "url": "https://vite.dev/config/",
       "file": "vite.config.js",
       "why": "コメント内のドキュメントへのリンク"
+    },
+    {
+      "url": "https://babeljs.io/",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://oxc.rs",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://react.dev/learn/react-compiler/installation",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://swc.rs/",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://typescript-eslint.io",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
+    },
+    {
+      "url": "https://vite.dev/guide/rolldown",
+      "file": "README.md",
+      "why": "Vite テンプレート README のドキュメントリンク。フロントが叩く先ではない"
     }
   ]
 }

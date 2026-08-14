@@ -94,27 +94,32 @@ BASELINE = BASELINE_DIR / "ui_api_closure_baseline.json"
 CLOSURE_EXCLUDED = frozenset({"node_modules", "dist"})
 # ファイル単位の除外。**ソースとして実行されないもの**だけ。
 CLOSURE_EXCLUDED_FILES = frozenset({"package-lock.json"})
-# 拡張子単位の除外。**中身では決めない。**
+# **バイナリとして宣言した拡張子。** 中身は走査しないが、**本当にその形式で
+# あることを先頭バイトで確かめる。**
 #
-# もとは「NUL を含むファイルはテキストでないので読まない」という中身の判定に
-# していた。これが唯一の fail-open 分岐で、**ソースに NUL を1文字混ぜるだけで
-# そのファイルが読まれず4ゲート全緑**になっていた（gate-verifier 4回目の実測。
-# NUL は JS の文字列リテラルとして合法で、vite は問題なくビルドできる）。
-# 引き継ぎ文書に書いた「その場しのぎの安全弁を足さない」の再演だった。
+# もともとは「読まない拡張子」を綴りで並べ、そこに JS を書いてコードに戻す道
+# （`?raw` / `new Function`）を綴りで禁止していた。**これは綴りのいたちごっこで、
+# `import.meta.glob({as:'raw'})` と素の `Function(` の2点だけで破られた**
+# （gate-verifier 6回目の実測。vite build が通り dist に生の fetch が出た）。
 #
-# 中身で決めるのをやめ、**拡張子で宣言する**。ここに載っていない拡張子は
-# 中身が何であろうと読む。読み込みは errors="replace" なので、デコードできない
-# バイトがあっても走査は続く（誤検出が出ても FAIL が増えるだけ）。
-# **足せばラチェットが落ちる。**
-CLOSURE_EXCLUDED_SUFFIXES = frozenset({
-    # Vite がアプリの一部として読み込まない（md プラグインは入っていない）。
-    # README のドキュメントリンクを許可リストに積むと、リストが
-    # 「フロントが使う外部 URL」を表さなくなる。
-    ".md",
-    # 画像。テキストとして読むと大量の誤検出になる。
-    # **実在するもの（public/assets/samples/*.png）だけを宣言する。**
-    ".png",
-})
+# 綴りを増やすのをやめ、**除外の正当性そのものを検証する**。
+# 「バイナリだから読まない」のなら、バイナリであることを確かめればよい。
+# JS を書いた `.png` はマジックバイトに合わないので違反になり、
+# 中身を取り出す道が何であっても成立しない。
+#
+# ここに拡張子を足すにはマジックバイトも書く必要がある。ベースラインに固定
+# してあるので、足せばラチェットが落ちる。
+CLOSURE_BINARY_SUFFIXES = frozenset({".png"})
+# 許すマジックバイト。**拡張子ではなく実体で確かめる。**
+# このリポジトリの `*.png` は中身が JPEG（JFIF）だった — 拡張子は嘘をつく。
+# 画像であることさえ確かめられれば、そこに JS を書いて取り出す道は成立しない。
+CLOSURE_BINARY_MAGICS: dict[str, str] = {
+    "PNG": "89504e470d0a1a0a",
+    "JPEG": "ffd8ff",
+    "GIF87a": "474946383761",
+    "GIF89a": "474946383961",
+    "WEBP": "52494646",
+}
 
 # 扉に置いてよいファイル。**ここに無いファイルは第2の扉**なので違反にする。
 ALLOWLIST_REL = f"{GATEWAY_DIR}/external_urls.json"
@@ -145,8 +150,11 @@ _NOT_A_CALL_FORM: tuple[str, ...] = ()
 # **中身を文字列として持ち出す道と、文字列をコードにする道**を禁止する。
 _CLOSURE_ONLY_FORMS: dict[str, re.Pattern] = {
     "?raw インポート": re.compile(r"\?raw(?![\w])"),
+    # `new` の有無を問わない。素の `Function(` で回避されていた（6回目）。
     "文字列をコードにする": re.compile(
-        r"(?<![\w.$])(?:new\s+Function\s*\(|eval\s*\()"),
+        r"(?<![\w.$])(?:new\s+)?(?:Function|eval)\s*\("),
+    "文字列を実行する遅延": re.compile(
+        r"(?<![\w.$])set(?:Timeout|Interval)\s*\(\s*['\"`]"),
 }
 FORBIDDEN_FORMS: dict[str, re.Pattern] = {
     "fetch": _FETCH_RE,
@@ -223,8 +231,9 @@ CLOSURE_SEMANTICS = {
          "宣言はベースラインに固定してあり、1つ足せばラチェットが落ちる"),
         ("frontend/ の下に symlink が無い（走査が降りないので、"
          "あれば違反にする）"),
-        ("走査から外した拡張子の中身を、コードに戻す道が無い"
-         "（`?raw` インポート・`new Function`・`eval` を禁止する）"),
+        ("**走査から外したファイルが、本当に画像である**"
+         "（先頭バイトを既知の画像マジックと突き合わせる）。"
+         "拡張子は嘘をつくので、外している根拠のほうを確かめる"),
         ("走査したファイルの一覧が固定されている"
          "（走査から外せば、そこの呼び出しは何も出ない）"),
         ("扉の関数の使用が**回数まで**固定されている"
@@ -254,6 +263,12 @@ CLOSURE_SEMANTICS = {
          "**捕まらない。P5 はこれを解決しない**"),
         ("**変数を挟んで組み立てた URL**（`'/ap' + kind` など）。"
          "字句上つながっていないので結合できない。**捕まらない**"),
+        ("**実行時に組み立てたコードの実行。** `?raw` インポート・"
+         "`Function` / `eval`・文字列を渡す `setTimeout` は禁止しているが、"
+         "これは綴りの列挙にすぎない（`import.meta.glob({as:'raw'})` と"
+         "素の `Function(` で一度破られた）。**閉包を支えているのは"
+         "「全部読む・バイナリは実体を検証する」ほうで、この禁止は"
+         "そこに足した保険**。綴りを変えられれば通る"),
         ("`/` を含まない単語1つの相対 URL。普通の英単語と区別が付かないので"
          "対象外にしてある"),
         ("**frontend/ の外**（backend が配信する静的ファイルなど）。"
@@ -345,8 +360,8 @@ class ClosureExecutor:
                 continue
             if path.name in CLOSURE_EXCLUDED_FILES:
                 continue
-            if path.suffix.lower() in CLOSURE_EXCLUDED_SUFFIXES:
-                continue
+            if path.suffix.lower() in CLOSURE_BINARY_SUFFIXES:
+                continue  # 実体は _boundary_findings が確かめる
             yield path
 
     def _boundary_findings(self) -> list[Finding]:
@@ -365,6 +380,26 @@ class ClosureExecutor:
                     "symlinked_path", rel, 0, "",
                     "frontend/ の下に symlink があります。走査が降りないので"
                     "リンク先が無検査になります"))
+        # **バイナリと宣言した拡張子が、本当にその形式か。**
+        # ここが「読まない」ことの唯一の根拠なので、根拠のほうを確かめる。
+        # JS を書いた `.png` はここで落ちる（gate-verifier 6回目の反例）。
+        for path in sorted(self.frontend.rglob("*")):
+            rel = self._rel(path)
+            if any(rel == name or rel.startswith(name + "/")
+                   for name in CLOSURE_EXCLUDED):
+                continue
+            if path.suffix.lower() not in CLOSURE_BINARY_SUFFIXES:
+                continue
+            if not path.is_file():
+                continue
+            head = path.read_bytes()[:16]
+            if not any(head.startswith(bytes.fromhex(magic))
+                       for magic in CLOSURE_BINARY_MAGICS.values()):
+                findings.append(Finding(
+                    "not_really_binary", rel, 0, head[:8].hex(),
+                    "バイナリとして走査から外しているのに、既知の画像では"
+                    "ありません（中身をコードとして取り出せます）"))
+
         # **「実在しない除外は違反」は入れない。** 一度入れたが、
         # `node_modules` と `dist` は gitignore 対象で CI には存在しないため
         # 偽の赤になる（実測）。除外を1つ足すことはラチェットの
@@ -727,7 +762,8 @@ class ClosureExecutor:
 
 DECLARATION_KEYS = ("forbidden_forms", "gateway_files", "scanned_suffixes",
                     "excluded_dirs", "closure_excluded",
-                    "closure_excluded_files", "closure_excluded_suffixes",
+                    "closure_excluded_files", "closure_binary_suffixes",
+                    "closure_binary_magics",
                     "detectors", "scanned_files",
                     "allowlist", "usages", "entries")
 
@@ -747,7 +783,8 @@ def declaration() -> dict:
         # 閉包自身の走査範囲。**ここに1つ足せば、その場所が無検査になる。**
         "closure_excluded": sorted(CLOSURE_EXCLUDED),
         "closure_excluded_files": sorted(CLOSURE_EXCLUDED_FILES),
-        "closure_excluded_suffixes": sorted(CLOSURE_EXCLUDED_SUFFIXES),
+        "closure_binary_suffixes": sorted(CLOSURE_BINARY_SUFFIXES),
+        "closure_binary_magics": dict(sorted(CLOSURE_BINARY_MAGICS.items())),
         # **このモジュール自身の検出器の本体。** `_backend_token_re` を
         # 絶対に当たらないパターンに差し替えるだけで backend URL の検出が
         # 丸ごと無効になるのに、ラチェットは何も言わなかった
@@ -830,7 +867,7 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
                 "（除外ディレクトリ・拡張子・到達可能性のどれかが狭まった）")
     for key in ("forbidden_forms", "gateway_files", "scanned_suffixes",
                 "excluded_dirs", "closure_excluded", "closure_excluded_files",
-                "closure_excluded_suffixes", "detectors"):
+                "closure_binary_suffixes", "closure_binary_magics", "detectors"):
         if baseline[key] != now[key]:
             violations.append(
                 f"[判定が動いた] {key}: {_diff(baseline[key], now[key])}"

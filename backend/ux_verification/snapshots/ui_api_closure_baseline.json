@@ -22,7 +22,8 @@
     "window.open": "(?<![\\w$])window\\.open\\s*\\(",
     "動的 import": "(?<![\\w.$])import\\s*\\(\\s*['\\\"`]",
     "合成された URL": "(?<![\\w.$])(?:atob\\s*\\(|String\\.fromCharCode\\s*\\(|decodeURIComponent\\s*\\(|\\]\\s*\\.\\s*join\\s*\\()",
-    "文字列をコードにする": "(?<![\\w.$])(?:new\\s+Function\\s*\\(|eval\\s*\\()",
+    "文字列をコードにする": "(?<![\\w.$])(?:new\\s+)?(?:Function|eval)\\s*\\(",
+    "文字列を実行する遅延": "(?<![\\w.$])set(?:Timeout|Interval)\\s*\\(\\s*['\\\"`]",
     "素の open()": "(?<![\\w.$])open\\s*\\(\\s*['\\\"`]",
     "計算メンバでの fetch": "\\[\\s*['\\\"]fetch['\\\"]\\s*\\]"
   },
@@ -59,10 +60,16 @@
   "closure_excluded_files": [
     "package-lock.json"
   ],
-  "closure_excluded_suffixes": [
-    ".md",
+  "closure_binary_suffixes": [
     ".png"
   ],
+  "closure_binary_magics": {
+    "GIF87a": "474946383761",
+    "GIF89a": "474946383961",
+    "JPEG": "ffd8ff",
+    "PNG": "89504e470d0a1a0a",
+    "WEBP": "52494646"
+  },
   "detectors": {
     "absolute_url": "[A-Za-z][A-Za-z0-9+.\\-]*://[^\\s'\\\"`)<>]*",
     "protocol_relative": "(?<![:\\w])//[\\w.\\-]+(?::\\d+)?/[^\\s'\\\"`)<>]*",
@@ -75,6 +82,7 @@
   },
   "scanned_files": [
     ".gitignore",
+    "README.md",
     "eslint.config.js",
     "index.html",
     "package.json",
@@ -132,6 +140,15 @@
     "vite.config.js"
   ],
   "allowlist": [
+    "README.md|https://babeljs.io/",
+    "README.md|https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react",
+    "README.md|https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc",
+    "README.md|https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts",
+    "README.md|https://oxc.rs",
+    "README.md|https://react.dev/learn/react-compiler/installation",
+    "README.md|https://swc.rs/",
+    "README.md|https://typescript-eslint.io",
+    "README.md|https://vite.dev/guide/rolldown",
     "index.html|https://fonts.googleapis.com",
     "index.html|https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Outfit:wght@400;600;700;800&display=swap",
     "index.html|https://fonts.gstatic.com",

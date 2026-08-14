@@ -991,8 +991,8 @@ def test_the_excluded_suffixes_are_pinned(tmp_path):
     """読まない拡張子を黙って増やせない。"""
     executor = _build(tmp_path)
     baseline = _pinned(tmp_path, executor)
-    baseline["closure_excluded_suffixes"] = sorted(
-        baseline["closure_excluded_suffixes"] + [".jsx"])
+    baseline["closure_binary_suffixes"] = sorted(
+        baseline["closure_binary_suffixes"] + [".jsx"])
 
     assert any("判定が動いた" in v
                for v in check_ratchet(executor.run(), baseline))
@@ -1081,7 +1081,8 @@ def test_turning_a_string_into_code_is_a_violation(tmp_path, source):
 def test_an_uppercase_excluded_suffix_is_also_skipped(tmp_path):
     """`.PNG` で宣言をすり抜けられない（大文字小文字を問わない）。"""
     executor = _build(tmp_path)
-    (executor.frontend / "src" / "IMAGE.PNG").write_bytes(b"\x89PNG\x00\x00")
+    (executor.frontend / "src" / "IMAGE.PNG").write_bytes(
+        bytes.fromhex("89504e470d0a1a0a") + b"\x00" * 8)
 
     assert executor.run().findings == []
 
@@ -1096,3 +1097,89 @@ def test_the_closure_is_green_without_node_modules(tmp_path):
     executor = _build(tmp_path)  # node_modules も dist も作っていない
 
     assert executor.run().findings == []
+
+
+# --- gate-verifier 6回目の反例 -----------------------------------------------
+#
+# **綴りの列挙で塞ごうとしたのが誤りだった。** `?raw` → `import.meta.glob(
+# {as:'raw'})`、`new Function` → 素の `Function(` の2点だけで復活した。
+# 閉包を支えるのは「全部読む・バイナリは実体を検証する」ほうにした。
+
+
+def test_a_markdown_payload_is_scanned(tmp_path):
+    """`.md` を走査から外していたので、そこに JS を書いて取り出せた。
+
+    **載せ方（`?raw` でも `import.meta.glob` でも）に関係なく**、
+    中身を読んでいれば `fetch` も backend URL もそこで捕まる。
+    """
+    report = _build(tmp_path, extra={
+        "components/payload.md":
+            "return fetch('/api/demo/status').then((r) => r.json());\n",
+    }).run()
+
+    kinds = _kinds(report)
+    assert "forbidden_form" in kinds
+    assert "backend_url" in kinds
+
+
+def test_a_binary_file_that_is_not_an_image_is_a_violation(tmp_path):
+    """**外している根拠のほうを確かめる。** 拡張子は嘘をつく。
+
+    走査から外すのは「画像だから」。JS を書いた `.png` はマジックバイトに
+    合わないので落ちる。中身の取り出し方が何であっても成立しない。
+    """
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "payload.png").write_bytes(
+        b'return fetch("/api/demo/status");')
+
+    assert "not_really_binary" in _kinds(executor.run())
+
+
+def test_a_real_image_is_skipped_even_with_a_wrong_extension(tmp_path):
+    """このリポジトリの `*.png` は中身が JPEG だった。**実体で判定する。**"""
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "photo.png").write_bytes(
+        bytes.fromhex("ffd8ff") + b"\x00" * 32)
+
+    assert executor.run().findings == []
+
+
+@pytest.mark.parametrize("source", [
+    "export const go = (p) => Function(p)();",      # `new` 無し
+    "export const go = (p) => new Function(p)();",
+    "export const go = (p) => eval(p);",
+    "export const go = () => setTimeout('x()', 0);",
+    "export const go = () => setInterval('x()', 0);",
+])
+def test_turning_a_string_into_code_stays_banned(tmp_path, source):
+    """保険としては残す。**ただしこれで閉じたとは言わない**（意味表に明記）。"""
+    report = _build(tmp_path, extra={"run.js": source + "\n"}).run()
+
+    assert "forbidden_form" in _kinds(report)
+
+
+def test_a_normal_settimeout_is_not_flagged(tmp_path):
+    """関数を渡す `setTimeout` は正当。過検出でコードを壊さない。"""
+    report = _build(tmp_path, extra={
+        "timer.js": "export const go = (f) => setTimeout(f, 0);\n"}).run()
+
+    assert report.findings == []
+
+
+def test_the_semantics_do_not_claim_the_spelling_ban_closes_it():
+    """**綴りの列挙で閉じたと言わない。** 1回目・6回目と同じ型の過剰主張。"""
+    not_checked = "".join(CLOSURE_SEMANTICS["確かめないこと"])
+
+    assert "実行時に組み立てたコードの実行" in not_checked
+    assert "綴りの列挙" in not_checked
+
+
+def test_the_binary_declaration_is_pinned(tmp_path):
+    """マジックバイトを緩めれば、画像でないものを外せる。"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    baseline["closure_binary_magics"] = dict(
+        baseline["closure_binary_magics"], ANYTHING="")
+
+    assert any("判定が動いた" in v
+               for v in check_ratchet(executor.run(), baseline))
