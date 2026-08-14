@@ -17,8 +17,8 @@ import QuickDecisionBar from '../components/QuickDecisionBar';   // R-2: ステ�
 import StepReviewPanel from '../components/StepReviewPanel';     // R-3: ステップ⑦
 import ThemeSelector from '../components/ThemeSelector';         // R-4: ステップ④.5
 import WelcomeOnboarding from '../components/WelcomeOnboarding'; // P0-2: 初回オンボーディング
+import { apiFetch, apiUrl } from '../gateway/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 export default function EditorPage() {
   const [segments, setSegments] = useState([]);
@@ -104,7 +104,7 @@ export default function EditorPage() {
   const prevPipelineStatusRef = useRef(null);
   useEffect(() => {
     const checkPipeline = () => {
-      fetch(`${API_BASE}/api/pipeline/status`)
+      apiFetch('getPipelineStatus')
         .then(r => r.json())
         .then(d => {
           const running = d.status === 'running';
@@ -177,8 +177,7 @@ export default function EditorPage() {
   // Load Segments (with cache busting)
   useEffect(() => {
     // 1. Load Subtitles
-    const url = `${API_BASE}/api/segments?t=${videoTimestamp}`;
-    fetch(url)
+    apiFetch('getSegments', { query: { t: videoTimestamp } })
       .then(res => res.json())
       .then(data => {
         const formatted = data.map(s => ({
@@ -191,7 +190,7 @@ export default function EditorPage() {
       .catch(err => console.error("Failed to load segments:", err));
 
     // 2. Load Director State (Scenes & Audio)
-    fetch(`${API_BASE}/api/director/state?t=${videoTimestamp}`)
+    apiFetch('getDirectorState', { query: { t: videoTimestamp } })
       .then(res => res.json())
       .then(data => {
         if (data.scenes) setScenes(data.scenes);
@@ -835,11 +834,7 @@ export default function EditorPage() {
       const currentSeg = newSegments[currentIndex];
 
       try {
-        const res = await fetch(`${API_BASE}/api/rhythm/split`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: currentSeg.text, target_chars: targetChars })
-        });
+        const res = await apiFetch('postRhythmSplit', { body: { text: currentSeg.text, target_chars: targetChars } });
         const data = await res.json();
         const parts = data.parts || [currentSeg.text];
 
@@ -968,18 +963,10 @@ export default function EditorPage() {
     setIsRendering(true); // Reuse loading state for spinner
     try {
       // 1. Save Segments
-      await fetch(`${API_BASE}/api/segments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(segments)
-      });
+      await apiFetch('postSegments', { body: segments });
 
       // 2. Save Director State (Scenes & Audio)
-      await fetch(`${API_BASE}/api/director/state`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenes, audioConfig })
-      });
+      await apiFetch('postDirectorState', { body: { scenes, audioConfig } });
 
       alert("保存しました！ (字幕 + 演出構成)");
     } catch (e) {
@@ -997,15 +984,11 @@ export default function EditorPage() {
       const fullText = segments.map(s => s.text).join('\n');
 
       // 2. Call Quality Gate API
-      const res = await fetch(`${API_BASE}/api/director/verify-quality`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await apiFetch('postDirectorVerifyQuality', { body: {
           full_text: fullText,
           scenes: scenes,
           segments: segments
-        })
-      });
+        } });
       const data = await res.json();
       setQualityGateData(data);
       setShowQualityGate(true);
@@ -1021,14 +1004,10 @@ export default function EditorPage() {
     setShowQualityGate(false);
     setIsRendering(true);
     try {
-      const res = await fetch(`${API_BASE}/api/render`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await apiFetch('postRender', { body: {
           mode: cutMode ? "cut" : "normal",
           style: subtitleStyle
-        })
-      });
+        } });
       const data = await res.json();
       if (data.status === "success") {
         alert("動画が正常に書き出されました！\n場所: " + data.path);
@@ -1255,7 +1234,7 @@ export default function EditorPage() {
               <div className="video-wrapper">
                 <video
                   ref={videoRef}
-                  src={`${API_BASE}/api/video?t=${videoTimestamp}`}
+                  src={apiUrl('getVideo', { query: { t: videoTimestamp } })}
                   controls
                   onTimeUpdate={handleTimeUpdate}
                   style={{ opacity: (scenes.length > 0 && showDirectorOverlay) ? 0 : 1 }}
@@ -1719,11 +1698,7 @@ export default function EditorPage() {
         onRender={async () => {
           setShowProductionWizard(false);
           try {
-            const res = await fetch(`${API_BASE}/api/render`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mode: 'normal', style: 'default' }),
-            });
+            const res = await apiFetch('postRender', { body: { mode: 'normal', style: 'default' } });
             const data = await res.json();
             console.log('🎬 レンダリング完了:', data);
             // パイプラインの最終出力パスがある場合、ダウンロード案内

@@ -8,8 +8,8 @@
  * - やり直し予算（残りリトライ回数）
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '../gateway/client.js';
 
-const API_BASE = 'http://localhost:8000';
 
 export default function OperationsDashboard() {
   const [health, setHealth] = useState(null);
@@ -25,37 +25,37 @@ export default function OperationsDashboard() {
     const results = {};
     try {
       // Health
-      const hRes = await fetch(`${API_BASE}/api/dashboard/health`).catch(() => null);
+      const hRes = await apiFetch('getDashboardHealth').catch(() => null);
       results.health = hRes?.ok ? await hRes.json() : { status: 'offline' };
     } catch { results.health = { status: 'offline' }; }
 
     try {
       // Pipeline
-      const pRes = await fetch(`${API_BASE}/api/pipeline/status`).catch(() => null);
+      const pRes = await apiFetch('getPipelineStatus').catch(() => null);
       results.pipeline = pRes?.ok ? await pRes.json() : null;
     } catch { results.pipeline = null; }
 
     try {
       // Usage
-      const uRes = await fetch(`${API_BASE}/api/usage/dashboard`).catch(() => null);
+      const uRes = await apiFetch('getUsageDashboard').catch(() => null);
       results.usage = uRes?.ok ? await uRes.json() : null;
     } catch { results.usage = null; }
 
     try {
       // Retry Budget
-      const rRes = await fetch(`${API_BASE}/api/usage/retry-budget`).catch(() => null);
+      const rRes = await apiFetch('getUsageRetryBudget').catch(() => null);
       results.retryBudget = rRes?.ok ? await rRes.json() : null;
     } catch { results.retryBudget = null; }
 
     try {
       // Governance (tier status + fallback history)
-      const gRes = await fetch(`${API_BASE}/api/usage/governance`).catch(() => null);
+      const gRes = await apiFetch('getUsageGovernance').catch(() => null);
       results.governance = gRes?.ok ? await gRes.json() : null;
     } catch { results.governance = null; }
 
     try {
       // Switch History
-      const sRes = await fetch(`${API_BASE}/api/usage/switch-history?limit=5`).catch(() => null);
+      const sRes = await apiFetch('getUsageSwitchHistory', { query: { limit: '5' } }).catch(() => null);
       results.switchHistory = sRes?.ok ? await sRes.json() : null;
     } catch { results.switchHistory = null; }
 

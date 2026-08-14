@@ -1,197 +1,193 @@
 {
   "method": "static_fetch_scan",
   "sites": {
-    "src/components/AISuggestionCard.jsx|POST|/api/quality/apply-suggestion": "matched",
-    "src/components/AISuggestionCard.jsx|POST|/api/quality/undo-suggestion": "matched",
-    "src/components/Boardroom.jsx|GET|/api/settings": "matched",
-    "src/components/CollaborativePanel.jsx|GET|/api/collaboration/journal": "matched",
-    "src/components/CollaborativePanel.jsx|POST|/api/collaboration/journal": "matched",
-    "src/components/CollaborativePanel.jsx|POST|/api/collaboration/feedback": "matched",
-    "src/components/CouncilChamber.jsx|POST|/api/council/session": "matched",
-    "src/components/CouncilChamber.jsx|POST|/api/council/decision": "matched",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/analyze-resources": "matched",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/analyze-script": "matched",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/quality-score": "matched",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/plan-storyboard": "matched",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/batch-generate": "matched",
-    "src/components/DirectorBriefing.jsx|GET|/api/director/tasks/{}": "matched",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/generate-report": "matched",
-    "src/components/ImageDirector.jsx|GET|/api/director/tasks/{}": "matched",
-    "src/components/ImageDirector.jsx|POST|/api/director/chat": "matched",
-    "src/components/ImageDirector.jsx|POST|/api/director/generate-image-async": "matched",
     "src/components/ImageDirector.jsx|?|img": "unresolved_url",
-    "src/components/OperationsDashboard.jsx|GET|/api/dashboard/health": "matched",
-    "src/components/OperationsDashboard.jsx|GET|/api/pipeline/status": "matched",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/dashboard": "matched",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/retry-budget": "matched",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/governance": "matched",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/switch-history": "matched",
-    "src/components/PreProductionPlanner.jsx|POST|/api/youtube/pre-plan": "matched",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/videos/metadata": "matched",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/status": "matched",
-    "src/components/ProductionPipeline.jsx|GET|/api/v1/themes/current/active": "matched",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/videos": "matched",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/videos/validate": "matched",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/start": "matched",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/quality-gate/status": "matched",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/quality-gate/improve": "matched",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/open-folder": "matched",
-    "src/components/ProductionPipeline.jsx|POST|/api/render/start": "matched",
-    "src/components/ProductionPipeline.jsx|WEBSOCKET|/api/pipeline/ws/pipeline": "matched",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/preview": "matched",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/final": "matched",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/result": "matched",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/status": "matched",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/dictionary": "matched",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/approve": "matched",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/reject": "matched",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/approve-all": "matched",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/reject-all": "matched",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/dictionary": "matched",
-    "src/components/ProofreadingStagePanel.jsx|DELETE|/api/pipeline/dictionary/{}": "matched",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/skip": "matched",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/srt": "matched",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/txt": "matched",
-    "src/components/QuickDecisionBar.jsx|POST|/api/quality/decision/quick": "matched",
+    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/{video_type}": "matched",
+    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/{export_format}": "matched",
     "src/components/QuickDecisionBar.jsx|?|currentItem.preview": "unresolved_url",
     "src/components/SceneTimeline.jsx|?|scene.image": "unresolved_url",
-    "src/components/SettingsPage.jsx|GET|/api/settings": "matched",
-    "src/components/SettingsPage.jsx|POST|/api/settings/video": "matched",
-    "src/components/SettingsPage.jsx|POST|/api/settings/identity": "matched",
-    "src/components/SettingsPage.jsx|GET|/api/transcribe/status": "matched",
-    "src/components/SettingsPage.jsx|POST|/api/transcribe": "matched",
-    "src/components/SettingsPage.jsx|POST|/api/settings/reset": "matched",
-    "src/components/ShortsGenerator.jsx|POST|/api/shorts/candidates": "matched",
-    "src/components/ShortsGenerator.jsx|POST|/api/shorts/render": "matched",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/init": "matched",
-    "src/components/SmartCutPanel.jsx|GET|/api/smartcut/all-candidates": "matched",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/recommend": "matched",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/lock": "matched",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/unlock": "matched",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/finalize": "matched",
-    "src/components/SoulPassport.jsx|GET|/api/director/evolution": "matched",
-    "src/components/SoulPassport.jsx|GET|/api/status": "matched",
-    "src/components/StepReviewPanel.jsx|POST|/api/quality/review/approve": "matched",
-    "src/components/ThemeSelector.jsx|POST|/api/v1/themes/recommend": "matched",
-    "src/components/ThemeSelector.jsx|POST|/api/v1/themes/apply": "matched",
-    "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/models": "matched",
-    "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/segments": "matched",
-    "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/status": "matched",
-    "src/components/TranscriptionStagePanel.jsx|POST|/api/pipeline/transcription/model": "matched",
-    "src/components/TranscriptionStagePanel.jsx|PUT|/api/pipeline/transcription/segments/{}": "matched",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/optimize": "matched",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/thumbnail/select": "matched",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/improve-hook": "matched",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/apply-hook": "matched",
     "src/components/YouTubeOptimizerPanel.jsx|?|thumb.path": "unresolved_url",
     "src/components/YouTubeOptimizerPanel.jsx|?|合成された URL": "unscanned_form",
-    "src/pages/EditorPage.jsx|GET|/api/pipeline/status": "matched",
-    "src/pages/EditorPage.jsx|GET|/api/segments": "matched",
-    "src/pages/EditorPage.jsx|GET|/api/director/state": "matched",
-    "src/pages/EditorPage.jsx|POST|/api/rhythm/split": "matched",
-    "src/pages/EditorPage.jsx|POST|/api/segments": "matched",
-    "src/pages/EditorPage.jsx|POST|/api/director/state": "matched",
-    "src/pages/EditorPage.jsx|POST|/api/director/verify-quality": "matched",
-    "src/pages/EditorPage.jsx|POST|/api/render": "matched",
     "src/pages/EditorPage.jsx|GET|/api/video": "matched",
+    "src/gateway/client.js|?|apiUrl(name, { params, query })": "gateway_dispatch",
+    "src/gateway/endpoints.js|DELETE|/api/pipeline/dictionary/{entry_id}": "matched",
+    "src/gateway/endpoints.js|GET|/api/collaboration/journal": "matched",
+    "src/gateway/endpoints.js|GET|/api/dashboard/health": "matched",
+    "src/gateway/endpoints.js|GET|/api/director/evolution": "matched",
+    "src/gateway/endpoints.js|GET|/api/director/state": "matched",
+    "src/gateway/endpoints.js|GET|/api/director/tasks/{task_id}": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/dictionary": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/open-folder": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/export/{export_format}": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/result": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/status": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/status": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/stream/{video_type}": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/models": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/segments": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/status": "matched",
+    "src/gateway/endpoints.js|GET|/api/pipeline/videos": "matched",
+    "src/gateway/endpoints.js|GET|/api/segments": "matched",
+    "src/gateway/endpoints.js|GET|/api/settings": "matched",
+    "src/gateway/endpoints.js|GET|/api/smartcut/all-candidates": "matched",
+    "src/gateway/endpoints.js|GET|/api/status": "matched",
+    "src/gateway/endpoints.js|GET|/api/transcribe/status": "matched",
+    "src/gateway/endpoints.js|GET|/api/usage/dashboard": "matched",
+    "src/gateway/endpoints.js|GET|/api/usage/governance": "matched",
+    "src/gateway/endpoints.js|GET|/api/usage/retry-budget": "matched",
+    "src/gateway/endpoints.js|GET|/api/usage/switch-history": "matched",
+    "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "matched",
+    "src/gateway/endpoints.js|GET|/api/video": "matched",
+    "src/gateway/endpoints.js|POST|/api/collaboration/feedback": "matched",
+    "src/gateway/endpoints.js|POST|/api/collaboration/journal": "matched",
+    "src/gateway/endpoints.js|POST|/api/council/decision": "matched",
+    "src/gateway/endpoints.js|POST|/api/council/session": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-resources": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-script": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/batch-generate": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/chat": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/generate-image-async": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/generate-report": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/plan-storyboard": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/quality-score": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/state": "matched",
+    "src/gateway/endpoints.js|POST|/api/director/verify-quality": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/dictionary": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve-all": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject-all": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/skip": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/start": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/transcription/model": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/videos/metadata": "matched",
+    "src/gateway/endpoints.js|POST|/api/pipeline/videos/validate": "matched",
+    "src/gateway/endpoints.js|POST|/api/quality/apply-suggestion": "matched",
+    "src/gateway/endpoints.js|POST|/api/quality/decision/quick": "matched",
+    "src/gateway/endpoints.js|POST|/api/quality/review/approve": "matched",
+    "src/gateway/endpoints.js|POST|/api/quality/undo-suggestion": "matched",
+    "src/gateway/endpoints.js|POST|/api/render": "matched",
+    "src/gateway/endpoints.js|POST|/api/render/start": "matched",
+    "src/gateway/endpoints.js|POST|/api/rhythm/split": "matched",
+    "src/gateway/endpoints.js|POST|/api/segments": "matched",
+    "src/gateway/endpoints.js|POST|/api/settings/identity": "matched",
+    "src/gateway/endpoints.js|POST|/api/settings/reset": "matched",
+    "src/gateway/endpoints.js|POST|/api/settings/video": "matched",
+    "src/gateway/endpoints.js|POST|/api/shorts/candidates": "matched",
+    "src/gateway/endpoints.js|POST|/api/shorts/render": "matched",
+    "src/gateway/endpoints.js|POST|/api/smartcut/finalize": "matched",
+    "src/gateway/endpoints.js|POST|/api/smartcut/init": "matched",
+    "src/gateway/endpoints.js|POST|/api/smartcut/lock": "matched",
+    "src/gateway/endpoints.js|POST|/api/smartcut/recommend": "matched",
+    "src/gateway/endpoints.js|POST|/api/smartcut/unlock": "matched",
+    "src/gateway/endpoints.js|POST|/api/thumbnail/select": "matched",
+    "src/gateway/endpoints.js|POST|/api/transcribe": "matched",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "matched",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "matched",
+    "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "matched",
+    "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "matched",
+    "src/gateway/endpoints.js|POST|/api/youtube/optimize": "matched",
+    "src/gateway/endpoints.js|POST|/api/youtube/pre-plan": "matched",
+    "src/gateway/endpoints.js|PUT|/api/pipeline/transcription/segments/{segment_id}": "matched",
+    "src/gateway/endpoints.js|WEBSOCKET|/api/pipeline/ws/pipeline": "matched",
     "index.html|GET|https://fonts.googleapis.com": "external_host",
     "index.html|GET|https://fonts.gstatic.com": "external_host",
     "index.html|GET|https://fonts.googleapis.com/css2": "external_host"
   },
   "declarations": {
-    "src/components/AISuggestionCard.jsx|POST|/api/quality/apply-suggestion": "static_route_scan: routers/quality.py:157 POST /api/quality/apply-suggestion",
-    "src/components/AISuggestionCard.jsx|POST|/api/quality/undo-suggestion": "static_route_scan: routers/quality.py:166 POST /api/quality/undo-suggestion",
-    "src/components/Boardroom.jsx|GET|/api/settings": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
-    "src/components/CollaborativePanel.jsx|GET|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:157 GET /api/collaboration/journal",
-    "src/components/CollaborativePanel.jsx|POST|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:163 POST /api/collaboration/journal",
-    "src/components/CollaborativePanel.jsx|POST|/api/collaboration/feedback": "static_route_scan: routers/legacy_management_router.py:123 POST /api/collaboration/feedback",
-    "src/components/CouncilChamber.jsx|POST|/api/council/session": "static_route_scan: routers/collaboration.py:198 POST /api/council/session",
-    "src/components/CouncilChamber.jsx|POST|/api/council/decision": "static_route_scan: routers/collaboration.py:212 POST /api/council/decision",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/analyze-resources": "static_route_scan: routers/director.py:175 POST /api/director/analyze-resources",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/analyze-script": "static_route_scan: routers/director.py:133 POST /api/director/analyze-script",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/quality-score": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/plan-storyboard": "static_route_scan: routers/director.py:233 POST /api/director/plan-storyboard",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/batch-generate": "static_route_scan: routers/director.py:256 POST /api/director/batch-generate",
-    "src/components/DirectorBriefing.jsx|GET|/api/director/tasks/{}": "static_route_scan: routers/legacy_director_router.py:55 GET /api/director/tasks/{task_id}",
-    "src/components/DirectorBriefing.jsx|POST|/api/director/generate-report": "static_route_scan: routers/director.py:196 POST /api/director/generate-report",
-    "src/components/ImageDirector.jsx|GET|/api/director/tasks/{}": "static_route_scan: routers/legacy_director_router.py:55 GET /api/director/tasks/{task_id}",
-    "src/components/ImageDirector.jsx|POST|/api/director/chat": "static_route_scan: routers/director.py:72 POST /api/director/chat",
-    "src/components/ImageDirector.jsx|POST|/api/director/generate-image-async": "static_route_scan: routers/director.py:103 POST /api/director/generate-image-async",
     "src/components/ImageDirector.jsx|?|img": "",
-    "src/components/OperationsDashboard.jsx|GET|/api/dashboard/health": "static_route_scan: routers/dashboard_router.py:108 GET /api/dashboard/health",
-    "src/components/OperationsDashboard.jsx|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/dashboard": "static_route_scan: routers/usage_router.py:84 GET /api/usage/dashboard",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/retry-budget": "static_route_scan: routers/usage_router.py:172 GET /api/usage/retry-budget",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/governance": "static_route_scan: routers/usage_router.py:559 GET /api/usage/governance",
-    "src/components/OperationsDashboard.jsx|GET|/api/usage/switch-history": "static_route_scan: routers/usage_router.py:340 GET /api/usage/switch-history",
-    "src/components/PreProductionPlanner.jsx|POST|/api/youtube/pre-plan": "static_route_scan: routers/youtube_optimizer.py:230 POST /api/youtube/pre-plan",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/videos/metadata": "static_route_scan: routers/pipeline_router.py:467 POST /api/pipeline/videos/metadata",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
-    "src/components/ProductionPipeline.jsx|GET|/api/v1/themes/current/active": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/videos": "static_route_scan: routers/pipeline_router.py:429 GET /api/pipeline/videos",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/videos/validate": "static_route_scan: routers/pipeline_router.py:574 POST /api/pipeline/videos/validate",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/start": "static_route_scan: routers/pipeline_router.py:655 POST /api/pipeline/start",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1354 GET /api/pipeline/quality-gate/status",
-    "src/components/ProductionPipeline.jsx|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/open-folder": "static_route_scan: routers/pipeline_router.py:913 GET /api/pipeline/open-folder",
-    "src/components/ProductionPipeline.jsx|POST|/api/render/start": "static_route_scan: routers/render.py:165 POST /api/render/start",
-    "src/components/ProductionPipeline.jsx|WEBSOCKET|/api/pipeline/ws/pipeline": "static_route_scan: routers/pipeline_router.py:933 WEBSOCKET /api/pipeline/ws/pipeline",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/preview": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/final": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/result": "static_route_scan: routers/pipeline_router.py:1125 GET /api/pipeline/proofreading/result",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/status": "static_route_scan: routers/pipeline_router.py:1321 GET /api/pipeline/proofreading/status",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1191 GET /api/pipeline/dictionary",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/approve": "static_route_scan: routers/pipeline_router.py:1145 POST /api/pipeline/proofreading/approve",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/reject": "static_route_scan: routers/pipeline_router.py:1156 POST /api/pipeline/proofreading/reject",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/approve-all": "static_route_scan: routers/pipeline_router.py:1167 POST /api/pipeline/proofreading/approve-all",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/reject-all": "static_route_scan: routers/pipeline_router.py:1179 POST /api/pipeline/proofreading/reject-all",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1215 POST /api/pipeline/dictionary",
-    "src/components/ProofreadingStagePanel.jsx|DELETE|/api/pipeline/dictionary/{}": "static_route_scan: routers/pipeline_router.py:1260 DELETE /api/pipeline/dictionary/{entry_id}",
-    "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/skip": "static_route_scan: routers/pipeline_router.py:1340 POST /api/pipeline/proofreading/skip",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/srt": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/txt": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
-    "src/components/QuickDecisionBar.jsx|POST|/api/quality/decision/quick": "static_route_scan: routers/quality.py:128 POST /api/quality/decision/quick",
+    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
+    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
     "src/components/QuickDecisionBar.jsx|?|currentItem.preview": "",
     "src/components/SceneTimeline.jsx|?|scene.image": "",
-    "src/components/SettingsPage.jsx|GET|/api/settings": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
-    "src/components/SettingsPage.jsx|POST|/api/settings/video": "static_route_scan: routers/legacy_management_router.py:203 POST /api/settings/video",
-    "src/components/SettingsPage.jsx|POST|/api/settings/identity": "static_route_scan: routers/legacy_management_router.py:197 POST /api/settings/identity",
-    "src/components/SettingsPage.jsx|GET|/api/transcribe/status": "static_route_scan: routers/legacy_production_router.py:217 GET /api/transcribe/status",
-    "src/components/SettingsPage.jsx|POST|/api/transcribe": "static_route_scan: routers/legacy_production_router.py:172 POST /api/transcribe",
-    "src/components/SettingsPage.jsx|POST|/api/settings/reset": "static_route_scan: routers/legacy_management_router.py:235 POST /api/settings/reset",
-    "src/components/ShortsGenerator.jsx|POST|/api/shorts/candidates": "static_route_scan: routers/shorts.py:154 POST /api/shorts/candidates",
-    "src/components/ShortsGenerator.jsx|POST|/api/shorts/render": "static_route_scan: routers/shorts.py:290 POST /api/shorts/render",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/init": "static_route_scan: routers/smartcut.py:116 POST /api/smartcut/init",
-    "src/components/SmartCutPanel.jsx|GET|/api/smartcut/all-candidates": "static_route_scan: routers/smartcut.py:317 GET /api/smartcut/all-candidates",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/recommend": "static_route_scan: routers/smartcut.py:189 POST /api/smartcut/recommend",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/lock": "static_route_scan: routers/smartcut.py:229 POST /api/smartcut/lock",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/unlock": "static_route_scan: routers/smartcut.py:278 POST /api/smartcut/unlock",
-    "src/components/SmartCutPanel.jsx|POST|/api/smartcut/finalize": "static_route_scan: routers/smartcut.py:350 POST /api/smartcut/finalize",
-    "src/components/SoulPassport.jsx|GET|/api/director/evolution": "static_route_scan: routers/legacy_director_router.py:110 GET /api/director/evolution",
-    "src/components/SoulPassport.jsx|GET|/api/status": "static_route_scan: routers/trinity.py:48 GET /api/status",
-    "src/components/StepReviewPanel.jsx|POST|/api/quality/review/approve": "static_route_scan: routers/quality.py:182 POST /api/quality/review/approve",
-    "src/components/ThemeSelector.jsx|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
-    "src/components/ThemeSelector.jsx|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
-    "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/models": "static_route_scan: routers/pipeline_router.py:1020 GET /api/pipeline/transcription/models",
-    "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/segments": "static_route_scan: routers/pipeline_router.py:1059 GET /api/pipeline/transcription/segments",
-    "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/status": "static_route_scan: routers/pipeline_router.py:1090 GET /api/pipeline/transcription/status",
-    "src/components/TranscriptionStagePanel.jsx|POST|/api/pipeline/transcription/model": "static_route_scan: routers/pipeline_router.py:1107 POST /api/pipeline/transcription/model",
-    "src/components/TranscriptionStagePanel.jsx|PUT|/api/pipeline/transcription/segments/{}": "static_route_scan: routers/pipeline_router.py:1078 PUT /api/pipeline/transcription/segments/{segment_id}",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/thumbnail/select": "static_route_scan: routers/ab_test_tracker.py:79 POST /api/thumbnail/select",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
-    "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
     "src/components/YouTubeOptimizerPanel.jsx|?|thumb.path": "",
     "src/components/YouTubeOptimizerPanel.jsx|?|合成された URL": "",
-    "src/pages/EditorPage.jsx|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
-    "src/pages/EditorPage.jsx|GET|/api/segments": "static_route_scan: routers/segments.py:33 GET /api/segments",
-    "src/pages/EditorPage.jsx|GET|/api/director/state": "static_route_scan: routers/legacy_director_router.py:66 GET /api/director/state",
-    "src/pages/EditorPage.jsx|POST|/api/rhythm/split": "static_route_scan: routers/legacy_production_router.py:157 POST /api/rhythm/split",
-    "src/pages/EditorPage.jsx|POST|/api/segments": "static_route_scan: routers/segments.py:78 POST /api/segments",
-    "src/pages/EditorPage.jsx|POST|/api/director/state": "static_route_scan: routers/legacy_director_router.py:79 POST /api/director/state",
-    "src/pages/EditorPage.jsx|POST|/api/director/verify-quality": "static_route_scan: routers/legacy_director_router.py:96 POST /api/director/verify-quality",
-    "src/pages/EditorPage.jsx|POST|/api/render": "static_route_scan: routers/render.py:386 POST /api/render",
     "src/pages/EditorPage.jsx|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
+    "src/gateway/client.js|?|apiUrl(name, { params, query })": "",
+    "src/gateway/endpoints.js|DELETE|/api/pipeline/dictionary/{entry_id}": "static_route_scan: routers/pipeline_router.py:1260 DELETE /api/pipeline/dictionary/{entry_id}",
+    "src/gateway/endpoints.js|GET|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:157 GET /api/collaboration/journal",
+    "src/gateway/endpoints.js|GET|/api/dashboard/health": "static_route_scan: routers/dashboard_router.py:108 GET /api/dashboard/health",
+    "src/gateway/endpoints.js|GET|/api/director/evolution": "static_route_scan: routers/legacy_director_router.py:110 GET /api/director/evolution",
+    "src/gateway/endpoints.js|GET|/api/director/state": "static_route_scan: routers/legacy_director_router.py:66 GET /api/director/state",
+    "src/gateway/endpoints.js|GET|/api/director/tasks/{task_id}": "static_route_scan: routers/legacy_director_router.py:55 GET /api/director/tasks/{task_id}",
+    "src/gateway/endpoints.js|GET|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1191 GET /api/pipeline/dictionary",
+    "src/gateway/endpoints.js|GET|/api/pipeline/open-folder": "static_route_scan: routers/pipeline_router.py:913 GET /api/pipeline/open-folder",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/result": "static_route_scan: routers/pipeline_router.py:1125 GET /api/pipeline/proofreading/result",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/status": "static_route_scan: routers/pipeline_router.py:1321 GET /api/pipeline/proofreading/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1354 GET /api/pipeline/quality-gate/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/models": "static_route_scan: routers/pipeline_router.py:1020 GET /api/pipeline/transcription/models",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/segments": "static_route_scan: routers/pipeline_router.py:1059 GET /api/pipeline/transcription/segments",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/status": "static_route_scan: routers/pipeline_router.py:1090 GET /api/pipeline/transcription/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/videos": "static_route_scan: routers/pipeline_router.py:429 GET /api/pipeline/videos",
+    "src/gateway/endpoints.js|GET|/api/segments": "static_route_scan: routers/segments.py:33 GET /api/segments",
+    "src/gateway/endpoints.js|GET|/api/settings": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
+    "src/gateway/endpoints.js|GET|/api/smartcut/all-candidates": "static_route_scan: routers/smartcut.py:317 GET /api/smartcut/all-candidates",
+    "src/gateway/endpoints.js|GET|/api/status": "static_route_scan: routers/trinity.py:48 GET /api/status",
+    "src/gateway/endpoints.js|GET|/api/transcribe/status": "static_route_scan: routers/legacy_production_router.py:217 GET /api/transcribe/status",
+    "src/gateway/endpoints.js|GET|/api/usage/dashboard": "static_route_scan: routers/usage_router.py:84 GET /api/usage/dashboard",
+    "src/gateway/endpoints.js|GET|/api/usage/governance": "static_route_scan: routers/usage_router.py:559 GET /api/usage/governance",
+    "src/gateway/endpoints.js|GET|/api/usage/retry-budget": "static_route_scan: routers/usage_router.py:172 GET /api/usage/retry-budget",
+    "src/gateway/endpoints.js|GET|/api/usage/switch-history": "static_route_scan: routers/usage_router.py:340 GET /api/usage/switch-history",
+    "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
+    "src/gateway/endpoints.js|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
+    "src/gateway/endpoints.js|POST|/api/collaboration/feedback": "static_route_scan: routers/legacy_management_router.py:123 POST /api/collaboration/feedback",
+    "src/gateway/endpoints.js|POST|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:163 POST /api/collaboration/journal",
+    "src/gateway/endpoints.js|POST|/api/council/decision": "static_route_scan: routers/collaboration.py:212 POST /api/council/decision",
+    "src/gateway/endpoints.js|POST|/api/council/session": "static_route_scan: routers/collaboration.py:198 POST /api/council/session",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-resources": "static_route_scan: routers/director.py:175 POST /api/director/analyze-resources",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-script": "static_route_scan: routers/director.py:133 POST /api/director/analyze-script",
+    "src/gateway/endpoints.js|POST|/api/director/batch-generate": "static_route_scan: routers/director.py:256 POST /api/director/batch-generate",
+    "src/gateway/endpoints.js|POST|/api/director/chat": "static_route_scan: routers/director.py:72 POST /api/director/chat",
+    "src/gateway/endpoints.js|POST|/api/director/generate-image-async": "static_route_scan: routers/director.py:103 POST /api/director/generate-image-async",
+    "src/gateway/endpoints.js|POST|/api/director/generate-report": "static_route_scan: routers/director.py:196 POST /api/director/generate-report",
+    "src/gateway/endpoints.js|POST|/api/director/plan-storyboard": "static_route_scan: routers/director.py:233 POST /api/director/plan-storyboard",
+    "src/gateway/endpoints.js|POST|/api/director/quality-score": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
+    "src/gateway/endpoints.js|POST|/api/director/state": "static_route_scan: routers/legacy_director_router.py:79 POST /api/director/state",
+    "src/gateway/endpoints.js|POST|/api/director/verify-quality": "static_route_scan: routers/legacy_director_router.py:96 POST /api/director/verify-quality",
+    "src/gateway/endpoints.js|POST|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1215 POST /api/pipeline/dictionary",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve": "static_route_scan: routers/pipeline_router.py:1145 POST /api/pipeline/proofreading/approve",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve-all": "static_route_scan: routers/pipeline_router.py:1167 POST /api/pipeline/proofreading/approve-all",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject": "static_route_scan: routers/pipeline_router.py:1156 POST /api/pipeline/proofreading/reject",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject-all": "static_route_scan: routers/pipeline_router.py:1179 POST /api/pipeline/proofreading/reject-all",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/skip": "static_route_scan: routers/pipeline_router.py:1340 POST /api/pipeline/proofreading/skip",
+    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
+    "src/gateway/endpoints.js|POST|/api/pipeline/start": "static_route_scan: routers/pipeline_router.py:655 POST /api/pipeline/start",
+    "src/gateway/endpoints.js|POST|/api/pipeline/transcription/model": "static_route_scan: routers/pipeline_router.py:1107 POST /api/pipeline/transcription/model",
+    "src/gateway/endpoints.js|POST|/api/pipeline/videos/metadata": "static_route_scan: routers/pipeline_router.py:467 POST /api/pipeline/videos/metadata",
+    "src/gateway/endpoints.js|POST|/api/pipeline/videos/validate": "static_route_scan: routers/pipeline_router.py:574 POST /api/pipeline/videos/validate",
+    "src/gateway/endpoints.js|POST|/api/quality/apply-suggestion": "static_route_scan: routers/quality.py:157 POST /api/quality/apply-suggestion",
+    "src/gateway/endpoints.js|POST|/api/quality/decision/quick": "static_route_scan: routers/quality.py:128 POST /api/quality/decision/quick",
+    "src/gateway/endpoints.js|POST|/api/quality/review/approve": "static_route_scan: routers/quality.py:182 POST /api/quality/review/approve",
+    "src/gateway/endpoints.js|POST|/api/quality/undo-suggestion": "static_route_scan: routers/quality.py:166 POST /api/quality/undo-suggestion",
+    "src/gateway/endpoints.js|POST|/api/render": "static_route_scan: routers/render.py:386 POST /api/render",
+    "src/gateway/endpoints.js|POST|/api/render/start": "static_route_scan: routers/render.py:165 POST /api/render/start",
+    "src/gateway/endpoints.js|POST|/api/rhythm/split": "static_route_scan: routers/legacy_production_router.py:157 POST /api/rhythm/split",
+    "src/gateway/endpoints.js|POST|/api/segments": "static_route_scan: routers/segments.py:78 POST /api/segments",
+    "src/gateway/endpoints.js|POST|/api/settings/identity": "static_route_scan: routers/legacy_management_router.py:197 POST /api/settings/identity",
+    "src/gateway/endpoints.js|POST|/api/settings/reset": "static_route_scan: routers/legacy_management_router.py:235 POST /api/settings/reset",
+    "src/gateway/endpoints.js|POST|/api/settings/video": "static_route_scan: routers/legacy_management_router.py:203 POST /api/settings/video",
+    "src/gateway/endpoints.js|POST|/api/shorts/candidates": "static_route_scan: routers/shorts.py:154 POST /api/shorts/candidates",
+    "src/gateway/endpoints.js|POST|/api/shorts/render": "static_route_scan: routers/shorts.py:290 POST /api/shorts/render",
+    "src/gateway/endpoints.js|POST|/api/smartcut/finalize": "static_route_scan: routers/smartcut.py:350 POST /api/smartcut/finalize",
+    "src/gateway/endpoints.js|POST|/api/smartcut/init": "static_route_scan: routers/smartcut.py:116 POST /api/smartcut/init",
+    "src/gateway/endpoints.js|POST|/api/smartcut/lock": "static_route_scan: routers/smartcut.py:229 POST /api/smartcut/lock",
+    "src/gateway/endpoints.js|POST|/api/smartcut/recommend": "static_route_scan: routers/smartcut.py:189 POST /api/smartcut/recommend",
+    "src/gateway/endpoints.js|POST|/api/smartcut/unlock": "static_route_scan: routers/smartcut.py:278 POST /api/smartcut/unlock",
+    "src/gateway/endpoints.js|POST|/api/thumbnail/select": "static_route_scan: routers/ab_test_tracker.py:79 POST /api/thumbnail/select",
+    "src/gateway/endpoints.js|POST|/api/transcribe": "static_route_scan: routers/legacy_production_router.py:172 POST /api/transcribe",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
+    "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
+    "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
+    "src/gateway/endpoints.js|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
+    "src/gateway/endpoints.js|POST|/api/youtube/pre-plan": "static_route_scan: routers/youtube_optimizer.py:230 POST /api/youtube/pre-plan",
+    "src/gateway/endpoints.js|PUT|/api/pipeline/transcription/segments/{segment_id}": "static_route_scan: routers/pipeline_router.py:1078 PUT /api/pipeline/transcription/segments/{segment_id}",
+    "src/gateway/endpoints.js|WEBSOCKET|/api/pipeline/ws/pipeline": "static_route_scan: routers/pipeline_router.py:933 WEBSOCKET /api/pipeline/ws/pipeline",
     "index.html|GET|https://fonts.googleapis.com": "",
     "index.html|GET|https://fonts.gstatic.com": "",
     "index.html|GET|https://fonts.googleapis.com/css2": ""
@@ -264,5 +260,529 @@
       "not_declared",
       "not_registered"
     ]
-  }
+  },
+  "migrations": [
+    {
+      "key": "src/components/AISuggestionCard.jsx|POST|/api/quality/apply-suggestion",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/quality.py:157 POST /api/quality/apply-suggestion",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/AISuggestionCard.jsx|POST|/api/quality/undo-suggestion",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/quality.py:166 POST /api/quality/undo-suggestion",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/Boardroom.jsx|GET|/api/settings",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/CollaborativePanel.jsx|GET|/api/collaboration/journal",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:157 GET /api/collaboration/journal",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/CollaborativePanel.jsx|POST|/api/collaboration/journal",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:163 POST /api/collaboration/journal",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/CollaborativePanel.jsx|POST|/api/collaboration/feedback",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:123 POST /api/collaboration/feedback",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/CouncilChamber.jsx|POST|/api/council/session",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/collaboration.py:198 POST /api/council/session",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/CouncilChamber.jsx|POST|/api/council/decision",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/collaboration.py:212 POST /api/council/decision",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/DirectorBriefing.jsx|POST|/api/director/analyze-resources",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:175 POST /api/director/analyze-resources",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/DirectorBriefing.jsx|POST|/api/director/analyze-script",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:133 POST /api/director/analyze-script",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/DirectorBriefing.jsx|POST|/api/director/quality-score",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/DirectorBriefing.jsx|POST|/api/director/plan-storyboard",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:233 POST /api/director/plan-storyboard",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/DirectorBriefing.jsx|POST|/api/director/batch-generate",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:256 POST /api/director/batch-generate",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/DirectorBriefing.jsx|GET|/api/director/tasks/{}",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_director_router.py:55 GET /api/director/tasks/{task_id}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/DirectorBriefing.jsx|POST|/api/director/generate-report",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:196 POST /api/director/generate-report",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ImageDirector.jsx|GET|/api/director/tasks/{}",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_director_router.py:55 GET /api/director/tasks/{task_id}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ImageDirector.jsx|POST|/api/director/chat",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:72 POST /api/director/chat",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ImageDirector.jsx|POST|/api/director/generate-image-async",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/director.py:103 POST /api/director/generate-image-async",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/OperationsDashboard.jsx|GET|/api/dashboard/health",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/dashboard_router.py:108 GET /api/dashboard/health",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/OperationsDashboard.jsx|GET|/api/pipeline/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/OperationsDashboard.jsx|GET|/api/usage/dashboard",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/usage_router.py:84 GET /api/usage/dashboard",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/OperationsDashboard.jsx|GET|/api/usage/retry-budget",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/usage_router.py:172 GET /api/usage/retry-budget",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/OperationsDashboard.jsx|GET|/api/usage/governance",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/usage_router.py:559 GET /api/usage/governance",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/OperationsDashboard.jsx|GET|/api/usage/switch-history",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/usage_router.py:340 GET /api/usage/switch-history",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/PreProductionPlanner.jsx|POST|/api/youtube/pre-plan",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/youtube_optimizer.py:230 POST /api/youtube/pre-plan",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|POST|/api/pipeline/videos/metadata",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:467 POST /api/pipeline/videos/metadata",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/pipeline/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/v1/themes/current/active",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/pipeline/videos",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:429 GET /api/pipeline/videos",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|POST|/api/pipeline/videos/validate",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:574 POST /api/pipeline/videos/validate",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|POST|/api/pipeline/start",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:655 POST /api/pipeline/start",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/pipeline/quality-gate/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1354 GET /api/pipeline/quality-gate/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|POST|/api/pipeline/quality-gate/improve",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/pipeline/open-folder",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:913 GET /api/pipeline/open-folder",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|POST|/api/render/start",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/render.py:165 POST /api/render/start",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|WEBSOCKET|/api/pipeline/ws/pipeline",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:933 WEBSOCKET /api/pipeline/ws/pipeline",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/preview",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/final",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/result",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1125 GET /api/pipeline/proofreading/result",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1321 GET /api/pipeline/proofreading/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/dictionary",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1191 GET /api/pipeline/dictionary",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/approve",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1145 POST /api/pipeline/proofreading/approve",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/reject",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1156 POST /api/pipeline/proofreading/reject",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/approve-all",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1167 POST /api/pipeline/proofreading/approve-all",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/reject-all",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1179 POST /api/pipeline/proofreading/reject-all",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/dictionary",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1215 POST /api/pipeline/dictionary",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|DELETE|/api/pipeline/dictionary/{}",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1260 DELETE /api/pipeline/dictionary/{entry_id}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|POST|/api/pipeline/proofreading/skip",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1340 POST /api/pipeline/proofreading/skip",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/srt",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/txt",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/QuickDecisionBar.jsx|POST|/api/quality/decision/quick",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/quality.py:128 POST /api/quality/decision/quick",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SettingsPage.jsx|GET|/api/settings",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SettingsPage.jsx|POST|/api/settings/video",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:203 POST /api/settings/video",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SettingsPage.jsx|POST|/api/settings/identity",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:197 POST /api/settings/identity",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SettingsPage.jsx|GET|/api/transcribe/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_production_router.py:217 GET /api/transcribe/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SettingsPage.jsx|POST|/api/transcribe",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_production_router.py:172 POST /api/transcribe",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SettingsPage.jsx|POST|/api/settings/reset",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_management_router.py:235 POST /api/settings/reset",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ShortsGenerator.jsx|POST|/api/shorts/candidates",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/shorts.py:154 POST /api/shorts/candidates",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ShortsGenerator.jsx|POST|/api/shorts/render",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/shorts.py:290 POST /api/shorts/render",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SmartCutPanel.jsx|POST|/api/smartcut/init",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/smartcut.py:116 POST /api/smartcut/init",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SmartCutPanel.jsx|GET|/api/smartcut/all-candidates",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/smartcut.py:317 GET /api/smartcut/all-candidates",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SmartCutPanel.jsx|POST|/api/smartcut/recommend",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/smartcut.py:189 POST /api/smartcut/recommend",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SmartCutPanel.jsx|POST|/api/smartcut/lock",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/smartcut.py:229 POST /api/smartcut/lock",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SmartCutPanel.jsx|POST|/api/smartcut/unlock",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/smartcut.py:278 POST /api/smartcut/unlock",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SmartCutPanel.jsx|POST|/api/smartcut/finalize",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/smartcut.py:350 POST /api/smartcut/finalize",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SoulPassport.jsx|GET|/api/director/evolution",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_director_router.py:110 GET /api/director/evolution",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/SoulPassport.jsx|GET|/api/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/trinity.py:48 GET /api/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/StepReviewPanel.jsx|POST|/api/quality/review/approve",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/quality.py:182 POST /api/quality/review/approve",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ThemeSelector.jsx|POST|/api/v1/themes/recommend",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/ThemeSelector.jsx|POST|/api/v1/themes/apply",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/models",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1020 GET /api/pipeline/transcription/models",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/segments",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1059 GET /api/pipeline/transcription/segments",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/TranscriptionStagePanel.jsx|GET|/api/pipeline/transcription/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1090 GET /api/pipeline/transcription/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/TranscriptionStagePanel.jsx|POST|/api/pipeline/transcription/model",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1107 POST /api/pipeline/transcription/model",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/TranscriptionStagePanel.jsx|PUT|/api/pipeline/transcription/segments/{}",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:1078 PUT /api/pipeline/transcription/segments/{segment_id}",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/optimize",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/YouTubeOptimizerPanel.jsx|POST|/api/thumbnail/select",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/ab_test_tracker.py:79 POST /api/thumbnail/select",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/improve-hook",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/components/YouTubeOptimizerPanel.jsx|POST|/api/youtube/apply-hook",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|GET|/api/pipeline/status",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|GET|/api/segments",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/segments.py:33 GET /api/segments",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|GET|/api/director/state",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_director_router.py:66 GET /api/director/state",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|POST|/api/rhythm/split",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_production_router.py:157 POST /api/rhythm/split",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|POST|/api/segments",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/segments.py:78 POST /api/segments",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|POST|/api/director/state",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_director_router.py:79 POST /api/director/state",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|POST|/api/director/verify-quality",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/legacy_director_router.py:96 POST /api/director/verify-quality",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    },
+    {
+      "key": "src/pages/EditorPage.jsx|POST|/api/render",
+      "was": "matched",
+      "now_via": "static_route_scan: routers/render.py:386 POST /api/render",
+      "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    }
+  ]
 }

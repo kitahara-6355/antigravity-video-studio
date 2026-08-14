@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-const API_BASE = "http://localhost:8000";
+import { apiFetch, apiUrl } from '../gateway/client.js';
 
 const ProofreadingStagePanel = ({ stageData, isActive }) => {
   const [segments, setSegments] = useState([]);
@@ -11,7 +11,7 @@ const ProofreadingStagePanel = ({ stageData, isActive }) => {
   const [skipProofreading, setSkipProofreading] = useState(false);
 
   const fetchResult = useCallback(() => {
-    fetch(`${API_BASE}/api/pipeline/proofreading/result`)
+    apiFetch('getPipelineProofreadingResult')
       .then(r => r.json())
       .then(data => {
         setSegments(data.segments || []);
@@ -23,7 +23,7 @@ const ProofreadingStagePanel = ({ stageData, isActive }) => {
 
   useEffect(() => {
     const poll = setInterval(() => {
-      fetch(`${API_BASE}/api/pipeline/proofreading/status`)
+      apiFetch('getPipelineProofreadingStatus')
         .then(r => r.json())
         .then(data => { setPrProgress(data.progress); setSkipProofreading(data.skip); })
         .catch(() => {});
@@ -32,59 +32,47 @@ const ProofreadingStagePanel = ({ stageData, isActive }) => {
   }, []);
 
   const fetchDict = useCallback(() => {
-    fetch(`${API_BASE}/api/pipeline/dictionary`)
+    apiFetch('getPipelineDictionary')
       .then(r => r.json())
       .then(data => setDictionary(data.entries || []))
       .catch(() => {});
   }, []);
 
   const approveSegment = async (id) => {
-    await fetch(`${API_BASE}/api/pipeline/proofreading/approve`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ segment_id: id }),
-    });
+    await apiFetch('postPipelineProofreadingApprove', { body: { segment_id: id } });
     fetchResult();
   };
 
   const rejectSegment = async (id) => {
-    await fetch(`${API_BASE}/api/pipeline/proofreading/reject`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ segment_id: id }),
-    });
+    await apiFetch('postPipelineProofreadingReject', { body: { segment_id: id } });
     fetchResult();
   };
 
   const approveAll = async () => {
-    await fetch(`${API_BASE}/api/pipeline/proofreading/approve-all`, { method: 'POST' });
+    await apiFetch('postPipelineProofreadingApproveAll');
     fetchResult();
   };
 
   const rejectAll = async () => {
-    await fetch(`${API_BASE}/api/pipeline/proofreading/reject-all`, { method: 'POST' });
+    await apiFetch('postPipelineProofreadingRejectAll');
     fetchResult();
   };
 
   const addDictEntry = async () => {
     if (!newEntry.incorrect || !newEntry.correct) return;
-    await fetch(`${API_BASE}/api/pipeline/dictionary`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newEntry),
-    });
+    await apiFetch('postPipelineDictionary', { body: newEntry });
     setNewEntry({ incorrect: '', correct: '' });
     fetchDict();
   };
 
   const deleteDictEntry = async (entryId) => {
-    await fetch(`${API_BASE}/api/pipeline/dictionary/${entryId}`, { method: 'DELETE' });
+    await apiFetch('deletePipelineDictionary', { params: { entry_id: entryId } });
     fetchDict();
   };
 
   const toggleSkip = async () => {
     const newSkip = !skipProofreading;
-    await fetch(`${API_BASE}/api/pipeline/proofreading/skip`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skip: newSkip }),
-    });
+    await apiFetch('postPipelineProofreadingSkip', { body: { skip: newSkip } });
     setSkipProofreading(newSkip);
   };
 
@@ -114,11 +102,11 @@ const ProofreadingStagePanel = ({ stageData, isActive }) => {
             style={{ padding:'4px 12px', borderRadius:6, border:'1px solid var(--border-color,#e2e8f0)', background:'transparent', fontSize:'0.72rem', cursor:'pointer' }}>
             📖 辞書 {showDict ? '▲' : '▼'}
           </button>
-          <a data-testid="export-srt-btn" href={`${API_BASE}/api/pipeline/proofreading/export/srt`}
+          <a data-testid="export-srt-btn" href={apiUrl('getPipelineProofreadingExport', { params: { export_format: 'srt' } })}
             style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border-color,#e2e8f0)', fontSize:'0.72rem', textDecoration:'none', color:'inherit' }}>
             📥 SRT
           </a>
-          <a data-testid="export-txt-btn" href={`${API_BASE}/api/pipeline/proofreading/export/txt`}
+          <a data-testid="export-txt-btn" href={apiUrl('getPipelineProofreadingExport', { params: { export_format: 'txt' } })}
             style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border-color,#e2e8f0)', fontSize:'0.72rem', textDecoration:'none', color:'inherit' }}>
             📥 TXT
           </a>

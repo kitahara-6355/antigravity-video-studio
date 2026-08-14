@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../App.css';
 import './ImageDirector.css'; // Import specific styles
+import { apiFetch } from '../gateway/client.js';
 
-const API_BASE = "http://localhost:8000";
 
 function ImageDirector({ isOpen, onClose, scene, onApplyImage, initialTakes, initialChatHistory, segments }) {
     const [messages, setMessages] = useState([]); // { role: 'user'|'model', parts: [text] } for API
@@ -86,7 +86,7 @@ function ImageDirector({ isOpen, onClose, scene, onApplyImage, initialTakes, ini
 
         pollingRef.current = setInterval(async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/director/tasks/${taskId}`);
+                const res = await apiFetch('getDirectorTasks', { params: { task_id: taskId } });
                 if (!res.ok) return;
                 const task = await res.json();
 
@@ -128,14 +128,10 @@ function ImageDirector({ isOpen, onClose, scene, onApplyImage, initialTakes, ini
 
         try {
             // 1. Chat with Gemini
-            const chatRes = await fetch(`${API_BASE}/api/director/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const chatRes = await apiFetch('postDirectorChat', { body: {
                     history: messages,
                     message: userText
-                })
-            });
+                } });
 
             if (!chatRes.ok) throw new Error("Chat API Failed");
             const chatData = await chatRes.json();
@@ -150,11 +146,7 @@ function ImageDirector({ isOpen, onClose, scene, onApplyImage, initialTakes, ini
             // 2. Trigger Async Image Generation
             setDisplayMessages(prev => [...prev, { sender: 'ai', text: "画像を生成しています... (バックグラウンドで作業中 🎨)" }]);
 
-            const imgRes = await fetch(`${API_BASE}/api/director/generate-image-async`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: `${currentPrompt}, ${userText}` })
-            });
+            const imgRes = await apiFetch('postDirectorGenerateImageAsync', { body: { prompt: `${currentPrompt}, ${userText}` } });
 
             if (!imgRes.ok) throw new Error("Image Gen Start Failed");
             const imgData = await imgRes.json();

@@ -7,8 +7,8 @@
  * バックエンドAPI: POST /api/youtube/pre-plan
  */
 import React, { useState } from 'react';
+import { apiFetch } from '../gateway/client.js';
 
-const API_BASE = 'http://localhost:8000';
 
 const GENRE_OPTIONS = [
   { value: '', label: '選択してください' },
@@ -38,15 +38,11 @@ export default function PreProductionPlanner() {
     setResult(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/youtube/pre-plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await apiFetch('postYoutubePrePlan', { body: {
           topic: topic.trim(),
           genre,
           target_audience: targetAudience.trim(),
-        }),
-      });
+        } });
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
       const data = await res.json();
       setResult(data);

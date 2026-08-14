@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Users, Target, Shield, Zap, RefreshCw, X, AlertCircle } from 'lucide-react';
 import CouncilChamber from './CouncilChamber';
+import { apiFetch } from '../gateway/client.js';
 
 export default function Boardroom({ onClose, initialQuery }) {
     const [dashboardData, setDashboardData] = useState(null);
@@ -10,7 +11,7 @@ export default function Boardroom({ onClose, initialQuery }) {
 
     // Load Dashboard Data (User Model + Analytics)
     useEffect(() => {
-        fetch('http://localhost:8000/api/settings')
+        apiFetch('getSettings')
             .then(res => {
                 if (!res.ok) throw new Error("Server Response Error");
                 return res.json();

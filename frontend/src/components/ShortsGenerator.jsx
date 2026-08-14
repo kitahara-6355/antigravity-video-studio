@@ -12,8 +12,8 @@
  *   POST /api/shorts/render      — 縦型レンダリング
  */
 import React, { useState } from 'react';
+import { apiFetch } from '../gateway/client.js';
 
-const API_BASE = 'http://localhost:8000';
 
 const STRATEGY_LABELS = {
   hook_clip: { icon: '🎣', label: 'フック切り出し', color: '#7C3AED' },
@@ -37,15 +37,11 @@ export default function ShortsGenerator({ segments = [], videoDuration = 0, vide
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/shorts/candidates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await apiFetch('postShortsCandidates', { body: {
           segments: segments,
           video_duration_sec: videoDuration || 300,
           video_id: 'current',
-        }),
-      });
+        } });
       if (!res.ok) throw new Error(`API Error: ${res.status}`);
       const data = await res.json();
       setCandidates(data.candidates || []);
@@ -73,16 +69,12 @@ export default function ShortsGenerator({ segments = [], videoDuration = 0, vide
       }));
 
       try {
-        const res = await fetch(`${API_BASE}/api/shorts/render`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const res = await apiFetch('postShortsRender', { body: {
             video_path: videoPath,
             start_sec: candidate.start_sec,
             end_sec: candidate.end_sec,
             subtitle_text: candidate.preview_text?.slice(0, 50) || null,
-          }),
-        });
+          } });
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
