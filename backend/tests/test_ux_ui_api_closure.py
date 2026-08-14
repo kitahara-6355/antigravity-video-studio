@@ -783,7 +783,7 @@ def test_every_detector_is_pinned(tmp_path):
     assert set(taken["detectors"]) == {
         "absolute_url", "protocol_relative", "backend_token", "call_after",
         "catalogue_entry", "gateway_import", "joined_literals", "one_literal",
-        "relative_spec", "root_spec"}
+        "string_literal", "js_escape", "spec_scheme"}
 
 
 def test_this_file_is_registered_in_testpaths():
@@ -1490,6 +1490,78 @@ def test_pointing_at_the_build_output_from_the_project_root_is_a_violation(
     assert "points_at_unscanned" in _kinds(executor.run())
 
 
+# --- gate-verifier 10回目の反例 ----------------------------------------------
+#
+# 9回目の修正は判定を2本の正規表現に分けて書き、**片方にしか frontend の外へ
+# 出る判定を入れていなかった**。`'/../shared_ui/net.js'` は
+# 「ルート相対」側に当たるので `node_modules` / `dist` かどうかしか見られず
+# 素通りした。8回目（除外の条件と固定の条件が別々）とまったく同じ型。
+#
+# **判定を1本にする。** 文字列リテラルを1つずつ拾い、エスケープを解いてから
+# 場所として解決する。ルート相対も `\u002e\u002e/` もローカル依存の
+# `file:` も、同じ1本の道を通る（綴りが増えない）。
+
+
+def test_escaping_the_frontend_through_the_project_root_is_a_violation(
+        tmp_path):
+    """反例1。`/x` は frontend/ からの解決なので `/../x` は外に出る。"""
+    executor = _build(tmp_path)
+    _entry(executor, "import { pwn } from '/../shared_ui/net.js';\npwn();\n")
+
+    assert "escapes_frontend" in _kinds(executor.run())
+
+
+@pytest.mark.parametrize("spec", [
+    r"\u002e\u002e/\u002e\u002e/shared_ui/net.js",
+    r"\x2e\x2e/\x2e\x2e/shared_ui/net.js",
+])
+def test_an_escaped_path_is_decoded_before_judging(tmp_path, spec):
+    """**綴りではなく値で見る。** 書き換えで綴りを変えても同じ道を通る。"""
+    executor = _build(tmp_path)
+    _entry(executor, f'import {{ pwn }} from "{spec}";\npwn();\n')
+
+    assert "escapes_frontend" in _kinds(executor.run())
+
+
+def test_a_local_file_dependency_is_a_violation(tmp_path):
+    """反例3。`"file:../shared_ui"` は接頭辞が付いただけのパス。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "package.json").write_text(
+        json.dumps({"name": "frontend",
+                    "dependencies": {"sharednet": "file:../shared_ui"}}),
+        encoding="utf-8")
+
+    assert "escapes_frontend" in _kinds(executor.run())
+
+
+def test_a_computed_alias_is_not_claimed_to_be_caught(tmp_path):
+    """**反例2は塞げていない。塞げたと書かない。**
+
+    `resolve.alias` を `path.resolve(process.cwd(), '..', 'shared_ui')` で
+    組むと、リテラルに `../` が1つも現れないまま frontend の外を指す別名が
+    でき、使用側は普通のパッケージ名になる（10回目の実測。4ゲート全緑）。
+    設定は任意のコードなので**字句の禁止では閉じない**。
+
+    ここで固定するのは「捕まらないこと」ではなく、
+    **捕まらないと意味表に書いてあること**。測っていないことを
+    『確かめること』に書かないための歯止め（1・3・4・6・7回目と同じ型）。
+    """
+    executor = _build(tmp_path, extra={"../vite.config.js": """
+        import path from 'node:path';
+
+        export default {
+          resolve: {
+            alias: { sharedui: path.resolve(process.cwd(), '..', 'shared_ui') },
+          },
+        };
+    """})
+    _entry(executor, "import { pwn } from 'sharedui/net.js';\npwn();\n")
+
+    assert _kinds(executor.run()) == []  # 実測。捕まらない
+    assert "設定で計算されたモジュール解決。捕まらない。" in "".join(
+        CLOSURE_SEMANTICS["確かめないこと"])
+
+
 def test_pointing_at_node_modules_is_a_violation(tmp_path):
     """依存の中身も読んでいない。名指しで持ち出せば同じ穴になる。"""
     executor = _build(tmp_path)
@@ -1526,7 +1598,7 @@ def test_the_reference_detectors_are_pinned(tmp_path):
     """字句の当たり方を差し替えれば、名指しの禁止を無効にできる。"""
     executor = _build(tmp_path)
     baseline = _pinned(tmp_path, executor)
-    baseline["detectors"]["relative_spec"] = "(?!x)x"
+    baseline["detectors"]["string_literal"] = "(?!x)x"
 
     assert any("判定が動いた" in v
                for v in check_ratchet(executor.run(), baseline))

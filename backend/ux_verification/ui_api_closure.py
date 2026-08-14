@@ -214,10 +214,33 @@ _JOINED_LITERALS_RE = re.compile(
 # P4 が14回破られた型）。**禁止で閉じる。** 走査した場所に書かれた相対パスの
 # リテラルが走査対象の外を指していたら違反にする。字句だけで決まるので
 # 精度が要らず、誤検出は FAIL が増えるだけで沈黙にならない。
-_RELATIVE_SPEC_RE = re.compile(r"""(['"`])(\.{1,2}/[^'"`\n]*)\1""")
-# vite は `/x` を**プロジェクトルート**（= frontend/）から解決するので、
-# `/dist/payload.js` は `../dist/payload.js` と同じ場所を指す。
-_ROOT_SPEC_RE = re.compile(r"""(['"`])(/[^'"`\n]*)\1""")
+# **綴りを並べない。文字列リテラルを1つずつ「場所」として読む。**
+# 最初は `'./x'` / `'../x'` と `'/x'` の2本の正規表現で書いたが、
+# 前者にしか frontend の外へ出る判定が無く、`'/../shared_ui/net.js'` が
+# 素通りした（gate-verifier 10回目の反例1。`/x` はプロジェクトルート
+# = frontend/ から解決されるので、`..` を混ぜれば同じ場所に届く）。
+# **判定を2か所に分けたことが原因** — 8回目とまったく同じ型の失敗。
+#
+# いまはリテラルを1本で拾い、エスケープを解いてから場所として解決する。
+# `"\u002e\u002e/x"` のような書き換えも同じ道を通る（綴りが増えない）。
+_STRING_LITERAL_RE = re.compile(r"""(['"`])((?:(?!\1)[^\\\n]|\\.)*)\1""")
+_JS_ESCAPE_RE = re.compile(
+    r"\\(u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|(.))")
+# npm / yarn のローカル依存（`"file:../shared_ui"`）。パスの前に付くだけの
+# 接頭辞なので、外して場所として読む（10回目の反例3）。
+_SPEC_SCHEME_RE = re.compile(r"^(?:file|link|portal|patch):(?://)?")
+_SIMPLE_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f",
+                   "v": "\v", "0": "\0"}
+
+
+def _decode_js_string(text: str) -> str:
+    """JS の文字列エスケープを解く。**綴りではなく値で判定するため。**"""
+    def one(hit: re.Match) -> str:
+        for group in (2, 3, 4):
+            if hit.group(group):
+                return chr(int(hit.group(group), 16))
+        return _SIMPLE_ESCAPES.get(hit.group(5), hit.group(5))
+    return _JS_ESCAPE_RE.sub(one, text)
 
 # カタログの文法。項目行・開始行・終了行・行コメント・空行だけを許す。
 _CATALOGUE_OPEN = "export const ENDPOINTS = {"
@@ -277,8 +300,13 @@ CLOSURE_SEMANTICS = {
          "「到達可能性」ではなく「frontend/ という場所」で決めている**ので、"
          "外に置いて import すれば無検査で実行できた（9回目の実測。難読化も "
          "`git add -f` も要らない素の書き方で4ゲート全緑だった）。"
-         "解決ではなく禁止で閉じている — `../` の数と自分の位置だけで決まり、"
-         "import 指定子を解決しない"),
+         "解決ではなく禁止で閉じている — 文字列リテラルの**エスケープを解いて**"
+         "場所として読み、`../` の数と自分の位置だけで決める。"
+         "ルート相対（vite が frontend/ から解決する `/../x`）も、"
+         "`\\u002e\\u002e/` のような書き換えも、npm のローカル依存"
+         "（`\"file:../shared_ui\"`）も同じ道を通る。"
+         "**ただし『名指し』として見えるのは文字列リテラルだけで、"
+         "設定で計算したパスは見えない**（下の『確かめないこと』）"),
         ("**走査しなかったファイルの中身が、1バイトも変わっていない**"
          "（内容の sha256 をベースラインに固定する）。**バイナリだけではない** — "
          "`package-lock.json` のように別の理由で読まないものも例外なく入る。"
@@ -354,6 +382,16 @@ CLOSURE_SEMANTICS = {
         ("**npm パッケージ名での import**（`import x from 'react'`）。"
          "解決先は `node_modules` で、その中身は読まない。"
          "パッケージを1つ足すこと自体はこの判定では止まらない"),
+        ("**設定で計算されたモジュール解決。捕まらない。** "
+         "`resolve: { alias: { sharedui: path.resolve(process.cwd(), '..', "
+         "'shared_ui') } }` のように `vite.config.js` で組み立てると、"
+         "リテラルに `../` が1つも現れないまま frontend/ の外を指す別名が作れ、"
+         "使用側は `import { pwn } from 'sharedui/net.js'` という普通の"
+         "パッケージ名になる（gate-verifier 10回目の実測反例。4ゲート全緑）。"
+         "**設定は任意のコードなので、字句の禁止では閉じない。** "
+         "閉じるには走査を「エントリからの到達可能性」に作り替えるか、"
+         "`resolve.alias` と依存の宣言そのものをベースラインに固定する必要が"
+         "あり、**どちらも C-1 の条件文の書き直しを含む（ユーザー判断）**"),
     ],
     "判定の性質": "禁止であって解決ではない。誤検出は FAIL を増やすだけで"
                   "沈黙にならないので、コメント除去のような前処理を持たない",
@@ -692,36 +730,35 @@ class ClosureExecutor:
         解決する必要が無い（解決は精度を要求し、失敗が沈黙になる）。
         """
         findings: list[Finding] = []
-        for hit in _RELATIVE_SPEC_RE.finditer(raw):
-            spec = hit.group(2)
-            line = _line_of(raw, hit.start())
+        for hit in _STRING_LITERAL_RE.finditer(raw):
+            value = _SPEC_SCHEME_RE.sub("", _decode_js_string(hit.group(2)))
             # `./x.png?raw` `./x#y` のような接尾辞は場所ではない。
-            target = Path(os.path.normpath(
-                path.parent / re.split(r"[?#]", spec, maxsplit=1)[0]))
+            spec = re.split(r"[?#]", value, maxsplit=1)[0]
+            if spec.startswith(("./", "../")):
+                base = path.parent  # 自分の位置からの相対
+            elif spec.startswith("/"):
+                # vite は `/x` を**プロジェクトルート**（= frontend/）から
+                # 解決する。`/../x` は `../x` と同じ場所に届く。
+                base, spec = self.frontend, spec.lstrip("/")
+            else:
+                continue  # パッケージ名・URL・ただの文字列
+            line = _line_of(raw, hit.start())
+            target = Path(os.path.normpath(base / spec))
             try:
                 inside = target.relative_to(self.frontend).as_posix()
             except ValueError:
                 findings.append(Finding(
-                    "escapes_frontend", rel, line, spec[:70],
+                    "escapes_frontend", rel, line, hit.group(2)[:70],
                     "frontend/ の外を名指しで参照しています"
                     "（そこは1行も読んでいないので、実行されるのに"
                     "無検査になります）"))
                 continue
             if self._is_build_output(inside):
                 findings.append(Finding(
-                    "points_at_unscanned", rel, line, spec[:70],
+                    "points_at_unscanned", rel, line, hit.group(2)[:70],
                     "走査していない場所（node_modules / dist）を名指しで"
                     "参照しています。この2つは中身を読まずハッシュも"
                     "固定しないので、参照できると無検査の実行経路になります"))
-        # vite の `/x` はプロジェクトルート（frontend/）からの解決。
-        for hit in _ROOT_SPEC_RE.finditer(raw):
-            spec = re.split(r"[?#]", hit.group(2), maxsplit=1)[0]
-            if self._is_build_output(spec.lstrip("/")):
-                findings.append(Finding(
-                    "points_at_unscanned", rel, _line_of(raw, hit.start()),
-                    hit.group(2)[:70],
-                    "走査していない場所（node_modules / dist）を名指しで"
-                    "参照しています（`/x` は frontend/ からの解決）"))
         return findings
 
     def _check_joined_literals(self, raw: str, rel: str) -> list[Finding]:
@@ -961,8 +998,9 @@ def declaration() -> dict:
             "catalogue_entry": _CATALOGUE_ENTRY_RE.pattern,
             "gateway_import": _GATEWAY_IMPORT_RE.pattern,
             "call_after": _CALL_AFTER_RE.pattern,
-            "relative_spec": _RELATIVE_SPEC_RE.pattern,
-            "root_spec": _ROOT_SPEC_RE.pattern,
+            "string_literal": _STRING_LITERAL_RE.pattern,
+            "js_escape": _JS_ESCAPE_RE.pattern,
+            "spec_scheme": _SPEC_SCHEME_RE.pattern,
         },
     }
 
