@@ -49,6 +49,7 @@ PASS になる。
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -93,6 +94,10 @@ BASELINE = BASELINE_DIR / "ui_api_closure_baseline.json"
 # （`node_modules` / `dist` は gitignore 対象で CI に存在せず、偽の赤になる）。
 CLOSURE_EXCLUDED = frozenset({"node_modules", "dist"})
 # ファイル単位の除外。**ソースとして実行されないもの**だけ。
+# **frontend からの相対パスの完全一致。** ファイル名で任意階層に効かせていた
+# ので、`src/components/package-lock.json` を置くだけで黙って読まれなくなって
+# いた（gate-verifier 7回目の指摘。5回目にディレクトリ側で塞いだ穴が
+# ファイル側に残っていた）。
 CLOSURE_EXCLUDED_FILES = frozenset({"package-lock.json"})
 # **バイナリとして宣言した拡張子。** 中身は走査しないが、**本当にその形式で
 # あることを先頭バイトで確かめる。**
@@ -225,15 +230,18 @@ CLOSURE_SEMANTICS = {
          "（変数に束ね直す・引数として渡す、は使用が判定から消えるので違反）"),
         ("**frontend/ の下を全部読んでいる。** 読むかどうかは**場所と拡張子だけ**で"
          "決めており、**中身では決めない**。読まないのは frontend 直下の "
-         "`node_modules` と `dist`（**相対パスの完全一致**。ディレクトリ名で"
-         "任意階層に効かせていたので `src/components/build/` を作るだけで"
-         "無検査になっていた）、`package-lock.json`、`.md` と `.png`。"
-         "宣言はベースラインに固定してあり、1つ足せばラチェットが落ちる"),
+         "`node_modules` と `dist`、そして `package-lock.json`"
+         "（いずれも**相対パスの完全一致**。名前で任意階層に効かせていたので "
+         "`src/components/build/` を作るだけで無検査になっていた）。"
+         "**`.md` は読む。** 走査から外していたので、そこに JS を書いて"
+         "取り出せた"),
         ("frontend/ の下に symlink が無い（走査が降りないので、"
          "あれば違反にする）"),
-        ("**走査から外したファイルが、本当に画像である**"
-         "（先頭バイトを既知の画像マジックと突き合わせる）。"
-         "拡張子は嘘をつくので、外している根拠のほうを確かめる"),
+        ("**走査から外したバイナリの中身が、1バイトも変わっていない**"
+         "（内容の sha256 をベースラインに固定する）。新規追加も差し替えも"
+         "ラチェットが落とす。先頭バイトが既知の画像マジックであることも"
+         "見るが、**それだけでは足りない** — マジックの後ろに JS を置いた"
+         "ファイルが「画像」と判定されて素通りした（7回目の実測）"),
         ("走査したファイルの一覧が固定されている"
          "（走査から外せば、そこの呼び出しは何も出ない）"),
         ("扉の関数の使用が**回数まで**固定されている"
@@ -268,13 +276,17 @@ CLOSURE_SEMANTICS = {
          "これは綴りの列挙にすぎない（`import.meta.glob({as:'raw'})` と"
          "素の `Function(` で一度破られた）。**閉包を支えているのは"
          "「全部読む・バイナリは実体を検証する」ほうで、この禁止は"
-         "そこに足した保険**。綴りを変えられれば通る"),
+         "そこに足した保険**。綴りを変えられれば通る"
+         "（`Blob` + `URL.createObjectURL` + 変数引数の動的 `import()` で"
+         "実際に破られた。**塞いだのは綴りではなく、中身をハッシュで固定する"
+         "側**）"),
         ("`/` を含まない単語1つの相対 URL。普通の英単語と区別が付かないので"
          "対象外にしてある"),
         ("**frontend/ の外**（backend が配信する静的ファイルなど）。"
          "この判定は frontend/ の中しか読まない"),
-        ("**宣言した拡張子の中身**（`.md`・`.png`）。走査から外してあること"
-         "自体はベースラインに固定してあるので、黙って増やせない"),
+        ("**走査から外したバイナリの中身**（既知の画像マジックで始まる "
+         "`.png`）。中身は読まないが、**sha256 をベースラインに固定**して"
+         "あるので、差し替えも新規追加もラチェットが落とす"),
     ],
     "判定の性質": "禁止であって解決ではない。誤検出は FAIL を増やすだけで"
                   "沈黙にならないので、コメント除去のような前処理を持たない",
@@ -306,6 +318,8 @@ class ClosureReport:
     scanned_files: list[str] = field(default_factory=list)
     # backend URL を見つける検出器の本体。差し替えを検出するために持つ。
     backend_token_pattern: str = ""
+    # 走査から外したバイナリの中身。**マジックバイトの先だけでは足りない。**
+    binary_assets: dict[str, str] = field(default_factory=dict)
 
     @property
     def closed(self) -> bool:
@@ -358,14 +372,17 @@ class ClosureExecutor:
                 continue
             if not path.is_file():
                 continue
-            if path.name in CLOSURE_EXCLUDED_FILES:
+            if rel in CLOSURE_EXCLUDED_FILES:
                 continue
             if path.suffix.lower() in CLOSURE_BINARY_SUFFIXES:
                 continue  # 実体は _boundary_findings が確かめる
             yield path
 
-    def _boundary_findings(self) -> list[Finding]:
-        """走査範囲そのものの異常。**読まなかった事実を残す。**"""
+    def _boundary_findings(self, assets: dict[str, str]) -> list[Finding]:
+        """走査範囲そのものの異常。**読まなかった事実を残す。**
+
+        `assets` には、走査から外したバイナリの内容ハッシュを入れて返す。
+        """
         findings: list[Finding] = []
         # symlink は降りない（Path.rglob の既定）。降りないなら**違反にする** —
         # 黙って読み飛ばすと、リンク先に何を置いても見えない
@@ -392,7 +409,16 @@ class ClosureExecutor:
                 continue
             if not path.is_file():
                 continue
-            head = path.read_bytes()[:16]
+            data = path.read_bytes()
+            # **中身をハッシュで固定する。** マジックバイトの検証は先頭8バイトの
+            # 一致しか見ないので、`89504e470d0a1a0a` の後ろに JS を置いた
+            # ファイルが「本当に画像」と判定され、`import.meta.glob({as:'raw'})`
+            # と `Blob` + 動的 import で実行できた（gate-verifier 7回目の実測。
+            # 禁止語彙に1つも触れずに dist に生の fetch が出た）。
+            # 深さを増やしても PNG の tEXt チャンクなどで同じことができる。
+            # **中身そのものを固定し、変更も新規追加もラチェットで落とす。**
+            assets[rel] = hashlib.sha256(data).hexdigest()
+            head = data[:16]
             if not any(head.startswith(bytes.fromhex(magic))
                        for magic in CLOSURE_BINARY_MAGICS.values()):
                 findings.append(Finding(
@@ -689,7 +715,7 @@ class ClosureExecutor:
                    and isinstance(e.get("url"), str)}
         hit_allowed: set[tuple[str, str]] = set()
 
-        report.findings += self._boundary_findings()
+        report.findings += self._boundary_findings(report.binary_assets)
 
         gateway_seen: set[str] = set()
         for path in self._iter_files():
@@ -763,7 +789,7 @@ class ClosureExecutor:
 DECLARATION_KEYS = ("forbidden_forms", "gateway_files", "scanned_suffixes",
                     "excluded_dirs", "closure_excluded",
                     "closure_excluded_files", "closure_binary_suffixes",
-                    "closure_binary_magics",
+                    "closure_binary_magics", "binary_assets",
                     "detectors", "scanned_files",
                     "allowlist", "usages", "entries")
 
@@ -810,6 +836,8 @@ def snapshot(report: ClosureReport) -> dict:
     # 走査範囲を狭める道は他にもある（拡張子・到達可能性・rglob の起点）。
     # 「前は読んでいたのに読まなくなった」を直接見る。
     payload["scanned_files"] = sorted(report.scanned_files)
+    # 走査から外したバイナリの中身。**新規追加も差し替えも違反にする。**
+    payload["binary_assets"] = dict(sorted(report.binary_assets.items()))
     payload["detectors"] = dict(payload["detectors"])
     payload["detectors"]["backend_token"] = report.backend_token_pattern
     payload["allowlist"] = sorted(
@@ -858,6 +886,21 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
     now = snapshot(report)
     # 判定の本体。**どちらに動いても違反。** 増やすのも「見えていたものが
     # 見えなくなる」経路（正規表現の差し替え）になりうる。
+    # **走査から外したバイナリの中身。** 新規追加も差し替えも違反にする。
+    # マジックバイトを付けただけの偽画像は、ここで「未ピン」として落ちる。
+    for rel, digest in sorted(now["binary_assets"].items()):
+        before = baseline["binary_assets"].get(rel)
+        if before is None:
+            violations.append(
+                f"[未ピンのバイナリ] {rel} が走査から外れていますが、"
+                "中身がベースラインに固定されていません")
+        elif before != digest:
+            violations.append(
+                f"[バイナリが差し替わった] {rel}: {before[:12]}… → {digest[:12]}…")
+    for rel in sorted(baseline["binary_assets"]):
+        if rel not in now["binary_assets"]:
+            violations.append(f"[バイナリが消えた] {rel}")
+
     # 前は読んでいたのに読まなくなったファイル。**除外ディレクトリの追加**が
     # ここに出る（C-5 が名指しした弱化。1回目の検証で素通りしていた）。
     for rel in baseline["scanned_files"]:

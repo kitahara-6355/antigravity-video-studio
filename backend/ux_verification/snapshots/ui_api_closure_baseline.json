@@ -139,6 +139,11 @@
     "src/tokens.css",
     "vite.config.js"
   ],
+  "binary_assets": {
+    "public/assets/samples/sample_ending.png": "15e2166150adfd75ced2b7485c324adacd0b6d1da4e2447e29ff2da7383da4d0",
+    "public/assets/samples/sample_talk.png": "457afd59f1906a9d38f5377732d875a302c6d7a31722b8357b129eb3e70cde76",
+    "public/assets/samples/sample_thumbnail.png": "004f454761eb996ba360777a359d92943bdcbb79b8cca6b841f9b39fff109097"
+  },
   "allowlist": [
     "README.md|https://babeljs.io/",
     "README.md|https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react",

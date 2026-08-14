@@ -1183,3 +1183,93 @@ def test_the_binary_declaration_is_pinned(tmp_path):
 
     assert any("判定が動いた" in v
                for v in check_ratchet(executor.run(), baseline))
+
+
+# --- gate-verifier 7回目の反例 -----------------------------------------------
+#
+# マジックバイトの検証は**先頭8バイトの一致しか見ない**。
+# `89504e470d0a1a0a` の後ろに JS を置いたファイルが「本当に画像」と判定され、
+# `import.meta.glob({as:'raw'})` + `Blob` + 変数引数の動的 `import()` で
+# 実行できた（禁止語彙に1つも触れない）。深さを増やしても PNG の tEXt
+# チャンクなどで同じことができるので、**中身そのものを固定する**。
+
+
+def _binary(executor, name: str, body: bytes) -> None:
+    (executor.frontend / name).parent.mkdir(parents=True, exist_ok=True)
+    (executor.frontend / name).write_bytes(body)
+
+
+def test_an_unpinned_binary_is_a_ratchet_violation(tmp_path):
+    """マジックだけ本物の偽画像は、**未ピン**として落ちる。"""
+    executor = _build(tmp_path)
+    _binary(executor, "src/real.png", bytes.fromhex("89504e470d0a1a0a") + b"\x01" * 8)
+    baseline = _pinned(tmp_path, executor)
+
+    _binary(executor, "src/payload.png",
+            bytes.fromhex("89504e470d0a1a0a")
+            + b"export const boom = () => fetch('/api/demo/status');")
+
+    assert any("未ピンのバイナリ" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_replacing_a_pinned_binary_is_a_ratchet_violation(tmp_path):
+    """既存の画像を JS に差し替えても落ちる。"""
+    executor = _build(tmp_path)
+    _binary(executor, "src/real.png", bytes.fromhex("89504e470d0a1a0a") + b"\x01" * 8)
+    baseline = _pinned(tmp_path, executor)
+
+    _binary(executor, "src/real.png",
+            bytes.fromhex("89504e470d0a1a0a") + b"fetch('/api/demo/status')")
+
+    assert any("バイナリが差し替わった" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_a_pinned_binary_that_disappears_is_a_ratchet_violation(tmp_path):
+    executor = _build(tmp_path)
+    _binary(executor, "src/real.png", bytes.fromhex("89504e470d0a1a0a") + b"\x01" * 8)
+    baseline = _pinned(tmp_path, executor)
+
+    (executor.frontend / "src" / "real.png").unlink()
+
+    assert any("バイナリが消えた" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_an_excluded_file_name_only_matches_at_the_declared_path(tmp_path):
+    """`src/components/package-lock.json` を置くだけで無検査になっていた。
+
+    ファイル除外もディレクトリ除外と同じく**相対パスの完全一致**にした。
+    """
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "components" / "package-lock.json").write_text(
+        "fetch('/api/demo/status')\n", encoding="utf-8")
+
+    assert "backend_url" in _kinds(executor.run())
+
+
+def test_the_declared_lock_file_is_still_skipped(tmp_path):
+    """宣言した場所のものは読まない（宣言どおり）。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "package-lock.json").write_text(
+        "https://registry.npmjs.org/x\n", encoding="utf-8")
+
+    assert executor.run().findings == []
+
+
+def test_the_semantics_say_markdown_is_read():
+    """`.md` を読むよう変えたのに意味表が古いままだった（7回目の指摘）。"""
+    checked = "".join(CLOSURE_SEMANTICS["確かめること"])
+    not_checked = "".join(CLOSURE_SEMANTICS["確かめないこと"])
+
+    assert "**`.md` は読む。**" in checked
+    assert ".md" not in not_checked.split("走査から外したバイナリの中身")[1][:80]
+
+
+def test_the_semantics_do_not_claim_magic_bytes_are_enough():
+    """「本当に画像である」という断定は8バイトで抜けた。**後退させる。**"""
+    checked = "".join(CLOSURE_SEMANTICS["確かめること"])
+
+    assert "1バイトも変わっていない" in checked
+    assert "それだけでは足りない" in checked
