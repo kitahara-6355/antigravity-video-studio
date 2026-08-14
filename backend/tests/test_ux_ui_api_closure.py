@@ -930,3 +930,82 @@ def test_the_ratchet_says_which_detector_moved(tmp_path):
 
     assert "backend_token" in message
     assert "(?!x)x" in message
+
+
+# --- gate-verifier 4回目の反例 -----------------------------------------------
+#
+# **自分で足した安全弁が唯一の fail-open 分岐になっていた。**
+# 「NUL を含むファイルはテキストでないので読まない」という中身の判定は、
+# ソースに NUL を1文字混ぜるだけで走査から外せる抜け道だった
+# （NUL は JS の文字列リテラルとして合法で、vite はビルドできる）。
+
+
+def test_a_source_with_a_nul_byte_is_still_scanned(tmp_path):
+    """**中身で読むかどうかを決めない。** 決めるのは場所と拡張子だけ。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "components" / "Notes.jsx").write_text(
+        "const MARKER = 'x\x00y';\n"
+        "export const Notes = () => fetch('/api/demo/status');\n",
+        encoding="utf-8")
+
+    kinds = _kinds(executor.run())
+
+    assert "forbidden_form" in kinds
+    assert "backend_url" in kinds
+
+
+def test_a_nul_byte_does_not_hide_a_re_export_shim(tmp_path):
+    """3回目に塞いだ再輸出シムが、NUL 1文字で完全に復活していた。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "components" / "shim.js").write_text(
+        "const MARKER = 'x\x00y';\n"
+        "export { apiFetch } from '../gateway/client.js';\n",
+        encoding="utf-8")
+
+    assert "bad_import" in _kinds(executor.run())
+
+
+def test_a_nul_byte_does_not_hide_a_comment_url(tmp_path):
+    report_files = _build(tmp_path)
+    (report_files.frontend / "src" / "components" / "Note.jsx").write_text(
+        "// https://unregistered.example.com/collect に送る\n"
+        "const M = 'x\x00y';\nexport const N = null;\n", encoding="utf-8")
+
+    assert "external_url" in _kinds(report_files.run())
+
+
+def test_an_undeclared_binary_suffix_is_read_not_skipped(tmp_path):
+    """宣言していない拡張子は、中身が何であろうと読む（fail-closed）。
+
+    誤検出が出るなら**拡張子を宣言する**（そしてラチェットが差分に出す）。
+    黙って読み飛ばす道は残さない。
+    """
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "blob.gif").write_bytes(
+        b'GIF89a\x00\x00 fetch("/api/demo/status")')
+
+    assert "forbidden_form" in _kinds(executor.run())
+
+
+def test_the_excluded_suffixes_are_pinned(tmp_path):
+    """読まない拡張子を黙って増やせない。"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    baseline["closure_excluded_suffixes"] = sorted(
+        baseline["closure_excluded_suffixes"] + [".jsx"])
+
+    assert any("判定が動いた" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_nothing_decides_what_to_read_by_content():
+    """**中身を見て読む／読まないを決める分岐が1つも無い**ことを固定する。
+
+    ここに分岐が戻ると、その条件を満たすファイルが走査から消える。
+    """
+    from backend.ux_verification import ui_api_closure
+
+    source = Path(ui_api_closure.__file__).read_text(encoding="utf-8")
+
+    assert "_BINARY_HINT" not in source
+    assert not hasattr(ui_api_closure, "_BINARY_HINT")

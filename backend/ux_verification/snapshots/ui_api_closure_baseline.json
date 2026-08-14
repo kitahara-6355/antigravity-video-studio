@@ -63,7 +63,8 @@
     "package-lock.json"
   ],
   "closure_excluded_suffixes": [
-    ".md"
+    ".md",
+    ".png"
   ],
   "detectors": {
     "absolute_url": "[A-Za-z][A-Za-z0-9+.\\-]*://[^\\s'\\\"`)<>]*",

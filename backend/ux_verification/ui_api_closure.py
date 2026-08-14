@@ -88,13 +88,27 @@ CLOSURE_EXCLUDED = frozenset({
 })
 # ファイル単位の除外。**ソースとして実行されないもの**だけ。
 CLOSURE_EXCLUDED_FILES = frozenset({"package-lock.json"})
-# 拡張子単位の除外。Markdown は Vite がアプリの一部として読み込まない
-# （このリポジトリに md プラグインは無い）。README のドキュメントリンクを
-# 許可リストに積むと、リストが「フロントが使う外部 URL」を表さなくなる。
+# 拡張子単位の除外。**中身では決めない。**
+#
+# もとは「NUL を含むファイルはテキストでないので読まない」という中身の判定に
+# していた。これが唯一の fail-open 分岐で、**ソースに NUL を1文字混ぜるだけで
+# そのファイルが読まれず4ゲート全緑**になっていた（gate-verifier 4回目の実測。
+# NUL は JS の文字列リテラルとして合法で、vite は問題なくビルドできる）。
+# 引き継ぎ文書に書いた「その場しのぎの安全弁を足さない」の再演だった。
+#
+# 中身で決めるのをやめ、**拡張子で宣言する**。ここに載っていない拡張子は
+# 中身が何であろうと読む。読み込みは errors="replace" なので、デコードできない
+# バイトがあっても走査は続く（誤検出が出ても FAIL が増えるだけ）。
 # **足せばラチェットが落ちる。**
-CLOSURE_EXCLUDED_SUFFIXES = frozenset({".md"})
-# 中身がテキストでないファイルは読まない（判定できない）。
-_BINARY_HINT = chr(0)
+CLOSURE_EXCLUDED_SUFFIXES = frozenset({
+    # Vite がアプリの一部として読み込まない（md プラグインは入っていない）。
+    # README のドキュメントリンクを許可リストに積むと、リストが
+    # 「フロントが使う外部 URL」を表さなくなる。
+    ".md",
+    # 画像。テキストとして読むと大量の誤検出になる。
+    # **実在するもの（public/assets/samples/*.png）だけを宣言する。**
+    ".png",
+})
 
 # 扉に置いてよいファイル。**ここに無いファイルは第2の扉**なので違反にする。
 ALLOWLIST_REL = f"{GATEWAY_DIR}/external_urls.json"
@@ -182,10 +196,10 @@ CLOSURE_SEMANTICS = {
         "呼び出し口の外に、宣言していない絶対 URL が1件も無い",
         ("呼び出し口の関数が、呼び出す以外の使われ方をしていない"
          "（変数に束ね直す・引数として渡す、は使用が判定から消えるので違反）"),
-        ("**frontend/ の下を全部読んでいる**（src の外も、拡張子を問わず）。"
-         "読まない場所（node_modules・dist・build・.vite・__pycache__・.git・"
-         "coverage・package-lock.json・`.md`）は宣言してベースラインに固定して"
-         "あり、1つ足せばラチェットが落ちる"),
+        ("**frontend/ の下を全部読んでいる。** 読むかどうかは**場所と拡張子だけ**で"
+         "決めており、**中身では決めない**（node_modules・dist・build・.vite・"
+         "__pycache__・.git・coverage / package-lock.json / `.md`・`.png`）。"
+         "宣言はベースラインに固定してあり、1つ足せばラチェットが落ちる"),
         ("走査したファイルの一覧が固定されている"
          "（走査から外せば、そこの呼び出しは何も出ない）"),
         ("扉の関数の使用が**回数まで**固定されている"
@@ -219,8 +233,8 @@ CLOSURE_SEMANTICS = {
          "対象外にしてある"),
         ("**frontend/ の外**（backend が配信する静的ファイルなど）。"
          "この判定は frontend/ の中しか読まない"),
-        ("**Markdown の中身**。Vite がアプリの一部として読み込まないので"
-         "走査から外してある（外していること自体は固定してある）"),
+        ("**宣言した拡張子の中身**（`.md`・`.png`）。走査から外してあること"
+         "自体はベースラインに固定してあるので、黙って増やせない"),
     ],
     "判定の性質": "禁止であって解決ではない。誤検出は FAIL を増やすだけで"
                   "沈黙にならないので、コメント除去のような前処理を持たない",
@@ -595,8 +609,6 @@ class ClosureExecutor:
         for path in self._iter_files():
             rel = self._rel(path)
             raw = path.read_text(encoding="utf-8", errors="replace")
-            if _BINARY_HINT in raw:
-                continue  # テキストでないファイルは判定できない
             report.files_scanned += 1
             report.scanned_files.append(rel)
             if rel.startswith(GATEWAY_DIR + "/"):
@@ -639,8 +651,6 @@ class ClosureExecutor:
             if rel.startswith(GATEWAY_DIR + "/"):
                 continue
             raw = path.read_text(encoding="utf-8", errors="replace")
-            if _BINARY_HINT in raw:
-                continue
             used, found = self._check_usage(raw, rel, report.entries)
             report.findings += found
             if used:
