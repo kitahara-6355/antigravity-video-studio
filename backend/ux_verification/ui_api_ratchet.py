@@ -106,7 +106,8 @@ def scan_boundary() -> dict:
 
 def write_baseline(report: UiApiReport, path: Path,
                    redeclarations: list | None = None,
-                   migrations: list | None = None) -> Path:
+                   migrations: list | None = None,
+                   resolutions: list | None = None) -> Path:
     """呼び出しごとに書き出す。タイムスタンプは入れない。"""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,6 +129,9 @@ def write_baseline(report: UiApiReport, path: Path,
     if migrations:
         # 呼び出し口への移行で消えた呼び出しの履歴。**差分に必ず出す。**
         payload["migrations"] = migrations
+    if resolutions:
+        # 読めなかった記述を直して消した履歴。**差分に必ず出す。**
+        payload["resolutions"] = resolutions
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=False)
         f.write("\n")
@@ -294,7 +298,8 @@ class UiApiRatchet:
                 + "\n".join(f"  {v}" for v in blocking))
         return write_baseline(report, path,
                               (baseline or {}).get("redeclarations"),
-                              migrations=(baseline or {}).get("migrations"))
+                              migrations=(baseline or {}).get("migrations"),
+                              resolutions=(baseline or {}).get("resolutions"))
 
     def migrate(self, report: UiApiReport, path: Path, reason: str) -> Path:
         """呼び出し口への移行で消えた呼び出しを、理由つきで受理する（P5）。
@@ -343,7 +348,52 @@ class UiApiRatchet:
                      "reason": reason.strip()} for v in moved]
         return write_baseline(report, path,
                               (baseline or {}).get("redeclarations"),
-                              migrations=history)
+                              migrations=history,
+                              resolutions=baseline.get("resolutions"))
+
+    def resolve(self, report: UiApiReport, path: Path, reason: str) -> Path:
+        """**読めなかった記述を消したことを、理由つきで受理する。**
+
+        `unscanned_form` や `unresolved_url` のサイトは「ここに読めないものが
+        ある」という FAIL の印であって、突き合った呼び出しではない。それを
+        コードごと直して消すのは**改善**なのに、`removed` として一律に拒むと
+        「読めない構文を永久に残す」しか道が無くなる。
+
+        受理するのは**ベースラインで matched でなかったサイトの削除だけ**。
+        matched（＝突き合っていた呼び出し）の削除は、いまも `--migrate` で
+        「同じ宣言にカタログ経由で届いている」ことを示さない限り通らない。
+        受理した分は `resolutions` に残り、PR の差分に必ず出る。
+        """
+        if not reason.strip():
+            raise ValueError("--resolve には理由が要ります")
+        baseline = load_baseline(path)
+        if baseline is None:
+            raise ValueError("ベースラインがありません")
+        result = self.check(report, baseline)
+
+        matched_removals = [v for v in result.violations
+                            if v.kind == "removed"
+                            and v.before == Verdict.MATCHED.value]
+        if matched_removals:
+            raise ValueError(
+                "突き合っていた呼び出しの削除は --resolve では受理しません"
+                "（--migrate で移行先を示してください）:\n"
+                + "\n".join(f"  {v}" for v in matched_removals))
+
+        blocking = [v for v in result.violations
+                    if v.kind not in ("removed", "unpinned_new")]
+        if blocking:
+            raise ValueError(
+                "削除以外の違反が残っています:\n"
+                + "\n".join(f"  {v}" for v in blocking))
+
+        history = list(baseline.get("resolutions") or [])
+        history += [{"key": v.key, "was": v.before, "reason": reason.strip()}
+                    for v in result.violations if v.kind == "removed"]
+        return write_baseline(report, path,
+                              (baseline or {}).get("redeclarations"),
+                              migrations=baseline.get("migrations"),
+                              resolutions=history)
 
     def redeclare(self, report: UiApiReport, path: Path, reason: str) -> Path:
         """当たり先の差し替えを理由つきで受理する。"""
@@ -364,7 +414,8 @@ class UiApiRatchet:
                      "reason": reason.strip()}
                     for v in result.violations if v.kind == "substituted"]
         return write_baseline(report, path, history,
-                              migrations=baseline.get("migrations"))
+                              migrations=baseline.get("migrations"),
+                              resolutions=baseline.get("resolutions"))
 
 
 # --- CLI ---------------------------------------------------------------------
@@ -381,6 +432,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--migrate", metavar="理由",
                         help="呼び出し口への移行で消えた呼び出しを理由つきで受理する"
                              "（カタログ経由で同じ宣言に届いているものだけ）")
+    parser.add_argument("--resolve", metavar="理由",
+                        help="読めなかった記述を直して消したことを理由つきで受理する"
+                             "（matched だったサイトの削除は受理しない）")
     args = parser.parse_args(argv)
 
     report = UiApiExecutor.for_repo().run()
@@ -392,6 +446,9 @@ def main(argv: list[str] | None = None) -> int:
         print("🚫 fetch 呼び出しを1件も読み取れませんでした。")
         return 1
 
+    if args.resolve is not None:
+        print(f"✅ 解消を受理しました: {ratchet.resolve(report, BASELINE, args.resolve)}")
+        return 0
     if args.migrate is not None:
         print(f"✅ 移行を受理しました: {ratchet.migrate(report, BASELINE, args.migrate)}")
         return 0

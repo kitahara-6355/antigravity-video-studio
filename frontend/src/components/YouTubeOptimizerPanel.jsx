@@ -74,6 +74,12 @@ const HookAnalysisDashboard = ({ hookData, onReanalyze, onAIImprove }) => {
     );
 };
 
+// 案の見出し。`String.fromCharCode` は「合成された URL」の禁止に
+// 引っかかる形なので使わない。**禁止の側を緩めずコードを直す** —
+// 誤検出を消すために禁止を狭めたら、実際に検出が1つ減っていた
+// （gate-verifier 1回目の反例 A1）。
+const CANDIDATE_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
 /**
  * サムネイルA/Bテストパネル
  */
@@ -96,7 +102,7 @@ const ThumbnailABPanel = ({ thumbnails, selectedId, onSelect, onRegenerate, onCu
                                 <img src={thumb.path} alt={`案${i + 1}`} />
                             ) : (
                                 <div className="thumbnail-placeholder">
-                                    <span>案{String.fromCharCode(65 + i)}</span>
+                                    <span>案{CANDIDATE_LABELS[i] ?? i + 1}</span>
                                 </div>
                             )}
                         </div>

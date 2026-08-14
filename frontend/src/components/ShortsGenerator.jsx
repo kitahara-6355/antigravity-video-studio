@@ -7,9 +7,8 @@
  * - ハイライト部分（感嘆詞検出）
  * - まとめ部分（終盤20%）
  *
- * バックエンドAPI:
- *   POST /api/shorts/candidates  — 候補抽出
- *   POST /api/shorts/render      — 縦型レンダリング
+ * バックエンド: カタログの postShortsCandidates（候補抽出）と
+ *   postShortsRender（縦型レンダリング）。パスは gateway/endpoints.js
  */
 import React, { useState } from 'react';
 import { apiFetch } from '../gateway/client.js';

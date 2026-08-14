@@ -56,6 +56,7 @@ from pathlib import Path
 
 from backend.ux_verification.ui_api import (
     _CATALOGUE_ENTRY_RE,
+    _EXCLUDED_DIRS,
     _FETCH_RE,
     _PURE_ORIGIN_RE,
     _URL_LITERAL_RE,
@@ -80,29 +81,36 @@ GATEWAY_FILES = (CATALOGUE_REL, CLIENT_REL, ALLOWLIST_REL)
 # 扉の外で禁止する呼び出しの形。**`ui_api` の検出器をそのまま借りる** —
 # 別に書き起こすと、片方を緩めてももう片方が気づかない。
 #
-# ただし「合成された URL」だけは外す。`String.fromCharCode(` / `atob(` /
-# `decodeURIComponent(` / `].join(` は**文字列を作る形であって呼び出しの形では
-# ない**。`ui_api` では、作った文字列が実際の呼び出しに渡りうるので検出対象に
-# する意味がある。閉包では呼び出しの形そのものを1つ残らず禁止しているので、
-# 合成された文字列を**渡す先が無い**。ここに入れておくと、URL と無関係な
-# `String.fromCharCode(65 + i)` のような表示コードが落ちるだけで、
-# 保護は1つも増えない（実測で1件当たった）。
+# **1つも外さない。** かつて「合成された URL」（`String.fromCharCode(` /
+# `atob(` / `decodeURIComponent(` / `].join(`）を「文字列を作る形であって
+# 呼び出しの形ではない。閉包では呼び出しの形を1つ残らず禁止しているので
+# 渡す先が無い」という理由で外していたが、**この理由は誤りだった**。
 #
-# **URL 属性は禁止の対象外**（`src={expr}` はデータ由来のことがある）。
-# したがって「式で作った URL を属性に入れる」経路はここでは確かめていない —
-# CLOSURE_SEMANTICS の『確かめないこと』に書いてある。
-_NOT_A_CALL_FORM = ("合成された URL",)
+# 渡す先はある — **URL 属性**（`src={expr}`）は禁止の対象外なので、
+# `<img src={['', 'api', 'tasks'].join('/')} />` は実際に backend へ GET を
+# 投げるのに、外した状態では閉包ゲートを素通りした（gate-verifier 1回目の
+# 実測反例 A1）。外したことで検出は確かに1つ減っていた。
+#
+# 誤検出（URL と無関係な `String.fromCharCode(65 + i)` など）は起きるが、
+# **それは FAIL が増えるだけで沈黙にはならない。** 禁止をすり抜ける方が重い。
+_NOT_A_CALL_FORM: tuple[str, ...] = ()
 FORBIDDEN_FORMS: dict[str, re.Pattern] = {
     "fetch": _FETCH_RE,
     "new WebSocket": _WEBSOCKET_RE,
     "window.open": _WINDOW_OPEN_RE,
-    **{name: pattern for name, pattern in UNSCANNED_FORMS.items()
-       if name not in _NOT_A_CALL_FORM},
+    **UNSCANNED_FORMS,
 }
 
 # 絶対 URL。スキームがあるものは全部。**backend も外部も区別しない** —
 # 区別した瞬間「backend かどうか」の判定が要り、そこが精度を要求する場所になる。
 _ABSOLUTE_URL_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://[^\s'\"`)<>]*")
+
+# `'/' + 'api' + '/tasks'`。**リテラルだけを `+` でつないだ並び**を丸ごと取る。
+# 変数が混ざったら（`'/ap' + kind`）その時点で並びが切れる — 結合できないものを
+# 結合したことにしない。
+_ONE_LITERAL_RE = re.compile(r"""(['"])((?:(?!\1)[^\\]|\\.)*)\1""")
+_JOINED_LITERALS_RE = re.compile(
+    r"""(['"])(?:(?!\1)[^\\]|\\.)*\1(?:\s*\+\s*(['"])(?:(?!\2)[^\\]|\\.)*\2)+""")
 
 # カタログの文法。項目行・開始行・終了行・行コメント・空行だけを許す。
 _CATALOGUE_OPEN = "export const ENDPOINTS = {"
@@ -125,12 +133,30 @@ def _usage_re(name: str) -> re.Pattern:
     return re.compile(rf"(?<![\w$.]){re.escape(name)}\s*\(\s*(?P<arg>[^),]*)")
 
 
+# 名前の出現そのもの（呼び出しかどうかを問わない）。**呼ぶ以外の使い方**を
+# 見つけるために要る — 変数に束ね直されると使用が判定から消える。
+def _bare_name_re(name: str) -> re.Pattern:
+    return re.compile(rf"(?<![\w$.]){re.escape(name)}(?![\w$])")
+
+
+_CALL_AFTER_RE = re.compile(r"\s*\(")
+
+
 CLOSURE_SEMANTICS = {
     "確かめること": [
         ("呼び出し口（frontend/" + GATEWAY_DIR + "/）の外に、"
          "ネットワーク呼び出しの形が1件も無い（コメント内も含む）"),
-        "呼び出し口の外に、backend のパスで始まる文字列リテラルが1件も無い",
+        ("呼び出し口の外に、backend のプレフィクスから始まる文字列リテラルが"
+         "1件も無い（`/api/x` と `api/x` の両方。**`/` を含まない単語1つは"
+         "対象外** — 宣言済みプレフィクスには health / soul / themes のような"
+         "普通の英単語が並ぶため）"),
+        ("呼び出し口の外に、リテラルを `+` でつないで作った backend の URL が"
+         "1件も無い（`'/' + 'api' + '/x'`。**変数を挟んだものは結合できない**）"),
         "呼び出し口の外に、宣言していない絶対 URL が1件も無い",
+        ("呼び出し口の関数が、呼び出す以外の使われ方をしていない"
+         "（変数に束ね直す・引数として渡す、は使用が判定から消えるので違反）"),
+        ("走査したファイルの一覧と除外ディレクトリが固定されている"
+         "（走査から外せば、そこの呼び出しは何も出ない）"),
         "カタログが1行1項目の閉じた文法だけでできている",
         "呼び出し口の関数の宛先が、すべてカタログのリテラルのキーである",
         "カタログのどの項目も、どこかから使われている",
@@ -153,6 +179,10 @@ CLOSURE_SEMANTICS = {
          "動作の保証ではない。フロントには CI が無く、手元実行が唯一の証拠）"),
         ("トークンを途中で割る難読化（`globalThis['fet'+'ch']` など）。"
          "**捕まらない。P5 はこれを解決しない**"),
+        ("**変数を挟んで組み立てた URL**（`'/ap' + kind` など）。"
+         "字句上つながっていないので結合できない。**捕まらない**"),
+        ("`/` を含まない単語1つの相対 URL。普通の英単語と区別が付かないので"
+         "対象外にしてある"),
     ],
     "判定の性質": "禁止であって解決ではない。誤検出は FAIL を増やすだけで"
                   "沈黙にならないので、コメント除去のような前処理を持たない",
@@ -180,6 +210,8 @@ class ClosureReport:
     # ファイル -> 使っているカタログのキー
     usages: dict[str, list[str]] = field(default_factory=dict)
     allowlist: list[dict] = field(default_factory=list)
+    # 実際に読んだファイル。**走査から外れたことを直接見る**ために持つ。
+    scanned_files: list[str] = field(default_factory=list)
 
     @property
     def closed(self) -> bool:
@@ -200,6 +232,7 @@ class ClosureExecutor:
         self.executor = executor
         self.frontend = executor.frontend_src.parent
         self.prefixes = executor.backend_prefixes
+        self._token_re: re.Pattern | None = None
 
     @classmethod
     def for_repo(cls) -> ClosureExecutor:
@@ -293,9 +326,21 @@ class ClosureExecutor:
         return findings
 
     def _is_backend_path(self, value: str) -> bool:
-        if not value.startswith("/"):
+        """backend のパスを指すリテラルか。
+
+        **先頭の `/` を要求しない。** `<img src="api/tasks" />` はブラウザが
+        相対解決して backend に GET を投げるのに、`/` で始まらないという
+        理由だけで素通りしていた（gate-verifier 1回目の実測反例 A3）。
+
+        ただし `/` を1つも含まない単語（`'health'` `'soul'` `'themes'`）は
+        対象にしない。宣言済みプレフィクスには普通の英単語が並んでいるので、
+        単語1つで落とすと無関係な文字列が大量に FAIL になる。
+        **この非対称は穴なので `CLOSURE_SEMANTICS` に書いてある。**
+        """
+        stripped = value.strip()
+        if "/" not in stripped:
             return False
-        head = value.strip("/").split("/", 1)[0].split("?", 1)[0]
+        head = stripped.lstrip("/").split("/", 1)[0].split("?", 1)[0]
         return head in self.prefixes
 
     # --- 扉の外 -------------------------------------------------------------
@@ -317,12 +362,55 @@ class ClosureExecutor:
                 "external_url", rel, _line_of(raw, hit.start()), url[:70],
                 "宣言していない絶対 URL です"
                 f"（{ALLOWLIST_REL} に理由つきで宣言してください）"))
-        for hit in _URL_LITERAL_RE.finditer(raw):
-            value = hit.group("value").strip()
-            if self._is_backend_path(value):
+        # **引用符の対応付けに頼らない。** 文字列リテラルとして拾おうとすると、
+        # ファイル内のどこかにあるアポストロフィ1つで対応がずれ、
+        # `src="api/tasks"` が巨大な「文字列」の中に飲まれて先頭が
+        # backend プレフィクスでなくなる（gate-verifier 1回目の反例 A3 が
+        # 素通りした本当の原因はこれだった）。**字句そのものを見る。**
+        for hit in self._backend_token_re().finditer(raw):
+            findings.append(Finding(
+                "backend_url", rel, _line_of(raw, hit.start()),
+                hit.group(0)[:70],
+                "backend のパスを呼び出し口の外に書けません"))
+        findings += self._check_joined_literals(raw, rel)
+        return findings
+
+    def _backend_token_re(self) -> re.Pattern:
+        """宣言済みプレフィクスで始まるパスの**字句**。
+
+        `/api/x` も `api/x` も拾う。直前が識別子・`.`・`/`・`-` のときは
+        拾わない（`foo/api/bar` や `../gateway/` は backend のパスではない）。
+        判定基準はプレフィクスの宣言側から導く（P4 の教訓）。
+        """
+        if self._token_re is None:
+            names = "|".join(sorted(re.escape(p) for p in self.prefixes))
+            self._token_re = re.compile(
+                rf"(?<![\w./\-])/?(?:{names})/[\w\-./{{}}]*")
+        return self._token_re
+
+    def _check_joined_literals(self, raw: str, rel: str) -> list[Finding]:
+        """**リテラルを `+` で割って組み立てた URL。**
+
+        `'/' + 'api' + '/tasks'` は、どの1つを取っても backend のパスに
+        見えないので、リテラル単体の禁止をすり抜ける（gate-verifier 1回目の
+        実測反例 A2。4ゲートすべてを素通りした）。
+
+        隣り合うリテラルを `+` でつないだ**字句上の**並びだけを結合して判定する。
+        変数を挟んだもの（`'/ap' + kind`）は結合できないので**捕まらない** —
+        それは `CLOSURE_SEMANTICS` の『確かめないこと』に書いてある。
+        字句だけなので誤検出しても FAIL が増えるだけで、沈黙にはならない。
+        """
+        findings = []
+        for hit in _JOINED_LITERALS_RE.finditer(raw):
+            pieces = _ONE_LITERAL_RE.findall(hit.group(0))
+            if len(pieces) < 2:
+                continue
+            joined = "".join(piece for _, piece in pieces)
+            if self._is_backend_path(joined) or _ABSOLUTE_URL_RE.match(joined):
                 findings.append(Finding(
-                    "backend_url", rel, _line_of(raw, hit.start()), value[:70],
-                    "backend のパスを呼び出し口の外に書けません"))
+                    "joined_backend_url", rel, _line_of(raw, hit.start()),
+                    joined[:70],
+                    "リテラルを `+` でつないで backend の URL を作っています"))
         return findings
 
     # --- 使用（C-3） --------------------------------------------------------
@@ -331,6 +419,13 @@ class ClosureExecutor:
                      entries: dict[str, str]) -> tuple[list[str], list[Finding]]:
         findings: list[Finding] = []
         names: list[str] = []
+        # import 文が占める範囲。そこに現れる名前は「使用」ではない。
+        import_spans: set[int] = set()
+        offset = 0
+        for line in raw.split("\n"):
+            if _GATEWAY_MENTION in line and _IMPORTS_SOMETHING_RE.search(line):
+                import_spans |= set(range(offset, offset + len(line) + 1))
+            offset += len(line) + 1
         for number, line in enumerate(raw.split("\n"), start=1):
             if _GATEWAY_MENTION not in line or not _IMPORTS_SOMETHING_RE.search(line):
                 continue
@@ -355,6 +450,21 @@ class ClosureExecutor:
 
         used: list[str] = []
         for name in names:
+            # **扉の関数は「呼ぶ」以外に使えない。**
+            # `const call = apiFetch; call(key)` と束ね直すと、呼び出し地点に
+            # 扉の名前が現れないので使用そのものが判定から消える
+            # （gate-verifier 1回目の実測反例。4ゲートすべて素通りした）。
+            # 引数として渡す・プロパティに入れる・再代入する、も同じ形。
+            # 呼び出し位置（直後が `(`）以外の出現は1つ残らず違反にする。
+            for hit in _bare_name_re(name).finditer(raw):
+                if _CALL_AFTER_RE.match(raw, hit.end()):
+                    continue  # 呼び出し。これだけが許される使い方
+                if hit.start() in import_spans:
+                    continue  # import 文そのもの
+                findings.append(Finding(
+                    "escaped_gateway_name", rel, _line_of(raw, hit.start()), name,
+                    f"{name} は呼び出す以外に使えません"
+                    "（変数に束ね直す・引数として渡すと、使用が判定から消える）"))
             for hit in _usage_re(name).finditer(raw):
                 arg = hit.group("arg").strip()
                 line = _line_of(raw, hit.start())
@@ -391,6 +501,7 @@ class ClosureExecutor:
             rel = _display_path(path, self.executor.frontend_src).replace("\\", "/")
             raw = path.read_text(encoding="utf-8", errors="replace")
             report.files_scanned += 1
+            report.scanned_files.append(rel)
             if rel.startswith(GATEWAY_DIR + "/"):
                 gateway_seen.add(rel)
                 if rel == CATALOGUE_REL:
@@ -453,7 +564,8 @@ class ClosureExecutor:
 # --- ラチェット（C-5） --------------------------------------------------------
 
 DECLARATION_KEYS = ("forbidden_forms", "gateway_files", "scanned_suffixes",
-                    "allowlist", "usages", "entries")
+                    "excluded_dirs", "scanned_files", "allowlist", "usages",
+                    "entries")
 
 
 def declaration() -> dict:
@@ -463,11 +575,20 @@ def declaration() -> dict:
                             for name, pattern in sorted(FORBIDDEN_FORMS.items())},
         "gateway_files": sorted(GATEWAY_FILES),
         "scanned_suffixes": sorted(SCANNED_SUFFIXES),
+        # **走査から外す場所。** ここに1つ足すだけで、そのディレクトリの
+        # 生 fetch がゲートにもラチェットにも出なくなる。C-5 が名指しした
+        # 「除外ディレクトリの追加」がこれで、固定していなかったので
+        # 4ゲート＋テストのすべてを素通りしていた（gate-verifier 1回目）。
+        "excluded_dirs": sorted(_EXCLUDED_DIRS),
     }
 
 
 def snapshot(report: ClosureReport) -> dict:
     payload = declaration()
+    # **実際に読んだファイルの一覧。** 除外ディレクトリを固定しても、
+    # 走査範囲を狭める道は他にもある（拡張子・到達可能性・rglob の起点）。
+    # 「前は読んでいたのに読まなくなった」を直接見る。
+    payload["scanned_files"] = sorted(report.scanned_files)
     payload["allowlist"] = sorted(
         f"{e.get('file')}|{e.get('url')}" for e in report.allowlist)
     payload["usages"] = {rel: sorted(keys)
@@ -510,7 +631,15 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
     now = snapshot(report)
     # 判定の本体。**どちらに動いても違反。** 増やすのも「見えていたものが
     # 見えなくなる」経路（正規表現の差し替え）になりうる。
-    for key in ("forbidden_forms", "gateway_files", "scanned_suffixes"):
+    # 前は読んでいたのに読まなくなったファイル。**除外ディレクトリの追加**が
+    # ここに出る（C-5 が名指しした弱化。1回目の検証で素通りしていた）。
+    for rel in baseline["scanned_files"]:
+        if rel not in now["scanned_files"]:
+            violations.append(
+                f"[走査から外れた] {rel} を読まなくなりました"
+                "（除外ディレクトリ・拡張子・到達可能性のどれかが狭まった）")
+    for key in ("forbidden_forms", "gateway_files", "scanned_suffixes",
+                "excluded_dirs"):
         if baseline[key] != now[key]:
             violations.append(
                 f"[判定が動いた] {key}: {_render(baseline[key])} → {_render(now[key])}"
@@ -619,8 +748,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.gate and not report.closed:
         return 1
     if args.gate:
-        print("\n✅ 呼び出し口の外に、呼び出しの形も backend の URL も"
-              "宣言していない絶対 URL もありません。")
+        # **測ったことしか言わない。** 「呼び出しは無い」と言い切ると、
+        # 確かめていない経路（変数を挟んだ URL・データ由来の URL 属性）まで
+        # 保証したことになる（gate-verifier 1回目の指摘）。
+        print("\n✅ 禁止した呼び出しの形・backend の URL リテラル・"
+              "宣言していない絶対 URL は、呼び出し口の外に1件もありません"
+              "（--semantics に確かめていないものを列挙してあります）。")
     return 0
 
 

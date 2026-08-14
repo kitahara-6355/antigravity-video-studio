@@ -7,7 +7,6 @@
     "src/components/QuickDecisionBar.jsx|?|currentItem.preview": "unresolved_url",
     "src/components/SceneTimeline.jsx|?|scene.image": "unresolved_url",
     "src/components/YouTubeOptimizerPanel.jsx|?|thumb.path": "unresolved_url",
-    "src/components/YouTubeOptimizerPanel.jsx|?|合成された URL": "unscanned_form",
     "src/pages/EditorPage.jsx|GET|/api/video": "matched",
     "src/gateway/client.js|?|apiUrl(name, { params, query })": "gateway_dispatch",
     "src/gateway/endpoints.js|DELETE|/api/pipeline/dictionary/{entry_id}": "matched",
@@ -105,7 +104,6 @@
     "src/components/QuickDecisionBar.jsx|?|currentItem.preview": "",
     "src/components/SceneTimeline.jsx|?|scene.image": "",
     "src/components/YouTubeOptimizerPanel.jsx|?|thumb.path": "",
-    "src/components/YouTubeOptimizerPanel.jsx|?|合成された URL": "",
     "src/pages/EditorPage.jsx|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
     "src/gateway/client.js|?|apiUrl(name, { params, query })": "",
     "src/gateway/endpoints.js|DELETE|/api/pipeline/dictionary/{entry_id}": "static_route_scan: routers/pipeline_router.py:1260 DELETE /api/pipeline/dictionary/{entry_id}",
@@ -784,6 +782,13 @@
       "was": "matched",
       "now_via": "static_route_scan: routers/render.py:386 POST /api/render",
       "reason": "P5: frontend/src の全呼び出しを呼び出し口 gateway/client.js 経由に移行。コンポーネント側の呼び出しはカタログ（gateway/endpoints.js）の項目に置き換わった"
+    }
+  ],
+  "resolutions": [
+    {
+      "key": "src/components/YouTubeOptimizerPanel.jsx|?|合成された URL",
+      "was": "unscanned_form",
+      "reason": "String.fromCharCode(65 + i) を配列参照に直した。合成された URL の禁止を緩めずコードを直す（gate-verifier 1回目の反例 A1）"
     }
   ]
 }

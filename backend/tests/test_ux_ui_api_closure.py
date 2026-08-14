@@ -409,9 +409,15 @@ def test_the_ban_covers_every_call_form_that_ui_api_knows():
     assert {"fetch", "new WebSocket", "window.open"} <= set(FORBIDDEN_FORMS)
 
 
-def test_the_excluded_form_is_declared_and_is_not_a_call_form():
-    """外した理由が意味表に書いてある（黙って外さない）。"""
-    assert _NOT_A_CALL_FORM == ("合成された URL",)
+def test_nothing_is_excluded_from_the_ban():
+    """**禁止語彙から1つも外さない。**
+
+    かつて「合成された URL」を『呼び出しの形ではない』という理由で外していたが、
+    URL 属性という渡す先があり、検出が実際に1つ減っていた
+    （gate-verifier 1回目の反例 A1）。外すなら名指しで宣言する仕組みは残すが、
+    **いまは空でなければならない。**
+    """
+    assert _NOT_A_CALL_FORM == ()
     assert "URL 属性の式" in "".join(CLOSURE_SEMANTICS["確かめないこと"])
 
 
@@ -508,3 +514,148 @@ def test_the_snapshot_covers_every_declared_field(tmp_path):
     taken = snapshot(_build(tmp_path).run())
 
     assert set(taken) == set(DECLARATION_KEYS)
+
+
+# --- gate-verifier 1回目の反例（すべて実測で素通りしたもの） -------------------
+#
+# 修正が新しい沈黙を作らないよう、**破られた形をそのまま**固定する。
+
+
+def test_a_relative_backend_path_is_a_violation(tmp_path):
+    """`src="api/tasks"` は `/` で始まらないが、ブラウザは backend に GET を投げる。
+
+    反例 A3。`/` で始まることを要求していたので素通りしていた。
+    """
+    report = _build(tmp_path, extra={
+        "components/Sneak.jsx": """
+            export const Sneak = () => <img alt="" src="api/demo/status" />;
+        """}).run()
+
+    assert "backend_url" in _kinds(report)
+
+
+def test_a_backend_path_is_found_even_when_quotes_drift(tmp_path):
+    """**引用符の対応付けに頼らない。**
+
+    A3 が素通りした本当の原因はこれだった。ファイルのどこかにアポストロフィが
+    1つあると文字列リテラルの対応がずれ、`src="api/x"` が巨大な「文字列」の
+    中に飲まれて先頭が backend プレフィクスでなくなる。字句そのものを見る。
+    """
+    report = _build(tmp_path, extra={
+        "components/Sneak.jsx": """
+            // it's a comment with an apostrophe
+            export const Sneak = () => <img alt="" src="/api/demo/status" />;
+        """}).run()
+
+    assert "backend_url" in _kinds(report)
+
+
+def test_literals_joined_with_plus_are_a_violation(tmp_path):
+    """`'/' + 'api' + '/x'` はどの1つも backend に見えない。反例 A2。"""
+    report = _build(tmp_path, extra={
+        "components/Sneak.jsx": """
+            export const URL = '/' + 'api' + '/demo/status';
+        """}).run()
+
+    assert "joined_backend_url" in _kinds(report)
+
+
+def test_a_literal_joined_with_a_variable_is_not_claimed_to_be_caught(tmp_path):
+    """**捕まらないことを固定する。** 結合できないものを結合したことにしない。"""
+    report = _build(tmp_path, extra={
+        "components/Sneak.jsx": """
+            export const make = (kind) => '/ap' + kind;
+        """}).run()
+
+    assert "joined_backend_url" not in _kinds(report)
+    assert "変数を挟んで組み立てた URL" in "".join(
+        CLOSURE_SEMANTICS["確かめないこと"])
+
+
+def test_a_synthesised_url_form_is_still_banned(tmp_path):
+    """反例 A1。`['', 'api', 'x'].join('/')` は URL 属性に入れば GET になる。
+
+    「呼び出しの形ではないから」と禁止語彙から外していたが、
+    **URL 属性という渡す先があった**ので外したのは誤りだった。
+    """
+    report = _build(tmp_path, extra={
+        "components/Sneak.jsx": """
+            export const Sneak = () => <img alt="" src={['', 'x'].join('/')} />;
+        """}).run()
+
+    assert "forbidden_form" in _kinds(report)
+
+
+def test_the_ban_excludes_nothing_from_ui_api(tmp_path):
+    """**1つも外さない。** 外すたびに、その形の検出が実際に減る。"""
+    assert _NOT_A_CALL_FORM == ()
+    assert set(UNSCANNED_FORMS) <= set(FORBIDDEN_FORMS)
+
+
+def test_binding_a_gateway_function_to_a_variable_is_a_violation(tmp_path):
+    """`const call = apiFetch; call(key)` は使用が判定から消える。C-3 の反例。"""
+    report = _build(tmp_path, app="""
+        import { apiFetch } from '../gateway/client.js';
+
+        const call = apiFetch;
+
+        export default function App(key) {
+          return call(key);
+        }
+    """).run()
+
+    assert "escaped_gateway_name" in _kinds(report)
+
+
+def test_passing_a_gateway_function_as_an_argument_is_a_violation(tmp_path):
+    report = _build(tmp_path, app="""
+        import { apiFetch } from '../gateway/client.js';
+
+        export default function App(run) {
+          return run(apiFetch);
+        }
+    """).run()
+
+    assert "escaped_gateway_name" in _kinds(report)
+
+
+def test_a_plain_call_is_not_flagged_as_an_escape(tmp_path):
+    """過検出で普通の呼び出しを落とさない。"""
+    report = _build(tmp_path).run()
+
+    assert "escaped_gateway_name" not in _kinds(report)
+
+
+def test_excluding_a_directory_is_a_ratchet_violation(tmp_path):
+    """**C-5 が名指しした弱化。** 1回目の検証では4ゲートを素通りしていた。"""
+    executor = _build(tmp_path, extra={"hooks/useThing.js": "export const x = 1;\n"})
+    baseline = _pinned(tmp_path, executor)
+    # 除外ディレクトリを増やした状態を模す
+    baseline["excluded_dirs"] = [d for d in baseline["excluded_dirs"]] + ["hooks"]
+
+    violations = check_ratchet(executor.run(), baseline)
+
+    assert any("判定が動いた" in v for v in violations)
+
+
+def test_a_file_dropping_out_of_the_scan_is_a_ratchet_violation(tmp_path):
+    """除外ディレクトリ以外の道（拡張子・到達可能性）で狭めても出る。"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    baseline["scanned_files"] = sorted(
+        baseline["scanned_files"] + ["src/components/Gone.jsx"])
+
+    assert any("走査から外れた" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_the_success_message_does_not_claim_more_than_it_measured():
+    """**測ったことしか言わない。** 「呼び出しは無い」と言い切らない。"""
+    checked = "".join(CLOSURE_SEMANTICS["確かめること"])
+    not_checked = "".join(CLOSURE_SEMANTICS["確かめないこと"])
+
+    # PASS 側は「禁止した形が無い」までで、「呼び出しが無い」ではない
+    assert "ネットワーク呼び出しの形が1件も無い" in checked
+    # すり抜ける道が確かめないことに実在する
+    assert "変数を挟んで組み立てた URL" in not_checked
+    assert "URL 属性の式" in not_checked

@@ -408,3 +408,66 @@ def test_updating_the_baseline_keeps_the_migration_history(tmp_path):
     UiApiRatchet().update(grown, tmp_path / "baseline.json")
 
     assert load_baseline(tmp_path / "baseline.json")["migrations"]
+
+
+# --- 読めなかった記述の解消（--resolve） --------------------------------------
+#
+# `unscanned_form` / `unresolved_url` は「ここに読めないものがある」という
+# FAIL の印であって、突き合った呼び出しではない。コードごと直して消すのは
+# **改善**なのに `removed` として一律に拒むと、読めない構文を永久に残すしか
+# なくなる。**ただし matched の削除を紛れ込ませてはいけない。**
+
+
+def test_resolving_an_unreadable_site_is_accepted(tmp_path):
+    before = _report(_site(verdict=Verdict.UNSCANNED_FORM, declared=""),
+                     _site(path="/api/y", declared="routers/demo.py:20"))
+    _pinned(tmp_path, before)
+    after = _report(_site(path="/api/y", declared="routers/demo.py:20"))
+
+    UiApiRatchet().resolve(after, tmp_path / "baseline.json", "構文を直した")
+
+    assert UiApiRatchet().check(
+        after, load_baseline(tmp_path / "baseline.json")).valid
+
+
+def test_resolving_refuses_to_delete_a_matched_call(tmp_path):
+    """**突き合っていた呼び出しの削除は受理しない。** ここが緩めば抜け道になる。"""
+    _pinned(tmp_path, _report(_site(declared="routers/demo.py:10"),
+                              _site(path="/api/y", declared="routers/demo.py:20")))
+    after = _report(_site(path="/api/y", declared="routers/demo.py:20"))
+
+    with pytest.raises(ValueError, match="--resolve では受理しません"):
+        UiApiRatchet().resolve(after, tmp_path / "baseline.json", "消したい")
+
+
+def test_resolving_needs_a_reason(tmp_path):
+    _pinned(tmp_path, _report(_site(verdict=Verdict.UNSCANNED_FORM, declared="")))
+    after = _report(_site(path="/api/y", declared="routers/demo.py:20"))
+
+    with pytest.raises(ValueError, match="理由が要ります"):
+        UiApiRatchet().resolve(after, tmp_path / "baseline.json", "  ")
+
+
+def test_resolving_is_recorded_in_the_baseline_diff(tmp_path):
+    _pinned(tmp_path, _report(_site(verdict=Verdict.UNSCANNED_FORM, declared=""),
+                              _site(path="/api/y", declared="routers/demo.py:20")))
+    after = _report(_site(path="/api/y", declared="routers/demo.py:20"))
+
+    UiApiRatchet().resolve(after, tmp_path / "baseline.json", "構文を直した")
+
+    recorded = load_baseline(tmp_path / "baseline.json")["resolutions"]
+    assert [r["was"] for r in recorded] == ["unscanned_form"]
+    assert recorded[0]["reason"] == "構文を直した"
+
+
+def test_updating_the_baseline_keeps_the_resolution_history(tmp_path):
+    _pinned(tmp_path, _report(_site(verdict=Verdict.UNSCANNED_FORM, declared=""),
+                              _site(path="/api/y", declared="routers/demo.py:20")))
+    after = _report(_site(path="/api/y", declared="routers/demo.py:20"))
+    UiApiRatchet().resolve(after, tmp_path / "baseline.json", "構文を直した")
+
+    grown = _report(_site(path="/api/y", declared="routers/demo.py:20"),
+                    _site(path="/api/z", declared="routers/demo.py:30"))
+    UiApiRatchet().update(grown, tmp_path / "baseline.json")
+
+    assert load_baseline(tmp_path / "baseline.json")["resolutions"]

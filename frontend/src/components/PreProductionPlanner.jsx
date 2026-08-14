@@ -4,7 +4,7 @@
  * MrBeast流: 撮影前にタイトル→サムネ→CTR予測を実行。
  * CTR基準（4%+）を満たさない企画は早期に没にし、制作コストを節約。
  * 
- * バックエンドAPI: POST /api/youtube/pre-plan
+ * バックエンド: カタログの postYoutubePrePlan（gateway/endpoints.js）
  */
 import React, { useState } from 'react';
 import { apiFetch } from '../gateway/client.js';
