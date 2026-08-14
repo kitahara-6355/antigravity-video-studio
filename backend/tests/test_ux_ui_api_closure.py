@@ -782,7 +782,8 @@ def test_every_detector_is_pinned(tmp_path):
 
     assert set(taken["detectors"]) == {
         "absolute_url", "protocol_relative", "backend_token", "call_after",
-        "catalogue_entry", "gateway_import", "joined_literals", "one_literal"}
+        "catalogue_entry", "gateway_import", "joined_literals", "one_literal",
+        "relative_spec", "root_spec"}
 
 
 def test_this_file_is_registered_in_testpaths():
@@ -1428,3 +1429,120 @@ def test_the_semantics_admit_the_pin_does_not_work_in_the_gate():
 
     assert "ハッシュ固定はゲートでは効かない" in not_checked
     assert "`node_modules` / `dist` の中身" in not_checked
+
+
+# --- gate-verifier 9回目の反例 -----------------------------------------------
+#
+# **走査範囲を「到達可能性」ではなく「場所」で決めていた。**
+# エントリから import されていて実際に実行されるのに、`frontend/` の外に
+# 置くだけで1行も読まれない。3回目の反例（`frontend/lib/api.js`）と同型で、
+# 境界を `src` → `frontend` に1段上げた修正が、もう1段上に効いていなかった。
+#
+# **難読化も `git add -f` も要らない素の書き方**で、`fetch(` と
+# backend URL リテラルと未宣言の絶対 URL が同居したまま4ゲート全緑だった。
+#
+# 走査を到達可能性に作り替えると import 指定子の解決という精度を要求する
+# 仕事が増える（解決に失敗したファイルが黙って読まれなくなる）。
+# **禁止で閉じる** — 走査した場所から走査していない場所を名指しできない。
+
+
+def _entry(executor, source: str) -> None:
+    (executor.frontend / "src" / "main.jsx").write_text(
+        textwrap.dedent(source), encoding="utf-8")
+
+
+def test_importing_from_outside_the_frontend_is_a_violation(tmp_path):
+    """反例1。`frontend/` の外は1行も読んでいないので、名指しを禁止する。"""
+    executor = _build(tmp_path)
+    (tmp_path / "shared_ui").mkdir()
+    (tmp_path / "shared_ui" / "net.js").write_text(
+        "export const pwn = () => fetch('/api/demo/status');\n", encoding="utf-8")
+    _entry(executor, """
+        import { pwn } from '../../shared_ui/net.js';
+        if (window.__y) pwn();
+    """)
+
+    report = executor.run()
+
+    assert "escapes_frontend" in _kinds(report)
+    assert any(f.line and f.excerpt.startswith("../../shared_ui")
+               for f in report.findings)
+
+
+def test_pointing_at_the_build_output_is_a_violation(tmp_path):
+    """反例2。`dist` は走査もハッシュ固定もしないので、名指しを禁止する。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "dist").mkdir()
+    (executor.frontend / "dist" / "payload.js").write_text(
+        "export const boom = () => fetch('/api/demo/status');\n",
+        encoding="utf-8")
+    _entry(executor, "import { boom } from '../dist/payload.js';\n")
+
+    assert "points_at_unscanned" in _kinds(executor.run())
+
+
+def test_pointing_at_the_build_output_from_the_project_root_is_a_violation(
+        tmp_path):
+    """vite は `/x` を frontend/ から解決する。`../` と同じ場所を指す。"""
+    executor = _build(tmp_path)
+    _entry(executor, "const payload = '/dist/payload.js';\nexport default payload;\n")
+
+    assert "points_at_unscanned" in _kinds(executor.run())
+
+
+def test_pointing_at_node_modules_is_a_violation(tmp_path):
+    """依存の中身も読んでいない。名指しで持ち出せば同じ穴になる。"""
+    executor = _build(tmp_path)
+    _entry(executor, "import x from '../node_modules/.bin/payload.js';\nexport default x;\n")
+
+    assert "points_at_unscanned" in _kinds(executor.run())
+
+
+def test_the_gateway_itself_cannot_escape(tmp_path):
+    """**扉の中も対象。** 扉が外を読めるなら、閉包は扉ごと外に広がる。"""
+    # 扉は src/gateway/ にあるので、外に出るには3段のぼる必要がある。
+    executor = _build(tmp_path, client=_CLIENT + """
+        export { pwn } from '../../../shared_ui/net.js';
+    """)
+
+    assert "escapes_frontend" in _kinds(executor.run())
+
+
+def test_a_normal_relative_import_is_not_flagged(tmp_path):
+    """**誤検出のコストは実測で0。** 現物の 57 ファイルにも1件も無い。"""
+    executor = _build(tmp_path, extra={"components/Panel.jsx": """
+        import { apiFetch } from '../gateway/client.js';
+        import logo from './logo.png';
+
+        export const Panel = () => apiFetch('getStatus') && logo;
+    """})
+    _binary(executor, "src/components/logo.png",
+            bytes.fromhex("89504e470d0a1a0a") + b"\x01" * 8)
+
+    assert _kinds(executor.run()) == []
+
+
+def test_the_reference_detectors_are_pinned(tmp_path):
+    """字句の当たり方を差し替えれば、名指しの禁止を無効にできる。"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    baseline["detectors"]["relative_spec"] = "(?!x)x"
+
+    assert any("判定が動いた" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_the_semantics_admit_the_scan_is_bounded_by_place(tmp_path):
+    """**測っていないことを『確かめること』に書かない**（3型目の失敗）。
+
+    9回目は逆向きで、`--semantics` の『確かめること』に
+    「差集合なので固定から漏れない」と書いてあるのに、`dist` は差集合にも
+    入っていなかった（実測で偽）。主張のほうを事実に合わせる。
+    """
+    checked = "".join(CLOSURE_SEMANTICS["確かめること"])
+    not_checked = "".join(CLOSURE_SEMANTICS["確かめないこと"])
+
+    assert "名指しで参照していない" in checked
+    assert "この差集合にも入らない" in checked
+    assert "名指しで参照することを禁止" in not_checked
+    assert "npm パッケージ名での import" in not_checked

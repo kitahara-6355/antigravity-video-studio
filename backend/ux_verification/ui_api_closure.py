@@ -52,6 +52,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -195,6 +196,29 @@ _ONE_LITERAL_RE = re.compile(r"""(['"])((?:(?!\1)[^\\]|\\.)*)\1""")
 _JOINED_LITERALS_RE = re.compile(
     r"""(['"])(?:(?!\1)[^\\]|\\.)*\1(?:\s*\+\s*(['"])(?:(?!\2)[^\\]|\\.)*\2)+""")
 
+# **走査した場所から、走査していない場所を名指しで参照しない。**
+#
+# 走査範囲を「エントリからの到達可能性」ではなく「`frontend/` という場所」で
+# 決めているので、到達可能なのに読まれないファイルを作れた。実測の反例は2つ:
+#
+# - `shared_ui/net.js`（frontend の外）を `main.jsx` から
+#   `import { pwn } from '../../shared_ui/net.js'` する。**難読化なし・
+#   `git add -f` も不要**で、`fetch(` も `/api/pipeline/tasks` も未宣言の
+#   絶対 URL も4ゲート全緑を素通りした（gate-verifier 9回目の反例1）
+# - `frontend/dist/payload.js` を `git add -f` で入れて `../dist/` から
+#   import する。`dist` は走査もハッシュ固定もしない唯一の場所なので、
+#   置くだけで無検査だった（同 反例2）
+#
+# 走査範囲を到達可能性に作り替えると、import 指定子の解決という**精度を
+# 要求する仕事**が増える（解決に失敗したファイルが黙って読まれなくなる＝
+# P4 が14回破られた型）。**禁止で閉じる。** 走査した場所に書かれた相対パスの
+# リテラルが走査対象の外を指していたら違反にする。字句だけで決まるので
+# 精度が要らず、誤検出は FAIL が増えるだけで沈黙にならない。
+_RELATIVE_SPEC_RE = re.compile(r"""(['"`])(\.{1,2}/[^'"`\n]*)\1""")
+# vite は `/x` を**プロジェクトルート**（= frontend/）から解決するので、
+# `/dist/payload.js` は `../dist/payload.js` と同じ場所を指す。
+_ROOT_SPEC_RE = re.compile(r"""(['"`])(/[^'"`\n]*)\1""")
+
 # カタログの文法。項目行・開始行・終了行・行コメント・空行だけを許す。
 _CATALOGUE_OPEN = "export const ENDPOINTS = {"
 _CATALOGUE_CLOSE = "};"
@@ -247,13 +271,25 @@ CLOSURE_SEMANTICS = {
          "取り出せた"),
         ("frontend/ の下に symlink が無い（走査が降りないので、"
          "あれば違反にする）"),
+        ("**走査した場所から、走査していない場所を名指しで参照していない。**"
+         "frontend/ の外を指す相対パスのリテラル（`'../../shared_ui/net.js'`）と、"
+         "`node_modules` / `dist` を指すリテラルは違反。**走査範囲は"
+         "「到達可能性」ではなく「frontend/ という場所」で決めている**ので、"
+         "外に置いて import すれば無検査で実行できた（9回目の実測。難読化も "
+         "`git add -f` も要らない素の書き方で4ゲート全緑だった）。"
+         "解決ではなく禁止で閉じている — `../` の数と自分の位置だけで決まり、"
+         "import 指定子を解決しない"),
         ("**走査しなかったファイルの中身が、1バイトも変わっていない**"
          "（内容の sha256 をベースラインに固定する）。**バイナリだけではない** — "
          "`package-lock.json` のように別の理由で読まないものも例外なく入る。"
          "対象は「全ファイル − 走査したファイル」の**差集合**なので、"
          "どんな理由で読まないことにしても固定から漏れない"
          "（除外の条件と固定の条件が別々に書かれていて、lockfile だけが"
-         "両方から落ちていた。8回目の実測）。新規追加も差し替えも"
+         "両方から落ちていた。8回目の実測）。"
+         "**ただし `node_modules` / `dist` はこの差集合にも入らない** — "
+         "走査もハッシュ固定もしない唯一の場所で、`git add -f` すれば"
+         "中身を置ける（9回目の実測）。そこは上の「名指しで参照しない」で"
+         "閉じている。新規追加も差し替えも"
          "ラチェットが落とし、**固定を増やすには `--pin \"理由\"` が要る**"
          "（`--update-baseline` は理由なしにピンを増やせない）。"
          "先頭バイトが既知の画像マジックであることも見るが、"
@@ -311,9 +347,13 @@ CLOSURE_SEMANTICS = {
          "突き合わせなので `--ratchet` の担当で、`--gate` 単体では"
          "差し替えを検出しない（CI は両方走らせる。この非対称は穴なので"
          "ここに書いてある）"),
-        ("**`node_modules` / `dist` の中身。** gitignore 対象のビルド生成物で"
-         "CI に存在しないため、走査もハッシュ固定もしない"
-         "**唯一の場所**。ここに置いたものについては何も言わない"),
+        ("**`node_modules` / `dist` の中身。** ビルド生成物・依存なので、"
+         "走査もハッシュ固定もしない**唯一の場所**。`git add -f` すれば"
+         "中身を置けてしまう（9回目の実測）。中身については何も言わない代わりに、"
+         "**走査した場所からそこを名指しで参照することを禁止**して閉じている"),
+        ("**npm パッケージ名での import**（`import x from 'react'`）。"
+         "解決先は `node_modules` で、その中身は読まない。"
+         "パッケージを1つ足すこと自体はこの判定では止まらない"),
     ],
     "判定の性質": "禁止であって解決ではない。誤検出は FAIL を増やすだけで"
                   "沈黙にならないので、コメント除去のような前処理を持たない",
@@ -640,6 +680,50 @@ class ClosureExecutor:
                 rf"|(?<![\w./\-])(?:{names})/)[\w\-./{{}}]*")
         return self._token_re
 
+    def _check_reference_closure(self, raw: str, rel: str,
+                                 path: Path) -> list[Finding]:
+        """**走査した集合が、参照について閉じている。**
+
+        走査範囲は「場所」で決まっているので、そこから外を名指しできるなら
+        範囲は実質的に外まで広がっている。**外を名指しすること自体を禁止**
+        すれば、読んだ範囲がそのまま実行される範囲になる。
+
+        判定は字句だけ。`../` の数と自分の位置で決まるので、import 指定子を
+        解決する必要が無い（解決は精度を要求し、失敗が沈黙になる）。
+        """
+        findings: list[Finding] = []
+        for hit in _RELATIVE_SPEC_RE.finditer(raw):
+            spec = hit.group(2)
+            line = _line_of(raw, hit.start())
+            # `./x.png?raw` `./x#y` のような接尾辞は場所ではない。
+            target = Path(os.path.normpath(
+                path.parent / re.split(r"[?#]", spec, maxsplit=1)[0]))
+            try:
+                inside = target.relative_to(self.frontend).as_posix()
+            except ValueError:
+                findings.append(Finding(
+                    "escapes_frontend", rel, line, spec[:70],
+                    "frontend/ の外を名指しで参照しています"
+                    "（そこは1行も読んでいないので、実行されるのに"
+                    "無検査になります）"))
+                continue
+            if self._is_build_output(inside):
+                findings.append(Finding(
+                    "points_at_unscanned", rel, line, spec[:70],
+                    "走査していない場所（node_modules / dist）を名指しで"
+                    "参照しています。この2つは中身を読まずハッシュも"
+                    "固定しないので、参照できると無検査の実行経路になります"))
+        # vite の `/x` はプロジェクトルート（frontend/）からの解決。
+        for hit in _ROOT_SPEC_RE.finditer(raw):
+            spec = re.split(r"[?#]", hit.group(2), maxsplit=1)[0]
+            if self._is_build_output(spec.lstrip("/")):
+                findings.append(Finding(
+                    "points_at_unscanned", rel, _line_of(raw, hit.start()),
+                    hit.group(2)[:70],
+                    "走査していない場所（node_modules / dist）を名指しで"
+                    "参照しています（`/x` は frontend/ からの解決）"))
+        return findings
+
     def _check_joined_literals(self, raw: str, rel: str) -> list[Finding]:
         """**リテラルを `+` で割って組み立てた URL。**
 
@@ -767,6 +851,9 @@ class ClosureExecutor:
             raw = path.read_text(encoding="utf-8", errors="replace")
             report.files_scanned += 1
             report.scanned_files.append(rel)
+            # **扉の中も対象。** 扉が外を名指しできるなら、閉包は扉ごと外に
+            # 広がる（`client.js` から `'../../shared_ui/net.js'` を読める）。
+            report.findings += self._check_reference_closure(raw, rel, path)
             if rel.startswith(GATEWAY_DIR + "/"):
                 gateway_seen.add(rel)
                 if rel == CATALOGUE_REL:
@@ -874,6 +961,8 @@ def declaration() -> dict:
             "catalogue_entry": _CATALOGUE_ENTRY_RE.pattern,
             "gateway_import": _GATEWAY_IMPORT_RE.pattern,
             "call_after": _CALL_AFTER_RE.pattern,
+            "relative_spec": _RELATIVE_SPEC_RE.pattern,
+            "root_spec": _ROOT_SPEC_RE.pattern,
         },
     }
 
