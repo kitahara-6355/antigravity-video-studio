@@ -479,9 +479,9 @@ def test_dropping_a_usage_is_a_violation(tmp_path):
     """**カタログに項目が残るので ui_api のラチェットでは気づけない。**"""
     executor = _build(tmp_path)
     baseline = _pinned(tmp_path, executor)
-    baseline["usages"]["src/components/App.jsx"] = ["getStatus", "getSpare"]
+    baseline["usages"]["src/components/App.jsx"] = {"getStatus": 1, "getSpare": 1}
 
-    assert any("使用が消えた" in v
+    assert any("使用が減った" in v
                for v in check_ratchet(executor.run(), baseline))
 
 
@@ -780,8 +780,8 @@ def test_every_detector_is_pinned(tmp_path):
     taken = snapshot(_build(tmp_path).run())
 
     assert set(taken["detectors"]) == {
-        "absolute_url", "backend_token", "call_after", "catalogue_entry",
-        "gateway_import", "joined_literals", "one_literal"}
+        "absolute_url", "protocol_relative", "backend_token", "call_after",
+        "catalogue_entry", "gateway_import", "joined_literals", "one_literal"}
 
 
 def test_this_file_is_registered_in_testpaths():
@@ -807,3 +807,126 @@ def test_this_file_is_registered_in_testpaths():
         if f"backend/tests/{p.name}" not in registered)
 
     assert missing == [], f"testpaths に無い UI-API 検証テスト: {missing}"
+
+
+# --- gate-verifier 3回目の反例 -----------------------------------------------
+#
+# 走査範囲そのものが穴だった。`frontend/src` の外は1行も読まれていなかった。
+
+
+def test_a_file_outside_src_is_scanned(tmp_path):
+    """`frontend/lib/api.js` は src から import されれば実行される。
+
+    借りていた走査は `frontend/src` + index.html + vite.config.* + public/**
+    に固定されていたので、ここは**1行も読まれず**4ゲート全緑だった（3回目）。
+    """
+    executor = _build(tmp_path)
+    (executor.frontend / "lib").mkdir()
+    (executor.frontend / "lib" / "api.js").write_text(
+        "export const go = () => fetch('http://localhost:8000/api/x');\n",
+        encoding="utf-8")
+
+    assert "forbidden_form" in _kinds(executor.run())
+
+
+def test_a_re_export_shim_outside_src_is_a_violation(tmp_path):
+    """2回目に塞いだ再輸出シムは、1つ上の階層に置くだけで復活していた。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "lib").mkdir()
+    (executor.frontend / "lib" / "door.js").write_text(
+        "export { apiFetch } from '../src/gateway/client.js';\n",
+        encoding="utf-8")
+
+    assert "bad_import" in _kinds(executor.run())
+
+
+def test_an_unlisted_suffix_is_still_scanned(tmp_path):
+    """拡張子で絞ると、絞り漏れがそのまま穴になる（`.mts` が抜けていた）。"""
+    executor = _build(tmp_path)
+    (executor.frontend / "src" / "thing.mts").write_text(
+        "export const go = () => fetch('http://localhost:8000/api/x');\n",
+        encoding="utf-8")
+
+    assert "forbidden_form" in _kinds(executor.run())
+
+
+@pytest.mark.parametrize("href", ["./api/demo/status", "../api/demo/status"])
+def test_a_dot_relative_backend_path_is_a_violation(tmp_path, href):
+    """`./api/x` は先読みが `.` に潰されて拾えていなかった。"""
+    report = _build(tmp_path, extra={
+        "components/Link.jsx": f'export const L = () => <a href="{href}">x</a>;\n',
+    }).run()
+
+    assert "backend_url" in _kinds(report)
+
+
+def test_a_protocol_relative_url_is_a_violation(tmp_path):
+    """`//host/x` はブラウザがページと同じスキームで解決する。
+
+    絶対 URL の検出がスキーム必須だったので素通りしていた。
+    """
+    report = _build(tmp_path, extra={
+        "components/Link.jsx":
+            'export const L = () => <a href="//localhost:8000/api/x">y</a>;\n',
+    }).run()
+
+    assert "external_url" in _kinds(report)
+
+
+def test_a_line_comment_is_not_a_protocol_relative_url(tmp_path):
+    """`// コメント` を URL と誤検出しない（直後が空白）。"""
+    report = _build(tmp_path, extra={
+        "components/Note.jsx": "// ふつうの行コメント\nexport const N = null;\n",
+    }).run()
+
+    assert "external_url" not in _kinds(report)
+
+
+def test_dropping_one_of_several_identical_calls_is_a_ratchet_violation(tmp_path):
+    """**回数まで固定する。**
+
+    同じファイルで同じキーを何度も呼んでいるとき、集合だけを固定していると
+    最後の1本が残る限り何本消しても黙っていた（C-5(b) がそのまま成立）。
+    """
+    executor = _build(tmp_path, app="""
+        import { apiFetch } from '../gateway/client.js';
+
+        export default function App() {
+          apiFetch('getStatus');
+          apiFetch('getStatus');
+          return apiFetch('getStatus');
+        }
+    """)
+    baseline = _pinned(tmp_path, executor)
+    assert baseline["usages"]["src/components/App.jsx"]["getStatus"] == 3
+
+    (executor.frontend / "src" / "components" / "App.jsx").write_text(
+        "import { apiFetch } from '../gateway/client.js';\n"
+        "export default function App() { return apiFetch('getStatus'); }\n",
+        encoding="utf-8")
+
+    assert any("使用が減った" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_the_scan_boundary_of_the_closure_is_pinned(tmp_path):
+    """除外を1つ足せば、その場所が無検査になる。**足したら落ちる。**"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    baseline["closure_excluded"] = sorted(
+        baseline["closure_excluded"] + ["components"])
+
+    assert any("判定が動いた" in v
+               for v in check_ratchet(executor.run(), baseline))
+
+
+def test_the_ratchet_says_which_detector_moved(tmp_path):
+    """「動いた」だけでは何が起きたか分からない（3回目の指摘）。"""
+    executor = _build(tmp_path)
+    baseline = _pinned(tmp_path, executor)
+    baseline["detectors"]["backend_token"] = "(?!x)x"
+
+    message = "\n".join(check_ratchet(executor.run(), baseline))
+
+    assert "backend_token" in message
+    assert "(?!x)x" in message

@@ -68,11 +68,33 @@ from backend.ux_verification.ui_api import (
     SCANNED_SUFFIXES,
     UNSCANNED_FORMS,
     UiApiExecutor,
-    _display_path,
 )
 
 BASELINE_DIR = Path(__file__).parent / "snapshots"
 BASELINE = BASELINE_DIR / "ui_api_closure_baseline.json"
+
+# **走査は frontend/ の全体。** `ui_api._iter_files()` は `frontend/src` と
+# index.html / vite.config.* / public/** に固定されているので、
+# `frontend/lib/api.js` のように src の外に置いたファイルは、src から import
+# されていて実際に実行されるのに**1行も読まれない**まま緑になっていた
+# （gate-verifier 3回目の実測反例。4ゲートすべて exit 0）。
+# 拡張子でも絞らない — `.mts` が抜けていて同じ穴になっていた。
+#
+# 読まない場所は**宣言してベースラインに固定する**。ここに1つ足せば
+# ラチェットが落ちる。
+CLOSURE_EXCLUDED = frozenset({
+    "node_modules", "dist", "build", ".vite", "__pycache__", ".git",
+    "coverage",
+})
+# ファイル単位の除外。**ソースとして実行されないもの**だけ。
+CLOSURE_EXCLUDED_FILES = frozenset({"package-lock.json"})
+# 拡張子単位の除外。Markdown は Vite がアプリの一部として読み込まない
+# （このリポジトリに md プラグインは無い）。README のドキュメントリンクを
+# 許可リストに積むと、リストが「フロントが使う外部 URL」を表さなくなる。
+# **足せばラチェットが落ちる。**
+CLOSURE_EXCLUDED_SUFFIXES = frozenset({".md"})
+# 中身がテキストでないファイルは読まない（判定できない）。
+_BINARY_HINT = chr(0)
 
 # 扉に置いてよいファイル。**ここに無いファイルは第2の扉**なので違反にする。
 ALLOWLIST_REL = f"{GATEWAY_DIR}/external_urls.json"
@@ -104,6 +126,11 @@ FORBIDDEN_FORMS: dict[str, re.Pattern] = {
 # 絶対 URL。スキームがあるものは全部。**backend も外部も区別しない** —
 # 区別した瞬間「backend かどうか」の判定が要り、そこが精度を要求する場所になる。
 _ABSOLUTE_URL_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://[^\s'\"`)<>]*")
+# `//localhost:8000/api/x`。スキームを省いた絶対 URL で、ブラウザはページと
+# 同じスキームで解決する。**スキーム必須にしていたので素通りしていた**
+# （gate-verifier 3回目の指摘）。行コメント `// foo` は直後が空白なので当たらない。
+_PROTOCOL_RELATIVE_RE = re.compile(
+    r"(?<![:\w])//[\w.\-]+(?::\d+)?/[^\s'\"`)<>]*")
 
 # `'/' + 'api' + '/tasks'`。**リテラルだけを `+` でつないだ並び**を丸ごと取る。
 # 変数が混ざったら（`'/ap' + kind`）その時点で並びが切れる — 結合できないものを
@@ -155,8 +182,15 @@ CLOSURE_SEMANTICS = {
         "呼び出し口の外に、宣言していない絶対 URL が1件も無い",
         ("呼び出し口の関数が、呼び出す以外の使われ方をしていない"
          "（変数に束ね直す・引数として渡す、は使用が判定から消えるので違反）"),
-        ("走査したファイルの一覧と除外ディレクトリが固定されている"
+        ("**frontend/ の下を全部読んでいる**（src の外も、拡張子を問わず）。"
+         "読まない場所（node_modules・dist・build・.vite・__pycache__・.git・"
+         "coverage・package-lock.json・`.md`）は宣言してベースラインに固定して"
+         "あり、1つ足せばラチェットが落ちる"),
+        ("走査したファイルの一覧が固定されている"
          "（走査から外せば、そこの呼び出しは何も出ない）"),
+        ("扉の関数の使用が**回数まで**固定されている"
+         "（同じキーを何度も呼んでいるとき、何本消しても最後の1本で"
+         "黙らないようにするため）"),
         "カタログが1行1項目の閉じた文法だけでできている",
         "呼び出し口の関数の宛先が、すべてカタログのリテラルのキーである",
         "カタログのどの項目も、どこかから使われている",
@@ -183,6 +217,10 @@ CLOSURE_SEMANTICS = {
          "字句上つながっていないので結合できない。**捕まらない**"),
         ("`/` を含まない単語1つの相対 URL。普通の英単語と区別が付かないので"
          "対象外にしてある"),
+        ("**frontend/ の外**（backend が配信する静的ファイルなど）。"
+         "この判定は frontend/ の中しか読まない"),
+        ("**Markdown の中身**。Vite がアプリの一部として読み込まないので"
+         "走査から外してある（外していること自体は固定してある）"),
     ],
     "判定の性質": "禁止であって解決ではない。誤検出は FAIL を増やすだけで"
                   "沈黙にならないので、コメント除去のような前処理を持たない",
@@ -239,6 +277,36 @@ class ClosureExecutor:
     @classmethod
     def for_repo(cls) -> ClosureExecutor:
         return cls(UiApiExecutor.for_repo())
+
+    # --- 走査範囲 -----------------------------------------------------------
+
+    def _rel(self, path: Path) -> str:
+        """`frontend/` からの相対パス。表示にもベースラインの鍵にも使う。"""
+        return path.relative_to(self.frontend).as_posix()
+
+    def _iter_files(self):
+        """**frontend/ の下を全部読む。**
+
+        `ui_api._iter_files()` は `frontend/src` と index.html / vite.config.* /
+        public/** に固定されている。そこを借りていたので、
+        `frontend/lib/api.js` のように src の外に置いたファイルは、src から
+        import されていて実際に実行されるのに**1行も読まれない**まま緑だった
+        （gate-verifier 3回目の実測反例。4ゲートすべて exit 0）。
+        拡張子でも絞らない — `.mts` が抜けていて同じ穴になっていた。
+
+        読まない場所は `CLOSURE_EXCLUDED` / `CLOSURE_EXCLUDED_FILES` に宣言し、
+        ベースラインに固定する。**1つ足せばラチェットが落ちる。**
+        """
+        for path in sorted(self.frontend.rglob("*")):
+            if not path.is_file():
+                continue
+            if CLOSURE_EXCLUDED & set(path.parts):
+                continue
+            if path.name in CLOSURE_EXCLUDED_FILES:
+                continue
+            if path.suffix in CLOSURE_EXCLUDED_SUFFIXES:
+                continue
+            yield path
 
     # --- 許可リスト ---------------------------------------------------------
 
@@ -356,14 +424,15 @@ class ClosureExecutor:
                 findings.append(Finding(
                     "forbidden_form", rel, _line_of(raw, hit.start()), name,
                     f"呼び出しの形（{name}）は呼び出し口の外に書けません"))
-        for hit in _ABSOLUTE_URL_RE.finditer(raw):
-            url = hit.group(0)
-            if (rel, url) in allowed:
-                continue
-            findings.append(Finding(
-                "external_url", rel, _line_of(raw, hit.start()), url[:70],
-                "宣言していない絶対 URL です"
-                f"（{ALLOWLIST_REL} に理由つきで宣言してください）"))
+        for pattern in (_ABSOLUTE_URL_RE, _PROTOCOL_RELATIVE_RE):
+            for hit in pattern.finditer(raw):
+                url = hit.group(0)
+                if (rel, url) in allowed:
+                    continue
+                findings.append(Finding(
+                    "external_url", rel, _line_of(raw, hit.start()), url[:70],
+                    "宣言していない絶対 URL です"
+                    f"（{ALLOWLIST_REL} に理由つきで宣言してください）"))
         # **引用符の対応付けに頼らない。** 文字列リテラルとして拾おうとすると、
         # ファイル内のどこかにあるアポストロフィ1つで対応がずれ、
         # `src="api/tasks"` が巨大な「文字列」の中に飲まれて先頭が
@@ -392,11 +461,15 @@ class ClosureExecutor:
                 # **`/` を後ろに必須にしていたので `/health` を取りこぼした** —
                 # 直前のコミットでは捕まえていたものを、修正が黙って見えなく
                 # していた（gate-verifier 2回目の実測反例）。
-                rf"(?<![\w./\-])(?:/(?:{names})(?![\w\-])"
+                # `./api/x` `../api/x` も相対の backend パス。1本の
+                # 先読みで書くと `.` に潰されて拾えなかった（3回目の指摘）。
+                rf"(?:(?<![\w\-])\.{{0,2}}/(?:{names})(?![\w\-])"
                 # 先頭に `/` が無いなら、後ろに `/` を要求する。
                 # `health` `soul` `themes` は普通の英単語なので、単語1つでは
                 # 落とさない（この非対称は CLOSURE_SEMANTICS に書いてある）。
-                rf"|(?:{names})/)[\w\-./{{}}]*")
+                # 先頭に `/` が無いなら後ろに `/` を要求する。ただしここは
+                # `foo/api/bar` を拾わないよう `/` も先読みで塞ぐ。
+                rf"|(?<![\w./\-])(?:{names})/)[\w\-./{{}}]*")
         return self._token_re
 
     def _check_joined_literals(self, raw: str, rel: str) -> list[Finding]:
@@ -500,7 +573,10 @@ class ClosureExecutor:
                         "カタログに無いキーです"))
                     continue
                 used.append(key)
-        return sorted(set(used)), findings
+        # **回数まで返す。** `set` に潰すと、同じファイルで同じキーを5回
+        # 呼んでいるうち3回を消しても最後の1本が残る限りラチェットが黙る
+        # （C-5(b)「使用の削除で緑」がそのまま成立していた。3回目の実測反例）。
+        return sorted(used), findings
 
     # --- 実行 ---------------------------------------------------------------
 
@@ -516,9 +592,11 @@ class ClosureExecutor:
         hit_allowed: set[tuple[str, str]] = set()
 
         gateway_seen: set[str] = set()
-        for path in self.executor._iter_files():
-            rel = _display_path(path, self.executor.frontend_src).replace("\\", "/")
+        for path in self._iter_files():
+            rel = self._rel(path)
             raw = path.read_text(encoding="utf-8", errors="replace")
+            if _BINARY_HINT in raw:
+                continue  # テキストでないファイルは判定できない
             report.files_scanned += 1
             report.scanned_files.append(rel)
             if rel.startswith(GATEWAY_DIR + "/"):
@@ -536,7 +614,9 @@ class ClosureExecutor:
                         "（増やせば第2の扉になる）"))
                 continue
             report.findings += self._check_outside(raw, rel, allowed)
-            for url in {m.group(0) for m in _ABSOLUTE_URL_RE.finditer(raw)}:
+            urls = {m.group(0) for m in _ABSOLUTE_URL_RE.finditer(raw)}
+            urls |= {m.group(0) for m in _PROTOCOL_RELATIVE_RE.finditer(raw)}
+            for url in urls:
                 if (rel, url) in allowed:
                     hit_allowed.add((rel, url))
 
@@ -554,11 +634,13 @@ class ClosureExecutor:
                 "走査したファイルが0件です"))
 
         # 使用の解決は、カタログを読んだあとでないと判定できない。
-        for path in self.executor._iter_files():
-            rel = _display_path(path, self.executor.frontend_src).replace("\\", "/")
+        for path in self._iter_files():
+            rel = self._rel(path)
             if rel.startswith(GATEWAY_DIR + "/"):
                 continue
             raw = path.read_text(encoding="utf-8", errors="replace")
+            if _BINARY_HINT in raw:
+                continue
             used, found = self._check_usage(raw, rel, report.entries)
             report.findings += found
             if used:
@@ -583,8 +665,10 @@ class ClosureExecutor:
 # --- ラチェット（C-5） --------------------------------------------------------
 
 DECLARATION_KEYS = ("forbidden_forms", "gateway_files", "scanned_suffixes",
-                    "excluded_dirs", "detectors", "scanned_files", "allowlist",
-                    "usages", "entries")
+                    "excluded_dirs", "closure_excluded",
+                    "closure_excluded_files", "closure_excluded_suffixes",
+                    "detectors", "scanned_files",
+                    "allowlist", "usages", "entries")
 
 
 def declaration() -> dict:
@@ -599,6 +683,10 @@ def declaration() -> dict:
         # 「除外ディレクトリの追加」がこれで、固定していなかったので
         # 4ゲート＋テストのすべてを素通りしていた（gate-verifier 1回目）。
         "excluded_dirs": sorted(_EXCLUDED_DIRS),
+        # 閉包自身の走査範囲。**ここに1つ足せば、その場所が無検査になる。**
+        "closure_excluded": sorted(CLOSURE_EXCLUDED),
+        "closure_excluded_files": sorted(CLOSURE_EXCLUDED_FILES),
+        "closure_excluded_suffixes": sorted(CLOSURE_EXCLUDED_SUFFIXES),
         # **このモジュール自身の検出器の本体。** `_backend_token_re` を
         # 絶対に当たらないパターンに差し替えるだけで backend URL の検出が
         # 丸ごと無効になるのに、ラチェットは何も言わなかった
@@ -608,6 +696,7 @@ def declaration() -> dict:
         # 自分自身にも適用する。
         "detectors": {
             "absolute_url": _ABSOLUTE_URL_RE.pattern,
+            "protocol_relative": _PROTOCOL_RELATIVE_RE.pattern,
             "joined_literals": _JOINED_LITERALS_RE.pattern,
             "one_literal": _ONE_LITERAL_RE.pattern,
             "catalogue_entry": _CATALOGUE_ENTRY_RE.pattern,
@@ -627,8 +716,12 @@ def snapshot(report: ClosureReport) -> dict:
     payload["detectors"]["backend_token"] = report.backend_token_pattern
     payload["allowlist"] = sorted(
         f"{e.get('file')}|{e.get('url')}" for e in report.allowlist)
-    payload["usages"] = {rel: sorted(keys)
-                         for rel, keys in sorted(report.usages.items())}
+    # **回数まで固定する。** キーの集合だけだと、同じファイルで同じキーを
+    # 5回呼んでいるうち3回を消しても最後の1本が残る限り気づけない
+    # （C-5(b)「使用の削除で緑」がそのまま成立していた）。
+    payload["usages"] = {
+        rel: {key: keys.count(key) for key in sorted(set(keys))}
+        for rel, keys in sorted(report.usages.items())}
     payload["entries"] = dict(sorted(report.entries.items()))
     return payload
 
@@ -675,22 +768,25 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
                 f"[走査から外れた] {rel} を読まなくなりました"
                 "（除外ディレクトリ・拡張子・到達可能性のどれかが狭まった）")
     for key in ("forbidden_forms", "gateway_files", "scanned_suffixes",
-                "excluded_dirs", "detectors"):
+                "excluded_dirs", "closure_excluded", "closure_excluded_files",
+                "closure_excluded_suffixes", "detectors"):
         if baseline[key] != now[key]:
             violations.append(
-                f"[判定が動いた] {key}: {_render(baseline[key])} → {_render(now[key])}"
+                f"[判定が動いた] {key}: {_diff(baseline[key], now[key])}"
                 "（禁止語彙・扉の構成・走査範囲は緩めても締めても差分に出す）")
     # 許可リストが増えるのは例外が増えるということ。
     for item in sorted(set(now["allowlist"]) - set(baseline["allowlist"])):
         violations.append(f"[例外が増えた] 許可リストに {item} が足された")
     # 使用が消えるのは「呼ばなくなった」。カタログに項目が残るので
     # ui_api のラチェットでは気づけない。**ここが受け皿。**
-    for rel, keys in baseline["usages"].items():
-        now_keys = now["usages"].get(rel, [])
-        for key in keys:
-            if key not in now_keys:
+    for rel, counts in baseline["usages"].items():
+        now_counts = now["usages"].get(rel, {})
+        for key, before in counts.items():
+            after = now_counts.get(key, 0)
+            if after < before:
                 violations.append(
-                    f"[使用が消えた] {rel} が {key} を呼ばなくなりました")
+                    f"[使用が減った] {rel} の {key} が {before} → {after} 回に"
+                    "なりました")
     for key, value in baseline["entries"].items():
         if key not in now["entries"]:
             violations.append(f"[項目が消えた] カタログから {key} が消えました")
@@ -698,6 +794,17 @@ def check_ratchet(report: ClosureReport, baseline: dict | None) -> list[str]:
             violations.append(
                 f"[項目が差し替わった] {key}: {value} → {now['entries'][key]}")
     return violations
+
+
+def _diff(before, after) -> str:
+    """**何が動いたかを言う。** キー名だけを並べると、本体を差し替えたときに
+    両辺が同じ文字列になって「動いた」としか読めない（3回目の指摘）。"""
+    if isinstance(before, dict) and isinstance(after, dict):
+        changed = [f"{k}: {before.get(k, '（無し）')} → {after.get(k, '（無し）')}"
+                   for k in sorted(set(before) | set(after))
+                   if before.get(k) != after.get(k)]
+        return " / ".join(changed) or "（差分なし）"
+    return f"{_render(before)} → {_render(after)}"
 
 
 def _render(value) -> str:

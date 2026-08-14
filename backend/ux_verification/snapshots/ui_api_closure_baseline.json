@@ -50,17 +50,36 @@
     "dist",
     "node_modules"
   ],
+  "closure_excluded": [
+    ".git",
+    ".vite",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "node_modules"
+  ],
+  "closure_excluded_files": [
+    "package-lock.json"
+  ],
+  "closure_excluded_suffixes": [
+    ".md"
+  ],
   "detectors": {
     "absolute_url": "[A-Za-z][A-Za-z0-9+.\\-]*://[^\\s'\\\"`)<>]*",
+    "protocol_relative": "(?<![:\\w])//[\\w.\\-]+(?::\\d+)?/[^\\s'\\\"`)<>]*",
     "joined_literals": "(['\"])(?:(?!\\1)[^\\\\]|\\\\.)*\\1(?:\\s*\\+\\s*(['\"])(?:(?!\\2)[^\\\\]|\\\\.)*\\2)+",
     "one_literal": "(['\"])((?:(?!\\1)[^\\\\]|\\\\.)*)\\1",
     "catalogue_entry": "^\\s*(?P<key>[A-Za-z_$][\\w$]*)\\s*:\\s*\\{\\s*method\\s*:\\s*'(?P<method>[A-Z]+)'\\s*,\\s*path\\s*:\\s*'(?P<path>/[^']*)'\\s*\\}\\s*,\\s*$",
     "gateway_import": "import\\s*\\{(?P<names>[^}]*)\\}\\s*from\\s*'(?P<spec>(?:\\.\\./|\\./)*gateway/client\\.js)'",
     "call_after": "\\s*\\(",
-    "backend_token": "(?<![\\w./\\-])(?:/(?:api|health|soul|themes|ws)(?![\\w\\-])|(?:api|health|soul|themes|ws)/)[\\w\\-./{}]*"
+    "backend_token": "(?:(?<![\\w\\-])\\.{0,2}/(?:api|health|soul|themes|ws)(?![\\w\\-])|(?<![\\w./\\-])(?:api|health|soul|themes|ws)/)[\\w\\-./{}]*"
   },
   "scanned_files": [
+    ".gitignore",
+    "eslint.config.js",
     "index.html",
+    "package.json",
     "public/vite.svg",
     "src/App.css",
     "src/App.jsx",
@@ -106,6 +125,7 @@
     "src/gateway/client.js",
     "src/gateway/endpoints.js",
     "src/gateway/external_urls.json",
+    "src/generate_tokens_css.py",
     "src/hooks/useSegments.js",
     "src/index.css",
     "src/main.jsx",
@@ -125,136 +145,136 @@
     "vite.config.js|https://vite.dev/config/"
   ],
   "usages": {
-    "src/components/AISuggestionCard.jsx": [
-      "postQualityApplySuggestion",
-      "postQualityUndoSuggestion"
-    ],
-    "src/components/Boardroom.jsx": [
-      "getSettings"
-    ],
-    "src/components/CollaborativePanel.jsx": [
-      "getCollaborationJournal",
-      "postCollaborationFeedback",
-      "postCollaborationJournal"
-    ],
-    "src/components/CouncilChamber.jsx": [
-      "postCouncilDecision",
-      "postCouncilSession"
-    ],
-    "src/components/DirectorBriefing.jsx": [
-      "getDirectorTasks",
-      "postDirectorAnalyzeResources",
-      "postDirectorAnalyzeScript",
-      "postDirectorBatchGenerate",
-      "postDirectorGenerateReport",
-      "postDirectorPlanStoryboard",
-      "postDirectorQualityScore"
-    ],
-    "src/components/ImageDirector.jsx": [
-      "getDirectorTasks",
-      "postDirectorChat",
-      "postDirectorGenerateImageAsync"
-    ],
-    "src/components/ModelQuotaDashboard.jsx": [
-      "getUsageTwoTierStatus",
-      "postUsageSelectOption"
-    ],
-    "src/components/OperationsDashboard.jsx": [
-      "getDashboardHealth",
-      "getPipelineStatus",
-      "getUsageDashboard",
-      "getUsageGovernance",
-      "getUsageRetryBudget",
-      "getUsageSwitchHistory"
-    ],
-    "src/components/PreProductionPlanner.jsx": [
-      "postYoutubePrePlan"
-    ],
-    "src/components/ProductionPipeline.jsx": [
-      "getPipelineOpenFolder",
-      "getPipelineQualityGateStatus",
-      "getPipelineStatus",
-      "getPipelineStream",
-      "getPipelineVideos",
-      "getV1ThemesCurrentActive",
-      "postPipelineQualityGateImprove",
-      "postPipelineStart",
-      "postPipelineVideosMetadata",
-      "postPipelineVideosValidate",
-      "postRenderStart",
-      "wsPipeline"
-    ],
-    "src/components/ProofreadingStagePanel.jsx": [
-      "deletePipelineDictionary",
-      "getPipelineDictionary",
-      "getPipelineProofreadingExport",
-      "getPipelineProofreadingResult",
-      "getPipelineProofreadingStatus",
-      "postPipelineDictionary",
-      "postPipelineProofreadingApprove",
-      "postPipelineProofreadingApproveAll",
-      "postPipelineProofreadingReject",
-      "postPipelineProofreadingRejectAll",
-      "postPipelineProofreadingSkip"
-    ],
-    "src/components/QuickDecisionBar.jsx": [
-      "postQualityDecisionQuick"
-    ],
-    "src/components/SettingsPage.jsx": [
-      "getSettings",
-      "getTranscribeStatus",
-      "postSettingsIdentity",
-      "postSettingsReset",
-      "postSettingsVideo",
-      "postTranscribe"
-    ],
-    "src/components/ShortsGenerator.jsx": [
-      "postShortsCandidates",
-      "postShortsRender"
-    ],
-    "src/components/SmartCutPanel.jsx": [
-      "getSmartcutAllCandidates",
-      "postSmartcutFinalize",
-      "postSmartcutInit",
-      "postSmartcutLock",
-      "postSmartcutRecommend",
-      "postSmartcutUnlock"
-    ],
-    "src/components/SoulPassport.jsx": [
-      "getDirectorEvolution",
-      "getStatus"
-    ],
-    "src/components/StepReviewPanel.jsx": [
-      "postQualityReviewApprove"
-    ],
-    "src/components/ThemeSelector.jsx": [
-      "postV1ThemesApply",
-      "postV1ThemesRecommend"
-    ],
-    "src/components/TranscriptionStagePanel.jsx": [
-      "getPipelineTranscriptionModels",
-      "getPipelineTranscriptionSegments",
-      "getPipelineTranscriptionStatus",
-      "postPipelineTranscriptionModel",
-      "putPipelineTranscriptionSegments"
-    ],
-    "src/components/YouTubeOptimizerPanel.jsx": [
-      "postThumbnailSelect",
-      "postYoutubeApplyHook",
-      "postYoutubeImproveHook",
-      "postYoutubeOptimize"
-    ],
-    "src/pages/EditorPage.jsx": [
-      "getDirectorState",
-      "getPipelineStatus",
-      "getSegments",
-      "getVideo",
-      "postDirectorState",
-      "postDirectorVerifyQuality",
-      "postRender",
-      "postRhythmSplit",
-      "postSegments"
-    ]
+    "src/components/AISuggestionCard.jsx": {
+      "postQualityApplySuggestion": 1,
+      "postQualityUndoSuggestion": 1
+    },
+    "src/components/Boardroom.jsx": {
+      "getSettings": 1
+    },
+    "src/components/CollaborativePanel.jsx": {
+      "getCollaborationJournal": 1,
+      "postCollaborationFeedback": 1,
+      "postCollaborationJournal": 1
+    },
+    "src/components/CouncilChamber.jsx": {
+      "postCouncilDecision": 1,
+      "postCouncilSession": 1
+    },
+    "src/components/DirectorBriefing.jsx": {
+      "getDirectorTasks": 1,
+      "postDirectorAnalyzeResources": 1,
+      "postDirectorAnalyzeScript": 1,
+      "postDirectorBatchGenerate": 1,
+      "postDirectorGenerateReport": 1,
+      "postDirectorPlanStoryboard": 1,
+      "postDirectorQualityScore": 1
+    },
+    "src/components/ImageDirector.jsx": {
+      "getDirectorTasks": 1,
+      "postDirectorChat": 1,
+      "postDirectorGenerateImageAsync": 1
+    },
+    "src/components/ModelQuotaDashboard.jsx": {
+      "getUsageTwoTierStatus": 1,
+      "postUsageSelectOption": 1
+    },
+    "src/components/OperationsDashboard.jsx": {
+      "getDashboardHealth": 1,
+      "getPipelineStatus": 1,
+      "getUsageDashboard": 1,
+      "getUsageGovernance": 1,
+      "getUsageRetryBudget": 1,
+      "getUsageSwitchHistory": 1
+    },
+    "src/components/PreProductionPlanner.jsx": {
+      "postYoutubePrePlan": 1
+    },
+    "src/components/ProductionPipeline.jsx": {
+      "getPipelineOpenFolder": 1,
+      "getPipelineQualityGateStatus": 1,
+      "getPipelineStatus": 5,
+      "getPipelineStream": 3,
+      "getPipelineVideos": 1,
+      "getV1ThemesCurrentActive": 2,
+      "postPipelineQualityGateImprove": 1,
+      "postPipelineStart": 1,
+      "postPipelineVideosMetadata": 1,
+      "postPipelineVideosValidate": 1,
+      "postRenderStart": 1,
+      "wsPipeline": 1
+    },
+    "src/components/ProofreadingStagePanel.jsx": {
+      "deletePipelineDictionary": 1,
+      "getPipelineDictionary": 1,
+      "getPipelineProofreadingExport": 2,
+      "getPipelineProofreadingResult": 1,
+      "getPipelineProofreadingStatus": 1,
+      "postPipelineDictionary": 1,
+      "postPipelineProofreadingApprove": 1,
+      "postPipelineProofreadingApproveAll": 1,
+      "postPipelineProofreadingReject": 1,
+      "postPipelineProofreadingRejectAll": 1,
+      "postPipelineProofreadingSkip": 1
+    },
+    "src/components/QuickDecisionBar.jsx": {
+      "postQualityDecisionQuick": 1
+    },
+    "src/components/SettingsPage.jsx": {
+      "getSettings": 1,
+      "getTranscribeStatus": 1,
+      "postSettingsIdentity": 1,
+      "postSettingsReset": 1,
+      "postSettingsVideo": 1,
+      "postTranscribe": 1
+    },
+    "src/components/ShortsGenerator.jsx": {
+      "postShortsCandidates": 1,
+      "postShortsRender": 1
+    },
+    "src/components/SmartCutPanel.jsx": {
+      "getSmartcutAllCandidates": 1,
+      "postSmartcutFinalize": 1,
+      "postSmartcutInit": 1,
+      "postSmartcutLock": 1,
+      "postSmartcutRecommend": 1,
+      "postSmartcutUnlock": 1
+    },
+    "src/components/SoulPassport.jsx": {
+      "getDirectorEvolution": 1,
+      "getStatus": 1
+    },
+    "src/components/StepReviewPanel.jsx": {
+      "postQualityReviewApprove": 1
+    },
+    "src/components/ThemeSelector.jsx": {
+      "postV1ThemesApply": 1,
+      "postV1ThemesRecommend": 1
+    },
+    "src/components/TranscriptionStagePanel.jsx": {
+      "getPipelineTranscriptionModels": 1,
+      "getPipelineTranscriptionSegments": 1,
+      "getPipelineTranscriptionStatus": 1,
+      "postPipelineTranscriptionModel": 1,
+      "putPipelineTranscriptionSegments": 1
+    },
+    "src/components/YouTubeOptimizerPanel.jsx": {
+      "postThumbnailSelect": 1,
+      "postYoutubeApplyHook": 1,
+      "postYoutubeImproveHook": 1,
+      "postYoutubeOptimize": 1
+    },
+    "src/pages/EditorPage.jsx": {
+      "getDirectorState": 1,
+      "getPipelineStatus": 1,
+      "getSegments": 1,
+      "getVideo": 1,
+      "postDirectorState": 1,
+      "postDirectorVerifyQuality": 1,
+      "postRender": 2,
+      "postRhythmSplit": 1,
+      "postSegments": 1
+    }
   },
   "entries": {
     "deletePipelineDictionary": "DELETE /api/pipeline/dictionary/{entry_id}",
