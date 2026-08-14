@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../gateway/client.js';
 
 /**
  * モデル使用量ダッシュボード（2段階方式）
@@ -22,7 +23,7 @@ export default function ModelQuotaDashboard({ onModelSelect }) {
 
     const fetchTierStatus = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/usage/two-tier-status');
+            const response = await apiFetch('getUsageTwoTierStatus');
             const data = await response.json();
             setTierStatus(data);
             setLoading(false);
@@ -34,9 +35,7 @@ export default function ModelQuotaDashboard({ onModelSelect }) {
 
     const handleOptionSelect = async (tier, option) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/usage/select-option?tier=${tier}&option=${option}`, {
-                method: 'POST'
-            });
+            const response = await apiFetch('postUsageSelectOption', { query: { tier, option } });
             const result = await response.json();
             setSelectedOption(result);
 

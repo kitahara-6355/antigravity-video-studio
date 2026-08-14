@@ -207,6 +207,25 @@ jobs:
           GOOGLE_API_KEY: "dummy_key_for_ci"
         run: python -m backend.ux_verification.ui_api_ratchet --ratchet
 
+      # ここまでは「叩いている先が実在するか」。見落とした呼び出しは止められない。
+      # 呼び出しを1つの扉に集約し、**扉の外に呼び出しが1件も無い**ことを
+      # 生テキストの禁止として判定する。コメントも除去しないので、
+      # コメント内に書いた URL も落ちる（禁止は精度を要求しない）。
+      - name: 呼び出し口の閉包ゲート（扉の外に呼び出しが無い）
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+        run: python -m backend.ux_verification.ui_api_closure --gate
+
+      # ゲートは「いま違反がゼロか」しか見ない。禁止語彙を減らす・許可リストを
+      # 増やす・使用を消す、はどれもゼロのまま緑になる。判定そのものと
+      # 使用の一覧をベースラインに固定して、弱化を落とす。
+      - name: 呼び出し口ラチェット（禁止語彙・許可・使用の弱化を許さない）
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+        run: python -m backend.ux_verification.ui_api_closure --ratchet
+
       - name: テスト結果アップロード
         if: always()
         uses: actions/upload-artifact@v4

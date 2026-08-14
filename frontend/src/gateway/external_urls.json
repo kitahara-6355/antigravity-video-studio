@@ -1,0 +1,50 @@
+{
+  "_why": "呼び出し口の外に書いてよい絶対 URL の宣言。ui_api_closure が突き合わせる。ここに無い絶対 URL は違反。使われていない宣言も違反（あとで何かを黙って通すため）。",
+  "declared": [
+    {
+      "url": "https://fonts.googleapis.com",
+      "file": "index.html",
+      "why": "Google Fonts への preconnect。backend 呼び出しではない"
+    },
+    {
+      "url": "https://fonts.gstatic.com",
+      "file": "index.html",
+      "why": "Google Fonts のフォント配信元への preconnect"
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Outfit:wght@400;600;700;800&display=swap",
+      "file": "index.html",
+      "why": "Google Fonts のスタイルシート。Inter / Noto Sans JP / Outfit"
+    },
+    {
+      "url": "http://www.w3.org/2000/svg",
+      "file": "src/assets/react.svg",
+      "why": "SVG の名前空間 URI。取得されない識別子"
+    },
+    {
+      "url": "http://www.w3.org/1999/xlink",
+      "file": "src/assets/react.svg",
+      "why": "xlink の名前空間 URI。取得されない識別子"
+    },
+    {
+      "url": "http://www.w3.org/2000/svg",
+      "file": "public/vite.svg",
+      "why": "SVG の名前空間 URI。取得されない識別子"
+    },
+    {
+      "url": "http://www.w3.org/1999/xlink",
+      "file": "public/vite.svg",
+      "why": "xlink の名前空間 URI。取得されない識別子"
+    },
+    {
+      "url": "https://json-schema.org/draft/2020-12/schema",
+      "file": "src/design_tokens.json",
+      "why": "JSON Schema の $schema。取得されない識別子"
+    },
+    {
+      "url": "https://vite.dev/config/",
+      "file": "vite.config.js",
+      "why": "コメント内のドキュメントへのリンク"
+    }
+  ]
+}

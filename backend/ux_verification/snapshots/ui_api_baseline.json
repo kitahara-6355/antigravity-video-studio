@@ -37,6 +37,7 @@
     "src/gateway/endpoints.js|GET|/api/usage/governance": "matched",
     "src/gateway/endpoints.js|GET|/api/usage/retry-budget": "matched",
     "src/gateway/endpoints.js|GET|/api/usage/switch-history": "matched",
+    "src/gateway/endpoints.js|GET|/api/usage/two-tier-status": "matched",
     "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "matched",
     "src/gateway/endpoints.js|GET|/api/video": "matched",
     "src/gateway/endpoints.js|POST|/api/collaboration/feedback": "matched",
@@ -84,6 +85,7 @@
     "src/gateway/endpoints.js|POST|/api/smartcut/unlock": "matched",
     "src/gateway/endpoints.js|POST|/api/thumbnail/select": "matched",
     "src/gateway/endpoints.js|POST|/api/transcribe": "matched",
+    "src/gateway/endpoints.js|POST|/api/usage/select-option": "matched",
     "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "matched",
     "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "matched",
     "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "matched",
@@ -133,6 +135,7 @@
     "src/gateway/endpoints.js|GET|/api/usage/governance": "static_route_scan: routers/usage_router.py:559 GET /api/usage/governance",
     "src/gateway/endpoints.js|GET|/api/usage/retry-budget": "static_route_scan: routers/usage_router.py:172 GET /api/usage/retry-budget",
     "src/gateway/endpoints.js|GET|/api/usage/switch-history": "static_route_scan: routers/usage_router.py:340 GET /api/usage/switch-history",
+    "src/gateway/endpoints.js|GET|/api/usage/two-tier-status": "static_route_scan: routers/usage_router.py:413 GET /api/usage/two-tier-status",
     "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
     "src/gateway/endpoints.js|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
     "src/gateway/endpoints.js|POST|/api/collaboration/feedback": "static_route_scan: routers/legacy_management_router.py:123 POST /api/collaboration/feedback",
@@ -180,6 +183,7 @@
     "src/gateway/endpoints.js|POST|/api/smartcut/unlock": "static_route_scan: routers/smartcut.py:278 POST /api/smartcut/unlock",
     "src/gateway/endpoints.js|POST|/api/thumbnail/select": "static_route_scan: routers/ab_test_tracker.py:79 POST /api/thumbnail/select",
     "src/gateway/endpoints.js|POST|/api/transcribe": "static_route_scan: routers/legacy_production_router.py:172 POST /api/transcribe",
+    "src/gateway/endpoints.js|POST|/api/usage/select-option": "static_route_scan: routers/usage_router.py:452 POST /api/usage/select-option",
     "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
     "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
     "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
@@ -192,10 +196,7 @@
     "index.html|GET|https://fonts.gstatic.com": "",
     "index.html|GET|https://fonts.googleapis.com/css2": ""
   },
-  "unreachable": [
-    "src/components/ModelQuotaDashboard.jsx:25  fetch",
-    "src/components/ModelQuotaDashboard.jsx:37  fetch"
-  ],
+  "unreachable": [],
   "passing_verdicts": [
     "matched"
   ],

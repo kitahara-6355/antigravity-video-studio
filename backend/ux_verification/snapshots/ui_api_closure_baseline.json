@@ -1,0 +1,274 @@
+{
+  "forbidden_forms": {
+    "$.ajax / ky / superagent": "(?<![\\w.$])(?:\\$\\s*\\.\\s*ajax|ky\\s*[.(]|superagent\\s*\\.)",
+    "CSS の url()": "url\\s*\\(\\s*[^)\\n]*?/api/",
+    "DOM への URL 代入": "\\.\\s*(?:href|src|action|poster)\\s*=(?!=)",
+    "EventSource": "(?<![\\w.$])new\\s+EventSource\\s*\\(",
+    "Service Worker": "serviceWorker\\s*\\.\\s*register\\s*\\(",
+    "XMLHttpRequest": "(?<![\\w.$])new\\s+XMLHttpRequest\\s*\\(",
+    "axios": "(?<![\\w.$])axios\\s*[.(]",
+    "fetch": "(?<![\\w$])fetch\\s*(?:\\?\\.)?\\s*\\(",
+    "fetch の別名束縛": "=\\s*(?:window|globalThis|self)?\\.?\\s*fetch\\s*(?![\\s(])",
+    "fetch.call / fetch.apply": "(?<![\\w$])fetch\\s*\\.\\s*(?:call|apply|bind)\\s*\\(",
+    "form action": "(?<![\\w$])(?:form)?[Aa]ction\\s*=\\s*[{'\\\"]",
+    "location 遷移": "(?<![\\w$])(?:(?:window|globalThis|self|top|parent|document)\\s*\\.\\s*)?location\\s*(?:\\.\\s*(?:assign|replace)\\s*\\(|\\.\\s*href\\s*=(?!=)|=(?!=))",
+    "new WebSocket": "(?<![\\w.$])new\\s+(?:(?:window|globalThis|self)\\s*\\.\\s*)?WebSocket\\s*\\(",
+    "new Worker": "(?<![\\w.$])new\\s+(?:Shared)?Worker\\s*\\(",
+    "object の data": "<object\\b[^>]*?\\bdata\\s*=\\s*[{'\\\"]",
+    "sendBeacon": "(?<![\\w.$])navigator\\.sendBeacon\\s*\\(",
+    "setAttribute で URL": "setAttribute\\s*\\(\\s*['\\\"](?:src|href|action|formaction|data|poster|srcset|content|ping)['\\\"]",
+    "srcSet": "(?<![\\w$])srcSet\\s*=\\s*[{'\\\"]",
+    "window.open": "(?<![\\w$])window\\.open\\s*\\(",
+    "動的 import": "(?<![\\w.$])import\\s*\\(\\s*['\\\"`]",
+    "素の open()": "(?<![\\w.$])open\\s*\\(\\s*['\\\"`]",
+    "計算メンバでの fetch": "\\[\\s*['\\\"]fetch['\\\"]\\s*\\]"
+  },
+  "gateway_files": [
+    "src/gateway/client.js",
+    "src/gateway/endpoints.js",
+    "src/gateway/external_urls.json"
+  ],
+  "scanned_suffixes": [
+    ".cjs",
+    ".css",
+    ".html",
+    ".js",
+    ".json",
+    ".jsx",
+    ".mjs",
+    ".svg",
+    ".ts",
+    ".tsx",
+    ".webmanifest",
+    ".xml"
+  ],
+  "allowlist": [
+    "index.html|https://fonts.googleapis.com",
+    "index.html|https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Outfit:wght@400;600;700;800&display=swap",
+    "index.html|https://fonts.gstatic.com",
+    "public/vite.svg|http://www.w3.org/1999/xlink",
+    "public/vite.svg|http://www.w3.org/2000/svg",
+    "src/assets/react.svg|http://www.w3.org/1999/xlink",
+    "src/assets/react.svg|http://www.w3.org/2000/svg",
+    "src/design_tokens.json|https://json-schema.org/draft/2020-12/schema",
+    "vite.config.js|https://vite.dev/config/"
+  ],
+  "usages": {
+    "src/components/AISuggestionCard.jsx": [
+      "postQualityApplySuggestion",
+      "postQualityUndoSuggestion"
+    ],
+    "src/components/Boardroom.jsx": [
+      "getSettings"
+    ],
+    "src/components/CollaborativePanel.jsx": [
+      "getCollaborationJournal",
+      "postCollaborationFeedback",
+      "postCollaborationJournal"
+    ],
+    "src/components/CouncilChamber.jsx": [
+      "postCouncilDecision",
+      "postCouncilSession"
+    ],
+    "src/components/DirectorBriefing.jsx": [
+      "getDirectorTasks",
+      "postDirectorAnalyzeResources",
+      "postDirectorAnalyzeScript",
+      "postDirectorBatchGenerate",
+      "postDirectorGenerateReport",
+      "postDirectorPlanStoryboard",
+      "postDirectorQualityScore"
+    ],
+    "src/components/ImageDirector.jsx": [
+      "getDirectorTasks",
+      "postDirectorChat",
+      "postDirectorGenerateImageAsync"
+    ],
+    "src/components/ModelQuotaDashboard.jsx": [
+      "getUsageTwoTierStatus",
+      "postUsageSelectOption"
+    ],
+    "src/components/OperationsDashboard.jsx": [
+      "getDashboardHealth",
+      "getPipelineStatus",
+      "getUsageDashboard",
+      "getUsageGovernance",
+      "getUsageRetryBudget",
+      "getUsageSwitchHistory"
+    ],
+    "src/components/PreProductionPlanner.jsx": [
+      "postYoutubePrePlan"
+    ],
+    "src/components/ProductionPipeline.jsx": [
+      "getPipelineOpenFolder",
+      "getPipelineQualityGateStatus",
+      "getPipelineStatus",
+      "getPipelineStream",
+      "getPipelineVideos",
+      "getV1ThemesCurrentActive",
+      "postPipelineQualityGateImprove",
+      "postPipelineStart",
+      "postPipelineVideosMetadata",
+      "postPipelineVideosValidate",
+      "postRenderStart",
+      "wsPipeline"
+    ],
+    "src/components/ProofreadingStagePanel.jsx": [
+      "deletePipelineDictionary",
+      "getPipelineDictionary",
+      "getPipelineProofreadingExport",
+      "getPipelineProofreadingResult",
+      "getPipelineProofreadingStatus",
+      "postPipelineDictionary",
+      "postPipelineProofreadingApprove",
+      "postPipelineProofreadingApproveAll",
+      "postPipelineProofreadingReject",
+      "postPipelineProofreadingRejectAll",
+      "postPipelineProofreadingSkip"
+    ],
+    "src/components/QuickDecisionBar.jsx": [
+      "postQualityDecisionQuick"
+    ],
+    "src/components/SettingsPage.jsx": [
+      "getSettings",
+      "getTranscribeStatus",
+      "postSettingsIdentity",
+      "postSettingsReset",
+      "postSettingsVideo",
+      "postTranscribe"
+    ],
+    "src/components/ShortsGenerator.jsx": [
+      "postShortsCandidates",
+      "postShortsRender"
+    ],
+    "src/components/SmartCutPanel.jsx": [
+      "getSmartcutAllCandidates",
+      "postSmartcutFinalize",
+      "postSmartcutInit",
+      "postSmartcutLock",
+      "postSmartcutRecommend",
+      "postSmartcutUnlock"
+    ],
+    "src/components/SoulPassport.jsx": [
+      "getDirectorEvolution",
+      "getStatus"
+    ],
+    "src/components/StepReviewPanel.jsx": [
+      "postQualityReviewApprove"
+    ],
+    "src/components/ThemeSelector.jsx": [
+      "postV1ThemesApply",
+      "postV1ThemesRecommend"
+    ],
+    "src/components/TranscriptionStagePanel.jsx": [
+      "getPipelineTranscriptionModels",
+      "getPipelineTranscriptionSegments",
+      "getPipelineTranscriptionStatus",
+      "postPipelineTranscriptionModel",
+      "putPipelineTranscriptionSegments"
+    ],
+    "src/components/YouTubeOptimizerPanel.jsx": [
+      "postThumbnailSelect",
+      "postYoutubeApplyHook",
+      "postYoutubeImproveHook",
+      "postYoutubeOptimize"
+    ],
+    "src/pages/EditorPage.jsx": [
+      "getDirectorState",
+      "getPipelineStatus",
+      "getSegments",
+      "getVideo",
+      "postDirectorState",
+      "postDirectorVerifyQuality",
+      "postRender",
+      "postRhythmSplit",
+      "postSegments"
+    ]
+  },
+  "entries": {
+    "deletePipelineDictionary": "DELETE /api/pipeline/dictionary/{entry_id}",
+    "getCollaborationJournal": "GET /api/collaboration/journal",
+    "getDashboardHealth": "GET /api/dashboard/health",
+    "getDirectorEvolution": "GET /api/director/evolution",
+    "getDirectorState": "GET /api/director/state",
+    "getDirectorTasks": "GET /api/director/tasks/{task_id}",
+    "getPipelineDictionary": "GET /api/pipeline/dictionary",
+    "getPipelineOpenFolder": "GET /api/pipeline/open-folder",
+    "getPipelineProofreadingExport": "GET /api/pipeline/proofreading/export/{export_format}",
+    "getPipelineProofreadingResult": "GET /api/pipeline/proofreading/result",
+    "getPipelineProofreadingStatus": "GET /api/pipeline/proofreading/status",
+    "getPipelineQualityGateStatus": "GET /api/pipeline/quality-gate/status",
+    "getPipelineStatus": "GET /api/pipeline/status",
+    "getPipelineStream": "GET /api/pipeline/stream/{video_type}",
+    "getPipelineTranscriptionModels": "GET /api/pipeline/transcription/models",
+    "getPipelineTranscriptionSegments": "GET /api/pipeline/transcription/segments",
+    "getPipelineTranscriptionStatus": "GET /api/pipeline/transcription/status",
+    "getPipelineVideos": "GET /api/pipeline/videos",
+    "getSegments": "GET /api/segments",
+    "getSettings": "GET /api/settings",
+    "getSmartcutAllCandidates": "GET /api/smartcut/all-candidates",
+    "getStatus": "GET /api/status",
+    "getTranscribeStatus": "GET /api/transcribe/status",
+    "getUsageDashboard": "GET /api/usage/dashboard",
+    "getUsageGovernance": "GET /api/usage/governance",
+    "getUsageRetryBudget": "GET /api/usage/retry-budget",
+    "getUsageSwitchHistory": "GET /api/usage/switch-history",
+    "getUsageTwoTierStatus": "GET /api/usage/two-tier-status",
+    "getV1ThemesCurrentActive": "GET /api/v1/themes/current/active",
+    "getVideo": "GET /api/video",
+    "postCollaborationFeedback": "POST /api/collaboration/feedback",
+    "postCollaborationJournal": "POST /api/collaboration/journal",
+    "postCouncilDecision": "POST /api/council/decision",
+    "postCouncilSession": "POST /api/council/session",
+    "postDirectorAnalyzeResources": "POST /api/director/analyze-resources",
+    "postDirectorAnalyzeScript": "POST /api/director/analyze-script",
+    "postDirectorBatchGenerate": "POST /api/director/batch-generate",
+    "postDirectorChat": "POST /api/director/chat",
+    "postDirectorGenerateImageAsync": "POST /api/director/generate-image-async",
+    "postDirectorGenerateReport": "POST /api/director/generate-report",
+    "postDirectorPlanStoryboard": "POST /api/director/plan-storyboard",
+    "postDirectorQualityScore": "POST /api/director/quality-score",
+    "postDirectorState": "POST /api/director/state",
+    "postDirectorVerifyQuality": "POST /api/director/verify-quality",
+    "postPipelineDictionary": "POST /api/pipeline/dictionary",
+    "postPipelineProofreadingApprove": "POST /api/pipeline/proofreading/approve",
+    "postPipelineProofreadingApproveAll": "POST /api/pipeline/proofreading/approve-all",
+    "postPipelineProofreadingReject": "POST /api/pipeline/proofreading/reject",
+    "postPipelineProofreadingRejectAll": "POST /api/pipeline/proofreading/reject-all",
+    "postPipelineProofreadingSkip": "POST /api/pipeline/proofreading/skip",
+    "postPipelineQualityGateImprove": "POST /api/pipeline/quality-gate/improve",
+    "postPipelineStart": "POST /api/pipeline/start",
+    "postPipelineTranscriptionModel": "POST /api/pipeline/transcription/model",
+    "postPipelineVideosMetadata": "POST /api/pipeline/videos/metadata",
+    "postPipelineVideosValidate": "POST /api/pipeline/videos/validate",
+    "postQualityApplySuggestion": "POST /api/quality/apply-suggestion",
+    "postQualityDecisionQuick": "POST /api/quality/decision/quick",
+    "postQualityReviewApprove": "POST /api/quality/review/approve",
+    "postQualityUndoSuggestion": "POST /api/quality/undo-suggestion",
+    "postRender": "POST /api/render",
+    "postRenderStart": "POST /api/render/start",
+    "postRhythmSplit": "POST /api/rhythm/split",
+    "postSegments": "POST /api/segments",
+    "postSettingsIdentity": "POST /api/settings/identity",
+    "postSettingsReset": "POST /api/settings/reset",
+    "postSettingsVideo": "POST /api/settings/video",
+    "postShortsCandidates": "POST /api/shorts/candidates",
+    "postShortsRender": "POST /api/shorts/render",
+    "postSmartcutFinalize": "POST /api/smartcut/finalize",
+    "postSmartcutInit": "POST /api/smartcut/init",
+    "postSmartcutLock": "POST /api/smartcut/lock",
+    "postSmartcutRecommend": "POST /api/smartcut/recommend",
+    "postSmartcutUnlock": "POST /api/smartcut/unlock",
+    "postThumbnailSelect": "POST /api/thumbnail/select",
+    "postTranscribe": "POST /api/transcribe",
+    "postUsageSelectOption": "POST /api/usage/select-option",
+    "postV1ThemesApply": "POST /api/v1/themes/apply",
+    "postV1ThemesRecommend": "POST /api/v1/themes/recommend",
+    "postYoutubeApplyHook": "POST /api/youtube/apply-hook",
+    "postYoutubeImproveHook": "POST /api/youtube/improve-hook",
+    "postYoutubeOptimize": "POST /api/youtube/optimize",
+    "postYoutubePrePlan": "POST /api/youtube/pre-plan",
+    "putPipelineTranscriptionSegments": "PUT /api/pipeline/transcription/segments/{segment_id}",
+    "wsPipeline": "WEBSOCKET /api/pipeline/ws/pipeline"
+  }
+}

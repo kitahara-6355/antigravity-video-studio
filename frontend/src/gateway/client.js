@@ -28,7 +28,7 @@ function entryOf(name) {
   return entry;
 }
 
-// `/api/director/tasks/{task_id}` の `{task_id}` を params から埋める。
+// パスの `{name}` を params から埋める（例: 単一タスク取得の `{task_id}`）。
 // 足りなければ投げる。**空文字で埋めない** — 別のパスに化けて黙って通る。
 function fillParams(path, params) {
   return path.replace(/\{(\w+)\}/g, (_match, key) => {
