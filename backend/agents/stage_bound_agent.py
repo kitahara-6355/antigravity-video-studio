@@ -116,8 +116,12 @@ class StageBoundAgent:
             self._own_gateway = True
 
             async def _default_client_call(model_name: str, prompt_text: str, cfg: Optional[Dict]) -> str:
+                # **課金経路は必ず factory を通す。** 生のクライアントを直接
+                # 組み立てると model_governance の proxy を迂回し、cost_guard の
+                # キルスイッチが効かない（実測で見つけた唯一の迂回経路。
+                # backend/tests/test_cost_guard.py が再発を止める）。
                 try:
-                    from google import genai
+                    from gemini_client_factory import get_gemini_client
                     from google.genai import types
                     from google.genai.errors import APIError
                 except ImportError as e:
@@ -125,7 +129,11 @@ class StageBoundAgent:
                     raise RuntimeError(f"Default client call failed to import: {e}") from e
 
                 try:
-                    client = genai.Client()
+                    client = get_gemini_client()
+                    if client is None:
+                        raise RuntimeError(
+                            "GOOGLE_API_KEY が未設定です（STUB モード）。"
+                            "課金する呼び出しは行いません")
                     loop = asyncio.get_running_loop()
                     response = await loop.run_in_executor(
                         None,

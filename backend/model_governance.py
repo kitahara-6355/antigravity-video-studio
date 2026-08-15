@@ -28,6 +28,11 @@ from datetime import datetime
 from google.genai.errors import APIError
 from google.api_core.exceptions import GoogleAPICallError
 
+# 従量課金のキルスイッチ（憲法第3条）。**全呼び出しがここを通る。**
+# 本番の 40 モジュールはすべて gemini_client_factory 経由で、直接 genai を
+# 叩く本番モジュールは実測 0 件。だから絞り口はここ1つでよい。
+from cost_guard import guard_after, guard_before
+
 logger = logging.getLogger(__name__)
 
 # ============================================================
@@ -443,7 +448,9 @@ class GovernedModelsProxy:
         last_error = None
         for i, try_model in enumerate(chain):
             try:
+                _guard = guard_before(try_model, self._caller)
                 result = self._real.generate_content(model=try_model, **kwargs)
+                guard_after(_guard, try_model, result, self._caller)
 
                 if i > 0:
                     # フォールバックで成功した場合
@@ -596,9 +603,11 @@ class GovernedAsyncModelsProxy:
         last_error = None
         for i, try_model in enumerate(chain):
             try:
+                _guard = guard_before(try_model, self._caller)
                 result = await self._real.generate_content(
                     model=try_model, **kwargs,
                 )
+                guard_after(_guard, try_model, result, self._caller)
                 if i > 0:
                     model_governance._stats["fallback_activations"] += 1
                     model_governance._record_event(
@@ -656,9 +665,11 @@ class GovernedAsyncModelsProxy:
         last_error = None
         for i, try_model in enumerate(chain):
             try:
+                _guard = guard_before(try_model, self._caller)
                 result = await self._real.embed_content(
                     model=try_model, contents=contents, **kwargs,
                 )
+                guard_after(_guard, try_model, result, self._caller)
                 if i > 0:
                     model_governance._stats["fallback_activations"] += 1
                     model_governance._record_event(

@@ -134,10 +134,13 @@ async def test_stage_bound_agent_call_llm_own_gateway(tmp_path):
     mock_response = MagicMock()
     mock_response.text = "Own gateway mocked response"
     
-    with patch("google.genai.Client") as mock_client_class:
+    # **課金経路は factory を通る。** 生クライアントを patch すると
+    # model_governance の proxy と cost_guard のキルスイッチを迂回した
+    # 経路を検証してしまう（実際にその迂回があり、2026-08-15 に塞いだ）。
+    with patch("gemini_client_factory.get_gemini_client") as mock_get_client:
         mock_client = MagicMock()
         mock_client.models.generate_content.return_value = mock_response
-        mock_client_class.return_value = mock_client
+        mock_get_client.return_value = mock_client
         
         response = await agent.call_llm(prompt="Hello Own", model="gemini-2.5-flash")
         assert response == "Own gateway mocked response"
@@ -193,10 +196,13 @@ async def test_stage_bound_agent_call_llm_default_client_failure(tmp_path):
     
     agent = StageBoundAgent(stage_name="smartcut", db_path=str(db_file))
     
-    with patch("google.genai.Client") as mock_client_class:
+    # **課金経路は factory を通る。** 生クライアントを patch すると
+    # model_governance の proxy と cost_guard のキルスイッチを迂回した
+    # 経路を検証してしまう（実際にその迂回があり、2026-08-15 に塞いだ）。
+    with patch("gemini_client_factory.get_gemini_client") as mock_get_client:
         mock_client = MagicMock()
         mock_client.models.generate_content.side_effect = Exception("Default client exception")
-        mock_client_class.return_value = mock_client
+        mock_get_client.return_value = mock_client
         
         with pytest.raises(Exception) as exc_info:
             await agent.call_llm(prompt="Hello Exception", model="gemini-2.5-flash")
@@ -507,10 +513,13 @@ async def test_stage_bound_agent_default_client_runtime_error_wrap(tmp_path):
     
     agent = StageBoundAgent(stage_name="smartcut", db_path=str(db_file))
     
-    with patch("google.genai.Client") as mock_client_class:
+    # **課金経路は factory を通る。** 生クライアントを patch すると
+    # model_governance の proxy と cost_guard のキルスイッチを迂回した
+    # 経路を検証してしまう（実際にその迂回があり、2026-08-15 に塞いだ）。
+    with patch("gemini_client_factory.get_gemini_client") as mock_get_client:
         mock_client = MagicMock()
         mock_client.models.generate_content.side_effect = Exception("Original root cause")
-        mock_client_class.return_value = mock_client
+        mock_get_client.return_value = mock_client
         
         with pytest.raises(RuntimeError) as exc_info:
             await agent.call_llm(prompt="Hello wrap", model="gemini-2.5-flash")

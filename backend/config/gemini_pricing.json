@@ -1,0 +1,31 @@
+{
+  "_comment": "Gemini API の単価表。**外部の事実なのでコードに埋め込まない。** 出典と取得日を必須にする。ここに無いモデルは cost_guard が『表の最高単価』で見積もる（fail-closed）。数字を動かすときは source と retrieved_at も同じコミットで更新すること。",
+  "retrieved_at": "2026-08-15",
+  "source": "web検索で確認した二次情報（2026-08-15）。**一次情報は https://ai.google.dev/gemini-api/docs/pricing 。実走前に必ず突き合わせること。**",
+  "confidence": "unverified_secondary",
+  "usd_jpy_rate": 160.0,
+  "usd_jpy_note": "為替も外部の事実。安全側に倒して固定値を置いている。実費の精算時に見直す。",
+  "unit": "USD per 1M tokens",
+  "models": {
+    "gemini-2.5-pro": {
+      "input_usd_per_1m": 1.25,
+      "output_usd_per_1m": 10.0,
+      "note": "200Kトークン超のプロンプトは $2.50/$15 になる。ここでは通常帯を置いている（超過帯は未登録なので最高単価で見積もられる）。2026-10-16 提供終了予定"
+    },
+    "gemini-2.5-flash": {
+      "input_usd_per_1m": 0.30,
+      "output_usd_per_1m": 2.50,
+      "note": "$0.15/$1.25 とする情報源もあるが、**安全側の高いほう**を採用している。2026-10-16 提供終了予定"
+    },
+    "gemini-2.5-flash-lite": {
+      "input_usd_per_1m": 0.10,
+      "output_usd_per_1m": 0.40,
+      "note": "推定値。実測の請求と突き合わせること"
+    },
+    "text-embedding-004": {
+      "input_usd_per_1m": 0.15,
+      "output_usd_per_1m": 0.0,
+      "note": "埋め込みは出力課金なし"
+    }
+  }
+}
