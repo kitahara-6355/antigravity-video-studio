@@ -64,6 +64,10 @@ class Price:
     """百万トークンあたりの単価（USD）。"""
     input_usd: float
     output_usd: float
+    # **無料枠の対象か。** Flash 系には無料枠が残っている（1,500 RPD 程度）。
+    # 枠内なら実費は 0 円なので、**見積もりは上限**でしかない。
+    # Pro 系は 2026-04-01 に無料枠から外れた。
+    free_tier: bool = False
 
 
 def _load_pricing() -> tuple[dict[str, Price], dict]:
@@ -75,7 +79,8 @@ def _load_pricing() -> tuple[dict[str, Price], dict]:
     payload = json.loads(PRICING_PATH.read_text(encoding="utf-8"))
     prices = {
         name: Price(float(row["input_usd_per_1m"]),
-                    float(row["output_usd_per_1m"]))
+                    float(row["output_usd_per_1m"]),
+                    bool(row.get("free_tier", False)))
         for name, row in payload["models"].items()
     }
     if not prices:
@@ -100,7 +105,8 @@ class CostGuard:
         # 未知のモデルは**最高単価**で見積もる（fail-closed）。
         self._worst = Price(
             max(p.input_usd for p in self._prices.values()),
-            max(p.output_usd for p in self._prices.values()))
+            max(p.output_usd for p in self._prices.values()),
+            False)  # 未知のモデルを無料扱いにしない
 
     # --- 残高 ---------------------------------------------------------------
 
@@ -167,6 +173,9 @@ class CostGuard:
             "prompt_tokens": prompt,
             "output_tokens": out,
             "known_price": known,
+            # 無料枠の対象モデルか。**枠内なら実費 0 円**なので、
+            # ここが True の行は「上限としての見積もり」でしかない。
+            "free_tier_eligible": price.free_tier,
             "usd": round(usd, 6),
             "jpy": round(jpy, 4),
             "spent_jpy": round(spent, 4),
@@ -295,6 +304,15 @@ def _format_status() -> str:
         f"  残り    : {limit - spent:,.2f} 円",
         "",
     ]
+    mode = budget.get("billing_mode", "(未宣言)")
+    lines.append(f"  課金方式: {mode}")
+    if mode == "prepay" and budget.get("auto_reload") != "off":
+        lines.append("  ⚠ **自動リロードが OFF だと宣言されていません。**"
+                     "ON のままだと Google 側の上限が効きません"
+                     "（budget.json の auto_reload を \"off\" にする）")
+    if budget.get("credits_expire_at"):
+        lines.append(f"  クレジット失効: {budget['credits_expire_at']}（1年で失効）")
+    lines.append("")
     if LEDGER_PATH.is_file():
         rows = [json.loads(line) for line in
                 LEDGER_PATH.read_text(encoding="utf-8").splitlines() if line]
@@ -307,6 +325,12 @@ def _format_status() -> str:
         if unknown:
             lines.append(f"  ⚠ 単価が未登録のモデル: {unknown} 件"
                          "（最高単価で見積もっています）")
+        free = sum(1 for r in rows if r.get("free_tier_eligible"))
+        if free:
+            lines.append(f"  ℹ 無料枠の対象モデル: {free} 件。"
+                         "**枠内に収まっていれば実費は 0 円**なので、"
+                         "上の実績は上限としての見積もりです"
+                         "（一次情報の請求額と突き合わせてください）")
     else:
         lines.append("  呼び出し: 0 件（台帳なし）")
     return "\n".join(lines)

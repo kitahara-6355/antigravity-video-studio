@@ -10,22 +10,55 @@
     "gemini-2.5-pro": {
       "input_usd_per_1m": 1.25,
       "output_usd_per_1m": 10.0,
-      "note": "200Kトークン超のプロンプトは $2.50/$15 になる。ここでは通常帯を置いている（超過帯は未登録なので最高単価で見積もられる）。2026-10-16 提供終了予定"
+      "note": "200Kトークン超のプロンプトは $2.50/$15 になる。ここでは通常帯を置いている（超過帯は未登録なので最高単価で見積もられる）。2026-10-16 提供終了予定",
+      "free_tier": false
     },
     "gemini-2.5-flash": {
-      "input_usd_per_1m": 0.30,
-      "output_usd_per_1m": 2.50,
-      "note": "$0.15/$1.25 とする情報源もあるが、**安全側の高いほう**を採用している。2026-10-16 提供終了予定"
+      "input_usd_per_1m": 0.3,
+      "output_usd_per_1m": 2.5,
+      "note": "$0.15/$1.25 とする情報源もあるが、**安全側の高いほう**を採用している。2026-10-16 提供終了予定",
+      "free_tier": true
     },
     "gemini-2.5-flash-lite": {
-      "input_usd_per_1m": 0.10,
-      "output_usd_per_1m": 0.40,
-      "note": "推定値。実測の請求と突き合わせること"
+      "input_usd_per_1m": 0.1,
+      "output_usd_per_1m": 0.4,
+      "note": "推定値。実測の請求と突き合わせること",
+      "free_tier": true
     },
     "text-embedding-004": {
       "input_usd_per_1m": 0.15,
       "output_usd_per_1m": 0.0,
       "note": "埋め込みは出力課金なし"
+    },
+    "gemini-3-flash-preview": {
+      "input_usd_per_1m": 0.3,
+      "output_usd_per_1m": 2.5,
+      "free_tier": true,
+      "note": "推定値（2.5-flash と同等に置いている）。実費と突き合わせること"
     }
-  }
+  },
+  "billing_model": {
+    "_comment": "**2026-03-23 から Prepay / Postpay 体系。** 従量課金の請求が後から来る形ではなく、AI Studio でクレジットを前払いして残高から引く形が選べる（2026-04-15 開始）。",
+    "recommended": "prepay",
+    "why": "**自動リロードを OFF にすれば、Google 側で物理的に上限が効く。** cost_guard より強い歯止めになる（こちらは推定でしか止められない）",
+    "credit_expiry": "購入したクレジットは**1年で失効**する。使い切れない額を買わない",
+    "free_trial": "**Gemini API の利用は $300 の Google Cloud 無料トライアルの対象外**（2026-03〜）。無料で始まる道は無い",
+    "source": "web検索で確認（2026-08-15）。一次情報は https://ai.google.dev/gemini-api/docs/billing",
+    "confidence": "unverified_secondary"
+  },
+  "free_tier": {
+    "_comment": "**無料枠は残っている。** R1 の実走が ¥0 で済む可能性がある。ただし Pro 系は 2026-04-01 に無料枠から外れた。",
+    "eligible_models": [
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-3-flash-preview"
+    ],
+    "limits": "Flash 系はおよそ 1,500 RPD / 15 RPM、Flash-Lite は 30 RPM（2026-08 時点の二次情報）",
+    "pro_excluded": "gemini-2.5-pro は 2026-04-01 に無料枠から外れた。**このリポジトリは 2.5-pro を67箇所で参照している**ので、フル実走は有料になる",
+    "privacy": "**無料枠で送ったデータは Google の製品改善に使われる。** 有料枠では学習に使われない。台本や素材の扱いはユーザー判断",
+    "effect_on_estimate": "cost_guard の見積もりは**上限**。無料枠に収まった呼び出しの実費は 0 円になる",
+    "source": "web検索で確認（2026-08-15）",
+    "confidence": "unverified_secondary"
+  },
+  "price_change_note": "2026-07-02 に値上げがあった。ここの数字は値上げ後の水準として拾ったもの（安全側の高いほうを採用）"
 }

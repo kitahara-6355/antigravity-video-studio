@@ -7,7 +7,10 @@
     "limit_jpy": "上限（円）",
     "spent_jpy": "実績（円）。使うたびに更新する",
     "status": "active | exhausted | closed",
-    "note": "内訳・前提"
+    "note": "内訳・前提",
+    "billing_mode": "prepay | postpay | free_tier_only",
+    "auto_reload": "prepay のとき、自動リロードを OFF にしたか。**ON だと上限が効かない**",
+    "credits_expire_at": "prepay のクレジット失効日（購入から1年）"
   },
   "budgets": [
     {
@@ -17,7 +20,10 @@
       "limit_jpy": 3000,
       "spent_jpy": 0,
       "status": "active",
-      "note": "ユーザー承認（2026-08-15・対話で明示）。cost_guard が呼び出しごとに実費を計上し、残高が予約額（5円）を割った時点で CostLimitExceeded を上げて止める。台帳は .claude/cost_ledger.jsonl。**この枠を超える利用は再承認が要る。** 単価表は backend/config/gemini_pricing.json（出典と取得日つき・一次情報との突き合わせは実走前に行う）"
+      "note": "ユーザー承認（2026-08-15・対話で明示）。cost_guard が呼び出しごとに実費を計上し、残高が予約額（5円）を割った時点で CostLimitExceeded を上げて止める。台帳は .claude/cost_ledger.jsonl。**この枠を超える利用は再承認が要る。** 単価表は backend/config/gemini_pricing.json（出典と取得日つき・一次情報との突き合わせは実走前に行う） **2026-03-23 からの Prepay 体系に合わせる: クレジットを前払いし、自動リロードは必ず OFF にする**（ON だと Google 側の上限が効かなくなる）。クレジットは1年で失効。Flash 系には無料枠が残っているので、実走が ¥0 で終わる可能性がある（cost_guard の見積もりは上限）。ただし gemini-2.5-pro は 2026-04-01 に無料枠から外れており、67箇所で参照しているためフル実走は有料。",
+      "billing_mode": "prepay",
+      "auto_reload": "must_be_off",
+      "credits_expire_at": null
     }
   ]
 }

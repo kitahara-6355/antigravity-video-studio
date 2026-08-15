@@ -277,3 +277,53 @@ def test_no_production_module_bypasses_the_factory():
     assert offenders == [], (
         "gemini_client_factory を通らない課金経路ができています: "
         + ", ".join(offenders))
+
+
+# --- 課金体系（2026-03-23 からの Prepay / 無料枠） -----------------------------
+
+
+def test_free_tier_models_are_flagged_in_the_ledger(tmp_path):
+    """**無料枠に収まれば実費は 0 円。** 見積もりが上限であることを台帳に残す。"""
+    guard = _guard(tmp_path)
+    guard.after_call("gemini-2.5-flash", _Response(_Usage(prompt=1000)))
+
+    row = json.loads((tmp_path / "ledger.jsonl").read_text(
+        encoding="utf-8").splitlines()[0])
+
+    assert row["free_tier_eligible"] is True
+
+
+def test_paid_only_models_are_not_flagged_as_free(tmp_path):
+    """gemini-2.5-pro は 2026-04-01 に無料枠から外れた。"""
+    guard = _guard(tmp_path)
+    guard.after_call("gemini-2.5-pro", _Response(_Usage(prompt=1000)))
+
+    row = json.loads((tmp_path / "ledger.jsonl").read_text(
+        encoding="utf-8").splitlines()[0])
+
+    assert row["free_tier_eligible"] is False
+
+
+def test_an_unknown_model_is_never_treated_as_free(tmp_path):
+    """未知のモデルを無料扱いにしない（fail-closed）。"""
+    guard = _guard(tmp_path)
+
+    assert guard.price_of("gemini-99-unknown").free_tier is False
+
+
+def test_the_pricing_table_declares_the_billing_model():
+    """**Prepay とクレジット失効は運用の前提。** 表に書いてある。"""
+    payload = json.loads(cost_guard.PRICING_PATH.read_text(encoding="utf-8"))
+
+    assert payload["billing_model"]["recommended"] == "prepay"
+    assert "1年で失効" in payload["billing_model"]["credit_expiry"]
+    assert payload["free_tier"]["eligible_models"]
+
+
+def test_the_budget_declares_the_billing_mode():
+    """自動リロードが ON だと Google 側の上限が効かない。**宣言を要求する。**"""
+    budget = load_active_budget()
+    if budget is None:
+        return
+    assert budget.get("billing_mode") in ("prepay", "postpay", "free_tier_only")
+    assert "auto_reload" in budget
