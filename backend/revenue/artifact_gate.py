@@ -52,6 +52,9 @@ ARTIFACT_SEMANTICS = {
          "（工程名・原因・入力が残っている）"),
         ("**実費が計測されていること** — cost_ledger に1行1呼び出しで残り、"
          "単価不明・未計測の件数が出る"),
+        ("**工程ごとに、どのモデルで動いたかが残ること**"
+         "（見える化。不満があったときに上げる先を決めるために要る。"
+         "実行全体の `models_used` だけでは足りない）"),
         "**使ったモデル名が残ること**（2026-10-16 に終了する 2.5 系への依存を見るため）",
     ],
     "確かめないこと": [
@@ -182,6 +185,17 @@ def check_runs(runs: list[dict]) -> list[Finding]:
                 f"実行記録に必要な項目がありません: {', '.join(missing)}"))
             continue
         for stage in run.get("stages") or []:
+            # **見える化はここで担保する（ユーザー要件・2026-08-15）。**
+            # 「どの結果がどのモデルで出たか」が残っていなければ、不満が
+            # あっても**どこを上げればいいか分からない**。記録が無いことを
+            # 緑にしない。
+            if not stage.get("model"):
+                findings.append(Finding(
+                    "model_not_recorded",
+                    f"{rid} / {stage.get('name', '(名前なし)')}",
+                    "この工程が**どのモデルで動いたか**が記録されていません。"
+                    "結果に不満があったときに上げる先を決められません"
+                    "（`python -m backend.model_policy --why <工程>`）"))
             if stage.get("status") != "failed":
                 continue
             # **失敗を記録するだけでは足りない。** 再開できる情報が要る。

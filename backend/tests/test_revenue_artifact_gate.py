@@ -29,7 +29,8 @@ def _kinds(findings) -> set[str]:
 
 def _run(tmp_path: Path, **over) -> Path:
     run = {"run_id": "r1", "started_at": "2026-08-15T00:00:00Z",
-           "stages": [{"name": "script", "status": "ok"}],
+           "stages": [{"name": "script", "status": "ok",
+                       "model": "gemini-3-flash-preview"}],
            "models_used": ["gemini-2.5-flash"],
            "artifacts": []}
     run.update(over)
@@ -89,7 +90,8 @@ def test_an_incomplete_run_record_is_a_violation(tmp_path):
 
 def test_a_failed_stage_without_resume_info_is_a_violation(tmp_path):
     """**失敗を記録するだけでは足りない。** そこから再開できる情報が要る。"""
-    _run(tmp_path, stages=[{"name": "tts", "status": "failed"}])
+    _run(tmp_path, stages=[{"name": "tts", "status": "failed",
+                            "model": "gemini-3-flash-preview"}])
 
     findings = check_runs(load_runs(tmp_path))
 
@@ -98,6 +100,7 @@ def test_a_failed_stage_without_resume_info_is_a_violation(tmp_path):
 
 def test_a_failed_stage_with_resume_info_passes(tmp_path):
     _run(tmp_path, stages=[{"name": "tts", "status": "failed",
+                            "model": "gemini-3-flash-preview",
                             "error": "429 rate limited",
                             "input": "script.json"}])
 
@@ -181,3 +184,29 @@ def test_the_semantics_do_not_claim_quality(tmp_path):
 
 def test_the_semantics_admit_fail_closed():
     assert "fail-closed" in ARTIFACT_SEMANTICS["判定の性質"]
+
+
+# --- 8. 見える化（ユーザー要件・2026-08-15） ----------------------------------
+
+
+def test_a_stage_without_a_model_is_a_violation(tmp_path):
+    """**どの結果がどのモデルで出たか**が残っていなければ FAIL。
+
+    残っていないと、不満があっても**どこを上げればいいか決められない**。
+    """
+    _run(tmp_path, stages=[{"name": "telop", "status": "ok"}])
+
+    assert "model_not_recorded" in _kinds(check_runs(load_runs(tmp_path)))
+
+
+def test_a_stage_with_a_model_passes(tmp_path):
+    _run(tmp_path, stages=[{"name": "telop", "status": "ok",
+                            "model": "gemini-3-flash-preview"}])
+
+    assert check_runs(load_runs(tmp_path)) == []
+
+
+def test_the_semantics_promise_per_stage_visibility():
+    checked = "".join(ARTIFACT_SEMANTICS["確かめること"])
+
+    assert "工程ごとに、どのモデルで動いたかが残ること" in checked

@@ -1,298 +1,317 @@
 {
-    "version": "5.0.0",
-    "last_updated": "2026-04-10",
-    "architecture": "three_tier_complete",
-    "description": "3段階方式。グレード方針: 後発・高性能・無料枠が限られるモデルを上位に配置し優先消費。安定版を中位で確保。",
-    "grade_policy": {
-        "principle": "後発モデルでより賢いもの、利用枠が少なく先に消費すべきモデルをPremiumに配置する",
-        "premium": "最新世代・高性能・枠変動リスクあり → 優先消費",
-        "standard": "安定版・信頼性重視 → 確実な処理に使用",
-        "batch": "軽量版・大量処理 → コスト最適化"
+  "version": "5.0.0",
+  "last_updated": "2026-08-15",
+  "architecture": "three_tier_complete",
+  "description": "3段階方式。グレード方針: 後発・高性能・無料枠が限られるモデルを上位に配置し優先消費。安定版を中位で確保。",
+  "grade_policy": {
+    "principle": "後発モデルでより賢いもの、利用枠が少なく先に消費すべきモデルをPremiumに配置する",
+    "premium": "最新世代・高性能・枠変動リスクあり → 優先消費",
+    "standard": "安定版・信頼性重視 → 確実な処理に使用",
+    "batch": "軽量版・大量処理 → コスト最適化",
+    "escalation": "**段は batch → standard → premium → pro。** 昇格はユーザーの指示だけで起きる（`python -m backend.model_policy --up <工程> --reason \"…\"`）。自動では上がらない（課金が増えるため）。降格は `--down`。履歴は .claude/model_escalations.jsonl に残る"
+  },
+  "text_generation": {
+    "default_model": "gemini-2.5-flash",
+    "tiers": {
+      "premium": {
+        "model": "gemini-3-flash-preview",
+        "label": "上 (Premium)",
+        "description": "最新世代・最高性能 — 品質ゲート・最終判断・重要な意思決定",
+        "preserve_ratio": 0.2,
+        "note": "Gemini 3世代。後発かつ高性能、枠が限定的なため優先消費する",
+        "use_cases": [
+          "quality_gate",
+          "director",
+          "brand_check",
+          "lightweight_scan",
+          "supervisor"
+        ]
+      },
+      "standard": {
+        "model": "gemini-2.5-flash",
+        "label": "中 (Standard)",
+        "description": "安定版 — 字幕・テロップ・AI確認・校閲の確実な処理",
+        "preserve_ratio": 0.0,
+        "note": "最も信頼性が高い安定モデル。確実な処理に使用",
+        "use_cases": [
+          "subtitle",
+          "telop",
+          "ai_confirmation",
+          "proofreader"
+        ]
+      },
+      "batch": {
+        "model": "gemini-2.5-flash-lite",
+        "label": "下 (Batch)",
+        "description": "軽量版 — 大量処理・バッチ・事前分析",
+        "preserve_ratio": 0.0,
+        "note": "軽量版。大量処理・コスト最適化向け",
+        "use_cases": [
+          "branding",
+          "semantic_chunker",
+          "bulk_processing",
+          "strategist"
+        ]
+      },
+      "pro": {
+        "model": "gemini-2.5-pro",
+        "label": "特上 (Pro)",
+        "description": "**昇格先。既定では誰も使わない。** AI の提案・自動処理の結果に不満があったときだけ、工程単位で上げる段",
+        "preserve_ratio": 0.0,
+        "note": "2026-08-15 追加（ユーザー要件『不満ならすぐグレードアップを指示できる体制』）。**追加前は全工程が premium に張り付いており、昇格先が存在しなかった。** premium の実体は flash 系なので、品質で上に行くには pro 系が要る。**課金上の注意: gemini-2.5-pro は 2026-04-01 に無料枠から外れており、単価は flash の約4倍（入力）〜4倍（出力）。cost_guard が実費を計上する。**また 2026-10-16 に 2.5 系は提供終了予定なので、その時点で後継に差し替える",
+        "use_cases": [
+          "ユーザーが --up で指定した工程のみ"
+        ],
+        "free_tier": false
+      }
     },
-    "text_generation": {
-        "default_model": "gemini-2.5-flash",
-        "tiers": {
-            "premium": {
-                "model": "gemini-3-flash-preview",
-                "label": "上 (Premium)",
-                "description": "最新世代・最高性能 — 品質ゲート・最終判断・重要な意思決定",
-                "preserve_ratio": 0.2,
-                "note": "Gemini 3世代。後発かつ高性能、枠が限定的なため優先消費する",
-                "use_cases": [
-                    "quality_gate",
-                    "director",
-                    "brand_check",
-                    "lightweight_scan",
-                    "supervisor"
-                ]
-            },
-            "standard": {
-                "model": "gemini-2.5-flash",
-                "label": "中 (Standard)",
-                "description": "安定版 — 字幕・テロップ・AI確認・校閲の確実な処理",
-                "preserve_ratio": 0.0,
-                "note": "最も信頼性が高い安定モデル。確実な処理に使用",
-                "use_cases": [
-                    "subtitle",
-                    "telop",
-                    "ai_confirmation",
-                    "proofreader"
-                ]
-            },
-            "batch": {
-                "model": "gemini-2.5-flash-lite",
-                "label": "下 (Batch)",
-                "description": "軽量版 — 大量処理・バッチ・事前分析",
-                "preserve_ratio": 0.0,
-                "note": "軽量版。大量処理・コスト最適化向け",
-                "use_cases": [
-                    "branding",
-                    "semantic_chunker",
-                    "bulk_processing",
-                    "strategist"
-                ]
-            }
-        },
-        "fallback_chain": {
-            "gemini-3-flash-preview": "gemini-2.5-flash",
-            "gemini-2.5-flash": "gemini-2.5-flash-lite",
-            "gemini-2.5-flash-lite": null
-        }
+    "fallback_chain": {
+      "gemini-3-flash-preview": "gemini-2.5-flash",
+      "gemini-2.5-flash": "gemini-2.5-flash-lite",
+      "gemini-2.5-flash-lite": null
     },
-    "image_generation": {
-        "default_model": "imagen-4.0-generate-001",
-        "tiers": {
-            "premium": {
-                "model": "imagen-4.0-ultra-generate-001",
-                "label": "上 (Ultra)",
-                "description": "最高品質 - 4K出力・最終サムネイル",
-                "preserve_ratio": 0.2,
-                "use_cases": [
-                    "final_thumbnail",
-                    "hero_image"
-                ]
-            },
-            "standard": {
-                "model": "imagen-4.0-generate-001",
-                "label": "中 (Standard)",
-                "description": "高品質 - 通常サムネイル・アセット",
-                "preserve_ratio": 0.0,
-                "use_cases": [
-                    "thumbnail",
-                    "asset_generation"
-                ]
-            },
-            "batch": {
-                "model": "imagen-4.0-fast-generate-001",
-                "label": "下 (Fast)",
-                "description": "高速生成 - プレビュー・バリエーション",
-                "preserve_ratio": 0.0,
-                "use_cases": [
-                    "preview",
-                    "variations",
-                    "draft"
-                ]
-            }
-        },
-        "fallback_chain": {
-            "imagen-4.0-ultra-generate-001": "imagen-4.0-generate-001",
-            "imagen-4.0-generate-001": "imagen-4.0-fast-generate-001",
-            "imagen-4.0-fast-generate-001": null
-        }
+    "tier_order": [
+      "batch",
+      "standard",
+      "premium",
+      "pro"
+    ],
+    "tier_order_note": "**左が下、右が上。** 昇格・降格はこの順で1つ動く。順序をここに置くのは、model_policy.py 側に持つと正典が2つになるため（憲法第5条）"
+  },
+  "image_generation": {
+    "default_model": "imagen-4.0-generate-001",
+    "tiers": {
+      "premium": {
+        "model": "imagen-4.0-ultra-generate-001",
+        "label": "上 (Ultra)",
+        "description": "最高品質 - 4K出力・最終サムネイル",
+        "preserve_ratio": 0.2,
+        "use_cases": [
+          "final_thumbnail",
+          "hero_image"
+        ]
+      },
+      "standard": {
+        "model": "imagen-4.0-generate-001",
+        "label": "中 (Standard)",
+        "description": "高品質 - 通常サムネイル・アセット",
+        "preserve_ratio": 0.0,
+        "use_cases": [
+          "thumbnail",
+          "asset_generation"
+        ]
+      },
+      "batch": {
+        "model": "imagen-4.0-fast-generate-001",
+        "label": "下 (Fast)",
+        "description": "高速生成 - プレビュー・バリエーション",
+        "preserve_ratio": 0.0,
+        "use_cases": [
+          "preview",
+          "variations",
+          "draft"
+        ]
+      }
     },
-    "video_generation": {
-        "default_model": "veo-3.1",
-        "note": "動画生成は有料APIのため、無料枠運用では最小限に使用",
-        "tiers": {
-            "premium": {
-                "model": "veo-3.1",
-                "label": "上 (Quality)",
-                "description": "最高品質 - 最終動画・4K対応",
-                "preserve_ratio": 0.5,
-                "use_cases": [
-                    "final_video",
-                    "opening",
-                    "ending"
-                ]
-            },
-            "standard": {
-                "model": "veo-3.1-fast",
-                "label": "中 (Fast)",
-                "description": "高速生成 - 通常動画・1080p",
-                "preserve_ratio": 0.0,
-                "use_cases": [
-                    "standard_video",
-                    "transitions"
-                ]
-            },
-            "batch": {
-                "model": "veo-3.0",
-                "label": "下 (Legacy)",
-                "description": "旧世代 - プレビュー・テスト用",
-                "preserve_ratio": 0.0,
-                "use_cases": [
-                    "preview",
-                    "test",
-                    "draft"
-                ]
-            }
-        },
-        "fallback_chain": {
-            "veo-3.1": "veo-3.1-fast",
-            "veo-3.1-fast": "veo-3.0",
-            "veo-3.0": null
-        }
-    },
-    "free_tier_limits": {
-        "gemini-3-flash-preview": {
-            "rpm": 15,
-            "rpd": 1000,
-            "tpm": 250000,
-            "tier": "premium",
-            "note": "Preview — 枠が変動する可能性があるため優先消費"
-        },
-        "gemini-2.5-flash": {
-            "rpm": 15,
-            "rpd": 1000,
-            "tpm": 250000,
-            "tier": "standard"
-        },
-        "gemini-2.5-flash-lite": {
-            "rpm": 30,
-            "rpd": 1500,
-            "tpm": 250000,
-            "tier": "batch"
-        },
-        "gemini-2.5-pro": {
-            "rpm": 0,
-            "rpd": 0,
-            "note": "無料枠 quota=0 — 利用不可"
-        },
-        "imagen-4.0-ultra-generate-001": {
-            "rpm": 2,
-            "rpd": 20
-        },
-        "imagen-4.0-generate-001": {
-            "rpm": 2,
-            "rpd": 50
-        },
-        "imagen-4.0-fast-generate-001": {
-            "rpm": 5,
-            "rpd": 100
-        },
-        "veo-3.1": {
-            "rpm": 1,
-            "rpd": 10,
-            "note": "有料Preview - 月100クレジット"
-        },
-        "veo-3.1-fast": {
-            "rpm": 2,
-            "rpd": 20,
-            "note": "有料Preview"
-        },
-        "veo-3.0": {
-            "rpm": 2,
-            "rpd": 30,
-            "note": "Preview"
-        }
-    },
-    "task_mapping": {
-        "quality_gate": "gemini-3-flash-preview",
-        "director": "gemini-3-flash-preview",
-        "brand_check": "gemini-3-flash-preview",
-        "live_api": "gemini-3-flash-preview",
-        "supervisor": "gemini-3-flash-preview",
-        "subtitle_split": "gemini-3-flash-preview",
-        "ai_confirmation": "gemini-3-flash-preview",
-        "telop_suggestion": "gemini-3-flash-preview",
-        "proofreader": "gemini-3-flash-preview",
-        "youtube_optimization": "gemini-3-flash-preview",
-        "branding": "gemini-3-flash-preview",
-        "semantic_chunker": "gemini-3-flash-preview",
-        "bulk_processing": "gemini-3-flash-preview",
-        "strategist": "gemini-3-flash-preview",
-        "final_thumbnail": "imagen-4.0-ultra-generate-001",
-        "thumbnail": "imagen-4.0-generate-001",
-        "thumbnail_preview": "imagen-4.0-fast-generate-001",
-        "opening_video": "veo-3.1",
-        "ending_video": "veo-3.1",
-        "transition_video": "veo-3.1-fast",
-        "lightweight_scan": "gemini-3-flash-preview"
-    },
-    "evolution_strategy": {
-        "description": "3段階入替方式 - 全カテゴリ統一",
-        "principle": "上中下で世代を揃え、処理量と品質要求に応じて使い分け",
-        "on_new_generation": {
-            "text": [
-                "1. 新世代ProをPremiumに設定",
-                "2. 新世代FlashをStandardに設定",
-                "3. 旧PremiumをBatchに降格",
-                "4. 旧Batchをdeprecatedに移動"
-            ],
-            "image": [
-                "1. 新世代UltraをPremiumに設定",
-                "2. 新世代StandardをStandardに設定",
-                "3. 新世代FastをBatchに設定",
-                "4. 旧世代をdeprecatedに移動"
-            ],
-            "video": [
-                "1. 新世代QualityをPremiumに設定",
-                "2. 新世代FastをStandardに設定",
-                "3. 旧世代をBatchに降格"
-            ]
-        }
-    },
-    "maintenance": {
-        "quarterly_review": {
-            "description": "四半期ごとのモデル棚卸しと更新",
-            "tasks": [
-                "1. Google AI公式発表をチェック",
-                "2. 新モデルのSDK互換性を確認",
-                "3. 無料枠制限の変更を確認",
-                "4. 必要に応じてtiers設定を更新",
-                "5. deprecatedモデルの削除判断"
-            ]
-        },
-        "sdk_compatibility_check": {
-            "description": "起動時のSDK互換性自動チェック",
-            "enabled": true,
-            "fallback_on_incompatible": true
-        },
-        "deprecation_policy": {
-            "warning_period_days": 90,
-            "auto_migrate": true
-        }
-    },
-    "deprecated": {
-        "gemini-2.0-flash": {
-            "replacement": "gemini-3-flash-preview",
-            "deadline": "2026-03-31",
-            "reason": "無料枠 quota=0。完全利用不可。"
-        },
-        "gemini-2.0-flash-lite": {
-            "replacement": "gemini-2.5-flash-lite",
-            "deadline": "2026-04-10",
-            "reason": "2.5-flash-lite への移行完了"
-        },
-        "gemini-2.5-pro": {
-            "replacement": "gemini-2.5-flash",
-            "deadline": "2026-04-10",
-            "reason": "無料枠 quota=0。gemini-2.5-flash をPremiumとして使用"
-        },
-        "imagen-3.0-generate-001": {
-            "replacement": "imagen-4.0-fast-generate-001",
-            "deadline": "2026-06-01",
-            "reason": "Imagen 4への移行"
-        }
-    },
-    "removed": {
-        "gemini-2.0-flash-exp": {
-            "replacement": "gemini-2.5-flash",
-            "removed_date": "2025-12-01"
-        },
-        "gemini-1.5-flash": {
-            "replacement": "gemini-2.5-flash",
-            "removed_date": "2025-06-01"
-        }
+    "fallback_chain": {
+      "imagen-4.0-ultra-generate-001": "imagen-4.0-generate-001",
+      "imagen-4.0-generate-001": "imagen-4.0-fast-generate-001",
+      "imagen-4.0-fast-generate-001": null
     }
+  },
+  "video_generation": {
+    "default_model": "veo-3.1",
+    "note": "動画生成は有料APIのため、無料枠運用では最小限に使用",
+    "tiers": {
+      "premium": {
+        "model": "veo-3.1",
+        "label": "上 (Quality)",
+        "description": "最高品質 - 最終動画・4K対応",
+        "preserve_ratio": 0.5,
+        "use_cases": [
+          "final_video",
+          "opening",
+          "ending"
+        ]
+      },
+      "standard": {
+        "model": "veo-3.1-fast",
+        "label": "中 (Fast)",
+        "description": "高速生成 - 通常動画・1080p",
+        "preserve_ratio": 0.0,
+        "use_cases": [
+          "standard_video",
+          "transitions"
+        ]
+      },
+      "batch": {
+        "model": "veo-3.0",
+        "label": "下 (Legacy)",
+        "description": "旧世代 - プレビュー・テスト用",
+        "preserve_ratio": 0.0,
+        "use_cases": [
+          "preview",
+          "test",
+          "draft"
+        ]
+      }
+    },
+    "fallback_chain": {
+      "veo-3.1": "veo-3.1-fast",
+      "veo-3.1-fast": "veo-3.0",
+      "veo-3.0": null
+    }
+  },
+  "free_tier_limits": {
+    "gemini-3-flash-preview": {
+      "rpm": 15,
+      "rpd": 1000,
+      "tpm": 250000,
+      "tier": "premium",
+      "note": "Preview — 枠が変動する可能性があるため優先消費"
+    },
+    "gemini-2.5-flash": {
+      "rpm": 15,
+      "rpd": 1000,
+      "tpm": 250000,
+      "tier": "standard"
+    },
+    "gemini-2.5-flash-lite": {
+      "rpm": 30,
+      "rpd": 1500,
+      "tpm": 250000,
+      "tier": "batch"
+    },
+    "gemini-2.5-pro": {
+      "rpm": 0,
+      "rpd": 0,
+      "note": "無料枠 quota=0 — 利用不可"
+    },
+    "imagen-4.0-ultra-generate-001": {
+      "rpm": 2,
+      "rpd": 20
+    },
+    "imagen-4.0-generate-001": {
+      "rpm": 2,
+      "rpd": 50
+    },
+    "imagen-4.0-fast-generate-001": {
+      "rpm": 5,
+      "rpd": 100
+    },
+    "veo-3.1": {
+      "rpm": 1,
+      "rpd": 10,
+      "note": "有料Preview - 月100クレジット"
+    },
+    "veo-3.1-fast": {
+      "rpm": 2,
+      "rpd": 20,
+      "note": "有料Preview"
+    },
+    "veo-3.0": {
+      "rpm": 2,
+      "rpd": 30,
+      "note": "Preview"
+    }
+  },
+  "task_mapping": {
+    "quality_gate": "gemini-3-flash-preview",
+    "director": "gemini-3-flash-preview",
+    "brand_check": "gemini-3-flash-preview",
+    "live_api": "gemini-3-flash-preview",
+    "supervisor": "gemini-3-flash-preview",
+    "subtitle_split": "gemini-3-flash-preview",
+    "ai_confirmation": "gemini-3-flash-preview",
+    "telop_suggestion": "gemini-3-flash-preview",
+    "proofreader": "gemini-3-flash-preview",
+    "youtube_optimization": "gemini-3-flash-preview",
+    "branding": "gemini-3-flash-preview",
+    "semantic_chunker": "gemini-3-flash-preview",
+    "bulk_processing": "gemini-3-flash-preview",
+    "strategist": "gemini-3-flash-preview",
+    "final_thumbnail": "imagen-4.0-ultra-generate-001",
+    "thumbnail": "imagen-4.0-generate-001",
+    "thumbnail_preview": "imagen-4.0-fast-generate-001",
+    "opening_video": "veo-3.1",
+    "ending_video": "veo-3.1",
+    "transition_video": "veo-3.1-fast",
+    "lightweight_scan": "gemini-3-flash-preview"
+  },
+  "evolution_strategy": {
+    "description": "3段階入替方式 - 全カテゴリ統一",
+    "principle": "上中下で世代を揃え、処理量と品質要求に応じて使い分け",
+    "on_new_generation": {
+      "text": [
+        "1. 新世代ProをPremiumに設定",
+        "2. 新世代FlashをStandardに設定",
+        "3. 旧PremiumをBatchに降格",
+        "4. 旧Batchをdeprecatedに移動"
+      ],
+      "image": [
+        "1. 新世代UltraをPremiumに設定",
+        "2. 新世代StandardをStandardに設定",
+        "3. 新世代FastをBatchに設定",
+        "4. 旧世代をdeprecatedに移動"
+      ],
+      "video": [
+        "1. 新世代QualityをPremiumに設定",
+        "2. 新世代FastをStandardに設定",
+        "3. 旧世代をBatchに降格"
+      ]
+    }
+  },
+  "maintenance": {
+    "quarterly_review": {
+      "description": "四半期ごとのモデル棚卸しと更新",
+      "tasks": [
+        "1. Google AI公式発表をチェック",
+        "2. 新モデルのSDK互換性を確認",
+        "3. 無料枠制限の変更を確認",
+        "4. 必要に応じてtiers設定を更新",
+        "5. deprecatedモデルの削除判断"
+      ]
+    },
+    "sdk_compatibility_check": {
+      "description": "起動時のSDK互換性自動チェック",
+      "enabled": true,
+      "fallback_on_incompatible": true
+    },
+    "deprecation_policy": {
+      "warning_period_days": 90,
+      "auto_migrate": true
+    }
+  },
+  "deprecated": {
+    "gemini-2.0-flash": {
+      "replacement": "gemini-3-flash-preview",
+      "deadline": "2026-03-31",
+      "reason": "無料枠 quota=0。完全利用不可。"
+    },
+    "gemini-2.0-flash-lite": {
+      "replacement": "gemini-2.5-flash-lite",
+      "deadline": "2026-04-10",
+      "reason": "2.5-flash-lite への移行完了"
+    },
+    "gemini-2.5-pro": {
+      "replacement": "gemini-2.5-flash",
+      "deadline": "2026-04-10",
+      "reason": "無料枠 quota=0。gemini-2.5-flash をPremiumとして使用"
+    },
+    "imagen-3.0-generate-001": {
+      "replacement": "imagen-4.0-fast-generate-001",
+      "deadline": "2026-06-01",
+      "reason": "Imagen 4への移行"
+    }
+  },
+  "removed": {
+    "gemini-2.0-flash-exp": {
+      "replacement": "gemini-2.5-flash",
+      "removed_date": "2025-12-01"
+    },
+    "gemini-1.5-flash": {
+      "replacement": "gemini-2.5-flash",
+      "removed_date": "2025-06-01"
+    }
+  }
 }

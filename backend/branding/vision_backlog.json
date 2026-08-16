@@ -462,6 +462,12 @@
         "met": false,
         "verify": "python -m backend.cost_guard --status",
         "condition": "実走で**実際に使われたモデル名**が記録され、2026-10-16 に提供終了する 2.5 系への依存が可視化されている"
+      },
+      {
+        "id": "R1-C6",
+        "condition": "**工程ごとに、どのモデルで動いたかが実行記録に残る**（見える化）。記録が無ければ成果物ゲートが FAIL する。あわせて `model_policy --show` で全工程の現在地が一覧でき、`--up <工程>` で昇格できる",
+        "met": false,
+        "verify": "python -m backend.revenue.artifact_gate --resume-check && python -m backend.model_policy --show"
       }
     ],
     "limits": [
@@ -898,6 +904,21 @@
       "effect_on_R1": "**R1 の実費は ¥3,000 より大幅に小さい可能性がある**（Flash が無料枠に収まれば実質 Pro 呼び出しぶんだけ）。cost_guard の見積もりは上限として読む",
       "source": "web検索で確認（2026-08-15）。一次情報は https://ai.google.dev/gemini-api/docs/billing",
       "confidence": "unverified_secondary"
+    },
+    "model_management": {
+      "_comment": "**ユーザー要件（2026-08-15）。マスト。**",
+      "requirements": [
+        "**適用モデルの見える化を徹底する。** どの提案・自動処理結果が、どのモデルで出たのかが常に分かること",
+        "**結果に不満なら、すぐグレードアップを指示できること。** 工程単位で段を上げてやり直せる",
+        "**学習に使われても構わない**（ユーザー判断）。無料枠の利用に制約は無い"
+      ],
+      "implemented": {
+        "backend/model_policy.py": "見える化（--show / --why）と昇格（--up / --down / --pin / --reset）。理由が無いと変更できず、履歴が .claude/model_escalations.jsonl に残る",
+        "backend/model_config.json": "段の正典（tier_order / tiers）。**2026-08-15 に pro 段を追加**",
+        "backend/revenue/artifact_gate.py": "**工程ごとにモデルが記録されていなければ FAIL**（見える化をゲートで担保）"
+      },
+      "finding_2026_08_15": "**追加前は全工程が premium に張り付いており、昇格先が存在しなかった。** しかも premium の実体は gemini-3-flash-preview（flash 系）で、pro 系は段の外にあった（リポジトリは 2.5-pro を67箇所で参照しているのに）。pro 段を足して昇格を成立させた。**既定では誰も pro を使わない** — 昇格はユーザーの指示だけで起きる（課金が増えるため）",
+      "cost_note": "pro（gemini-2.5-pro）は無料枠の対象外で単価も高い。昇格すると実費が増えるので cost_guard の台帳で追う"
     }
   },
   "roadmap": {
@@ -948,6 +969,12 @@
             "met": false,
             "verify": "python -m backend.cost_guard --status",
             "condition": "実走で**実際に使われたモデル名**が記録され、2026-10-16 に提供終了する 2.5 系への依存が可視化されている"
+          },
+          {
+            "id": "R1-C6",
+            "condition": "**工程ごとに、どのモデルで動いたかが実行記録に残る**（見える化）。記録が無ければ成果物ゲートが FAIL する。あわせて `model_policy --show` で全工程の現在地が一覧でき、`--up <工程>` で昇格できる",
+            "met": false,
+            "verify": "python -m backend.revenue.artifact_gate --resume-check && python -m backend.model_policy --show"
           }
         ],
         "limits": [
@@ -991,6 +1018,12 @@
             "met": false,
             "verify": "python -m backend.revenue.similarity --gate",
             "condition": "**動画間の類似度（テンプレ度）が機械的に測れ**、閾値を超えたら警告が出る（構成・ナレーション・サムネの3面で測る）"
+          },
+          {
+            "id": "R2-C5",
+            "condition": "**承認画面から、その提案がどのモデルで出たかが見え、その場で昇格を指示できる。** 不満 → 昇格 → やり直しが1画面で完結する",
+            "met": false,
+            "verify": "python -m backend.model_policy --show"
           }
         ],
         "limits": [

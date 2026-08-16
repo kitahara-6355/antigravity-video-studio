@@ -1,0 +1,4 @@
+{
+  "_comment": "**ユーザーが工程ごとに指定した段。** 段の定義そのものは backend/model_config.json が正典で、ここはその上書きだけ。`python -m backend.model_policy --up <task> --reason \"…\"` で増える。手で編集してもよいが、理由は必ず書くこと",
+  "tasks": {}
+}
