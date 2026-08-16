@@ -88,6 +88,27 @@ class Decision:
         return f"{mark} {self.task:24s} {self.tier:9s} {self.model}"
 
 
+# **入替トリガー（ユーザー承認 2026-08-16）。**
+# モデル選定を「一度の決定」から「維持される方針」に変えるための4条件。
+# これが無かったので、2.5 系が2ヶ月後に終了する状態まで誰も気づかなかった。
+REPLACEMENT_TRIGGERS = {
+    "price_change": (
+        "**価格が変わった。** ただし導入価格の値上げは想定内なので、それ自体では"
+        "外さない。**値上げの結果、無料枠から外れたら**見直す"),
+    "better_free_model": (
+        "**いまの組み合わせより高品質で、無料枠のある新モデルが出た。** "
+        "判定はベンチマークの数字ではなく、**このパイプラインの成果物で不満が"
+        "減ったか**。候補を検知 → 1工程で試す → 良ければ広げる"),
+    "free_tier_change": (
+        "**無料枠の条件が変わった**（枠から外れた・RPD/RPM が絞られた）。"
+        "P3 は無料枠を前提にしているので、**ここが崩れると戦略ごと崩れる**。"
+        "実績として Pro は 2026-04-01 に無料枠から外れている"),
+    "obsolescence": (
+        "**陳腐化。** 提供終了の予告が出た、モデル ID が実在しなくなった、"
+        "後継世代が出て現行が preview のまま取り残された、など"),
+}
+
+
 def _load_config() -> dict:
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
@@ -154,6 +175,12 @@ def resolve(task: str) -> Decision:
     config = _load_config()
     mapped = (config.get("task_mapping") or {}).get(task)
     if mapped:
+        # **工程は段（tier）に紐づけるのが正。** モデル名の直書きは、入替の
+        # たびに全工程を書き換えることになり、実際それで
+        # `gemini-3-flash-preview` が14工程に居座って腐った（2026-08-16）。
+        # 直書きも読めるようにしておくが、それは段の外として表示する。
+        if mapped in tiers():
+            return Decision(task, model_of_tier(mapped), mapped, "task_mapping")
         return Decision(task, mapped, tier_of_model(mapped) or "(段の外)",
                         "task_mapping")
 
@@ -247,6 +274,91 @@ def history(task: str | None = None) -> list[dict]:
     return [r for r in rows if task is None or r.get("task") == task]
 
 
+# --- 点検（入替トリガーの検知） -----------------------------------------------
+
+
+@dataclass(frozen=True)
+class AuditFinding:
+    trigger: str      # REPLACEMENT_TRIGGERS のキー、または "unverified"
+    tier: str
+    model: str
+    what: str
+
+    def __str__(self) -> str:
+        return f"[{self.trigger}] {self.tier} / {self.model}\n      — {self.what}"
+
+
+def live_model_ids() -> tuple[set[str], str]:
+    """**実 API のモデル一覧。** これが一次情報。
+
+    取得は無料（`models.list`）。キーが無ければ空集合と理由を返す。
+    **「確かめられなかった」を「問題なし」にしない** — 呼び出し側が FAIL にする。
+    """
+    from cost_guard import is_dummy_key
+
+    if is_dummy_key():
+        return set(), ("実 API キーがありません（ダミーキー）。"
+                       "モデルの実在を確かめられません")
+    try:
+        from gemini_client_factory import get_gemini_client
+        client = get_gemini_client()
+        if client is None:
+            return set(), "クライアントを作れませんでした"
+        names = set()
+        for model in client.models.list():
+            name = getattr(model, "name", "") or ""
+            names.add(name.split("/")[-1])
+        return names, ""
+    except Exception as e:  # noqa: BLE001 — 何で落ちても「未確認」に倒す
+        return set(), f"モデル一覧を取得できませんでした: {e}"
+
+
+def audit() -> tuple[list[AuditFinding], str]:
+    """入替トリガーに当たっていないかを点検する。
+
+    **人力に頼らない。** トリガーを定義しても誰も見ていなければ、前回と同じで
+    モデルが死ぬまで気づかない。定期実行して差分だけ見る。
+    """
+    findings: list[AuditFinding] = []
+    table = tiers()
+    live, why_not = live_model_ids()
+
+    for tier in tier_order():
+        row = table.get(tier)
+        if row is None:
+            findings.append(AuditFinding(
+                "obsolescence", tier, "(未定義)",
+                "段の並びに載っているのに定義がありません"))
+            continue
+        model = row.get("model", "")
+        if not row.get("verified"):
+            findings.append(AuditFinding(
+                "unverified", tier, model,
+                "モデル ID が**一次情報と突き合わせられていません**"
+                f"（{why_not or 'models.list と照合してください'}）"))
+        if live and model not in live:
+            findings.append(AuditFinding(
+                "obsolescence", tier, model,
+                "**この ID は実 API のモデル一覧にありません。**"
+                "廃止されたか、名前が違います"))
+
+    # 単価表に載っていない段のモデルは、実費を見積もれない。
+    try:
+        from cost_guard import CostGuard
+        priced = set(CostGuard(limit_jpy=0)._prices)
+    except Exception:  # noqa: BLE001
+        priced = set()
+    for tier in tier_order():
+        model = (table.get(tier) or {}).get("model", "")
+        if model and priced and model not in priced:
+            findings.append(AuditFinding(
+                "price_change", tier, model,
+                "単価表（backend/config/gemini_pricing.json）に**単価がありません**。"
+                "最高単価で見積もられるので、実費とズレます"))
+
+    return findings, why_not
+
+
 # --- CLI ----------------------------------------------------------------------
 
 
@@ -304,6 +416,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="段を固定する（要 --reason）")
     parser.add_argument("--reset", metavar="工程", help="上書きを外す")
     parser.add_argument("--reason", default="", help="なぜそうするのか")
+    parser.add_argument("--audit", action="store_true",
+                        help="入替トリガーに当たっていないか点検する（要 exit 0）")
+    parser.add_argument("--triggers", action="store_true",
+                        help="入替トリガーの定義を出す")
     parser.add_argument("--json", action="store_true", help="機械可読で出す")
     args = parser.parse_args(argv)
 
@@ -335,6 +451,28 @@ def main(argv: list[str] | None = None) -> int:
             return 0
     except (ValueError, UnknownTier) as e:
         print(f"🚫 {e}")
+        return 1
+
+    if args.triggers:
+        print("入替トリガー（当たったらモデルの組み替えを検討する）\n")
+        for key, text in REPLACEMENT_TRIGGERS.items():
+            print(f"  ▸ {key}\n      {text}\n")
+        return 0
+
+    if args.audit:
+        findings, _ = audit()
+        table = tiers()
+        print("モデルの点検\n")
+        print("  段: " + " → ".join(
+            f"{t}({table[t]['model']})" for t in tier_order() if t in table))
+        print()
+        if not findings:
+            print("  ✅ 入替トリガーに当たっているものはありません。")
+            return 0
+        for finding in findings:
+            print(f"    {finding}")
+        print(f"\n  🚫 {len(findings)} 件。"
+              "`--triggers` でトリガーの定義を確認してください。")
         return 1
 
     if args.json:

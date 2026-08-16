@@ -176,3 +176,136 @@ def test_the_real_config_lists_every_pipeline_task():
         decision = resolve(task)
         assert isinstance(decision, Decision)
         assert decision.model
+
+
+# --- 5. 工程は段に紐づける（2026-08-16） --------------------------------------
+
+
+def test_a_task_mapped_to_a_tier_resolves_through_it(sandbox, monkeypatch):
+    """**モデル名の直書きをやめる。**
+
+    直書きだと入替のたびに全工程を書き換えることになり、実際それで
+    `gemini-3-flash-preview` が14工程に居座って腐った。
+    """
+    config = json.loads(sandbox.joinpath("model_config.json").read_text())
+    config["task_mapping"]["telop"] = "premium"
+    sandbox.joinpath("model_config.json").write_text(json.dumps(config))
+
+    decision = resolve("telop")
+
+    assert decision.tier == "premium"
+    assert decision.model == "m-premium"
+
+
+def test_swapping_a_tier_model_moves_every_task_on_it(sandbox):
+    """**入替は段の1行で済む。** これがトリガー運用を現実的にする。"""
+    path = sandbox / "model_config.json"
+    config = json.loads(path.read_text())
+    config["task_mapping"] = {"a": "premium", "b": "premium"}
+    config["text_generation"]["tiers"]["premium"]["model"] = "m-newer"
+    path.write_text(json.dumps(config))
+
+    assert resolve("a").model == "m-newer"
+    assert resolve("b").model == "m-newer"
+
+
+# --- 6. 入替トリガーと点検 ----------------------------------------------------
+
+
+def test_the_four_replacement_triggers_are_declared():
+    """**4件そろっていること。** 無料枠の変更は P3 の土台なので外せない。"""
+    assert set(model_policy.REPLACEMENT_TRIGGERS) == {
+        "price_change", "better_free_model", "free_tier_change", "obsolescence"}
+
+
+def test_the_free_tier_trigger_explains_why_it_matters():
+    text = model_policy.REPLACEMENT_TRIGGERS["free_tier_change"]
+
+    assert "無料枠" in text
+
+
+def test_an_unverified_model_fails_the_audit(sandbox, monkeypatch):
+    """**「確かめられなかった」を緑にしない。**
+
+    一次情報と突き合わせるまで、段のモデルは未検証として落ちる。
+    """
+    monkeypatch.setattr(model_policy, "live_model_ids",
+                        lambda: (set(), "キーがありません"))
+    findings, _ = model_policy.audit()
+
+    assert any(f.trigger == "unverified" for f in findings)
+
+
+def test_a_model_missing_from_the_live_list_is_flagged(sandbox, monkeypatch):
+    """**実在しない ID を段に載せたままにしない**（gemini-3-flash-preview の再発防止）。"""
+    path = sandbox / "model_config.json"
+    config = json.loads(path.read_text())
+    for tier in config["text_generation"]["tiers"].values():
+        tier["verified"] = True
+    path.write_text(json.dumps(config))
+    monkeypatch.setattr(model_policy, "live_model_ids",
+                        lambda: ({"m-batch", "m-standard", "m-premium"}, ""))
+
+    findings, _ = model_policy.audit()
+
+    assert any(f.trigger == "obsolescence" and f.model == "m-pro"
+               for f in findings)
+
+
+def test_a_verified_and_live_ladder_raises_no_obsolescence(sandbox, monkeypatch):
+    """検証済み＆実在するなら、未検証・陳腐化の指摘は出ない。
+
+    単価の指摘はここでは見ない（この足場のモデル名は現物の単価表に無いので
+    必ず出る。単価の観点は `test_a_model_missing_from_the_pricing_table` 側）。
+    """
+    path = sandbox / "model_config.json"
+    config = json.loads(path.read_text())
+    for tier in config["text_generation"]["tiers"].values():
+        tier["verified"] = True
+    path.write_text(json.dumps(config))
+    monkeypatch.setattr(model_policy, "live_model_ids",
+                        lambda: ({"m-batch", "m-standard", "m-premium", "m-pro"}, ""))
+
+    findings, _ = model_policy.audit()
+
+    assert not [f for f in findings
+                if f.trigger in ("unverified", "obsolescence")]
+
+
+def test_a_model_missing_from_the_pricing_table_is_flagged(sandbox, monkeypatch):
+    """**単価が無ければ実費を見積もれない。** 最高単価に倒れるのでズレる。"""
+    path = sandbox / "model_config.json"
+    config = json.loads(path.read_text())
+    for tier in config["text_generation"]["tiers"].values():
+        tier["verified"] = True
+    path.write_text(json.dumps(config))
+    monkeypatch.setattr(model_policy, "live_model_ids",
+                        lambda: ({"m-batch", "m-standard", "m-premium", "m-pro"}, ""))
+
+    findings, _ = model_policy.audit()
+
+    assert any(f.trigger == "price_change" for f in findings)
+
+
+def test_the_real_ladder_is_the_approved_pattern():
+    """現物が P3（承認された組み合わせ）であること。"""
+    table = tiers()
+
+    assert table["premium"]["model"] == "gemini-3.7-flash"
+    assert table["standard"]["model"] == "gemini-3.6-flash"
+    assert table["batch"]["model"] == "gemini-3.5-flash-lite"
+    assert table["pro"]["model"] == "gemini-3.1-pro"
+    assert table["pro"]["free_tier"] is False
+
+
+def test_the_real_ladder_is_not_yet_verified():
+    """**未検証であることを、テストでも明示しておく。**
+
+    一次情報がプロキシで遮断されていて突き合わせできなかった（2026-08-16）。
+    実キー投入後に `--audit` が通ったら、`verified` を true にしてこの
+    テストを反転させる。
+    """
+    table = tiers()
+
+    assert all(not row.get("verified") for row in table.values()), (
+        "検証が済んだなら、このテストを『verified であること』に反転させてください")

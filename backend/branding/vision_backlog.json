@@ -468,6 +468,12 @@
         "condition": "**工程ごとに、どのモデルで動いたかが実行記録に残る**（見える化）。記録が無ければ成果物ゲートが FAIL する。あわせて `model_policy --show` で全工程の現在地が一覧でき、`--up <工程>` で昇格できる",
         "met": false,
         "verify": "python -m backend.revenue.artifact_gate --resume-check && python -m backend.model_policy --show"
+      },
+      {
+        "id": "R1-C7",
+        "condition": "**段のモデルが一次情報と突き合わせ済みである**（実 API の models.list に実在し、単価表にも載っている）。未検証のうちは点検が FAIL する",
+        "met": false,
+        "verify": "python -m backend.model_policy --audit"
       }
     ],
     "limits": [
@@ -918,7 +924,31 @@
         "backend/revenue/artifact_gate.py": "**工程ごとにモデルが記録されていなければ FAIL**（見える化をゲートで担保）"
       },
       "finding_2026_08_15": "**追加前は全工程が premium に張り付いており、昇格先が存在しなかった。** しかも premium の実体は gemini-3-flash-preview（flash 系）で、pro 系は段の外にあった（リポジトリは 2.5-pro を67箇所で参照しているのに）。pro 段を足して昇格を成立させた。**既定では誰も pro を使わない** — 昇格はユーザーの指示だけで起きる（課金が増えるため）",
-      "cost_note": "pro（gemini-2.5-pro）は無料枠の対象外で単価も高い。昇格すると実費が増えるので cost_guard の台帳で追う"
+      "cost_note": "pro（gemini-2.5-pro）は無料枠の対象外で単価も高い。昇格すると実費が増えるので cost_guard の台帳で追う",
+      "selected_pattern": {
+        "id": "P3",
+        "name": "無料枠100%・Pro は昇格専用",
+        "ladder": {
+          "batch": "gemini-3.5-flash-lite",
+          "standard": "gemini-3.6-flash",
+          "premium": "gemini-3.7-flash",
+          "pro": "gemini-3.1-pro（昇格専用）"
+        },
+        "decided_at": "2026-08-16",
+        "decided_by": "ユーザー（全面承認）",
+        "why": "無料枠を最大化しつつ品質の上限を取る。**律速は金額ではなくレート制限**（5〜15 RPM / 1,000 RPD 程度）なので、¥3,000 は『不満だった工程を Pro で焼き直す』ために温存する",
+        "hypothesis": "『3.7 Flash の方が 3.1 Pro より高品質かもしれない』はユーザーの仮説。**Flash と Pro は階級が違う**ので、長文脈の判断（quality_gate / director）で逆転しない可能性がある。既定を Flash にして不満が出た工程だけ Pro に上げれば、`.claude/model_escalations.jsonl` に**上げて良くなったかの実測が溜まる**。信念ではなく実験として扱う",
+        "structural_fix": "工程を**モデル名ではなく段に紐づけた**。直書きだと入替のたびに14工程を書き換えることになり、実際それで `gemini-3-flash-preview` が居座って腐った。段に紐づけば入替は tiers の3行で済む",
+        "verification_status": "unverified_secondary",
+        "verification_note": "**モデル ID と価格は二次情報のまま。** 一次情報 (ai.google.dev / docs.cloud.google.com) は実行環境のプロキシで遮断されていて突き合わせできなかった（2026-08-16 実測）。実キー投入後に `python -m backend.model_policy --audit` が models.list と照合する。**それまで audit は FAIL のまま**（確かめられないことを緑にしない）"
+      },
+      "replacement_triggers": {
+        "_comment": "**入替のタイミングを定義する（ユーザー承認 2026-08-16）。** モデル選定を『一度の決定』から『維持される方針』に変える。これが無かったので、2.5 系が2ヶ月後に終了する状態まで誰も気づかなかった。検知は `python -m backend.model_policy --audit`（人力に頼らない）",
+        "price_change": "価格が変わった。ただし導入価格の値上げは想定内で、それ自体では外さない。**値上げの結果、無料枠から外れたら**見直す",
+        "better_free_model": "いまの組み合わせより高品質で、無料枠のある新モデルが出た。**判定はベンチマークではなく、このパイプラインの成果物で不満が減ったか**。候補を検知 → 1工程で試す → 良ければ広げる",
+        "free_tier_change": "**無料枠の条件が変わった**（枠から外れた・RPD/RPM が絞られた）。P3 は無料枠を前提にしているので、ここが崩れると戦略ごと崩れる。実績として Pro は 2026-04-01 に無料枠から外れている",
+        "obsolescence": "提供終了の予告・モデル ID の消滅・後継世代に取り残された preview など"
+      }
     }
   },
   "roadmap": {
@@ -975,6 +1005,12 @@
             "condition": "**工程ごとに、どのモデルで動いたかが実行記録に残る**（見える化）。記録が無ければ成果物ゲートが FAIL する。あわせて `model_policy --show` で全工程の現在地が一覧でき、`--up <工程>` で昇格できる",
             "met": false,
             "verify": "python -m backend.revenue.artifact_gate --resume-check && python -m backend.model_policy --show"
+          },
+          {
+            "id": "R1-C7",
+            "condition": "**段のモデルが一次情報と突き合わせ済みである**（実 API の models.list に実在し、単価表にも載っている）。未検証のうちは点検が FAIL する",
+            "met": false,
+            "verify": "python -m backend.model_policy --audit"
           }
         ],
         "limits": [

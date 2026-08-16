@@ -1,6 +1,6 @@
 {
   "version": "5.0.0",
-  "last_updated": "2026-08-15",
+  "last_updated": "2026-08-16",
   "architecture": "three_tier_complete",
   "description": "3段階方式。グレード方針: 後発・高性能・無料枠が限られるモデルを上位に配置し優先消費。安定版を中位で確保。",
   "grade_policy": {
@@ -11,58 +11,39 @@
     "escalation": "**段は batch → standard → premium → pro。** 昇格はユーザーの指示だけで起きる（`python -m backend.model_policy --up <工程> --reason \"…\"`）。自動では上がらない（課金が増えるため）。降格は `--down`。履歴は .claude/model_escalations.jsonl に残る"
   },
   "text_generation": {
-    "default_model": "gemini-2.5-flash",
+    "default_model": "gemini-3.6-flash",
     "tiers": {
-      "premium": {
-        "model": "gemini-3-flash-preview",
-        "label": "上 (Premium)",
-        "description": "最新世代・最高性能 — 品質ゲート・最終判断・重要な意思決定",
-        "preserve_ratio": 0.2,
-        "note": "Gemini 3世代。後発かつ高性能、枠が限定的なため優先消費する",
-        "use_cases": [
-          "quality_gate",
-          "director",
-          "brand_check",
-          "lightweight_scan",
-          "supervisor"
-        ]
+      "batch": {
+        "model": "gemini-3.5-flash-lite",
+        "label": "下 (Batch)",
+        "description": "大量処理 — セマンティックチャンク・軽量スキャン・一括処理",
+        "free_tier": true,
+        "verified": false,
+        "note": "無料枠あり（Flash-Lite 系）。実写素材は文字起こしの処理量が多いので、ここが効く"
       },
       "standard": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-3.6-flash",
         "label": "中 (Standard)",
-        "description": "安定版 — 字幕・テロップ・AI確認・校閲の確実な処理",
-        "preserve_ratio": 0.0,
-        "note": "最も信頼性が高い安定モデル。確実な処理に使用",
-        "use_cases": [
-          "subtitle",
-          "telop",
-          "ai_confirmation",
-          "proofreader"
-        ]
+        "description": "制作の主力 — 字幕・テロップ・AI確認・校閲・ブランディング",
+        "free_tier": true,
+        "verified": false,
+        "note": "安定線。単価 $1.50/$7.50（二次情報）"
       },
-      "batch": {
-        "model": "gemini-2.5-flash-lite",
-        "label": "下 (Batch)",
-        "description": "軽量版 — 大量処理・バッチ・事前分析",
-        "preserve_ratio": 0.0,
-        "note": "軽量版。大量処理・コスト最適化向け",
-        "use_cases": [
-          "branding",
-          "semantic_chunker",
-          "bulk_processing",
-          "strategist"
-        ]
+      "premium": {
+        "model": "gemini-3.7-flash",
+        "label": "上 (Premium)",
+        "description": "判断・品質を決める工程 — 品質ゲート・ディレクター・監督・戦略",
+        "free_tier": true,
+        "verified": false,
+        "note": "2026-08-13 リリース。**導入価格 $0.75/$3.75 で 3.6 Flash より安い**（新しい方が安いという逆転が起きている）。導入価格はいずれ上がる想定 — 値上げ自体は入替トリガーではなく、**無料枠から外れたら**見直す"
       },
       "pro": {
-        "model": "gemini-2.5-pro",
+        "model": "gemini-3.1-pro",
         "label": "特上 (Pro)",
-        "description": "**昇格先。既定では誰も使わない。** AI の提案・自動処理の結果に不満があったときだけ、工程単位で上げる段",
-        "preserve_ratio": 0.0,
-        "note": "2026-08-15 追加（ユーザー要件『不満ならすぐグレードアップを指示できる体制』）。**追加前は全工程が premium に張り付いており、昇格先が存在しなかった。** premium の実体は flash 系なので、品質で上に行くには pro 系が要る。**課金上の注意: gemini-2.5-pro は 2026-04-01 に無料枠から外れており、単価は flash の約4倍（入力）〜4倍（出力）。cost_guard が実費を計上する。**また 2026-10-16 に 2.5 系は提供終了予定なので、その時点で後継に差し替える",
-        "use_cases": [
-          "ユーザーが --up で指定した工程のみ"
-        ],
-        "free_tier": false
+        "description": "**昇格専用。既定では誰も使わない。** 結果に不満があった工程だけ上げる",
+        "free_tier": false,
+        "verified": false,
+        "note": "Pro 系は 2026-04-01 に無料枠から外れた。単価 $2/$12（200K超で倍）。**7月時点で preview** なので仕様・価格が動きうる。『3.7 Flash の方が 3.1 Pro より高品質かもしれない』は**仮説**で、昇格の実測（.claude/model_escalations.jsonl）で確かめる"
       }
     },
     "fallback_chain": {
@@ -76,7 +57,17 @@
       "premium",
       "pro"
     ],
-    "tier_order_note": "**左が下、右が上。** 昇格・降格はこの順で1つ動く。順序をここに置くのは、model_policy.py 側に持つと正典が2つになるため（憲法第5条）"
+    "tier_order_note": "**左が下、右が上。** 昇格・降格はこの順で1つ動く。順序をここに置くのは、model_policy.py 側に持つと正典が2つになるため（憲法第5条）",
+    "selected_pattern": {
+      "id": "P3",
+      "name": "無料枠100%・Pro は昇格専用",
+      "decided_at": "2026-08-16",
+      "decided_by": "ユーザー（全面承認）",
+      "why": "無料枠を最大化しつつ品質の上限を取る。**律速は金額ではなくレート制限**（5〜15 RPM / 1,000 RPD 程度）なので、¥3,000 は『不満だった工程を Pro で焼き直す』ために温存する",
+      "verification_status": "unverified_secondary",
+      "verification_note": "**モデル ID と価格は二次情報のまま。** 一次情報 (ai.google.dev / docs.cloud.google.com) は実行環境のプロキシで遮断されていて突き合わせできなかった（2026-08-16 実測）。**実 API キーが入った時点で `python -m backend.model_policy --audit` が models.list と照合する**（モデル一覧の取得は無料）。それまで audit は FAIL のまま"
+    },
+    "task_mapping_note": "**工程は段（tier）に紐づける。モデル名を直に書かない。** 直書きだと入替のたびに14箇所を書き換えることになり、実際それで gemini-3-flash-preview が全工程に居座って腐った（2026-08-16 発見）。段に紐づけておけば、入替は tiers の3行を直すだけで済む"
   },
   "image_generation": {
     "default_model": "imagen-4.0-generate-001",
@@ -216,27 +207,27 @@
     }
   },
   "task_mapping": {
-    "quality_gate": "gemini-3-flash-preview",
-    "director": "gemini-3-flash-preview",
-    "brand_check": "gemini-3-flash-preview",
-    "live_api": "gemini-3-flash-preview",
-    "supervisor": "gemini-3-flash-preview",
-    "subtitle_split": "gemini-3-flash-preview",
-    "ai_confirmation": "gemini-3-flash-preview",
-    "telop_suggestion": "gemini-3-flash-preview",
-    "proofreader": "gemini-3-flash-preview",
-    "youtube_optimization": "gemini-3-flash-preview",
-    "branding": "gemini-3-flash-preview",
-    "semantic_chunker": "gemini-3-flash-preview",
-    "bulk_processing": "gemini-3-flash-preview",
-    "strategist": "gemini-3-flash-preview",
+    "quality_gate": "premium",
+    "director": "premium",
+    "brand_check": "premium",
+    "supervisor": "premium",
+    "strategist": "premium",
+    "subtitle_split": "standard",
+    "telop_suggestion": "standard",
+    "ai_confirmation": "standard",
+    "proofreader": "standard",
+    "youtube_optimization": "standard",
+    "branding": "standard",
+    "live_api": "standard",
+    "semantic_chunker": "batch",
+    "bulk_processing": "batch",
+    "lightweight_scan": "batch",
     "final_thumbnail": "imagen-4.0-ultra-generate-001",
     "thumbnail": "imagen-4.0-generate-001",
     "thumbnail_preview": "imagen-4.0-fast-generate-001",
     "opening_video": "veo-3.1",
     "ending_video": "veo-3.1",
-    "transition_video": "veo-3.1-fast",
-    "lightweight_scan": "gemini-3-flash-preview"
+    "transition_video": "veo-3.1-fast"
   },
   "evolution_strategy": {
     "description": "3段階入替方式 - 全カテゴリ統一",

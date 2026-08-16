@@ -112,6 +112,28 @@ python -m backend.model_policy --why <工程>        # なぜそのモデルか
 python -m backend.model_policy --up <工程> --reason "何が不満か"
 ```
 
+**採用している組み合わせは P3**（2026-08-16 ユーザー承認）:
+`batch: gemini-3.5-flash-lite` → `standard: gemini-3.6-flash` → `premium: gemini-3.7-flash` → `pro: gemini-3.1-pro`（昇格専用）。
+**上3つは無料枠あり。Pro だけ課金**するので、¥3,000 は「不満だった工程を焼き直す」ために温存する。
+
+**工程はモデル名ではなく段に紐づける。** 直書きだと入替のたびに14工程を書き換えることになり、
+実際それで `gemini-3-flash-preview` が居座って腐った。
+
+### 入替トリガー（当たったら組み替えを検討する）
+
+```
+python -m backend.model_policy --triggers   # 定義
+python -m backend.model_policy --audit      # 検知（要 exit 0）
+```
+
+1. **価格変動** — ただし導入価格の値上げは想定内。**無料枠から外れたら**見直す
+2. **より良い無料モデルの登場** — 判定はベンチマークではなく**成果物で不満が減ったか**
+3. **無料枠の条件変更** — P3 の土台なので、崩れたら戦略ごと見直す
+4. **陳腐化** — 提供終了・ID 消滅・後継に取り残された preview
+
+**モデル ID と価格は二次情報のまま**（一次情報はこの実行環境のプロキシで遮断されている）。
+実キー投入後に `--audit` が `models.list` と照合するまで、点検は FAIL のまま。
+
 段は `backend/model_config.json` が正典（`tier_order`: batch → standard → premium → **pro**）。
 **pro は 2026-08-15 に追加した昇格先で、既定では誰も使わない** — 上げるのはユーザーの指示だけ
 （自動では上がらない。課金が増えるため）。理由なしには変更できず、履歴は
