@@ -50,6 +50,31 @@ PRICING_PATH = Path(__file__).parent / "config" / "gemini_pricing.json"
 # 呼ぶ前に出力トークン数は分からないので、上振れを見込んで予約する。
 DEFAULT_RESERVE_JPY = 5.0
 
+ENV_PATH = Path(__file__).parent / ".env"
+_env_loaded = False
+
+
+def load_env() -> None:
+    """`backend/.env` を環境変数に読み込む（1回だけ）。
+
+    `main.py` は import 時に読んでいるが、**CLI は誰も読んでいなかった。**
+    そのため実キーを置いても `--status` / `--audit` / `verify_account` が
+    「ダミーキーです」と言い続ける（2026-08-16 に発覚）。
+
+    **既存の環境変数は上書きしない。** CI が渡す `dummy_key_for_ci` や
+    テストの monkeypatch が勝つ。
+    """
+    global _env_loaded
+    if _env_loaded or not ENV_PATH.is_file():
+        _env_loaded = True
+        return
+    _env_loaded = True
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(ENV_PATH, override=False)
+
 
 class CostLimitExceeded(RuntimeError):
     """予算の上限に達した。**握りつぶさないこと。**"""
@@ -351,6 +376,7 @@ def _format_status() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_env()
     parser = argparse.ArgumentParser(description="従量課金のキルスイッチ")
     parser.add_argument("--status", action="store_true", help="残高と内訳を出す")
     parser.add_argument("--gate", action="store_true",

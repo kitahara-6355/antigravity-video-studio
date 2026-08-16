@@ -172,6 +172,8 @@ def _format(probe: bool) -> tuple[str, int]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from backend.cost_guard import load_env
+    load_env()
     parser = argparse.ArgumentParser(description="アカウントの点検（R1）")
     parser.add_argument(
         "--probe", action="store_true",

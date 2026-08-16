@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -354,3 +355,44 @@ def test_the_pricing_table_declares_the_spend_cap():
     assert cap["enforcement_delay"]
     assert cap["tier_account_caps"]
     assert cap["confidence"] == "unverified_secondary"
+
+
+# --- backend/.env の読み込み --------------------------------------------------
+
+
+def test_the_cli_loads_the_env_file(tmp_path, monkeypatch):
+    """**実キーを置いても CLI が読んでいなかった**（2026-08-16 に発覚）。
+
+    `main.py` は import 時に読むが、`--status` / `--audit` /
+    `verify_account` はどれも読んでおらず、キーを置いても
+    「ダミーキーです」と言い続けた。
+    """
+    env = tmp_path / ".env"
+    env.write_text("GOOGLE_API_KEY=AIza_from_the_env_file\n", encoding="utf-8")
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setattr(cost_guard, "ENV_PATH", env)
+    monkeypatch.setattr(cost_guard, "_env_loaded", False)
+
+    cost_guard.load_env()
+
+    assert os.environ.get("GOOGLE_API_KEY") == "AIza_from_the_env_file"
+
+
+def test_the_env_file_does_not_override_the_environment(tmp_path, monkeypatch):
+    """**CI の dummy_key_for_ci が勝つこと。** 実キーが紛れ込むと外に出る。"""
+    env = tmp_path / ".env"
+    env.write_text("GOOGLE_API_KEY=AIza_real_key\n", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_API_KEY", "dummy_key_for_ci")
+    monkeypatch.setattr(cost_guard, "ENV_PATH", env)
+    monkeypatch.setattr(cost_guard, "_env_loaded", False)
+
+    cost_guard.load_env()
+
+    assert os.environ["GOOGLE_API_KEY"] == "dummy_key_for_ci"
+
+
+def test_a_missing_env_file_is_not_an_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(cost_guard, "ENV_PATH", tmp_path / "absent.env")
+    monkeypatch.setattr(cost_guard, "_env_loaded", False)
+
+    cost_guard.load_env()  # 例外が出なければ通過

@@ -411,6 +411,8 @@ def _format_why(task: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from backend.cost_guard import load_env
+    load_env()
     parser = argparse.ArgumentParser(
         description="適用モデルの見える化と、工程ごとの昇格")
     parser.add_argument("--show", action="store_true", help="全工程の現在地")
