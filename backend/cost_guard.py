@@ -311,7 +311,21 @@ def _format_status() -> str:
                      "ON のままだと Google 側の上限が効きません"
                      "（budget.json の auto_reload を \"off\" にする）")
     if budget.get("credits_expire_at"):
-        lines.append(f"  クレジット失効: {budget['credits_expire_at']}（1年で失効）")
+        lines.append(f"  クレジット失効: {budget['credits_expire_at']}"
+                     "（1年で失効。Postpay 移行以外で閉じると没収）")
+    # **Google 側の上限が本命。** cost_guard は推定でしか止められないので、
+    # ここが空なら「二重の歯止め」は掛かっていない。
+    cap = budget.get("spend_cap_usd")
+    if cap:
+        lines.append(f"  Google 側の上限: ${cap}/月 "
+                     f"（プロジェクト {budget.get('spend_cap_project') or '(未記録)'}"
+                     "・反映に約10分の遅れ）")
+    else:
+        lines.append("  ⚠ **AI Studio の Monthly spend cap が設定されていません。**"
+                     "cost_guard は推定でしか止められないので、"
+                     "確実な上限は Google 側に置いてください"
+                     "（設定したら budget.json の spend_cap_usd と "
+                     "spend_cap_project を埋める）")
     lines.append("")
     if LEDGER_PATH.is_file():
         rows = [json.loads(line) for line in

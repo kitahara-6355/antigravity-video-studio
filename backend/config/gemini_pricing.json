@@ -68,12 +68,21 @@
     }
   },
   "billing_model": {
-    "_comment": "**2026-03-23 から Prepay / Postpay 体系。** 従量課金の請求が後から来る形ではなく、AI Studio でクレジットを前払いして残高から引く形が選べる（2026-04-15 開始）。",
-    "recommended": "prepay",
-    "why": "**自動リロードを OFF にすれば、Google 側で物理的に上限が効く。** cost_guard より強い歯止めになる（こちらは推定でしか止められない）",
-    "credit_expiry": "購入したクレジットは**1年で失効**する。使い切れない額を買わない",
+    "_comment": "**2026-03-23 から Prepay / Postpay 体系。** 従量課金の請求が後から来る形ではなく、AI Studio でクレジットを前払いして残高から引く形が選べる（2026-04-15 開始）。**ただし本命の歯止めは Prepay ではなく spend_cap（下）。** 2026-08-15 に『本命は Prepay + 自動リロード OFF』と書いたのは、2026-03-16 に出ていた Spend Cap を見落としていた。2026-08-16 に訂正した。",
+    "recommended": "spend_cap",
+    "why": "**プロジェクト単位の月額上限が Google 側で効き、クレジットの失効も没収も無い。** Prepay の上位互換。cost_guard は推定でしか止められないので、確実な歯止めはこちら",
+    "credit_expiry": "購入したクレジットは**1年で失効**する。さらに **Postpay への移行以外の理由で Prepay を閉じると残高は没収**される。使い切れない額を買わない",
     "free_trial": "**Gemini API の利用は $300 の Google Cloud 無料トライアルの対象外**（2026-03〜）。無料で始まる道は無い",
-    "source": "web検索で確認（2026-08-15）。一次情報は https://ai.google.dev/gemini-api/docs/billing",
+    "source": "web検索で確認（2026-08-15 / 2026-08-16 更新）。一次情報は https://ai.google.dev/gemini-api/docs/billing",
+    "confidence": "unverified_secondary"
+  },
+  "spend_cap": {
+    "_comment": "**Google 側の確実な上限。** 2026-03-16 発表。AI Studio の Spend タブ →『Monthly spend cap』で、**プロジェクト単位に月額のドル上限**を置く。到達すると、そのプロジェクトの新規リクエストが止まる。**法人／個人アカウントを問わず使える**（法人だから使えないという情報は見つかっていない）。",
+    "where": "Google AI Studio の Spend タブ → Monthly spend cap（プロジェクト所有者が設定する）",
+    "enforcement_delay": "**約10分の反映遅れ**がある。その間の超過は自己負担。1本の動画パイプライン程度の throughput では実害は小さいが、遅れがあること自体は前提に置く",
+    "tier_account_caps": "**何もしなくても請求先アカウント単位の天井が掛かる。** 2026-04-01 から Tier 1 = $250/月、Tier 2 = $2,000/月。段が上がると自動で上がる",
+    "why_cost_guard_still_matters": "Spend Cap は**月額・10分遅れ・ドル建て**。cost_guard は**フェーズ予算・呼び出し単位・即時・円建て**で、止める粒度が違う。三重にする: Spend Cap → Tier 上限 → cost_guard",
+    "source": "web検索で確認（2026-08-16）。一次情報は https://docs.cloud.google.com/billing/docs/how-to/budgets-spend-caps と Google の発表（blog.google, 2026-03-16）。**どちらもこの実行環境のプロキシで遮断されていて到達できなかった**",
     "confidence": "unverified_secondary"
   },
   "free_tier": {

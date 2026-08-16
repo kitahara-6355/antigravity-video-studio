@@ -312,11 +312,12 @@ def test_an_unknown_model_is_never_treated_as_free(tmp_path):
 
 
 def test_the_pricing_table_declares_the_billing_model():
-    """**Prepay とクレジット失効は運用の前提。** 表に書いてある。"""
+    """**クレジットの失効と没収は運用の前提。** 表に書いてある。"""
     payload = json.loads(cost_guard.PRICING_PATH.read_text(encoding="utf-8"))
+    expiry = payload["billing_model"]["credit_expiry"]
 
-    assert payload["billing_model"]["recommended"] == "prepay"
-    assert "1年で失効" in payload["billing_model"]["credit_expiry"]
+    assert "1年で失効" in expiry
+    assert "没収" in expiry, "Prepay を閉じると残高が没収される件が抜けています"
     assert payload["free_tier"]["eligible_models"]
 
 
@@ -327,3 +328,29 @@ def test_the_budget_declares_the_billing_mode():
         return
     assert budget.get("billing_mode") in ("prepay", "postpay", "free_tier_only")
     assert "auto_reload" in budget
+
+
+def test_the_budget_declares_the_google_side_spend_cap():
+    """**Google 側の上限をどこに掛けたか。**
+
+    上限は**プロジェクト単位**なので、額だけ分かっても、どのプロジェクトに
+    掛けたかが残っていなければ確かめようがない。まだ設定していない段階では
+    null でよいが、**キー自体は要求する**（宣言し忘れを緑にしない）。
+    """
+    budget = load_active_budget()
+    if budget is None:
+        return
+
+    assert "spend_cap_usd" in budget
+    assert "spend_cap_project" in budget
+
+
+def test_the_pricing_table_declares_the_spend_cap():
+    """**本命の歯止めは Prepay ではなく spend cap**（2026-08-16 訂正）。"""
+    payload = json.loads(cost_guard.PRICING_PATH.read_text(encoding="utf-8"))
+    cap = payload["spend_cap"]
+
+    assert payload["billing_model"]["recommended"] == "spend_cap"
+    assert cap["enforcement_delay"]
+    assert cap["tier_account_caps"]
+    assert cap["confidence"] == "unverified_secondary"
