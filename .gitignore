@@ -64,6 +64,11 @@ previews/
 graded_previews/
 backend/graded_previews/
 output/
+
+# パイプラインの作業ディレクトリ。実走のたびに mp4/wav/jpg/png/srt が出る。
+# *.mp4 は別途無視しているが jpg・png・srt・wav は素通りしていた（2026-08-17 実走で判明）
+pipeline_work/
+
 temp/
 tmp/
 *.tmp

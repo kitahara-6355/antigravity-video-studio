@@ -149,8 +149,22 @@ class VideoComposer:
             current_video = video_path
             if subtitle_path and os.path.exists(subtitle_path):
                 subtitled = self.add_subtitles(current_video, subtitle_path)
-                if subtitled:
-                    current_video = subtitled
+                if not subtitled:
+                    # **握り潰さない。** 従来はここを素通りして字幕なしの入力を
+                    # そのままコピーし、success=True を返していた。成果物が入力と
+                    # バイト一致でも 10/10 完走・品質ゲート PASS になっていた。
+                    logger.error(
+                        "字幕の焼き付けに失敗したので合成を中止します: %s",
+                        subtitle_path,
+                    )
+                    return ComposeResult(
+                        success=False,
+                        error=(
+                            f"字幕の焼き付けに失敗しました: {subtitle_path}"
+                            "（字幕なしの動画を成果物として残さない）"
+                        ),
+                    )
+                current_video = subtitled
 
             try:
                 target_output.parent.mkdir(parents=True, exist_ok=True)
@@ -237,6 +251,21 @@ class VideoComposer:
             file_size=file_size,
         )
 
+    @staticmethod
+    def _escape_filter_path(path: str) -> str:
+        r"""FFmpeg のフィルタグラフに渡すパスを、区切りを失わない形にする。
+
+        `-vf subtitles='<path>'` の中では `\` がエスケープ文字として解釈される。
+        Windows の区切りをそのまま渡すと `job_xxx\subtitles.srt` が
+        `job_xxxsubtitles.srt` に潰れて開けない（2026-08-17 の実走で顕在化）。
+
+        - 区切りは `/` に寄せる（Windows の ffmpeg も受け付ける）
+        - ドライブレターの `:` はフィルタの区切り記号なので `\:` にする
+
+        POSIX では絶対パスに `:` もバックスラッシュも出ないので、実質は無変換。
+        """
+        return str(Path(path).resolve()).replace("\\", "/").replace(":", r"\:")
+
     def add_subtitles(self, video_path: str, subtitle_path: str) -> str:
         """動画に字幕を焼き付ける。
 
@@ -260,7 +289,11 @@ class VideoComposer:
         cmd = [
             "ffmpeg", "-y",
             "-i", str(input_path),
-            "-vf", f"subtitles='{subtitle_path}':force_style='{style_opts}'",
+            "-vf",
+            (
+                f"subtitles='{self._escape_filter_path(subtitle_path)}'"
+                f":force_style='{style_opts}'"
+            ),
             "-c:a", "copy",
             str(output_path),
         ]
