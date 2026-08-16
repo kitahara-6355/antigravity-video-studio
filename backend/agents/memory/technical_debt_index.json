@@ -1,7 +1,7 @@
 {
   "version": "1.1",
-  "last_updated": "2026-07-22T07:05:49.224389",
-  "entry_count": 1461,
+  "last_updated": "2026-08-16T09:16:47.596585",
+  "entry_count": 1462,
   "entries": [
     {
       "debt_id": "TD-001",
@@ -31588,6 +31588,31 @@
       "last_verified_at": null,
       "confidence": 1.0,
       "estimated_fix_minutes": null
+    },
+    {
+      "debt_id": "TD-1481",
+      "category": "ACCEPTED_SAFETY",
+      "file_path": "model_policy.py",
+      "line_number": 315,
+      "pattern": "except Exception as e:  # noqa: BLE001 — 何で落ちても「未確認」に倒す",
+      "cause_pattern": "",
+      "fix_pattern": "（塞がない）例外の型を絞ると、想定外の SDK エラーで audit() 自体が落ち、「確かめられなかった」が「問題なし」に化ける。fail-closed を優先する",
+      "status": "open",
+      "registered_at": "2026-08-16T09:15:34.462109",
+      "registered_by": "R1-model-policy",
+      "fixed_at": null,
+      "fixed_by": null,
+      "fix_evidence": null,
+      "related_test": null,
+      "notes": "live_model_ids() の models.list 呼び出し。ネットワーク・認証・SDK のどれで落ちても空集合と理由を返し、呼び出し側（audit）が unverified でFAIL する設計。**意図的な広域捕捉**なので塞がずに宣言する",
+      "tags": [
+        "fail-closed",
+        "model_policy",
+        "R1"
+      ],
+      "last_verified_at": null,
+      "confidence": 1.0,
+      "estimated_fix_minutes": null
     }
   ],
   "cause_patterns": [
@@ -31635,15 +31660,6 @@
     }
   ],
   "changelog": [
-    {
-      "timestamp": "2026-06-12T18:43:22.937678",
-      "action": "resolved",
-      "debt_id": "TD-1308",
-      "actor": "cleanup",
-      "old_status": "open",
-      "new_status": "fixed",
-      "detail": "file deleted (temporary script clean shutdown)"
-    },
     {
       "timestamp": "2026-06-12T18:43:22.967864",
       "action": "resolved",
@@ -36134,6 +36150,15 @@
       "old_status": "",
       "new_status": "open",
       "detail": "except Exception as e:"
+    },
+    {
+      "timestamp": "2026-08-16T09:15:34.462144",
+      "action": "registered",
+      "debt_id": "TD-1481",
+      "actor": "R1-model-policy",
+      "old_status": "",
+      "new_status": "open",
+      "detail": "except Exception as e:  # noqa: BLE001 — 何で落ちても「未確認」に倒す"
     }
   ]
 }

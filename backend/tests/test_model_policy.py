@@ -10,6 +10,10 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -309,3 +313,31 @@ def test_the_real_ladder_is_not_yet_verified():
 
     assert all(not row.get("verified") for row in table.values()), (
         "検証が済んだなら、このテストを『verified であること』に反転させてください")
+
+
+# --- CLI（CLAUDE.md が案内している叩き方） ------------------------------------
+
+
+@pytest.mark.parametrize("args", [
+    ["--show"], ["--triggers"], ["--audit"], ["--why", "director"],
+])
+def test_the_documented_cli_runs_from_the_repository_root(args):
+    """**CLAUDE.md の書き方でそのまま動くこと。**
+
+    `python -m backend.model_policy` はリポジトリ直下から叩かれる。裸の
+    `from cost_guard import ...` は `PYTHONPATH=./backend` でしか解決せず、
+    `--audit` が ModuleNotFoundError で落ちていた（2026-08-16）。
+    **テストは backend が sys.path に載った状態で走るので、この壊れ方を
+    捕まえられない。** 別プロセスで、直下から実行して確かめる。
+    """
+    root = Path(__file__).resolve().parents[2]
+    proc = subprocess.run(
+        [sys.executable, "-m", "backend.model_policy", *args],
+        cwd=root, capture_output=True, text=True, timeout=120,
+        env={**os.environ, "PYTHONPATH": "", "GOOGLE_API_KEY": "dummy_key_for_ci"})
+
+    assert "ModuleNotFoundError" not in proc.stderr, proc.stderr
+    assert "Traceback" not in proc.stderr, proc.stderr
+    # --audit は未検証のうち exit 1（fail-closed）。落ちたのではない。
+    assert proc.returncode in (0, 1)
+    assert proc.stdout.strip()

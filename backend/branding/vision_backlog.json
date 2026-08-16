@@ -487,7 +487,8 @@
       "`backend/config/gemini_pricing.json` の単価を一次情報と突き合わせる"
     ],
     "note": "正典は `roadmap.phases.R1` と同じ内容を指す。**台帳は1つ**（憲法第5条）",
-    "cost_note": "**¥3,000 は上限であって見込みではない。** Flash 系が無料枠（約1,500 RPD）に収まれば実費はほぼ Pro 呼び出しぶんだけになる。R1 の目的の1つは**1本あたりの実費を知ること**なので、見積もりではなく実測で答えを出す"
+    "cost_note": "**¥3,000 は上限であって見込みではない。** Flash 系が無料枠（約1,500 RPD）に収まれば実費はほぼ Pro 呼び出しぶんだけになる。R1 の目的の1つは**1本あたりの実費を知ること**なので、見積もりではなく実測で答えを出す",
+    "tooling": "**実行記録の書き手は 2026-08-16 に用意した**（`backend/revenue/run_record.py`・`RunRecorder`）。工程ごとに `output/runs/<run_id>/run.json` へ原子的に書き出し、宣言モデル（`model_policy` の段）と**実測モデル**（`cost_guard` 台帳から工程の開始時点以降を読む）の両方を残す。**残るのは実キーでの実走だけ** — C1/C2/C4/C5/C6 の met はここでは動かさない（記録の仕組みは証拠ではない）。`python -m backend.revenue.run_record --list` / `--resume <run_id>`"
   },
   "phase_history": [
     {
@@ -1023,7 +1024,8 @@
           "`.claude/budget.json` の `auto_reload` を `\"off\"` に更新する（宣言しないと --status が警告を出す）",
           "`backend/config/gemini_pricing.json` の単価を一次情報と突き合わせる"
         ],
-        "cost_note": "**¥3,000 は上限であって見込みではない。** Flash 系が無料枠（約1,500 RPD）に収まれば実費はほぼ Pro 呼び出しぶんだけになる。R1 の目的の1つは**1本あたりの実費を知ること**なので、見積もりではなく実測で答えを出す"
+        "cost_note": "**¥3,000 は上限であって見込みではない。** Flash 系が無料枠（約1,500 RPD）に収まれば実費はほぼ Pro 呼び出しぶんだけになる。R1 の目的の1つは**1本あたりの実費を知ること**なので、見積もりではなく実測で答えを出す",
+        "tooling": "**実行記録の書き手は 2026-08-16 に用意した**（`backend/revenue/run_record.py`・`RunRecorder`）。工程ごとに `output/runs/<run_id>/run.json` へ原子的に書き出し、宣言モデル（`model_policy` の段）と**実測モデル**（`cost_guard` 台帳から工程の開始時点以降を読む）の両方を残す。**残るのは実キーでの実走だけ** — C1/C2/C4/C5/C6 の met はここでは動かさない（記録の仕組みは証拠ではない）。`python -m backend.revenue.run_record --list` / `--resume <run_id>`"
       },
       "R2": {
         "title": "承認工程を必須にする（品質の担保 + D-16 の解消）",

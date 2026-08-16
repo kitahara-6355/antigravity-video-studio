@@ -294,7 +294,10 @@ def live_model_ids() -> tuple[set[str], str]:
     取得は無料（`models.list`）。キーが無ければ空集合と理由を返す。
     **「確かめられなかった」を「問題なし」にしない** — 呼び出し側が FAIL にする。
     """
-    from cost_guard import is_dummy_key
+    # **`backend.` を付ける。** 裸の `cost_guard` は PYTHONPATH=./backend でしか
+    # 解決せず、CLAUDE.md が案内している `python -m backend.model_policy --audit`
+    # をリポジトリ直下で叩くと ModuleNotFoundError で落ちていた（2026-08-16）。
+    from backend.cost_guard import is_dummy_key
 
     if is_dummy_key():
         return set(), ("実 API キーがありません（ダミーキー）。"
@@ -344,9 +347,11 @@ def audit() -> tuple[list[AuditFinding], str]:
 
     # 単価表に載っていない段のモデルは、実費を見積もれない。
     try:
-        from cost_guard import CostGuard
+        from backend.cost_guard import CostGuard, PricingUnavailable
         priced = set(CostGuard(limit_jpy=0)._prices)
-    except Exception:  # noqa: BLE001
+    except (PricingUnavailable, OSError, ValueError):
+        # 単価表が無い・壊れている。**点検そのものは続ける** — ここで落ちると
+        # 段の実在確認（上のループ）まで巻き添えになる。
         priced = set()
     for tier in tier_order():
         model = (table.get(tier) or {}).get("model", "")
