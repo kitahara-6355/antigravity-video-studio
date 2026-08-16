@@ -1,7 +1,7 @@
 {
   "version": "1.1",
-  "last_updated": "2026-08-16T09:16:47.596585",
-  "entry_count": 1462,
+  "last_updated": "2026-08-16T12:39:44.625713",
+  "entry_count": 1463,
   "entries": [
     {
       "debt_id": "TD-001",
@@ -31613,6 +31613,31 @@
       "last_verified_at": null,
       "confidence": 1.0,
       "estimated_fix_minutes": null
+    },
+    {
+      "debt_id": "TD-1482",
+      "category": "ACCEPTED_SAFETY",
+      "file_path": "verify_account.py",
+      "line_number": 106,
+      "pattern": "except Exception as e:  # noqa: BLE001 — 何で落ちても本文を読んで分類する",
+      "cause_pattern": "",
+      "fix_pattern": "（塞がない）**何が返ってきたかを読んで分類するのがこの関数の仕事**。型を絞ると、想定外の失敗が診断されずにそのまま落ちる",
+      "status": "open",
+      "registered_at": "2026-08-16T12:39:44.621626",
+      "registered_by": "R1-verify-account",
+      "fixed_at": null,
+      "fixed_by": null,
+      "fix_evidence": null,
+      "related_test": null,
+      "notes": "probe_generate() の最小呼び出し。SDK・ネットワーク・認証のどれで落ちても本文を diagnose() に渡し、『課金要求／管理者ブロック／レート上限』を言い分ける。**意図的な広域捕捉**",
+      "tags": [
+        "fail-closed",
+        "verify_account",
+        "R1"
+      ],
+      "last_verified_at": null,
+      "confidence": 1.0,
+      "estimated_fix_minutes": null
     }
   ],
   "cause_patterns": [
@@ -31660,15 +31685,6 @@
     }
   ],
   "changelog": [
-    {
-      "timestamp": "2026-06-12T18:43:22.967864",
-      "action": "resolved",
-      "debt_id": "TD-1309",
-      "actor": "cleanup",
-      "old_status": "open",
-      "new_status": "fixed",
-      "detail": "file deleted (temporary script clean shutdown)"
-    },
     {
       "timestamp": "2026-06-12T18:43:22.998291",
       "action": "resolved",
@@ -36159,6 +36175,15 @@
       "old_status": "",
       "new_status": "open",
       "detail": "except Exception as e:  # noqa: BLE001 — 何で落ちても「未確認」に倒す"
+    },
+    {
+      "timestamp": "2026-08-16T12:39:44.621661",
+      "action": "registered",
+      "debt_id": "TD-1482",
+      "actor": "R1-verify-account",
+      "old_status": "",
+      "new_status": "open",
+      "detail": "except Exception as e:  # noqa: BLE001 — 何で落ちても本文を読んで分類する"
     }
   ]
 }

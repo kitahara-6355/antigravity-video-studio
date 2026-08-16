@@ -1,7 +1,7 @@
 # Technical Debt Registry — Antigravity Pipeline
 
-> **最終更新**: 2026-08-16 09:16
-> **総エントリ数**: 1462 (open: 471 / fixed: 841)
+> **最終更新**: 2026-08-16 12:39
+> **総エントリ数**: 1463 (open: 472 / fixed: 841)
 > **管理方式**: JSON+Markdown二重管理（VF同型）。手動編集禁止。API経由で更新。
 > **更新ルール**: 新規 `except Exception` 追加時は `register_debt()` API経由で登録必須
 
@@ -15,7 +15,7 @@
 | CRITICAL_PHASE4 | Phase 4直接干渉 | 37 | 0 | 35 | 2 |
 | IMPORTANT_SERVICE | Service/Engine層 | 388 | 156 | 200 | 32 |
 | MINOR_INFRA | インフラ層（ログ出力あり） | 640 | 257 | 333 | 50 |
-| ACCEPTED_SAFETY | 正当な安全ネット（修正不要） | 153 | 58 | 55 | 40 |
+| ACCEPTED_SAFETY | 正当な安全ネット（修正不要） | 154 | 59 | 55 | 40 |
 
 ---
 
@@ -1356,7 +1356,7 @@
 
 ---
 
-## ACCEPTED_SAFETY: 正当な安全ネット（修正不要） (153件 / open:58 fixed:55)
+## ACCEPTED_SAFETY: 正当な安全ネット（修正不要） (154件 / open:59 fixed:55)
 
 | ID | ファイル | 行 | ステータス | パターン | 修正パターン | 修正日 |
 |:--|:---|:---:|:---:|:---|:---|:---|
@@ -1467,6 +1467,7 @@
 | TD-1479 | `video_pipeline/stable_ts_wrapper.py` | L104 | 🔴 open | `except Exception as e:` | 必要に応じてフォールバック | - |
 | TD-1480 | `video_pipeline/stable_ts_wrapper.py` | L167 | 🔴 open | `except Exception as e:` | 必要に応じてフォールバック | - |
 | TD-1481 | `model_policy.py` | L315 | 🔴 open | `except Exception as e:  # noqa: BLE001 — 何で落ちても「未確認」に倒す` | （塞がない）例外の型を絞ると、想定外の SDK エラーで audit() 自体が落ち、「確かめられなかった」が「問題なし」に化ける。fail-closed を優先する | - |
+| TD-1482 | `verify_account.py` | L106 | 🔴 open | `except Exception as e:  # noqa: BLE001 — 何で落ちても本文を読んで分類する` | （塞がない）**何が返ってきたかを読んで分類するのがこの関数の仕事**。型を絞ると、想定外の失敗が診断されずにそのまま落ちる | - |
 | TD-593 | `routers/pipeline_router.py` | L1120 | 🔵 accepted | `except Exception` | 修正不要（HTTPException re-raise済み） | - |
 | TD-594 | `routers/pipeline_router.py` | L1134 | 🔵 accepted | `except Exception` | 修正不要（HTTPException re-raise済み） | - |
 | TD-595 | `routers/smartcut.py` | L131 | 🔵 accepted | `except Exception` | 修正不要（HTTPException re-raise済み） | - |
