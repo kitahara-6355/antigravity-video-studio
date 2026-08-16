@@ -1,0 +1,2 @@
+{"at": "2026-08-16T01:56:38.569989+00:00", "action": "escalate", "task": "telop_suggestion", "from": {"tier": "premium", "model": "gemini-3-flash-preview"}, "to": {"tier": "pro", "model": "gemini-2.5-pro"}, "reason": "テロップの提案が硬い（動作確認）"}
+{"at": "2026-08-16T01:57:12.392068+00:00", "action": "reset", "task": "telop_suggestion", "from": {"tier": "pro", "model": "gemini-2.5-pro"}, "to": {"tier": "premium", "model": "gemini-3-flash-preview"}, "reason": "上書きを解除"}
