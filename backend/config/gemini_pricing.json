@@ -97,10 +97,31 @@
     ],
     "limits": "Flash 系はおよそ 5〜15 RPM / 最大 1,000 RPD（2026-08 時点の二次情報）。**P3 では律速が金額ではなくレート制限になる**見込み。実測は R1 で取る",
     "pro_excluded": "gemini-2.5-pro は 2026-04-01 に無料枠から外れた。**このリポジトリは 2.5-pro を67箇所で参照している**ので、フル実走は有料になる",
-    "privacy": "無料枠で送ったデータは Google の製品改善に使われる。**ユーザー判断（2026-08-15）: 学習に使われても構わない。** したがって無料枠の利用に制約は無い",
+    "privacy": "**2026-08-17 訂正。** 当初『無料枠で送ったデータは製品改善に使われる／ユーザー判断で構わない』と書いていたが、**判定軸が「無料枠かどうか」ではなく「Cloud 請求先アカウントが有効かどうか」だった。** 詳細は data_use を見ること",
     "effect_on_estimate": "cost_guard の見積もりは**上限**。無料枠に収まった呼び出しの実費は 0 円になる",
-    "source": "web検索で確認（2026-08-15）",
+    "source": "web検索で確認（2026-08-15）。privacy の項だけ 2026-08-17 に一次情報で訂正",
     "confidence": "unverified_secondary"
+  },
+  "data_use": {
+    "_comment": "**データが学習に使われるかは、無料枠かどうかでは決まらない。請求先アカウントが有効かどうかで決まる。** 2026-08-17 に一次情報（Gemini API 追加利用規約）で確認した。**このリポジトリで唯一 verified_primary の項。**",
+    "rule": "**Cloud 請求先アカウントを有効化すると、Gemini API および Google AI Studio のすべての使用が、データの利用方法に関しては『有料サービス』になる。無料枠を使っている場合でも同様。** 有料サービスでは Google はプロンプトと回答をプロダクトの改善に使用しない",
+    "unpaid_warning": "無料サービス側には規約が明示的にこう書いている: **『本無料サービスには、プライベート情報、機密情報、または個人情報を送信しないでください。』** 人間のレビュアーが確認・注記・処理を行う場合がある",
+    "why_it_matters_here": "**素材は実写の対談で、文字起こしには氏名・経歴・媒体名などの個人情報が入る。** したがって請求先アカウントが有効なキーを使うこと。費用は無料枠に収まれば同じ ¥0 で、保護だけが付く",
+    "key_selection": "個人 `...KqrA`（project video-automation-489607・請求先 有効）を使う。`...U6uw`（Jigyokei・請求先未設定）と法人 antigravity-pipeline（請求先未設定）は**無料サービス扱いなので対談素材を流さない**",
+    "eea_note": "欧州経済領域・スイス・英国を拠点とする場合は、無料で提供されるサービスにも有料サービスのデータ条項が適用される。**日本は対象外なので、この救済は効かない**",
+    "quote_ja": "サービスが有料で提供されている場合、それは有料サービスとみなされます。Cloud 請求先アカウントを有効化すると、Gemini API および Google AI Studio のすべての使用は、「Google による使用者のデータの利用方法」に関しては「有料サービス」となります。これは、無料で提供される本サービス（Google AI Studio、Gemini API の無料枠など）を使用する場合でも同様です。",
+    "source": "https://ai.google.dev/gemini-api/docs/terms?hl=ja#paid-services （Gemini API 追加利用規約・2026-03-23 より有効・最終更新 2026-04-28 UTC）。ユーザーが AI Studio の『アカウントステータス → 有料サービスの利用規約』から取得した原文 PDF を 2026-08-17 に読んで確認",
+    "retrieved_at": "2026-08-17",
+    "confidence": "verified_primary"
+  },
+  "google_ai_plan": {
+    "_comment": "**月額購読（Google AI Pro / Ultra）は API の枠にならない。** 法人アカウントで購読を勧める画面が出るが、パイプラインには1円も効かない。2026-08-17 に一次情報で確認した",
+    "rule": "Google AI plan の開発者向け特典は **Google AI Studio の Web UI の中だけ**に適用される。API キーや外部アプリケーションからの Gemini API の直接利用は、**別勘定で課金・管理される**",
+    "quote_en": "AI Studio UI only: Google AI plan benefits for developer usage apply only within the Google AI Studio web interface. Direct use of the Gemini API (such as using API keys or external applications) is billed and managed separately.",
+    "implication": "**法人プロジェクトの『API アクセス制限中』は購読では解けない。** 解くのは Cloud 請求先アカウントの設定だけ",
+    "source": "https://ai.google.dev/gemini-api/docs/google-ai-plans",
+    "retrieved_at": "2026-08-17",
+    "confidence": "verified_primary"
   },
   "price_change_note": "2026-07-02 に値上げがあった。ここの数字は値上げ後の水準として拾ったもの（安全側の高いほうを採用）"
 }
