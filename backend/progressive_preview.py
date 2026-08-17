@@ -15,7 +15,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 
-from path_resolver import project_root
+from path_resolver import project_root, writable_path
 
 logger = logging.getLogger(__name__)
 
@@ -760,7 +760,14 @@ class ProgressivePreview:
     async def resolve_progressive_preview_task(self, task_id: str) -> str:
         """StageBoundAgent の process_func として動作する非同期タスク処理"""
         import json
-        output_dir = Path(getattr(self, "output_dir", None) or "backend/temp/previews")
+        # **リポジトリ相対の直書きにしない。** ここは実行のたびに中身が変わる
+        # 出力なので `writable_path` が置き場を決める（テストでは conftest が
+        # 一時ディレクトリへ向ける）。直書きだと CWD 次第でリポジトリの中に
+        # `backend/temp/previews/<task_id>.png` が落ち、本番ファイル汚染
+        # ラチェットが赤くなる（2026-08-17 の CI 実測: その他 116 → 118）。
+        output_dir = Path(getattr(self, "output_dir", None)
+                          or writable_path("backend/temp/previews"))
+        output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{task_id}.png"
         
         width = getattr(self, "width", 1280)
