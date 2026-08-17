@@ -31,9 +31,14 @@ class ProgressivePreview:
         """
         self.session_id = session_id or datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # 絶対パスで出力ディレクトリを設定
-        base_dir = Path(__file__).parent
-        self.output_dir = Path(output_dir or base_dir / "temp" / "previews" / self.session_id)
+        # **`Path(__file__).parent` を起点にしない。** ここは実行のたびに中身が
+        # 変わる出力なので `writable_path` が置き場を決める（テストでは conftest が
+        # 一時ディレクトリへ向ける）。コードの所在を起点にすると、**構築しただけで
+        # リポジトリ内に `backend/temp/previews/<session_id>/` が実際に作られる**。
+        # 2026-08-17 の CI 実測で `default` と `test_b27` の2件が増え、
+        # 本番ファイル汚染ラチェットが赤になった（その他 116 → 118）。
+        self.output_dir = Path(
+            output_dir or writable_path("backend/temp/previews") / self.session_id)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.steps: list[dict] = []
