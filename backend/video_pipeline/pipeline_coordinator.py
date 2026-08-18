@@ -37,7 +37,17 @@ sys.modules["core.plugin"] = backend.core.plugin
 sys.modules["core.context"] = backend.core.context
 sys.modules["core.registry"] = backend.core.registry
 
+from backend.revenue.run_record import LOCAL_PREFIX, RunRecorder
+
 logger = logging.getLogger(__name__)
+
+
+class _StageFailed(RuntimeError):
+    """`run_stage` の失敗を `RunRecorder.stage` に伝えるための内部例外。
+
+    **外へは漏らさない。** `run_pipeline` の契約（失敗しても
+    `PipelineResult` を返す）は変えない。
+    """
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -58,6 +68,33 @@ STAGE_ORDER: list[str] = [
 ]
 
 MAX_RETRIES: int = 2
+
+# 工程ごとのモデル宣言（R1-C6 の見える化）。
+#
+# **`local:` は「LLM を使っていない」ことの宣言**であって、書き忘れの
+# 代用ではない。宣言が無い工程は成果物ゲートが FAIL する仕様なので、
+# 使っていないなら使っていないと書く。
+#
+# 値が `local:` で始まらないものは `model_policy` の**工程名**として扱い、
+# 段からモデルを引く。**モデル名は直書きしない** — 直書きすると入替の
+# たびに全工程を書き換えることになり、実際それで `gemini-3-flash-preview`
+# が居座って腐った。
+#
+# 2026-08-19 の実測: Gemini を呼ぶのは soul_feedback だけ。quality_gate は
+# model_policy に premium として登録されているが、`video_pipeline` の
+# QualityGate は完全にローカル判定で、API を1回も叩かない。
+STAGE_MODELS: dict[str, str] = {
+    "ingest": "local:ffmpeg",
+    "smart_cut": "local:auto-editor",
+    "audio_extract": "local:ffmpeg",
+    "transcribe": "local:whisper",
+    "subtitle_gen": "local:rule-based",
+    "soul_feedback": "director",          # model_policy の工程名
+    "telop_render": "local:pillow",
+    "compose": "local:ffmpeg",
+    "quality_gate": "local:rule-based",
+    "thumbnail": "local:ffmpeg",
+}
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -130,15 +167,23 @@ class PipelineCoordinator:
         self,
         work_dir: Optional[str] = None,
         config: Optional[dict] = None,
+        runs_dir: Optional[Path] = None,
     ) -> None:
         """PipelineCoordinatorを初期化する。
 
         Args:
             work_dir: 作業ディレクトリのパス
             config: パイプライン設定の辞書
+            runs_dir: 実行記録（run.json）の置き場。**渡したときだけ記録する。**
+                既定で `output/runs/` に書くと、既存のパイプラインテストが
+                本番ディレクトリを汚す。実走の入口（CLI）が明示的に渡す。
+                記録が無ければ成果物ゲートが FAIL するので、渡し忘れは
+                ゲート側で捕まる
         """
         self.work_dir: str = work_dir or os.getcwd()
         self.config: dict = config or {}
+        self.runs_dir: Optional[Path] = (
+            Path(runs_dir) if runs_dir is not None else None)
         self._jobs: dict[str, dict[str, Any]] = {}
         Path(self.work_dir).mkdir(parents=True, exist_ok=True)
 
@@ -172,9 +217,12 @@ class PipelineCoordinator:
         }
         error_message = ""
         target_stages = stages if stages is not None else STAGE_ORDER
+        recorder = self._new_recorder(input_path)
 
         for stage_name in target_stages:
-            stage_result = self.run_stage(stage_name, current_data)
+            stage_result = self._run_recorded_stage(
+                recorder, stage_name, current_data,
+            )
 
             if stage_result.success:
                 stages_completed.append(stage_name)
@@ -197,6 +245,15 @@ class PipelineCoordinator:
 
         elapsed = time.time() - start_time
         success = len(stages_completed) == len(target_stages)
+
+        if recorder is not None:
+            output_path = current_data.get("output_path", "")
+            # **成果物は完走したときだけ載せる。** 途中で落ちた実行の
+            # 中間ファイルを「成果物」として並べると、成果物ゲートが
+            # 落ちた実行を緑にしてしまう。
+            if success and output_path:
+                self._guarded(recorder.artifact, output_path)
+            self._guarded(recorder.finish)
 
         # ジョブ状態を更新
         self._jobs[job_id]["status"] = "completed" if success else "failed"
@@ -224,6 +281,71 @@ class PipelineCoordinator:
             duration_seconds=elapsed,
             error_message=error_message,
         )
+
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # 実行記録（R1-C1/C4/C5/C6）
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    #
+    # **記録は付帯物。書けなくても動画を作るのを諦めない。**
+    # ただし記録が無ければ成果物ゲートが FAIL するので、黙って
+    # 無かったことにはならない。
+
+    @staticmethod
+    def _guarded(func, *args, **kwargs):
+        """記録の書き出しでパイプラインを落とさない。"""
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:  # TDR登録済み: DP-02（記録は付帯物）
+            logger.warning("実行記録の書き出しに失敗: %s", e)
+            return None
+
+    def _new_recorder(self, input_path: str):
+        """`runs_dir` が指定されていれば記録係を作る。無ければ None。"""
+        if self.runs_dir is None:
+            return None
+        return self._guarded(
+            RunRecorder,
+            runs_dir=self.runs_dir,
+            inputs={"source": input_path, "config": dict(self.config)},
+        )
+
+    def _run_recorded_stage(
+        self, recorder, stage_name: str, input_data: dict
+    ) -> StageResult:
+        """1工程を実行し、記録係がいれば結果を書き残す。
+
+        `run_stage` は失敗を例外ではなく `StageResult.success=False` で
+        返す。`RunRecorder.stage` は例外で失敗を検知するので、ここで
+        いったん例外に変換して投げ直し、外へは漏らさない。
+        """
+        if recorder is None:
+            return self.run_stage(stage_name, input_data)
+
+        declared = STAGE_MODELS.get(stage_name, "")
+        kwargs: dict[str, Any] = {"stage_input": dict(input_data)}
+        if declared.startswith(LOCAL_PREFIX):
+            kwargs["model"] = declared
+        elif declared:
+            kwargs["task"] = declared
+        # どちらでもなければ宣言なし。**空のまま残してゲートに落とさせる。**
+
+        holder: dict[str, StageResult] = {}
+        try:
+            with recorder.stage(stage_name, **kwargs):
+                result = self.run_stage(stage_name, input_data)
+                holder["result"] = result
+                if not result.success:
+                    raise _StageFailed(result.error_message or stage_name)
+        except _StageFailed:
+            pass
+        except Exception as e:  # TDR登録済み: DP-02（記録は付帯物）
+            logger.warning("実行記録の書き出しに失敗: %s", e)
+            if "result" not in holder:
+                return self.run_stage(stage_name, input_data)
+        return holder.get("result", StageResult(
+            success=False, stage_name=stage_name,
+            error_message="実行記録の初期化に失敗しました",
+        ))
 
     def run_stage(
         self, stage_name: str, input_data: dict
@@ -631,10 +753,17 @@ if __name__ == "__main__":
         print("使用方法: python pipeline_coordinator.py <入力ファイルパス>")
         sys.exit(1)
 
-    coordinator = PipelineCoordinator(work_dir="./pipeline_work")
+    # **実走は必ず記録する。** 記録が無ければ成果物ゲートが FAIL する
+    # 仕様なので、実キーで動かす唯一の入口であるここで渡す。
+    from backend.revenue.artifact_gate import RUNS_DIR
+
+    coordinator = PipelineCoordinator(
+        work_dir="./pipeline_work", runs_dir=RUNS_DIR,
+    )
     result = coordinator.run_pipeline(sys.argv[1])
     print(f"パイプライン結果: success={result.success}, "
           f"job_id={result.job_id}, "
           f"stages={result.stages_completed}")
     if result.error_message:
         print(f"エラー: {result.error_message}")
+    print(f"実行記録: {RUNS_DIR}")

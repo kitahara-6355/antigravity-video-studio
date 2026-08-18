@@ -54,6 +54,22 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _unserializable(value: Any) -> str:
+    """JSON にできない値の置き換え。**記録全体を落とさない。**
+
+    2026-08-19 の実走で `TranscriptResult` が工程の入力に混ざり、
+    `json.dump` が TypeError を上げて **transcribe 以降の書き出しが
+    すべて失敗した。** 10/10 完走した実行の記録が「4工程・running」で
+    残り、完走したことも、どこまで進んだかも読めなくなった。
+
+    **黙って消さない。** 何が入っていたのかは残す（再開の手掛かりになる）。
+    """
+    text = repr(value)
+    if len(text) > 200:
+        text = text[:197] + "..."
+    return f"<{type(value).__name__}: {text}>"
+
+
 def new_run_id() -> str:
     """時刻順に並ぶ一意な ID。同じマイクロ秒でも衝突しない。"""
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
@@ -242,7 +258,8 @@ class RunRecorder:
         """**壊れた JSON を置かない。** 一時ファイルに書いてから置き換える。"""
         tmp = self.dir / "run.json.tmp"
         with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-            json.dump(self._record, fh, ensure_ascii=False, indent=2)
+            json.dump(self._record, fh, ensure_ascii=False, indent=2,
+                      default=_unserializable)
             fh.write("\n")
         os.replace(tmp, self.path)
 
