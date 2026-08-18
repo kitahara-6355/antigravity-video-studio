@@ -24,6 +24,13 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# この工程が使う段（model_policy の工程名）。
+# プロンプトが「あなたはプロの映像ディレクター」で始まり、演出・編集の提案を
+# 4カテゴリで作るので `director` に対応する。**モデル名は書かない** —
+# 段の入替が工程に届かなくなり、実際それで gemini-2.5-flash が居座って
+# 2026-08-19 の実走で 404 になった。
+LLM_TASK = "director"
+
 # ---------------------------------------------------------------------------
 # 定数
 # ---------------------------------------------------------------------------
@@ -422,8 +429,15 @@ class SoulFeedbackEngine:
         str
             Geminiの応答テキスト。
         """
+        # **モデル名を直書きしない。** 段（model_policy）から解決する。
+        # 直書きしていた `gemini-2.5-flash` は governance のフォールバック連鎖で
+        # `gemini-2.5-flash-lite` に落ち、2026-08-19 の実走で 404 を返した
+        # （新規ユーザーには既に提供されていない）。`--show` の表示と実際に
+        # 呼ぶモデルが食い違い、**見える化が嘘になっていた**。
+        from backend import model_policy
+
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=model_policy.resolve(LLM_TASK).model,
             contents=prompt,
         )
         return response.text or ""
