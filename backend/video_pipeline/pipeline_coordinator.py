@@ -618,6 +618,15 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
+    # `backend/.env` を読む。**CLI は誰も読んでいなかった**（cost_guard の
+    # load_env と同じ問題）。読まないと実キーがあってもダミー扱いになり、
+    # 実走のつもりが全部 STUB に落ちる。既存の環境変数は上書きしない。
+    try:
+        from backend.cost_guard import load_env
+    except ImportError:
+        from cost_guard import load_env
+    load_env()
+
     if len(sys.argv) < 2:
         print("使用方法: python pipeline_coordinator.py <入力ファイルパス>")
         sys.exit(1)

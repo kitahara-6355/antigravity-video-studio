@@ -396,3 +396,103 @@ def test_a_missing_env_file_is_not_an_error(tmp_path, monkeypatch):
     monkeypatch.setattr(cost_guard, "_env_loaded", False)
 
     cost_guard.load_env()  # 例外が出なければ通過
+
+
+# --- 実績が budget.json に残る -------------------------------------------------
+#
+# `flush_to_budget` は 2026-08-15 から存在したが、**本番の誰からも呼ばれて
+# いなかった。** 台帳（cost_ledger.jsonl）だけが伸び、budget.json の
+# spent_jpy は 0 のままだったので、
+#
+#   1. R1-C2 の「budget.json の spent_jpy に残っている」が満たせない
+#   2. **プロセスを跨ぐと上限がリセットされる。** 新しいプロセスは
+#      spent_jpy=0 から始まるので、¥3,000 の上限が実質「1プロセスあたり」
+#      になっていた。キルスイッチの穴
+#
+# 2026-08-19 の実走で発覚（台帳 ¥0.64 / budget.json ¥0.00）。
+
+
+def test_a_metered_call_lands_in_the_budget_file(tmp_path, monkeypatch):
+    """呼び出しごとに budget.json へ書き戻す。**プロセスを跨いで効かせる。**"""
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0, "status": "active"}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+    monkeypatch.setenv("GOOGLE_API_KEY", "AIza_real_key")
+    guard = _guard(tmp_path)
+
+    cost_guard.guard_after(guard, "gemini-2.5-flash",
+                           _Response(_Usage(prompt=1_000_000)))
+
+    assert json.loads(path.read_text(encoding="utf-8"))[
+        "budgets"][0]["spent_jpy"] > 0
+
+
+def test_the_budget_file_is_left_alone_without_a_guard(tmp_path, monkeypatch):
+    """ダミーキーのときは guard が None。**台帳を汚さない。**"""
+    path = tmp_path / "budget.json"
+    original = json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0, "status": "active"}]})
+    path.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+
+    cost_guard.guard_after(None, "gemini-2.5-flash", _Response())
+
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_the_ledger_can_be_reconciled_into_the_budget(tmp_path, monkeypatch):
+    """台帳が正で budget.json が遅れている場合に追いつかせる。
+
+    書き戻しが無かった時期の行が残っているので、修復の手段が要る。
+    """
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text("\n".join(json.dumps(row) for row in [
+        {"budget_id": "test", "jpy": 0.5},
+        {"budget_id": "test", "jpy": 1.25},
+        {"budget_id": "other", "jpy": 99.0},  # 別予算は数えない
+    ]) + "\n", encoding="utf-8")
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0, "status": "active"}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+
+    spent = cost_guard.reconcile_ledger()
+
+    assert spent == pytest.approx(1.75)
+    assert json.loads(path.read_text(encoding="utf-8"))[
+        "budgets"][0]["spent_jpy"] == pytest.approx(1.75)
+
+
+def test_reconciling_without_a_ledger_is_not_an_error(tmp_path, monkeypatch):
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0, "status": "active"}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", tmp_path / "absent.jsonl")
+
+    assert cost_guard.reconcile_ledger() == 0.0
+
+
+def test_the_status_always_reports_the_unreadable_counts(tmp_path, monkeypatch):
+    """0 件でも黙らない。**出力の不在を「問題なし」と読ませない。**"""
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps({
+        "budget_id": "test", "jpy": 0.1,
+        "metered": True, "known_price": True,
+    }) + "\n", encoding="utf-8")
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0, "status": "active"}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+
+    status = cost_guard._format_status()
+
+    assert "トークンを読めなかった呼び出し: 0 件" in status
+    assert "単価が未登録のモデル: 0 件" in status

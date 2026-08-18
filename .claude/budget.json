@@ -20,7 +20,7 @@
       "purpose": "実行層（L2）を開けて動画を1本完走させ、1本あたりの実コストと所要時間を実測する。Gemini API の従量課金（本番38モジュール）と text-embedding-004。Whisper / pyannote はローカルなので無料",
       "approved_at": "2026-08-15",
       "limit_jpy": 3000,
-      "spent_jpy": 0,
+      "spent_jpy": 0.64,
       "status": "active",
       "note": "ユーザー承認（2026-08-15・対話で明示）。cost_guard が呼び出しごとに実費を計上し、残高が予約額（5円）を割った時点で CostLimitExceeded を上げて止める。台帳は .claude/cost_ledger.jsonl。**この枠を超える利用は再承認が要る。** 単価表は backend/config/gemini_pricing.json（出典と取得日つき・一次情報との突き合わせは実走前に行う） **Google 側の本命の歯止めは AI Studio の Monthly spend cap**（プロジェクト単位の月額上限・2026-03-16 発表）。Prepay + 自動リロード OFF でも止まるが、クレジットは1年で失効し、Postpay 移行以外で Prepay を閉じると残高が没収されるので、spend cap のほうが上位互換。加えて Tier 1 は請求先アカウント単位で $250/月の天井が自動で掛かる。Flash 系には無料枠が残っているので、実走が ¥0 で終わる可能性がある（cost_guard の見積もりは上限）。ただし gemini-2.5-pro は 2026-04-01 に無料枠から外れており、67箇所で参照しているためフル実走は有料。",
       "billing_mode": "prepay",

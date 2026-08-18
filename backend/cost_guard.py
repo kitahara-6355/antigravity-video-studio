@@ -218,9 +218,13 @@ class CostGuard:
 
     # --- 台帳への反映 -------------------------------------------------------
 
-    def flush_to_budget(self, path: Path = BUDGET_PATH) -> None:
-        """`.claude/budget.json` の `spent_jpy` を実績で更新する。"""
-        path = Path(path)
+    def flush_to_budget(self, path: Path | None = None) -> None:
+        """`.claude/budget.json` の `spent_jpy` を実績で更新する。
+
+        **既定値を束縛せずに毎回モジュール変数を見る。** 既定引数に
+        `BUDGET_PATH` を焼き込むと、テストの monkeypatch が効かない。
+        """
+        path = Path(path if path is not None else BUDGET_PATH)
         if not path.is_file():
             return
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -237,9 +241,13 @@ class CostGuard:
 # --- 予算台帳から組み立てる ---------------------------------------------------
 
 
-def load_active_budget(path: Path = BUDGET_PATH) -> dict | None:
-    """`status == "active"` の予算を1つ返す。無ければ None。"""
-    path = Path(path)
+def load_active_budget(path: Path | None = None) -> dict | None:
+    """`status == "active"` の予算を1つ返す。無ければ None。
+
+    既定値に `BUDGET_PATH` を焼き込まない（束縛されるとテストの
+    monkeypatch が届かず、実物の台帳を読んでしまう）。
+    """
+    path = Path(path if path is not None else BUDGET_PATH)
     if not path.is_file():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -308,6 +316,56 @@ def guard_after(guard: CostGuard | None, model: str, response,
     if guard is None:
         return
     guard.after_call(model, response, caller)
+    # **呼び出しごとに budget.json へ書き戻す。**
+    # 書き戻さないと、新しいプロセスが spent_jpy=0 から始まってしまい、
+    # 上限が「1プロセスあたり ¥3,000」になる。キルスイッチはプロセスを
+    # 跨いで効かなければ意味が無い（2026-08-19 の実走で発覚）。
+    guard.flush_to_budget()
+
+
+# --- 台帳から予算を復元する ---------------------------------------------------
+
+
+def _ledger_rows() -> list[dict]:
+    """台帳を読む。無ければ空。**壊れた行は落とさず例外にする**（黙って
+    件数が減ると「使っていない」に見えるため）。"""
+    path = Path(LEDGER_PATH)
+    if not path.is_file():
+        return []
+    return [json.loads(line) for line in
+            path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def reconcile_ledger() -> float:
+    """台帳を正として `budget.json` の `spent_jpy` を作り直す。
+
+    書き戻しが本番から呼ばれていなかった時期（〜2026-08-19）の行が
+    台帳に残っている。**台帳が正**なので、そこから合計を作り直す。
+
+    Returns:
+        active な予算に計上された合計（円）。予算が無ければ 0.0。
+    """
+    budget = load_active_budget()
+    if budget is None:
+        return 0.0
+    budget_id = str(budget.get("id", ""))
+    total = sum(float(row.get("jpy", 0)) for row in _ledger_rows()
+                if row.get("budget_id") == budget_id)
+
+    path = Path(BUDGET_PATH)
+    if not path.is_file():
+        return total
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    for entry in payload.get("budgets", []):
+        if entry.get("id") == budget_id:
+            entry["spent_jpy"] = round(total, 2)
+            remaining = float(entry.get("limit_jpy", 0)) - total
+            if remaining < DEFAULT_RESERVE_JPY:
+                entry["status"] = "exhausted"
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    return total
 
 
 # --- CLI ----------------------------------------------------------------------
@@ -352,24 +410,33 @@ def _format_status() -> str:
                      "（設定したら budget.json の spend_cap_usd と "
                      "spend_cap_project を埋める）")
     lines.append("")
-    if LEDGER_PATH.is_file():
-        rows = [json.loads(line) for line in
-                LEDGER_PATH.read_text(encoding="utf-8").splitlines() if line]
+    if Path(LEDGER_PATH).is_file():
+        rows = _ledger_rows()
         lines.append(f"  呼び出し: {len(rows)} 件")
+        # **0 件でも必ず出す。** 黙っていると「出ていない」のか
+        # 「0 だった」のか読み手に区別がつかず、不在が「問題なし」に
+        # 化ける。R1-C2 が件数を要求しているのもここ。
         unmetered = sum(1 for r in rows if not r.get("metered"))
-        if unmetered:
-            lines.append(f"  ⚠ トークンを読めなかった呼び出し: {unmetered} 件"
-                         "（無料ではなく不明）")
+        mark = "⚠" if unmetered else "・"
+        lines.append(f"  {mark} トークンを読めなかった呼び出し: {unmetered} 件"
+                     "（無料ではなく不明）")
         unknown = sum(1 for r in rows if not r.get("known_price"))
-        if unknown:
-            lines.append(f"  ⚠ 単価が未登録のモデル: {unknown} 件"
-                         "（最高単価で見積もっています）")
+        mark = "⚠" if unknown else "・"
+        lines.append(f"  {mark} 単価が未登録のモデル: {unknown} 件"
+                     "（最高単価で見積もっています）")
         free = sum(1 for r in rows if r.get("free_tier_eligible"))
         if free:
             lines.append(f"  ℹ 無料枠の対象モデル: {free} 件。"
                          "**枠内に収まっていれば実費は 0 円**なので、"
                          "上の実績は上限としての見積もりです"
                          "（一次情報の請求額と突き合わせてください）")
+        ledger_total = sum(float(r.get("jpy", 0)) for r in rows
+                           if r.get("budget_id") == budget.get("id"))
+        if abs(ledger_total - spent) > 0.01:
+            lines.append(
+                f"  ⚠ **台帳と budget.json が食い違っています**"
+                f"（台帳 {ledger_total:,.2f} 円 / 予算 {spent:,.2f} 円）。"
+                "`--reconcile` で台帳を正として書き直してください")
     else:
         lines.append("  呼び出し: 0 件（台帳なし）")
     return "\n".join(lines)
@@ -381,7 +448,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--status", action="store_true", help="残高と内訳を出す")
     parser.add_argument("--gate", action="store_true",
                         help="予算を使い切っていれば exit 1")
+    parser.add_argument("--reconcile", action="store_true",
+                        help="台帳を正として budget.json の spent_jpy を作り直す")
     args = parser.parse_args(argv)
+
+    if args.reconcile:
+        total = reconcile_ledger()
+        print(f"台帳から実績を作り直しました: {total:,.4f} 円\n")
 
     print(_format_status())
 
