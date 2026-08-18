@@ -1118,11 +1118,14 @@ def test_retry_delay_execution():
 
     real_models.generate_content.side_effect = mock_generate_content
 
-    # time.sleep が RETRY_DELAY_SECONDS (2秒) で呼ばれていることを確認
+    # 429 は同じモデルで待って再試行する（降格はその後）。
+    # 待ち時間はジッターで散るので固定値では比較できない。
+    # RETRY_DELAY_SECONDS=2 → 初回の待ちは equal jitter で [1, 2] に入る。
     with patch("backend.model_governance.time.sleep") as mock_sleep:
         res = proxy.generate_content(model="gemini-3-flash-preview")
         assert res == "OK"
-        mock_sleep.assert_called_once_with(2)
+        mock_sleep.assert_called_once()
+        assert 1.0 <= mock_sleep.call_args.args[0] <= 2.0
 
 
 def test_governed_client_getattr_delegation():

@@ -554,7 +554,9 @@ class TestC4ErrorResilience:
                 result = proxy.generate_content(model="model-a")
 
         assert result is mock_response
-        assert call_count == 2
+        # 429 は同じ段で再試行してから降格する。
+        # model-a を (再試行上限+1) 回 → model-b で1回成功。
+        assert call_count == engine.MAX_RETRY_PER_MODEL + 2
 
 
 # ============================================================
@@ -847,7 +849,10 @@ class TestC7AdditionalCoverage:
                 result = await proxy.generate_content(model="model-a")
                 
         assert result.text == "async fallback ok"
-        assert call_models == ["model-a", "model-b"]
+        # 429 は同じ段で再試行してから降格する（回数には上限がある）
+        assert call_models == (
+            ["model-a"] * (engine.MAX_RETRY_PER_MODEL + 1) + ["model-b"]
+        )
 
     @pytest.mark.asyncio
     async def test_C7_03_governed_async_proxy_exhausted(self):
@@ -1197,7 +1202,10 @@ class TestC7AdditionalCoverage:
             with patch("time.sleep"):
                 res = proxy.embed_content(model="model-a", contents="hello")
         assert res == "fallback embed ok"
-        assert call_models == ["model-a", "model-b"]
+        # 429 は同じ段で再試行してから降格する（回数には上限がある）
+        assert call_models == (
+            ["model-a"] * (engine.MAX_RETRY_PER_MODEL + 1) + ["model-b"]
+        )
 
     def test_C7_29_governed_models_proxy_embed_content_exhausted(self):
         """C7-29: GovernedModelsProxy の embed_content で全フォールバックが枯渇した場合に raise すること"""
@@ -1256,7 +1264,10 @@ class TestC7AdditionalCoverage:
             with patch("asyncio.sleep"):
                 res = await proxy.embed_content(model="model-a", contents="hello")
         assert res == "async fallback embed ok"
-        assert call_models == ["model-a", "model-b"]
+        # 429 は同じ段で再試行してから降格する（回数には上限がある）
+        assert call_models == (
+            ["model-a"] * (engine.MAX_RETRY_PER_MODEL + 1) + ["model-b"]
+        )
 
     @pytest.mark.asyncio
     async def test_C7_33_governed_async_proxy_embed_content_exhausted(self):

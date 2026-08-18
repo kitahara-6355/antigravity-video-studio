@@ -5,12 +5,13 @@ Model Governance — ハーネス統合型モデルガバナンス
 
   Layer 1: PreToolUse Hook — deprecated モデル名の事前差替
   Layer 2: Fallback Chain  — 429/503/404 エラー時の自動降格
-  Layer 3: Audit Trail     — 全差替・フォールバックを監査記録
+  Layer 2.5: Backoff Retry — 429/503 は降格の前に同じモデルで指数バックオフ再試行
+  Layer 3: Audit Trail     — 全差替・フォールバック・再試行を監査記録
 
 対応するモデル異常:
-  - 枠枯渇 (429 RESOURCE_EXHAUSTED) → フォールバックチェーンで次のモデルへ
-  - 旧モデル利用不可 (404/quota=0)  → deprecated差替 + フォールバック
-  - サーバー混雑 (503 UNAVAILABLE)   → リトライ → フォールバック
+  - 枠枯渇 (429 RESOURCE_EXHAUSTED) → 待って再試行 → 尽きたら次のモデルへ
+  - 旧モデル利用不可 (404/quota=0)  → deprecated差替 + フォールバック（再試行しない）
+  - サーバー混雑 (503 UNAVAILABLE)   → 待って再試行 → 尽きたら次のモデルへ
   - 新モデル未反映                    → model_config.json 再読込で動的対応
 
 Fallback Chain (model_config.json から自動読込):
@@ -19,6 +20,8 @@ Fallback Chain (model_config.json から自動読込):
 
 import json
 import logging
+import random
+import re
 import time
 import threading
 from pathlib import Path
@@ -62,9 +65,20 @@ class ModelGovernanceEngine:
         "limit: 0",
     ]
 
+    # 同一モデルで再試行する対象。**404 は入れない。**
+    # 存在しないモデルは待っても現れない。降格だけが正しい対処で、
+    # 叩き直すのは無駄な負荷にしかならない。
+    RETRYABLE_ERROR_CODES = {429, 503}
+    RETRYABLE_ERROR_KEYWORDS = ("RESOURCE_EXHAUSTED", "UNAVAILABLE")
+
     # リトライ設定
-    MAX_RETRY_PER_MODEL = 1
+    # 降格の前に、同じモデルで MAX_RETRY_PER_MODEL 回まで待って再試行する。
+    # 一次情報の指示が「短時間待って再試行」であり、降格はその後の話。
+    # 上限を置くのは BAN 回避のため（無制限の再送は自動化された乱用と
+    # 区別がつかない）。RETRY_DELAY_SECONDS は指数バックオフの基準値も兼ねる。
+    MAX_RETRY_PER_MODEL = 2
     RETRY_DELAY_SECONDS = 2
+    BACKOFF_MAX_SECONDS = 60.0
 
     def __new__(cls):
         if cls._instance is None:
@@ -167,6 +181,124 @@ class ModelGovernanceEngine:
         """このエラーがフォールバック対象か判定"""
         error_str = str(error)
         return any(kw in error_str for kw in self.FALLBACK_ERROR_KEYWORDS)
+
+    # ============================================================
+    # Layer 2.5: 同一モデルの指数バックオフ再試行
+    # ============================================================
+
+    @staticmethod
+    def _error_code(error) -> Optional[int]:
+        """エラーから HTTP ステータスコードを取り出す。
+
+        `google.genai.errors.APIError` は int、`GoogleAPICallError` は
+        `HTTPStatus` を持つ。どちらも int() で揃う。
+        """
+        code = getattr(error, "code", None)
+        if code is None:
+            return None
+        try:
+            return int(code)
+        except (TypeError, ValueError):
+            return None
+
+    def is_retryable_error(self, error) -> bool:
+        """同じモデルで待って再試行する価値があるエラーか。
+
+        フォールバック対象（`is_fallback_error`）より狭い。404 は
+        フォールバックはするが再試行はしない。
+        """
+        code = self._error_code(error)
+        if code is not None:
+            return code in self.RETRYABLE_ERROR_CODES
+
+        # コードが取れない場合のみ文字列で判定する。
+        # 「404 ... NOT_FOUND」を取り違えないよう、キーワードは
+        # RESOURCE_EXHAUSTED / UNAVAILABLE の2つに絞る。
+        error_str = str(error)
+        return any(kw in error_str for kw in self.RETRYABLE_ERROR_KEYWORDS)
+
+    def retry_after_seconds(self, error) -> Optional[float]:
+        """サーバーが指定した待ち時間（google.rpc.RetryInfo）を取り出す。
+
+        429 の応答には「いつ再送してよいか」が入ってくることがある。
+        入っていればそれが一次情報で、自前の指数計算より優先する。
+
+        Returns:
+            秒数。指定が無ければ None。
+        """
+        details = getattr(error, "details", None)
+
+        # APIError.details は応答ボディ全体（dict）で、その中の
+        # "details" が RetryInfo を含む配列。
+        if isinstance(details, dict):
+            details = details.get("details") or details.get(
+                "error", {}
+            ).get("details")
+
+        if isinstance(details, list):
+            for item in details:
+                if not isinstance(item, dict):
+                    continue
+                if "RetryInfo" not in str(item.get("@type", "")):
+                    continue
+                parsed = self._parse_duration(item.get("retryDelay"))
+                if parsed is not None:
+                    return parsed
+
+        # 構造が取れないときは文字列から拾う（SDK の版差を吸収する）
+        match = re.search(
+            r"retry[_-]?[Dd]elay[\"']?\s*[:=]\s*[\"']?(\d+(?:\.\d+)?)s",
+            str(error),
+        )
+        if match:
+            return float(match.group(1))
+        return None
+
+    @staticmethod
+    def _parse_duration(value) -> Optional[float]:
+        """protobuf の Duration 表記（"31s" / "1.5s" / 31）を秒に直す。"""
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)s?\s*", str(value))
+        return float(match.group(1)) if match else None
+
+    def backoff_delay(self, attempt: int, error=None) -> float:
+        """`attempt` 回目の再試行までに待つ秒数。
+
+        サーバー指定があればそれを使い、無ければ
+        `RETRY_DELAY_SECONDS * 2**attempt` を上限で切って equal jitter を掛ける。
+
+        ジッターを入れるのは、同時に走った複数プロセスが同じ瞬間に
+        再送すると結局は連打になるため。全体を半分までしか縮めないので
+        「待たずに叩き直す」側には倒れない。
+        """
+        if error is not None:
+            server_hint = self.retry_after_seconds(error)
+            if server_hint is not None:
+                return min(server_hint, self.BACKOFF_MAX_SECONDS)
+
+        base = min(
+            self.RETRY_DELAY_SECONDS * (2 ** attempt),
+            self.BACKOFF_MAX_SECONDS,
+        )
+        half = base / 2
+        return half + random.uniform(0, half)
+
+    def _record_retry(self, model: str, caller: str, attempt: int,
+                      delay: float, error) -> None:
+        """再試行を監査ログに残す。何回粘ったかを後から読めるように。"""
+        self._record_event(
+            "retry_attempt", model, model, caller,
+            f"attempt={attempt}/{self.MAX_RETRY_PER_MODEL}, "
+            f"delay={delay:.2f}s, {error}",
+        )
+        logger.warning(
+            f"🛡️ ModelGovernance: '{model}' 一時エラー "
+            f"({attempt}/{self.MAX_RETRY_PER_MODEL}) → "
+            f"{delay:.2f}秒待って再試行 (caller={caller})"
+        )
 
     def build_fallback_sequence(self, start_model: str) -> List[str]:
         """フォールバックチェーン全体を配列で返す"""
@@ -327,15 +459,19 @@ class ModelGovernanceEngine:
                     gen_kwargs.update(config)
 
                 # genai.Client は aio.models.generate_content を持つ
-                if hasattr(client, "aio") and hasattr(client.aio, "models"):
-                    response = await client.aio.models.generate_content(
-                        **gen_kwargs
-                    )
-                else:
+                async def _call():
+                    if hasattr(client, "aio") and hasattr(client.aio, "models"):
+                        return await client.aio.models.generate_content(
+                            **gen_kwargs
+                        )
                     # 同期クライアントの場合はスレッドプールで実行
-                    response = await asyncio.to_thread(
+                    return await asyncio.to_thread(
                         client.models.generate_content, **gen_kwargs
                     )
+
+                response = await _attempt_with_backoff_async(
+                    _call, model=try_model, caller=caller_id,
+                )
 
                 # RPD 自動カウント
                 self._track_usage(try_model, caller_id)
@@ -421,6 +557,55 @@ model_governance = ModelGovernanceEngine()
 
 
 # ============================================================
+# 同一モデルの再試行ラッパー（同期 / 非同期）
+# ============================================================
+#
+# フォールバックループは「どのモデルを試すか」だけを持ち、
+# 「1つのモデルを何回叩くか」はここに集約する。
+# 5箇所（同期 generate/embed・非同期 generate/embed・ゲートウェイ）が
+# 同じ規則で動くようにするため、判断を1つにまとめている。
+
+def _attempt_with_backoff(call, *, model: str, caller: str):
+    """1つのモデルを、429/503 なら待って再試行しながら呼ぶ（同期）。
+
+    再試行が尽きたとき・再試行対象外のエラーのときは例外をそのまま
+    送出する。**降格するかどうかは呼び出し元のフォールバックループが決める。**
+    """
+    for attempt in range(model_governance.MAX_RETRY_PER_MODEL + 1):
+        try:
+            return call()
+        except (APIError, GoogleAPICallError) as e:
+            if attempt >= model_governance.MAX_RETRY_PER_MODEL:
+                raise
+            if not model_governance.is_retryable_error(e):
+                raise
+            delay = model_governance.backoff_delay(attempt, e)
+            model_governance._record_retry(
+                model, caller, attempt + 1, delay, e,
+            )
+            time.sleep(delay)
+
+
+async def _attempt_with_backoff_async(call, *, model: str, caller: str):
+    """`_attempt_with_backoff` の非同期版。`call` はコルーチンを返すこと。"""
+    import asyncio
+
+    for attempt in range(model_governance.MAX_RETRY_PER_MODEL + 1):
+        try:
+            return await call()
+        except (APIError, GoogleAPICallError) as e:
+            if attempt >= model_governance.MAX_RETRY_PER_MODEL:
+                raise
+            if not model_governance.is_retryable_error(e):
+                raise
+            delay = model_governance.backoff_delay(attempt, e)
+            model_governance._record_retry(
+                model, caller, attempt + 1, delay, e,
+            )
+            await asyncio.sleep(delay)
+
+
+# ============================================================
 # Governed Client — 自動フォールバック付きプロキシ
 # ============================================================
 
@@ -448,9 +633,17 @@ class GovernedModelsProxy:
         last_error = None
         for i, try_model in enumerate(chain):
             try:
-                _guard = guard_before(try_model, self._caller)
-                result = self._real.generate_content(model=try_model, **kwargs)
-                guard_after(_guard, try_model, result, self._caller)
+                def _call(try_model=try_model):
+                    _guard = guard_before(try_model, self._caller)
+                    result = self._real.generate_content(
+                        model=try_model, **kwargs,
+                    )
+                    guard_after(_guard, try_model, result, self._caller)
+                    return result
+
+                result = _attempt_with_backoff(
+                    _call, model=try_model, caller=self._caller,
+                )
 
                 if i > 0:
                     # フォールバックで成功した場合
@@ -515,7 +708,14 @@ class GovernedModelsProxy:
         last_error = None
         for i, try_model in enumerate(chain):
             try:
-                result = self._real.embed_content(model=try_model, contents=contents, **kwargs)
+                def _call(try_model=try_model):
+                    return self._real.embed_content(
+                        model=try_model, contents=contents, **kwargs,
+                    )
+
+                result = _attempt_with_backoff(
+                    _call, model=try_model, caller=self._caller,
+                )
 
                 if i > 0:
                     # フォールバックで成功した場合
@@ -603,11 +803,17 @@ class GovernedAsyncModelsProxy:
         last_error = None
         for i, try_model in enumerate(chain):
             try:
-                _guard = guard_before(try_model, self._caller)
-                result = await self._real.generate_content(
-                    model=try_model, **kwargs,
+                async def _call(try_model=try_model):
+                    _guard = guard_before(try_model, self._caller)
+                    result = await self._real.generate_content(
+                        model=try_model, **kwargs,
+                    )
+                    guard_after(_guard, try_model, result, self._caller)
+                    return result
+
+                result = await _attempt_with_backoff_async(
+                    _call, model=try_model, caller=self._caller,
                 )
-                guard_after(_guard, try_model, result, self._caller)
                 if i > 0:
                     model_governance._stats["fallback_activations"] += 1
                     model_governance._record_event(
@@ -665,11 +871,17 @@ class GovernedAsyncModelsProxy:
         last_error = None
         for i, try_model in enumerate(chain):
             try:
-                _guard = guard_before(try_model, self._caller)
-                result = await self._real.embed_content(
-                    model=try_model, contents=contents, **kwargs,
+                async def _call(try_model=try_model):
+                    _guard = guard_before(try_model, self._caller)
+                    result = await self._real.embed_content(
+                        model=try_model, contents=contents, **kwargs,
+                    )
+                    guard_after(_guard, try_model, result, self._caller)
+                    return result
+
+                result = await _attempt_with_backoff_async(
+                    _call, model=try_model, caller=self._caller,
                 )
-                guard_after(_guard, try_model, result, self._caller)
                 if i > 0:
                     model_governance._stats["fallback_activations"] += 1
                     model_governance._record_event(
