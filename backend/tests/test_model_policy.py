@@ -298,21 +298,36 @@ def test_the_real_ladder_is_the_approved_pattern():
     assert table["premium"]["model"] == "gemini-3.7-flash"
     assert table["standard"]["model"] == "gemini-3.6-flash"
     assert table["batch"]["model"] == "gemini-3.5-flash-lite"
-    assert table["pro"]["model"] == "gemini-3.1-pro"
+    # 2026-08-18: 実 API の models.list で `gemini-3.1-pro` は実在しなかった。
+    # 実在するのは preview 付きのほう。
+    assert table["pro"]["model"] == "gemini-3.1-pro-preview"
     assert table["pro"]["free_tier"] is False
 
 
-def test_the_real_ladder_is_not_yet_verified():
-    """**未検証であることを、テストでも明示しておく。**
+def test_the_real_ladder_is_verified_against_the_live_api():
+    """**一次情報との突き合わせが済んでいること。**（2026-08-16 の未検証版を反転）
 
-    一次情報がプロキシで遮断されていて突き合わせできなかった（2026-08-16）。
-    実キー投入後に `--audit` が通ったら、`verified` を true にしてこの
-    テストを反転させる。
+    前身は「未検証であること」を明示するテストで、
+    「実キー投入後に `--audit` が通ったら反転させる」と書き残されていた。
+    2026-08-18 に法人の `avs-prod-free` キーで実 API の models.list（50件）を
+    引き、4段すべての実在を確認したので反転させた。
+
+    **突き合わせで `gemini-3.1-pro` が実在しないことが判明した**
+    （実在するのは `gemini-3.1-pro-preview`）。つまりこの検証は形式ではなく、
+    実際に誤りを1件見つけている。
+
+    根拠を伴わない `verified: true` を通さないため、`verified_at` と
+    `verified_by` も必須にする。**「確かめた」と書くだけの緑を作らない。**
     """
     table = tiers()
 
-    assert all(not row.get("verified") for row in table.values()), (
-        "検証が済んだなら、このテストを『verified であること』に反転させてください")
+    for tier, row in table.items():
+        assert row.get("verified") is True, (
+            f"{tier} が未検証。`python -m backend.verify_account` で "
+            f"models.list と突き合わせてから true にすること")
+        assert row.get("verified_at"), f"{tier} に検証日が無い"
+        assert row.get("verified_by"), (
+            f"{tier} に検証方法が無い。**何をもって実在と判断したかを残す**")
 
 
 # --- CLI（CLAUDE.md が案内している叩き方） ------------------------------------

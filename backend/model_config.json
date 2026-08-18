@@ -18,32 +18,40 @@
         "label": "下 (Batch)",
         "description": "大量処理 — セマンティックチャンク・軽量スキャン・一括処理",
         "free_tier": true,
-        "verified": false,
-        "note": "無料枠あり（Flash-Lite 系）。実写素材は文字起こしの処理量が多いので、ここが効く"
+        "verified": true,
+        "note": "無料枠あり（Flash-Lite 系）。実写素材は文字起こしの処理量が多いので、ここが効く",
+        "verified_at": "2026-08-18",
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
       },
       "standard": {
         "model": "gemini-3.6-flash",
         "label": "中 (Standard)",
         "description": "制作の主力 — 字幕・テロップ・AI確認・校閲・ブランディング",
         "free_tier": true,
-        "verified": false,
-        "note": "安定線。単価 $1.50/$7.50（二次情報）"
+        "verified": true,
+        "note": "安定線。単価 $1.50/$7.50（二次情報）",
+        "verified_at": "2026-08-18",
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
       },
       "premium": {
         "model": "gemini-3.7-flash",
         "label": "上 (Premium)",
         "description": "判断・品質を決める工程 — 品質ゲート・ディレクター・監督・戦略",
         "free_tier": true,
-        "verified": false,
-        "note": "2026-08-13 リリース。**導入価格 $0.75/$3.75 で 3.6 Flash より安い**（新しい方が安いという逆転が起きている）。導入価格はいずれ上がる想定 — 値上げ自体は入替トリガーではなく、**無料枠から外れたら**見直す"
+        "verified": true,
+        "note": "2026-08-13 リリース。**導入価格 $0.75/$3.75 で 3.6 Flash より安い**（新しい方が安いという逆転が起きている）。導入価格はいずれ上がる想定 — 値上げ自体は入替トリガーではなく、**無料枠から外れたら**見直す",
+        "verified_at": "2026-08-18",
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
       },
       "pro": {
-        "model": "gemini-3.1-pro",
+        "model": "gemini-3.1-pro-preview",
         "label": "特上 (Pro)",
         "description": "**昇格専用。既定では誰も使わない。** 結果に不満があった工程だけ上げる",
         "free_tier": false,
-        "verified": false,
-        "note": "Pro 系は 2026-04-01 に無料枠から外れた。単価 $2/$12（200K超で倍）。**7月時点で preview** なので仕様・価格が動きうる。『3.7 Flash の方が 3.1 Pro より高品質かもしれない』は**仮説**で、昇格の実測（.claude/model_escalations.jsonl）で確かめる"
+        "verified": true,
+        "note": "Pro 系は 2026-04-01 に無料枠から外れた。単価 $2/$12（200K超で倍）。**2026-08-18 に実 API の models.list で実測**: `gemini-3.1-pro` は**実在しなかった**。実在するのは `gemini-3.1-pro-preview`。preview なので仕様・価格が動きうる（入替トリガー4『陳腐化』の監視対象）。なお `gemini-2.5-pro` も実在するが **2026-10-16 に提供終了**するので採らない。`gemini-pro-latest` は別名で、どのモデルが動いたか隠れるため**見える化の要件に反する**ので採らない。『3.7 Flash の方が 3.1 Pro より高品質かもしれない』は**仮説**で、昇格の実測（.claude/model_escalations.jsonl）で確かめる",
+        "verified_at": "2026-08-18",
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
       }
     },
     "fallback_chain": {

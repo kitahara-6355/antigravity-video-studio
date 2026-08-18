@@ -60,11 +60,11 @@
       "free_tier": true,
       "note": "$0.10/$0.40 とする情報源もあり食い違う。**安全側の高いほうを採用**"
     },
-    "gemini-3.1-pro": {
+    "gemini-3.1-pro-preview": {
       "input_usd_per_1m": 2.0,
       "output_usd_per_1m": 12.0,
       "free_tier": false,
-      "note": "200Kトークン超は倍（$4/$24）。超過帯は未登録なので最高単価で見積もられる。**Pro は 2026-04-01 に無料枠から外れた。** 7月時点で preview"
+      "note": "200Kトークン超は倍（$4/$24）。超過帯は未登録なので最高単価で見積もられる。**Pro は 2026-04-01 に無料枠から外れた。** **2026-08-18 に実 API の models.list で実測: ID は `gemini-3.1-pro` ではなく `gemini-3.1-pro-preview` だった。** 単価は旧 ID のときに拾った二次情報のままなので、preview の実価格とズレている可能性がある（実測は昇格を1回やったときに取る）"
     }
   },
   "billing_model": {
