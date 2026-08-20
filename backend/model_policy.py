@@ -42,7 +42,7 @@ import argparse
 import json
 import threading
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -364,6 +364,165 @@ def audit() -> tuple[list[AuditFinding], str]:
     return findings, why_not
 
 
+def format_audit(findings: list["AuditFinding"], why_not: str) -> str:
+    """点検の結果を、**何と照合したのかが分かる形で**返す。
+
+    1周目の gate-verifier の指摘（2026-08-20）:
+
+    > audit が緑になったのは保存済みブール値だけを根拠にしている。
+    > ダミーキーでは live_model_ids() が空集合を返し、obsolescence 照合は
+    > スキップされる
+
+    実際には実キーなら `models.list` に届いている（実測 50 件）。
+    **届いたのか飛ばしたのかが出力に出ていなかった**ので、そこを出す。
+    """
+    table = tiers()
+    lines = ["モデルの点検", ""]
+    lines.append("  段: " + " → ".join(
+        f"{t}({table[t]['model']})" for t in tier_order() if t in table))
+
+    live, _ = live_model_ids()
+    if live:
+        lines.append(f"  一次情報との照合: 実 API の models.list **{len(live)} 件**"
+                     "と突き合わせました")
+    else:
+        lines.append("  一次情報との照合: ⚠ **照合できていません**"
+                     f"（{why_not or '理由の記録なし'}）。"
+                     "廃止の検知はこの実行では効いていません")
+    lines.append("")
+
+    if not findings:
+        lines.append("  ✅ 入替トリガーに当たっているものはありません。")
+        return "\n".join(lines)
+    for finding in findings:
+        lines.append(f"    {finding}")
+    lines.append(f"\n  🚫 {len(findings)} 件。"
+                 "`--triggers` でトリガーの定義を確認してください。")
+    return "\n".join(lines)
+
+
+# ============================================================
+# 2.5 系の終了（2026-10-16）への依存を数える
+# ============================================================
+
+SUNSET_DATE = date(2026, 10, 16)
+SUNSET_PREFIX = "gemini-2.5"
+
+
+@dataclass(frozen=True)
+class SunsetReport:
+    """2.5 系への依存の棚卸し。"""
+    days_left: int
+    tiers_at_risk: dict[str, str]
+    runs_at_risk: dict[str, list[str]]
+    source_hits: dict[str, int]
+    run_count: int = 0
+
+    @property
+    def source_total(self) -> int:
+        return sum(self.source_hits.values())
+
+
+def scan_sunset_references(root: Path) -> dict[str, int]:
+    """ソースに残っている 2.5 系の参照を数える。
+
+    **実行記録だけでは依存は見えない。** 実走で通らなかった経路にも
+    埋まっているので、静的にも数える。テストは対象外（テストは
+    「2.5 系を使っている」ではなく「2.5 系の扱いを検査している」）。
+    """
+    hits: dict[str, int] = {}
+    root = Path(root)
+    for path in sorted(root.rglob("*.py")):
+        parts = set(path.parts)
+        if parts & {"tests", "__pycache__", "archives", "_deprecated"}:
+            continue
+        if path.name.startswith("test_"):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        count = text.count(SUNSET_PREFIX)
+        if count:
+            hits[path.relative_to(root).as_posix()] = count
+    return hits
+
+
+def sunset_report(tier_models: dict[str, str] | None = None,
+                  runs: list[dict] | None = None,
+                  source_hits: dict[str, int] | None = None,
+                  today: date | None = None) -> SunsetReport:
+    """2.5 系への依存をまとめる（R1-C5）。"""
+    if tier_models is None:
+        tier_models = {t: (tiers().get(t) or {}).get("model", "")
+                       for t in tier_order()}
+    if source_hits is None:
+        source_hits = scan_sunset_references(Path(__file__).parent)
+    runs = runs or []
+    today = today or date.today()
+
+    at_risk_tiers = {t: m for t, m in tier_models.items()
+                     if m.startswith(SUNSET_PREFIX)}
+    at_risk_runs: dict[str, list[str]] = {}
+    for run in runs:
+        used = [m for m in (run.get("models_used") or [])
+                if m.startswith(SUNSET_PREFIX)]
+        if used:
+            at_risk_runs[run.get("run_id", "(id なし)")] = sorted(used)
+
+    return SunsetReport(
+        days_left=max(0, (SUNSET_DATE - today).days),
+        tiers_at_risk=at_risk_tiers,
+        runs_at_risk=at_risk_runs,
+        source_hits=dict(source_hits),
+        run_count=len(runs),
+    )
+
+
+def format_sunset(report: SunsetReport) -> str:
+    """棚卸しを読める形にする。**0 件でも黙らない。**"""
+    lines = [
+        f"2.5 系の提供終了（{SUNSET_DATE.isoformat()}）への依存",
+        "",
+        f"  残り: {report.days_left} 日",
+        "",
+    ]
+
+    if report.tiers_at_risk:
+        lines.append(f"  🚫 段に 2.5 系が残っています（{len(report.tiers_at_risk)} 段）:")
+        for tier, model in sorted(report.tiers_at_risk.items()):
+            lines.append(f"      {tier}: {model}")
+    else:
+        lines.append("  ✅ 段に 2.5 系はありません。")
+    lines.append("")
+
+    # **記録が無いことを「使っていない」と読ませない。**
+    if report.run_count == 0:
+        lines.append("  ⚠ 実行記録がありません。"
+                     "実走で 2.5 系が動いたかどうかは確かめられていません。")
+    elif report.runs_at_risk:
+        lines.append(f"  🚫 実走で 2.5 系が動いています（{len(report.runs_at_risk)} 実行）:")
+        for rid, models in sorted(report.runs_at_risk.items()):
+            lines.append(f"      {rid}: {', '.join(models)}")
+    else:
+        lines.append(f"  ✅ 実行記録 {report.run_count} 件のいずれでも "
+                     "2.5 系は動いていません。")
+    lines.append("")
+
+    total = report.source_total
+    lines.append(f"  ソースに残る 2.5 系の参照: **{total} 箇所** "
+                 f"/ {len(report.source_hits)} ファイル")
+    if total:
+        lines.append("  **実走で通らない経路にも埋まっています。**"
+                     "実行記録だけでは見えません。")
+        for name, count in sorted(report.source_hits.items(),
+                                  key=lambda kv: (-kv[1], kv[0]))[:15]:
+            lines.append(f"      {count:3d}  {name}")
+        if len(report.source_hits) > 15:
+            lines.append(f"      … ほか {len(report.source_hits) - 15} ファイル")
+    return "\n".join(lines)
+
+
 # --- CLI ----------------------------------------------------------------------
 
 
@@ -425,6 +584,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reason", default="", help="なぜそうするのか")
     parser.add_argument("--audit", action="store_true",
                         help="入替トリガーに当たっていないか点検する（要 exit 0）")
+    parser.add_argument("--sunset", action="store_true",
+                        help="2026-10-16 に終了する 2.5 系への依存を数える")
     parser.add_argument("--triggers", action="store_true",
                         help="入替トリガーの定義を出す")
     parser.add_argument("--json", action="store_true", help="機械可読で出す")
@@ -466,21 +627,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  ▸ {key}\n      {text}\n")
         return 0
 
+    if args.sunset:
+        from backend.revenue.artifact_gate import load_runs
+        try:
+            runs = load_runs()
+        except OSError:
+            runs = []
+        print(format_sunset(sunset_report(runs=runs)))
+        return 0
+
     if args.audit:
-        findings, _ = audit()
-        table = tiers()
-        print("モデルの点検\n")
-        print("  段: " + " → ".join(
-            f"{t}({table[t]['model']})" for t in tier_order() if t in table))
-        print()
-        if not findings:
-            print("  ✅ 入替トリガーに当たっているものはありません。")
-            return 0
-        for finding in findings:
-            print(f"    {finding}")
-        print(f"\n  🚫 {len(findings)} 件。"
-              "`--triggers` でトリガーの定義を確認してください。")
-        return 1
+        findings, why_not = audit()
+        print(format_audit(findings, why_not))
+        return 1 if findings else 0
 
     if args.json:
         print(json.dumps([asdict(resolve(t)) for t in known_tasks()],
