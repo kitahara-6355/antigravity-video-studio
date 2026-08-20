@@ -426,10 +426,16 @@ def _format_status() -> str:
                      "（最高単価で見積もっています）")
         free = sum(1 for r in rows if r.get("free_tier_eligible"))
         if free:
+            # **文言を正典の条件文と揃える。** R1-C2 は 2026-08-21 に
+            # 「原価はトークン実測にもとづく上限見積もり」に改めた。無料枠では
+            # 突き合わせる請求額が構造的に存在しないので、ここで突き合わせを
+            # 迫ると**検証コマンド自身が条件文と食い違う**（1周目の
+            # gate-verifier が not_met にした理由がこれ）。
             lines.append(f"  ℹ 無料枠の対象モデル: {free} 件。"
-                         "**枠内に収まっていれば実費は 0 円**なので、"
-                         "上の実績は上限としての見積もりです"
-                         "（一次情報の請求額と突き合わせてください）")
+                         "**枠内に収まっていれば実費は 0 円。** "
+                         "上の実績は**トークン実測にもとづく上限見積もり**です"
+                         "（請求額との突き合わせは pro 昇格で課金運用に"
+                         "移ってから行います）")
         ledger_total = sum(float(r.get("jpy", 0)) for r in rows
                            if r.get("budget_id") == budget.get("id"))
         if abs(ledger_total - spent) > 0.01:

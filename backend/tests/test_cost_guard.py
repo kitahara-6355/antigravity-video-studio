@@ -496,3 +496,50 @@ def test_the_status_always_reports_the_unreadable_counts(tmp_path, monkeypatch):
 
     assert "トークンを読めなかった呼び出し: 0 件" in status
     assert "単価が未登録のモデル: 0 件" in status
+
+
+# --- 出力が正典の条件文と食い違わない ------------------------------------------
+#
+# 2026-08-21 に R1-C2 の条件文を「原価はトークン実測にもとづく上限見積もり」に
+# 改めた（無料枠では突き合わせる請求額が構造的に存在しないため）。
+# `--status` の文言が「一次情報の請求額と突き合わせてください」のままだと、
+# **検証コマンド自身が条件文と食い違う。** 1周目の gate-verifier が
+# not_met にした理由がまさにこれだった。
+
+
+def test_無料枠の実績は上限見積もりだと明示する(tmp_path, monkeypatch):
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps({
+        "budget_id": "test", "jpy": 0.5, "metered": True,
+        "known_price": True, "free_tier_eligible": True,
+    }) + "\n", encoding="utf-8")
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0.5, "status": "active"}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+
+    status = cost_guard._format_status()
+
+    assert "上限見積もり" in status
+
+
+def test_請求額との突き合わせを今やれと言わない(tmp_path, monkeypatch):
+    """**pro 昇格で課金運用に移ってから**行う。いま迫ると条件文と食い違う。"""
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps({
+        "budget_id": "test", "jpy": 0.5, "metered": True,
+        "known_price": True, "free_tier_eligible": True,
+    }) + "\n", encoding="utf-8")
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0.5, "status": "active"}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+
+    status = cost_guard._format_status()
+
+    assert "一次情報の請求額と突き合わせてください" not in status
+    assert "pro 昇格" in status
