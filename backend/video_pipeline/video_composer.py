@@ -172,10 +172,25 @@ class VideoComposer:
                     import shutil
                     shutil.copy2(current_video, target_output)
                 elif not os.path.exists(current_video):
-                    target_output.write_bytes(b"dummy composed output")
-            except Exception as e:
-                logger.warning("動画ファイルコピー失敗、ダミー生成: %s", e)
-                target_output.write_bytes(b"dummy composed output")
+                    # **21 バイトのテキストを「動画」として置かない。**
+                    # 従来はここで b"dummy composed output" を書いて
+                    # success=True を返していた。ffprobe が読めないので
+                    # 成果物ゲートは fail-closed で捕まえるが、パイプライン
+                    # 自身は 10/10 完走・品質ゲート PASS で緑になっていた。
+                    logger.error("元動画がありません: %s", current_video)
+                    return ComposeResult(
+                        success=False,
+                        error=(
+                            f"元動画がありません: {current_video}"
+                            "（中身の無いファイルを成果物として残さない）"
+                        ),
+                    )
+            except OSError as e:
+                logger.error("動画ファイルのコピーに失敗しました: %s", e)
+                return ComposeResult(
+                    success=False,
+                    error=f"動画ファイルのコピーに失敗しました: {e}",
+                )
 
             file_size = target_output.stat().st_size if target_output.exists() else 0
             return ComposeResult(

@@ -37,9 +37,45 @@ sys.modules["core.plugin"] = backend.core.plugin
 sys.modules["core.context"] = backend.core.context
 sys.modules["core.registry"] = backend.core.registry
 
-from backend.revenue.run_record import LOCAL_PREFIX, RunRecorder
+from backend.revenue.run_record import (
+    LOCAL_PREFIX,
+    RunRecorder,
+    failed_stage,
+    is_unserializable,
+    load_run,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class ResumeNotPossible(RuntimeError):
+    """記録から再開できない。**「再開したつもりで壊れたもの」を作らない。**"""
+
+
+class StageServiceFailed(RuntimeError):
+    """サービスが `success=False` を返した。**工程の失敗として扱う。**"""
+
+
+def _require_success(stage_name: str, result):
+    """サービスの戻り値の `success` を必ず見る。**捨てない。**
+
+    2026-08-20 に音声トラックの無い素材で実走したところ、10/10 完走・
+    success=True・所要 8.9 秒で終わり、**成果物は入力とバイト一致**
+    だった。`subtitles.srt` は作られてすらいない。
+
+    原因は `_execute_stage` が各サービスの戻り値から必要なフィールドだけ
+    取り出し、`success` を一度も読んでいなかったこと。個別のバグではなく
+    型なので、ここで型ごと閉じる。
+
+    - `success` が `False` **そのもの**のときだけ失敗にする。
+      MagicMock の属性は Mock であって False ではないので、既存の
+      パイプラインテストは通る（`is False` で見る理由）
+    - `success` を持たない戻り値は従来どおり通す
+    """
+    if getattr(result, "success", None) is False:
+        detail = getattr(result, "error", "") or "(理由の記録なし)"
+        raise StageServiceFailed(f"{stage_name}: {detail}")
+    return result
 
 
 class _StageFailed(RuntimeError):
@@ -188,7 +224,9 @@ class PipelineCoordinator:
         Path(self.work_dir).mkdir(parents=True, exist_ok=True)
 
     def run_pipeline(
-        self, input_path: str, stages: Optional[list[str]] = None
+        self, input_path: str, stages: Optional[list[str]] = None,
+        initial_data: Optional[dict] = None,
+        resumed_from: str = "",
     ) -> PipelineResult:
         """パイプライン全体を実行する。
 
@@ -198,6 +236,10 @@ class PipelineCoordinator:
         Args:
             input_path: 入力ファイルのパス
             stages: 実行するステージ名のリスト。省略時は全ステージを実行
+            initial_data: 工程間で受け渡す初期データ。**再開に使う。**
+                前の実行が作った中間成果物のパスなどが入る。
+                `job_dir` もここから引き継ぐ（再開は同じ作業場で続ける）
+            resumed_from: 再開元の run_id。実行記録に残して辿れるようにする
 
         Returns:
             PipelineResult: パイプライン全体の実行結果
@@ -215,9 +257,15 @@ class PipelineCoordinator:
             "job_id": job_id,
             "job_dir": job_dir,
         }
+        if initial_data:
+            # **再開は前の作業場をそのまま使う**（job_dir を含めて引き継ぐ）。
+            # ただし帳簿の job_id はこの実行のもの。
+            current_data.update(initial_data)
+            current_data["job_id"] = job_id
+            job_dir = current_data["job_dir"]
         error_message = ""
         target_stages = stages if stages is not None else STAGE_ORDER
-        recorder = self._new_recorder(input_path)
+        recorder = self._new_recorder(input_path, resumed_from=resumed_from)
 
         for stage_name in target_stages:
             stage_result = self._run_recorded_stage(
@@ -299,15 +347,94 @@ class PipelineCoordinator:
             logger.warning("実行記録の書き出しに失敗: %s", e)
             return None
 
-    def _new_recorder(self, input_path: str):
+    def _new_recorder(self, input_path: str, resumed_from: str = ""):
         """`runs_dir` が指定されていれば記録係を作る。無ければ None。"""
         if self.runs_dir is None:
             return None
+        inputs: dict[str, Any] = {
+            "source": input_path, "config": dict(self.config)}
+        if resumed_from:
+            inputs["resumed_from"] = resumed_from
         return self._guarded(
-            RunRecorder,
-            runs_dir=self.runs_dir,
-            inputs={"source": input_path, "config": dict(self.config)},
+            RunRecorder, runs_dir=self.runs_dir, inputs=inputs,
         )
+
+    def resume_run(self, run_id: str,
+                   runs_dir: Optional[Path] = None) -> PipelineResult:
+        """落ちた工程から**実際に再実行する**（R1-C4）。
+
+        `run_record --resume` は「どこで落ちたか」を報告するだけだった。
+        報告と再開は別物なので、ここで再開そのものを行う。
+
+        - 完了済みの工程はやり直さない（それが再開の意味）
+        - **元の作業ディレクトリを引き継ぐ。** 前の工程が作った中間
+          成果物を使う
+        - **元の失敗記録は書き換えない。** 証拠として残し、再開は
+          新しい記録に `resumed_from` を書く
+        - 復元できない入力があれば断る（fail-closed）
+
+        Raises:
+            ResumeNotPossible: 記録が無い・失敗していない・入力が復元できない
+        """
+        base = Path(runs_dir if runs_dir is not None else (self.runs_dir or ""))
+        path = base / run_id / "run.json"
+        if not path.is_file():
+            raise ResumeNotPossible(f"実行記録がありません: {path}")
+
+        run = load_run(path)
+        stage = failed_stage(run)
+        if stage is None:
+            raise ResumeNotPossible(
+                f"{run_id} に失敗した工程はありません"
+                f"（status={run.get('status')}）。再開するものがありません")
+
+        stage_name = stage.get("name", "")
+        if stage_name not in STAGE_ORDER:
+            raise ResumeNotPossible(f"知らない工程です: {stage_name}")
+
+        data = dict(stage.get("input") or {})
+        # **印だけ残っている値は復元できない。** これを渡して動かすと
+        # 「再開したつもりで壊れたもの」ができる。どこまで戻ればいいかを
+        # 添えて断る。
+        lost = sorted(k for k, v in data.items() if is_unserializable(v))
+        if lost:
+            producer = self._stage_that_produces(lost, stage_name)
+            raise ResumeNotPossible(
+                f"入力を復元できないので '{stage_name}' からは再開できません"
+                f"（記録できなかった値: {', '.join(lost)}）。"
+                f"'{producer}' からやり直してください")
+
+        remaining = STAGE_ORDER[STAGE_ORDER.index(stage_name):]
+        logger.info("再開: %s の '%s' から %d 工程",
+                    run_id, stage_name, len(remaining))
+        return self.run_pipeline(
+            run.get("inputs", {}).get("source", data.get("input_path", "")),
+            stages=remaining, initial_data=data, resumed_from=run_id,
+        )
+
+    @staticmethod
+    def _stage_that_produces(keys: list[str], before: str) -> str:
+        """`keys` を作る工程のうち、いちばん手前のものを返す。
+
+        戻り先を「先頭から」と言うと再開の意味が無いので、**必要な値を
+        作り直せる最小の地点**を示す。
+        """
+        producers = {
+            "normalized_path": "ingest",
+            "format_info": "ingest",
+            "duration_seconds": "ingest",
+            "audio_path": "audio_extract",
+            "transcript": "transcribe",
+            "transcript_segments": "transcribe",
+            "subtitle_path": "subtitle_gen",
+            "soul_suggestions": "soul_feedback",
+            "telop_images": "telop_render",
+            "output_path": "compose",
+        }
+        candidates = [producers[k] for k in keys if k in producers]
+        if not candidates:
+            return STAGE_ORDER[0]
+        return min(candidates, key=STAGE_ORDER.index)
 
     def _run_recorded_stage(
         self, recorder, stage_name: str, input_data: dict
@@ -443,7 +570,7 @@ class PipelineCoordinator:
         if stage_name == "ingest":
             from backend.video_pipeline.ingest_service import IngestService
             service = IngestService(output_dir=job_dir)
-            result = service.ingest(input_path)
+            result = _require_success(stage_name, service.ingest(input_path))
             return {
                 "normalized_path": result.normalized_path,
                 "format_info": result.format_info,
@@ -486,7 +613,8 @@ class PipelineCoordinator:
             from backend.video_pipeline.audio_extractor import AudioExtractor
             extractor = AudioExtractor(output_dir=job_dir)
             normalized_path = input_data.get("normalized_path", input_path)
-            result = extractor.extract(normalized_path)
+            result = _require_success(
+                stage_name, extractor.extract(normalized_path))
             return {
                 "audio_path": result.audio_path,
             }
@@ -501,7 +629,8 @@ class PipelineCoordinator:
                 refine_enabled=self.config.get("refine_enabled", True),
             )
             audio_path = input_data.get("audio_path", "")
-            result = service.transcribe(audio_path)
+            result = _require_success(
+                stage_name, service.transcribe(audio_path))
             return {
                 "transcript": result,
                 "transcript_segments": [
@@ -519,7 +648,8 @@ class PipelineCoordinator:
             )
             transcript = input_data.get("transcript")
             srt_path = os.path.join(job_dir, "subtitles.srt")
-            result = generator.generate_srt(transcript, srt_path)
+            result = _require_success(
+                stage_name, generator.generate_srt(transcript, srt_path))
             return {
                 "subtitle_path": result.output_path,
                 "subtitle_entries": result.entry_count,
@@ -601,11 +731,11 @@ class PipelineCoordinator:
             normalized_path = input_data.get("normalized_path", input_path)
             subtitle_path = input_data.get("subtitle_path", "")
             output_path = os.path.join(job_dir, "composed_output.mp4")
-            result = composer.compose(
+            result = _require_success(stage_name, composer.compose(
                 video_path=normalized_path,
                 subtitle_path=subtitle_path,
                 output_path=output_path,
-            )
+            ))
             return {
                 "output_path": output_path,
                 "soul_suggestions": soul_suggestions,
@@ -627,7 +757,8 @@ class PipelineCoordinator:
             )
             generator = ThumbnailGenerator(output_dir=job_dir)
             video_path = input_data.get("output_path", input_path)
-            result = generator.generate(video_path, title="")
+            result = _require_success(
+                stage_name, generator.generate(video_path, title=""))
             return {
                 "thumbnail_path": result.image_path,
                 "thumbnail_score": getattr(result, "score", 0.0),
@@ -750,7 +881,11 @@ if __name__ == "__main__":
     load_env()
 
     if len(sys.argv) < 2:
-        print("使用方法: python pipeline_coordinator.py <入力ファイルパス>")
+        print("使用方法:")
+        print("  python -m backend.video_pipeline.pipeline_coordinator "
+              "<入力ファイルパス>")
+        print("  python -m backend.video_pipeline.pipeline_coordinator "
+              "--resume <run_id>   # 落ちた工程から再実行する")
         sys.exit(1)
 
     # **実走は必ず記録する。** 記録が無ければ成果物ゲートが FAIL する
@@ -760,10 +895,24 @@ if __name__ == "__main__":
     coordinator = PipelineCoordinator(
         work_dir="./pipeline_work", runs_dir=RUNS_DIR,
     )
-    result = coordinator.run_pipeline(sys.argv[1])
+
+    if sys.argv[1] == "--resume":
+        if len(sys.argv) < 3:
+            print("再開する run_id を指定してください "
+                  "（一覧: python -m backend.revenue.run_record --list）")
+            sys.exit(1)
+        try:
+            result = coordinator.resume_run(sys.argv[2])
+        except ResumeNotPossible as e:
+            print(f"🚫 再開できません: {e}")
+            sys.exit(1)
+    else:
+        result = coordinator.run_pipeline(sys.argv[1])
+
     print(f"パイプライン結果: success={result.success}, "
           f"job_id={result.job_id}, "
           f"stages={result.stages_completed}")
     if result.error_message:
         print(f"エラー: {result.error_message}")
     print(f"実行記録: {RUNS_DIR}")
+    sys.exit(0 if result.success else 1)

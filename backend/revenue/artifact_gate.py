@@ -196,6 +196,17 @@ def check_runs(runs: list[dict]) -> list[Finding]:
                     "この工程が**どのモデルで動いたか**が記録されていません。"
                     "結果に不満があったときに上げる先を決められません"
                     "（`python -m backend.model_policy --why <工程>`）"))
+            # **宣言だけで一度も動いていないモデルを緑にしない。**
+            # 記録が「gemini-3.7-flash」でも、API が1回も成功していなければ
+            # 結果を出したのはスタブ。見える化が嘘になる。
+            if stage.get("model_unverified"):
+                findings.append(Finding(
+                    "model_unverified",
+                    f"{rid} / {stage.get('name', '(名前なし)')}",
+                    f"記録上のモデルは **{stage.get('model')}** ですが、"
+                    "**API 呼び出しが1回も成功していません**"
+                    "（台帳に実測がない）。結果を出したのは"
+                    "スタブか既定値である可能性があります"))
             if stage.get("status") != "failed":
                 continue
             # **失敗を記録するだけでは足りない。** 再開できる情報が要る。

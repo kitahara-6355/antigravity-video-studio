@@ -44,7 +44,10 @@ def test_a_recorded_run_passes_the_artifact_gate(tmp_path):
     with rec.stage("transcribe", model="local:whisper"):
         pass
     with rec.stage("script", model="gemini-3.6-flash"):
-        pass
+        # **実際に呼ばれた証拠を置く。** 宣言だけで台帳に実測が無い工程は
+        # 「スタブが答えたかもしれない」ので、ゲートが model_unverified を
+        # 出す（2026-08-20 に本物の 503 で踏んだ）。
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
     rec.finish()
 
     assert artifact_gate.check_runs(

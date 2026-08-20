@@ -49,6 +49,9 @@ _SEQ = itertools.count()
 # 区別がつかないと、見える化が抜けていても気づけない。
 LOCAL_PREFIX = "local:"
 
+# JSON にできなかった値に付ける印。**再開の可否をここで判定する。**
+UNSERIALIZABLE_MARK = "<記録できない値:"
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -63,11 +66,19 @@ def _unserializable(value: Any) -> str:
     残り、完走したことも、どこまで進んだかも読めなくなった。
 
     **黙って消さない。** 何が入っていたのかは残す（再開の手掛かりになる）。
+
+    印を決め打ちにしてあるのは、**再開のときに「この値は復元できない」と
+    機械的に判定する**ため。型名だけだと本物の文字列と区別がつかない。
     """
     text = repr(value)
     if len(text) > 200:
         text = text[:197] + "..."
-    return f"<{type(value).__name__}: {text}>"
+    return f"{UNSERIALIZABLE_MARK} {type(value).__name__} {text}>"
+
+
+def is_unserializable(value: Any) -> bool:
+    """記録できずに印だけ残った値か。**再開の可否を分ける。**"""
+    return isinstance(value, str) and value.startswith(UNSERIALIZABLE_MARK)
 
 
 def new_run_id() -> str:
@@ -224,6 +235,15 @@ class RunRecorder:
         # 別の段に落ちたことが、ここでだけ見える。
         entry["model_mismatch"] = bool(
             observed and declared and observed != [declared])
+        # **宣言しただけで一度も動いていないモデルに印を付ける。**
+        # 2026-08-20 の実走で 503 を踏み、soul_feedback は2回再試行して
+        # 諦め、スタブにフォールバックして success を返した。記録には
+        # `model: gemini-3.7-flash` が残り、読み手は「提案はこのモデルが
+        # 出した」と読む。**誰も出していない。** `local:` は台帳に出ない
+        # のが正常なので対象外。
+        entry["model_unverified"] = bool(
+            declared and not declared.startswith(LOCAL_PREFIX)
+            and not observed)
         self._write()
 
     # --- 成果物 -------------------------------------------------------------
@@ -302,6 +322,10 @@ def _format_resume(runs_dir: Path, run_id: str) -> tuple[str, int]:
         f"  完了済み: {', '.join(done) or 'なし'}", "",
         "  再開に使う入力:",
         json.dumps(stage.get("input", {}), ensure_ascii=False, indent=4),
+        "",
+        "  ここから再実行する:",
+        "    python -m backend.video_pipeline.pipeline_coordinator "
+        f"--resume {run_id}",
     ]
     return "\n".join(lines), 1
 
