@@ -241,3 +241,34 @@ def test_成果物ゲートが未検証のモデルを指摘する(tmp_path):
     }])
 
     assert [f.kind for f in findings] == ["model_unverified"]
+
+
+def test_失敗が0件のときに再開できると言い切らない(capsys):
+    """**不在を成功にしない。** 「確かめられていない」と「大丈夫」は違う。"""
+    from backend.revenue import artifact_gate
+
+    run = {"run_id": "r", "started_at": "t", "models_used": ["local:ffmpeg"],
+           "stages": [{"name": "compose", "status": "success",
+                       "model": "local:ffmpeg", "models_observed": []}]}
+    with patch.object(artifact_gate, "load_runs", return_value=[run]):
+        code = artifact_gate.main(["--resume-check"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "失敗した工程はありません" in out
+    assert "再開できます" not in out, "確かめていないことを確かめたと言っている"
+
+
+def test_失敗があって再開できるなら件数を出す(capsys):
+    from backend.revenue import artifact_gate
+
+    run = {"run_id": "r", "started_at": "t", "models_used": ["local:ffmpeg"],
+           "stages": [{"name": "compose", "status": "failed",
+                       "model": "local:ffmpeg", "models_observed": [],
+                       "error": "落ちた", "input": {"a": 1}}]}
+    with patch.object(artifact_gate, "load_runs", return_value=[run]):
+        code = artifact_gate.main(["--resume-check"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "1 件" in out

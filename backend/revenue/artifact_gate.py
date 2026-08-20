@@ -341,7 +341,18 @@ def main(argv: list[str] | None = None) -> int:
             for f in findings:
                 print(f"    {f}")
             return 1
-        print(f"✅ 実行記録 {len(runs)} 件。失敗した工程から再開できます。")
+        # **不在を成功にしない。** 失敗が1件も無い記録に対して
+        # 「再開できます」と言うと、確かめていないことを確かめたと
+        # 報告することになる。件数を出して区別する。
+        failed = sum(1 for r in runs for s in (r.get("stages") or [])
+                     if s.get("status") == "failed")
+        if failed:
+            print(f"✅ 実行記録 {len(runs)} 件 / 失敗した工程 {failed} 件。"
+                  "いずれも工程名・原因・入力が残っており再開できます。")
+        else:
+            print(f"✅ 実行記録 {len(runs)} 件。"
+                  "**失敗した工程はありません**"
+                  "（再開できるかどうかはこの記録では確かめられません）。")
         return 0
 
     report = run_gate(args.video)
