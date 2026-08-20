@@ -150,3 +150,72 @@ def test_照合できなかったら理由が出る(monkeypatch):
 
     assert "ダミーキー" in text
     assert "照合できていません" in text
+
+
+# --- 走査範囲 -----------------------------------------------------------------
+#
+# gate-verifier 2周目の指摘: 走査根が backend/ 配下だけで、
+# agents/orchestration/orchestrator.py（4）・.claude/hooks/billing_gate.py（1）・
+# scratch/run_weakness_orchestrator.py（1）の**計6箇所が数から漏れていた**。
+# 可視化の成立は妨げないが、報告する件数が過少になる。
+
+
+def test_リポジトリ全体を走査する(tmp_path):
+    """**backend/ の外にも埋まっている。** 走査範囲が狭いと件数が過少になる。"""
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "a.py").write_text(
+        'M = "gemini-2.5-flash"\n', encoding="utf-8")
+    outside = tmp_path / "agents" / "orchestration"
+    outside.mkdir(parents=True)
+    (outside / "orchestrator.py").write_text(
+        'M = "gemini-2.5-pro"\n', encoding="utf-8")
+    hooks = tmp_path / ".claude" / "hooks"
+    hooks.mkdir(parents=True)
+    (hooks / "billing_gate.py").write_text(
+        'M = "gemini-2.5-flash"\n', encoding="utf-8")
+
+    hits = model_policy.scan_sunset_references(tmp_path)
+
+    assert set(hits) == {
+        "backend/a.py",
+        "agents/orchestration/orchestrator.py",
+        ".claude/hooks/billing_gate.py",
+    }
+
+
+def test_既定の走査根はリポジトリ直下():
+    """`--sunset` を引数なしで呼んだときに backend/ だけを見ていないこと。"""
+    hits = model_policy.scan_sunset_references()
+
+    assert any(not name.startswith("backend/") for name in hits), (
+        f"backend/ の外を走査していない: {sorted(hits)[:5]}"
+    )
+
+
+def test_フロントやビルド成果物は数えない(tmp_path):
+    """node_modules や .venv を数に入れると件数が意味を失う。"""
+    for junk in ("node_modules", ".venv", "__pycache__"):
+        d = tmp_path / junk
+        d.mkdir()
+        (d / "x.py").write_text('M = "gemini-2.5-flash"\n', encoding="utf-8")
+    (tmp_path / "real.py").write_text(
+        'M = "gemini-2.5-flash"\n', encoding="utf-8")
+
+    assert model_policy.scan_sunset_references(tmp_path) == {"real.py": 1}
+
+
+def test_sunset_reportの既定も走査根を狭めない():
+    """CLI が通る経路。`scan_sunset_references()` だけ直しても意味が無い。
+
+    実際 1 回目の修正は `sunset_report` が `backend/` を明示的に渡していて、
+    **`--sunset` の件数が変わらなかった。**
+    """
+    report = model_policy.sunset_report(tier_models={}, runs=[])
+
+    # backend/ の外に実在する参照。**これが数に入っていること。**
+    for outside in (".claude/hooks/billing_gate.py",
+                    "agents/orchestration/orchestrator.py",
+                    "scratch/run_weakness_orchestrator.py"):
+        assert outside in report.source_hits, (
+            f"{outside} が数に入っていない（走査根が backend/ に狭まっている）"
+        )

@@ -423,18 +423,31 @@ class SunsetReport:
         return sum(self.source_hits.values())
 
 
-def scan_sunset_references(root: Path) -> dict[str, int]:
+# 数に入れない場所。テストは「2.5 系を使っている」のではなく
+# 「2.5 系の扱いを検査している」ので対象外。node_modules / .venv を
+# 数えると件数が意味を失う。
+_SCAN_SKIP_DIRS = frozenset({
+    "tests", "test", "__pycache__", "archives", "_deprecated",
+    "node_modules", ".venv", "venv", ".git", ".next", "dist", "build",
+    "antigravity_phase18_stable_v1", "antigravity_phase19_experimental_v1",
+})
+
+
+def scan_sunset_references(root: Path | None = None) -> dict[str, int]:
     """ソースに残っている 2.5 系の参照を数える。
 
     **実行記録だけでは依存は見えない。** 実走で通らなかった経路にも
-    埋まっているので、静的にも数える。テストは対象外（テストは
-    「2.5 系を使っている」ではなく「2.5 系の扱いを検査している」）。
+    埋まっているので、静的にも数える。
+
+    既定の走査根は**リポジトリ直下**。`backend/` だけを見ていた頃は
+    `agents/orchestration/orchestrator.py`・`.claude/hooks/billing_gate.py`・
+    `scratch/run_weakness_orchestrator.py` の**6箇所が数から漏れていた**
+    （gate-verifier 2周目の指摘）。
     """
     hits: dict[str, int] = {}
-    root = Path(root)
+    root = Path(root if root is not None else Path(__file__).resolve().parents[1])
     for path in sorted(root.rglob("*.py")):
-        parts = set(path.parts)
-        if parts & {"tests", "__pycache__", "archives", "_deprecated"}:
+        if set(path.parts) & _SCAN_SKIP_DIRS:
             continue
         if path.name.startswith("test_"):
             continue
@@ -457,7 +470,10 @@ def sunset_report(tier_models: dict[str, str] | None = None,
         tier_models = {t: (tiers().get(t) or {}).get("model", "")
                        for t in tier_order()}
     if source_hits is None:
-        source_hits = scan_sunset_references(Path(__file__).parent)
+        # **走査根を渡さない。** ここで `backend/` を渡していたせいで、
+        # `scan_sunset_references` の既定をリポジトリ直下に広げても
+        # `--sunset` の件数が変わらなかった（CLI はこの経路を通る）。
+        source_hits = scan_sunset_references()
     runs = runs or []
     today = today or date.today()
 
