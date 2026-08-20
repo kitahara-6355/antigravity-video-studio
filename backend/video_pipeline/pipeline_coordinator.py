@@ -204,6 +204,7 @@ class PipelineCoordinator:
         work_dir: Optional[str] = None,
         config: Optional[dict] = None,
         runs_dir: Optional[Path] = None,
+        ledger_path: Optional[Path] = None,
     ) -> None:
         """PipelineCoordinatorを初期化する。
 
@@ -220,6 +221,13 @@ class PipelineCoordinator:
         self.config: dict = config or {}
         self.runs_dir: Optional[Path] = (
             Path(runs_dir) if runs_dir is not None else None)
+        # **台帳は記録先と別に差し替える。** 実行の終わりに1本ぶんの要約を
+        # 追記するので、`runs_dir` だけ差し替えたテストが本番の
+        # `.claude/cost_ledger.jsonl` に書き込んでしまう（実際に 40 行混ざり、
+        # 成果物ゲートが「トークンを読めなかった呼び出し 40 件」と誤検知した）。
+        # **渡されなければ要約を書かない。** 本番の入口が両方を明示的に渡す。
+        self.ledger_path: Optional[Path] = (
+            Path(ledger_path) if ledger_path is not None else None)
         self._jobs: dict[str, dict[str, Any]] = {}
         Path(self.work_dir).mkdir(parents=True, exist_ok=True)
 
@@ -357,6 +365,7 @@ class PipelineCoordinator:
             inputs["resumed_from"] = resumed_from
         return self._guarded(
             RunRecorder, runs_dir=self.runs_dir, inputs=inputs,
+            ledger_path=self.ledger_path,
         )
 
     def resume_run(self, run_id: str,
@@ -892,8 +901,11 @@ if __name__ == "__main__":
     # 仕様なので、実キーで動かす唯一の入口であるここで渡す。
     from backend.revenue.artifact_gate import RUNS_DIR
 
+    from backend.cost_guard import LEDGER_PATH
+
     coordinator = PipelineCoordinator(
         work_dir="./pipeline_work", runs_dir=RUNS_DIR,
+        ledger_path=LEDGER_PATH,
     )
 
     if sys.argv[1] == "--resume":

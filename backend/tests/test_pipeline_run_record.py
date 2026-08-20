@@ -298,3 +298,52 @@ def test_記録そのものがJSONにできない値を受けても壊れない(
     run = json.loads(rec.path.read_text(encoding="utf-8"))
     assert run["status"] == "completed"
     assert "_NotJsonable" in str(run["inputs"]["bad"])
+
+
+# --- 本番の台帳を汚さない -------------------------------------------------------
+#
+# `RunRecorder` が実行の終わりに台帳へ要約を追記するようになった（R1-C2）。
+# **その結果、runs_dir だけ差し替えたテストが本番の
+# `.claude/cost_ledger.jsonl` に書き込むようになった。** 実際に 40 行の
+# テスト由来の要約が本番台帳に混ざり、成果物ゲートが
+# 「トークンを読めなかった呼び出し 40 件」と誤検知した。
+#
+# 記録先と台帳は**別々に差し替えられること**。
+
+
+def test_台帳の置き場を差し替えられる(tmp_path):
+    ledger = tmp_path / "ledger.jsonl"
+    coordinator = PipelineCoordinator(
+        work_dir=str(tmp_path / "work"),
+        runs_dir=tmp_path / "runs",
+        ledger_path=ledger,
+    )
+    with patch.object(PipelineCoordinator, "_execute_stage",
+                      side_effect=lambda n, d: _fake_stage_output(n, d)):
+        coordinator.run_pipeline("input.mp4")
+
+    rows = [json.loads(l) for l in
+            ledger.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert [r for r in rows if r.get("kind") == "run_summary"]
+
+
+def test_台帳を渡さなければ本番を触らない(tmp_path):
+    """**runs_dir だけ差し替えたテストが本番台帳に書かないこと。**
+
+    渡し忘れを緑にしないため、`runs_dir` を渡して `ledger_path` を渡さない
+    ときは要約を書かない（本番の入口は両方を明示的に渡す）。
+    """
+    from backend import cost_guard
+
+    before = (cost_guard.LEDGER_PATH.stat().st_size
+              if cost_guard.LEDGER_PATH.is_file() else 0)
+
+    coordinator = PipelineCoordinator(
+        work_dir=str(tmp_path / "work"), runs_dir=tmp_path / "runs")
+    with patch.object(PipelineCoordinator, "_execute_stage",
+                      side_effect=lambda n, d: _fake_stage_output(n, d)):
+        coordinator.run_pipeline("input.mp4")
+
+    after = (cost_guard.LEDGER_PATH.stat().st_size
+             if cost_guard.LEDGER_PATH.is_file() else 0)
+    assert after == before, "本番の台帳に書き込んでいる"

@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import logging
 import os
 import time
 import traceback
@@ -41,6 +42,8 @@ from typing import Any, Iterator
 
 from backend import cost_guard, model_policy
 from backend.revenue.artifact_gate import RUNS_DIR
+
+logger = logging.getLogger(__name__)
 
 _SEQ = itertools.count()
 
@@ -111,6 +114,11 @@ class RunRecorder:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.ledger_path = Path(
             ledger_path if ledger_path is not None else cost_guard.LEDGER_PATH)
+        # **明示的に渡されたときだけ台帳へ要約を書く。**
+        # 台帳は「工程ごとの原価」を引くために常に読むが、書くのは別。
+        # 既定で書くと、`runs_dir` だけ差し替えたテストが本番の
+        # `.claude/cost_ledger.jsonl` を汚す（実際に 40 行混ざった）。
+        self._summary_to_ledger = ledger_path is not None
         self._started = time.monotonic()
         self._ledger_start = self._ledger_offset()
         self._record: dict[str, Any] = {
@@ -219,7 +227,9 @@ class RunRecorder:
         self._close_stage(entry, offset, started)
 
     def _close_stage(self, entry: dict, offset: int, started: float) -> None:
-        rows = self._ledger_rows(offset)
+        # **要約の行は呼び出しではない。** 数えると工程の calls が水増しされる。
+        rows = [r for r in self._ledger_rows(offset)
+                if r.get("kind") != "run_summary"]
         observed = sorted({r.get("model", "") for r in rows if r.get("model")})
         entry["models_observed"] = observed
         entry["calls"] = len(rows)
@@ -272,7 +282,47 @@ class RunRecorder:
         self._record["status"] = status or (
             "failed" if failed_stage(self._record) else "completed")
         self._write()
+        if self._summary_to_ledger:
+            self._append_ledger_summary()
         return self._record
+
+    def _append_ledger_summary(self) -> None:
+        """**1本ぶんの所要時間と原価を台帳に1行だけ残す。**
+
+        所要時間は run.json にはあったが、R1-C2 が名指ししている
+        `.claude/cost_ledger.jsonl` には無く、しかも台帳の行に run_id が
+        無いので**「1本あたり」に切り出せなかった**（2026-08-21 の指摘）。
+
+        `jpy` は持たせない。呼び出しの行と足し合わせると二重計上になり、
+        `reconcile_ledger` が budget.json に倍の額を書く。実額は
+        `cost_jpy` に別名で持つ。
+
+        **書けなくても実行記録は捨てない**（要約は付帯物）。
+        """
+        row = {
+            "at": _now(),
+            "kind": "run_summary",
+            "run_id": self.run_id,
+            "status": self._record["status"],
+            "duration_sec": self._record["duration_sec"],
+            "calls": self._record["calls"],
+            "cost_jpy": self._record["cost_jpy"],
+            "models_used": self._record["models_used"],
+        }
+        try:
+            from backend.cost_guard import load_active_budget
+            budget = load_active_budget()
+            if budget:
+                row["budget_id"] = budget.get("id", "")
+        except Exception as e:  # noqa: BLE001 — 要約は付帯物
+            logger.debug("予算 ID を引けませんでした: %s", e)
+        try:
+            self.ledger_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.ledger_path, "a", encoding="utf-8",
+                      newline="\n") as fh:
+                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+        except OSError as e:
+            logger.warning("台帳に要約を書けませんでした: %s", e)
 
     def _write(self) -> None:
         """**壊れた JSON を置かない。** 一時ファイルに書いてから置き換える。"""

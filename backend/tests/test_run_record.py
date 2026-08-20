@@ -364,3 +364,93 @@ def test_the_cost_of_the_run_is_summed_from_the_ledger(tmp_path):
 
     assert run["cost_jpy"] == pytest.approx(0.2)
     assert run["calls"] == 2
+
+
+# --- 台帳に1本あたりの要約を残す ------------------------------------------------
+#
+# gate-verifier（改訂後の条件文に対する1周目・2026-08-21）の指摘:
+#
+# > 所要時間が --status にも cost_ledger.jsonl にも1つも出ない。台帳7行のキーに
+# > 経過時間の項目が存在しない。**「1本あたり」に分解できない** — 台帳に run_id が
+# > 無く、--status は3日にまたがる7件の総額を1つ出すだけ。完走した動画1本分が
+# > どれかを出力から切り出せない
+#
+# 所要時間は run.json にはあるが、**条件文が名指しした保存先に載っていなかった。**
+# 実行の終わりに要約を1行だけ台帳へ追記する。
+#
+# **`jpy` は 0 にする。** 呼び出しの行と足し合わせると二重計上になり、
+# reconcile_ledger と budget.json が壊れる。実額は `cost_jpy` に別名で持つ。
+
+
+def test_実行の終わりに台帳へ要約を残す(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("script", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    rows = [json.loads(l) for l in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    summary = [r for r in rows if r.get("kind") == "run_summary"]
+
+    assert len(summary) == 1
+    assert summary[0]["run_id"] == rec.run_id
+    assert summary[0]["duration_sec"] >= 0
+    assert summary[0]["calls"] == 1
+
+
+def test_要約は原価の合計を二重計上させない(tmp_path):
+    """**`jpy` を持たせない。** 持たせると reconcile_ledger が倍を書く。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("script", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")  # jpy=0.1
+    rec.finish()
+
+    rows = [json.loads(l) for l in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    total = sum(float(r.get("jpy") or 0) for r in rows)
+
+    assert total == pytest.approx(0.1), f"二重計上している: {total}"
+
+
+def test_要約に1本ぶんの原価が入る(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("script", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    rows = [json.loads(l) for l in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    summary = next(r for r in rows if r.get("kind") == "run_summary")
+
+    assert summary["cost_jpy"] == pytest.approx(0.2)
+    assert summary["calls"] == 2
+
+
+def test_失敗した実行も要約を残す(tmp_path):
+    """**落ちた実行の所要時間も測りたい。** 成功だけ数えると平均が嘘になる。"""
+    rec = _recorder(tmp_path)
+    try:
+        with rec.stage("compose", model="local:ffmpeg"):
+            raise RuntimeError("落ちた")
+    except RuntimeError:
+        pass
+    rec.finish()
+
+    rows = [json.loads(l) for l in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    summary = next(r for r in rows if r.get("kind") == "run_summary")
+
+    assert summary["status"] == "failed"
+
+
+def test_台帳が書けなくても実行記録は残る(tmp_path, monkeypatch):
+    """要約は付帯物。**書けなかったからといって run.json を捨てない。**"""
+    rec = _recorder(tmp_path)
+    monkeypatch.setattr(rec, "ledger_path", tmp_path / "無い" / "l.jsonl")
+    with rec.stage("script", model="local:x"):
+        pass
+
+    run = rec.finish()
+
+    assert run["status"] == "completed"

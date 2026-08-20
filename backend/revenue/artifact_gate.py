@@ -233,6 +233,10 @@ def check_cost(runs: list[dict]) -> list[Finding]:
         return findings
     rows = [json.loads(line) for line in
             ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # **1本ぶんの要約は課金の行ではない。** metered / known_price を持たない
+    # ので、数に入れると「トークンを読めなかった呼び出し」として誤検知する
+    # （実際に 40 / 47 件と出た）。
+    rows = [r for r in rows if r.get("kind") != "run_summary"]
     if not rows:
         findings.append(Finding("no_cost_ledger", str(ledger),
                                 "台帳が空です（1回も課金経路を通っていません）"))

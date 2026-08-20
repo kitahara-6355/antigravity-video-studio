@@ -349,8 +349,11 @@ def reconcile_ledger() -> float:
     if budget is None:
         return 0.0
     budget_id = str(budget.get("id", ""))
+    # **要約の行は足さない。** 1本ぶんの合計を持っているので、呼び出しの行と
+    # 一緒に足すと二重計上になり、budget.json に倍の額を書く。
     total = sum(float(row.get("jpy", 0)) for row in _ledger_rows()
-                if row.get("budget_id") == budget_id)
+                if row.get("budget_id") == budget_id
+                and row.get("kind") != "run_summary")
 
     path = Path(BUDGET_PATH)
     if not path.is_file():
@@ -411,7 +414,12 @@ def _format_status() -> str:
                      "spend_cap_project を埋める）")
     lines.append("")
     if Path(LEDGER_PATH).is_file():
-        rows = _ledger_rows()
+        all_rows = _ledger_rows()
+        # **要約の行は課金の行ではない。** 呼び出し件数にも未計測件数にも
+        # 原価の合計にも入れない。入れると回数が水増しされ、`cost_jpy` を
+        # 二重計上して台帳と budget.json が食い違って見える。
+        summaries = [r for r in all_rows if r.get("kind") == "run_summary"]
+        rows = [r for r in all_rows if r.get("kind") != "run_summary"]
         lines.append(f"  呼び出し: {len(rows)} 件")
         # **0 件でも必ず出す。** 黙っていると「出ていない」のか
         # 「0 だった」のか読み手に区別がつかず、不在が「問題なし」に
@@ -443,9 +451,42 @@ def _format_status() -> str:
                 f"  ⚠ **台帳と budget.json が食い違っています**"
                 f"（台帳 {ledger_total:,.2f} 円 / 予算 {spent:,.2f} 円）。"
                 "`--reconcile` で台帳を正として書き直してください")
+
+        # **1本あたり。** R1-C2 が要求しているのは総額ではなく1本の原価と
+        # 所要時間。総額しか出さないと、何日ぶん・何本ぶんが混ざった数字
+        # なのかが読み手に分からない。
+        lines.append("")
+        lines += _format_per_run(summaries)
     else:
         lines.append("  呼び出し: 0 件（台帳なし）")
     return "\n".join(lines)
+
+
+def _format_per_run(summaries: list[dict]) -> list[str]:
+    """実行1本ごとの所要時間と原価。**無ければ黙らない。**"""
+    if not summaries:
+        return ["  ⚠ **1本あたりの内訳がありません**"
+                "（上の実績は期間全体の合計です）。実行記録が台帳に要約を"
+                "書いていないので、1本の原価と所要時間は切り出せません"]
+
+    lines = [f"  1本あたり: {len(summaries)} 本"]
+    for row in summaries:
+        mark = {"completed": "✅", "failed": "🚫（失敗）"}.get(
+            row.get("status", ""), "…")
+        lines.append(
+            f"      {mark} {row.get('run_id', '(id なし)')}  "
+            f"{float(row.get('duration_sec') or 0):.1f} 秒 / "
+            f"{float(row.get('cost_jpy') or 0):.4f} 円 / "
+            f"{int(row.get('calls') or 0)} 回")
+
+    done = [r for r in summaries if r.get("status") == "completed"]
+    if done:
+        n = len(done)
+        avg_sec = sum(float(r.get("duration_sec") or 0) for r in done) / n
+        avg_jpy = sum(float(r.get("cost_jpy") or 0) for r in done) / n
+        lines.append(f"      完走 {n} 本の平均: "
+                     f"{avg_sec:.1f} 秒 / {avg_jpy:.4f} 円")
+    return lines
 
 
 def main(argv: list[str] | None = None) -> int:

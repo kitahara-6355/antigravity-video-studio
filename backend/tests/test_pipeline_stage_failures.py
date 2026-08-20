@@ -272,3 +272,27 @@ def test_失敗があって再開できるなら件数を出す(capsys):
     out = capsys.readouterr().out
     assert code == 0
     assert "1 件" in out
+
+
+def test_成果物ゲートは要約行を呼び出しに数えない(tmp_path, monkeypatch):
+    """要約に metered が無いのを「トークンを読めなかった」と読ませない。
+
+    実際に本番台帳へ 40 行の要約が混ざったとき、成果物ゲートが
+    「トークンを読めなかった呼び出し 40 / 47 件」と誤検知した。
+    """
+    import json as _json
+
+    from backend import cost_guard
+    from backend.revenue import artifact_gate
+
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text("".join(_json.dumps(r) + "\n" for r in [
+        {"model": "m", "jpy": 0.1, "metered": True, "known_price": True},
+        {"kind": "run_summary", "run_id": "r", "status": "completed",
+         "duration_sec": 1.0, "calls": 1, "cost_jpy": 0.1},
+    ]), encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+
+    findings = artifact_gate.check_cost([])
+
+    assert [f.kind for f in findings] == []

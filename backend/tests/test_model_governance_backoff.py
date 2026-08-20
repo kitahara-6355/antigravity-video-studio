@@ -322,3 +322,56 @@ async def test_ゲートウェイも同じ段で再試行する(engine):
     with patch("gemini_client_factory._get_raw_client", return_value=client):
         assert await engine.call(task="t", prompt="hi") == "ok"
     assert calls == ["model-a", "model-a", "model-a"]
+
+
+# --- 段に降格先があること -------------------------------------------------------
+#
+# 2026-08-20 の実走で 2回続けて 503 を踏み、どちらも
+# `all models exhausted! chain=gemini-3.7-flash` で終わった。
+# **チェーンの長さが 1。** 再試行が尽きても降格する先が無いので、
+# soul_feedback は毎回スタブに落ちる。
+#
+# 原因は `model_config.json` の fallback_chain が**旧世代のまま**だったこと:
+#
+#     gemini-3-flash-preview → gemini-2.5-flash → gemini-2.5-flash-lite → null
+#
+# 採用中の P3（3.5-flash-lite / 3.6-flash / 3.7-flash / 3.1-pro-preview）は
+# **1つも載っていない。** しかも降格先が 2026-10-16 に終了する 2.5 系。
+# 設計意図（Premium → Standard → Batch の順で消費し枯渇時に降格）が
+# 実装されていなかった。
+
+
+def test_採用中の段すべてに降格先がある():
+    """**最下段以外は降格できること。** チェーン長 1 は降格先ゼロ。"""
+    from backend import model_policy
+    from backend.model_governance import ModelGovernanceEngine
+
+    engine = ModelGovernanceEngine()
+    engine.reload()
+    order = model_policy.tier_order()
+    table = model_policy.tiers()
+
+    # `tier_order` は昇順（batch → … → pro）。降格は下向きなので、
+    # 降格先が要るのは**最下段以外**＝先頭を除いた全部。
+    for tier in order[1:]:
+        model = (table.get(tier) or {}).get("model", "")
+        if not model:
+            continue
+        chain = engine.build_fallback_sequence(model)
+        assert len(chain) > 1, (
+            f"{tier}({model}) に降格先がありません: chain={chain}"
+        )
+
+
+def test_降格先に2_5系を使わない():
+    """2026-10-16 に終了する段へ落とすチェーンを残さない。"""
+    from backend.model_governance import ModelGovernanceEngine
+
+    engine = ModelGovernanceEngine()
+    engine.reload()
+
+    # 出発点が 2.5 系なのは構わない（旧い呼び出し元がそこから始まる）。
+    # **降格した先**が 2.5 系だと、終了と同時に死ぬ段へ落とすことになる。
+    doomed = sorted({v for v in engine._fallback_chain.values()
+                     if v and v.startswith("gemini-2.5")})
+    assert doomed == [], f"降格先に 2.5 系が残っています: {doomed}"

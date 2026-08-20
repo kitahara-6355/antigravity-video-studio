@@ -543,3 +543,124 @@ def test_請求額との突き合わせを今やれと言わない(tmp_path, mon
 
     assert "一次情報の請求額と突き合わせてください" not in status
     assert "pro 昇格" in status
+
+
+# --- 1本あたりの内訳 -----------------------------------------------------------
+#
+# gate-verifier の指摘: 「--status は3日にまたがる7件の総額を1つ出すだけで、
+# 完走した動画1本分がどれかを出力から切り出せない」。R1-C2 は「**1本あたりの**
+# 所要時間と原価」を要求しているので、総額だけでは足りない。
+
+
+def _ledger(tmp_path, monkeypatch, rows):
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text("".join(json.dumps(r) + "\n" for r in rows),
+                      encoding="utf-8")
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps({"budgets": [
+        {"id": "test", "limit_jpy": 100, "spent_jpy": 0.3, "status": "active"}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", path)
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+    return ledger
+
+
+_CALL = {"budget_id": "test", "jpy": 0.15, "metered": True,
+         "known_price": True, "model": "gemini-3.6-flash"}
+
+
+def test_1本あたりの所要時間と原価が出る(tmp_path, monkeypatch):
+    _ledger(tmp_path, monkeypatch, [
+        _CALL, _CALL,
+        {"kind": "run_summary", "run_id": "run-A", "budget_id": "test",
+         "status": "completed", "duration_sec": 59.7, "calls": 1,
+         "cost_jpy": 0.15},
+        {"kind": "run_summary", "run_id": "run-B", "budget_id": "test",
+         "status": "completed", "duration_sec": 39.2, "calls": 1,
+         "cost_jpy": 0.15},
+    ])
+
+    status = cost_guard._format_status()
+
+    assert "run-A" in status and "run-B" in status
+    assert "59.7" in status and "39.2" in status
+
+
+def test_要約は呼び出し件数に数えない(tmp_path, monkeypatch):
+    """**要約は課金の行ではない。** 数えると呼び出し回数が水増しされる。"""
+    _ledger(tmp_path, monkeypatch, [
+        _CALL, _CALL,
+        {"kind": "run_summary", "run_id": "run-A", "budget_id": "test",
+         "status": "completed", "duration_sec": 1.0, "calls": 2,
+         "cost_jpy": 0.3},
+    ])
+
+    status = cost_guard._format_status()
+
+    assert "呼び出し: 2 件" in status
+
+
+def test_要約は未計測件数に数えない(tmp_path, monkeypatch):
+    """要約に metered が無いのを「トークンを読めなかった」と読ませない。"""
+    _ledger(tmp_path, monkeypatch, [
+        _CALL,
+        {"kind": "run_summary", "run_id": "run-A", "budget_id": "test",
+         "status": "completed", "duration_sec": 1.0, "calls": 1,
+         "cost_jpy": 0.15},
+    ])
+
+    status = cost_guard._format_status()
+
+    assert "トークンを読めなかった呼び出し: 0 件" in status
+    assert "単価が未登録のモデル: 0 件" in status
+
+
+def test_1本あたりの内訳が無ければ黙らない(tmp_path, monkeypatch):
+    """**不在を成功にしない。** 総額しか無いことを読み手に伝える。"""
+    _ledger(tmp_path, monkeypatch, [_CALL, _CALL])
+
+    status = cost_guard._format_status()
+
+    assert "1本あたりの内訳がありません" in status
+
+
+def test_要約の原価は合計に足さない(tmp_path, monkeypatch):
+    """`cost_jpy` を `jpy` と一緒に足すと二重計上。台帳との一致警告が誤発火する。"""
+    _ledger(tmp_path, monkeypatch, [
+        _CALL, _CALL,
+        {"kind": "run_summary", "run_id": "run-A", "budget_id": "test",
+         "status": "completed", "duration_sec": 1.0, "calls": 2,
+         "cost_jpy": 0.3},
+    ])
+
+    status = cost_guard._format_status()
+
+    assert "食い違っています" not in status
+
+
+def test_失敗した実行も内訳に出る(tmp_path, monkeypatch):
+    """落ちた実行を隠すと、所要時間の平均が実態より短く見える。"""
+    _ledger(tmp_path, monkeypatch, [
+        {"kind": "run_summary", "run_id": "run-X", "budget_id": "test",
+         "status": "failed", "duration_sec": 2.8, "calls": 0,
+         "cost_jpy": 0.0},
+    ])
+
+    status = cost_guard._format_status()
+
+    assert "run-X" in status
+    assert "失敗" in status
+
+
+def test_要約は再計算でも二重計上されない(tmp_path, monkeypatch):
+    """`--reconcile` は課金の行だけを足す。要約を足すと budget.json が倍になる。"""
+    _ledger(tmp_path, monkeypatch, [
+        _CALL, _CALL,
+        {"kind": "run_summary", "run_id": "run-A", "budget_id": "test",
+         "status": "completed", "duration_sec": 1.0, "calls": 2,
+         "cost_jpy": 0.3, "jpy": 0.3},  # 将来 jpy が付いても壊れないこと
+    ])
+
+    total = cost_guard.reconcile_ledger()
+
+    assert total == pytest.approx(0.3), f"要約を足している: {total}"
