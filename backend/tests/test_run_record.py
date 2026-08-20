@@ -454,3 +454,26 @@ def test_台帳が書けなくても実行記録は残る(tmp_path, monkeypatch)
     run = rec.finish()
 
     assert run["status"] == "completed"
+
+
+def test_他の実行の要約を自分の呼び出しに数えない(tmp_path):
+    """`finish()` の集計だけ要約行を除外し忘れていた（2026-08-21 の指摘）。
+
+    `_close_stage` は除外しているのに `finish()` はしていなかったので、
+    実行 A の窓の中で実行 B が `finish()` すると **A.calls が 1 になる**。
+    いまは並行実行の経路が無いので本番では発火しないが、除外の取りこぼしは
+    「呼び出していないのに呼び出したことになる」型なので塞ぐ。
+    """
+    a = _recorder(tmp_path)
+    with a.stage("x", model="local:test"):
+        # A の実行中に、別の実行が台帳へ要約を書いた状況を作る
+        with open(a.ledger_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "kind": "run_summary", "run_id": "別の実行",
+                "status": "completed", "duration_sec": 1.0,
+                "calls": 1, "cost_jpy": 0.9,
+            }) + "\n")
+    run = a.finish()
+
+    assert run["calls"] == 0, "他の実行の要約を呼び出しに数えている"
+    assert run["cost_jpy"] == 0.0

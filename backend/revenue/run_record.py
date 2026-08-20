@@ -170,6 +170,15 @@ class RunRecorder:
                 continue
         return rows
 
+    def _calls_since(self, offset: int) -> list[dict]:
+        """`offset` 以降の**課金の行だけ**を返す。
+
+        要約の行（`kind == "run_summary"`）は呼び出しではない。数えると
+        「呼び出していないのに呼び出したことになる」。除外はここ1箇所。
+        """
+        return [r for r in self._ledger_rows(offset)
+                if r.get("kind") != "run_summary"]
+
     # --- 工程 ---------------------------------------------------------------
 
     @contextmanager
@@ -227,9 +236,7 @@ class RunRecorder:
         self._close_stage(entry, offset, started)
 
     def _close_stage(self, entry: dict, offset: int, started: float) -> None:
-        # **要約の行は呼び出しではない。** 数えると工程の calls が水増しされる。
-        rows = [r for r in self._ledger_rows(offset)
-                if r.get("kind") != "run_summary"]
+        rows = self._calls_since(offset)
         observed = sorted({r.get("model", "") for r in rows if r.get("model")})
         entry["models_observed"] = observed
         entry["calls"] = len(rows)
@@ -267,7 +274,9 @@ class RunRecorder:
     # --- 締め ---------------------------------------------------------------
 
     def finish(self, status: str | None = None) -> dict:
-        rows = self._ledger_rows(self._ledger_start)
+        # **要約の行は呼び出しではない。** `_close_stage` では除外していたのに
+        # ここだけ除外し忘れていた（2026-08-21 の指摘）。除外を1箇所に寄せる。
+        rows = self._calls_since(self._ledger_start)
         used: set[str] = set()
         for stage in self._record["stages"]:
             if stage.get("model"):

@@ -440,9 +440,10 @@
       },
       {
         "id": "R1-C2",
-        "met": false,
+        "met": true,
         "verify": "python -m backend.cost_guard --status",
-        "condition": "**1本あたりの所要時間と原価が実測**され、`.claude/cost_ledger.jsonl` と `budget.json` の spent_jpy に残っている。原価は**トークン実測にもとづく上限見積もり**とする（無料枠に収まった呼び出しの実費は 0 円で、**突き合わせる請求額が構造的に存在しない**ため。請求額との突き合わせは pro 昇格で課金運用に移ってから行う。2026-08-21 ユーザー決定）。単価未登録モデル・トークンを読めなかった呼び出しの件数も出る"
+        "condition": "**1本あたりの所要時間と原価が実測**され、`.claude/cost_ledger.jsonl` と `budget.json` の spent_jpy に残っている。原価は**トークン実測にもとづく上限見積もり**とする（無料枠に収まった呼び出しの実費は 0 円で、**突き合わせる請求額が構造的に存在しない**ため。請求額との突き合わせは pro 昇格で課金運用に移ってから行う。2026-08-21 ユーザー決定）。単価未登録モデル・トークンを読めなかった呼び出しの件数も出る",
+        "evidence": "gate-verifier（改訂後の条件文に対する2周目・2026-08-21）が met と判定。台帳の run_summary の duration_sec が run.json の finished_at − started_at と4本すべてミリ秒まで一致（別々の計測系）。完走2本 53.3 秒/¥0.4526・35.4 秒/¥0.5548。`--reconcile` を2回走らせて spent_jpy 不動（二重計上なし）を隔離コピーで確認"
       },
       {
         "id": "R1-C3",
@@ -969,7 +970,7 @@
         "why": "**この codebase で動画が1本も作られたことがない**（*.mp4 が 0 件）。実行できないので pipeline_e2e / trinity_council / quality_auto_improve / soul_auto_evolution / progressive_preview / UX の L2 以上、6軸が測れず、D-20 / D-25 / D-27 / D-04 も解けない。ここが全ての前提",
         "budget_jpy": 3000,
         "budget_id": "R1-execution-layer",
-        "status": "ready",
+        "status": "exit_criteria_met",
         "exit_criteria": [
           {
             "id": "R1-C1",
@@ -979,9 +980,10 @@
           },
           {
             "id": "R1-C2",
-            "met": false,
+            "met": true,
             "verify": "python -m backend.cost_guard --status",
-            "condition": "**1本あたりの所要時間と原価が実測**され、`.claude/cost_ledger.jsonl` と `budget.json` の spent_jpy に残っている。原価は**トークン実測にもとづく上限見積もり**とする（無料枠に収まった呼び出しの実費は 0 円で、**突き合わせる請求額が構造的に存在しない**ため。請求額との突き合わせは pro 昇格で課金運用に移ってから行う。2026-08-21 ユーザー決定）。単価未登録モデル・トークンを読めなかった呼び出しの件数も出る"
+            "condition": "**1本あたりの所要時間と原価が実測**され、`.claude/cost_ledger.jsonl` と `budget.json` の spent_jpy に残っている。原価は**トークン実測にもとづく上限見積もり**とする（無料枠に収まった呼び出しの実費は 0 円で、**突き合わせる請求額が構造的に存在しない**ため。請求額との突き合わせは pro 昇格で課金運用に移ってから行う。2026-08-21 ユーザー決定）。単価未登録モデル・トークンを読めなかった呼び出しの件数も出る",
+            "evidence": "gate-verifier（改訂後の条件文に対する2周目・2026-08-21）が met と判定。台帳の run_summary の duration_sec が run.json の finished_at − started_at と4本すべてミリ秒まで一致（別々の計測系）。完走2本 53.3 秒/¥0.4526・35.4 秒/¥0.5548。`--reconcile` を2回走らせて spent_jpy 不動（二重計上なし）を隔離コピーで確認"
           },
           {
             "id": "R1-C3",
