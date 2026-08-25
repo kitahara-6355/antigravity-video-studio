@@ -962,7 +962,8 @@
       "R1.5",
       "R2",
       "R3",
-      "R4"
+      "R4",
+      "R5"
     ],
     "phases": {
       "R1": {
@@ -1070,6 +1071,14 @@
         "limits": [
           "**YouTube の判定そのものは再現できない。** ここで測るのは『こちらの作り方が量産型に見えないこと』であって、審査の合否ではない",
           "開示ラベルの要否はコンテンツによる。**判定は人間が行う**（機械はメタデータの有無だけを見る）"
+        ],
+        "gates": [
+          "G1",
+          "G2"
+        ],
+        "assumptions": [
+          "承認する中身（AI の編集判断）が R1.5 で成果物に届いている。**届いていなければ『捨てられる提案を承認する画面』になる**",
+          "D-16 / D-07（Progressive Preview 承認フロー）の未実装部分が、承認工程の土台として使える（**未検証**。着手時に1回動かして確かめる）"
         ]
       },
       "R3": {
@@ -1106,6 +1115,14 @@
         ],
         "limits": [
           "**投稿の自動化は含めない**（手動投稿でも記録が残ればよい）。API 投稿は R4 で必要になったら検討する"
+        ],
+        "gates": [
+          "G3"
+        ],
+        "note": "**投稿の自動化は R5 に移した**（2026-08-26 ユーザー決定）。収益化に必要なのは『動画が投稿されること』であって『システムが投稿すること』ではないので、当面は手動で投稿する。R3 に残るのは YouTube Data API の**読み取りだけ**（チャンネル統計）。OAuth + resumable upload の塊が丸ごと後ろに回る",
+        "assumptions": [
+          "YouTube Data API の読み取りだけで G3 が満たせる（投稿は手動）",
+          "`admin_channel_router` の現在の実装は**固定値を返す偽物**なので、土台にならない（確認済み）"
         ]
       },
       "R4": {
@@ -1136,52 +1153,97 @@
         ],
         "limits": [
           "**収益化の達成そのものは、この計画では保証できない。** 視聴者が集まるかは外部要因。ここで保証できるのは『出せる状態を作ること』まで"
+        ],
+        "gates": [
+          "G2",
+          "G4"
+        ],
+        "assumptions": [
+          "R1.5-C5 で測り直した原価が、必要本数を掛けても予算内に収まる（**未検証**）"
         ]
       },
       "R1.5": {
-        "title": "AI の出力を成果物に届かせる（編集の実体化）",
-        "why": "**R1 で『1本通った』が、AI は編集に1ミリも効いていない。** 2026-08-20 の実測で、唯一の Gemini 呼び出し（soul_feedback）が返した演出案は logger に件数が出るだけで捨てられ、telop_render が生成した5枚の PNG は**コード上どこからも読まれていない**（`telop_images` の参照が生成側以外に存在しない）。成果物に効いているのはauto-editor の無音カットと ffmpeg の字幕焼き込みだけで、この2つに AI は関与しない。\n\nR2「承認工程を必須にする」を先に作ると、**承認する中身が無い画面**ができる（捨てられる提案を承認することになる）。順序としてここが先。\n\n原価の測り直しもここに含める。R1 で測った1本 ¥0.44〜0.52 は**AI が働いていない状態の数字**で、本番の原価を代表していない（model_policy に21工程が登録されているのに実走で呼ばれるのは1工程だけ）。2026-08-21 ユーザー決定。",
+        "title": "本線を一本化し、AI の出力を成果物に届かせる",
+        "why": "**R1 で硬化したのは2つあるパイプラインの片方だった。** 2026-08-26 に両方を実走させて 本線を agents 側に決めた（invariants.mainline）。\n\n同時に、**モデル解決器が2つあって全工程で食い違う**ことが判明した。`model_config.json` の task_mapping は**段の名前**（\"standard\" / \"premium\"）を持つが、`model_governance._resolve_model()` はそれを生のまま返し、モデル ID として API に渡る:\n\n    404 NOT_FOUND: models/standard is not found for API version v1beta\n\n正しく解決するのは `model_policy.resolve()` だけで、使っているのは soul_feedback ほか2箇所。**製品の LLM 呼び出しは soul_feedback を除いてほぼ全部 404 している。**「21工程登録されているのに実走で1回しか呼ばれない」の原因はこれ。\n\nR2 の承認工程を先に作ると**承認する中身が無い画面**ができるので、順序としてここが先。",
         "budget_jpy": 0,
         "budget_note": "無料枠3段（batch/standard/premium）で足りる見込み。呼び出し数は増えるが Flash 系の無料枠（約1,500 RPD）の内側。**pro 昇格が要ると判断した時点で別途承認を取る**（憲法第3条）",
         "status": "blocked_by_R1",
         "exit_criteria": [
           {
             "id": "R1.5-C1",
-            "condition": "**soul_feedback の提案が成果物に反映されている。** 提案を反映した動画と反映しない動画で成果物が異なることが機械判定できる（SHA256 が一致しない）。**提案が捨てられていないことを、ログではなく成果物で示す**",
+            "condition": "**本線が agents 側に一本化され、R1 の保証がそこで効いている。** 実行記録（工程・モデル・失敗の原因と入力）が残り、サービスの失敗が握り潰されず、成果物ゲートが本線の実走に対して PASS する",
             "verify": "python -m backend.revenue.artifact_gate --gate",
             "met": false
           },
           {
             "id": "R1.5-C2",
-            "condition": "**telop_render が生成した画像が動画に合成されている。** 生成された枚数と合成された枚数が実行記録に残り、**生成したのに使われていない枚数が 0 でなければ成果物ゲートが FAIL する**（作って捨てるのを緑にしない）",
-            "verify": "python -m backend.revenue.artifact_gate --gate",
+            "condition": "**モデル解決器が1つになっている。** 全 task で `model_governance._resolve_model()` と `model_policy.resolve().model` が一致し、段の名前がモデル ID として API に渡らない。**食い違いが残っていたら FAIL する**",
+            "verify": "python -m backend.model_policy --audit",
             "met": false
           },
           {
             "id": "R1.5-C3",
-            "condition": "**quality_gate のスコアが実行記録に実値で残る。** 現在は `overall_score` と `total_score` の名前違いを `getattr` の既定値が飲み込み、ログに 89.1 点と出ていても記録は常に 0.0。**記録と実態が食い違う型**なので、同種の取りこぼしが他に無いことも併せて示す",
-            "verify": "python -m backend.revenue.run_record --list",
+            "condition": "**AI の出力が成果物に届いている。** AI を効かせた場合と効かせない場合で成果物が異なることが機械判定できる（SHA256 が一致しない）。生成されたのに使われていない中間成果物の件数が実行記録に出て、**0 でなければ成果物ゲートが FAIL する**",
+            "verify": "python -m backend.revenue.artifact_gate --gate",
             "met": false
           },
           {
             "id": "R1.5-C4",
-            "condition": "**AI が編集に効いた状態で、1本あたりの原価と所要時間が測り直されている。**呼び出し件数・工程ごとの内訳・単価未登録件数が出る。R4-C2 の総額試算はこの数字を使う（R1 の数字は使わない）",
-            "verify": "python -m backend.cost_guard --status",
+            "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
+            "verify": "docs/ 配下の実走記録",
             "met": false
           },
           {
             "id": "R1.5-C5",
-            "condition": "**soul_feedback のプロンプトが人の目で検証されている。** 出力が捨てられていたので、このプロンプトは一度も中身を見られていない。比較した記録（何を試して何を採ったか）が残る。Playground なら ¥0 で比較できる",
-            "verify": "docs/ 配下の比較記録",
+            "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
+            "verify": "python -m backend.cost_guard --status",
             "met": false
           }
         ],
         "limits": [
           "**動画の良し悪しは判定しない。** ここで示すのは『AI の出力が成果物に到達している』ことであって、その提案が良い提案かどうかではない（品質の担保は R2）",
-          "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化している問題（実測で `。` だけの行が出る）と Whisper が base 固定で固有名詞が崩れる問題は、AI の到達とは別軸なので R1.5 の合否に含めない",
-          "**HTTP API 経路は対象外。** `backend/agents/pipeline_coordinator.py` は別実装で RunRecorder も `_require_success` も通らない。R1.5 が見るのは `backend/video_pipeline/pipeline_coordinator.py` の経路だけ"
+          "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化する問題と、Whisper の固有名詞崩れは別軸",
+          "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
+          "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない"
         ],
-        "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る"
+        "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る",
+        "gates": [
+          "G1"
+        ],
+        "assumptions": [
+          "解決器を直せば、404 していた工程がそのまま動く（**未検証**。直して実走で確かめる）",
+          "AI が全工程で働いても無料枠（約1,500 RPD / 15 RPM）に収まる（**未検証**。R1.5-C5 で測る）",
+          "agents 側の worker は本物である（render_worker が実際に ffmpeg を叩くことは確認済み。他の worker は未検証）"
+        ]
+      },
+      "R5": {
+        "title": "投稿を自動化する",
+        "gates": [
+          "G4"
+        ],
+        "why": "**他が問題なく動いた後、最後に着手する**（2026-08-26 ユーザー決定）。本数が増えて手が回らなくなってから作る。\n\n現状の `backend/services/youtube_uploader.py` は `success=True` / `video_id=\"placeholder_video_id\"` を返す**プレースホルダ**で、実際には何もアップロードしない。R1.5-C4 で偽の success だけ先に止める",
+        "budget_jpy": 0,
+        "status": "blocked_by_R4",
+        "assumptions": [
+          "手動投稿で R3 / R4 が回る（本数が少ないうちは成立する見込み。**本数が増えたら崩れる**）"
+        ],
+        "exit_criteria": [
+          {
+            "id": "R5-C1",
+            "condition": "**実際に1本が YouTube にアップロードされ、動画 ID が実行記録に残る**（限定公開でよい）",
+            "verify": "python -m backend.revenue.run_record --list",
+            "met": false
+          },
+          {
+            "id": "R5-C2",
+            "condition": "**承認していない動画はアップロードできない**（R2 の承認フラグと接続されている）",
+            "verify": "python -m backend.revenue.artifact_gate --gate",
+            "met": false
+          }
+        ],
+        "limits": [
+          "**Google の OAuth 審査は範囲外。** 自分のチャンネルに投稿するだけなら審査は要らない想定だが、一次情報の確認は着手時に行う"
+        ]
       }
     },
     "frozen": {
@@ -1202,5 +1264,48 @@
       "**測っていないことを『確かめること』に書かない。** 実装を変えたら意味表も同じコミットで直す（これは維持）"
     ],
     "measured_cost": "gate-verifier 1周 = 約11万トークン / 修正込みで実時間 30〜60分（2026-08 実測）"
+  },
+  "invariants": {
+    "_comment": "**新事実では変えない層。** 手段を一切書かない。ここが変わるのは 北極星（revenue_goal）か外部期日が変わったときだけ。`roadmap.phases` は手段なので、新事実で変えてよい。2026-08-21 ユーザー決定（ロードマップを2層に分ける）",
+    "decided_at": "2026-08-21",
+    "gates": [
+      {
+        "id": "G1",
+        "condition": "人に見せられる動画が1本できる（AI が編集に効いた状態で）",
+        "why": "出せる物が無ければ何も始まらない"
+      },
+      {
+        "id": "G2",
+        "condition": "同じ品質で継続して出せる（原価と手数が許容内）",
+        "why": "収益化は本数と総再生時間の関数"
+      },
+      {
+        "id": "G3",
+        "condition": "出したものの数字が取れ、収益化までの残量が分かる",
+        "why": "残量が見えないとペース配分ができない"
+      },
+      {
+        "id": "G4",
+        "condition": "収益化基準に到達する",
+        "why": "北極星そのもの"
+      }
+    ],
+    "deadlines": [
+      {
+        "at": "2026-10-16",
+        "what": "Gemini 2.5 系の提供終了",
+        "measure": "python -m backend.model_policy --sunset"
+      },
+      {
+        "at": "2027-02-01",
+        "what": "収益化基準が2倍になる（長尺 8,000時間 / Shorts 2,000万回）"
+      }
+    ],
+    "mainline": {
+      "decided_at": "2026-08-26",
+      "choice": "backend/agents/pipeline_coordinator.py",
+      "why": "両方を実走させて決めた。agents 側は preview+final の2段レンダリング・カテゴリ別品質評価・7つの実 worker を持ち、HTTP API が呼ぶのもこちら。video_pipeline（R1 で硬化）は速い（53秒 vs 113秒）が作り込みが浅い。**R1 のガード（実行記録・_require_success・成果物ゲート）は本線へ移植する。**video_pipeline は検証用の基準実装として凍結する",
+      "evidence": "agents 実走: 10工程完走 / 113.4秒 / final 23.17秒 video+audio 2.9MB + preview 6.6MB / 品質スコア50点（カテゴリ別内訳あり）/ **LLM は全て 404 で台帳の増分 0 bytes**"
+    }
   }
 }

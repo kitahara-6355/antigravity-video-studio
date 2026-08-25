@@ -87,3 +87,67 @@ def test_フェーズの並びは現フェーズから始まる(canon):
     """現在地より前のフェーズが並びに残っていないこと。"""
     order = canon["roadmap"]["order"]
     assert canon["current_phase"]["id"] in order
+
+
+# --- 幹（invariants）が腐らないこと ---------------------------------------------
+#
+# 2026-08-21 にロードマップを2層に分けた。`invariants` は新事実で変えない層で、
+# `roadmap.phases` は手段なので変えてよい。**参照が切れると2層に分けた意味が消える**
+# ので、繋がりをここで固定する。
+
+
+def test_幹が存在する(canon):
+    gates = canon["invariants"]["gates"]
+    assert [g["id"] for g in gates] == ["G1", "G2", "G3", "G4"]
+    for g in gates:
+        assert g["condition"] and g["why"], f"{g['id']} に条件か理由が無い"
+
+
+def test_幹に手段を書かない(canon):
+    """**幹は「何が言えるようになるか」で書く。** ファイル名やコマンドが出たら枝。"""
+    forbidden = (".py", ".json", "python -m", "backend/", "http")
+    for g in canon["invariants"]["gates"]:
+        for word in forbidden:
+            assert word not in g["condition"], (
+                f"{g['id']} の条件に実装詳細が入っている: {word}"
+            )
+
+
+def test_全フェーズが幹を指す(canon):
+    """どの関門に効くのか分からないフェーズを作らない。"""
+    known = {g["id"] for g in canon["invariants"]["gates"]}
+    for pid, phase in canon["roadmap"]["phases"].items():
+        if pid == canon["current_phase"]["id"]:
+            continue  # 完了済みの現フェーズは対象外
+        gates = phase.get("gates")
+        assert gates, f"{pid} が幹を指していない"
+        unknown = [g for g in gates if g not in known]
+        assert not unknown, f"{pid} が知らない幹を指している: {unknown}"
+
+
+def test_本線が実在するファイルを指す(canon):
+    """**本線の宣言が腐らないこと。** 消えたファイルを指していたら気づけるように。"""
+    from pathlib import Path
+
+    mainline = canon["invariants"]["mainline"]["choice"]
+    path = CANON.parents[2] / mainline
+    assert path.is_file(), f"本線が実在しない: {mainline}"
+
+
+def test_外部期日が残っている(canon):
+    """期日は幹。消えたら逆算ができなくなる。"""
+    deadlines = {d["at"] for d in canon["invariants"]["deadlines"]}
+    assert "2026-10-16" in deadlines
+    assert "2027-02-01" in deadlines
+
+
+def test_前提が宣言されている(canon):
+    """**未着手フェーズは assumptions を持つこと。**
+
+    前提を書いておくと、新事実が出たときに「どのフェーズが影響を受けるか」が
+    予測できる。R1 で「実測原価が本番を代表している」という前提を誰も書いて
+    いなかったので、それが崩れたときに R4 への波及が見えなかった。
+    """
+    for pid in ("R1.5", "R5"):
+        phase = canon["roadmap"]["phases"][pid]
+        assert phase.get("assumptions"), f"{pid} が賭けている前提を宣言していない"
