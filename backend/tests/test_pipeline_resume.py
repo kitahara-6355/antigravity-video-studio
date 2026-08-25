@@ -206,3 +206,32 @@ def test_存在しない実行は再開しない(tmp_path):
         work_dir=str(tmp_path / "work"), runs_dir=tmp_path / "runs")
     with pytest.raises(ResumeNotPossible):
         coordinator.resume_run("ありません")
+
+
+def test_記録が読めないときも再開しない(tmp_path, monkeypatch):
+    """**`is_file()` の答えを信じない。**
+
+    存在確認と読み出しの間にファイルが消えることもあるし、
+    同じプロセスで走る別のテストが `Path.is_file` を差し替えていることもある
+    （`test_preview_engine.py` は import 時にプロセス全体を True へ固定する）。
+    そのとき `load_run` が生の `FileNotFoundError` を投げると、
+    **fail-closed を期待した呼び出し側が `ResumeNotPossible` を捕まえ損ねる。**
+    再開できない理由が何であれ、断り方は1つでなければならない。
+    """
+    monkeypatch.setattr(Path, "is_file", lambda self: True)
+    coordinator = PipelineCoordinator(
+        work_dir=str(tmp_path / "work"), runs_dir=tmp_path / "runs")
+    with pytest.raises(ResumeNotPossible):
+        coordinator.resume_run("ありません")
+
+
+def test_壊れた記録も再開しない(tmp_path):
+    """JSON として読めない記録も、断り方は `ResumeNotPossible` に揃える。"""
+    runs_dir = tmp_path / "runs"
+    (runs_dir / "壊れている").mkdir(parents=True)
+    (runs_dir / "壊れている" / "run.json").write_text("{壊れ", encoding="utf-8")
+
+    coordinator = PipelineCoordinator(
+        work_dir=str(tmp_path / "work"), runs_dir=runs_dir)
+    with pytest.raises(ResumeNotPossible):
+        coordinator.resume_run("壊れている")

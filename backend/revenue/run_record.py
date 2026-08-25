@@ -368,7 +368,10 @@ def _format_resume(runs_dir: Path, run_id: str) -> tuple[str, int]:
     path = Path(runs_dir) / run_id / "run.json"
     if not path.is_file():
         return f"🚫 実行記録がありません: {path}", 1
-    run = load_run(path)
+    try:
+        run = load_run(path)
+    except (OSError, ValueError) as e:
+        return f"🚫 実行記録を読めません: {path}（{e}）", 1
     stage = failed_stage(run)
     if stage is None:
         return f"✅ {run_id} に失敗した工程はありません（status={run.get('status')}）", 0

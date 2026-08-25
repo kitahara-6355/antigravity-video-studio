@@ -390,7 +390,14 @@ class PipelineCoordinator:
         if not path.is_file():
             raise ResumeNotPossible(f"実行記録がありません: {path}")
 
-        run = load_run(path)
+        # **`is_file()` を通ったことは、読めることを意味しない。** 存在確認と
+        # 読み出しの間に消えることもあれば、テストが `Path.is_file` を
+        # 差し替えていることもある。断り方を1つに揃えないと、fail-closed を
+        # 期待した呼び出し側が生の例外で壊れる。
+        try:
+            run = load_run(path)
+        except (OSError, ValueError) as e:
+            raise ResumeNotPossible(f"実行記録を読めません: {path}（{e}）") from e
         stage = failed_stage(run)
         if stage is None:
             raise ResumeNotPossible(
