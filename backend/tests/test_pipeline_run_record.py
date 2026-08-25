@@ -322,8 +322,8 @@ def test_台帳の置き場を差し替えられる(tmp_path):
                       side_effect=lambda n, d: _fake_stage_output(n, d)):
         coordinator.run_pipeline("input.mp4")
 
-    rows = [json.loads(l) for l in
-            ledger.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(line) for line in
+            ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert [r for r in rows if r.get("kind") == "run_summary"]
 
 

@@ -388,8 +388,8 @@ def test_実行の終わりに台帳へ要約を残す(tmp_path):
         _ledger_row(rec.ledger_path, "gemini-3.6-flash")
     rec.finish()
 
-    rows = [json.loads(l) for l in
-            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(line) for line in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     summary = [r for r in rows if r.get("kind") == "run_summary"]
 
     assert len(summary) == 1
@@ -405,8 +405,8 @@ def test_要約は原価の合計を二重計上させない(tmp_path):
         _ledger_row(rec.ledger_path, "gemini-3.6-flash")  # jpy=0.1
     rec.finish()
 
-    rows = [json.loads(l) for l in
-            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(line) for line in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     total = sum(float(r.get("jpy") or 0) for r in rows)
 
     assert total == pytest.approx(0.1), f"二重計上している: {total}"
@@ -419,8 +419,8 @@ def test_要約に1本ぶんの原価が入る(tmp_path):
         _ledger_row(rec.ledger_path, "gemini-3.6-flash")
     rec.finish()
 
-    rows = [json.loads(l) for l in
-            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(line) for line in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     summary = next(r for r in rows if r.get("kind") == "run_summary")
 
     assert summary["cost_jpy"] == pytest.approx(0.2)
@@ -437,8 +437,8 @@ def test_失敗した実行も要約を残す(tmp_path):
         pass
     rec.finish()
 
-    rows = [json.loads(l) for l in
-            rec.ledger_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(line) for line in
+            rec.ledger_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     summary = next(r for r in rows if r.get("kind") == "run_summary")
 
     assert summary["status"] == "failed"
