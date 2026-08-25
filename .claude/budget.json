@@ -22,7 +22,7 @@
       "limit_jpy": 3000,
       "spent_jpy": 3.89,
       "status": "active",
-      "note": "ユーザー承認（2026-08-15・対話で明示）。cost_guard が呼び出しごとに実費を計上し、残高が予約額（5円）を割った時点で CostLimitExceeded を上げて止める。台帳は .claude/cost_ledger.jsonl。**この枠を超える利用は再承認が要る。** 単価表は backend/config/gemini_pricing.json（出典と取得日つき・一次情報との突き合わせは実走前に行う） **Google 側の本命の歯止めは AI Studio の Monthly spend cap**（プロジェクト単位の月額上限・2026-03-16 発表）。Prepay + 自動リロード OFF でも止まるが、クレジットは1年で失効し、Postpay 移行以外で Prepay を閉じると残高が没収されるので、spend cap のほうが上位互換。加えて Tier 1 は請求先アカウント単位で $250/月の天井が自動で掛かる。Flash 系には無料枠が残っているので、実走が ¥0 で終わる可能性がある（cost_guard の見積もりは上限）。ただし gemini-2.5-pro は 2026-04-01 に無料枠から外れており、67箇所で参照しているためフル実走は有料。",
+      "note": "ユーザー承認（2026-08-15・対話で明示）。cost_guard が呼び出しごとに実費を計上し、残高が予約額（5円）を割った時点で CostLimitExceeded を上げて止める。台帳は .claude/cost_ledger.jsonl。**この枠を超える利用は再承認が要る。** 単価表は backend/config/gemini_pricing.json（出典と取得日つき・一次情報との突き合わせは実走前に行う） **Google 側の本命の歯止めは AI Studio の Monthly spend cap**（プロジェクト単位の月額上限・2026-03-16 発表）。Prepay + 自動リロード OFF でも止まるが、クレジットは1年で失効し、Postpay 移行以外で Prepay を閉じると残高が没収されるので、spend cap のほうが上位互換。加えて Tier 1 は請求先アカウント単位で $250/月の天井が自動で掛かる。Flash 系には無料枠が残っているので、実走が ¥0 で終わる可能性がある（cost_guard の見積もりは上限）。ただし gemini-2.5-pro は 2026-04-01 に無料枠から外れており、67箇所で参照しているためフル実走は有料。 **2026-08-26 ユーザー決定: Monthly spend cap は pro 昇格の直前に置く。** いま使っている本番キーは請求先を付けていない avs-prod-free で、pro は誰も使っていないため、Google 側に請求が発生する経路が現時点で存在しない。したがって --status が出す spend_cap 未設定の警告は**先送りした決定であって見落としではない**。pro 昇格の承認を取るときに、金額とプロジェクト ID を spend_cap_usd / spend_cap_project へ書く。",
       "billing_mode": "prepay",
       "auto_reload": "must_be_off",
       "credits_expire_at": null,
