@@ -435,7 +435,9 @@
       "**動画の良し悪しは判定しない。** ここで示すのは『AI の出力が成果物に到達している』ことであって、その提案が良い提案かどうかではない（品質の担保は R2）",
       "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化する問題と、Whisper の固有名詞崩れは別軸",
       "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
-      "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない"
+      "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない",
+      "**解決器の一致を保証する範囲は `model_policy` と `model_governance` の2者**（R1.5-C2 の検証で確定）。`backend/model_registry.py:99-101` の ImportError フォールバックは段の名前を生で返しうるが、到達には `backend/` が sys.path に無いことが要り、その状態では本線が import 時点で落ちる。塞がない",
+      "**突き合わせるのは宣言と deprecated 差替まで**（R1.5-C2 の検証で確定）。枠枯渇による降格は設計どおりの動きなので食い違いに数えない。`fallback_chain` の値はすべて実モデル ID で、段の名前は入っていない"
     ],
     "user_tasks": [
       "**実運用に近い尺（10分前後）の実写素材を1本置く**（C5 の測定用）。置き場は `output/testclips/`、mp4・音声トラックつき。**顔が映っていて構わない**（このリポジトリは公開だが `output/` は gitignore なので履歴には入らない）。用意できたらファイル名を教えてください"
@@ -453,7 +455,7 @@
         "id": "R1.5-C2",
         "condition": "**モデル解決器が1つになっている。** 全 task で `model_governance._resolve_model()` と `model_policy.resolve().model` が一致し、段の名前がモデル ID として API に渡らない。**食い違いが残っていたら FAIL する**",
         "verify": "python -m backend.model_policy --audit",
-        "met": false
+        "met": true
       },
       {
         "id": "R1.5-C3",
@@ -1044,7 +1046,7 @@
             "id": "R1.5-C2",
             "condition": "**モデル解決器が1つになっている。** 全 task で `model_governance._resolve_model()` と `model_policy.resolve().model` が一致し、段の名前がモデル ID として API に渡らない。**食い違いが残っていたら FAIL する**",
             "verify": "python -m backend.model_policy --audit",
-            "met": false
+            "met": true
           },
           {
             "id": "R1.5-C3",
@@ -1077,7 +1079,9 @@
           "**動画の良し悪しは判定しない。** ここで示すのは『AI の出力が成果物に到達している』ことであって、その提案が良い提案かどうかではない（品質の担保は R2）",
           "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化する問題と、Whisper の固有名詞崩れは別軸",
           "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
-          "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない"
+          "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない",
+          "**解決器の一致を保証する範囲は `model_policy` と `model_governance` の2者**（R1.5-C2 の検証で確定）。`backend/model_registry.py:99-101` の ImportError フォールバックは段の名前を生で返しうるが、到達には `backend/` が sys.path に無いことが要り、その状態では本線が import 時点で落ちる。塞がない",
+          "**突き合わせるのは宣言と deprecated 差替まで**（R1.5-C2 の検証で確定）。枠枯渇による降格は設計どおりの動きなので食い違いに数えない。`fallback_chain` の値はすべて実モデル ID で、段の名前は入っていない"
         ],
         "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る",
         "gates": [
