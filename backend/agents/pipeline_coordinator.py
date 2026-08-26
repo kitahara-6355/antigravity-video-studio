@@ -93,7 +93,14 @@ STAGE_RECORD: Dict[str, tuple] = {
     "SmartCutWorker": ("smart_cut", {"model": "local:auto-editor"}),
     "PreviewWorker": ("preview", {"model": "local:ffmpeg"}),
     "YouTubeOptWorker": ("youtube_opt", {"task": "youtube_optimization"}),
-    "QualityGateWorker": ("quality_gate", {"task": "quality_gate"}),
+    # **品質ゲートは規則ベース。** 減点式のプラグイン群で、LLM は下位の
+    # `AIRuleCheck` プラグイン（`quality_gate_ai`）が呼ぶ任意経路にしかない。
+    # `task_mapping` の `quality_gate: premium` はその下位経路のための宣言で、
+    # 工程そのものの宣言ではない。ここを premium と書くと、
+    # **一度も API を呼んでいないのに「3.7-flash で判定した」と記録に残る**
+    # （成果物ゲートが `model_unverified` で落とす）。
+    # AI が実際に効くようにするのは R1.5-C3 の担当。
+    "QualityGateWorker": ("quality_gate", {"model": "local:rule-based"}),
     "RenderWorker": ("render", {"model": "local:ffmpeg"}),
 }
 
@@ -553,8 +560,12 @@ class PipelineCoordinator:
                 "template_id": ctx.template_id,
                 "mainline": "agents",
             }}
-            if self.runs_dir is not None:
-                kwargs["runs_dir"] = Path(self.runs_dir)
+            # **記録の置き場は差し替えられること。** 差し替えられないと、
+            # コーディネータを動かすテストが本番の `output/runs/` に
+            # ゴミを積む（2026-08-26 に238件積んだ）。
+            runs_dir = self.runs_dir or os.getenv("AVS_RUNS_DIR")
+            if runs_dir:
+                kwargs["runs_dir"] = Path(runs_dir)
             if self.ledger_path is not None:
                 kwargs["ledger_path"] = Path(self.ledger_path)
             self._recorder = RunRecorder(**kwargs)
@@ -1126,3 +1137,66 @@ async def resolve_pipeline_coordinator_thumbnail_task(task_id: str) -> str:
     generate_pipeline_coordinator_thumbnail(output_path)
     result_info = validate_pipeline_coordinator_thumbnail(output_path)
     return json.dumps(result_info)
+
+
+# ============================================================
+# CLI — **本線をコマンドから走らせる**（R1.5-C1）
+# ============================================================
+#
+#   PYTHONPATH=./backend python -m backend.agents.pipeline_coordinator <入力.mp4>
+#
+# **これは課金経路。** 校閲・メタデータ・品質ゲートが Gemini を呼ぶ。
+# `cost_guard` が呼び出しごとに計上し、予算が尽きれば例外で止まる。
+
+def main(argv: Optional[List[str]] = None) -> int:
+    import argparse
+    import uuid
+
+    parser = argparse.ArgumentParser(
+        description="本線（agents）で動画を1本作る。**課金経路**")
+    parser.add_argument("video", help="入力動画のパス")
+    parser.add_argument("--target-minutes", type=int, default=20)
+    parser.add_argument("--runs-dir", default=None,
+                        help="実行記録の置き場（既定 output/runs）")
+    parser.add_argument("--no-ledger", action="store_true",
+                        help="台帳に1本ぶんの要約を書かない（試し撃ち用）")
+    args = parser.parse_args(argv)
+
+    video = Path(args.video)
+    if not video.is_file():
+        print(f"🚫 入力がありません: {video}")
+        return 1
+
+    from backend import cost_guard as _cg
+    _cg.load_env()
+
+    coordinator = PipelineCoordinator()
+    if args.runs_dir:
+        coordinator.runs_dir = Path(args.runs_dir)
+    if not args.no_ledger:
+        coordinator.ledger_path = Path(_cg.LEDGER_PATH)
+
+    ctx = PipelineContext(video_path=str(video),
+                          target_minutes=args.target_minutes,
+                          session_id=f"cli-{uuid.uuid4().hex[:8]}")
+
+    result = asyncio.run(coordinator.execute(ctx))
+
+    print()
+    print(f"  状態      : {result['status']}")
+    print(f"  所要      : {result['duration_seconds']} 秒")
+    print(f"  成果物    : {result.get('final_path') or '(無し)'}")
+    print(f"  プレビュー: {result.get('preview_path') or '(無し)'}")
+    print(f"  品質      : {result.get('quality_score')}")
+    if result["health"]["skipped_features"]:
+        print(f"  落ちた工程: {', '.join(result['health']['skipped_features'])}")
+    for w in result["health"]["warnings"]:
+        print(f"  ⚠ {w}")
+    if result.get("error"):
+        print(f"  🚫 {result['error']}")
+    return 0 if result["status"] in (STATUS_COMPLETED, STATUS_DEGRADED) else 1
+
+
+if __name__ == "__main__":
+    import sys as _sys
+    _sys.exit(main())

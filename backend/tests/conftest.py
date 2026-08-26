@@ -269,6 +269,24 @@ def reset_singletons():
     api_cache.clear()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def テストの実行記録を本番から隔離する(tmp_path_factory):
+    """**テストが本番の `output/runs/` に実行記録を書かないようにする。**
+
+    2026-08-26、本線（agents）に `RunRecorder` を被せた直後に踏んだ:
+    `runs_dir` を指定しないコーディネータのテストが1件ごとに記録を書き、
+    **`output/runs/` に 238 件のゴミが積もった**（実走の記録4件に紛れ込んだ）。
+    実行記録は R1 の証拠なので、混ざると「何本走ったか」が読めなくなる。
+
+    学習フック（DreamEngine）も同時に止める。走らせると
+    `VERIFIED_FACTS.md` などの追跡ファイルを書き換えてしまう。
+    """
+    os.environ["AVS_RUNS_DIR"] = str(tmp_path_factory.mktemp("runs"))
+    os.environ.setdefault("AVS_SKIP_LEARNING_SIDE_EFFECTS", "1")
+    yield
+    os.environ.pop("AVS_RUNS_DIR", None)
+
+
 # pytest設定
 def pytest_addoption(parser):
     """コマンドラインオプションの追加"""

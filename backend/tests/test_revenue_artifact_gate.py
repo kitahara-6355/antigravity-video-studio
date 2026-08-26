@@ -210,3 +210,57 @@ def test_the_semantics_promise_per_stage_visibility():
     checked = "".join(ARTIFACT_SEMANTICS["確かめること"])
 
     assert "工程ごとに、どのモデルで動いたかが残ること" in checked
+
+
+# --- 判定は最新の1本。過去は書庫 ------------------------------------------------
+
+
+def _write_run(runs_dir: Path, run_id: str, *, unverified: bool) -> None:
+    stage = {"name": "quality_gate", "status": "success",
+             "model": "gemini-3.7-flash"}
+    if unverified:
+        stage["model_unverified"] = True
+    d = runs_dir / run_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "run.json").write_text(json.dumps({
+        "run_id": run_id, "started_at": "2026-08-26T00:00:00Z",
+        "stages": [stage], "models_used": ["gemini-3.7-flash"],
+        "artifacts": [],
+    }), encoding="utf-8")
+
+
+def test_過去の欠陥ではゲートを落とさない(tmp_path):
+    """**直せない過去で永久に落ちない。**
+
+    「あの実行は宣言だけで API を呼んでいなかった」はその日の事実で、
+    実装を直しても記録からは消えない。全件を判定対象にすると、
+    一度でも駄目な実行をした時点でゲートが二度と緑にならない。
+    """
+    _write_run(tmp_path, "20260826T100000000000-0000", unverified=True)
+    _write_run(tmp_path, "20260826T110000000000-0000", unverified=False)
+
+    findings = check_runs(load_runs(tmp_path))
+
+    assert not findings, f"最新が綺麗なら通ること: {findings}"
+
+
+def test_過去の欠陥は黙って消さない(tmp_path):
+    """判定には使わないが、**見えなくもしない。**"""
+    from backend.revenue.artifact_gate import history_findings
+
+    _write_run(tmp_path, "20260826T100000000000-0000", unverified=True)
+    _write_run(tmp_path, "20260826T110000000000-0000", unverified=False)
+
+    history = history_findings(load_runs(tmp_path))
+
+    assert _kinds(history) == {"model_unverified"}
+
+
+def test_最新が駄目ならゲートは落ちる(tmp_path):
+    """**過去を免責にしたぶん、最新には厳しくする。**"""
+    _write_run(tmp_path, "20260826T100000000000-0000", unverified=False)
+    _write_run(tmp_path, "20260826T110000000000-0000", unverified=True)
+
+    findings = check_runs(load_runs(tmp_path))
+
+    assert _kinds(findings) == {"model_unverified"}

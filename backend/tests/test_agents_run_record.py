@@ -91,7 +91,8 @@ def test_使ったモデルが工程ごとに分かる(tmp_path):
     # 校閲・メタデータ・品質は LLM。**段から引く**（直書きしない）
     assert by_name["proofread"]["tier"] in ("batch", "standard", "premium", "pro")
     assert by_name["youtube_opt"]["tier"]
-    assert by_name["quality_gate"]["tier"]
+    # 品質ゲートは規則ベース。**AI だと偽らない**（R1.5-C3 で本当に効かせる）
+    assert by_name["quality_gate"]["model"] == "local:rule-based"
 
 
 def test_失敗した工程の原因と入力が残る(tmp_path):

@@ -85,6 +85,9 @@ class ArtifactReport:
     findings: list[Finding] = field(default_factory=list)
     video: dict | None = None
     runs: list[dict] = field(default_factory=list)
+    # **過去の実行にあった欠陥。判定はしない**（直せないので）。
+    # 黙って消すと「前も同じ所で駄目だった」が見えなくなるので残す。
+    history: list[Finding] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -165,7 +168,16 @@ def load_runs(runs_dir: Path = RUNS_DIR) -> list[dict]:
 
 
 def check_runs(runs: list[dict]) -> list[Finding]:
-    """実行記録が**再開できるだけの情報**を持っているか。"""
+    """実行記録が**再開できるだけの情報**を持っているか。
+
+    **見るのは最新の1本。** 過去の記録は書庫であって、直せない。
+    「2026-08-26 のあの実行は宣言だけで API を呼んでいなかった」は
+    **その日の事実**で、あとから実装を直しても消えない。全件を判定対象に
+    すると、一度でも駄目な実行をするとゲートが**永久に落ち続ける**。
+    それでは「いまパイプラインが動くか」を答えられない。
+
+    過去のぶんは `history_findings()` が別枠で出す（判定はしない）。
+    """
     findings: list[Finding] = []
     if not runs:
         findings.append(Finding(
@@ -173,7 +185,7 @@ def check_runs(runs: list[dict]) -> list[Finding]:
             "実行の記録が1件もありません。**0件を緑にしない** — "
             "記録が無ければ、動いたかどうかも、どこで落ちたかも分かりません"))
         return findings
-    for run in runs:
+    for run in [runs[-1]]:
         rid = run.get("run_id", "(不明)")
         if run.get("_broken"):
             findings.append(Finding("broken_run", rid, "run.json が壊れています"))
@@ -217,6 +229,19 @@ def check_runs(runs: list[dict]) -> list[Finding]:
                     f"失敗した工程から再開できません（欠けている: "
                     f"{', '.join(lacking)}）"))
     return findings
+
+
+def history_findings(runs: list[dict]) -> list[Finding]:
+    """**過去の実行にあった欠陥。判定材料にはしない。**
+
+    最新より前の記録は書庫で、あとから直せない。判定に混ぜると一度の失敗で
+    永久に落ちる。**ただし黙って捨てない** — 同じ所で繰り返し駄目になって
+    いるなら、それは次を疑う手がかりになる。
+    """
+    out: list[Finding] = []
+    for run in runs[:-1]:
+        out += check_runs([run])
+    return out
 
 
 def check_cost(runs: list[dict]) -> list[Finding]:
@@ -274,6 +299,7 @@ def run_gate(video: Path | None = None,
     report = ArtifactReport()
     report.runs = load_runs(runs_dir)
     report.findings += check_runs(report.runs)
+    report.history = history_findings(report.runs)
     report.findings += check_cost(report.runs)
     report.findings += check_models(report.runs)
     if video is not None:
@@ -307,9 +333,15 @@ def _format(report: ArtifactReport) -> str:
     if report.ok:
         lines.append("  ✅ 成果物を確認しました"
                      "（--semantics に確かめていないことを列挙してあります）")
-        return "\n".join(lines)
-    for finding in report.findings:
-        lines.append(f"    {finding}")
+    else:
+        for finding in report.findings:
+            lines.append(f"    {finding}")
+    if report.history:
+        kinds = ", ".join(sorted({f.kind for f in report.history}))
+        lines.append("")
+        lines.append(f"  ℹ 過去の実行に {len(report.history)} 件の欠陥があります"
+                     f"（{kinds}）。**判定には使っていません** — "
+                     "直せない過去で永久に落ちないよう、判定は最新の1本で行います")
     return "\n".join(lines)
 
 

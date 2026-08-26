@@ -1566,8 +1566,14 @@ class TestC8ExternalIntegration:
         assert result2["status"] == "completed" # 例外発生しても無視して完了する
 
     @pytest.mark.asyncio
-    async def test_C8_08_dream_learning_success_and_exception(self):
-        """C8-08: DreamEngine学習フックの正常系および例外ハンドリング"""
+    async def test_C8_08_dream_learning_success_and_exception(self, monkeypatch):
+        """C8-08: DreamEngine学習フックの正常系および例外ハンドリング
+
+        **このテストだけは学習フックを動かす。** conftest がセッション全体で
+        `AVS_SKIP_LEARNING_SIDE_EFFECTS=1` を立てている（実走のたびに
+        VERIFIED_FACTS が書き換わるのを防ぐため）ので、ここでは外す。
+        """
+        monkeypatch.delenv("AVS_SKIP_LEARNING_SIDE_EFFECTS", raising=False)
         # 1. 正常系
         coord = _create_coordinator_with_mocks()
         ctx = PipelineContext(video_path="/tmp/test.mp4")
