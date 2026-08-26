@@ -106,6 +106,7 @@ STAGE_RECORD: Dict[str, tuple] = {
 
 # **これが落ちたら成果物が無い。** 続けても意味が無いので中断する。
 FATAL_WORKERS = {"TranscribeWorker", "SmartCutWorker", "RenderWorker"}
+FATAL_STAGES = {STAGE_RECORD[w][0] for w in FATAL_WORKERS}
 
 # 落ちても**動画は作れる**工程。中断はしないが、**完走とも呼ばない**。
 # 結果は `degraded` になり、落ちた工程は `health.skipped_features` に出る。
@@ -154,8 +155,8 @@ class PipelineCoordinator:
         self.runs_dir: Optional[Path] = None
         self.ledger_path: Optional[Path] = None
         self._recorder: Optional[RunRecorder] = None
-        self._failed_required: List[str] = []
-        self._degraded: List[str] = []
+        # 工程名 → 最後の試行が通ったか。**リトライで通ったものは失敗にしない**
+        self._outcomes: Dict[str, bool] = {}
 
     # --- 実行記録 -----------------------------------------------------------
 
@@ -179,6 +180,19 @@ class PipelineCoordinator:
             },
         }
 
+    def _stage_name(self, worker: PipelineStageWorker) -> str:
+        return STAGE_RECORD.get(
+            type(worker).__name__, (type(worker).__name__, {}))[0]
+
+    def _record_outcome(self, worker: PipelineStageWorker, ok: bool) -> None:
+        """**最後の試行が答え。**
+
+        リトライで通ったものを失敗として数えない。品質改善ループのように
+        同じ工程を何度も回す経路もあるので、上書きで最後の結果を残す
+        （記録そのものは1試行ずつ全部残る）。
+        """
+        self._outcomes[self._stage_name(worker)] = ok
+
     async def _execute_worker(self, worker: PipelineStageWorker,
                               ctx: PipelineContext) -> StageResult:
         """**1工程 = 1記録。** 失敗も原因と入力ごと残す（R1.5-C1）。
@@ -187,7 +201,9 @@ class PipelineCoordinator:
         **worker の失敗そのものは飲まない** — `StageResult` はそのまま返す。
         """
         if self._recorder is None:
-            return await worker.execute(ctx)
+            result = await worker.execute(ctx)
+            self._record_outcome(worker, bool(result and result.success))
+            return result
 
         name, kwargs = self._stage_args(worker, ctx)
         result: Optional[StageResult] = None
@@ -205,16 +221,22 @@ class PipelineCoordinator:
             result = StageResult(stage_name=worker.name, success=False,
                                  detail=f"{worker.name} が例外で落ちました")
 
-        if result is not None and not result.success:
-            if type(worker).__name__ in FATAL_WORKERS:
-                self._failed_required.append(name)
-            else:
-                # **止めないが、成功にもしない。**
-                self._degraded.append(name)
-                if name not in ctx.skipped_features:
-                    ctx.skipped_features.append(name)
-                ctx.warnings.append(f"{worker.name}失敗: {result.detail}")
+        self._record_outcome(worker, bool(result and result.success))
         return result
+
+    def _settle_outcomes(self, ctx: PipelineContext) -> tuple:
+        """**最後まで通らなかった工程**を、致命とそれ以外に分ける。
+
+        呼ぶのは全工程が終わってから。途中で数えるとリトライで通ったものまで
+        失敗に数える（2026-08-26 に一度そうしてしまい、CI が教えてくれた）。
+        """
+        落ちた = [name for name, ok in self._outcomes.items() if not ok]
+        致命 = [n for n in 落ちた if n in FATAL_STAGES]
+        劣化 = [n for n in 落ちた if n not in FATAL_STAGES]
+        for name in 劣化:
+            if name not in ctx.skipped_features:
+                ctx.skipped_features.append(name)
+        return 致命, 劣化
 
     def _find_worker(self, worker_type: type) -> Optional[PipelineStageWorker]:
         """Worker をタイプで検索（インデックス直値を避ける）"""
@@ -513,16 +535,16 @@ class PipelineCoordinator:
         # **落ちた工程があるのに "completed" を返さない。** 直列で中断するのは
         # 文字起こしだけで、校閲・スマートカット・メタデータ・品質・レンダリングの
         # 失敗はここまで素通りしていた。宣言済みの例外（プレビュー）は除く。
-        if self._failed_required:
-            落ちた = "、".join(self._failed_required)
+        致命, 劣化 = self._settle_outcomes(ctx)
+        if 致命:
             self._finalize_harness(harness, ctx, "error")
             self._close_recorder(ctx, "failed")
             return self._build_result(
                 ctx, "error", total_start,
-                f"工程が失敗しました: {落ちた}")
+                f"工程が失敗しました: {'、'.join(致命)}")
 
         # 落ちた工程はあるが動画は作れた場合。**完走とは呼ばない。**
-        final_status = STATUS_DEGRADED if self._degraded else STATUS_COMPLETED
+        final_status = STATUS_DEGRADED if 劣化 else STATUS_COMPLETED
 
         # ━━━ 5. パイプライン後処理 ━━━
         retention_report = await self._run_retention_analysis(ctx)
@@ -550,8 +572,7 @@ class PipelineCoordinator:
     def _open_recorder(self, ctx: PipelineContext) -> None:
         """記録を開く。**開けなくても実行は続ける**（記録は実行を止めない）。"""
         self._recorder = None
-        self._failed_required = []
-        self._degraded = []
+        self._outcomes = {}
         try:
             kwargs = {"inputs": {
                 "video_path": ctx.video_path,
@@ -628,6 +649,8 @@ class PipelineCoordinator:
         for worker in serial_workers:
             denied, deny_reason = await self._fire_pre_hook(harness, worker, ctx)
             if denied:
+                # **断られた＝その工程は動いていない。** 成功に数えない
+                self._record_outcome(worker, False)
                 ctx.stage_results.append(StageResult(
                     stage_name=worker.name, success=False,
                     detail=f"Hook denied: {deny_reason}",
@@ -674,6 +697,7 @@ class PipelineCoordinator:
             """並列実行用のワーカーラッパー"""
             denied, deny_reason = await self._fire_pre_hook(harness, worker, ctx)
             if denied:
+                self._record_outcome(worker, False)
                 r = StageResult(stage_name=worker.name, success=False,
                                 detail=f"Hook denied: {deny_reason}")
                 ctx.stage_results.append(r)

@@ -169,3 +169,24 @@ def test_一致しているときは点検に出ない(枠は空いている):
 
     assert not [f for f in findings
                 if f.trigger in ("resolver_split", "resolver_unverified")]
+
+
+def test_deprecated差替の食い違いも点検が拾う(monkeypatch, 枠は空いている):
+    """**宣言だけ比べても足りない。**
+
+    `_resolve_model()` は宣言のあとに deprecated 差替を通す。差替表に1行
+    足すだけで API に渡るモデルは変わるのに、宣言だけ比べていると点検は
+    緑のままだった（2026-08-26・gate-verifier の指摘）。
+
+    **C6（2.5系サンセット）でまさに触る所**なので、うっかり型として塞ぐ。
+    """
+    monkeypatch.setitem(model_governance._deprecation_map,
+                        "gemini-3.6-flash", "gemini-2.5-flash")
+
+    findings, _ = model_policy.audit()
+    split = [f for f in findings if f.trigger == "resolver_split"]
+
+    assert split, "deprecated 差替で生まれた食い違いを点検が見逃しています"
+    assert any("gemini-2.5-flash" in f.model for f in split)
+    # 差替が実際に効いていること（テストが空振りしていないことの確認）
+    assert model_governance._resolve_model("proofreader") == "gemini-2.5-flash"

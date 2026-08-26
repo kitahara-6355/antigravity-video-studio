@@ -1316,8 +1316,9 @@ class TestC7HarnessIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        # AI校閲が拒否されたが、致命的ではないため completed になること
-        assert result["status"] == "completed"
+        # AI校閲が拒否されたが致命的ではないので**止めない**。
+        # ただし断られた工程は動いていないので completed とも呼ばない（R1.5-C1）
+        assert result["status"] == "degraded"
         # AI校閲の StageResult が失敗 (Hook denied) として記録されていること
         proofread_res = next(r for r in result["stage_results"] if r["name"] == "AI校閲")
         assert proofread_res["success"] is False
@@ -1357,7 +1358,8 @@ class TestC7HarnessIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        # 断られた工程は動いていない。止めないが完走とも呼ばない（R1.5-C1）
+        assert result["status"] == "degraded"
         yt_res = next(r for r in result["stage_results"] if r["name"] == "YouTube最適化")
         assert yt_res["success"] is False
         assert "Hook denied" in yt_res["detail"]

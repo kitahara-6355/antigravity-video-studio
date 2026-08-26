@@ -363,7 +363,8 @@ class TestPipelineCoordinatorCoverage:
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            # 断られた工程は動いていない。最終レンダリングまで断られたので動画が無い（R1.5-C1）
+            assert res["status"] == "error"
 
     @pytest.mark.asyncio
     async def test_execute_serial_worker_retry_and_success(self):
@@ -458,7 +459,8 @@ class TestPipelineCoordinatorCoverage:
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            # 並列で落ちても止めないが、完走とも呼ばない（R1.5-C1）
+            assert res["status"] == "degraded"
             assert any("プレビュー生成失敗" in w for w in ctx.warnings)
             assert ctx.render_mode == "safe"
             mock_ws.assert_called()
@@ -486,7 +488,8 @@ class TestPipelineCoordinatorCoverage:
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            # 断られた工程は動いていない。止めないが完走とも呼ばない（R1.5-C1）
+            assert res["status"] == "degraded"
 
     @pytest.mark.asyncio
     async def test_execute_evaluator_optimizer_success(self):
@@ -759,7 +762,11 @@ class TestPipelineCoordinatorCoverage:
             assert res is None
 
     @pytest.mark.asyncio
-    async def test_trigger_dream_learning_success(self):
+    async def test_trigger_dream_learning_success(self, monkeypatch):
+        # conftest がセッション全体で学習フックを止めている（実走のたびに
+        # VERIFIED_FACTS が書き換わるため）。**このテストだけは動かす。**
+        # `monkeypatch` を使うのは、外したまま他のテストへ漏らさないため。
+        monkeypatch.delenv("AVS_SKIP_LEARNING_SIDE_EFFECTS", raising=False)
         pc = PipelineCoordinator()
         ctx = PipelineContext(video_path=self.video_path, target_minutes=5, session_id="s123")
         ctx.segments = []
@@ -970,7 +977,8 @@ class TestPipelineCoordinatorCoverage:
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            # **動画が無いのに完了と言わない**（R1.5-C1）
+            assert res["status"] == "error"
 
     @pytest.mark.asyncio
     async def test_fire_post_hook_success_and_failure(self):

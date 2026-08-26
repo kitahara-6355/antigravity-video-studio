@@ -154,3 +154,27 @@ def test_成果物ゲートが本線の記録の形を認める(tmp_path):
 
     それ以外 = [f for f in findings if f.kind != "model_unverified"]
     assert not それ以外, f"本線の実行記録がゲートを通りません: {それ以外}"
+
+
+def test_記録が開けなくても失敗は握り潰さない(tmp_path, monkeypatch):
+    """**記録が壊れたら偽の success に戻る**、という穴が空いていた。
+
+    `_open_recorder` は記録を開けなくても実行を続ける（記録の失敗で
+    実行を落とさないため）。だが `_execute_worker` はそのとき
+    `worker.execute()` をそのまま返すだけで、失敗を数えていなかった。
+    結果、**最終レンダリングが落ちても `completed`** に戻ってしまう
+    （2026-08-26・gate-verifier の指摘）。
+    """
+    def 開けない(*a, **kw):
+        raise OSError("記録を開けません")
+
+    monkeypatch.setattr(
+        "agents.pipeline_coordinator.RunRecorder", 開けない)
+
+    result = _run(_coordinator(tmp_path, 落ちる={"RenderWorker"}), tmp_path)
+
+    assert result["status"] == "error", (
+        "記録が開けないときに偽の success へ戻っています: "
+        f"status={result['status']}")
+    assert not (tmp_path / "runs").exists() or not list(
+        (tmp_path / "runs").glob("*/run.json"))

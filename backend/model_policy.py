@@ -343,11 +343,21 @@ def _resolver_disagreements() -> tuple[list[tuple[str, str, str]], str]:
         return [], ("model_governance に `_resolve_declared` がありません"
                     "（解決器が一本化されていない可能性があります）")
 
+    # **宣言だけでは足りない。** `_resolve_model()` は宣言のあとに
+    # deprecated 差替（`validate_and_correct`）を通す。ここに1行足すだけで、
+    # API に渡るモデルは `model_policy` の答えと変わる。**C6（2.5系サンセット）で
+    # まさに触る所**なので、差替まで含めて突き合わせる。
+    # （枠枯渇による降格は設計どおりの動きなので、ここでは見ない。
+    #   実際に何で動いたかは実行記録の `models_observed` に残る）
+    correct = getattr(engine, "validate_and_correct", None)
+
     disagreements = []
     for task in known_tasks():
         mine = resolve(task).model
         try:
             theirs = resolve_declared(task)
+            if correct is not None:
+                theirs = correct(theirs, f"audit:{task}")
         except Exception as e:  # noqa: BLE001 — 解決できないこと自体が食い違い
             theirs = f"(解決できません: {e})"
         if mine != theirs:

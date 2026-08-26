@@ -264,3 +264,40 @@ def test_最新が駄目ならゲートは落ちる(tmp_path):
     findings = check_runs(load_runs(tmp_path))
 
     assert _kinds(findings) == {"model_unverified"}
+
+
+def test_resume_checkは検査した範囲だけを数える(tmp_path, capsys, monkeypatch):
+    """**検査していないものを「再開できます」に含めない。**
+
+    判定を最新の1本に絞ったのに、件数は全件ぶん出していた。
+    「実行記録 6 件 / 失敗した工程 12 件。いずれも再開できます」は、
+    実際には最新1本しか見ていないので嘘になる
+    （2026-08-26・gate-verifier の指摘）。
+    """
+    from backend.revenue import artifact_gate
+
+    for i, unverified in enumerate([True, False]):
+        rid = f"2026082{i}T000000000000-0000"
+        d = tmp_path / rid
+        d.mkdir(parents=True)
+        (d / "run.json").write_text(json.dumps({
+            "run_id": rid, "started_at": "2026-08-26T00:00:00Z",
+            "stages": [{"name": "render", "status": "failed",
+                        "model": "local:ffmpeg", "error": "落ちた",
+                        "input": {"video_path": "x.mp4"}}],
+            "models_used": ["local:ffmpeg"], "artifacts": [],
+        }), encoding="utf-8")
+
+    monkeypatch.setattr(artifact_gate, "RUNS_DIR", tmp_path)
+    monkeypatch.setattr(artifact_gate, "load_runs",
+                        lambda runs_dir=tmp_path: artifact_gate.load_runs.__wrapped__(tmp_path)
+                        if hasattr(artifact_gate.load_runs, "__wrapped__")
+                        else [json.loads((p).read_text(encoding="utf-8"))
+                              for p in sorted(tmp_path.glob("*/run.json"))])
+
+    assert artifact_gate.main(["--resume-check"]) == 0
+    out = capsys.readouterr().out
+
+    assert "最新の実行記録" in out, out
+    assert "過去 1 件は検査していません" in out, out
+    assert "6 件" not in out

@@ -380,15 +380,23 @@ def main(argv: list[str] | None = None) -> int:
         # **不在を成功にしない。** 失敗が1件も無い記録に対して
         # 「再開できます」と言うと、確かめていないことを確かめたと
         # 報告することになる。件数を出して区別する。
-        failed = sum(1 for r in runs for s in (r.get("stages") or [])
+        #
+        # **数えるのは検査した範囲だけ。** `check_runs` は最新の1本しか見ないので、
+        # 全件ぶんの件数を出すと「6件ぜんぶ再開できます」と読める嘘になる
+        # （2026-08-26 に gate-verifier の指摘で判明）。
+        検査した = runs[-1:]
+        failed = sum(1 for r in 検査した for s in (r.get("stages") or [])
                      if s.get("status") == "failed")
+        置き去り = len(runs) - len(検査した)
+        あと = f"（過去 {置き去り} 件は検査していません）" if 置き去り else ""
         if failed:
-            print(f"✅ 実行記録 {len(runs)} 件 / 失敗した工程 {failed} 件。"
-                  "いずれも工程名・原因・入力が残っており再開できます。")
+            print(f"✅ 最新の実行記録 {検査した[0].get('run_id', '(id なし)')} / "
+                  f"失敗した工程 {failed} 件。"
+                  f"いずれも工程名・原因・入力が残っており再開できます{あと}。")
         else:
-            print(f"✅ 実行記録 {len(runs)} 件。"
+            print(f"✅ 最新の実行記録 {検査した[0].get('run_id', '(id なし)')}。"
                   "**失敗した工程はありません**"
-                  "（再開できるかどうかはこの記録では確かめられません）。")
+                  f"（再開できるかどうかはこの記録では確かめられません）{あと}。")
         return 0
 
     report = run_gate(args.video)
