@@ -220,7 +220,13 @@ async def transcribe_video(file: UploadFile):
         if file is not None:
             try:
                 await file.close()
-            except (OSError, ValueError, AttributeError, RuntimeError) as e:
+            except Exception as e:  # noqa: BLE001
+                # **後始末の失敗で結果を上書きしない。**
+                # 文字起こしが成功しているのに `close()` の例外が返ると、
+                # クライアントには 400/500 が返る。HTTPException もここで止める
+                # （2026-08-26: テストは前からこれを主張していたが、
+                #   `routers.segments` がモックに差し替わっていて実コードに
+                #   届いていなかった）。
                 logger.error(f"Failed to close uploaded file: {e}")
 
 

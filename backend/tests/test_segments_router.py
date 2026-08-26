@@ -7,6 +7,24 @@ sys.modules["google.adk"] = MagicMock()
 sys.modules["google.genai"] = MagicMock()
 sys.modules["google.genai.types"] = MagicMock()
 
+# **`google.genai` を差し替えるなら `errors` も差し替える。**
+# 差し替えないと、同じ pytest プロセスで後から読まれるモジュールの
+# `from google.genai.errors import APIError` が
+# 「'google.genai' is not a package」で落ちる。
+# 巻き添えの相手は**バッチの区切り次第**で、testpaths に1ファイル足すだけで変わる
+# （2026-08-26 に踏んだ: test_smartcut_router / test_transcribe_worker /
+#  test_subtitle_quality_normalization が道連れになった）。
+class _MockAPIError(Exception):
+    def __init__(self, message="", code=None):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+
+
+_mock_errors = MagicMock()
+_mock_errors.APIError = _MockAPIError
+sys.modules["google.genai.errors"] = _mock_errors
+
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
