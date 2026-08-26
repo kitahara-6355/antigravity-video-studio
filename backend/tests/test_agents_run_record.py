@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -51,9 +52,18 @@ def _coordinator(tmp_path, 落ちる=(), *, final_path=None):
 
 
 def _run(coordinator, tmp_path):
+    """**ハーネスと後処理は止めて走らせる。**
+
+    `_init_harness` はセッションとトレースを `backend/data/` へ書く
+    （本番ファイル汚染ラチェットが増加を検出する）。ここで見たいのは
+    実行記録と失敗の伝播であって、ハーネスの配線ではない。
+    既存の `test_workers/test_pipeline_coordinator.py` も同じ形で止めている。
+    """
     ctx = PipelineContext(video_path=str(tmp_path / "入力.mp4"),
                           session_id="test-session")
-    return asyncio.run(coordinator.execute(ctx))
+    with patch.object(coordinator, "_init_harness", return_value=None),             patch.object(coordinator, "_run_retention_analysis",
+                         new=AsyncMock(return_value=None)):
+        return asyncio.run(coordinator.execute(ctx))
 
 
 def _run_json(tmp_path):
