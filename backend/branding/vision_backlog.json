@@ -428,16 +428,18 @@
     "started_at": "2026-08-26",
     "rationale": "**R1 で硬化したのは2つあるパイプラインの片方だった。** 2026-08-26 に両方を実走させて 本線を agents 側に決めた（invariants.mainline）。\n\n同時に、**モデル解決器が2つあって全工程で食い違う**ことが判明した。`model_config.json` の task_mapping は**段の名前**（\"standard\" / \"premium\"）を持つが、`model_governance._resolve_model()` はそれを生のまま返し、モデル ID として API に渡る:\n\n    404 NOT_FOUND: models/standard is not found for API version v1beta\n\n正しく解決するのは `model_policy.resolve()` だけで、使っているのは soul_feedback ほか2箇所。**製品の LLM 呼び出しは soul_feedback を除いてほぼ全部 404 している。**「21工程登録されているのに実走で1回しか呼ばれない」の原因はこれ。\n\nR2 の承認工程を先に作ると**承認する中身が無い画面**ができるので、順序としてここが先。",
     "score_note": "**このフェーズは実現度を測り直す前提を作る。** R1 で実行層は開いたが、本線では LLM がほぼ全部 404 しており、いま pipeline_e2e を測ると『AI が働いていない状態』の数字が確定する。再監査（/vision-audit）は R1.5 の後に打つ（2026-08-26 ユーザー決定）",
-    "budget_jpy": 0,
-    "budget_id": "",
-    "budget_note": "**まだ枠を取っていない。** 見込みは無料枠3段（batch/standard/premium）で ¥0 だが、cost_guard は fail-closed で、active な予算が無いと実キーの呼び出しが例外で止まる。R1 の枠（R1-execution-layer・残 ¥2,996）は R1 に対する承認なので流用しない。**C1 と C5 の検証には実走が要るので、その前に予算を取る**（憲法第3条）",
+    "budget_jpy": 1000,
+    "budget_id": "R1.5-mainline",
+    "budget_note": "ユーザー承認 ¥1,000（2026-08-26）。**見込みは ¥0** — 無料枠3段で足りる。呼び出し数は増えるが Flash 系の無料枠（約1,500 RPD / 15 RPM）の内側。**pro 昇格が要ると判断した時点で別途承認を取る**（憲法第3条）",
     "limits": [
       "**動画の良し悪しは判定しない。** ここで示すのは『AI の出力が成果物に到達している』ことであって、その提案が良い提案かどうかではない（品質の担保は R2）",
       "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化する問題と、Whisper の固有名詞崩れは別軸",
       "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
       "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない"
     ],
-    "user_tasks": [],
+    "user_tasks": [
+      "**実運用に近い尺（10分前後）の実写素材を1本置く**（C5 の測定用）。置き場は `output/testclips/`、mp4・音声トラックつき。**顔が映っていて構わない**（このリポジトリは公開だが `output/` は gitignore なので履歴には入らない）。用意できたらファイル名を教えてください"
+    ],
     "note": "正典は `roadmap.phases.R1.5` と同じ内容を指す。**台帳は1つ**（憲法第5条）",
     "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る",
     "exit_criteria": [
@@ -463,13 +465,15 @@
         "id": "R1.5-C4",
         "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
         "verify": "docs/ 配下の実走記録",
-        "met": false
+        "met": false,
+        "decision": "**youtube_uploader.upload_video() は未実装として失敗させる**（2026-08-26 ユーザー決定）。呼ばれたら明示的に例外で止める。投稿の自動化は R5 で最後尾、当面は手動投稿という既定方針に合わせる。実装も削除もしない — 削除は呼び出し元（ルーター・UI）に連鎖するため"
       },
       {
         "id": "R1.5-C5",
         "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
         "verify": "python -m backend.cost_guard --status",
-        "met": false
+        "met": false,
+        "decision": "**実運用に近い尺（10分前後）の実写素材で測る**（2026-08-26 ユーザー決定）。30秒クリップだと1日に何本作れるか（RPD/RPM）の答えが現実的にならないため。素材はユーザーが用意する（user_tasks）"
       },
       {
         "id": "R1.5-C6",
@@ -1026,8 +1030,8 @@
       "R1.5": {
         "title": "本線を一本化し、AI の出力を成果物に届かせる",
         "why": "**R1 で硬化したのは2つあるパイプラインの片方だった。** 2026-08-26 に両方を実走させて 本線を agents 側に決めた（invariants.mainline）。\n\n同時に、**モデル解決器が2つあって全工程で食い違う**ことが判明した。`model_config.json` の task_mapping は**段の名前**（\"standard\" / \"premium\"）を持つが、`model_governance._resolve_model()` はそれを生のまま返し、モデル ID として API に渡る:\n\n    404 NOT_FOUND: models/standard is not found for API version v1beta\n\n正しく解決するのは `model_policy.resolve()` だけで、使っているのは soul_feedback ほか2箇所。**製品の LLM 呼び出しは soul_feedback を除いてほぼ全部 404 している。**「21工程登録されているのに実走で1回しか呼ばれない」の原因はこれ。\n\nR2 の承認工程を先に作ると**承認する中身が無い画面**ができるので、順序としてここが先。",
-        "budget_jpy": 0,
-        "budget_note": "無料枠3段（batch/standard/premium）で足りる見込み。呼び出し数は増えるが Flash 系の無料枠（約1,500 RPD）の内側。**pro 昇格が要ると判断した時点で別途承認を取る**（憲法第3条）",
+        "budget_jpy": 1000,
+        "budget_note": "ユーザー承認 ¥1,000（2026-08-26）。**見込みは ¥0** — 無料枠3段で足りる。呼び出し数は増えるが Flash 系の無料枠（約1,500 RPD / 15 RPM）の内側。**pro 昇格が要ると判断した時点で別途承認を取る**（憲法第3条）",
         "status": "in_progress",
         "exit_criteria": [
           {
@@ -1052,13 +1056,15 @@
             "id": "R1.5-C4",
             "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
             "verify": "docs/ 配下の実走記録",
-            "met": false
+            "met": false,
+            "decision": "**youtube_uploader.upload_video() は未実装として失敗させる**（2026-08-26 ユーザー決定）。呼ばれたら明示的に例外で止める。投稿の自動化は R5 で最後尾、当面は手動投稿という既定方針に合わせる。実装も削除もしない — 削除は呼び出し元（ルーター・UI）に連鎖するため"
           },
           {
             "id": "R1.5-C5",
             "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
             "verify": "python -m backend.cost_guard --status",
-            "met": false
+            "met": false,
+            "decision": "**実運用に近い尺（10分前後）の実写素材で測る**（2026-08-26 ユーザー決定）。30秒クリップだと1日に何本作れるか（RPD/RPM）の答えが現実的にならないため。素材はユーザーが用意する（user_tasks）"
           },
           {
             "id": "R1.5-C6",
@@ -1091,7 +1097,8 @@
             "R1.5-C2"
           ],
           "decided_at": "2026-08-26"
-        }
+        },
+        "budget_id": "R1.5-mainline"
       },
       "R2": {
         "title": "承認工程を必須にする（品質の担保 + D-16 の解消）",
