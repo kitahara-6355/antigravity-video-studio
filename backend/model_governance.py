@@ -38,6 +38,28 @@ from cost_guard import guard_after, guard_before
 
 logger = logging.getLogger(__name__)
 
+
+def _model_policy():
+    """**段の解決はここだけ。** 段 → モデルの対応と、ユーザーの上書きを持つ。
+
+    実行のされ方で import の形が変わる（CLI は `PYTHONPATH=./backend`、
+    実走は `PYTHONPATH=.`）ので両方を試す。**読めなければ落とす** —
+    段の名前をモデル ID として API に渡すと 404 になるだけで、
+    黙って進めても意味が無い。
+    """
+    try:
+        from backend import model_policy
+    except ImportError:
+        try:
+            import model_policy  # type: ignore[no-redef]
+        except ImportError as e:  # pragma: no cover — 経路が壊れたときだけ
+            raise RuntimeError(
+                "model_policy を読み込めません。段（batch/standard/premium/pro）を"
+                "モデルに解決できないため、モデル解決を続行できません"
+            ) from e
+    return model_policy
+
+
 # ============================================================
 # モデルガバナンスエンジン
 # ============================================================
@@ -353,11 +375,38 @@ class ModelGovernanceEngine:
     # Layer 4: 統一 API ゲートウェイ
     # ============================================================
 
+    def _resolve_declared(self, task: str) -> str:
+        """**この工程が宣言上どのモデルで動くか。** 段の名前は段として解く。
+
+        `model_config.json` の `task_mapping` は**段の名前**（`"standard"` /
+        `"premium"`）を持つ。ここを生のまま返していたため、段の名前が
+        モデル ID として API に渡っていた:
+
+            404 NOT_FOUND: models/standard is not found for API version v1beta
+
+        **解決器は `model_policy` に一本化する**（R1.5-C2）。ここが自前で解くと
+        答えが2種類でき、`--up` での昇格も片方にしか効かない。
+        """
+        policy = _model_policy()
+
+        # ユーザーの上書き（`--up`）は自前のマッピングより強い。
+        # **昇格したのに古い段で走り続ける**のを防ぐ。
+        override = policy.load_overrides().get(task)
+        if override:
+            return policy.model_of_tier(override["tier"])
+
+        declared = self._task_mapping.get(task, self._default_model)
+
+        # 段の名前ならモデルに解く。モデル ID の直書き（imagen / veo）はそのまま。
+        if declared in policy.tiers():
+            return policy.model_of_tier(declared)
+        return declared
+
     def _resolve_model(self, task: str, model: Optional[str] = None) -> str:
         """タスク名からモデルを解決（枠チェック付き）。
 
         解決フロー:
-          1. 明示的 model 指定 or task_mapping or default_model
+          1. 明示的 model 指定 or **段の解決（model_policy）** or default_model
           2. deprecated 差替
           3. 枠チェック → 枯渇なら fallback_chain で自動降格（プロアクティブ）
 
@@ -368,7 +417,7 @@ class ModelGovernanceEngine:
         if model:
             resolved = model
         else:
-            resolved = self._task_mapping.get(task, self._default_model)
+            resolved = self._resolve_declared(task)
 
         # deprecated 差替
         resolved = self.validate_and_correct(resolved, f"resolve:{task}")

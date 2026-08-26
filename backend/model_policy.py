@@ -316,6 +316,45 @@ def live_model_ids() -> tuple[set[str], str]:
         return set(), f"モデル一覧を取得できませんでした: {e}"
 
 
+def _resolver_disagreements() -> tuple[list[tuple[str, str, str]], str]:
+    """**答えが2種類ある工程**を挙げる（R1.5-C2）。
+
+    `model_config.json` の `task_mapping` は段の名前を持つ。段として解かずに
+    生で返すと、それがモデル ID として API に渡って 404 になる:
+
+        404 NOT_FOUND: models/standard is not found for API version v1beta
+
+    比べるのは**宣言**（`_resolve_declared`）であって、枠枯渇による降格後の値では
+    ない。降格は食い違いではなく、設計どおりの動きなので。
+
+    Returns:
+        (食い違い, 確かめられなかった理由)
+    """
+    try:
+        from model_governance import model_governance as engine
+    except ImportError:
+        try:
+            from backend.model_governance import model_governance as engine
+        except ImportError as e:  # pragma: no cover — 経路が壊れたときだけ
+            return [], f"model_governance を読み込めませんでした: {e}"
+
+    resolve_declared = getattr(engine, "_resolve_declared", None)
+    if resolve_declared is None:
+        return [], ("model_governance に `_resolve_declared` がありません"
+                    "（解決器が一本化されていない可能性があります）")
+
+    disagreements = []
+    for task in known_tasks():
+        mine = resolve(task).model
+        try:
+            theirs = resolve_declared(task)
+        except Exception as e:  # noqa: BLE001 — 解決できないこと自体が食い違い
+            theirs = f"(解決できません: {e})"
+        if mine != theirs:
+            disagreements.append((task, mine, theirs))
+    return disagreements, ""
+
+
 def audit() -> tuple[list[AuditFinding], str]:
     """入替トリガーに当たっていないかを点検する。
 
@@ -360,6 +399,21 @@ def audit() -> tuple[list[AuditFinding], str]:
                 "price_change", tier, model,
                 "単価表（backend/config/gemini_pricing.json）に**単価がありません**。"
                 "最高単価で見積もられるので、実費とズレます"))
+
+    # **解決器が2つあると答えも2つになる**（R1.5-C2）。
+    # 段の名前がモデル ID として API に渡ると 404 で、実走では
+    # 「21工程登録されているのに1回しか呼ばれない」という形で出た。
+    disagreements, resolver_why_not = _resolver_disagreements()
+    for task, mine, theirs in disagreements:
+        findings.append(AuditFinding(
+            "resolver_split", task, theirs,
+            f"**解決器が2つあります。** model_policy は `{mine}`、"
+            f"model_governance は `{theirs}` と答えます。"
+            "段の名前がモデル ID として API に渡ると 404 になります"))
+    if resolver_why_not:
+        findings.append(AuditFinding(
+            "resolver_unverified", "(全工程)", "(未確認)",
+            f"**解決器が一致しているか確かめられませんでした**: {resolver_why_not}"))
 
     return findings, why_not
 
