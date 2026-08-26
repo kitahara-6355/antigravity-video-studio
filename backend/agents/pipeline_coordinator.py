@@ -25,6 +25,7 @@ except ImportError:
 
 
 
+import os
 import json
 import logging
 import asyncio
@@ -65,6 +66,50 @@ from agents.workers import (  # noqa: F401 — re-export
     YouTubeOptWorker,
 )
 
+from backend.revenue.run_record import RunRecorder
+
+
+# ============================================================
+# 実行記録（R1.5-C1）
+# ============================================================
+#
+# **R1 で硬化したのは2つあるパイプラインの片方だった。** 本線はこちらなので、
+# R1 の保証（工程ごとの記録・モデルの見える化・失敗を握り潰さない）をここへ移す。
+
+class _StageFailed(RuntimeError):
+    """worker の `success=False` を `RunRecorder.stage` へ伝えるための内部例外。
+
+    worker は例外ではなく `StageResult` で失敗を返す。記録側は例外で失敗を
+    検知するので、境界でここに変換する。**外へは漏らさない。**
+    """
+
+
+# 工程名（記録に残る安定した名前）と、**モデルの出どころ**。
+# 段（tier）に紐づけるのが正で、モデル名の直書きはしない — 直書きだと
+# 入替のたびに全工程を書き換えることになる。
+STAGE_RECORD: Dict[str, tuple] = {
+    "TranscribeWorker": ("transcribe", {"model": "local:whisper"}),
+    "ProofreadWorker": ("proofread", {"task": "proofreader"}),
+    "SmartCutWorker": ("smart_cut", {"model": "local:auto-editor"}),
+    "PreviewWorker": ("preview", {"model": "local:ffmpeg"}),
+    "YouTubeOptWorker": ("youtube_opt", {"task": "youtube_optimization"}),
+    "QualityGateWorker": ("quality_gate", {"task": "quality_gate"}),
+    "RenderWorker": ("render", {"model": "local:ffmpeg"}),
+}
+
+# **これが落ちたら成果物が無い。** 続けても意味が無いので中断する。
+FATAL_WORKERS = {"TranscribeWorker", "SmartCutWorker", "RenderWorker"}
+
+# 落ちても**動画は作れる**工程。中断はしないが、**完走とも呼ばない**。
+# 結果は `degraded` になり、落ちた工程は `health.skipped_features` に出る。
+# （プレビューの継続は T-020b の既存決定。ここではその範囲を広げただけ）
+#
+# **旧実装はここを全部「completed」と言っていた。** 最終レンダリングが落ちても
+# 完了扱いで、テストにもそう書いてあった（C9-01）。動画が無いのに成功と
+# 言うのが「偽の success」そのものなので、R1.5-C1 で作り直した。
+STATUS_COMPLETED = "completed"
+STATUS_DEGRADED = "degraded"
+
 
 # ============================================================
 # Coordinator（司令塔）
@@ -97,6 +142,72 @@ class PipelineCoordinator:
         ]
         self._progress_callback: Optional[Callable] = None
         self._ws_broadcast: Optional[Callable] = None
+
+        # 実行記録（R1.5-C1）。`runs_dir` を差し替えればテストは本番を汚さない。
+        self.runs_dir: Optional[Path] = None
+        self.ledger_path: Optional[Path] = None
+        self._recorder: Optional[RunRecorder] = None
+        self._failed_required: List[str] = []
+        self._degraded: List[str] = []
+
+    # --- 実行記録 -----------------------------------------------------------
+
+    def _stage_args(self, worker: PipelineStageWorker,
+                    ctx: PipelineContext) -> tuple:
+        """記録に残す工程名と、モデルの出どころ、再開に要る入力。"""
+        name, source = STAGE_RECORD.get(
+            type(worker).__name__, (type(worker).__name__, {}))
+        return name, {
+            **source,
+            "stage_input": {
+                "video_path": ctx.video_path,
+                "session_id": ctx.session_id,
+                "target_minutes": ctx.target_minutes,
+                "template_id": ctx.template_id,
+                "render_mode": ctx.render_mode,
+                "segments": len(ctx.segments or []),
+                "selected_segments": len(ctx.selected_segments or []),
+                "preview_path": ctx.preview_path,
+                "final_path": ctx.final_path,
+            },
+        }
+
+    async def _execute_worker(self, worker: PipelineStageWorker,
+                              ctx: PipelineContext) -> StageResult:
+        """**1工程 = 1記録。** 失敗も原因と入力ごと残す（R1.5-C1）。
+
+        記録の書き出しが実行を落とさないよう、記録側の例外は飲む。
+        **worker の失敗そのものは飲まない** — `StageResult` はそのまま返す。
+        """
+        if self._recorder is None:
+            return await worker.execute(ctx)
+
+        name, kwargs = self._stage_args(worker, ctx)
+        result: Optional[StageResult] = None
+        try:
+            with self._recorder.stage(name, **kwargs):
+                result = await worker.execute(ctx)
+                if result is not None and not result.success:
+                    raise _StageFailed(f"{name}: {result.detail}")
+        except _StageFailed:
+            pass
+        except Exception:
+            # worker が例外で落ちた場合。記録には残っているので、
+            # 呼び出し側が扱えるよう `StageResult` に均す。
+            logger.exception(f"❌ {worker.name} が例外で落ちました")
+            result = StageResult(stage_name=worker.name, success=False,
+                                 detail=f"{worker.name} が例外で落ちました")
+
+        if result is not None and not result.success:
+            if type(worker).__name__ in FATAL_WORKERS:
+                self._failed_required.append(name)
+            else:
+                # **止めないが、成功にもしない。**
+                self._degraded.append(name)
+                if name not in ctx.skipped_features:
+                    ctx.skipped_features.append(name)
+                ctx.warnings.append(f"{worker.name}失敗: {result.detail}")
+        return result
 
     def _find_worker(self, worker_type: type) -> Optional[PipelineStageWorker]:
         """Worker をタイプで検索（インデックス直値を避ける）"""
@@ -352,6 +463,11 @@ class PipelineCoordinator:
         ctx.started_at = datetime.now().isoformat()
         total_start = time.time()
 
+        # ━━━ 0. 実行記録を開く（R1.5-C1）━━━
+        # **どの工程がどのモデルで動き、どこで落ちたか。** これが無いと
+        # 「動いた」を証拠で示せない。書き出しに失敗しても実行は続ける。
+        self._open_recorder(ctx)
+
         # ━━━ 0. パフォーマンスバジェットマネージャー初期化 (PB-01) ━━━
         perf_manager = self._init_performance_budget_manager(ctx)
 
@@ -362,6 +478,7 @@ class PipelineCoordinator:
         free_gb = self._check_disk_space(ctx)
         if free_gb is not None and free_gb < 1.0:
             self._finalize_harness(harness, ctx, "error")
+            self._close_recorder(ctx, "failed")
             return self._build_result(ctx, "error", total_start,
                                       f"ディスク空き容量不足: {free_gb:.1f}GB")
 
@@ -373,6 +490,7 @@ class PipelineCoordinator:
         serial_error = await self._execute_serial_stages(ctx, harness, perf_manager)
         if serial_error:
             self._finalize_harness(harness, ctx, "error")
+            self._close_recorder(ctx, "failed")
             return self._build_result(ctx, "error", total_start, serial_error)
 
         # 並列ステージ (S4 || S5 || S6)
@@ -383,6 +501,21 @@ class PipelineCoordinator:
 
         # 品質ゲート: Evaluator-Optimizer (並列実行結果から取得)
         await self._optimize_quality(ctx, harness, perf_manager)
+
+        # ━━━ 4.5 失敗を握り潰さない（R1.5-C1）━━━
+        # **落ちた工程があるのに "completed" を返さない。** 直列で中断するのは
+        # 文字起こしだけで、校閲・スマートカット・メタデータ・品質・レンダリングの
+        # 失敗はここまで素通りしていた。宣言済みの例外（プレビュー）は除く。
+        if self._failed_required:
+            落ちた = "、".join(self._failed_required)
+            self._finalize_harness(harness, ctx, "error")
+            self._close_recorder(ctx, "failed")
+            return self._build_result(
+                ctx, "error", total_start,
+                f"工程が失敗しました: {落ちた}")
+
+        # 落ちた工程はあるが動画は作れた場合。**完走とは呼ばない。**
+        final_status = STATUS_DEGRADED if self._degraded else STATUS_COMPLETED
 
         # ━━━ 5. パイプライン後処理 ━━━
         retention_report = await self._run_retention_analysis(ctx)
@@ -398,10 +531,51 @@ class PipelineCoordinator:
         # ━━━ 7. パフォーマンスバジェットレポート保存 (PB-01) ━━━
         perf_report_data = self._save_performance_report(ctx, perf_manager)
 
-        result = self._build_result(ctx, "completed", total_start)
+        self._close_recorder(ctx, final_status)
+
+        result = self._build_result(ctx, final_status, total_start)
         if perf_report_data:
             result["performance_budget"] = perf_report_data
         return result
+
+    # --- 実行記録の開閉 -----------------------------------------------------
+
+    def _open_recorder(self, ctx: PipelineContext) -> None:
+        """記録を開く。**開けなくても実行は続ける**（記録は実行を止めない）。"""
+        self._recorder = None
+        self._failed_required = []
+        self._degraded = []
+        try:
+            kwargs = {"inputs": {
+                "video_path": ctx.video_path,
+                "session_id": ctx.session_id,
+                "target_minutes": ctx.target_minutes,
+                "template_id": ctx.template_id,
+                "mainline": "agents",
+            }}
+            if self.runs_dir is not None:
+                kwargs["runs_dir"] = Path(self.runs_dir)
+            if self.ledger_path is not None:
+                kwargs["ledger_path"] = Path(self.ledger_path)
+            self._recorder = RunRecorder(**kwargs)
+            logger.info(f"📓 実行記録: {self._recorder.path}")
+        except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
+            logger.warning(f"⚠️ 実行記録を開けませんでした: {e}")
+
+    def _close_recorder(self, ctx: PipelineContext, status: str) -> None:
+        """記録を閉じる。成果物のパスも残す。"""
+        recorder = self._recorder
+        if recorder is None:
+            return
+        try:
+            for path in (ctx.final_path, ctx.preview_path):
+                if path:
+                    recorder.artifact(path)
+            recorder.finish(status)
+        except Exception as e:  # noqa: BLE001 — 同上
+            logger.warning(f"⚠️ 実行記録を閉じられませんでした: {e}")
+        finally:
+            self._recorder = None
 
     def _init_performance_budget_manager(self, ctx: PipelineContext) -> Optional[Any]:
         """パフォーマンスバジェットマネージャーを初期化します。(PB-01)"""
@@ -447,7 +621,7 @@ class PipelineCoordinator:
                     stage_name=worker.name, success=False,
                     detail=f"Hook denied: {deny_reason}",
                 ))
-                if isinstance(worker, (TranscribeWorker,)):
+                if type(worker).__name__ in FATAL_WORKERS:
                     return deny_reason
                 continue
 
@@ -455,7 +629,7 @@ class PipelineCoordinator:
             result = None
             for attempt in range(1, self.MAX_RETRIES + 1):
                 _worker_start = time.time()
-                result = await worker.execute(ctx)
+                result = await self._execute_worker(worker, ctx)
                 _worker_dur = time.time() - _worker_start
                 if perf_manager:
                     perf_manager.record_worker_time(worker.name, _worker_dur)
@@ -474,7 +648,7 @@ class PipelineCoordinator:
                 await self._notify(worker, "completed", result.detail, 100, result.data)
             else:
                 await self._notify(worker, "error", result.detail)
-                if isinstance(worker, (TranscribeWorker,)):
+                if type(worker).__name__ in FATAL_WORKERS:
                     logger.error(f"❌ 致命的エラー: {worker.name} — 中断")
                     return result.detail
         return None
@@ -498,7 +672,7 @@ class PipelineCoordinator:
             result = None
             for attempt in range(1, self.MAX_RETRIES + 1):
                 _pw_start = time.time()
-                result = await worker.execute(ctx)
+                result = await self._execute_worker(worker, ctx)
                 _pw_dur = time.time() - _pw_start
                 if perf_manager:
                     perf_manager.record_worker_time(worker.name, _pw_dur)
@@ -566,7 +740,7 @@ class PipelineCoordinator:
             await self._notify(render_worker, "running",
                                f"{render_worker.name} 開始... (mode={ctx.render_mode})")
             _render_start = time.time()
-            result = await render_worker.execute(ctx)
+            result = await self._execute_worker(render_worker, ctx)
             _render_dur = time.time() - _render_start
             if perf_manager:
                 perf_manager.record_worker_time(render_worker.name, _render_dur)
@@ -664,7 +838,7 @@ class PipelineCoordinator:
             # Preview 再生成 (BUG-02修正: 計測フック追加)
             await self._notify(preview_worker, "running", "品質改善のため再生成中...")
             _ql_preview_start = time.time()
-            preview_result = await preview_worker.execute(ctx)
+            preview_result = await self._execute_worker(preview_worker, ctx)
             _ql_preview_dur = time.time() - _ql_preview_start
             if perf_manager:
                 perf_manager.record_worker_time(preview_worker.name, _ql_preview_dur)
@@ -675,7 +849,7 @@ class PipelineCoordinator:
             # QualityGate 再チェック (BUG-02修正: 計測フック追加)
             await self._notify(quality_worker, "running", "品質再チェック...")
             _ql_quality_start = time.time()
-            quality_result = await quality_worker.execute(ctx)
+            quality_result = await self._execute_worker(quality_worker, ctx)
             _ql_quality_dur = time.time() - _ql_quality_start
             if perf_manager:
                 perf_manager.record_worker_time(quality_worker.name, _ql_quality_dur)
@@ -834,6 +1008,15 @@ class PipelineCoordinator:
 
     async def _trigger_dream_learning(self, ctx: PipelineContext):
         """提案3: パイプライン完了時に DreamEngine 学習フック"""
+        # **実走のたびに追跡ファイルが書き換わる。** 2026-08-26 に1回起こした:
+        # 比較のため走らせただけで `verified_facts_index.json` から138行、
+        # `VERIFIED_FACTS.md` から28行が消えた（`8cd96ce` で復旧）。
+        # 検証のための実走では止められるようにする。**既定は従来どおり動く** —
+        # 学習を止めるかどうかは製品の判断なので、ここでは既定を変えない。
+        if os.getenv("AVS_SKIP_LEARNING_SIDE_EFFECTS") == "1":
+            logger.info("🌙 学習フックを止めました（AVS_SKIP_LEARNING_SIDE_EFFECTS=1）")
+            ctx.skipped_features.append("dream_learning")
+            return
         try:
             from agents.dream_engine import dream_engine
 

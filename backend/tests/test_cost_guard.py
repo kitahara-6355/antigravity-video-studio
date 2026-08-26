@@ -664,3 +664,26 @@ def test_要約は再計算でも二重計上されない(tmp_path, monkeypatch)
     total = cost_guard.reconcile_ledger()
 
     assert total == pytest.approx(0.3), f"要約を足している: {total}"
+
+
+def test_一部の工程が落ちた実行も1本あたりに数える():
+    """**うまくいった回だけの平均は嘘になる。**
+
+    本線（agents）は、動画は出たが一部の工程が落ちた実行を `degraded` で
+    残す（R1.5-C1）。時間も原価も現実に使っているので、平均から外さない。
+    外すと「失敗ぶんのコストは無かったこと」になり、見積もりが甘くなる。
+    """
+    lines = cost_guard._format_per_run([
+        {"run_id": "A", "status": "completed", "duration_sec": 100.0,
+         "cost_jpy": 1.0, "calls": 1},
+        {"run_id": "B", "status": "degraded", "duration_sec": 200.0,
+         "cost_jpy": 3.0, "calls": 2},
+        {"run_id": "C", "status": "failed", "duration_sec": 5.0,
+         "cost_jpy": 0.0, "calls": 0},
+    ])
+    text = "\n".join(lines)
+
+    assert "動画が出た 2 本の平均" in text
+    assert "うち一部失敗 1 本" in text
+    assert "150.0 秒" in text and "2.0000 円" in text
+    assert "⚠（一部失敗）" in text, "degraded と completed を見た目で区別すること"

@@ -496,7 +496,12 @@ class TestC4ErrorControl:
 
     @pytest.mark.asyncio
     async def test_C4_02_proofread_failure_continues(self):
-        """C4-02: ProofreadWorker 失敗 → パイプライン継続"""
+        """C4-02: ProofreadWorker 失敗 → 中断はしないが**完走とは呼ばない**
+
+    R1.5-C1 で契約を変えた。旧実装は "completed" を返していたが、
+    校閲が落ちた動画を「完了」と呼ぶのは偽の success。
+    止めない（動画は作れる）が `degraded` にする。
+    """
         coord = _create_coordinator_with_mocks()
         proofread = coord._find_worker(ProofreadWorker)
         proofread.execute = AsyncMock(
@@ -510,8 +515,9 @@ class TestC4ErrorControl:
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        # ProofreadWorker 失敗してもパイプラインは完了状態
-        assert result["status"] == "completed"
+        # 止めない。ただし完走ではない
+        assert result["status"] == "degraded"
+        assert "proofread" in result["health"]["skipped_features"]
 
     @pytest.mark.asyncio
     async def test_C4_03_preview_failure_continues_with_warning(self):
@@ -529,7 +535,7 @@ class TestC4ErrorControl:
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "degraded"   # 止めない（T-020b）が完走でもない
         assert any("プレビュー" in w for w in ctx.warnings)
 
     @pytest.mark.asyncio
@@ -546,8 +552,9 @@ class TestC4ErrorControl:
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        # 例外があっても completed（gather の return_exceptions=True で処理）
-        assert result["status"] == "completed"
+        # 例外で他のステージは巻き込まない。ただし落ちた事実は残す
+        assert result["status"] == "degraded"
+        assert "youtube_opt" in result["health"]["skipped_features"]
 
     @pytest.mark.asyncio
     async def test_C4_05_quality_improvement_loop_on_low_score(self):
@@ -1152,8 +1159,8 @@ class TestC7HarnessIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        # 校閲は非致命的なので完了する
-        assert result["status"] == "completed"
+        # 校閲は非致命的なので**中断はしない**。ただし完走とは呼ばない（R1.5-C1）
+        assert result["status"] == "degraded"
 
         # POST_TOOL_USE (成功した文字起こしなど) と POST_TOOL_USE_FAILURE (失敗したAI校閲) が両方呼ばれていること
         fired_events = [args[0] for args, kwargs in mock_hooks.hook_system.fire.call_args_list]
@@ -1661,8 +1668,10 @@ class TestC9EdgeCases:
             result = await coord.execute(ctx := PipelineContext(video_path="/tmp/test.mp4"))
 
         assert "error" in notify_calls
-        # Render はパイプラインの最後なので、失敗してもパイプライン自体は StageResult 記録して完了扱い
-        assert result["status"] == "completed"
+        # **動画が無いのに完了と言わない**（R1.5-C1）。
+        # 旧実装は「Render は最後だから completed」としていたが、
+        # それが偽の success そのものだった。
+        assert result["status"] == "error"
         assert result["stage_results"][-1]["success"] is False
 
     @pytest.mark.asyncio

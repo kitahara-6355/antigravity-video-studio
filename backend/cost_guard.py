@@ -471,20 +471,26 @@ def _format_per_run(summaries: list[dict]) -> list[str]:
 
     lines = [f"  1本あたり: {len(summaries)} 本"]
     for row in summaries:
-        mark = {"completed": "✅", "failed": "🚫（失敗）"}.get(
-            row.get("status", ""), "…")
+        mark = {"completed": "✅", "degraded": "⚠（一部失敗）",
+                "failed": "🚫（失敗）"}.get(row.get("status", ""), "…")
         lines.append(
             f"      {mark} {row.get('run_id', '(id なし)')}  "
             f"{float(row.get('duration_sec') or 0):.1f} 秒 / "
             f"{float(row.get('cost_jpy') or 0):.4f} 円 / "
             f"{int(row.get('calls') or 0)} 回")
 
-    done = [r for r in summaries if r.get("status") == "completed"]
+    # **一部の工程が落ちた実行（degraded）も動画は出ている。**
+    # 時間も原価も現実に使っているので、1本あたりの平均からは外さない。
+    # 外すと「うまくいった回だけ」の平均になり、見積もりが甘くなる。
+    done = [r for r in summaries
+            if r.get("status") in ("completed", "degraded")]
     if done:
         n = len(done)
         avg_sec = sum(float(r.get("duration_sec") or 0) for r in done) / n
         avg_jpy = sum(float(r.get("cost_jpy") or 0) for r in done) / n
-        lines.append(f"      完走 {n} 本の平均: "
+        欠け = sum(1 for r in done if r.get("status") == "degraded")
+        注 = f"（うち一部失敗 {欠け} 本）" if 欠け else ""
+        lines.append(f"      動画が出た {n} 本の平均{注}: "
                      f"{avg_sec:.1f} 秒 / {avg_jpy:.4f} 円")
     return lines
 
