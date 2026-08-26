@@ -422,74 +422,62 @@
   },
   "canonical": "現在地の正典はこのファイル。北極星は `revenue_goal`、進め方は `roadmap`、停止規則は `verification_policy`。phase_state.json と docs/BACKLOG_MASTER.md は参照資料",
   "current_phase": {
-    "id": "R1",
-    "title": "実行層（L2）を開けて、動画を1本完走させる",
+    "id": "R1.5",
+    "title": "本線を一本化し、AI の出力を成果物に届かせる",
     "axis": "pipeline_e2e",
-    "started_at": "2026-08-15",
-    "rationale": "**この codebase で動画が1本も作られたことがない**（*.mp4 が 0 件）。実行できないので pipeline_e2e / trinity_council / quality_auto_improve / soul_auto_evolution / progressive_preview / UX の L2 以上、6軸が測れず、D-20 / D-25 / D-27 / D-04 も解けない。ここが全ての前提",
-    "score_note": "**このフェーズは実現度を大きく動かしうる。** 動作確認は scoring_policy の 『E2E動作確認=50%以上』の段に入る唯一の道で、pipeline_e2e ほか6軸が『測れない』状態から出る。P1〜P5 は各軸 50% が天井だった",
-    "budget_jpy": 3000,
-    "budget_id": "R1-execution-layer",
-    "budget_note": "ユーザー承認（2026-08-15・上限¥3,000）。cost_guard が呼び出しごとに実費を計上し、残高が予約額を割った時点で止める。**この枠を超える利用は再承認が要る**",
+    "started_at": "2026-08-26",
+    "rationale": "**R1 で硬化したのは2つあるパイプラインの片方だった。** 2026-08-26 に両方を実走させて 本線を agents 側に決めた（invariants.mainline）。\n\n同時に、**モデル解決器が2つあって全工程で食い違う**ことが判明した。`model_config.json` の task_mapping は**段の名前**（\"standard\" / \"premium\"）を持つが、`model_governance._resolve_model()` はそれを生のまま返し、モデル ID として API に渡る:\n\n    404 NOT_FOUND: models/standard is not found for API version v1beta\n\n正しく解決するのは `model_policy.resolve()` だけで、使っているのは soul_feedback ほか2箇所。**製品の LLM 呼び出しは soul_feedback を除いてほぼ全部 404 している。**「21工程登録されているのに実走で1回しか呼ばれない」の原因はこれ。\n\nR2 の承認工程を先に作ると**承認する中身が無い画面**ができるので、順序としてここが先。",
+    "score_note": "**このフェーズは実現度を測り直す前提を作る。** R1 で実行層は開いたが、本線では LLM がほぼ全部 404 しており、いま pipeline_e2e を測ると『AI が働いていない状態』の数字が確定する。再監査（/vision-audit）は R1.5 の後に打つ（2026-08-26 ユーザー決定）",
+    "budget_jpy": 0,
+    "budget_id": "",
+    "budget_note": "**まだ枠を取っていない。** 見込みは無料枠3段（batch/standard/premium）で ¥0 だが、cost_guard は fail-closed で、active な予算が無いと実キーの呼び出しが例外で止まる。R1 の枠（R1-execution-layer・残 ¥2,996）は R1 に対する承認なので流用しない。**C1 と C5 の検証には実走が要るので、その前に予算を取る**（憲法第3条）",
+    "limits": [
+      "**動画の良し悪しは判定しない。** ここで示すのは『AI の出力が成果物に到達している』ことであって、その提案が良い提案かどうかではない（品質の担保は R2）",
+      "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化する問題と、Whisper の固有名詞崩れは別軸",
+      "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
+      "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない"
+    ],
+    "user_tasks": [],
+    "note": "正典は `roadmap.phases.R1.5` と同じ内容を指す。**台帳は1つ**（憲法第5条）",
+    "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る",
     "exit_criteria": [
       {
-        "id": "R1-C1",
-        "met": true,
-        "verify": "python -m backend.revenue.artifact_gate --video <path>",
-        "condition": "`backend/.env` が設置され、キルスイッチが有効な状態でパイプラインが完走し、**再生可能な mp4 が1本存在する**（尺 > 0 秒・映像トラックと音声トラックの両方がある。ffprobe で機械判定する）"
+        "id": "R1.5-C1",
+        "condition": "**本線が agents 側に一本化され、R1 の保証がそこで効いている。** 実行記録（工程・モデル・失敗の原因と入力）が残り、サービスの失敗が握り潰されず、成果物ゲートが本線の実走に対して PASS する",
+        "verify": "python -m backend.revenue.artifact_gate --gate",
+        "met": false
       },
       {
-        "id": "R1-C2",
-        "met": true,
+        "id": "R1.5-C2",
+        "condition": "**モデル解決器が1つになっている。** 全 task で `model_governance._resolve_model()` と `model_policy.resolve().model` が一致し、段の名前がモデル ID として API に渡らない。**食い違いが残っていたら FAIL する**",
+        "verify": "python -m backend.model_policy --audit",
+        "met": false
+      },
+      {
+        "id": "R1.5-C3",
+        "condition": "**AI の出力が成果物に届いている。** AI を効かせた場合と効かせない場合で成果物が異なることが機械判定できる（SHA256 が一致しない）。生成されたのに使われていない中間成果物の件数が実行記録に出て、**0 でなければ成果物ゲートが FAIL する**",
+        "verify": "python -m backend.revenue.artifact_gate --gate",
+        "met": false
+      },
+      {
+        "id": "R1.5-C4",
+        "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
+        "verify": "docs/ 配下の実走記録",
+        "met": false
+      },
+      {
+        "id": "R1.5-C5",
+        "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
         "verify": "python -m backend.cost_guard --status",
-        "condition": "**1本あたりの所要時間と原価が実測**され、`.claude/cost_ledger.jsonl` と `budget.json` の spent_jpy に残っている。原価は**トークン実測にもとづく上限見積もり**とする（無料枠に収まった呼び出しの実費は 0 円で、**突き合わせる請求額が構造的に存在しない**ため。請求額との突き合わせは pro 昇格で課金運用に移ってから行う。2026-08-21 ユーザー決定）。単価未登録モデル・トークンを読めなかった呼び出しの件数も出る",
-        "evidence": "gate-verifier（改訂後の条件文に対する2周目・2026-08-21）が met と判定。台帳の run_summary の duration_sec が run.json の finished_at − started_at と4本すべてミリ秒まで一致（別々の計測系）。完走2本 53.3 秒/¥0.4526・35.4 秒/¥0.5548。`--reconcile` を2回走らせて spent_jpy 不動（二重計上なし）を隔離コピーで確認"
+        "met": false
       },
       {
-        "id": "R1-C3",
-        "met": true,
-        "verify": "pytest backend/tests/test_cost_guard.py",
-        "evidence": "2026-08-15 実装・18 passed。`test_spending_accumulates_until_it_trips` が実際に止まるところまで走らせている",
-        "condition": "コスト上限に達したら**API 呼び出しが止まる**ことが実測されている（意図的に低い上限を置いて停止を確認する）"
-      },
-      {
-        "id": "R1-C4",
-        "met": true,
-        "verify": "python -m backend.revenue.artifact_gate --resume-check",
-        "condition": "途中で失敗した工程が**どれか特定でき、そこから再実行できる**（失敗した工程名・原因・入力が残る）"
-      },
-      {
-        "id": "R1-C5",
-        "met": true,
+        "id": "R1.5-C6",
+        "met": false,
         "verify": "python -m backend.model_policy --sunset",
-        "condition": "実走で**実際に使われたモデル名**が記録され、2026-10-16 に提供終了する 2.5 系への依存が可視化されている"
-      },
-      {
-        "id": "R1-C6",
-        "condition": "**工程ごとに、どのモデルで動いたかが実行記録に残る**（見える化）。記録が無ければ成果物ゲートが FAIL する。あわせて `model_policy --show` で全工程の現在地が一覧でき、`--up <工程>` で昇格できる",
-        "met": true,
-        "verify": "python -m backend.revenue.artifact_gate --resume-check && python -m backend.model_policy --show"
-      },
-      {
-        "id": "R1-C7",
-        "condition": "**段のモデルが一次情報と突き合わせ済みである**（実 API の models.list に実在し、単価表にも載っている）。未検証のうちは点検が FAIL する",
-        "met": true,
-        "verify": "python -m backend.model_policy --audit"
+        "condition": "**2026-10-16 に提供終了する 2.5 系への依存が、本番の実行経路から消えている。** `--sunset` が段・実行記録・**本番モジュール**のいずれにも 2.5 系が無いことを示し、残った参照（テスト・アーカイブ・到達不能な経路）は本番と区別して数えられている。区別できないうちは FAIL する"
       }
-    ],
-    "limits": [
-      "**1本通ることは、良い動画であることを意味しない。** 視聴維持率も収益化適格性もここでは測らない（R2・R3 の担当）",
-      "コストは1本の実測であって、テーマや尺が変われば変わる。**平均原価ではない**"
-    ],
-    "user_tasks": [
-      "`backend/.env` に実 API キーを置く（私は読み取らない・触らない）",
-      "**AI Studio で Prepay を選び、クレジットを購入して自動リロードを OFF にする。** これが本命の上限（cost_guard は二重の歯止め）",
-      "`.claude/budget.json` の `auto_reload` を `\"off\"` に更新する（宣言しないと --status が警告を出す）",
-      "`backend/config/gemini_pricing.json` の単価を一次情報と突き合わせる"
-    ],
-    "note": "正典は `roadmap.phases.R1` と同じ内容を指す。**台帳は1つ**（憲法第5条）",
-    "cost_note": "**¥3,000 は上限であって見込みではない。** Flash 系が無料枠（約1,500 RPD）に収まれば実費はほぼ Pro 呼び出しぶんだけになる。R1 の目的の1つは**1本あたりの原価を知ること**だが、**無料枠では Google 側の請求額が構造的に ¥0 で、突き合わせる相手が存在しない**（2026-08-21 ユーザー決定）。したがって答えは『トークンは実測・円は上限見積もり』とする。請求額との実測突き合わせは pro 昇格で課金運用に移ってから行う",
-    "tooling": "**実行記録の書き手は 2026-08-16 に用意した**（`backend/revenue/run_record.py`・`RunRecorder`）。工程ごとに `output/runs/<run_id>/run.json` へ原子的に書き出し、宣言モデル（`model_policy` の段）と**実測モデル**（`cost_guard` 台帳から工程の開始時点以降を読む）の両方を残す。**残るのは実キーでの実走だけ** — C1/C2/C4/C5/C6 の met はここでは動かさない（記録の仕組みは証拠ではない）。`python -m backend.revenue.run_record --list` / `--resume <run_id>`"
+    ]
   },
   "phase_history": [
     {
@@ -853,6 +841,76 @@
       "note": "6/6 中 3件（C-2・C-3・C-5）が独立検証で met。C-1 は10周の敵対的検証の末に limits 化（ユーザー判断）。C-4 は訂正済みで再判定待ち。C-6 は未確認。**このフェーズは設計上スコアを上げない**（静的検証の上限 50 に P4 で到達済み）。買ったのは 50 の頑健さ。**投じたコストに対して得たものが小さいという判断で、以降は収益化から逆算した R 系列に切り替える**",
       "gate": "ユーザーの /gate-report 待ち（2026-08-15 時点）",
       "verification_rounds": 10
+    },
+    {
+      "id": "R1",
+      "title": "実行層（L2）を開けて、動画を1本完走させる",
+      "why": "**この codebase で動画が1本も作られたことがない**（*.mp4 が 0 件）。実行できないので pipeline_e2e / trinity_council / quality_auto_improve / soul_auto_evolution / progressive_preview / UX の L2 以上、6軸が測れず、D-20 / D-25 / D-27 / D-04 も解けない。ここが全ての前提",
+      "budget_jpy": 3000,
+      "budget_id": "R1-execution-layer",
+      "status": "completed",
+      "exit_criteria": [
+        {
+          "id": "R1-C1",
+          "met": true,
+          "verify": "python -m backend.revenue.artifact_gate --video <path>",
+          "condition": "`backend/.env` が設置され、キルスイッチが有効な状態でパイプラインが完走し、**再生可能な mp4 が1本存在する**（尺 > 0 秒・映像トラックと音声トラックの両方がある。ffprobe で機械判定する）"
+        },
+        {
+          "id": "R1-C2",
+          "met": true,
+          "verify": "python -m backend.cost_guard --status",
+          "condition": "**1本あたりの所要時間と原価が実測**され、`.claude/cost_ledger.jsonl` と `budget.json` の spent_jpy に残っている。原価は**トークン実測にもとづく上限見積もり**とする（無料枠に収まった呼び出しの実費は 0 円で、**突き合わせる請求額が構造的に存在しない**ため。請求額との突き合わせは pro 昇格で課金運用に移ってから行う。2026-08-21 ユーザー決定）。単価未登録モデル・トークンを読めなかった呼び出しの件数も出る",
+          "evidence": "gate-verifier（改訂後の条件文に対する2周目・2026-08-21）が met と判定。台帳の run_summary の duration_sec が run.json の finished_at − started_at と4本すべてミリ秒まで一致（別々の計測系）。完走2本 53.3 秒/¥0.4526・35.4 秒/¥0.5548。`--reconcile` を2回走らせて spent_jpy 不動（二重計上なし）を隔離コピーで確認"
+        },
+        {
+          "id": "R1-C3",
+          "met": true,
+          "verify": "pytest backend/tests/test_cost_guard.py",
+          "evidence": "2026-08-15 実装・18 passed。`test_spending_accumulates_until_it_trips` が実際に止まるところまで走らせている",
+          "condition": "コスト上限に達したら**API 呼び出しが止まる**ことが実測されている（意図的に低い上限を置いて停止を確認する）"
+        },
+        {
+          "id": "R1-C4",
+          "met": true,
+          "verify": "python -m backend.revenue.artifact_gate --resume-check",
+          "condition": "途中で失敗した工程が**どれか特定でき、そこから再実行できる**（失敗した工程名・原因・入力が残る）"
+        },
+        {
+          "id": "R1-C5",
+          "met": true,
+          "verify": "python -m backend.model_policy --sunset",
+          "condition": "実走で**実際に使われたモデル名**が記録され、2026-10-16 に提供終了する 2.5 系への依存が可視化されている"
+        },
+        {
+          "id": "R1-C6",
+          "condition": "**工程ごとに、どのモデルで動いたかが実行記録に残る**（見える化）。記録が無ければ成果物ゲートが FAIL する。あわせて `model_policy --show` で全工程の現在地が一覧でき、`--up <工程>` で昇格できる",
+          "met": true,
+          "verify": "python -m backend.revenue.artifact_gate --resume-check && python -m backend.model_policy --show"
+        },
+        {
+          "id": "R1-C7",
+          "condition": "**段のモデルが一次情報と突き合わせ済みである**（実 API の models.list に実在し、単価表にも載っている）。未検証のうちは点検が FAIL する",
+          "met": true,
+          "verify": "python -m backend.model_policy --audit"
+        }
+      ],
+      "limits": [
+        "**1本通ることは、良い動画であることを意味しない。** 視聴維持率も収益化適格性もここでは測らない（R2・R3 の担当）",
+        "コストは1本の実測であって、テーマや尺が変われば変わる。**平均原価ではない**"
+      ],
+      "user_tasks": [
+        "`backend/.env` に実 API キーを置く（私は読み取らない・触らない）",
+        "**AI Studio で Prepay を選び、クレジットを購入して自動リロードを OFF にする。** これが本命の上限（cost_guard は二重の歯止め）",
+        "`.claude/budget.json` の `auto_reload` を `\"off\"` に更新する（宣言しないと --status が警告を出す）",
+        "`backend/config/gemini_pricing.json` の単価を一次情報と突き合わせる"
+      ],
+      "cost_note": "**¥3,000 は上限であって見込みではない。** Flash 系が無料枠（約1,500 RPD）に収まれば実費はほぼ Pro 呼び出しぶんだけになる。R1 の目的の1つは**1本あたりの原価を知ること**だが、**無料枠では Google 側の請求額が構造的に ¥0 で、突き合わせる相手が存在しない**（2026-08-21 ユーザー決定）。したがって答えは『トークンは実測・円は上限見積もり』とする。請求額との実測突き合わせは pro 昇格で課金運用に移ってから行う",
+      "tooling": "**実行記録の書き手は 2026-08-16 に用意した**（`backend/revenue/run_record.py`・`RunRecorder`）。工程ごとに `output/runs/<run_id>/run.json` へ原子的に書き出し、宣言モデル（`model_policy` の段）と**実測モデル**（`cost_guard` 台帳から工程の開始時点以降を読む）の両方を残す。**残るのは実キーでの実走だけ** — C1/C2/C4/C5/C6 の met はここでは動かさない（記録の仕組みは証拠ではない）。`python -m backend.revenue.run_record --list` / `--resume <run_id>`",
+      "completed_at": "2026-08-26",
+      "gate": "2026-08-26 ユーザー承認。gate-verifier 2周（1周目は C-4 を not_met と判定し、CI(Linux) で test_存在しない実行は再開しない が FileNotFoundError で FAIL していた。3コミット dc356ac→3a1c688 で修正し、2周目で met・overall: ready）",
+      "note": "**7/7 met。** 証拠: CI run 32910606632（3ジョブ success・テスト 10,086件 失敗0・カバレッジ 75.9%）／mp4 は pipeline_work/job_20327f284f79/composed_output.mp4 29.53秒 h264+aac 3,377,043 bytes／完走3本の平均 56.5秒・¥0.3358（無料枠なので実費は ¥0、トークン実測にもとづく上限見積もり）。**この codebase で初めて動画が作られたフェーズ。** ただし硬化したのは video_pipeline 側で、本線に決まった agents 側には R1 の保証が効いていない（R1.5-C1）",
+      "verification_rounds": 2
     }
   ],
   "revenue_goal": {
@@ -958,7 +1016,6 @@
     "decided_at": "2026-08-15",
     "decided_by": "ユーザー（収益化から引き直す・承認工程を必須にする・予算¥3,000・停止規則）",
     "order": [
-      "R1",
       "R1.5",
       "R2",
       "R3",
@@ -966,70 +1023,75 @@
       "R5"
     ],
     "phases": {
-      "R1": {
-        "title": "実行層（L2）を開けて、動画を1本完走させる",
-        "why": "**この codebase で動画が1本も作られたことがない**（*.mp4 が 0 件）。実行できないので pipeline_e2e / trinity_council / quality_auto_improve / soul_auto_evolution / progressive_preview / UX の L2 以上、6軸が測れず、D-20 / D-25 / D-27 / D-04 も解けない。ここが全ての前提",
-        "budget_jpy": 3000,
-        "budget_id": "R1-execution-layer",
-        "status": "exit_criteria_met",
+      "R1.5": {
+        "title": "本線を一本化し、AI の出力を成果物に届かせる",
+        "why": "**R1 で硬化したのは2つあるパイプラインの片方だった。** 2026-08-26 に両方を実走させて 本線を agents 側に決めた（invariants.mainline）。\n\n同時に、**モデル解決器が2つあって全工程で食い違う**ことが判明した。`model_config.json` の task_mapping は**段の名前**（\"standard\" / \"premium\"）を持つが、`model_governance._resolve_model()` はそれを生のまま返し、モデル ID として API に渡る:\n\n    404 NOT_FOUND: models/standard is not found for API version v1beta\n\n正しく解決するのは `model_policy.resolve()` だけで、使っているのは soul_feedback ほか2箇所。**製品の LLM 呼び出しは soul_feedback を除いてほぼ全部 404 している。**「21工程登録されているのに実走で1回しか呼ばれない」の原因はこれ。\n\nR2 の承認工程を先に作ると**承認する中身が無い画面**ができるので、順序としてここが先。",
+        "budget_jpy": 0,
+        "budget_note": "無料枠3段（batch/standard/premium）で足りる見込み。呼び出し数は増えるが Flash 系の無料枠（約1,500 RPD）の内側。**pro 昇格が要ると判断した時点で別途承認を取る**（憲法第3条）",
+        "status": "in_progress",
         "exit_criteria": [
           {
-            "id": "R1-C1",
-            "met": true,
-            "verify": "python -m backend.revenue.artifact_gate --video <path>",
-            "condition": "`backend/.env` が設置され、キルスイッチが有効な状態でパイプラインが完走し、**再生可能な mp4 が1本存在する**（尺 > 0 秒・映像トラックと音声トラックの両方がある。ffprobe で機械判定する）"
+            "id": "R1.5-C1",
+            "condition": "**本線が agents 側に一本化され、R1 の保証がそこで効いている。** 実行記録（工程・モデル・失敗の原因と入力）が残り、サービスの失敗が握り潰されず、成果物ゲートが本線の実走に対して PASS する",
+            "verify": "python -m backend.revenue.artifact_gate --gate",
+            "met": false
           },
           {
-            "id": "R1-C2",
-            "met": true,
+            "id": "R1.5-C2",
+            "condition": "**モデル解決器が1つになっている。** 全 task で `model_governance._resolve_model()` と `model_policy.resolve().model` が一致し、段の名前がモデル ID として API に渡らない。**食い違いが残っていたら FAIL する**",
+            "verify": "python -m backend.model_policy --audit",
+            "met": false
+          },
+          {
+            "id": "R1.5-C3",
+            "condition": "**AI の出力が成果物に届いている。** AI を効かせた場合と効かせない場合で成果物が異なることが機械判定できる（SHA256 が一致しない）。生成されたのに使われていない中間成果物の件数が実行記録に出て、**0 でなければ成果物ゲートが FAIL する**",
+            "verify": "python -m backend.revenue.artifact_gate --gate",
+            "met": false
+          },
+          {
+            "id": "R1.5-C4",
+            "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
+            "verify": "docs/ 配下の実走記録",
+            "met": false
+          },
+          {
+            "id": "R1.5-C5",
+            "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
             "verify": "python -m backend.cost_guard --status",
-            "condition": "**1本あたりの所要時間と原価が実測**され、`.claude/cost_ledger.jsonl` と `budget.json` の spent_jpy に残っている。原価は**トークン実測にもとづく上限見積もり**とする（無料枠に収まった呼び出しの実費は 0 円で、**突き合わせる請求額が構造的に存在しない**ため。請求額との突き合わせは pro 昇格で課金運用に移ってから行う。2026-08-21 ユーザー決定）。単価未登録モデル・トークンを読めなかった呼び出しの件数も出る",
-            "evidence": "gate-verifier（改訂後の条件文に対する2周目・2026-08-21）が met と判定。台帳の run_summary の duration_sec が run.json の finished_at − started_at と4本すべてミリ秒まで一致（別々の計測系）。完走2本 53.3 秒/¥0.4526・35.4 秒/¥0.5548。`--reconcile` を2回走らせて spent_jpy 不動（二重計上なし）を隔離コピーで確認"
+            "met": false
           },
           {
-            "id": "R1-C3",
-            "met": true,
-            "verify": "pytest backend/tests/test_cost_guard.py",
-            "evidence": "2026-08-15 実装・18 passed。`test_spending_accumulates_until_it_trips` が実際に止まるところまで走らせている",
-            "condition": "コスト上限に達したら**API 呼び出しが止まる**ことが実測されている（意図的に低い上限を置いて停止を確認する）"
-          },
-          {
-            "id": "R1-C4",
-            "met": true,
-            "verify": "python -m backend.revenue.artifact_gate --resume-check",
-            "condition": "途中で失敗した工程が**どれか特定でき、そこから再実行できる**（失敗した工程名・原因・入力が残る）"
-          },
-          {
-            "id": "R1-C5",
-            "met": true,
+            "id": "R1.5-C6",
+            "met": false,
             "verify": "python -m backend.model_policy --sunset",
-            "condition": "実走で**実際に使われたモデル名**が記録され、2026-10-16 に提供終了する 2.5 系への依存が可視化されている"
-          },
-          {
-            "id": "R1-C6",
-            "condition": "**工程ごとに、どのモデルで動いたかが実行記録に残る**（見える化）。記録が無ければ成果物ゲートが FAIL する。あわせて `model_policy --show` で全工程の現在地が一覧でき、`--up <工程>` で昇格できる",
-            "met": true,
-            "verify": "python -m backend.revenue.artifact_gate --resume-check && python -m backend.model_policy --show"
-          },
-          {
-            "id": "R1-C7",
-            "condition": "**段のモデルが一次情報と突き合わせ済みである**（実 API の models.list に実在し、単価表にも載っている）。未検証のうちは点検が FAIL する",
-            "met": true,
-            "verify": "python -m backend.model_policy --audit"
+            "condition": "**2026-10-16 に提供終了する 2.5 系への依存が、本番の実行経路から消えている。** `--sunset` が段・実行記録・**本番モジュール**のいずれにも 2.5 系が無いことを示し、残った参照（テスト・アーカイブ・到達不能な経路）は本番と区別して数えられている。区別できないうちは FAIL する"
           }
         ],
         "limits": [
-          "**1本通ることは、良い動画であることを意味しない。** 視聴維持率も収益化適格性もここでは測らない（R2・R3 の担当）",
-          "コストは1本の実測であって、テーマや尺が変われば変わる。**平均原価ではない**"
+          "**動画の良し悪しは判定しない。** ここで示すのは『AI の出力が成果物に到達している』ことであって、その提案が良い提案かどうかではない（品質の担保は R2）",
+          "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化する問題と、Whisper の固有名詞崩れは別軸",
+          "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
+          "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない"
         ],
-        "user_tasks": [
-          "`backend/.env` に実 API キーを置く（私は読み取らない・触らない）",
-          "**AI Studio で Prepay を選び、クレジットを購入して自動リロードを OFF にする。** これが本命の上限（cost_guard は二重の歯止め）",
-          "`.claude/budget.json` の `auto_reload` を `\"off\"` に更新する（宣言しないと --status が警告を出す）",
-          "`backend/config/gemini_pricing.json` の単価を一次情報と突き合わせる"
+        "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る",
+        "gates": [
+          "G1"
         ],
-        "cost_note": "**¥3,000 は上限であって見込みではない。** Flash 系が無料枠（約1,500 RPD）に収まれば実費はほぼ Pro 呼び出しぶんだけになる。R1 の目的の1つは**1本あたりの原価を知ること**だが、**無料枠では Google 側の請求額が構造的に ¥0 で、突き合わせる相手が存在しない**（2026-08-21 ユーザー決定）。したがって答えは『トークンは実測・円は上限見積もり』とする。請求額との実測突き合わせは pro 昇格で課金運用に移ってから行う",
-        "tooling": "**実行記録の書き手は 2026-08-16 に用意した**（`backend/revenue/run_record.py`・`RunRecorder`）。工程ごとに `output/runs/<run_id>/run.json` へ原子的に書き出し、宣言モデル（`model_policy` の段）と**実測モデル**（`cost_guard` 台帳から工程の開始時点以降を読む）の両方を残す。**残るのは実キーでの実走だけ** — C1/C2/C4/C5/C6 の met はここでは動かさない（記録の仕組みは証拠ではない）。`python -m backend.revenue.run_record --list` / `--resume <run_id>`"
+        "assumptions": [
+          "解決器を直せば、404 していた工程がそのまま動く（**未検証**。直して実走で確かめる）",
+          "AI が全工程で働いても無料枠（約1,500 RPD / 15 RPM）に収まる（**未検証**。R1.5-C5 で測る）",
+          "agents 側の worker は本物である（render_worker が実際に ffmpeg を叩くことは確認済み。他の worker は未検証）",
+          "2.5系の参照 71箇所は、解決器の統一で触る箇所と重なっている（**未検証**。重ならなければ別作業として切り出す）"
+        ],
+        "started_at": "2026-08-26",
+        "intermediate_gate": {
+          "_comment": "**C1+C2 で一度止めてゲート報告を出す**（2026-08-26 ユーザー決定）。本線一本化と解決器統一は前提工事で、ここが崩れると C3〜C5 の作業が丸ごと無駄になる。404 が止まった実走を見てから後半へ進む",
+          "after": [
+            "R1.5-C1",
+            "R1.5-C2"
+          ],
+          "decided_at": "2026-08-26"
+        }
       },
       "R2": {
         "title": "承認工程を必須にする（品質の担保 + D-16 の解消）",
@@ -1160,60 +1222,6 @@
         ],
         "assumptions": [
           "R1.5-C5 で測り直した原価が、必要本数を掛けても予算内に収まる（**未検証**）"
-        ]
-      },
-      "R1.5": {
-        "title": "本線を一本化し、AI の出力を成果物に届かせる",
-        "why": "**R1 で硬化したのは2つあるパイプラインの片方だった。** 2026-08-26 に両方を実走させて 本線を agents 側に決めた（invariants.mainline）。\n\n同時に、**モデル解決器が2つあって全工程で食い違う**ことが判明した。`model_config.json` の task_mapping は**段の名前**（\"standard\" / \"premium\"）を持つが、`model_governance._resolve_model()` はそれを生のまま返し、モデル ID として API に渡る:\n\n    404 NOT_FOUND: models/standard is not found for API version v1beta\n\n正しく解決するのは `model_policy.resolve()` だけで、使っているのは soul_feedback ほか2箇所。**製品の LLM 呼び出しは soul_feedback を除いてほぼ全部 404 している。**「21工程登録されているのに実走で1回しか呼ばれない」の原因はこれ。\n\nR2 の承認工程を先に作ると**承認する中身が無い画面**ができるので、順序としてここが先。",
-        "budget_jpy": 0,
-        "budget_note": "無料枠3段（batch/standard/premium）で足りる見込み。呼び出し数は増えるが Flash 系の無料枠（約1,500 RPD）の内側。**pro 昇格が要ると判断した時点で別途承認を取る**（憲法第3条）",
-        "status": "blocked_by_R1",
-        "exit_criteria": [
-          {
-            "id": "R1.5-C1",
-            "condition": "**本線が agents 側に一本化され、R1 の保証がそこで効いている。** 実行記録（工程・モデル・失敗の原因と入力）が残り、サービスの失敗が握り潰されず、成果物ゲートが本線の実走に対して PASS する",
-            "verify": "python -m backend.revenue.artifact_gate --gate",
-            "met": false
-          },
-          {
-            "id": "R1.5-C2",
-            "condition": "**モデル解決器が1つになっている。** 全 task で `model_governance._resolve_model()` と `model_policy.resolve().model` が一致し、段の名前がモデル ID として API に渡らない。**食い違いが残っていたら FAIL する**",
-            "verify": "python -m backend.model_policy --audit",
-            "met": false
-          },
-          {
-            "id": "R1.5-C3",
-            "condition": "**AI の出力が成果物に届いている。** AI を効かせた場合と効かせない場合で成果物が異なることが機械判定できる（SHA256 が一致しない）。生成されたのに使われていない中間成果物の件数が実行記録に出て、**0 でなければ成果物ゲートが FAIL する**",
-            "verify": "python -m backend.revenue.artifact_gate --gate",
-            "met": false
-          },
-          {
-            "id": "R1.5-C4",
-            "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
-            "verify": "docs/ 配下の実走記録",
-            "met": false
-          },
-          {
-            "id": "R1.5-C5",
-            "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
-            "verify": "python -m backend.cost_guard --status",
-            "met": false
-          }
-        ],
-        "limits": [
-          "**動画の良し悪しは判定しない。** ここで示すのは『AI の出力が成果物に到達している』ことであって、その提案が良い提案かどうかではない（品質の担保は R2）",
-          "**字幕の質は対象外。** MeCab 辞書が無く行分割が劣化する問題と、Whisper の固有名詞崩れは別軸",
-          "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
-          "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない"
-        ],
-        "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る",
-        "gates": [
-          "G1"
-        ],
-        "assumptions": [
-          "解決器を直せば、404 していた工程がそのまま動く（**未検証**。直して実走で確かめる）",
-          "AI が全工程で働いても無料枠（約1,500 RPD / 15 RPM）に収まる（**未検証**。R1.5-C5 で測る）",
-          "agents 側の worker は本物である（render_worker が実際に ffmpeg を叩くことは確認済み。他の worker は未検証）"
         ]
       },
       "R5": {
