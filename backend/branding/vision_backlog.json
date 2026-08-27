@@ -1143,7 +1143,9 @@
             "R1.5-C1",
             "R1.5-C2"
           ],
-          "decided_at": "2026-08-26"
+          "decided_at": "2026-08-26",
+          "approved_at": "2026-08-27",
+          "approved_note": "**承認済み**（2026-08-27・ユーザー）。対象は C1a・C1b・C1c・C1d・C2 の5条件で、すべて gate-verifier が別コンテキストで met と判定した。CI run 33039964697（テスト 10,128件 失敗0 / カバレッジ 75.8%）。PR #80 は fast-forward で main にマージ済み（main = 8eef716）。**次は C3。ただし C3 の前に品質スコアが 2/100 で固まる問題を切り分ける**（2026-08-27 ユーザー決定）"
         },
         "budget_id": "R1.5-mainline",
         "condition_notes": [
