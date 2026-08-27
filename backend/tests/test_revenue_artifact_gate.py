@@ -407,3 +407,15 @@ def test_過去の動画で緑にしない(tmp_path, monkeypatch):
 
     assert "no_video" in _kinds(report.findings)
     assert not report.ok
+
+
+def test_過去のモデル記録で最新を免責しない(tmp_path):
+    """**`produced` と同じ穴が `check_models` にもあった。**
+
+    全 run から集めていたので、1本前の実走が何かを記録していれば
+    最新が何も記録していなくても通った。判定は最新の1本（R1.5-C1c）。
+    """
+    過去 = {"run_id": "old", "models_used": ["gemini-3.6-flash"]}
+    最新 = {"run_id": "new", "models_used": []}
+
+    assert "no_models_recorded" in _kinds(check_models([過去, 最新]))

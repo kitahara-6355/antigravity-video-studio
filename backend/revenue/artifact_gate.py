@@ -321,7 +321,9 @@ def check_cost(runs: list[dict]) -> list[Finding]:
 
 def check_models(runs: list[dict]) -> list[Finding]:
     """**2026-10-16 に終了する 2.5 系への依存**を見えるようにする。"""
-    used = {m for run in runs for m in (run.get("models_used") or [])}
+    # **見るのは最新の1本**（R1.5-C1c）。全 run から集めていたので、
+    # 1本前の実走の記録が最新を免責していた（`produced` と同じ穴）。
+    used = set((runs[-1].get("models_used") or []) if runs else [])
     if not used:
         return [Finding("no_models_recorded", "models_used",
                         "使ったモデルが記録されていません（2.5 系の終了に"
