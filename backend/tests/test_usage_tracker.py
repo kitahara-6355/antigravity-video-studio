@@ -339,8 +339,10 @@ def test_tracker_get_model_recommendation(temp_configs):
     # get_model を呼び出したときに NameError が起きる状況をシミュレート
     with patch("builtins.__import__", side_effect=ImportError("No module named model_registry")):
         rec_ex = tracker.get_model_recommendation("transcribe")
-        # デフォルトの gemini-2.5-flash が返るが、制限に達しているので gemini-2.5-flash-lite へフォールバック
-        assert rec_ex == "gemini-2.5-flash-lite"
+        # レジストリが読めないときの既定値が返る。**2026-10-16 に終了する 2.5 系を
+        # 既定にしていたので gemini-3.6-flash に変えた**（R1.5-C6）。
+        # 制限によるフォールバックは直前の rec_fallback で検査済み
+        assert rec_ex == "gemini-3.6-flash"
         
     # 一般例外 (Exception) パス
     sys.modules["model_registry"] = MagicMock()
@@ -348,7 +350,7 @@ def test_tracker_get_model_recommendation(temp_configs):
     mr_mock.get_model.side_effect = Exception("Registry corrupted")
     
     rec_gen_ex = tracker.get_model_recommendation("transcribe")
-    assert rec_gen_ex == "gemini-2.5-flash-lite"
+    assert rec_gen_ex == "gemini-3.6-flash"
 
 
 def test_tracker_load_old_daily_usage(temp_configs):

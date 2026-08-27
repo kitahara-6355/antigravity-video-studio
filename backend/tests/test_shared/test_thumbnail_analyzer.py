@@ -490,7 +490,7 @@ class TestThumbnailAnalyzerImportFallback:
             
             # フォールバックの get_model が期待通り動作することを確認
             fallback_get_model = services.thumbnail_analyzer.get_model
-            assert fallback_get_model("any_task") == "gemini-2.5-flash"
+            assert fallback_get_model("any_task") == "gemini-3.6-flash"
             
         finally:
             # sys.modules を復元

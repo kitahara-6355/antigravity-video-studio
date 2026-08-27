@@ -252,8 +252,8 @@ def test_resolve_model_fallback():
     with patch.dict("sys.modules", {"model_governance": None}):
         spec.loader.exec_module(module)
         
-    # fallback が正常に定義され、正常に gemini-2.5-flash を返すことを確認
-    assert module._resolve_model("branding") == "gemini-2.5-flash"
+    # fallback が正常に定義され、正常に gemini-3.6-flash を返すことを確認
+    assert module._resolve_model("branding") == "gemini-3.6-flash"
 
 def test_youtube_optimized_context_to_dict():
     context = YouTubeOptimizedContext(
