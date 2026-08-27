@@ -121,3 +121,113 @@ def is_done(gap: dict, run: dict | None) -> bool | None:
                    for a in (run.get("artifacts") or []))
 
     return None
+
+
+def latest_run() -> dict | None:
+    """最新の実行記録。**無ければ `None`。**"""
+    try:
+        from backend.revenue.artifact_gate import load_runs
+    except ImportError:
+        from revenue.artifact_gate import load_runs
+    runs = load_runs()
+    return runs[-1] if runs else None
+
+
+def audit(run: dict | None, gaps: list[dict],
+          static_only: bool = False) -> tuple[list[str], list[str]]:
+    """**違反**と、**この実行では確かめていないもの**を返す。
+
+    分けて返すのが要。混ぜると「確かめられなかった」が「問題なし」に化ける。
+    """
+    違反 = list(check_entries(gaps))
+    未確認: list[str] = []
+
+    # 条件1: 記録に出たのに台帳にも本線の工程名にも無い＝新しい実装漏れ
+    if static_only or run is None:
+        未確認.append("実行記録との突き合わせ（新しい実装漏れの検出）"
+                      "— 実行記録が無いので確かめていません"
+                      if run is None else
+                      "実行記録との突き合わせ（新しい実装漏れの検出）"
+                      "— --static-only なので確かめていません")
+    else:
+        for 名 in unknown_from_record(run, gaps):
+            違反.append(f"{名}: 実行記録に出ましたが、台帳にも本線の工程名にも"
+                        "ありません。**新しい実装漏れです** — "
+                        "台帳に足すか、意図して止めているなら "
+                        "kind: intentional で宣言してください")
+
+    # 条件2: 実装済みなのに台帳に残っている＝片付け忘れ
+    for g in gaps:
+        if static_only and (g.get("done_when") or {}).get("kind") != "marker_gone":
+            未確認.append(f"{g.get('id')}: 実装済みかどうか"
+                          "（実行記録が要る検査なので --static-only では見ていません）")
+            continue
+        済み = is_done(g, run)
+        if 済み is None:
+            未確認.append(f"{g.get('id')}: 実装済みかどうかを確かめられませんでした")
+        elif 済み:
+            違反.append(f"{g.get('id')}: **実装されているのに台帳に残っています。**"
+                        "消してください（残すと『まだ無い』という嘘になり、"
+                        "品質ゲートもこの機能を見なくなります）")
+    return 違反, 未確認
+
+
+def _format(gaps: list[dict], run: dict | None) -> str:
+    lines = ["実装不足項目の台帳 — **一覧は台帳、期限は正典**", ""]
+    if run:
+        lines.append(f"  最新の実行記録: {run.get('run_id', '(id なし)')} / "
+                     f"{run.get('finished_at') or run.get('started_at') or '(日時なし)'}")
+    else:
+        lines.append("  最新の実行記録: **ありません**（実走していないので"
+                     "実行記録で見る検査は確かめられません）")
+    lines.append("")
+    for kind, 見出し in (("gap", "実装が足りていないもの"),
+                         ("intentional", "意図して止めているもの（実装漏れではない）")):
+        並び = [g for g in gaps if g.get("kind") == kind]
+        if not 並び:
+            continue
+        lines.append(f"  【{見出し}】{len(並び)} 件")
+        for g in 並び:
+            行先 = g.get("handled_in") or "—"
+            済み = is_done(g, run)
+            印 = {True: "✅ 実装済み", False: "⬜ 未実装", None: "❔ 未確認"}[済み]
+            lines.append(f"    {印}  {g['id']:<22} {g.get('title', '')}（行先: {行先}）")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="実装不足項目の台帳と点検")
+    parser.add_argument("--show", action="store_true", help="一覧を出す")
+    parser.add_argument("--audit", action="store_true",
+                        help="点検する（違反があれば exit 1）")
+    parser.add_argument("--static-only", action="store_true",
+                        help="実行記録を使わない検査だけ（CI 用）")
+    args = parser.parse_args(argv)
+
+    gaps = load_gaps()
+    run = None if args.static_only else latest_run()
+
+    if args.show or not args.audit:
+        print(_format(gaps, run))
+        if not args.audit:
+            return 0
+
+    違反, 未確認 = audit(run, gaps, static_only=args.static_only)
+    if 未確認:
+        print(f"  ℹ この実行で**確かめていない**検査が {len(未確認)} 件あります"
+              "（黙って飛ばさないために列挙します）:")
+        for m in 未確認:
+            print(f"      - {m}")
+    if 違反:
+        print(f"\n🚫 実装不足項目の点検で {len(違反)} 件:")
+        for m in 違反:
+            print(f"    - {m}")
+        return 1
+    print("\n✅ 台帳と実態は食い違っていません。")
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

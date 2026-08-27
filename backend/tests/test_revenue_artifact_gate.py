@@ -545,3 +545,48 @@ def test_記録が無ければ確かめていないと言う():
     gap = {"id": "bgm", "surfaces_as": "BGM", "done_when": {"kind": "run_record_clean"}}
 
     assert is_done(gap, None) is None
+
+
+def _台帳(**over) -> list[dict]:
+    g = {"id": "bgm", "kind": "gap", "title": "BGM", "why": "理由",
+         "handled_in": "将来", "surfaces_as": "BGM",
+         "done_when": {"kind": "run_record_clean"}}
+    g.update(over)
+    return [g]
+
+
+def test_静的点検は確かめなかった検査を列挙する():
+    """**黙って飛ばさない。**
+
+    `model_policy --audit` がダミーキーで exit 0 を返す問題と同じ形なので、
+    ここで同じ間違いを繰り返さない。CI は実走できない（実キーも実行記録も
+    無い）ので、評価しなかった検査は必ず名前を出す。
+    """
+    from backend.feature_gaps import audit
+
+    違反, 未確認 = audit(None, _台帳(), static_only=True)
+
+    assert 違反 == []
+    assert any("bgm" in m for m in 未確認), 未確認
+
+
+def test_点検が新しい実装漏れで落ちる():
+    from backend.feature_gaps import audit
+
+    違反, _ = audit(_記録(skipped_features=["字幕の焼き込み"]), _台帳())
+
+    assert any("字幕の焼き込み" in m for m in 違反), 違反
+
+
+def test_点検が片付け忘れで落ちる():
+    from backend.feature_gaps import audit
+
+    違反, _ = audit(_記録(skipped_features=[]), _台帳())
+
+    assert any("bgm" in m and "実装" in m for m in 違反), 違反
+
+
+def test_showは落ちない():
+    from backend import feature_gaps
+
+    assert feature_gaps.main(["--show"]) == 0

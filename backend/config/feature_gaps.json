@@ -16,8 +16,18 @@
       "handled_in": "将来",
       "surfaces_as": "サムネイル",
       "capability": "thumbnail",
-      "gate_checks": ["thumbnail_quality_check"],
-      "done_when": {"kind": "artifact_present", "suffixes": [".png", ".jpg", ".jpeg", ".webp"]}
+      "gate_checks": [
+        "thumbnail_quality_check"
+      ],
+      "done_when": {
+        "kind": "artifact_present",
+        "suffixes": [
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".webp"
+        ]
+      }
     },
     {
       "id": "thumbnail_insert",
@@ -25,9 +35,11 @@
       "kind": "gap",
       "why": "生成しても `ctx.metadata['thumbnail_path']` を誰も設定しないので、下流（品質ゲート・YouTube 最適化）から見えない。生成と設定は別の実装",
       "handled_in": "将来",
-      "surfaces_as": "サムネイル設定",
+      "surfaces_as": "サムネイル",
       "capability": "thumbnail",
-      "done_when": {"kind": "run_record_clean"}
+      "done_when": {
+        "kind": "run_record_clean"
+      }
     },
     {
       "id": "retention_analysis",
@@ -36,9 +48,11 @@
       "why": "実走ログに `[STUB] 現状は映像・音声解析をモック稼働` が出る。視聴維持率の分析は収益化の判断材料そのものなので、モックのままだと数字を信じられない",
       "handled_in": "R1.5-C4",
       "surfaces_as": "retention",
-      "done_when": {"kind": "marker_gone",
-                    "path": "backend/agents/pipeline_coordinator.py",
-                    "marker": "[STUB]"}
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/plugins/retention_map_plugin.py",
+        "marker": "[STUB]"
+      }
     },
     {
       "id": "bgm_mixing",
@@ -47,7 +61,9 @@
       "why": "実走のたびに `BGMミキシング(ファイルなし)` が落ちる。実装はあるが音源が置かれていない。**落ちた工程として毎回記録に出るので、本物の失敗が埋もれる**",
       "handled_in": "将来",
       "surfaces_as": "BGMミキシング",
-      "done_when": {"kind": "run_record_clean"}
+      "done_when": {
+        "kind": "run_record_clean"
+      }
     },
     {
       "id": "youtube_upload",
@@ -56,9 +72,11 @@
       "why": "`youtube_uploader.upload_video()` が `placeholder_video_id` を返す。**投稿していないのに success を返す**ので、収益化の前提が崩れる。2026-08-26 のユーザー決定で「未実装として失敗させる」方針",
       "handled_in": "R1.5-C4",
       "surfaces_as": "youtube_upload",
-      "done_when": {"kind": "marker_gone",
-                    "path": "backend/youtube_uploader.py",
-                    "marker": "placeholder_video_id"}
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/services/youtube_uploader.py",
+        "marker": "placeholder_video_id"
+      }
     },
     {
       "id": "channel_stats",
@@ -67,9 +85,11 @@
       "why": "`admin_channel_router` が `watch_time_hours: 15200` などの固定値を返す。**収益化の到達度をこの数字で判断すると嘘になる**",
       "handled_in": "R1.5-C4",
       "surfaces_as": "channel_stats",
-      "done_when": {"kind": "marker_gone",
-                    "path": "backend/routers/admin_channel_router.py",
-                    "marker": "15200"}
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/admin_channel_router.py",
+        "marker": "15200"
+      }
     },
     {
       "id": "shorts_candidates",
@@ -78,7 +98,10 @@
       "why": "実走で `Shorts候補ゼロ: ハイライトワードが未検出` が出る。**Shorts は登録者を集める側の主軸**（長尺4,000時間 / Shorts 1,000万回）なので、候補が出ないと収益化の片翼が動かない",
       "handled_in": "将来",
       "surfaces_as": "Shorts候補",
-      "done_when": {"kind": "run_record_clean"}
+      "done_when": {
+        "kind": "run_record_clean"
+      },
+      "capability": "shorts"
     },
     {
       "id": "dream_learning",
@@ -86,7 +109,9 @@
       "kind": "intentional",
       "why": "`AVS_SKIP_LEARNING_SIDE_EFFECTS=1` で止めている。止めないと DreamEngine が `VERIFIED_FACTS.md` などの追跡ファイルを書き換える（2026-08-26 に1回起こし、138行と28行が消えた）。**実装漏れではない**",
       "surfaces_as": "dream_learning",
-      "done_when": {"kind": "run_record_clean"}
+      "done_when": {
+        "kind": "run_record_clean"
+      }
     }
   ]
 }
