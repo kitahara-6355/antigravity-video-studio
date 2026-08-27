@@ -272,15 +272,43 @@ async def update_model_assignment(model_assignment: ModelAssignmentRequest):
 
 # ── S10: フォールバックチェーン ──
 
+def _tier_models() -> dict:
+    """段 → 実モデル ID。**正典は model_config.json**（R1.5-C6）。
+
+    ここは定数で `gemini-2.5-pro` / `gemini-2.0-flash` /
+    `gemini-2.0-flash-lite` を返していた。**どれも段の実体と違い**、
+    しかも 2.5 系は 2026-10-16 に提供終了する。API が返す値なので、
+    画面には「いま動いているモデル」として出ていた。
+    """
+    config_path = Path(__file__).parent.parent / "model_config.json"
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    tiers = (config.get("text_generation") or {}).get("tiers") or {}
+    return {tier: (info or {}).get("model") for tier, info in tiers.items()}
+
+
 @router.get("/fallback-chain")
 async def get_fallback_chain():
     """A-1 S10: 3段階フォールバックチェーンの設定"""
+    try:
+        models = _tier_models()
+    except HTTPException:
+        raise
+    except Exception as e:
+        # **読めなかったことを「これが現在の設定です」と言わない**（R1.5-C4）。
+        # 定数を返すと、腐った値が実測値の顔で画面に出る
+        logger.warning(f"model_config.json load error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="model_config.json を読めないため、フォールバックチェーンを返せません",
+        )
     return {
-        "primary": {"tier": "premium", "model": "gemini-2.5-pro"},
-        "secondary": {"tier": "standard", "model": "gemini-2.0-flash"},
-        "tertiary": {"tier": "batch", "model": "gemini-2.0-flash-lite"},
+        "primary": {"tier": "premium", "model": models.get("premium")},
+        "secondary": {"tier": "standard", "model": models.get("standard")},
+        "tertiary": {"tier": "batch", "model": models.get("batch")},
         "auto_fallback": True,
         "trigger_conditions": ["rate_limit", "quota_exceeded", "server_error"],
+        "source": "model_config.json (text_generation.tiers)",
     }
 
 

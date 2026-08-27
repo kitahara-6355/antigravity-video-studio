@@ -15,7 +15,14 @@ import os
 try:
     from model_registry import get_model
 except ImportError:
-    def get_model(task): return "gemini-2.5-flash"
+    # **モデル ID を直書きしない**（R1.5-C6）。正典は model_config.json で、
+    # それを読む解決器が model_policy（標準ライブラリだけに依存するので
+    # model_registry より落ちにくい）。直書きの既定値は入替のたびに腐り、
+    # 実際それで 2026-10-16 に提供終了する 2.5 系が本番の実行経路に居座った。
+    from model_policy import resolve as _resolve
+
+    def get_model(task):
+        return _resolve(task).model
 
 logger = logging.getLogger(__name__)
 

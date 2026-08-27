@@ -281,6 +281,10 @@ def test_model_registry_import_error():
     orig_quota_manager = sys.modules.pop("usage_tracker.quota_manager", None)
     
     # インポート時に ImportError を発生させるモック
+    # 期待値は patch の外で引く（__import__ を差し替えた中で引かない）
+    from model_policy import resolve
+    正典のモデル = resolve("proofreader").model
+
     def mock_import(name, *args, **kwargs):
         if name == "model_registry":
             raise ImportError("Mocked ImportError")
@@ -291,7 +295,10 @@ def test_model_registry_import_error():
             # quota_manager から get_model をインポート
             # これにより quota_manager.py が実行され、ImportErrorが発生し、fallbackのget_modelが定義される
             from usage_tracker.quota_manager import get_model
-            assert get_model("proofreader") == "gemini-2.5-flash"
+            # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+            # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+            assert get_model("proofreader") == 正典のモデル
+            assert not get_model("proofreader").startswith("gemini-2.5")
     finally:
         # sys.modulesを元に戻す
         if orig_model_registry is not None:

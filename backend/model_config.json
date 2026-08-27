@@ -182,30 +182,37 @@
       "veo-3.0": null
     }
   },
+  "free_tier_limits_note": "**いま使っている段のモデルがここに載っていなかった**（R1.5-C5 の実測で判明・2026-08-28 に追記）。載っていたのは旧 ID（gemini-3-flash-preview / gemini-2.5-*）だけで、tracker.py の _get_rpd() は未知のモデルに既定 1000 を返すので、batch の 1500 が効いていなかった。数値は text_generation.tiers の rpm/rpd と同じ二次情報。実キーで 429 を観測したら差し替える。**2.5 系の行は 2026-08-28 に削除した** — 本番のどこからも引かれなくなったため（R1.5-C6）",
   "free_tier_limits": {
+    "gemini-3.5-flash-lite": {
+      "rpm": 30,
+      "rpd": 1500,
+      "tpm": 250000,
+      "tier": "batch"
+    },
+    "gemini-3.6-flash": {
+      "rpm": 15,
+      "rpd": 1000,
+      "tpm": 250000,
+      "tier": "standard"
+    },
+    "gemini-3.7-flash": {
+      "rpm": 15,
+      "rpd": 1000,
+      "tpm": 250000,
+      "tier": "premium"
+    },
+    "gemini-3.1-pro-preview": {
+      "rpm": 0,
+      "rpd": 0,
+      "note": "pro は無料枠なし（昇格専用・課金）"
+    },
     "gemini-3-flash-preview": {
       "rpm": 15,
       "rpd": 1000,
       "tpm": 250000,
       "tier": "premium",
       "note": "Preview — 枠が変動する可能性があるため優先消費"
-    },
-    "gemini-2.5-flash": {
-      "rpm": 15,
-      "rpd": 1000,
-      "tpm": 250000,
-      "tier": "standard"
-    },
-    "gemini-2.5-flash-lite": {
-      "rpm": 30,
-      "rpd": 1500,
-      "tpm": 250000,
-      "tier": "batch"
-    },
-    "gemini-2.5-pro": {
-      "rpm": 0,
-      "rpd": 0,
-      "note": "無料枠 quota=0 — 利用不可"
     },
     "imagen-4.0-ultra-generate-001": {
       "rpm": 2,
@@ -302,21 +309,32 @@
       "auto_migrate": true
     }
   },
+  "deprecated_note": "**replacement は実行時に validate_and_correct() がそのまま返す値**で、そのまま API に渡る。ここに提供終了するモデルを書くと、差替が差替になっていない。2026-08-28 まで gemini-2.0-flash-lite → gemini-2.5-flash-lite / gemini-2.5-pro → gemini-2.5-flash と書いてあり、**2026-10-16 に消えるモデルへ逃がしていた**（R1.5-C6・gate-verifier 1周目の指摘）。行き先は必ず現行の段のモデルにする",
   "deprecated": {
     "gemini-2.0-flash": {
-      "replacement": "gemini-3-flash-preview",
+      "replacement": "gemini-3.6-flash",
       "deadline": "2026-03-31",
-      "reason": "無料枠 quota=0。完全利用不可。"
+      "reason": "無料枠 quota=0。完全利用不可。standard 段へ逃がす（旧: gemini-3-flash-preview は preview のまま取り残された）"
     },
     "gemini-2.0-flash-lite": {
-      "replacement": "gemini-2.5-flash-lite",
+      "replacement": "gemini-3.5-flash-lite",
       "deadline": "2026-04-10",
-      "reason": "2.5-flash-lite への移行完了"
+      "reason": "batch 段へ逃がす（旧: gemini-2.5-flash-lite は 2026-10-16 に提供終了）"
     },
     "gemini-2.5-pro": {
-      "replacement": "gemini-2.5-flash",
-      "deadline": "2026-04-10",
-      "reason": "無料枠 quota=0。gemini-2.5-flash をPremiumとして使用"
+      "replacement": "gemini-3.7-flash",
+      "deadline": "2026-10-16",
+      "reason": "無料枠 quota=0 かつ 2026-10-16 に提供終了。premium 段へ逃がす（旧: gemini-2.5-flash も同日に消える）"
+    },
+    "gemini-2.5-flash": {
+      "replacement": "gemini-3.6-flash",
+      "deadline": "2026-10-16",
+      "reason": "2026-10-16 に提供終了。standard 段へ逃がす"
+    },
+    "gemini-2.5-flash-lite": {
+      "replacement": "gemini-3.5-flash-lite",
+      "deadline": "2026-10-16",
+      "reason": "2026-10-16 に提供終了。batch 段へ逃がす"
     },
     "imagen-3.0-generate-001": {
       "replacement": "imagen-4.0-fast-generate-001",
@@ -326,11 +344,11 @@
   },
   "removed": {
     "gemini-2.0-flash-exp": {
-      "replacement": "gemini-2.5-flash",
+      "replacement": "gemini-3.6-flash",
       "removed_date": "2025-12-01"
     },
     "gemini-1.5-flash": {
-      "replacement": "gemini-2.5-flash",
+      "replacement": "gemini-3.6-flash",
       "removed_date": "2025-06-01"
     }
   }

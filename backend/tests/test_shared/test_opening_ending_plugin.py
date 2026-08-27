@@ -306,11 +306,19 @@ class TestOpeningEndingPluginExecute:
         assert mock_sleep.call_count == 60
 
 def test_model_registry_import_fallback():
+    """**直書きの既定値に逃げない**（R1.5-C6）。
+
+    2026-08-28 まで `gemini-2.5-flash` を直書きしており、2026-10-16 に
+    提供終了するモデルが本番の実行経路に居座っていた。正典から引き直す。
+    """
+    from model_policy import resolve
+
     with patch.dict("sys.modules", {"model_registry": None}):
         plugin_mod = get_plugin_module()
         importlib.reload(plugin_mod)
         fallback_get_model = plugin_mod.get_model
-        assert fallback_get_model("opening_video") == "gemini-2.5-flash"
+        assert fallback_get_model("opening_video") == resolve("opening_video").model
+        assert not fallback_get_model("opening_video").startswith("gemini-2.5")
 
 def test_video_title_empty_string():
     """video_title が空文字列の場合の挙動を検証"""
