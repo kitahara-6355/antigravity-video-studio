@@ -419,6 +419,10 @@ def run_gate(video: Path | None = None,
     report.runs = load_runs(runs_dir)
     report.findings += check_runs(report.runs)
     report.findings += check_run_status(report.runs)
+    # **AI が作ったのに誰も使っていない中間成果物を 0 にする**（R1.5-C3）。
+    # 作ったものが下流の誰にも読まれずに消えるなら、その呼び出しは
+    # 成果物に何も足していない。
+    report.findings += check_intermediates(report.runs)
     report.history = history_findings(report.runs)
     report.findings += check_cost(report.runs)
     report.findings += check_models(report.runs)

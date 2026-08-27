@@ -155,6 +155,8 @@ class PipelineCoordinator:
         self.runs_dir: Optional[Path] = None
         self.ledger_path: Optional[Path] = None
         self._recorder: Optional[RunRecorder] = None
+        # AI が作ったメタデータの置き場（R1.5-C3）
+        self._sidecar_path: Optional[str] = None
         # 工程名 → 最後の試行が通ったか。**リトライで通ったものは失敗にしない**
         self._outcomes: Dict[str, bool] = {}
 
@@ -630,6 +632,7 @@ class PipelineCoordinator:
         """記録を開く。**開けなくても実行は続ける**（記録は実行を止めない）。"""
         self._recorder = None
         self._outcomes = {}
+        self._sidecar_path = None
         try:
             kwargs = {"inputs": {
                 "video_path": ctx.video_path,
@@ -651,6 +654,29 @@ class PipelineCoordinator:
         except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
             logger.warning(f"⚠️ 実行記録を開けませんでした: {e}")
 
+    def _write_metadata_sidecar(self, ctx: PipelineContext) -> Optional[str]:
+        """**AI が作ったメタデータを捨てない**（R1.5-C3・2026-08-27 ユーザー決定）。
+
+        `youtube_opt` の titles / tags / description は `ctx.metadata` に入るだけで、
+        CLI 実行では戻り値ごと消えていた。**消費者の YouTube 投稿が未実装**
+        （`backend/config/feature_gaps.json` の `youtube_upload`）だから。
+
+        投稿が未実装な以上、**いまの現実は手動投稿**。そのまま貼れる形で
+        最終動画の隣に置く。空のときは作らない（**空のファイルを置いて
+        「使った」と言わない**）。
+        """
+        if not ctx.metadata or not ctx.final_path:
+            return None
+        try:
+            横 = Path(ctx.final_path).with_suffix(".youtube.json")
+            横.write_text(json.dumps(ctx.metadata, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+            logger.info(f"📝 YouTube 用メタデータ: {横}")
+            return str(横)
+        except Exception as e:  # noqa: BLE001 — 書けなくても実行は止めない
+            logger.warning(f"⚠️ メタデータを書き出せませんでした: {e}")
+            return None
+
     def _intermediates(self, ctx: PipelineContext) -> list:
         """**AI が生み出したものが下流で使われたか**（R1.5-C3）。
 
@@ -671,10 +697,12 @@ class PipelineCoordinator:
              "produced": bool(ctx.segments),
              "consumed_by": "preview",
              "consumed": "preview" in 使った工程},
+            # **投稿が未実装なので、消費者は「手動投稿用のサイドカー」。**
+            # 自動投稿そのものは台帳の `youtube_upload` に残っている
             {"name": "youtube_metadata", "produced_by": "youtube_opt",
              "produced": bool(ctx.metadata),
-             "consumed_by": "youtube_upload",
-             "consumed": False},
+             "consumed_by": "metadata サイドカー（手動投稿用）",
+             "consumed": bool(self._sidecar_path)},
             {"name": "quality_feedback", "produced_by": "quality_gate",
              "produced": bool(ctx.quality_feedback),
              "consumed_by": "render",
@@ -687,7 +715,8 @@ class PipelineCoordinator:
         if recorder is None:
             return
         try:
-            for path in (ctx.final_path, ctx.preview_path):
+            self._sidecar_path = self._write_metadata_sidecar(ctx)
+            for path in (ctx.final_path, ctx.preview_path, self._sidecar_path):
                 if path:
                     recorder.artifact(path)
             # **記録だけを見て「何が落ちたか」が分かること**（R1.5-C1b）。

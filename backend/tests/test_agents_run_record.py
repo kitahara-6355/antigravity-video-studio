@@ -441,8 +441,10 @@ def test_中間成果物の使われ方が記録に残る(tmp_path):
 
     中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
     assert 中間["youtube_metadata"]["produced"] is True
+    # **動画が出来ていなければサイドカーも作らない**（置き場が無い）ので、
+    # この筋書きでは「作られたが使われていない」のまま
     assert 中間["youtube_metadata"]["consumed"] is False
-    assert 中間["youtube_metadata"]["consumed_by"] == "youtube_upload"
+    assert "サイドカー" in 中間["youtube_metadata"]["consumed_by"]
 
 
 def test_作られていない中間成果物は捨てられたと言わない(tmp_path):
@@ -453,3 +455,44 @@ def test_作られていない中間成果物は捨てられたと言わない(t
 
     中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
     assert 中間["youtube_metadata"]["produced"] is False
+
+
+def test_AIのメタデータがサイドカーとして残る(tmp_path):
+    """**AI が金を使って作ったものを捨てない**（R1.5-C3・2026-08-27 ユーザー決定）。
+
+    `youtube_opt` の titles / tags / description は `ctx.metadata` に入るだけで、
+    CLI 実行では戻り値ごと消えていた。消費者である YouTube 投稿が未実装だから。
+    **投稿が未実装な以上、いまの現実は手動投稿**なので、そのまま貼れる形で
+    最終動画の隣に残す。
+    """
+    final = tmp_path / "final.mp4"
+    final.write_bytes(b"video")
+    c = _coordinator(tmp_path, final_path=final)
+    for w in c.workers:
+        if type(w).__name__ == "YouTubeOptWorker":
+            async def _メタデータを作る(ctx, _w=w):
+                ctx.metadata = {"titles": ["案1"], "tags": ["t"], "description": "d"}
+                return StageResult(stage_name=_w.name, success=True, detail="やった")
+            w.execute = _メタデータを作る
+
+    _run(c, tmp_path)
+
+    横 = final.with_suffix(".youtube.json")
+    assert 横.is_file(), list(tmp_path.iterdir())
+    assert json.loads(横.read_text(encoding="utf-8"))["titles"] == ["案1"]
+
+    rec = _run_json(tmp_path)
+    assert str(横) in rec["artifacts"], rec["artifacts"]
+    中間 = {i["name"]: i for i in rec["intermediates"]}
+    assert 中間["youtube_metadata"]["consumed"] is True
+
+
+def test_メタデータが無ければサイドカーを作らない(tmp_path):
+    """**空のファイルを置いて「使った」と言わない。**"""
+    final = tmp_path / "final.mp4"
+    final.write_bytes(b"video")
+    c = _coordinator(tmp_path, final_path=final)
+
+    _run(c, tmp_path)
+
+    assert not final.with_suffix(".youtube.json").exists()

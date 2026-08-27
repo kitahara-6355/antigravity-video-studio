@@ -767,3 +767,30 @@ def test_使われていない中間成果物があればゲートが落ちる()
          "consumed_by": "youtube_upload"}]}])
 
     assert "unused_intermediate" in _kinds(出た), 出た
+
+
+def test_使われていない中間成果物があるとゲートが落ちる(tmp_path, monkeypatch):
+    """**0 でなければ成果物ゲートが FAIL する**（正典 R1.5-C3）。"""
+    from backend import cost_guard
+    from backend.revenue import artifact_gate as ag
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps({"metered": True, "known_price": True}) + "\n",
+                      encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+    monkeypatch.setattr(ag, "check_video", lambda p: (None, []))
+    runs = tmp_path / "runs"
+    d = runs / "20260827T120000000000-0000"
+    d.mkdir(parents=True)
+    (d / "run.json").write_text(json.dumps({
+        "run_id": "20260827T120000000000-0000", "started_at": "2026-08-27T00:00:00Z",
+        "status": "completed",
+        "stages": [{"name": "render", "status": "success", "model": "local:ffmpeg"}],
+        "models_used": ["local:ffmpeg"], "artifacts": ["out.mp4"],
+        "intermediates": [{"name": "youtube_metadata", "produced": True,
+                           "consumed": False, "consumed_by": "youtube_upload"}],
+    }), encoding="utf-8")
+
+    report = ag.run_gate(video=None, runs_dir=runs)
+
+    assert "unused_intermediate" in _kinds(report.findings), report.findings
+    assert not report.ok
