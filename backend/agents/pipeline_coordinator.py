@@ -232,6 +232,21 @@ class PipelineCoordinator:
             self._record_dead_stage(worker, ctx, f"Hook denied: {reason}")
         return not denied
 
+    def _normalized(self, worker: PipelineStageWorker,
+                    result: Optional[StageResult]) -> StageResult:
+        """**`None` は成功ではない**（R1.5-C1b）。
+
+        記録側は `result is not None and not result.success` を見ていたので
+        `None` だと `success` と書かれ、`_outcomes` は失敗という食い違いが
+        起きた。直列側はさらに `result.retries` で AttributeError になり、
+        **実行ごと落ちて記録が閉じられなかった**（`status: running` が残る）。
+        """
+        if result is None:
+            return StageResult(
+                stage_name=worker.name, success=False,
+                detail=f"{worker.name} が結果を返しませんでした")
+        return result
+
     async def _execute_worker(self, worker: PipelineStageWorker,
                               ctx: PipelineContext) -> StageResult:
         """**1工程 = 1記録。** 失敗も原因と入力ごと残す（R1.5-C1）。
@@ -240,8 +255,8 @@ class PipelineCoordinator:
         **worker の失敗そのものは飲まない** — `StageResult` はそのまま返す。
         """
         if self._recorder is None:
-            result = await worker.execute(ctx)
-            self._record_outcome(worker, bool(result and result.success))
+            result = self._normalized(worker, await worker.execute(ctx))
+            self._record_outcome(worker, result.success)
             return result
 
         name, kwargs = self._stage_args(worker, ctx)
@@ -249,8 +264,10 @@ class PipelineCoordinator:
         try:
             with self._recorder.stage(name, **kwargs):
                 result = await worker.execute(ctx)
-                if result is not None and not result.success:
-                    raise _StageFailed(f"{name}: {result.detail}")
+                if result is None or not result.success:
+                    raise _StageFailed(
+                        f"{name}: "
+                        f"{result.detail if result else '結果を返しませんでした'}")
         except _StageFailed:
             pass
         except Exception:
@@ -260,7 +277,8 @@ class PipelineCoordinator:
             result = StageResult(stage_name=worker.name, success=False,
                                  detail=f"{worker.name} が例外で落ちました")
 
-        self._record_outcome(worker, bool(result and result.success))
+        result = self._normalized(worker, result)
+        self._record_outcome(worker, result.success)
         return result
 
     def _settle_outcomes(self, ctx: PipelineContext) -> tuple:

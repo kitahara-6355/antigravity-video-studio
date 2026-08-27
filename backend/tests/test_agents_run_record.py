@@ -317,3 +317,50 @@ def test_断られた工程を改善ループが動かさない(tmp_path):
     assert result["status"] != "completed", result["status"]
     rec = _run_json(tmp_path)
     assert "quality_gate" in rec["health"]["failed_stages"], rec["health"]
+
+
+def test_結果を返さない工程を成功に数えない(tmp_path):
+    """**`None` は成功ではない。** C1b の条件文が名指ししている「工程が結果を
+    返さない」がこれ。
+
+    記録側は `result is not None and not result.success` を見ていたので
+    **`None` だと `success` と書かれ**、`_outcomes` は失敗という食い違いが
+    起きていた。直列側はさらに `result.retries` で AttributeError になり、
+    **実行ごと落ちて記録が閉じられなかった**（`status: running` のまま）。
+    """
+    c = _coordinator(tmp_path)
+
+    async def _何も返さない(ctx):
+        return None
+
+    for w in c.workers:
+        if type(w).__name__ == "YouTubeOptWorker":
+            w.execute = _何も返さない
+
+    result = _run(c, tmp_path)
+
+    assert result["status"] != "completed", result["status"]
+    rec = _run_json(tmp_path)
+    youtube = [s for s in rec["stages"] if s.get("name") == "youtube_opt"]
+    assert youtube, rec["stages"]
+    assert all(s["status"] == "failed" for s in youtube), youtube
+    assert "youtube_opt" in rec["health"]["failed_stages"], rec["health"]
+
+
+def test_直列で結果を返さなくても実行は落ちない(tmp_path):
+    """**記録が閉じられないのが一番困る。** 落ちた事実ごと消える。"""
+    c = _coordinator(tmp_path)
+
+    async def _何も返さない(ctx):
+        return None
+
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            w.execute = _何も返さない
+
+    result = _run(c, tmp_path)
+
+    assert result["status"] != "completed", result["status"]
+    rec = _run_json(tmp_path)
+    assert rec["status"] in ("failed", "degraded"), rec["status"]
+    assert "proofread" in rec["health"]["failed_stages"], rec["health"]
