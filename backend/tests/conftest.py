@@ -9,6 +9,8 @@
 import sys
 import types
 # Pydantic hacks removed to avoid breaking RootModel construction in modern Pydantic v2.
+from pathlib import Path
+
 import pytest
 import sys
 import os
@@ -459,6 +461,46 @@ def _block_external_network(request):
         yield
     finally:
         uninstall()
+
+
+# ---------------- 本番の課金台帳を守る（2026-08-27）----------------
+#
+# **テストが `.claude/cost_ledger.jsonl` と `.claude/budget.json` を書いていた。**
+# CI run 33079706782 の fs-guard で、`test_shared/test_model_governance.py` の
+# 統治プロキシ系5件が `open(a)` / `open(w)` していた。台帳は**実費の記録**で、
+# 憲法第3条のキルスイッチが読む先でもあるので、テストの数字が混ざると
+# 「いくら使ったか」が分からなくなる。
+#
+# 経路: `cost_guard.guard_before()` は**ダミーキーなら None を返して書かない**が、
+# 何らかの経路で非ダミーのキーが見えていると本物のガードを作って書き込む
+# （`mock_api_key` のように `dummy` / `test` で始まらない値は非ダミー扱い）。
+# **どのテストが漏らしたかに関わらず塞ぐ**ため、書き込み先そのものを退避する。
+#
+# 個別のテストが `monkeypatch.setattr(cost_guard, "LEDGER_PATH", ...)` で
+# 上書きするのは従来どおり効く（このフィクスチャより後に走るため）。
+@pytest.fixture(autouse=True)
+def _課金台帳を退避する(tmp_path_factory, monkeypatch):
+    try:
+        import cost_guard
+    except ImportError:  # 読み込めない構成では何もしない
+        yield
+        return
+    退避先 = tmp_path_factory.mktemp("cost_guard", numbered=True)
+    # **予算そのものは複製して持っていく。** 空にすると、非ダミーのキーが
+    # 見えているときに `guard_before()` が「承認済みの予算がない」で
+    # 例外を上げ、**汚染がテスト失敗にすり替わるだけ**になる。
+    # 見せる中身は本番と同じ、書き込み先だけ違う、という状態にする。
+    複製 = 退避先 / "budget.json"
+    try:
+        元 = Path(cost_guard.BUDGET_PATH)
+        if 元.is_file():
+            複製.write_text(元.read_text(encoding="utf-8"), encoding="utf-8")
+    except OSError:
+        pass
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", 退避先 / "cost_ledger.jsonl",
+                        raising=False)
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", 複製, raising=False)
+    yield
 
 
 # ---------------- 本番ファイル書き込みの検出 ----------------
