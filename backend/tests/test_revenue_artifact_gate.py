@@ -718,3 +718,52 @@ def test_指紋が読めなければ確かめていないと言う():
                             _ai_run("b", calls=2, digest="y")])
 
     assert "ai_effect_unverified" in _kinds(出た), 出た
+
+
+# --- 使われていない中間成果物（R1.5-C3・後半）---------------------------------
+#
+# **AI が金を使って作ったものが捨てられていないか。** `youtube_opt` が生成する
+# titles / tags / description は `ctx.metadata` に入るだけで、成果物にも実行記録にも
+# 残らない（CLI 実行では戻り値ごと消える）。消費者である YouTube 投稿が未実装だから。
+
+
+def test_使われていない中間成果物を数える():
+    from backend.revenue.artifact_gate import unused_intermediates
+
+    run = {"run_id": "r", "intermediates": [
+        {"name": "youtube_metadata", "produced": True, "consumed": False},
+        {"name": "subtitles", "produced": True, "consumed": True},
+    ]}
+
+    出た = unused_intermediates(run)
+
+    assert [i["name"] for i in 出た] == ["youtube_metadata"]
+
+
+def test_生まれていないものは数えない():
+    """**作られていないものは「捨てられた」ではない。**"""
+    from backend.revenue.artifact_gate import unused_intermediates
+
+    run = {"run_id": "r", "intermediates": [
+        {"name": "youtube_metadata", "produced": False, "consumed": False}]}
+
+    assert unused_intermediates(run) == []
+
+
+def test_中間成果物の記録が無ければ確かめていないと言う():
+    from backend.revenue.artifact_gate import check_intermediates
+
+    出た = check_intermediates([{"run_id": "r"}])
+
+    assert "intermediates_unverified" in _kinds(出た), 出た
+
+
+def test_使われていない中間成果物があればゲートが落ちる():
+    """**0 でなければ FAIL**（正典 R1.5-C3）。"""
+    from backend.revenue.artifact_gate import check_intermediates
+
+    出た = check_intermediates([{"run_id": "r", "intermediates": [
+        {"name": "youtube_metadata", "produced": True, "consumed": False,
+         "consumed_by": "youtube_upload"}]}])
+
+    assert "unused_intermediate" in _kinds(出た), 出た

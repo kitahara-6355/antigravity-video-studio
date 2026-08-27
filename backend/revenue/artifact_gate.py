@@ -315,6 +315,39 @@ def check_ai_effect(runs: list[dict]) -> list[Finding]:
     return []
 
 
+def unused_intermediates(run: dict) -> list[dict]:
+    """**生み出されたのに誰も使っていない中間成果物**（R1.5-C3）。
+
+    作られていないものは数えない（捨てられたわけではない）。
+    """
+    return [i for i in (run.get("intermediates") or [])
+            if i.get("produced") and not i.get("consumed")]
+
+
+def check_intermediates(runs: list[dict]) -> list[Finding]:
+    """**0 でなければ FAIL**（正典 R1.5-C3）。
+
+    AI は金を使って中間成果物を作る。作ったものが下流の誰にも読まれずに
+    消えているなら、その呼び出しは**成果物に何も足していない。**
+    """
+    if not runs:
+        return []
+    run = runs[-1]
+    if "intermediates" not in run:
+        return [Finding(
+            "intermediates_unverified", run.get("run_id", "(不明)"),
+            "中間成果物の使われ方が記録にありません。**確かめられなかったことを"
+            "「全部使われている」にはしません**")]
+    findings = []
+    for i in unused_intermediates(run):
+        findings.append(Finding(
+            "unused_intermediate", f"{run.get('run_id')} / {i.get('name')}",
+            f"**{i.get('name')} は作られたのに使われていません**"
+            f"（消費者: {i.get('consumed_by') or '(宣言なし)'}）。"
+            "AI の呼び出しが成果物に何も足していません"))
+    return findings
+
+
 def history_findings(runs: list[dict]) -> list[Finding]:
     """**過去の実行にあった欠陥。判定材料にはしない。**
 
@@ -457,6 +490,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="成果物が揃っていなければ exit 1")
     parser.add_argument("--resume-check", action="store_true",
                         help="失敗した工程から再開できるかだけを見る")
+    parser.add_argument("--intermediates", action="store_true",
+                        help="使われていない中間成果物を数える（R1.5-C3）")
     parser.add_argument("--ai-effect", action="store_true",
                         help="AI の出力が成果物に届いているかだけを見る（R1.5-C3）")
     parser.add_argument("--semantics", action="store_true")
@@ -464,6 +499,23 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.semantics:
         print(_format_semantics())
+        return 0
+
+    if args.intermediates:
+        runs = load_runs()
+        findings = check_intermediates(runs)
+        if runs and "intermediates" in runs[-1]:
+            for i in runs[-1]["intermediates"]:
+                印 = "✅ 使われた" if i.get("consumed") else (
+                    "⬜ 作られていない" if not i.get("produced") else "🚫 捨てられた")
+                print(f"    {印}  {i.get('name'):<20} "
+                      f"{i.get('produced_by')} → {i.get('consumed_by')}")
+            print()
+        if findings:
+            for f in findings:
+                print(f"    {f}")
+            return 1
+        print("✅ 作られた中間成果物はすべて使われています。")
         return 0
 
     if args.ai_effect:

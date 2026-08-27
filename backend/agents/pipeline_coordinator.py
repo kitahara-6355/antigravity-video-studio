@@ -651,6 +651,36 @@ class PipelineCoordinator:
         except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
             logger.warning(f"⚠️ 実行記録を開けませんでした: {e}")
 
+    def _intermediates(self, ctx: PipelineContext) -> list:
+        """**AI が生み出したものが下流で使われたか**（R1.5-C3）。
+
+        AI は金を使って中間成果物を作る。作ったものが誰にも読まれずに消えるなら、
+        **その呼び出しは成果物に何も足していない。**
+
+        - `subtitles`（校閲したテキスト）→ プレビューが焼き込む。
+          実際に届いていることは SHA256 の比較で別途確かめている
+          （`artifact_gate --ai-effect`）
+        - `youtube_metadata` → **消費者は YouTube 投稿で、本線に工程が無い**
+          （`backend/config/feature_gaps.json` の `youtube_upload`）。
+          いまは必ず「使われていない」になる
+        - `quality_feedback` → レンダリングモードの決定と改善ループが読む
+        """
+        使った工程 = {n for n, ok in self._outcomes.items() if ok}
+        return [
+            {"name": "subtitles", "produced_by": "proofread",
+             "produced": bool(ctx.segments),
+             "consumed_by": "preview",
+             "consumed": "preview" in 使った工程},
+            {"name": "youtube_metadata", "produced_by": "youtube_opt",
+             "produced": bool(ctx.metadata),
+             "consumed_by": "youtube_upload",
+             "consumed": False},
+            {"name": "quality_feedback", "produced_by": "quality_gate",
+             "produced": bool(ctx.quality_feedback),
+             "consumed_by": "render",
+             "consumed": ctx.render_mode in ("safe", "production")},
+        ]
+
     def _close_recorder(self, ctx: PipelineContext, status: str) -> None:
         """記録を閉じる。成果物のパスも残す。"""
         recorder = self._recorder
@@ -668,6 +698,7 @@ class PipelineCoordinator:
             # 通らないので空のまま閉じていた。`_outcomes` なら着手した工程が
             # 全部入っている。
             落ちた = [n for n, ok in self._outcomes.items() if not ok]
+            recorder.intermediates(self._intermediates(ctx))
             recorder.finish(status, health={
                 "skipped_features": list(ctx.skipped_features),
                 "failed_stages": 落ちた,

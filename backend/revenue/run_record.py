@@ -294,6 +294,14 @@ class RunRecorder:
         self._record.setdefault("artifact_digests", {})[value] = _sha256(value)
         self._write()
 
+    def intermediates(self, rows: list) -> None:
+        """**中間成果物が下流で使われたか**（R1.5-C3）。
+
+        作られたのに誰にも読まれていないものを、あとから件数で出せるようにする。
+        """
+        self._record["intermediates"] = list(rows)
+        self._write()
+
     # --- 締め ---------------------------------------------------------------
 
     def finish(self, status: str | None = None,

@@ -417,3 +417,39 @@ def test_明示した目標尺が自動より優先される(tmp_path, monkeypat
         except SystemExit:
             pass
         assert 渡された["target_minutes"] == 期待, argv
+
+
+# --- 使われていない中間成果物（R1.5-C3）---------------------------------------
+
+
+def test_中間成果物の使われ方が記録に残る(tmp_path):
+    """**AI が金を使って作ったものが捨てられていないか。**
+
+    `youtube_opt` の titles / tags / description は `ctx.metadata` に入るだけで、
+    成果物にも実行記録にも残らない（CLI 実行では戻り値ごと消える）。
+    消費者である YouTube 投稿が未実装だから。**それを件数で出す。**
+    """
+    c = _coordinator(tmp_path)
+    for w in c.workers:
+        if type(w).__name__ == "YouTubeOptWorker":
+            async def _メタデータを作る(ctx, _w=w):
+                ctx.metadata = {"titles": ["案1"], "tags": ["t"], "description": "d"}
+                return StageResult(stage_name=_w.name, success=True, detail="やった")
+            w.execute = _メタデータを作る
+
+    _run(c, tmp_path)
+
+    中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
+    assert 中間["youtube_metadata"]["produced"] is True
+    assert 中間["youtube_metadata"]["consumed"] is False
+    assert 中間["youtube_metadata"]["consumed_by"] == "youtube_upload"
+
+
+def test_作られていない中間成果物は捨てられたと言わない(tmp_path):
+    """**作られていないものは「捨てられた」ではない。**"""
+    c = _coordinator(tmp_path)
+
+    _run(c, tmp_path)
+
+    中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
+    assert 中間["youtube_metadata"]["produced"] is False
