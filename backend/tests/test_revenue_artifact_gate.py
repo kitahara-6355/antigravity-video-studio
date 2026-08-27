@@ -419,3 +419,40 @@ def test_過去のモデル記録で最新を免責しない(tmp_path):
     最新 = {"run_id": "new", "models_used": []}
 
     assert "no_models_recorded" in _kinds(check_models([過去, 最新]))
+
+
+# --- 実装不足項目の台帳（R1.5・2026-08-27 ユーザー決定）------------------------
+#
+# **実装が足りていない機能を1箇所に集める。** 分かっている7件のうち3件は正典の
+# 条件文に散らばって書かれ、残り4件はどこにも書かれていなかった（実走ログと
+# 品質ゲートの出力にしか現れない）。**一覧が無ければ思い出せない。**
+#
+# 技術負債の台帳（1,463件）とは別物。あれは `file_path:line_number` を持つ
+# 既存コードの負債で、**存在しない機能は行番号を持てない**。
+
+
+def test_台帳の全項目に理由と判定条件がある():
+    """**「あとで書く」を許さない。** 理由の無い項目は思い出せない。"""
+    from backend.feature_gaps import check_entries, load_gaps
+
+    assert check_entries(load_gaps()) == []
+
+
+def test_理由が無ければ不備として出る():
+    from backend.feature_gaps import check_entries
+
+    不備 = check_entries([{"id": "x", "title": "何か", "kind": "gap",
+                           "handled_in": "将来",
+                           "done_when": {"kind": "run_record_clean"}}])
+
+    assert any("why" in m for m in 不備), 不備
+
+
+def test_gapには行先が要る():
+    """`intentional` には要らないが、`gap` は**どこで直すか**が要る。"""
+    from backend.feature_gaps import check_entries
+
+    不備 = check_entries([{"id": "x", "title": "何か", "kind": "gap",
+                           "why": "理由", "done_when": {"kind": "run_record_clean"}}])
+
+    assert any("handled_in" in m for m in 不備), 不備

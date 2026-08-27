@@ -1,0 +1,92 @@
+{
+  "_comment": "**実装が足りていない機能の一覧。**技術負債（backend/agents/memory/technical_debt_index.json・1,463件）とは別物で、あちらは `file_path:line_number` を持つ既存コードの負債。**存在しない機能は行番号を持てない**し、7件の戦略的な項目を1,463件の中に入れたら確実に埋もれる。設計は docs/specs/2026-08-27-feature-gaps-design.md。点検は `python -m backend.feature_gaps --audit`",
+  "_rules": [
+    "**一覧は台帳、期限は正典。** `handled_in` にフェーズの条件 ID（例 R1.5-C4）か `将来` を書く。正典 vision_backlog.json の条件文はここからは書き換えない（フェーズの定義はユーザーの領分・憲法第1条）",
+    "**kind は2種類。** `gap` は実装が足りていないもの。`intentional` は意図して止めているもので実装漏れではない。実行記録には両方が同じ顔で出るので、区別しないと点検が誤検知する",
+    "**`surfaces_as` は実行記録の health.skipped_features / failed_stages に出るときの名前。**部分一致で照合する",
+    "**`gate_checks` は品質ゲートで回さないプラグイン名。**本線に無い機能を減点し続けると、ゲートは原理的に閾値へ到達できない",
+    "**実装したらこの台帳から消す。**消し忘れは `--audit` が検出して FAIL する"
+  ],
+  "gaps": [
+    {
+      "id": "thumbnail_generation",
+      "title": "サムネイルの自動生成",
+      "kind": "gap",
+      "why": "品質ゲートが要求するが、本線（agents）にサムネイル工程が無い。物理チェックで -20、プラグインで -15、完走チェックで -5 の固定減点になっており、**構成上どうやっても閾値90に届かない**。`generate_pipeline_coordinator_thumbnail()` はあるが StageBoundAgent 用の別タスクで、パイプラインからは呼ばれない",
+      "handled_in": "将来",
+      "surfaces_as": "サムネイル",
+      "capability": "thumbnail",
+      "gate_checks": ["thumbnail_quality_check"],
+      "done_when": {"kind": "artifact_present", "suffixes": [".png", ".jpg", ".jpeg", ".webp"]}
+    },
+    {
+      "id": "thumbnail_insert",
+      "title": "サムネイルの自動インサート",
+      "kind": "gap",
+      "why": "生成しても `ctx.metadata['thumbnail_path']` を誰も設定しないので、下流（品質ゲート・YouTube 最適化）から見えない。生成と設定は別の実装",
+      "handled_in": "将来",
+      "surfaces_as": "サムネイル設定",
+      "capability": "thumbnail",
+      "done_when": {"kind": "run_record_clean"}
+    },
+    {
+      "id": "retention_analysis",
+      "title": "retention 分析（現在はモック）",
+      "kind": "gap",
+      "why": "実走ログに `[STUB] 現状は映像・音声解析をモック稼働` が出る。視聴維持率の分析は収益化の判断材料そのものなので、モックのままだと数字を信じられない",
+      "handled_in": "R1.5-C4",
+      "surfaces_as": "retention",
+      "done_when": {"kind": "marker_gone",
+                    "path": "backend/agents/pipeline_coordinator.py",
+                    "marker": "[STUB]"}
+    },
+    {
+      "id": "bgm_mixing",
+      "title": "BGM ミキシング（アセット未配置）",
+      "kind": "gap",
+      "why": "実走のたびに `BGMミキシング(ファイルなし)` が落ちる。実装はあるが音源が置かれていない。**落ちた工程として毎回記録に出るので、本物の失敗が埋もれる**",
+      "handled_in": "将来",
+      "surfaces_as": "BGMミキシング",
+      "done_when": {"kind": "run_record_clean"}
+    },
+    {
+      "id": "youtube_upload",
+      "title": "YouTube 投稿（placeholder を返す）",
+      "kind": "gap",
+      "why": "`youtube_uploader.upload_video()` が `placeholder_video_id` を返す。**投稿していないのに success を返す**ので、収益化の前提が崩れる。2026-08-26 のユーザー決定で「未実装として失敗させる」方針",
+      "handled_in": "R1.5-C4",
+      "surfaces_as": "youtube_upload",
+      "done_when": {"kind": "marker_gone",
+                    "path": "backend/youtube_uploader.py",
+                    "marker": "placeholder_video_id"}
+    },
+    {
+      "id": "channel_stats",
+      "title": "チャンネル統計（固定値）",
+      "kind": "gap",
+      "why": "`admin_channel_router` が `watch_time_hours: 15200` などの固定値を返す。**収益化の到達度をこの数字で判断すると嘘になる**",
+      "handled_in": "R1.5-C4",
+      "surfaces_as": "channel_stats",
+      "done_when": {"kind": "marker_gone",
+                    "path": "backend/routers/admin_channel_router.py",
+                    "marker": "15200"}
+    },
+    {
+      "id": "shorts_candidates",
+      "title": "Shorts 候補の抽出",
+      "kind": "gap",
+      "why": "実走で `Shorts候補ゼロ: ハイライトワードが未検出` が出る。**Shorts は登録者を集める側の主軸**（長尺4,000時間 / Shorts 1,000万回）なので、候補が出ないと収益化の片翼が動かない",
+      "handled_in": "将来",
+      "surfaces_as": "Shorts候補",
+      "done_when": {"kind": "run_record_clean"}
+    },
+    {
+      "id": "dream_learning",
+      "title": "学習の副作用（意図して止めている）",
+      "kind": "intentional",
+      "why": "`AVS_SKIP_LEARNING_SIDE_EFFECTS=1` で止めている。止めないと DreamEngine が `VERIFIED_FACTS.md` などの追跡ファイルを書き換える（2026-08-26 に1回起こし、138行と28行が消えた）。**実装漏れではない**",
+      "surfaces_as": "dream_learning",
+      "done_when": {"kind": "run_record_clean"}
+    }
+  ]
+}
