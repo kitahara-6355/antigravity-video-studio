@@ -279,6 +279,14 @@ jobs:
       - name: 絶対パス直書きラチェット（増加を許さない）
         run: python .github/scripts/abspath_ratchet.py
 
+      # **実装が足りていない機能を埋もれさせない**（R1.5・2026-08-27 ユーザー決定）。
+      # CI はパイプラインを実走できない（実キーも実行記録も無い）ので、
+      # 実行記録が要る検査は評価できない。**「確かめられなかった」を「問題なし」に
+      # しない**ため、--static-only は評価しなかった検査を必ず列挙する。
+      # 実行記録まで含めた完全な点検は手元で `--audit` を叩く。
+      - name: 実装不足項目の点検（静的のみ）
+        run: PYTHONPATH=./backend python -m backend.feature_gaps --audit --static-only
+
   security:
     name: シークレットスキャン
     runs-on: ubuntu-latest
