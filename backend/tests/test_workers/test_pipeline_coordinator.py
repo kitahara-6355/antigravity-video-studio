@@ -563,7 +563,8 @@ class TestC4ErrorControl:
         ctx = PipelineContext(video_path="/tmp/test.mp4")
 
         loop_called = False
-        async def _track_loop(ctx, perf_manager=None):
+        # `harness` は R1.5-C1b で足した引数（改善ループもガバナンスを通す）
+        async def _track_loop(ctx, perf_manager=None, harness=None):
             nonlocal loop_called
             loop_called = True
             return False  # 改善不成功

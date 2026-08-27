@@ -193,6 +193,45 @@ class PipelineCoordinator:
         """
         self._outcomes[self._stage_name(worker)] = ok
 
+    def _record_dead_stage(self, worker: PipelineStageWorker,
+                           ctx: PipelineContext, reason: str) -> None:
+        """**動かなかった工程も記録に1件残す**（R1.5-C1b）。
+
+        事前フックが断った・落ちたときは `_execute_worker` に入らないので、
+        記録には何も残らなかった。**`status: failed` なのに落ちた工程が
+        ゼロ**という記録ができ、`run_record --resume` が「失敗した工程は
+        ありません」と言って exit 0 を返した（2026-08-27・gate-verifier の指摘1）。
+        """
+        if self._recorder is None:
+            return
+        name, kwargs = self._stage_args(worker, ctx)
+        try:
+            with self._recorder.stage(name, **kwargs):
+                raise _StageFailed(f"{name}: {reason}")
+        except _StageFailed:
+            pass
+        except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
+            logger.warning(f"⚠️ 工程を記録できませんでした: {e}")
+
+    async def _ensure_allowed(self, harness, worker: PipelineStageWorker,
+                              ctx: PipelineContext) -> bool:
+        """**改善ループもガバナンスを通す**（R1.5-C1b）。
+
+        `_quality_improvement_loop` は `_execute_worker` を直接呼んでおり、
+        **断られた工程を迂回して実行していた。** しかも成功で `_outcomes` を
+        上書きするので `completed` に戻り、記録には拒否の痕跡が残らなかった
+        （2026-08-27・gate-verifier の指摘2）。
+        """
+        try:
+            denied, reason = await self._fire_pre_hook(harness, worker, ctx)
+        except Exception as e:  # noqa: BLE001 — 確かめられないなら止める
+            denied, reason = True, f"事前フックが落ちました: {e}"
+        if denied:
+            logger.warning(f"⛔ {worker.name} は許可されませんでした: {reason}")
+            self._record_outcome(worker, False)
+            self._record_dead_stage(worker, ctx, f"Hook denied: {reason}")
+        return not denied
+
     async def _execute_worker(self, worker: PipelineStageWorker,
                               ctx: PipelineContext) -> StageResult:
         """**1工程 = 1記録。** 失敗も原因と入力ごと残す（R1.5-C1）。
@@ -606,10 +645,16 @@ class PipelineCoordinator:
             # **記録だけを見て「何が落ちたか」が分かること**（R1.5-C1b）。
             # `degraded` は残っていたが、何が落ちたのかは API の戻り値に
             # しか無く、記録からは追えなかった。
+            # **致命工程も残す**（R1.5-C1b）。`skipped_features` には劣化しか
+            # 入らないうえ、致命の早期 return では `_settle_outcomes` 自体を
+            # 通らないので空のまま閉じていた。`_outcomes` なら着手した工程が
+            # 全部入っている。
+            落ちた = [n for n, ok in self._outcomes.items() if not ok]
             recorder.finish(status, health={
                 "skipped_features": list(ctx.skipped_features),
+                "failed_stages": 落ちた,
                 "warnings": list(ctx.warnings),
-                "all_features_active": len(ctx.skipped_features) == 0,
+                "all_features_active": not 落ちた and not ctx.skipped_features,
             })
         except Exception as e:  # noqa: BLE001 — 同上
             logger.warning(f"⚠️ 実行記録を閉じられませんでした: {e}")
@@ -662,6 +707,7 @@ class PipelineCoordinator:
                     harness, worker, ctx)
             except Exception as e:  # noqa: BLE001 — 数えずに素通りさせない
                 logger.exception(f"❌ {worker.name} の事前フックが落ちました")
+                self._record_dead_stage(worker, ctx, f"事前フックが落ちました: {e}")
                 ctx.stage_results.append(StageResult(
                     stage_name=worker.name, success=False,
                     detail=f"事前フックが落ちました: {e}"))
@@ -671,6 +717,7 @@ class PipelineCoordinator:
             if denied:
                 # **断られた＝その工程は動いていない。** 成功に数えない
                 self._record_outcome(worker, False)
+                self._record_dead_stage(worker, ctx, f"Hook denied: {deny_reason}")
                 ctx.stage_results.append(StageResult(
                     stage_name=worker.name, success=False,
                     detail=f"Hook denied: {deny_reason}",
@@ -725,12 +772,14 @@ class PipelineCoordinator:
                     harness, worker, ctx)
             except Exception as e:  # noqa: BLE001 — 数えずに素通りさせない
                 logger.exception(f"❌ {worker.name} の事前フックが落ちました")
+                self._record_dead_stage(worker, ctx, f"事前フックが落ちました: {e}")
                 r = StageResult(stage_name=worker.name, success=False,
                                 detail=f"事前フックが落ちました: {e}")
                 ctx.stage_results.append(r)
                 return r
             if denied:
                 self._record_outcome(worker, False)
+                self._record_dead_stage(worker, ctx, f"Hook denied: {deny_reason}")
                 r = StageResult(stage_name=worker.name, success=False,
                                 detail=f"Hook denied: {deny_reason}")
                 ctx.stage_results.append(r)
@@ -853,7 +902,8 @@ class PipelineCoordinator:
                         f"{opt_result.final_score}点"
                     )
             except (ImportError, Exception):
-                improved = await self._quality_improvement_loop(ctx, perf_manager)
+                improved = await self._quality_improvement_loop(
+                    ctx, perf_manager, harness=harness)
                 if not improved:
                     logger.warning("品質改善ループ上限到達 — 現状で続行")
 
@@ -874,7 +924,8 @@ class PipelineCoordinator:
         return None
 
     async def _quality_improvement_loop(self, ctx: PipelineContext,
-                                         perf_manager=None) -> bool:
+                                         perf_manager=None,
+                                         harness: Optional[Dict] = None) -> bool:
         """
         U-03: 品質ゲート90点未満時の自動改善ループ。
 
@@ -907,6 +958,9 @@ class PipelineCoordinator:
 
             # Preview 再生成 (BUG-02修正: 計測フック追加)
             await self._notify(preview_worker, "running", "品質改善のため再生成中...")
+            # **断られた工程をここで迂回しない**（R1.5-C1b）
+            if not await self._ensure_allowed(harness, preview_worker, ctx):
+                return False
             _ql_preview_start = time.time()
             preview_result = await self._execute_worker(preview_worker, ctx)
             _ql_preview_dur = time.time() - _ql_preview_start
@@ -918,6 +972,8 @@ class PipelineCoordinator:
 
             # QualityGate 再チェック (BUG-02修正: 計測フック追加)
             await self._notify(quality_worker, "running", "品質再チェック...")
+            if not await self._ensure_allowed(harness, quality_worker, ctx):
+                return False
             _ql_quality_start = time.time()
             quality_result = await self._execute_worker(quality_worker, ctx)
             _ql_quality_dur = time.time() - _ql_quality_start

@@ -449,7 +449,7 @@
         "id": "R1.5-C1a",
         "condition": "**本線の実走の記録が、そのまま再開材料になっている。** 工程・使ったモデル（段の名前ではなく実モデル ID）・失敗の原因・再開に要る入力が、最新の実走の記録に残っている",
         "verify": "python -m backend.revenue.artifact_gate --gate",
-        "met": false
+        "met": true
       },
       {
         "id": "R1.5-C1b",
@@ -461,13 +461,13 @@
         "id": "R1.5-C1c",
         "condition": "**成果物ゲートが赤い実走を FAIL にする。** 最新の実走が `failed` / 動画を作っていない / 状態を判定できないとき、`--gate` は exit 0 を返さない。判定も動画も**最新の1本**で行う（過去の動画で緑にしない）。`degraded` は FAIL にしないが出力に必ず現れる（2026-08-27 ユーザー決定）。**PASS することではなく、赤を落とせることを条件にする**",
         "verify": "pytest backend/tests/test_revenue_artifact_gate.py",
-        "met": false
+        "met": true
       },
       {
         "id": "R1.5-C1d",
         "condition": "**本線が agents 側に一本化されている。** 本線の記録に対する再開の案内が agents 側の入口を指し、「実キーで動かす唯一の入口」を名乗る場所が1つしかない。`video_pipeline` は凍結した基準実装として残す",
         "verify": "pytest backend/tests/test_run_record.py backend/tests/test_agents_run_record.py",
-        "met": false
+        "met": true
       },
       {
         "id": "R1.5-C2",
@@ -1061,7 +1061,7 @@
             "id": "R1.5-C1a",
             "condition": "**本線の実走の記録が、そのまま再開材料になっている。** 工程・使ったモデル（段の名前ではなく実モデル ID）・失敗の原因・再開に要る入力が、最新の実走の記録に残っている",
             "verify": "python -m backend.revenue.artifact_gate --gate",
-            "met": false
+            "met": true
           },
           {
             "id": "R1.5-C1b",
@@ -1073,13 +1073,13 @@
             "id": "R1.5-C1c",
             "condition": "**成果物ゲートが赤い実走を FAIL にする。** 最新の実走が `failed` / 動画を作っていない / 状態を判定できないとき、`--gate` は exit 0 を返さない。判定も動画も**最新の1本**で行う（過去の動画で緑にしない）。`degraded` は FAIL にしないが出力に必ず現れる（2026-08-27 ユーザー決定）。**PASS することではなく、赤を落とせることを条件にする**",
             "verify": "pytest backend/tests/test_revenue_artifact_gate.py",
-            "met": false
+            "met": true
           },
           {
             "id": "R1.5-C1d",
             "condition": "**本線が agents 側に一本化されている。** 本線の記録に対する再開の案内が agents 側の入口を指し、「実キーで動かす唯一の入口」を名乗る場所が1つしかない。`video_pipeline` は凍結した基準実装として残す",
             "verify": "pytest backend/tests/test_run_record.py backend/tests/test_agents_run_record.py",
-            "met": false
+            "met": true
           },
           {
             "id": "R1.5-C2",

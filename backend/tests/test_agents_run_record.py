@@ -241,3 +241,79 @@ def test_落ちた工程が実行記録にも残る(tmp_path):
     rec = _run_json(tmp_path)
     assert rec["status"] == "degraded"
     assert "youtube_opt" in rec["health"]["skipped_features"], rec.get("health")
+
+
+# --- 致命的失敗でも記録から追えること（R1.5-C1b・2周目の指摘）-----------------
+
+
+def _拒否する(*工程):
+    async def _hook(harness, worker, ctx):
+        if type(worker).__name__ in 工程:
+            return True, "governance が禁止しました"
+        return False, None
+    return _hook
+
+
+def test_致命工程が断られても記録から追える(tmp_path):
+    """**落ちた工程が記録から消えていた。**
+
+    `_close_recorder(ctx, "failed")` は `_settle_outcomes` より**前**に
+    呼ばれるので `ctx.skipped_features` は空。しかも致命工程は
+    `_execute_worker` に入る前に return するので `stages` にも残らない。
+    結果、記録は `status: failed` なのに
+    **`all_features_active: true`・失敗した工程ゼロ**になり、
+    `run_record --resume` が「失敗した工程はありません」と exit 0 を返した
+    （gate-verifier の指摘1）。
+    """
+    from backend.revenue.run_record import failed_stage
+
+    c = _coordinator(tmp_path)
+    c._fire_pre_hook = _拒否する("SmartCutWorker")
+
+    result = _run(c, tmp_path)
+
+    assert result["status"] == "error", result["status"]
+    rec = _run_json(tmp_path)
+    assert rec["status"] == "failed"
+    assert "smart_cut" in [s.get("name") for s in rec["stages"]], rec["stages"]
+    assert "smart_cut" in rec["health"]["failed_stages"], rec["health"]
+    assert rec["health"]["all_features_active"] is False
+    # **記録だけで再開材料が引ける**（`--resume` が exit 1 を返す条件）
+    assert failed_stage(rec) is not None
+
+
+def test_致命工程の事前フックが例外でも記録から追える(tmp_path):
+    """断られた場合と同じ。落ちたことが記録に残らなければ追えない。"""
+    c = _coordinator(tmp_path)
+
+    async def _爆ぜる(harness, worker, ctx):
+        if type(worker).__name__ == "TranscribeWorker":
+            raise RuntimeError("governance boom")
+        return False, None
+
+    c._fire_pre_hook = _爆ぜる
+
+    result = _run(c, tmp_path)
+
+    assert result["status"] == "error", result["status"]
+    rec = _run_json(tmp_path)
+    assert "transcribe" in [s.get("name") for s in rec["stages"]], rec["stages"]
+    assert "transcribe" in rec["health"]["failed_stages"], rec["health"]
+
+
+def test_断られた工程を改善ループが動かさない(tmp_path):
+    """**ガバナンスが禁じた工程を、改善ループが迂回して実行していた。**
+
+    `_quality_improvement_loop` は `_execute_worker` を直接呼んでおり、
+    `_fire_pre_hook` を通さない。拒否で False にした `_outcomes` が
+    **成功で上書きされ**、`completed` に戻ったうえ、記録には拒否の痕跡が
+    1つも残らなかった（gate-verifier の指摘2）。
+    """
+    c = _coordinator(tmp_path)
+    c._fire_pre_hook = _拒否する("QualityGateWorker")
+
+    result = _run(c, tmp_path)
+
+    assert result["status"] != "completed", result["status"]
+    rec = _run_json(tmp_path)
+    assert "quality_gate" in rec["health"]["failed_stages"], rec["health"]
