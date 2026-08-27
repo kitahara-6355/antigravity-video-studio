@@ -103,6 +103,25 @@ RPD も RPM も**桁で余っている**。**原価は ¥0**（上限見積も�
 
 **R1 の ¥0.45 は使わない**（AI が働いていない状態の数字）。
 
+## 裏取りの経路（`run.json` は消失している）
+
+**この実走の `output/runs/20260827T184459832485-0000/run.json` は残っていない。**
+テストの autouse フィクスチャが `shutil.rmtree(Path("output"))` を実行しており、
+`output/runs/` 18件がまとめて消えた（修正済み `60db9fa` — 削除範囲を
+`output/generated/` に限定した）。
+
+**上の数字はすべて run.json 以外の3系統から裏が取れる**（gate-verifier が突き合わせ済み）:
+
+| 裏取り先 | 何が取れるか |
+|---|---|
+| `.claude/cost_ledger.jsonl` | `kind: run_summary` の1行に **run_id / `status: completed` / `duration_sec: 1199.841` / `calls: 6` / `cost_jpy: 42.6871` / `models_used`** が揃っている。加えて 18:51:31〜18:56:16 に `gemini-3.6-flash` の**呼び出し6行**が個別に載っている |
+| `vault-outputs/final/final_20260828_035717.quality.json` | **品質スコア 94**・`category_scores`・「全ステージ正常完走」・「807セグメント, 8648文字」・「出力尺 25.6分（目標30分）」 |
+| `backend/data/sessions/` ・ `backend/data/traces/` | 工程ごとの所要と実行の痕跡 |
+
+**工程ごとの内訳（render 461.1s ほか）の一次記録は run.json だったので、その表だけは
+再取得できない。** 数字自体は測定時の出力から転記したもので、合計 1,199.8 秒が
+ledger の `duration_sec` と一致することで整合を確認している。
+
 ## 確かめていないこと
 
 - **60分以上の素材**では測っていない。原価は尺に比例すると見込んでいるが未確認
