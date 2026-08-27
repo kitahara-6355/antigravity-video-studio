@@ -646,3 +646,27 @@ def test_宣言した能力のプラグインは回さない(tmp_path):
 
     assert "thumbnail_quality_check" not in 結果["plugin_results"], 結果["plugin_results"].keys()
     assert not any("サムネイル" in f for f in 結果["feedback"]), 結果["feedback"]
+
+
+def test_床打ちした素点が見える(tmp_path):
+    """**0点は「どれくらい悪いか」を何も言わない。**
+
+    実測では減点合計が -134（素点 -34）でも表示は 0 点だった。改善しても
+    数字が動かないので、改善ループが効いているかを判断できない
+    （実際、品質改善ループ3周がまったく動かなかった）。
+
+    `ctx.quality_score` の 0〜100 の範囲は変えない（消費側が多い）。
+    素点は detail と記録に残す。
+    """
+    import asyncio
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = set()
+    ctx.target_minutes = 20      # 30秒未満の素材に対して QV-01 が -50 を打つ
+
+    r = asyncio.run(QualityGateWorker().execute(ctx))
+
+    assert ctx.quality_score >= 0
+    assert "素点" in r.detail, r.detail
+    assert (ctx.quality_gate_report or {}).get("raw_score") is not None

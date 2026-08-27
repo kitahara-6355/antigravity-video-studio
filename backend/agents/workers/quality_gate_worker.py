@@ -187,19 +187,32 @@ class QualityGateWorker(PipelineStageWorker):
             result = {"total_deductions": 100 - score, "feedback": feedback,
                       "category_report": [], "category_scores": {}}
 
+        # **0で床打ちすると「どれくらい悪いか」が消える**（R1.5・2026-08-27）。
+        # 実測では減点合計 -134（素点 -34）でも表示は 0 点で、改善しても数字が
+        # 動かなかった（品質改善ループ3周がまったく動かなかった原因の1つ）。
+        # `ctx.quality_score` の 0〜100 は消費側が多いので変えない。
+        # **素点は捨てずに記録と出力へ回す。**
+        raw_score = score
         score = max(0, min(100, score))
         rank = "S" if score >= 95 else "A" if score >= 90 else "B" if score >= 80 else "C"
         ctx.quality_score = score
         ctx.quality_feedback = feedback
+        ctx.quality_gate_report = {
+            "raw_score": raw_score,
+            "clamped": raw_score != score,
+            "deductions": 100 - raw_score,
+        }
         # カテゴリ情報を直接ctxに保存（_build_resultで確実に取得するため）
         ctx.quality_category_report = result.get("category_report", [])
         ctx.quality_category_scores = result.get("category_scores", {})
 
         return StageResult(
             stage_name=self.name, success=score >= 90,
-            detail=f"スコア: {score}点 (ランク{rank})",
+            detail=(f"スコア: {score}点（素点 {raw_score}）(ランク{rank})"
+                    if raw_score != score else f"スコア: {score}点 (ランク{rank})"),
             data={
-                "score": score, "rank": rank, "feedback": feedback,
+                "score": score, "raw_score": raw_score,
+                "rank": rank, "feedback": feedback,
                 "category_report": ctx.quality_category_report,
                 "category_scores": ctx.quality_category_scores,
             },
