@@ -120,9 +120,12 @@ def test_load_or_create_daily_usage_os_error(tmp_path):
             
     assert tracker._daily_usage.date == date.today().isoformat()
 
-def test_save_usage_type_error():
+def test_save_usage_type_error(tmp_path):
+    # **相対パスを書かない。** `Path("dummy.json")` は CWD に実ファイルを作り、
+    # リポジトリ直下に空の `dummy.json` が残っていた（2026-08-27 に追跡下へ
+    # 紛れ込んだ）。汚染ラチェットが検出する。
     tracker = UsageTracker()
-    tracker._usage_path = Path("dummy.json")
+    tracker._usage_path = tmp_path / "dummy.json"
     tracker._daily_usage = DailyUsage(date=date.today().isoformat())
     
     with patch("json.dump", side_effect=TypeError("Not serializable")):
