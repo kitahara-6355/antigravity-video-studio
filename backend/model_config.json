@@ -21,7 +21,11 @@
         "verified": true,
         "note": "無料枠あり（Flash-Lite 系）。実写素材は文字起こしの処理量が多いので、ここが効く",
         "verified_at": "2026-08-18",
-        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる",
+        "rpm": 30,
+        "rpd": 1500,
+        "limits_confidence": "unverified_secondary",
+        "limits_note": "**二次情報。**一次情報はこの実行環境のプロキシで遮断されている。`free_tier_limits` に載っているのは旧 ID（gemini-3-flash-preview / gemini-2.5-flash / gemini-2.5-flash-lite）で、**いま使っている段の枠は記録されていなかった**（R1.5-C5・2026-08-28）。実キーで 429 を観測したら実測値に差し替える"
       },
       "standard": {
         "model": "gemini-3.6-flash",
@@ -31,7 +35,11 @@
         "verified": true,
         "note": "安定線。単価 $1.50/$7.50（二次情報）",
         "verified_at": "2026-08-18",
-        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる",
+        "rpm": 15,
+        "rpd": 1000,
+        "limits_confidence": "unverified_secondary",
+        "limits_note": "**二次情報。**一次情報はこの実行環境のプロキシで遮断されている。`free_tier_limits` に載っているのは旧 ID（gemini-3-flash-preview / gemini-2.5-flash / gemini-2.5-flash-lite）で、**いま使っている段の枠は記録されていなかった**（R1.5-C5・2026-08-28）。実キーで 429 を観測したら実測値に差し替える"
       },
       "premium": {
         "model": "gemini-3.7-flash",
@@ -41,7 +49,11 @@
         "verified": true,
         "note": "2026-08-13 リリース。**導入価格 $0.75/$3.75 で 3.6 Flash より安い**（新しい方が安いという逆転が起きている）。導入価格はいずれ上がる想定 — 値上げ自体は入替トリガーではなく、**無料枠から外れたら**見直す",
         "verified_at": "2026-08-18",
-        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる",
+        "rpm": 15,
+        "rpd": 1000,
+        "limits_confidence": "unverified_secondary",
+        "limits_note": "**二次情報。**一次情報はこの実行環境のプロキシで遮断されている。`free_tier_limits` に載っているのは旧 ID（gemini-3-flash-preview / gemini-2.5-flash / gemini-2.5-flash-lite）で、**いま使っている段の枠は記録されていなかった**（R1.5-C5・2026-08-28）。実キーで 429 を観測したら実測値に差し替える"
       },
       "pro": {
         "model": "gemini-3.1-pro-preview",
@@ -51,7 +63,11 @@
         "verified": true,
         "note": "Pro 系は 2026-04-01 に無料枠から外れた。単価 $2/$12（200K超で倍）。**2026-08-18 に実 API の models.list で実測**: `gemini-3.1-pro` は**実在しなかった**。実在するのは `gemini-3.1-pro-preview`。preview なので仕様・価格が動きうる（入替トリガー4『陳腐化』の監視対象）。なお `gemini-2.5-pro` も実在するが **2026-10-16 に提供終了**するので採らない。`gemini-pro-latest` は別名で、どのモデルが動いたか隠れるため**見える化の要件に反する**ので採らない。『3.7 Flash の方が 3.1 Pro より高品質かもしれない』は**仮説**で、昇格の実測（.claude/model_escalations.jsonl）で確かめる",
         "verified_at": "2026-08-18",
-        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる"
+        "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる",
+        "rpm": 0,
+        "rpd": 0,
+        "limits_confidence": "unverified_secondary",
+        "limits_note": "**pro は無料枠なし**（gemini-2.5-pro は 2026-04-01 に無料枠から外れた）。昇格はユーザーの指示があるときだけ（憲法第3条）"
       }
     },
     "fallback_chain": {

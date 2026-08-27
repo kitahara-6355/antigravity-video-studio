@@ -295,6 +295,12 @@
       "sources": {
         "ai_proofreader": 7
       }
+    },
+    "2026-08-28": {
+      "total": 5,
+      "sources": {
+        "ai_proofreader": 5
+      }
     }
   },
   "limit": 500

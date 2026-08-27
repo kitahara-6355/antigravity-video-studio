@@ -493,7 +493,7 @@
       {
         "id": "R1.5-C5",
         "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
-        "verify": "python -m backend.cost_guard --status",
+        "verify": "python -m backend.cost_guard --status かつ docs/C5_COST_MEASUREMENT_20260828.md（30分素材の実測）",
         "met": false,
         "decision": "**実運用に近い尺（10分前後）の実写素材で測る**（2026-08-26 ユーザー決定）。30秒クリップだと1日に何本作れるか（RPD/RPM）の答えが現実的にならないため。素材はユーザーが用意する（user_tasks）"
       },
@@ -1105,7 +1105,7 @@
           {
             "id": "R1.5-C5",
             "condition": "**AI が効いた状態で1本あたりの原価と所要時間が測り直され、無料枠に収まるかが判定されている。**1日に何本作れるかが RPD / RPM の両方から出る。R4 の総額試算はこの数字を使う（R1 の ¥0.45 は AI が働いていない状態の数字なので使わない）",
-            "verify": "python -m backend.cost_guard --status",
+            "verify": "python -m backend.cost_guard --status かつ docs/C5_COST_MEASUREMENT_20260828.md（30分素材の実測）",
             "met": false,
             "decision": "**実運用に近い尺（10分前後）の実写素材で測る**（2026-08-26 ユーザー決定）。30秒クリップだと1日に何本作れるか（RPD/RPM）の答えが現実的にならないため。素材はユーザーが用意する（user_tasks）"
           },
