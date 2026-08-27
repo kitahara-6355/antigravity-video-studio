@@ -61,7 +61,7 @@ _StageFailed: quality_gate: スコア: 89点 (ランクB)
 ## ④ retention 分析 — `agents.pipeline_coordinator._run_retention_analysis()`
 
 ```
-success=False / detail=未実装（映像・音声解析が入っていません）
+返り値=None（走った工程ではないので stage_results に積まない）
 skipped_features=['retention分析（未実装）']
 metadata に retention_analysis があるか: False
 ```
@@ -71,6 +71,11 @@ metadata に retention_analysis があるか: False
 サイドカー（成果物）にまで載っていた。**`RetentionMapPlugin.IMPLEMENTED = False` を
 立て、コーディネータがそれを見て飛ばすようにした。モックのコード自体は残してある
 （実装するときの土台）。
+
+**宣言の置き場は `skipped_features`** — `stage_results` は「走った工程」の並びで、
+未実装は工程の失敗ではない（C1b で決めた形）。最初これを失敗した工程として
+積んだところ、`test_e2e_pipeline_scenarios` の「走った工程はすべて成功」という
+主張が落ちて気づいた。
 
 台帳: `retention_analysis`。
 

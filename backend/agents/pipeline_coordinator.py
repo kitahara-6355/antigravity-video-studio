@@ -1216,10 +1216,10 @@ class PipelineCoordinator:
                     ctx.skipped_features.append(印)
                 logger.info("📊 retention 分析は未実装なので飛ばします"
                             "（成果物には混ぜません）")
-                return StageResult(
-                    stage_name="Retention分析", success=False,
-                    detail="未実装（映像・音声解析が入っていません）",
-                    duration_seconds=0.0)
+                # **`stage_results` には積まない。** あれは「走った工程」の
+                # 並びで、未実装は工程の失敗ではない。宣言の置き場は
+                # `skipped_features`（C1b で決めた形）。
+                return None
 
             video_id = Path(ctx.video_path).stem
             # 動画の総尺（セグメントから推定）
