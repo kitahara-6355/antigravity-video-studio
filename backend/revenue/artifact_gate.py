@@ -290,8 +290,33 @@ def check_ai_effect(runs: list[dict]) -> list[Finding]:
     **片方が無い・指紋が読めないときは「確かめていない」と言う** —
     「一致しなかった」に倒すと、走らせていないだけで緑になる。
     """
+    def _条件(run: dict) -> tuple:
+        """**比べてよいのは同じ入力どうしだけ。**
+
+        素材や目標尺が違えば成果物が違うのは当たり前で、それを
+        「AI が効いた」と読むと嘘になる（2026-08-27・指摘 N-3）。
+        """
+        inp = run.get("inputs") or {}
+        return (str(inp.get("video_path") or ""), inp.get("target_minutes"))
+
     ありの実走 = [r for r in runs if (r.get("calls") or 0) > 0]
     なしの実走 = [r for r in runs if (r.get("calls") or 0) == 0]
+    if ありの実走 and なしの実走:
+        # 同じ入力のペアを新しい順に探す
+        なし別 = {}
+        for r in なしの実走:
+            なし別.setdefault(_条件(r), []).append(r)
+        for r in reversed(ありの実走):
+            相手 = なし別.get(_条件(r))
+            if 相手:
+                ありの実走, なしの実走 = [r], [相手[-1]]
+                break
+        else:
+            return [Finding(
+                "ai_effect_unverified", "inputs",
+                "**同じ入力で AI あり／なしを走らせた組がありません。**"
+                "素材や目標尺が違うと成果物が違うのは当たり前なので、"
+                "それを AI の効果として読むことはできません")]
     あり = _final_digest(ありの実走[-1]) if ありの実走 else None
     なし = _final_digest(なしの実走[-1]) if なしの実走 else None
 

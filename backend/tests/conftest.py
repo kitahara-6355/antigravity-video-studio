@@ -480,9 +480,17 @@ def _block_external_network(request):
 # 上書きするのは従来どおり効く（このフィクスチャより後に走るため）。
 @pytest.fixture(autouse=True)
 def _課金台帳を退避する(tmp_path_factory, monkeypatch):
-    try:
-        import cost_guard
-    except ImportError:  # 読み込めない構成では何もしない
+    # **`cost_guard` と `backend.cost_guard` は sys.modules 上で別物。**
+    # 裸 import が50箇所超あるリポジトリなので、片方だけ差し替えても
+    # もう片方を使うコードが本番へ書く（`backend/revenue/run_record.py:44` は
+    # `from backend import cost_guard`）。**両方に同じ退避先を入れる。**
+    実体 = []
+    for 名 in ("cost_guard", "backend.cost_guard"):
+        try:
+            実体.append(__import__(名, fromlist=["*"]))
+        except ImportError:
+            pass
+    if not 実体:
         yield
         return
     退避先 = tmp_path_factory.mktemp("cost_guard", numbered=True)
@@ -492,14 +500,15 @@ def _課金台帳を退避する(tmp_path_factory, monkeypatch):
     # 見せる中身は本番と同じ、書き込み先だけ違う、という状態にする。
     複製 = 退避先 / "budget.json"
     try:
-        元 = Path(cost_guard.BUDGET_PATH)
+        元 = Path(実体[0].BUDGET_PATH)
         if 元.is_file():
             複製.write_text(元.read_text(encoding="utf-8"), encoding="utf-8")
     except OSError:
         pass
-    monkeypatch.setattr(cost_guard, "LEDGER_PATH", 退避先 / "cost_ledger.jsonl",
-                        raising=False)
-    monkeypatch.setattr(cost_guard, "BUDGET_PATH", 複製, raising=False)
+    for mod in 実体:
+        monkeypatch.setattr(mod, "LEDGER_PATH", 退避先 / "cost_ledger.jsonl",
+                            raising=False)
+        monkeypatch.setattr(mod, "BUDGET_PATH", 複製, raising=False)
     yield
 
 

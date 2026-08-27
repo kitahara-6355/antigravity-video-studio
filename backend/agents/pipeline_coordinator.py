@@ -157,6 +157,7 @@ class PipelineCoordinator:
         self._recorder: Optional[RunRecorder] = None
         # AI が作ったメタデータの置き場（R1.5-C3）
         self._sidecar_path: Optional[str] = None
+        self._quality_sidecar_path: Optional[str] = None
         # 工程名 → 最後の試行が通ったか。**リトライで通ったものは失敗にしない**
         self._outcomes: Dict[str, bool] = {}
 
@@ -633,6 +634,7 @@ class PipelineCoordinator:
         self._recorder = None
         self._outcomes = {}
         self._sidecar_path = None
+        self._quality_sidecar_path = None
         try:
             kwargs = {"inputs": {
                 "video_path": ctx.video_path,
@@ -654,6 +656,38 @@ class PipelineCoordinator:
         except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
             logger.warning(f"⚠️ 実行記録を開けませんでした: {e}")
 
+    def _write_sidecar(self, ctx: PipelineContext, 拡張子: str,
+                       中身: dict | None) -> Optional[str]:
+        """**AI が作ったものを捨てない**（R1.5-C3）。最終動画の隣に置く。
+
+        空のときは作らない（**空のファイルを置いて「使った」と言わない**）。
+        """
+        if not 中身 or not ctx.final_path:
+            return None
+        try:
+            横 = Path(ctx.final_path).with_suffix(拡張子)
+            横.write_text(json.dumps(中身, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+            logger.info(f"📝 {横}")
+            return str(横)
+        except Exception as e:  # noqa: BLE001 — 書けなくても実行は止めない
+            logger.warning(f"⚠️ {拡張子} を書き出せませんでした: {e}")
+            return None
+
+    def _ai_produced(self, ctx: PipelineContext, stage: str, 印: str) -> bool:
+        """**その工程の AI が実際に何かを出したか**（R1.5-C3）。
+
+        `bool(ctx.segments)` のような「下流に何か入っているか」では測れない。
+        文字起こし（`local:whisper`）が入れたものを校閲（AI）の成果と
+        取り違える（2026-08-27・gate-verifier の指摘 N-2）。
+        **工程が通り、かつ AI がスキップされていないこと**を見る。
+        中身があることは呼び出し側で併せて確かめる（AI は動いたが空だった、
+        という場合を「生まれた」に数えない）。
+        """
+        if not self._outcomes.get(stage):
+            return False
+        return not any(印 in s for s in ctx.skipped_features)
+
     def _write_metadata_sidecar(self, ctx: PipelineContext) -> Optional[str]:
         """**AI が作ったメタデータを捨てない**（R1.5-C3・2026-08-27 ユーザー決定）。
 
@@ -665,17 +699,24 @@ class PipelineCoordinator:
         最終動画の隣に置く。空のときは作らない（**空のファイルを置いて
         「使った」と言わない**）。
         """
-        if not ctx.metadata or not ctx.final_path:
+        return self._write_sidecar(ctx, ".youtube.json", ctx.metadata)
+
+    def _write_quality_sidecar(self, ctx: PipelineContext) -> Optional[str]:
+        """**なぜその点数なのかを残す**（R1.5-C3）。
+
+        `quality_feedback` は API の戻り値に入るだけで、CLI 実行では
+        `youtube_metadata` とまったく同じように消えていた。**消費者として
+        宣言していた render は `quality_score`（数値）しか読んでおらず、
+        講評そのものは誰も読んでいなかった**（gate-verifier の指摘 N-1）。
+        """
+        if not ctx.quality_feedback:
             return None
-        try:
-            横 = Path(ctx.final_path).with_suffix(".youtube.json")
-            横.write_text(json.dumps(ctx.metadata, ensure_ascii=False, indent=2),
-                          encoding="utf-8")
-            logger.info(f"📝 YouTube 用メタデータ: {横}")
-            return str(横)
-        except Exception as e:  # noqa: BLE001 — 書けなくても実行は止めない
-            logger.warning(f"⚠️ メタデータを書き出せませんでした: {e}")
-            return None
+        return self._write_sidecar(ctx, ".quality.json", {
+            "score": ctx.quality_score,
+            "raw_score": (ctx.quality_gate_report or {}).get("raw_score"),
+            "feedback": list(ctx.quality_feedback),
+            "category_scores": getattr(ctx, "quality_category_scores", {}),
+        })
 
     def _intermediates(self, ctx: PipelineContext) -> list:
         """**AI が生み出したものが下流で使われたか**（R1.5-C3）。
@@ -694,19 +735,26 @@ class PipelineCoordinator:
         使った工程 = {n for n, ok in self._outcomes.items() if ok}
         return [
             {"name": "subtitles", "produced_by": "proofread",
-             "produced": bool(ctx.segments),
+             "produced": bool(ctx.segments) and self._ai_produced(
+                 ctx, "proofread", "AI校閲"),
              "consumed_by": "preview",
              "consumed": "preview" in 使った工程},
             # **投稿が未実装なので、消費者は「手動投稿用のサイドカー」。**
             # 自動投稿そのものは台帳の `youtube_upload` に残っている
             {"name": "youtube_metadata", "produced_by": "youtube_opt",
-             "produced": bool(ctx.metadata),
+             "produced": bool(ctx.metadata) and self._ai_produced(
+                 ctx, "youtube_opt", "YouTube最適化"),
              "consumed_by": "metadata サイドカー（手動投稿用）",
              "consumed": bool(self._sidecar_path)},
+            # **恒真の判定式は測定ではない。** `render_mode` の既定は
+            # `"production"` で `"force"` はどこからも設定されないので、
+            # 以前の式は何も実行していなくても True になっていた。
+            # 宣言していた消費者（render）も `quality_score`（数値）しか
+            # 読んでおらず、講評そのものは誰も読んでいなかった。
             {"name": "quality_feedback", "produced_by": "quality_gate",
              "produced": bool(ctx.quality_feedback),
-             "consumed_by": "render",
-             "consumed": ctx.render_mode in ("safe", "production")},
+             "consumed_by": "quality サイドカー（なぜその点数か）",
+             "consumed": bool(self._quality_sidecar_path)},
         ]
 
     def _close_recorder(self, ctx: PipelineContext, status: str) -> None:
@@ -716,7 +764,9 @@ class PipelineCoordinator:
             return
         try:
             self._sidecar_path = self._write_metadata_sidecar(ctx)
-            for path in (ctx.final_path, ctx.preview_path, self._sidecar_path):
+            self._quality_sidecar_path = self._write_quality_sidecar(ctx)
+            for path in (ctx.final_path, ctx.preview_path,
+                         self._sidecar_path, self._quality_sidecar_path):
                 if path:
                     recorder.artifact(path)
             # **記録だけを見て「何が落ちたか」が分かること**（R1.5-C1b）。

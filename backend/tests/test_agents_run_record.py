@@ -496,3 +496,73 @@ def test_メタデータが無ければサイドカーを作らない(tmp_path):
     _run(c, tmp_path)
 
     assert not final.with_suffix(".youtube.json").exists()
+
+
+# --- 中間成果物の判定を恒真にしない（R1.5-C3・1周目の指摘）--------------------
+
+
+def test_品質フィードバックの使われ方が恒真でない(tmp_path):
+    """**恒真の判定式は測定ではない。**
+
+    `consumed` を `ctx.render_mode in ("safe", "production")` で判定していたが、
+    `render_mode` の既定値は `"production"` で `"force"` は本線のどこからも
+    設定されない。**何も実行していなくても True** になり、この行は原理的に
+    件数へ寄与できなかった（gate-verifier の指摘 N-1）。
+    """
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    c = PipelineCoordinator()
+    ctx = PipelineContext(video_path="x.mp4", session_id="s")
+    ctx.quality_feedback = ["🔴 音がおかしい"]   # 工程は一度も走らせない
+
+    中間 = {i["name"]: i for i in c._intermediates(ctx)}
+
+    assert 中間["quality_feedback"]["consumed"] is False, 中間["quality_feedback"]
+
+
+def test_品質の講評もサイドカーに残る(tmp_path):
+    """**なぜその点数なのかが分からなければ直せない。**
+
+    `quality_feedback` は API の戻り値に入るだけで CLI 実行では消えていた
+    （`youtube_metadata` とまったく同じ形）。動画の隣に残す。
+    """
+    final = tmp_path / "final.mp4"
+    final.write_bytes(b"video")
+    c = _coordinator(tmp_path, final_path=final)
+    for w in c.workers:
+        if type(w).__name__ == "QualityGateWorker":
+            async def _講評を出す(ctx, _w=w):
+                ctx.quality_score = 89
+                ctx.quality_feedback = ["📡 解像度注意: 1280x720 (1080p推奨)"]
+                return StageResult(stage_name=_w.name, success=True, detail="やった")
+            w.execute = _講評を出す
+
+    _run(c, tmp_path)
+
+    横 = final.with_suffix(".quality.json")
+    assert 横.is_file(), list(tmp_path.iterdir())
+    中身 = json.loads(横.read_text(encoding="utf-8"))
+    assert "score" in 中身 and "feedback" in 中身
+    中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
+    assert 中間["quality_feedback"]["consumed"] is True
+
+
+def test_AIが何も出していなければ生まれたと言わない(tmp_path):
+    """**`produced` が「AI が作ったか」を測っていなかった。**
+
+    `subtitles.produced = bool(ctx.segments)` だが、`ctx.segments` を作るのは
+    文字起こし（`local:whisper`）であって校閲ではない。**AI が1文字も出して
+    いない実走でも `produced=True`** になっていた（指摘 N-2）。
+    """
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    c = PipelineCoordinator()
+    ctx = PipelineContext(video_path="x.mp4", session_id="s")
+    ctx.segments = [{"start": 0.0, "end": 1.0, "text": "あ"}]
+    ctx.skipped_features.append("AI校閲(Gemini)")   # AI は動かなかった
+
+    中間 = {i["name"]: i for i in c._intermediates(ctx)}
+
+    assert 中間["subtitles"]["produced"] is False, 中間["subtitles"]

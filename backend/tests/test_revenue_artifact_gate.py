@@ -794,3 +794,29 @@ def test_使われていない中間成果物があるとゲートが落ちる(t
 
     assert "unused_intermediate" in _kinds(report.findings), report.findings
     assert not report.ok
+
+
+def test_別の素材どうしを比べない():
+    """**AI 以外の理由で違ったものを「AI が効いた」にしない。**
+
+    比べる2本の入力が違えば、成果物が違うのは当たり前。素材や目標尺が
+    違うペアで緑になっていた（gate-verifier の指摘 N-3）。
+    """
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    def _run(rid, calls, digest, video, minutes=1):
+        return {"run_id": rid, "calls": calls,
+                "inputs": {"video_path": video, "target_minutes": minutes},
+                "artifacts": [f"/out/{rid}/final.mp4"],
+                "artifact_digests": {f"/out/{rid}/final.mp4": digest}}
+
+    別素材 = check_ai_effect([_run("a", 0, "x", "clip30s.mp4"),
+                              _run("b", 2, "y", "30min.mp4")])
+    別の尺 = check_ai_effect([_run("a", 0, "x", "clip30s.mp4", 1),
+                              _run("b", 2, "y", "clip30s.mp4", 20)])
+    同条件 = check_ai_effect([_run("a", 0, "x", "clip30s.mp4"),
+                              _run("b", 2, "y", "clip30s.mp4")])
+
+    assert "ai_effect_unverified" in _kinds(別素材), 別素材
+    assert "ai_effect_unverified" in _kinds(別の尺), 別の尺
+    assert 同条件 == []
