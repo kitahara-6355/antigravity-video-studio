@@ -53,3 +53,33 @@ def check_entries(gaps: list[dict]) -> list[str]:
             出た.append(f"{rid}: id が重複しています")
         見た.add(rid)
     return 出た
+
+
+def _mainline_stage_names() -> set[str]:
+    """**本線の工程名は実装不足ではない。** 落ちたのは工程であって機能ではない。
+
+    実行記録には3種類が同じ顔で出る — 工程が落ちた（`quality_gate`）／
+    意図して止めている（`dream_learning`）／実装が足りていない
+    （`BGMミキシング(ファイルなし)`）。**区別しないと点検が誤検知する。**
+    """
+    try:
+        from agents.pipeline_coordinator import STAGE_RECORD
+    except ImportError:  # PYTHONPATH=./backend が無いとき
+        from backend.agents.pipeline_coordinator import STAGE_RECORD
+    return {v[0] for v in STAGE_RECORD.values()}
+
+
+def surfaced_in(run: dict) -> list[str]:
+    """実行記録に「やっていない」として出たものを重複なく並べる。"""
+    health = run.get("health") or {}
+    出たもの = (list(health.get("skipped_features") or [])
+                + list(health.get("failed_stages") or []))
+    return list(dict.fromkeys(出たもの))
+
+
+def unknown_from_record(run: dict, gaps: list[dict]) -> list[str]:
+    """**台帳にも本線の工程名にも無いもの。** 新しい実装漏れがこれで出る。"""
+    既知 = _mainline_stage_names()
+    印 = [g.get("surfaces_as") for g in gaps if g.get("surfaces_as")]
+    return [名 for 名 in surfaced_in(run)
+            if 名 not in 既知 and not any(s and s in 名 for s in 印)]

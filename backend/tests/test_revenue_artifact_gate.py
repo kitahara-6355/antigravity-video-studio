@@ -456,3 +456,44 @@ def test_gapには行先が要る():
                            "why": "理由", "done_when": {"kind": "run_record_clean"}}])
 
     assert any("handled_in" in m for m in 不備), 不備
+
+
+def _記録(**over) -> dict:
+    run = {"run_id": "r", "status": "degraded",
+           "health": {"skipped_features": [], "failed_stages": []}}
+    run["health"].update(over)
+    return run
+
+
+def test_記録に出た未知の項目を見つける():
+    """**新しい実装漏れが黙って増えない。**"""
+    from backend.feature_gaps import unknown_from_record
+
+    出た = unknown_from_record(_記録(skipped_features=["字幕の焼き込み"]), [])
+
+    assert 出た == ["字幕の焼き込み"]
+
+
+def test_本線の工程名は実装漏れではない():
+    """`quality_gate` が落ちたのは**工程の失敗**であって実装不足ではない。"""
+    from backend.feature_gaps import unknown_from_record
+
+    assert unknown_from_record(
+        _記録(failed_stages=["quality_gate"], skipped_features=["quality_gate"]), []) == []
+
+
+def test_台帳に載っていれば実装漏れではない():
+    from backend.feature_gaps import unknown_from_record
+
+    gaps = [{"id": "bgm", "surfaces_as": "BGMミキシング", "kind": "gap"}]
+
+    assert unknown_from_record(_記録(skipped_features=["BGMミキシング(ファイルなし)"]), gaps) == []
+
+
+def test_意図して止めているものも実装漏れではない():
+    """**実行記録には gap と intentional が同じ顔で出る。** 区別しないと誤検知する。"""
+    from backend.feature_gaps import unknown_from_record
+
+    gaps = [{"id": "dream", "surfaces_as": "dream_learning", "kind": "intentional"}]
+
+    assert unknown_from_record(_記録(skipped_features=["dream_learning"]), gaps) == []
