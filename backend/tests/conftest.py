@@ -494,6 +494,11 @@ def _課金台帳を退避する(tmp_path_factory, monkeypatch):
         yield
         return
     退避先 = tmp_path_factory.mktemp("cost_guard", numbered=True)
+    # **空でも必ず作る。** 「無い」と「空」を行き来すると、
+    # `is_file()` で守ってから `stat()` を呼ぶ既存テストが競合で落ちる
+    # （CI run 33094086222 の `test_台帳を渡さなければ本番を触らない`）。
+    台帳 = 退避先 / "cost_ledger.jsonl"
+    台帳.touch()
     # **予算そのものは複製して持っていく。** 空にすると、非ダミーのキーが
     # 見えているときに `guard_before()` が「承認済みの予算がない」で
     # 例外を上げ、**汚染がテスト失敗にすり替わるだけ**になる。
@@ -506,8 +511,7 @@ def _課金台帳を退避する(tmp_path_factory, monkeypatch):
     except OSError:
         pass
     for mod in 実体:
-        monkeypatch.setattr(mod, "LEDGER_PATH", 退避先 / "cost_ledger.jsonl",
-                            raising=False)
+        monkeypatch.setattr(mod, "LEDGER_PATH", 台帳, raising=False)
         monkeypatch.setattr(mod, "BUDGET_PATH", 複製, raising=False)
     yield
 
