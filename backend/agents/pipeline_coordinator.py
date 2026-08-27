@@ -1206,6 +1206,21 @@ class PipelineCoordinator:
         try:
             from plugins.retention_map_plugin import retention_map_plugin
 
+            # **未実装のものを「分析した」と言わない**（R1.5-C4）。
+            # 中身は `random.random()` で組み立てたモックで、それが
+            # `ctx.metadata["retention_analysis"]` 経由でサイドカー
+            # （成果物）にまで載っていた。
+            if not getattr(retention_map_plugin, "IMPLEMENTED", True):
+                印 = "retention分析（未実装）"
+                if 印 not in ctx.skipped_features:
+                    ctx.skipped_features.append(印)
+                logger.info("📊 retention 分析は未実装なので飛ばします"
+                            "（成果物には混ぜません）")
+                return StageResult(
+                    stage_name="Retention分析", success=False,
+                    detail="未実装（映像・音声解析が入っていません）",
+                    duration_seconds=0.0)
+
             video_id = Path(ctx.video_path).stem
             # 動画の総尺（セグメントから推定）
             duration_sec = 0

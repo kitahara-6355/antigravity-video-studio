@@ -820,3 +820,34 @@ def test_別の素材どうしを比べない():
     assert "ai_effect_unverified" in _kinds(別素材), 別素材
     assert "ai_effect_unverified" in _kinds(別の尺), 別の尺
     assert 同条件 == []
+
+
+# --- 偽の success を返さない（R1.5-C4）----------------------------------------
+
+
+def test_未実装の投稿は成功を返さない(tmp_path):
+    """**投稿していないのに success を返していた。**
+
+    `upload_video()` は `video_id="placeholder_video_id"` と
+    `success=True` を返していた。**収益化の前提が崩れる** — 投稿できて
+    いないのに「できた」と記録されると、チャンネルの数字と実装の状態が
+    食い違う。2026-08-26 のユーザー決定で「実装も削除もせず、
+    **未実装として失敗させる**」。
+    """
+    import asyncio
+    from services.youtube_uploader import YouTubeCredentials, YouTubeUploaderService
+
+    動画 = tmp_path / "v.mp4"
+    動画.write_bytes(b"x")
+    up = YouTubeUploaderService()
+    # 認証もファイルも揃った状態＝**本来なら投稿できるはずの場面**で確かめる
+    up._credentials = YouTubeCredentials(
+        client_id="id", client_secret="secret", access_token="token")
+
+    r = asyncio.run(up.upload_video(video_path=str(動画), title="t",
+                                    description="d", tags=["t"]))
+
+    assert r.success is False, r
+    assert r.error == "not_implemented", r
+    assert not r.video_id, r
+    assert "未実装" in r.message, r.message

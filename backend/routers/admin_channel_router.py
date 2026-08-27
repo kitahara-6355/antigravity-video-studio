@@ -55,6 +55,18 @@ class ReportGenerateRequest(BaseModel):
 
 # ── 状態管理 (インメモリ) ──
 
+# **これは実在のチャンネルの数字ではない**（R1.5-C4・2026-08-27）。
+# `subscribers` も `total_views` も `watch_time_hours: 15200` も固定値で、
+# YouTube Analytics には一度も接続していない。**収益化の到達度をこの数字で
+# 判断すると嘘になる**ので、返すときは `DATA_SOURCE` を必ず添える。
+# 台帳: `backend/config/feature_gaps.json` の `channel_stats`
+DATA_SOURCE = {
+    "data_source": "sample",
+    "is_real": False,
+    "note": "**実在のチャンネルの数字ではありません。**YouTube Analytics には"
+            "接続していません（未実装）。収益化の判断には使えません",
+}
+
 _channels = [
     {"id": "ch-001", "name": "Antigravity Tech", "status": "active", "genre": "tech",
      "youtube_channel_id": "UC_xxxxx1", "subscribers": 12500, "total_views": 850000,
@@ -88,6 +100,7 @@ async def get_channel_dashboard():
     """A-7 S1: チャンネル管理ダッシュボードの全体情報"""
     active = [c for c in _channels if c["status"] == "active"]
     return {
+        **DATA_SOURCE,
         "title": "チャンネル主ダッシュボード管理",
         "status": "healthy" if len(active) == len(_channels) else "partial",
         "summary": {
@@ -115,7 +128,7 @@ async def get_channel_dashboard():
 @router.get("/channels")
 async def get_channels():
     """A-7 S2: 管理対象チャンネルの一覧"""
-    return {"channels": _channels, "total": len(_channels)}
+    return {**DATA_SOURCE, "channels": _channels, "total": len(_channels)}
 
 
 # ── S3: チャンネル詳細 ──
@@ -127,10 +140,12 @@ async def get_channel_detail(channel_id: str):
     if ch is None:
         raise HTTPException(status_code=404, detail=f"Channel {channel_id} not found")
     return {
+        **DATA_SOURCE,
         **ch,
         "kpi": {
             "subscribers": ch["subscribers"],
             "views": ch["total_views"],
+            # **固定値。** 実測ではない（R1.5-C4）
             "watch_time_hours": 15200,
             "avg_view_duration_seconds": 420,
             "engagement_rate": 4.8,

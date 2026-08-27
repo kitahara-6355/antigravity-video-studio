@@ -214,13 +214,24 @@ class YouTubeUploaderService:
             
             logger.info(f"Uploading video: {title}")
             
-            # プレースホルダー実装（実際のAPI呼び出しは要実装）
+            # **未実装として失敗させる**（R1.5-C4・2026-08-26 ユーザー決定）。
+            #
+            # ここは `success=True` と `video_id="placeholder_video_id"` を
+            # 返していた。**投稿していないのに「できた」と記録される**ので、
+            # チャンネルの数字と実装の状態が食い違い、収益化の前提が崩れる。
+            # 実装も削除もせず、**やっていないことをやっていないと言う**。
+            #
+            # 実装するときは resumable upload をここに入れる
+            # （メタデータ `body` は組み立て済み）。台帳:
+            # `backend/config/feature_gaps.json` の `youtube_upload`
+            logger.warning("YouTube 投稿は未実装です（偽の success を返しません）")
             return UploadResult(
-                success=True,
-                video_id="placeholder_video_id",
-                video_url="https://youtube.com/watch?v=placeholder",
-                status="processing",
-                message="アップロード機能はOAuth設定後に有効になります。docs/youtube_api_setup.md を参照してください。"
+                success=False,
+                status="failed",
+                message="YouTube への投稿は**未実装**です。"
+                        "動画の隣に置いた `<動画名>.youtube.json` の"
+                        "タイトル・タグ・説明文を使って手動で投稿してください",
+                error="not_implemented"
             )
             
         except httpx.HTTPError as e:

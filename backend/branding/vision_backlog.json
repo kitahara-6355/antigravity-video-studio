@@ -486,7 +486,7 @@
       {
         "id": "R1.5-C4",
         "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
-        "verify": "docs/ 配下の実走記録",
+        "verify": "docs/C4_DEPENDENCY_RUN_20260828.md（4件の実走記録）",
         "met": false,
         "decision": "**youtube_uploader.upload_video() は未実装として失敗させる**（2026-08-26 ユーザー決定）。呼ばれたら明示的に例外で止める。投稿の自動化は R5 で最後尾、当面は手動投稿という既定方針に合わせる。実装も削除もしない — 削除は呼び出し元（ルーター・UI）に連鎖するため"
       },
@@ -1098,7 +1098,7 @@
           {
             "id": "R1.5-C4",
             "condition": "**依存機能を1つずつ実際に動かした記録がある**（投稿・チャンネル統計・品質スコア・retention 分析）。動かないものは**偽の success を返さないように直っている** — `youtube_uploader.upload_video()` の placeholder_video_id、`admin_channel_router` の固定値（watch_time_hours: 15200 等）、常に 0.0 になる quality_score、`[STUB]` の retention 分析",
-            "verify": "docs/ 配下の実走記録",
+            "verify": "docs/C4_DEPENDENCY_RUN_20260828.md（4件の実走記録）",
             "met": false,
             "decision": "**youtube_uploader.upload_video() は未実装として失敗させる**（2026-08-26 ユーザー決定）。呼ばれたら明示的に例外で止める。投稿の自動化は R5 で最後尾、当面は手動投稿という既定方針に合わせる。実装も削除もしない — 削除は呼び出し元（ルーター・UI）に連鎖するため"
           },

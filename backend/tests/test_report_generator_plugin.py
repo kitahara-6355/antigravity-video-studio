@@ -93,7 +93,7 @@ def test_report_generator_plugin_robustness_with_null_and_invalid_data(tmp_path)
     
     content = report_path.read_text(encoding="utf-8")
     assert "サムネイル候補 | 0枚" in content
-    assert "品質スコア | 0.0/100" in content
+    assert "品質スコア | **未計測**" in content
     assert "品質チェック結果" not in content  # dict 以外はスキップされること
     assert "carousel" not in content  # リスト以外はスキップされること
 
@@ -143,3 +143,21 @@ def test_report_generator_plugin_can_execute():
     plugin = ReportGeneratorPlugin()
     assert plugin.can_execute(None) is True
     assert plugin.can_execute(ProductionContext()) is True
+
+
+def test_未計測の品質スコアを0点として出さない(tmp_path):
+    """**測っていないことを、0点という測定結果に見せない**（R1.5-C4）。
+
+    `backend/core/context.py` の経路には品質ゲートが繋がっておらず、
+    dataclass の既定値 `0.0` がそのまま「0.0/100」と表示されていた。
+    **0点で落ちたのか、そもそも測っていないのかが区別できない。**
+    """
+    context = ProductionContext(task_id="T-c4-001", mood="elegant",
+                                output_dir=tmp_path)
+
+    ReportGeneratorPlugin().execute(context)
+
+    本文 = (tmp_path / "generation_report.md").read_text(encoding="utf-8")
+
+    assert "未計測" in 本文, 本文[:400]
+    assert "0.0/100" not in 本文, 本文[:400]

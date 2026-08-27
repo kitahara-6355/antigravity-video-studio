@@ -566,3 +566,26 @@ def test_AIが何も出していなければ生まれたと言わない(tmp_path
     中間 = {i["name"]: i for i in c._intermediates(ctx)}
 
     assert 中間["subtitles"]["produced"] is False, 中間["subtitles"]
+
+
+def test_未実装のretention分析を成果物に混ぜない(tmp_path):
+    """**`random` で作った数字を「分析結果」として成果物に入れない**（R1.5-C4）。
+
+    `retention_map_plugin` は `[STUB]` と警告を出しながら
+    `random.random()` でセグメントを組み立て、`success=True` の
+    `StageResult` を返していた。その中身は `ctx.metadata["retention_analysis"]`
+    に入り、**AI メタデータのサイドカー（成果物）にまで載っていた。**
+    """
+    import asyncio
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    c = PipelineCoordinator()
+    ctx = PipelineContext(video_path="x.mp4", session_id="s")
+    ctx.segments = [{"start": 0.0, "end": 30.0, "text": "あ"}]
+
+    r = asyncio.run(c._run_retention_analysis(ctx))
+
+    assert "retention_analysis" not in (ctx.metadata or {}), ctx.metadata
+    assert any("retention" in s for s in ctx.skipped_features), ctx.skipped_features
+    assert r is None or r.success is False, r
