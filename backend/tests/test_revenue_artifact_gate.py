@@ -16,6 +16,7 @@ from backend.revenue.artifact_gate import (
     ARTIFACT_SEMANTICS,
     check_cost,
     check_models,
+    check_run_status,
     check_runs,
     check_video,
     load_runs,
@@ -301,3 +302,108 @@ def test_resume_checkは検査した範囲だけを数える(tmp_path, capsys, m
     assert "最新の実行記録" in out, out
     assert "過去 1 件は検査していません" in out, out
     assert "6 件" not in out
+
+
+# --- 赤い実走を落とせること（R1.5-C1c・2026-08-27）-----------------------------
+#
+# **「ゲートが PASS する」を条件にすると、ゲートを弱くするのが最短の達成手段に
+# なる。** 実際そうなっていた — `--gate` は run の `status` を一度も見ておらず、
+# きちんと書式の整った全滅の記録に対して exit 0 を返した。動画も全 run から
+# 集めていたので、1本前の実走が残した mp4 が永久に緑を作っていた。
+#
+# 条件は「PASS すること」ではなく「**赤を落とせること**」。
+
+
+def _gate_run(runs_dir: Path, run_id: str, *, status: str,
+              artifacts: list | None = None) -> None:
+    """**書式は完全で、状態だけが違う記録。** 書式で落ちては検査にならない。"""
+    d = runs_dir / run_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "run.json").write_text(json.dumps({
+        "run_id": run_id, "started_at": "2026-08-27T00:00:00Z",
+        "status": status,
+        "stages": [{"name": "render", "status": "success",
+                    "model": "local:ffmpeg"}],
+        "models_used": ["local:ffmpeg"],
+        "artifacts": artifacts or [],
+    }), encoding="utf-8")
+
+
+def test_最新の実走が失敗ならゲートは落ちる(tmp_path):
+    """**赤い実走を緑にしない。** 記録の書式が完全でも、落ちたものは落ちた。"""
+    _gate_run(tmp_path, "20260827T100000000000-0000", status="failed")
+
+    assert "run_failed" in _kinds(check_run_status(load_runs(tmp_path)))
+
+
+def test_終わっていない実走も緑にしない(tmp_path):
+    """プロセスが死ぬと記録は `running` のまま残る。**未完は成功ではない。**"""
+    _gate_run(tmp_path, "20260827T100000000000-0000", status="running")
+
+    assert "run_failed" in _kinds(check_run_status(load_runs(tmp_path)))
+
+
+def test_状態が記録されていなければ判定できない(tmp_path):
+    """**「確かめられなかった」を「問題なし」にしない**（fail-closed）。"""
+    d = tmp_path / "20260827T100000000000-0000"
+    d.mkdir(parents=True)
+    (d / "run.json").write_text(json.dumps({
+        "run_id": "20260827T100000000000-0000",
+        "started_at": "2026-08-27T00:00:00Z",
+        "stages": [{"name": "render", "status": "success",
+                    "model": "local:ffmpeg"}],
+        "models_used": ["local:ffmpeg"], "artifacts": [],
+    }), encoding="utf-8")
+
+    assert "run_status_missing" in _kinds(check_run_status(load_runs(tmp_path)))
+
+
+def test_degradedは落とさない(tmp_path):
+    """**動画は出来ている。** 完走ではないが、赤ではない（2026-08-27 ユーザー決定）。
+
+    ここを落とすと、`quality_gate` が直るまでゲートが二度と緑にならない。
+    見えなくするわけではない — `_format` が最新の実走の状態を必ず出す。
+    """
+    _gate_run(tmp_path, "20260827T100000000000-0000", status="degraded")
+
+    assert check_run_status(load_runs(tmp_path)) == []
+    assert check_runs(load_runs(tmp_path)) == []
+
+
+def test_最新の実走の状態が出力に出る(tmp_path, monkeypatch):
+    from backend import cost_guard
+    from backend.revenue import artifact_gate as ag
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps(
+        {"metered": True, "known_price": True}) + "\n", encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+    runs = tmp_path / "runs"
+    _gate_run(runs, "20260827T100000000000-0000", status="degraded",
+              artifacts=["out.mp4"])
+    monkeypatch.setattr(ag, "check_video", lambda p: (None, []))
+
+    out = ag._format(ag.run_gate(video=None, runs_dir=runs))
+
+    assert "degraded" in out
+
+
+def test_過去の動画で緑にしない(tmp_path, monkeypatch):
+    """**動画も最新の1本で見る。** 1本前の mp4 が永久に緑を作っていた。"""
+    from backend import cost_guard
+    from backend.revenue import artifact_gate as ag
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps(
+        {"metered": True, "known_price": True}) + "\n", encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+    runs = tmp_path / "runs"
+    _gate_run(runs, "20260827T100000000000-0000", status="completed",
+              artifacts=["old.mp4"])
+    _gate_run(runs, "20260827T110000000000-0000", status="completed",
+              artifacts=[])
+    # 動画そのものの検査は別軸。**どの run の成果物を見るか**だけを問う
+    monkeypatch.setattr(ag, "check_video", lambda p: (None, []))
+
+    report = ag.run_gate(video=None, runs_dir=runs)
+
+    assert "no_video" in _kinds(report.findings)
+    assert not report.ok

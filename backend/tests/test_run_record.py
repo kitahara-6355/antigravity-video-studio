@@ -477,3 +477,72 @@ def test_他の実行の要約を自分の呼び出しに数えない(tmp_path):
 
     assert run["calls"] == 0, "他の実行の要約を呼び出しに数えている"
     assert run["cost_jpy"] == 0.0
+
+
+# --- 6. 再開の案内は本線を指す（R1.5-C1d・2026-08-27）--------------------------
+
+
+def _失敗した記録(tmp_path, **inputs) -> str:
+    rec = _recorder(tmp_path, inputs=inputs)
+    with pytest.raises(ValueError):
+        with rec.stage("proofread", model="gemini-3.6-flash",
+                       stage_input={"video_path": "x.mp4"}):
+            raise ValueError("落ちた")
+    rec.finish()
+    return rec.run_id
+
+
+def test_本線の記録は本線の入口を案内する(tmp_path):
+    """**旧パイプラインを案内していた。**
+
+    本線（agents）の記録に対して
+    `python -m backend.video_pipeline.pipeline_coordinator --resume` を
+    決め打ちで出していた。工程名の体系が違うので**実際には再開できない**
+    案内で、しかも「一本化した」という終了条件と矛盾する
+    （gate-verifier の指摘 N-3）。
+    """
+    from backend.revenue.run_record import _format_resume
+
+    run_id = _失敗した記録(tmp_path, mainline="agents", video_path="x.mp4")
+
+    out, code = _format_resume(tmp_path / "runs", run_id)
+
+    assert code == 1
+    assert "backend.agents.pipeline_coordinator" in out, out
+    assert "video_pipeline" not in out, out
+
+
+def test_本線に再開が無いことを隠さない(tmp_path):
+    """**無い機能を案内しない。** 本線にあるのはやり直しだけ。"""
+    from backend.revenue.run_record import _format_resume
+
+    run_id = _失敗した記録(tmp_path, mainline="agents", video_path="x.mp4")
+
+    out, _ = _format_resume(tmp_path / "runs", run_id)
+
+    assert "--resume" not in out.split("ここから")[-1], out
+
+
+def test_旧実装の記録は旧実装の入口を案内する(tmp_path):
+    """凍結した基準実装の記録は、そちらの再開を案内してよい。"""
+    from backend.revenue.run_record import _format_resume
+
+    run_id = _失敗した記録(tmp_path, video_path="x.mp4")
+
+    out, _ = _format_resume(tmp_path / "runs", run_id)
+
+    assert "backend.video_pipeline.pipeline_coordinator" in out, out
+
+
+def test_凍結した実装は唯一の入口を名乗らない():
+    """**「唯一」が2つあると、どちらが本線か分からない。**
+
+    本線は `agents` 側（`唯一の実行パス`）。`video_pipeline` は凍結した
+    基準実装で、実キーの入口を名乗る立場にない。
+    """
+    from pathlib import Path
+
+    旧 = (Path(__file__).parent.parent / "video_pipeline"
+          / "pipeline_coordinator.py").read_text(encoding="utf-8")
+
+    assert "唯一の入口" not in 旧

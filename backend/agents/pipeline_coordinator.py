@@ -603,7 +603,14 @@ class PipelineCoordinator:
             for path in (ctx.final_path, ctx.preview_path):
                 if path:
                     recorder.artifact(path)
-            recorder.finish(status)
+            # **記録だけを見て「何が落ちたか」が分かること**（R1.5-C1b）。
+            # `degraded` は残っていたが、何が落ちたのかは API の戻り値に
+            # しか無く、記録からは追えなかった。
+            recorder.finish(status, health={
+                "skipped_features": list(ctx.skipped_features),
+                "warnings": list(ctx.warnings),
+                "all_features_active": len(ctx.skipped_features) == 0,
+            })
         except Exception as e:  # noqa: BLE001 — 同上
             logger.warning(f"⚠️ 実行記録を閉じられませんでした: {e}")
         finally:
@@ -647,7 +654,20 @@ class PipelineCoordinator:
                           if isinstance(w, (TranscribeWorker, ProofreadWorker, SmartCutWorker))]
 
         for worker in serial_workers:
-            denied, deny_reason = await self._fire_pre_hook(harness, worker, ctx)
+            # **着手した工程は、結果を返すまで「落ちた」扱い**（R1.5-C1b）。
+            # 載っていない工程は `_settle_outcomes` が数えられない。
+            self._record_outcome(worker, False)
+            try:
+                denied, deny_reason = await self._fire_pre_hook(
+                    harness, worker, ctx)
+            except Exception as e:  # noqa: BLE001 — 数えずに素通りさせない
+                logger.exception(f"❌ {worker.name} の事前フックが落ちました")
+                ctx.stage_results.append(StageResult(
+                    stage_name=worker.name, success=False,
+                    detail=f"事前フックが落ちました: {e}"))
+                if type(worker).__name__ in FATAL_WORKERS:
+                    return f"事前フックが落ちました: {e}"
+                continue
             if denied:
                 # **断られた＝その工程は動いていない。** 成功に数えない
                 self._record_outcome(worker, False)
@@ -695,7 +715,20 @@ class PipelineCoordinator:
 
         async def _run_parallel_worker(worker):
             """並列実行用のワーカーラッパー"""
-            denied, deny_reason = await self._fire_pre_hook(harness, worker, ctx)
+            # **着手した工程は、結果を返すまで「落ちた」扱い**（R1.5-C1b）。
+            # ここが無かったので、事前フックが例外で落ちた工程は `_outcomes`
+            # に載らず、`gather(return_exceptions=True)` がログ1行に変えて
+            # 捨てていた。**3工程が1つも動かなくても `completed`** になった。
+            self._record_outcome(worker, False)
+            try:
+                denied, deny_reason = await self._fire_pre_hook(
+                    harness, worker, ctx)
+            except Exception as e:  # noqa: BLE001 — 数えずに素通りさせない
+                logger.exception(f"❌ {worker.name} の事前フックが落ちました")
+                r = StageResult(stage_name=worker.name, success=False,
+                                detail=f"事前フックが落ちました: {e}")
+                ctx.stage_results.append(r)
+                return r
             if denied:
                 self._record_outcome(worker, False)
                 r = StageResult(stage_name=worker.name, success=False,
@@ -752,6 +785,8 @@ class PipelineCoordinator:
         """最終ステージ (品質ゲート連動 T-031) のレンダリング処理。"""
         render_worker = self._find_worker(RenderWorker)
         if render_worker:
+            # **着手した工程は、結果を返すまで「落ちた」扱い**（R1.5-C1b）
+            self._record_outcome(render_worker, False)
             # T-031: 品質ゲート結果に基づくレンダリングモード判定
             quality_passed = ctx.quality_score >= 90
             if not quality_passed:

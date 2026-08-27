@@ -188,3 +188,56 @@ def test_記録が開けなくても失敗は握り潰さない(tmp_path, monkey
         f"status={result['status']}")
     assert not (tmp_path / "runs").exists() or not list(
         (tmp_path / "runs").glob("*/run.json"))
+
+
+# --- 動かなかった工程を成功に数えない（R1.5-C1b・2026-08-27）-------------------
+
+
+def test_pre_hookが例外でも工程を成功に数えない(tmp_path):
+    """**載っていないものは数えられない。**
+
+    `_fire_pre_hook` は try の外にあり、そこで例外が出ると
+    `asyncio.gather(return_exceptions=True)` がログ1行に変えて捨てていた。
+    工程は `_outcomes` に載らず、`_settle_outcomes` は載っているものしか
+    見ないので、**プレビュー・メタデータ・品質ゲートが1つも動いていない
+    のに `completed`** になった（gate-verifier の指摘 N-2）。
+    """
+    c = _coordinator(tmp_path)
+    # **品質ゲートは外しておく。** あれが落ちると改善ループが同じ工程を
+    # 回し直し、**最後の試行が通る**ので「一度も動いていない」の検査に
+    # ならない（リトライで通ったものを失敗に数えないのは C1b の別の柱）。
+    爆ぜる工程 = {"PreviewWorker", "YouTubeOptWorker"}
+    元のpre_hook = c._fire_pre_hook
+
+    async def _爆ぜる(harness, worker, ctx):
+        if type(worker).__name__ in 爆ぜる工程:
+            raise RuntimeError("governance boom")
+        return await 元のpre_hook(harness, worker, ctx)
+
+    c._fire_pre_hook = _爆ぜる
+
+    result = _run(c, tmp_path)
+
+    assert result["status"] != "completed", result["status"]
+    落ちた = set(result["health"]["skipped_features"])
+    assert {"preview", "youtube_opt"} <= 落ちた, 落ちた
+    # **記録からも追えること**
+    assert set(_run_json(tmp_path)["health"]["skipped_features"]) >= {
+        "preview", "youtube_opt"}
+
+
+def test_落ちた工程が実行記録にも残る(tmp_path):
+    """**記録だけを見て「何が落ちたか」が分かること。**
+
+    `status: degraded` は残っていたが、**何が落ちたのかは残っていなかった**
+    （`health` は API の戻り値にしかなく、`run.json` には無かった）。
+    記録は再開材料であって、状態の一言ではない。
+    """
+    c = _coordinator(tmp_path, 落ちる={"YouTubeOptWorker"})
+
+    result = _run(c, tmp_path)
+
+    assert result["status"] == "degraded", result["status"]
+    rec = _run_json(tmp_path)
+    assert rec["status"] == "degraded"
+    assert "youtube_opt" in rec["health"]["skipped_features"], rec.get("health")

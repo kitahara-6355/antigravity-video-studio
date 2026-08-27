@@ -904,8 +904,10 @@ if __name__ == "__main__":
               "--resume <run_id>   # 落ちた工程から再実行する")
         sys.exit(1)
 
-    # **実走は必ず記録する。** 記録が無ければ成果物ゲートが FAIL する
-    # 仕様なので、実キーで動かす唯一の入口であるここで渡す。
+    # **実走は必ず記録する。** 記録が無ければ成果物ゲートが FAIL する。
+    # **本線は `backend/agents/pipeline_coordinator.py`**（唯一の実行パス）。
+    # こちらは凍結した基準実装で、検証のために CLI を残してあるだけ
+    # （R1.5-C1d・2026-08-27）。
     from backend.revenue.artifact_gate import RUNS_DIR
 
     from backend.cost_guard import LEDGER_PATH

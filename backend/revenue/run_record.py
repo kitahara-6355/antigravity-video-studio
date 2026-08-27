@@ -273,7 +273,8 @@ class RunRecorder:
 
     # --- 締め ---------------------------------------------------------------
 
-    def finish(self, status: str | None = None) -> dict:
+    def finish(self, status: str | None = None,
+               health: dict | None = None) -> dict:
         # **要約の行は呼び出しではない。** `_close_stage` では除外していたのに
         # ここだけ除外し忘れていた（2026-08-21 の指摘）。除外を1箇所に寄せる。
         rows = self._calls_since(self._ledger_start)
@@ -290,6 +291,10 @@ class RunRecorder:
         self._record["finished_at"] = _now()
         self._record["status"] = status or (
             "failed" if failed_stage(self._record) else "completed")
+        # **「何が落ちたか」を記録に残す**（R1.5-C1b）。状態の一言だけでは
+        # 記録から追えない。
+        if health is not None:
+            self._record["health"] = health
         self._write()
         if self._summary_to_ledger:
             self._append_ledger_summary()
@@ -364,6 +369,26 @@ def _format_list(runs_dir: Path) -> str:
     return "\n".join(lines)
 
 
+def _再実行の案内(run: dict) -> list[str]:
+    """**記録を書いたパイプラインの入口を案内する**（R1.5-C1d）。
+
+    旧実装の `--resume` を決め打ちで出していたが、本線（agents）の記録に
+    対しては**工程名の体系が違うので実際には再開できない**案内だった。
+
+    **本線に再開は無い。** 無いものを案内しないで、やり直しの入口を出す
+    （偽の success を返さないのと同じ理由）。
+    """
+    if (run.get("inputs") or {}).get("mainline") == "agents":
+        video = (run.get("inputs") or {}).get("video_path") or "<入力の動画>"
+        return [
+            "    # 本線（agents）に再開はありません。入力からやり直します",
+            "    PYTHONPATH=./backend python -m backend.agents"
+            f".pipeline_coordinator {video}",
+        ]
+    return ["    python -m backend.video_pipeline.pipeline_coordinator "
+            f"--resume {run['run_id']}"]
+
+
 def _format_resume(runs_dir: Path, run_id: str) -> tuple[str, int]:
     path = Path(runs_dir) / run_id / "run.json"
     if not path.is_file():
@@ -386,8 +411,7 @@ def _format_resume(runs_dir: Path, run_id: str) -> tuple[str, int]:
         json.dumps(stage.get("input", {}), ensure_ascii=False, indent=4),
         "",
         "  ここから再実行する:",
-        "    python -m backend.video_pipeline.pipeline_coordinator "
-        f"--resume {run_id}",
+        *_再実行の案内(run),
     ]
     return "\n".join(lines), 1
 

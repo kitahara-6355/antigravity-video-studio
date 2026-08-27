@@ -154,6 +154,12 @@ def check_video(path: Path) -> tuple[dict | None, list[Finding]]:
 
 REQUIRED_RUN_KEYS = ("run_id", "started_at", "stages", "models_used")
 
+# **緑と呼べる状態はこの2つだけ**（R1.5-C1c）。
+# `degraded` を落とさないのは 2026-08-27 のユーザー決定 — 動画は出来ている。
+# ここに無いもの（`failed` / `error` / 途中で死んで `running` のまま / 見知らぬ値）は
+# すべて赤に倒す。**「確かめられなかった」を「問題なし」にしない。**
+GREEN_RUN_STATUSES = ("completed", "degraded")
+
 
 def load_runs(runs_dir: Path = RUNS_DIR) -> list[dict]:
     if not runs_dir.is_dir():
@@ -231,6 +237,38 @@ def check_runs(runs: list[dict]) -> list[Finding]:
     return findings
 
 
+def check_run_status(runs: list[dict]) -> list[Finding]:
+    """**赤い実走を緑にしない**（R1.5-C1c）。見るのは最新の1本。
+
+    これが無かったので、**きちんと書式の整った全滅の記録**に対して
+    `--gate` が exit 0 を返した。「ゲートが PASS すること」を終了条件に
+    すると、**ゲートを弱くするのが最短の達成手段**になる。
+
+    `check_runs` と分けてあるのは `--resume-check` のため。あちらは
+    **落ちた実行から再開できるか**を見る道具で、落ちていること自体は
+    違反ではない。ここは逆に、落ちた実行を成果物の証拠にしないための検査。
+    """
+    if not runs:
+        return []
+    run = runs[-1]
+    if run.get("_broken"):
+        return []          # 壊れた記録は `check_runs` が既に落としている
+    rid = run.get("run_id", "(不明)")
+    status = run.get("status")
+    if not status:
+        return [Finding(
+            "run_status_missing", rid,
+            "実行の状態が記録されていません。**動いたかどうかを判定できない**"
+            "ので緑にはしません")]
+    if status not in GREEN_RUN_STATUSES:
+        return [Finding(
+            "run_failed", rid,
+            f"最新の実走が **{status}** で終わっています。"
+            "**動かなかった実行を成果物の証拠にしない**"
+            f"（緑と呼べるのは {'、'.join(GREEN_RUN_STATUSES)} だけ）")]
+    return []
+
+
 def history_findings(runs: list[dict]) -> list[Finding]:
     """**過去の実行にあった欠陥。判定材料にはしない。**
 
@@ -299,6 +337,7 @@ def run_gate(video: Path | None = None,
     report = ArtifactReport()
     report.runs = load_runs(runs_dir)
     report.findings += check_runs(report.runs)
+    report.findings += check_run_status(report.runs)
     report.history = history_findings(report.runs)
     report.findings += check_cost(report.runs)
     report.findings += check_models(report.runs)
@@ -307,8 +346,12 @@ def run_gate(video: Path | None = None,
         report.video = summary
         report.findings += findings
     else:
-        produced = [Path(p) for run in report.runs
-                    for p in (run.get("artifacts") or []) if str(p).endswith(".mp4")]
+        # **最新の1本の成果物だけを見る**（R1.5-C1c）。全 run から集めていた
+        # ので、**1本前の実走が残した mp4 が永久に緑を作っていた** —
+        # 今日の実行が動画を1本も作らなくてもゲートが通った。
+        latest = report.runs[-1] if report.runs else {}
+        produced = [Path(p) for p in (latest.get("artifacts") or [])
+                    if str(p).endswith(".mp4")]
         if not produced:
             report.findings.append(Finding(
                 "no_video", "artifacts",
@@ -325,6 +368,10 @@ def run_gate(video: Path | None = None,
 def _format(report: ArtifactReport) -> str:
     lines = ["成果物ゲート（R1）— 動いた証拠だけを見る", ""]
     lines.append(f"  実行記録: {len(report.runs)} 件")
+    if report.runs:
+        latest = report.runs[-1]
+        lines.append(f"  最新の実走: {latest.get('run_id', '(id なし)')} / "
+                     f"{latest.get('status') or '(状態の記録なし)'}")
     if report.video:
         v = report.video
         lines.append(f"  動画: {v['path']} / {v['duration_sec']} 秒 / "
