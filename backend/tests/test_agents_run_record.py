@@ -364,3 +364,56 @@ def test_直列で結果を返さなくても実行は落ちない(tmp_path):
     rec = _run_json(tmp_path)
     assert rec["status"] in ("failed", "degraded"), rec["status"]
     assert "proofread" in rec["health"]["failed_stages"], rec["health"]
+
+
+# --- 目標尺は素材から決める（2026-08-27 ユーザー決定）-------------------------
+
+
+def test_目標尺を素材の尺から決める():
+    """**付け忘れると黙って -50 点**になっていた。
+
+    `--target-minutes` の既定は20分で、30秒の素材に対して品質ゲートの
+    QV-01 が「出力尺異常（目標20分, 差19.6分）」で満額の減点を打っていた。
+    実測: 目標尺を素材に合わせるだけで **2点 → 52点**。
+    """
+    from agents import pipeline_coordinator as pc
+
+    assert pc._auto_target_minutes(30.0) == 1       # 30秒 → 1分（0分にしない）
+    assert pc._auto_target_minutes(90.0) == 2
+    assert pc._auto_target_minutes(1800.0) == 30    # C5 の30分素材
+
+
+def test_尺が読めなければ既定値にすり替えない():
+    """**「確かめられなかった」を「20分だった」にしない。**
+
+    既存の `get_video_duration()` は失敗を 15.0 秒に握り潰す。同じ形にすると
+    誤った目標尺が黙って入り、また -50 点が出る。
+    """
+    from agents import pipeline_coordinator as pc
+
+    assert pc._auto_target_minutes(None) is None
+    assert pc._auto_target_minutes(0.0) is None
+    assert pc._auto_target_minutes(-1.0) is None
+
+
+def test_明示した目標尺が自動より優先される(tmp_path, monkeypatch):
+    """**狙いがあるときは人が上書きできる。**"""
+    from agents import pipeline_coordinator as pc
+
+    video = tmp_path / "素材.mp4"
+    video.write_bytes(b"x")
+    monkeypatch.setattr(pc, "_probe_duration_sec", lambda p: 30.0)
+    渡された = {}
+
+    def _捕まえる(self, ctx):
+        渡された["target_minutes"] = ctx.target_minutes
+        raise SystemExit(0)
+
+    monkeypatch.setattr(pc.PipelineCoordinator, "execute", _捕まえる)
+
+    for argv, 期待 in (([str(video)], 1), ([str(video), "--target-minutes", "20"], 20)):
+        try:
+            pc.main(argv)
+        except SystemExit:
+            pass
+        assert 渡された["target_minutes"] == 期待, argv

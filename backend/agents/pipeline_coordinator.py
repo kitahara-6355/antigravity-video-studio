@@ -1281,6 +1281,41 @@ async def resolve_pipeline_coordinator_thumbnail_task(task_id: str) -> str:
 # **これは課金経路。** 校閲・メタデータ・品質ゲートが Gemini を呼ぶ。
 # `cost_guard` が呼び出しごとに計上し、予算が尽きれば例外で止まる。
 
+def _probe_duration_sec(video: Path) -> Optional[float]:
+    """素材の尺を秒で返す。**読めなければ `None`。**
+
+    既存の `aligned_preview_generator.get_video_duration()` は失敗を 15.0 秒に
+    握り潰す。同じ形にすると、誤った目標尺が黙って入って品質ゲートが
+    -50 点を打つ（2026-08-27 に実際にそうなった）。**読めなかったことは
+    読めなかったと言う。**
+    """
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+            capture_output=True, text=True, check=True, timeout=30).stdout
+        return float(out.strip())
+    except Exception as e:  # noqa: BLE001 — 読めないことを 0 や既定値にしない
+        logger.warning(f"⚠️ 素材の尺を読めませんでした: {e}")
+        return None
+
+
+def _auto_target_minutes(duration_sec: Optional[float]) -> Optional[int]:
+    """**目標尺は素材から決める**（2026-08-27 ユーザー決定）。
+
+    `--target-minutes` の既定は20分だった。30秒の素材に対して品質ゲートの
+    QV-01 が「出力尺異常（目標20分, 差19.6分）」で満額 -50 を打ち、
+    スコアが 2/100 に張り付いていた。**目標尺を素材に合わせるだけで 52点。**
+
+    `target_minutes` は SmartCut では使われておらず、**品質ゲートが
+    「出来上がりはこれくらいのはず」と照らす期待値**としてだけ効く。
+    """
+    if duration_sec is None or duration_sec <= 0:
+        return None
+    return max(1, round(duration_sec / 60))
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     import argparse
     import uuid
@@ -1288,7 +1323,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="本線（agents）で動画を1本作る。**課金経路**")
     parser.add_argument("video", help="入力動画のパス")
-    parser.add_argument("--target-minutes", type=int, default=20)
+    parser.add_argument("--target-minutes", type=int, default=None,
+                        help="出来上がりの目安（分）。既定は素材の尺から決める")
     parser.add_argument("--runs-dir", default=None,
                         help="実行記録の置き場（既定 output/runs）")
     parser.add_argument("--no-ledger", action="store_true",
@@ -1300,6 +1336,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"🚫 入力がありません: {video}")
         return 1
 
+    target_minutes = args.target_minutes
+    if target_minutes is None:
+        target_minutes = _auto_target_minutes(_probe_duration_sec(video))
+        if target_minutes is None:
+            print("🚫 素材の尺を読めないので目標尺を決められません。"
+                  "`--target-minutes <分>` で明示してください")
+            return 1
+        print(f"📏 目標尺を素材から決めました: {target_minutes} 分")
+
     from backend import cost_guard as _cg
     _cg.load_env()
 
@@ -1310,7 +1355,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         coordinator.ledger_path = Path(_cg.LEDGER_PATH)
 
     ctx = PipelineContext(video_path=str(video),
-                          target_minutes=args.target_minutes,
+                          target_minutes=target_minutes,
                           session_id=f"cli-{uuid.uuid4().hex[:8]}")
 
     result = asyncio.run(coordinator.execute(ctx))
