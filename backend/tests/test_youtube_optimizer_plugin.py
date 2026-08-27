@@ -12,13 +12,26 @@ from plugins.youtube_optimizer_plugin import youtube_optimizer, ThumbnailCandida
 
 @pytest.fixture(autouse=True)
 def cleanup_output():
-    # テスト前後のクリーンアップ
+    """**リポジトリ直下の `output/` を消さない**（2026-08-28）。
+
+    以前ここは `shutil.rmtree(Path("output"))` を無条件で実行していた。
+    CWD がリポジトリ直下だと**本番の `output/` が丸ごと消える** —
+    実際に消えたもの:
+
+      - `output/testclips/2025-09-22_16-34-33.mp4`（ユーザーが C5 の計測用に
+        用意した 600MB の実写素材）
+      - `output/runs/` の実行記録 18 件（C1a・C1c・C3 の判定根拠そのもの）
+
+    **証拠の土台をテストが壊していた。** このテストが作るものは
+    `youtube_optimizer` が `output/generated/` 以下に書くものだけなので、
+    消す範囲をそこに限る。`output/` そのものには触らない。
+    """
     yield
-    output_dir = Path("output")
-    if output_dir.exists():
+    生成物 = Path("output") / "generated"
+    if 生成物.exists():
         try:
-            shutil.rmtree(output_dir)
-        except Exception:
+            shutil.rmtree(生成物)
+        except OSError:
             pass
 
 @pytest.mark.asyncio
