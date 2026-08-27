@@ -219,3 +219,75 @@ def test_sunset_reportの既定も走査根を狭めない():
         assert outside in report.source_hits, (
             f"{outside} が数に入っていない（走査根が backend/ に狭まっている）"
         )
+
+
+# --- 本番と到達不能を区別する（R1.5-C6・2026-08-28）---------------------------
+#
+# 条件文: 「`--sunset` が段・実行記録・**本番モジュール**のいずれにも 2.5 系が
+# 無いことを示し、残った参照（テスト・アーカイブ・到達不能な経路）は本番と
+# 区別して数えられている。**区別できないうちは FAIL する**」
+#
+# 直す前は 71 箇所を1つの数として出すだけで、本番かどうかを言えなかった。
+
+
+def test_本番の実行経路を静的に辿れる():
+    """**本線の入口から import を辿って「本番」を定義する。**
+
+    「本番かどうか」を人の感覚で決めない。`agents.pipeline_coordinator`
+    （本線）と `main`（API）から辿れるものを本番とする。
+    """
+    from backend.model_policy import reachable_modules
+
+    到達 = reachable_modules()
+
+    assert "backend/agents/pipeline_coordinator.py" in 到達
+    assert "backend/model_governance.py" in 到達
+    # アーカイブは本線から辿れない
+    assert not any("archives/" in p for p in 到達), [p for p in 到達 if "archives/" in p][:3]
+
+
+def test_2_5系の参照を本番と到達不能に分ける():
+    from backend.model_policy import classify_sunset_references
+
+    分類 = classify_sunset_references()
+
+    assert set(分類) == {"production_code", "production_doc", "unreachable"}
+    # 分類の合計が走査の合計と一致すること（**取りこぼしを作らない**）
+    from backend.model_policy import scan_sunset_references
+    合計 = sum(scan_sunset_references().values())
+    分類合計 = sum(sum(v.values()) for v in 分類.values())
+    assert 分類合計 == 合計, (分類合計, 合計)
+
+
+def test_文書の中の2_5系は依存ではない(tmp_path):
+    """**docstring の例と、実際に使われる既定値を混ぜない。**
+
+    `cost_guard.py` の 2 箇所は使い方を示す docstring で、依存ではない。
+    """
+    from backend.model_policy import split_code_and_doc
+
+    src = '''"""使い方: guard.before_call("gemini-2.5-flash")"""
+既定 = "gemini-2.5-flash"
+# gemini-2.5-flash はコメント
+'''
+    f = tmp_path / "x.py"
+    f.write_text(src, encoding="utf-8")
+
+    コード, 文書 = split_code_and_doc(f)
+
+    assert コード == 1, (コード, 文書)   # 代入だけが依存
+    assert 文書 == 2                      # docstring とコメント
+
+
+def test_本番にコード上の2_5系が残っていたらFAILする():
+    """**区別できないうちは FAIL する**（条件文）。"""
+    from backend.model_policy import sunset_gate
+
+    残っている = sunset_gate({"production_code": {"backend/x.py": 1},
+                              "production_doc": {}, "unreachable": {}})
+    消えた = sunset_gate({"production_code": {},
+                          "production_doc": {"backend/y.py": 3},
+                          "unreachable": {"scratch/z.py": 9}})
+
+    assert 残っている, "本番にコード参照が残っていたら違反を出すこと"
+    assert 消えた == [], 消えた

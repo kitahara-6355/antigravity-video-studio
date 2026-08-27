@@ -20,7 +20,7 @@ try:
     from model_governance import model_governance as _mg
     def _resolve_model(task): return _mg._resolve_model(task)
 except ImportError:
-    def _resolve_model(task): return "gemini-2.5-flash"
+    def _resolve_model(task): return "gemini-3.6-flash"
 
 logger = logging.getLogger(__name__)
 

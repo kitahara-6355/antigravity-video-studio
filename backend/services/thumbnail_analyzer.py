@@ -22,7 +22,7 @@ from typing import Dict, Any, List, Optional
 try:
     from model_registry import get_model
 except ImportError:
-    def get_model(task): return "gemini-2.5-flash"
+    def get_model(task): return "gemini-3.6-flash"
 
 logger = logging.getLogger(__name__)
 

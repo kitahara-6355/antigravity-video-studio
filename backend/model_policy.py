@@ -510,8 +510,13 @@ def scan_sunset_references(root: Path | None = None) -> dict[str, int]:
     """
     hits: dict[str, int] = {}
     root = Path(root if root is not None else Path(__file__).resolve().parents[1])
+    自分 = Path(__file__).resolve()
     for path in sorted(root.rglob("*.py")):
         if set(path.parts) & _SCAN_SKIP_DIRS:
+            continue
+        # **走査器自身の目印（`SUNSET_PREFIX`）は依存ではない。**
+        # これを数えると、2.5 系を全部消しても件数が 1 のまま残る
+        if path.resolve() == 自分:
             continue
         if path.name.startswith("test_"):
             continue
@@ -523,6 +528,145 @@ def scan_sunset_references(root: Path | None = None) -> dict[str, int]:
         if count:
             hits[path.relative_to(root).as_posix()] = count
     return hits
+
+
+# 本線の入口。**「本番かどうか」を人の感覚で決めない**（R1.5-C6）。
+# ここから import を辿れるものを本番とする。
+_MAINLINE_ENTRIES = ("agents.pipeline_coordinator", "main")
+
+
+def _module_path(name: str, root: Path) -> Path | None:
+    parts = name.split(".")
+    for base in (root / "backend", root):
+        p = base.joinpath(*parts)
+        if p.with_suffix(".py").is_file():
+            return p.with_suffix(".py")
+        if (p / "__init__.py").is_file():
+            return p / "__init__.py"
+    return None
+
+
+def reachable_modules(root: Path | None = None) -> set[str]:
+    """**本線の入口から静的に辿れるモジュール**（R1.5-C6）。
+
+    実行記録では「その日通らなかった経路」が見えない。import を辿れば
+    通りうる経路が分かる。**辿れないものは本番ではない**と言い切れる。
+    """
+    import ast
+
+    root = Path(root if root is not None else Path(__file__).resolve().parents[1])
+    seen: set[str] = set()
+    stack = list(_MAINLINE_ENTRIES)
+    while stack:
+        name = stack.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        path = _module_path(name, root)
+        if path is None:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                stack.extend(a.name for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                stack.append(node.module)
+
+    out: set[str] = set()
+    for name in seen:
+        path = _module_path(name, root)
+        if path is None:
+            continue
+        try:
+            out.add(path.relative_to(root).as_posix())
+        except ValueError:
+            continue
+    return out
+
+
+def split_code_and_doc(path: Path) -> tuple[int, int]:
+    """1ファイルの 2.5 系参照を「コード上の値」と「文書」に分ける。
+
+    **docstring の例と、実際に使われる既定値を混ぜない。** 条件文が言う
+    「依存」は前者だけで、使い方を説明する文は依存ではない。
+    """
+    import ast
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return 0, 0
+    合計 = text.count(SUNSET_PREFIX)
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        # 読めないものは**文書側に倒さない**（fail-closed）
+        return 合計, 0
+
+    docstrings: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
+                             ast.ClassDef)):
+            doc = ast.get_docstring(node, clean=False)
+            if doc:
+                docstrings.append(doc)
+    文書 = sum(d.count(SUNSET_PREFIX) for d in docstrings)
+    # コメントは AST に無いので、行頭が `#` の行から数える
+    lines = text.splitlines()
+    for line in lines:
+        if line.lstrip().startswith("#"):
+            文書 += line.count(SUNSET_PREFIX)
+
+    # **`if __name__ == "__main__":` の中は本番の実行経路ではない。**
+    # `model_governance.py` の自己テストは 2.5 を「訂正される入力」として
+    # 渡しており、依存ではない（2026-08-28）。
+    for node in tree.body:
+        if not (isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+                and isinstance(node.test.left, ast.Name)
+                and node.test.left.id == "__name__"):
+            continue
+        始 = (node.body[0].lineno - 1) if node.body else node.lineno
+        終 = max(getattr(n, "end_lineno", n.lineno) for n in node.body) if node.body else 始
+        文書 += sum(line.count(SUNSET_PREFIX) for line in lines[始:終])
+
+    return max(0, 合計 - 文書), min(合計, 文書)
+
+
+def classify_sunset_references(root: Path | None = None) -> dict[str, dict[str, int]]:
+    """2.5 系の参照を**本番／到達不能**と**コード／文書**に分ける（R1.5-C6）。
+
+    分類の合計は走査の合計と必ず一致する（**取りこぼしを作らない**）。
+    """
+    root = Path(root if root is not None else Path(__file__).resolve().parents[1])
+    到達 = reachable_modules(root)
+    out: dict[str, dict[str, int]] = {
+        "production_code": {}, "production_doc": {}, "unreachable": {}}
+    for rel, count in scan_sunset_references(root).items():
+        if rel not in 到達:
+            out["unreachable"][rel] = count
+            continue
+        コード, 文書 = split_code_and_doc(root / rel)
+        if コード:
+            out["production_code"][rel] = コード
+        if 文書:
+            out["production_doc"][rel] = 文書
+    return out
+
+
+def sunset_gate(分類: dict[str, dict[str, int]]) -> list[str]:
+    """**本番の実行経路にコード上の 2.5 系が残っていたら違反**（R1.5-C6）。
+
+    文書と到達不能は数えるだけで落とさない。**区別できているからこそ
+    落とさずに済む** — 区別できないうちは全部が疑わしいので落とす。
+    """
+    残り = 分類.get("production_code") or {}
+    if not 残り:
+        return []
+    return [f"{path}: {count} 箇所（本番の実行経路から辿れます）"
+            for path, count in sorted(残り.items(), key=lambda x: -x[1])]
 
 
 def sunset_report(tier_models: dict[str, str] | None = None,
@@ -714,6 +858,29 @@ def main(argv: list[str] | None = None) -> int:
         except OSError:
             runs = []
         print(format_sunset(sunset_report(runs=runs)))
+
+        # **本番と到達不能を区別して数える**（R1.5-C6）。
+        # 数えるだけでは条件を満たさない — 条件文は「区別できないうちは
+        # FAIL する」と言っている。区別できているからこそ、文書と到達不能を
+        # 落とさずに済む。
+        分類 = classify_sunset_references()
+        print()
+        print(f"  本番の実行経路（本線と API から辿れる）: "
+              f"**{sum(分類['production_code'].values())} 箇所**")
+        print(f"  同・文書（docstring / コメント / __main__ の自己テスト）: "
+              f"{sum(分類['production_doc'].values())} 箇所")
+        print(f"  到達不能（補助ツール・スクラッチ・フック等）: "
+              f"{sum(分類['unreachable'].values())} 箇所 / "
+              f"{len(分類['unreachable'])} ファイル")
+        違反 = sunset_gate(分類)
+        if 違反:
+            print()
+            print(f"🚫 **本番の実行経路に 2.5 系が残っています**（{len(違反)} ファイル）:")
+            for m in 違反:
+                print(f"    - {m}")
+            return 1
+        print()
+        print("  ✅ 本番の実行経路に 2.5 系のコード参照はありません。")
         return 0
 
     if args.audit:

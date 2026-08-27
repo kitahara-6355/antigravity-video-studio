@@ -57,7 +57,7 @@ class YouTubeOptWorker(PipelineStageWorker):
             model_name = _mg._resolve_model("youtube_optimization")
         except (ImportError, AttributeError) as e:
             logger.warning(f"モデル解決でエラーが発生したため、デフォルトを使用します: {e}")
-            model_name = "gemini-2.5-flash"  # フォールバック
+            model_name = "gemini-3.6-flash"  # フォールバック
 
         response = client.models.generate_content(
             model=model_name,
