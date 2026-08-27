@@ -83,3 +83,41 @@ def unknown_from_record(run: dict, gaps: list[dict]) -> list[str]:
     印 = [g.get("surfaces_as") for g in gaps if g.get("surfaces_as")]
     return [名 for 名 in surfaced_in(run)
             if 名 not in 既知 and not any(s and s in 名 for s in 印)]
+
+
+def is_done(gap: dict, run: dict | None) -> bool | None:
+    """実装済みか。**`None` は「この実行では確かめていない」。**
+
+    `False` と `None` を混ぜない。混ぜると「確かめられなかった」が
+    「問題なし」に化ける（`model_policy --audit` がダミーキーで exit 0 を
+    返す問題と同じ形）。
+    """
+    dw = gap.get("done_when") or {}
+    kind = dw.get("kind")
+
+    if kind == "marker_gone":
+        # **弱い証拠。** 印が残っていることは「未実装」の確かな証拠だが、
+        # 印が消えたことは「実装された」の証拠にならない
+        # （`placeholder_video_id` が「書いてあるが動かない」の実例）。
+        p = Path(dw.get("path", ""))
+        if not p.is_absolute():
+            p = REPO_ROOT / p
+        if not p.is_file():
+            return None
+        return dw.get("marker", "") not in p.read_text(encoding="utf-8", errors="ignore")
+
+    if run is None:
+        return None
+
+    if kind == "run_record_clean":
+        印 = gap.get("surfaces_as") or gap.get("id") or ""
+        return not any(印 in 名 for 名 in surfaced_in(run))
+
+    if kind == "artifact_present":
+        suffixes = tuple(dw.get("suffixes") or [])
+        if not suffixes:
+            return None
+        return any(str(a).lower().endswith(suffixes)
+                   for a in (run.get("artifacts") or []))
+
+    return None

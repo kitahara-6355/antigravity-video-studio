@@ -497,3 +497,51 @@ def test_意図して止めているものも実装漏れではない():
     gaps = [{"id": "dream", "surfaces_as": "dream_learning", "kind": "intentional"}]
 
     assert unknown_from_record(_記録(skipped_features=["dream_learning"]), gaps) == []
+
+
+def test_記録から消えたら実装済みとみなす():
+    """**片付け忘れが残らない。** 直したのに台帳に残っていたら FAIL する。"""
+    from backend.feature_gaps import is_done
+
+    gap = {"id": "bgm", "surfaces_as": "BGMミキシング",
+           "done_when": {"kind": "run_record_clean"}}
+
+    assert is_done(gap, _記録(skipped_features=[])) is True
+    assert is_done(gap, _記録(skipped_features=["BGMミキシング(ファイルなし)"])) is False
+
+
+def test_成果物が出たら実装済みとみなす():
+    from backend.feature_gaps import is_done
+
+    gap = {"id": "thumb",
+           "done_when": {"kind": "artifact_present", "suffixes": [".png", ".jpg"]}}
+
+    assert is_done(gap, {"artifacts": ["out.mp4"], "health": {}}) is False
+    assert is_done(gap, {"artifacts": ["out.mp4", "t.png"], "health": {}}) is True
+
+
+def test_印が残っている間は未実装(tmp_path):
+    """**印が消えても実装済みの証拠にはならない**（弱い証拠）。
+
+    `placeholder_video_id` が「書いてあるが動かない」の実例。だから実行記録で
+    判定できる項目にはこの種類を使わない。
+    """
+    from backend.feature_gaps import is_done
+
+    f = tmp_path / "x.py"
+    f.write_text("video_id = 'placeholder_video_id'", encoding="utf-8")
+    gap = {"id": "up", "done_when": {"kind": "marker_gone",
+                                     "path": str(f), "marker": "placeholder_video_id"}}
+
+    assert is_done(gap, None) is False
+    f.write_text("video_id = resp['id']", encoding="utf-8")
+    assert is_done(gap, None) is True
+
+
+def test_記録が無ければ確かめていないと言う():
+    """**「確かめられなかった」を「問題なし」にしない。**"""
+    from backend.feature_gaps import is_done
+
+    gap = {"id": "bgm", "surfaces_as": "BGM", "done_when": {"kind": "run_record_clean"}}
+
+    assert is_done(gap, None) is None
