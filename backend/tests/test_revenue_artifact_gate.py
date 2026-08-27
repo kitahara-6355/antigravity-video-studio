@@ -590,3 +590,59 @@ def test_showは落ちない():
     from backend import feature_gaps
 
     assert feature_gaps.main(["--show"]) == 0
+
+
+def _品質ctx(tmp_path):
+    """品質ゲートに渡す最小のコンテキスト。"""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from agents.pipeline_types import PipelineContext
+
+    preview = tmp_path / "preview.mp4"
+    preview.write_bytes(b"0" * 2048)
+    ctx = PipelineContext(video_path=str(tmp_path / "src.mp4"), session_id="t")
+    ctx.preview_path = str(preview)
+    ctx.segments = [{"start": 0.0, "end": 3.0, "text": "あ", "score": 0.8}]
+    ctx.selected_segments = list(ctx.segments)
+    return ctx
+
+
+def test_台帳に載っている機能は減点しない(tmp_path):
+    """**構成上どうやっても届かない減点を止める。**
+
+    本線にサムネイル工程は無い。無い工程を減点し続けると品質ゲートは
+    **原理的に閾値へ到達できない**（実測: 物理 -20 / プラグイン -15 /
+    完走チェック -5）。台帳に載っている間は減点せず、「やっていない」として
+    `skipped_features` に出す。**実装したら台帳から消え、その瞬間から
+    ゲートが本気で見はじめる。**
+    """
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = {"thumbnail"}
+
+    結果 = QualityGateWorker()._thumbnail_physical_check(ctx)
+
+    assert 結果["failures"] == [], 結果
+    assert any("サムネイル" in s for s in ctx.skipped_features), ctx.skipped_features
+
+
+def test_台帳に無ければ従来どおり減点する(tmp_path):
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = set()
+
+    assert QualityGateWorker()._thumbnail_physical_check(ctx)["failures"]
+
+
+def test_宣言した能力のプラグインは回さない(tmp_path):
+    from quality_gate_plugins import run_all_plugins
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = {"thumbnail"}
+
+    結果 = run_all_plugins(ctx, None)
+
+    assert "thumbnail_quality_check" not in 結果["plugin_results"], 結果["plugin_results"].keys()
+    assert not any("サムネイル" in f for f in 結果["feedback"]), 結果["feedback"]

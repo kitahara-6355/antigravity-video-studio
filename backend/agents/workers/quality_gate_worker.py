@@ -46,6 +46,16 @@ class QualityGateWorker(PipelineStageWorker):
         score = 100  # 満点から減点方式
         feedback = []
 
+        # **台帳に載っている「まだ無い機能」を先に知る**（R1.5・2026-08-27）。
+        # 既に入っていれば尊重する（テストが差し替えられるように）。
+        if not hasattr(ctx, "declared_gaps"):
+            try:
+                from feature_gaps import declared_capabilities
+                ctx.declared_gaps = declared_capabilities()
+            except Exception as e:  # noqa: BLE001 — 台帳が読めなくても実行は止めない
+                logger.warning(f"⚠️ 実装不足項目の台帳を読めませんでした: {e}")
+                ctx.declared_gaps = set()
+
         # ━━━ META-01修正: FFprobe実測チェック (QualityGate v2) ━━━
         # プラグインチェックの前に、出力動画の物理的整合性を検証
         ffprobe_passed = True
@@ -323,6 +333,17 @@ class QualityGateWorker(PipelineStageWorker):
         Returns:
             {"failures": [{"message": str, "deduction": int}], "warnings": [str]}
         """
+        # **本線に無い機能を減点しない**（R1.5・2026-08-27 ユーザー決定）。
+        # 本線にサムネイル工程は無いので、減点し続けると品質ゲートは
+        # **原理的に閾値へ到達できない**。台帳に載っている間は「やっていない」
+        # として `skipped_features` に出す。実装したら台帳から消え、
+        # **その瞬間からゲートが本気で見はじめる。**
+        if "thumbnail" in getattr(ctx, "declared_gaps", set()):
+            未実装 = "サムネイル（未実装）"
+            if 未実装 not in ctx.skipped_features:
+                ctx.skipped_features.append(未実装)
+            return {"failures": [], "warnings": [f"⬜ {未実装}。台帳に載っています"]}
+
         try:
             from PIL import Image, UnidentifiedImageError
         except ImportError as ie:

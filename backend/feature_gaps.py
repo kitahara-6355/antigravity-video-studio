@@ -231,3 +231,16 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
+
+
+def declared_capabilities(path: Path | None = None) -> set[str]:
+    """**まだ無い機能の能力名。** 品質ゲートがこれを見て減点をやめる。
+
+    台帳が読めないときは空集合を返す（実行は止めない）。**空にしても
+    従来どおり減点されるだけ**で、緩む方向には倒れない。
+    """
+    try:
+        return {g["capability"] for g in load_gaps(path)
+                if g.get("kind") == "gap" and g.get("capability")}
+    except Exception:  # noqa: BLE001
+        return set()

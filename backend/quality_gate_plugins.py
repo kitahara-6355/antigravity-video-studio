@@ -899,6 +899,7 @@ class ThumbnailQualityCheck(QualityCheckPlugin):
     """サムネイル品質チェック (解像度, アスペクト比, ファイルサイズ, 破損確認)"""
     name = "thumbnail_quality_check"
     category = "youtube"
+    capability = "thumbnail"
 
     def analyze(self, ctx, template_config=None):
         deductions = 0
@@ -979,14 +980,18 @@ class PipelineCompletionCheck(QualityCheckPlugin):
 
         # 必須成果物の存在チェック（品質ゲートはプレビュー生成前に実行される）
         has_thumb_path = bool(getattr(ctx, 'thumbnail_path', None) or (hasattr(ctx, 'metadata') and isinstance(ctx.metadata, dict) and ctx.metadata.get('thumbnail_path')))
+        declared = set(getattr(ctx, "declared_gaps", set()) or set())
         checks = [
-            (bool(ctx.segments and len(ctx.segments) > 0), "セグメント（文字起こし）", 15),
-            (bool(getattr(ctx, 'selected_segments', None)), "SmartCut結果", 5),
-            (bool(ctx.metadata), "メタデータ", 5),
-            (has_thumb_path, "サムネイル設定", 5),
+            (bool(ctx.segments and len(ctx.segments) > 0), "セグメント（文字起こし）", 15, None),
+            (bool(getattr(ctx, 'selected_segments', None)), "SmartCut結果", 5, None),
+            (bool(ctx.metadata), "メタデータ", 5, None),
+            # **台帳に載っている能力はここでも数えない**（R1.5・2026-08-27）
+            (has_thumb_path, "サムネイル設定", 5, "thumbnail"),
         ]
 
-        for ok, label, pts in checks:
+        for ok, label, pts, capability in checks:
+            if capability and capability in declared:
+                continue
             if not ok:
                 deductions += pts
                 feedback.append(f"🔴 {label}が未生成 — パイプライン中断の可能性")
@@ -1089,8 +1094,15 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
     category_deductions = {}
     category_max = {}
 
+    # **台帳に載っている「まだ無い機能」のプラグインは回さない**
+    # （R1.5・2026-08-27 ユーザー決定）。本線に無い工程を減点し続けると、
+    # 品質ゲートは原理的に閾値へ到達できない。
+    declared = set(getattr(ctx, "declared_gaps", set()) or set())
+
     for plugin in PLUGIN_REGISTRY:
         if categories and plugin.category not in categories:
+            continue
+        if getattr(plugin, "capability", None) in declared:
             continue
 
         try:
