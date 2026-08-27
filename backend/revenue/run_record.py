@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import hashlib
 import json
 import logging
 import os
@@ -54,6 +55,21 @@ LOCAL_PREFIX = "local:"
 
 # JSON にできなかった値に付ける印。**再開の可否をここで判定する。**
 UNSERIALIZABLE_MARK = "<記録できない値:"
+
+
+def _sha256(path: str | Path) -> str | None:
+    """成果物の指紋。**読めなければ `None`。**
+
+    「確かめられなかった」を「一致した」にしない。
+    """
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
 
 
 def _now() -> str:
@@ -130,6 +146,7 @@ class RunRecorder:
             "stages": [],
             "models_used": [],
             "artifacts": [],
+            "artifact_digests": {},
             "duration_sec": 0.0,
             "cost_jpy": 0.0,
             "calls": 0,
@@ -269,6 +286,12 @@ class RunRecorder:
         value = str(path)
         if value not in self._record["artifacts"]:
             self._record["artifacts"].append(value)
+        # **成果物の指紋を残す**（R1.5-C3）。AI を効かせた場合と効かせない場合で
+        # 成果物が違うことを、あとから機械で確かめられるようにする。
+        # 実測（2026-08-27）: AI なしで2回走らせると最終 mp4 の SHA256 は
+        # 完全一致した（エンコーダは決定的）。だから AI ありとの差は
+        # **AI に起因すると言い切れる。**
+        self._record.setdefault("artifact_digests", {})[value] = _sha256(value)
         self._write()
 
     # --- 締め ---------------------------------------------------------------

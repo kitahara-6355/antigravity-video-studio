@@ -670,3 +670,51 @@ def test_床打ちした素点が見える(tmp_path):
     assert ctx.quality_score >= 0
     assert "素点" in r.detail, r.detail
     assert (ctx.quality_gate_report or {}).get("raw_score") is not None
+
+
+# --- AI が成果物に届いているか（R1.5-C3・2026-08-27）--------------------------
+#
+# **実測で確かめた前提**: AI なしで2回走らせると最終 mp4 の SHA256 は完全一致した
+# （`58b2511a…` / 2,988,566 bytes ×2）。**エンコーダは決定的**なので、AI ありとの
+# 差（`6b3d4495…` / 2,986,662 bytes）は AI に起因すると言い切れる。
+
+
+def _ai_run(rid: str, *, calls: int, digest: str) -> dict:
+    return {"run_id": rid, "status": "degraded", "calls": calls,
+            "artifacts": [f"/out/{rid}/final.mp4"],
+            "artifact_digests": {f"/out/{rid}/final.mp4": digest}}
+
+
+def test_AIありとなしで成果物が違えば通る():
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    assert check_ai_effect([_ai_run("a", calls=0, digest="x"),
+                            _ai_run("b", calls=2, digest="y")]) == []
+
+
+def test_AIを効かせても成果物が同じなら落ちる():
+    """**AI が動いていても、出力が成果物に届いていなければ意味がない。**"""
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    出た = check_ai_effect([_ai_run("a", calls=0, digest="same"),
+                            _ai_run("b", calls=2, digest="same")])
+
+    assert "ai_not_reaching_artifact" in _kinds(出た), 出た
+
+
+def test_片方しか無ければ確かめていないと言う():
+    """**「確かめられなかった」を「問題なし」にしない。**"""
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    出た = check_ai_effect([_ai_run("b", calls=2, digest="y")])
+
+    assert "ai_effect_unverified" in _kinds(出た), 出た
+
+
+def test_指紋が読めなければ確かめていないと言う():
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    出た = check_ai_effect([_ai_run("a", calls=0, digest=None),
+                            _ai_run("b", calls=2, digest="y")])
+
+    assert "ai_effect_unverified" in _kinds(出た), 出た
