@@ -92,18 +92,6 @@
       }
     },
     {
-      "id": "shorts_candidates",
-      "title": "Shorts 候補の抽出",
-      "kind": "gap",
-      "why": "実走で `Shorts候補ゼロ: ハイライトワードが未検出` が出る。**Shorts は登録者を集める側の主軸**（長尺4,000時間 / Shorts 1,000万回）なので、候補が出ないと収益化の片翼が動かない",
-      "handled_in": "将来",
-      "surfaces_as": "Shorts候補",
-      "done_when": {
-        "kind": "run_record_clean"
-      },
-      "capability": "shorts"
-    },
-    {
       "id": "dream_learning",
       "title": "学習の副作用（意図して止めている）",
       "kind": "intentional",
