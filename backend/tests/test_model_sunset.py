@@ -251,10 +251,12 @@ def test_2_5系の参照を本番と到達不能に分ける():
 
     分類 = classify_sunset_references()
 
-    assert set(分類) == {"production_code", "production_doc", "unreachable"}
+    assert set(分類) == {"production_code", "production_config",
+                        "production_doc", "unreachable"}
     # 分類の合計が走査の合計と一致すること（**取りこぼしを作らない**）
-    from backend.model_policy import scan_sunset_references
-    合計 = sum(scan_sunset_references().values())
+    from backend.model_policy import scan_config_model_ids, scan_sunset_references
+    合計 = (sum(scan_sunset_references().values())
+            + sum(scan_config_model_ids().values()))
     分類合計 = sum(sum(v.values()) for v in 分類.values())
     assert 分類合計 == 合計, (分類合計, 合計)
 
@@ -284,10 +286,133 @@ def test_本番にコード上の2_5系が残っていたらFAILする():
     from backend.model_policy import sunset_gate
 
     残っている = sunset_gate({"production_code": {"backend/x.py": 1},
+                              "production_config": {},
                               "production_doc": {}, "unreachable": {}})
-    消えた = sunset_gate({"production_code": {},
+    設定に残っている = sunset_gate({"production_code": {},
+                                    "production_config": {"backend/c.json": 2},
+                                    "production_doc": {}, "unreachable": {}})
+    消えた = sunset_gate({"production_code": {}, "production_config": {},
                           "production_doc": {"backend/y.py": 3},
                           "unreachable": {"scratch/z.py": 9}})
 
     assert 残っている, "本番にコード参照が残っていたら違反を出すこと"
+    assert 設定に残っている, "設定データに残っていたら違反を出すこと"
     assert 消えた == [], 消えた
+
+
+# --- 走査器の穴（gate-verifier 1周目の指摘・2026-08-28）--------------------
+#
+# 「本番 0 箇所」は**嘘だった**。到達可能性の判定に3つ穴があり、
+# `backend/routers/**` が丸ごと「到達不能」に落ちていた。
+
+
+def test_相対importを辿る(tmp_path):
+    """**`node.level == 0` で切っていたので相対 import を1つも辿れなかった。**
+
+    `backend/routers/__init__.py` は全行が相対 import で、
+    `backend/main.py` が `from routers import (...)` で実行する。
+    結果 `routers/**` 全体が「到達不能」に落ち、本番の 2.5 参照が隠れていた。
+    """
+    from backend.model_policy import reachable_modules
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "main.py").write_text(
+        "from pkg import router\n", encoding="utf-8")
+    pkg = tmp_path / "backend" / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text(
+        "from .leaf import router\n", encoding="utf-8")
+    (pkg / "leaf.py").write_text("router = 1\n", encoding="utf-8")
+
+    到達 = reachable_modules(tmp_path)
+
+    assert "backend/pkg/__init__.py" in 到達, sorted(到達)
+    assert "backend/pkg/leaf.py" in 到達, sorted(到達)
+
+
+def test_相対importの親参照を辿る(tmp_path):
+    """`from ..sibling import x`（level=2）も辿る。"""
+    from backend.model_policy import reachable_modules
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "main.py").write_text(
+        "import pkg.sub.deep\n", encoding="utf-8")
+    sub = tmp_path / "backend" / "pkg" / "sub"
+    sub.mkdir(parents=True)
+    (tmp_path / "backend" / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "backend" / "pkg" / "sibling.py").write_text("y = 1\n", encoding="utf-8")
+    (sub / "__init__.py").write_text("", encoding="utf-8")
+    (sub / "deep.py").write_text("from ..sibling import y\n", encoding="utf-8")
+
+    到達 = reachable_modules(tmp_path)
+
+    assert "backend/pkg/sibling.py" in 到達, sorted(到達)
+
+
+def test_from_pkg_import_sub_でサブモジュールを積む(tmp_path):
+    """**`from pkg import sub` で `pkg` しか積んでいなかった。**
+
+    `f"{module}.{name}"` も積まないと、`pkg/__init__.py` が
+    `sub` を再輸出していない場合にサブモジュールを取り落とす。
+    """
+    from backend.model_policy import reachable_modules
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "main.py").write_text(
+        "from pkg import sub\n", encoding="utf-8")
+    pkg = tmp_path / "backend" / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "sub.py").write_text("z = 1\n", encoding="utf-8")
+
+    到達 = reachable_modules(tmp_path)
+
+    assert "backend/pkg/sub.py" in 到達, sorted(到達)
+
+
+def test_本線からroutersに到達する():
+    """このリポジトリの実物で確かめる。**`main.py:167` が実行する経路。**"""
+    from backend.model_policy import reachable_modules
+
+    到達 = reachable_modules()
+
+    assert "backend/routers/__init__.py" in 到達
+    assert "backend/routers/websocket.py" in 到達
+    assert "backend/routers/admin_setup_router.py" in 到達
+
+
+def test_設定データの中のモデルIDも走査する(tmp_path):
+    """**`rglob("*.py")` だけでは設定データを見ていなかった。**
+
+    `model_config.json` の `deprecated[*].replacement` は
+    実行時に `validate_and_correct()` がそのまま返す値で、
+    2.5 系ならそれが API に渡る。
+    """
+    from backend.model_policy import scan_config_model_ids
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "conf.json").write_text(
+        '{"deprecated": {"gemini-2.5-pro": {"replacement": "gemini-2.5-flash",'
+        ' "reason": "gemini-2.5-flash を使う"}},'
+        ' "aliases": {"gemini-2.5-flash": "gemini-3.6-flash"}}',
+        encoding="utf-8")
+
+    hits = scan_config_model_ids(tmp_path)
+
+    # 値がまるごとモデル ID のものだけを数える。
+    # **キーは「訂正される入力」なので依存ではない**（aliases / deprecated のキー）。
+    # 散文の中の言及も依存ではない（reason）。
+    assert hits == {"backend/conf.json": 1}, hits
+
+
+def test_設定データの2_5系も本番として落とす():
+    """**設定データも分類に載る**（載らなければ数が合わない）。"""
+    from backend.model_policy import classify_sunset_references
+
+    分類 = classify_sunset_references()
+
+    合計 = sum(sum(v.values()) for v in 分類.values())
+    assert 合計 > 0
+    # 設定データの分だけを取り出しても、キーの重複が無いこと
+    全部 = [k for v in 分類.values() for k in v]
+    assert len(全部) == len(set(全部)), "同じファイルが2つの分類に入っている"

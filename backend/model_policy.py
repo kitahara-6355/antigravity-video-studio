@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import threading
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
@@ -546,11 +547,47 @@ def _module_path(name: str, root: Path) -> Path | None:
     return None
 
 
+def _package_of(name: str, path: Path) -> str:
+    """相対 import の基準になるパッケージ名。
+
+    `__init__.py` なら自分自身がパッケージ、そうでなければ親。
+    """
+    if path.name == "__init__.py":
+        return name
+    return name.rpartition(".")[0]
+
+
+def _resolve_relative(package: str, module: str | None, level: int) -> str | None:
+    """`from ..x import y` の `..x` を絶対のモジュール名に直す。
+
+    `level` は先頭のドットの数。1 なら同じパッケージ、2 なら親。
+    パッケージの外へ出る指定は解決できないので None を返す。
+    """
+    parts = [p for p in package.split(".") if p]
+    if level - 1 > len(parts):
+        return None
+    base = parts[:len(parts) - (level - 1)] if level > 1 else parts
+    if module:
+        base = base + module.split(".")
+    return ".".join(base) or None
+
+
+def _prefixes(name: str) -> list[str]:
+    """`a.b.c` を import すると `a` と `a.b` の `__init__.py` も実行される。"""
+    parts = name.split(".")
+    return [".".join(parts[:i]) for i in range(1, len(parts) + 1)]
+
+
 def reachable_modules(root: Path | None = None) -> set[str]:
     """**本線の入口から静的に辿れるモジュール**（R1.5-C6）。
 
     実行記録では「その日通らなかった経路」が見えない。import を辿れば
     通りうる経路が分かる。**辿れないものは本番ではない**と言い切れる。
+
+    **相対 import を辿らなかったせいで `routers/**` を丸ごと取り落としていた**
+    （gate-verifier 1周目の指摘・2026-08-28）。`backend/routers/__init__.py` は
+    全行が相対 import で、`backend/main.py` が `from routers import (...)` で
+    実行する。`from pkg import sub` で `pkg` しか積まないのも同じ取りこぼしを生む。
     """
     import ast
 
@@ -569,11 +606,23 @@ def reachable_modules(root: Path | None = None) -> set[str]:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (OSError, SyntaxError, UnicodeDecodeError):
             continue
+        package = _package_of(name, path)
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                stack.extend(a.name for a in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-                stack.append(node.module)
+                for a in node.names:
+                    stack.extend(_prefixes(a.name))
+            elif isinstance(node, ast.ImportFrom):
+                if node.level:
+                    target = _resolve_relative(package, node.module, node.level)
+                else:
+                    target = node.module
+                if not target:
+                    continue
+                stack.extend(_prefixes(target))
+                # `from pkg import sub` の `sub` はモジュールかもしれない。
+                # モジュールでなければ `_module_path` が None を返すだけ。
+                stack.extend(f"{target}.{a.name}" for a in node.names
+                             if a.name != "*")
 
     out: set[str] = set()
     for name in seen:
@@ -585,6 +634,72 @@ def reachable_modules(root: Path | None = None) -> set[str]:
         except ValueError:
             continue
     return out
+
+
+# 設定データの中で「まるごとモデル ID」の値を見つける。
+# **散文の中の言及は依存ではない**（`reason` や `note` に 2.5 と書いてあっても、
+# それが API に渡るわけではない）。**キーも依存ではない** — `deprecated` や
+# `fallback_chain` のキーは「訂正される入力」であって、使うモデルではない。
+_CONFIG_SUFFIXES = (".json", ".yaml", ".yml")
+_MODEL_ID_RE = re.compile(
+    r"^(?:models/)?" + re.escape(SUNSET_PREFIX) + r"[A-Za-z0-9._-]*$")
+_YAML_VALUE_RE = re.compile(
+    r"""^\s*(?:-\s*)?(?:[\w.\-]+\s*:\s*)?['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$""")
+
+
+def _count_json_model_ids(node: object) -> int:
+    """JSON の**値**のうち、まるごと 2.5 系のモデル ID のものを数える。"""
+    if isinstance(node, str):
+        return 1 if _MODEL_ID_RE.match(node.strip()) else 0
+    if isinstance(node, dict):
+        # キーは数えない。値だけを辿る
+        return sum(_count_json_model_ids(v) for v in node.values())
+    if isinstance(node, list):
+        return sum(_count_json_model_ids(v) for v in node)
+    return 0
+
+
+def scan_config_model_ids(root: Path | None = None) -> dict[str, int]:
+    """**設定データに埋まっている 2.5 系のモデル ID を数える**（R1.5-C6）。
+
+    `rglob("*.py")` だけでは設定データを見ていなかった
+    （gate-verifier 1周目の指摘・2026-08-28）。`model_config.json` の
+    `deprecated[*].replacement` は実行時に `validate_and_correct()` が
+    **そのまま返す値**で、2.5 系ならそれが API に渡る。
+
+    設定データは import を辿れないので**到達可能性を静的に判定できない。
+    よって全部を本番として扱う**（fail-closed）。数えるのは値だけで、
+    キーと散文は数えない。
+    """
+    root = Path(root if root is not None else Path(__file__).resolve().parents[1])
+    hits: dict[str, int] = {}
+    for path in sorted(root.rglob("*")):
+        if path.suffix.lower() not in _CONFIG_SUFFIXES or not path.is_file():
+            continue
+        if set(path.parts) & _SCAN_SKIP_DIRS:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if SUNSET_PREFIX not in text:
+            continue
+        if path.suffix.lower() == ".json":
+            try:
+                count = _count_json_model_ids(json.loads(text))
+            except json.JSONDecodeError:
+                # **読めないものは安全側に倒す**（fail-closed）。
+                # 素通しすると「見ていない」ことが緑に化ける
+                count = text.count(SUNSET_PREFIX)
+        else:
+            count = 0
+            for line in text.splitlines():
+                m = _YAML_VALUE_RE.match(line)
+                if m and _MODEL_ID_RE.match(m.group(1)):
+                    count += 1
+        if count:
+            hits[path.relative_to(root).as_posix()] = count
+    return hits
 
 
 def split_code_and_doc(path: Path) -> tuple[int, int]:
@@ -643,7 +758,8 @@ def classify_sunset_references(root: Path | None = None) -> dict[str, dict[str, 
     root = Path(root if root is not None else Path(__file__).resolve().parents[1])
     到達 = reachable_modules(root)
     out: dict[str, dict[str, int]] = {
-        "production_code": {}, "production_doc": {}, "unreachable": {}}
+        "production_code": {}, "production_config": {},
+        "production_doc": {}, "unreachable": {}}
     for rel, count in scan_sunset_references(root).items():
         if rel not in 到達:
             out["unreachable"][rel] = count
@@ -653,6 +769,8 @@ def classify_sunset_references(root: Path | None = None) -> dict[str, dict[str, 
             out["production_code"][rel] = コード
         if 文書:
             out["production_doc"][rel] = 文書
+    # **設定データは import を辿れないので全部を本番として扱う**（fail-closed）
+    out["production_config"] = scan_config_model_ids(root)
     return out
 
 
@@ -662,11 +780,14 @@ def sunset_gate(分類: dict[str, dict[str, int]]) -> list[str]:
     文書と到達不能は数えるだけで落とさない。**区別できているからこそ
     落とさずに済む** — 区別できないうちは全部が疑わしいので落とす。
     """
-    残り = 分類.get("production_code") or {}
+    残り = [(p, c, "本番の実行経路から辿れます")
+            for p, c in (分類.get("production_code") or {}).items()]
+    残り += [(p, c, "設定データの値がそのまま API に渡ります")
+             for p, c in (分類.get("production_config") or {}).items()]
     if not 残り:
         return []
-    return [f"{path}: {count} 箇所（本番の実行経路から辿れます）"
-            for path, count in sorted(残り.items(), key=lambda x: -x[1])]
+    return [f"{path}: {count} 箇所（{なぜ}）"
+            for path, count, なぜ in sorted(残り, key=lambda x: (-x[1], x[0]))]
 
 
 def sunset_report(tier_models: dict[str, str] | None = None,
@@ -867,6 +988,8 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print(f"  本番の実行経路（本線と API から辿れる）: "
               f"**{sum(分類['production_code'].values())} 箇所**")
+        print(f"  同・設定データの値（import を辿れないので本番として扱う）: "
+              f"**{sum(分類['production_config'].values())} 箇所**")
         print(f"  同・文書（docstring / コメント / __main__ の自己テスト）: "
               f"{sum(分類['production_doc'].values())} 箇所")
         print(f"  到達不能（補助ツール・スクラッチ・フック等）: "
