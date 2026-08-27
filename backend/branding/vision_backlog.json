@@ -437,7 +437,9 @@
       "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
       "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない",
       "**解決器の一致を保証する範囲は `model_policy` と `model_governance` の2者**（R1.5-C2 の検証で確定）。`backend/model_registry.py:99-101` の ImportError フォールバックは段の名前を生で返しうるが、到達には `backend/` が sys.path に無いことが要り、その状態では本線が import 時点で落ちる。塞がない",
-      "**突き合わせるのは宣言と deprecated 差替まで**（R1.5-C2 の検証で確定）。枠枯渇による降格は設計どおりの動きなので食い違いに数えない。`fallback_chain` の値はすべて実モデル ID で、段の名前は入っていない"
+      "**突き合わせるのは宣言と deprecated 差替まで**（R1.5-C2 の検証で確定）。枠枯渇による降格は設計どおりの動きなので食い違いに数えない。`fallback_chain` の値はすべて実モデル ID で、段の名前は入っていない",
+      "**記録を閉じる経路の外側は保証しない**（R1.5-C1b の検証で確定）。`_notify` / `_ws_broadcast` / `verify` / `_fire_post_hook` に例外を上げるコールバックを**外から差した**場合、`execute()` ごと抜けて記録が `running` のまま残る。本番の注入元（`pipeline_router` / `PipelineWSManager` / `hook_system`）はいずれも例外を握るので到達しない。塞がない",
+      "**記録そのものが書けない場合は保証の外**（R1.5-C1b の検証で確定）。`_record_dead_stage` の書き出しが失敗すると `stages` の行は欠ける（`health.failed_stages` には残る）。記録は実行を止めない側に倒してあるので、これは設計どおり"
     ],
     "user_tasks": [
       "**実運用に近い尺（10分前後）の実写素材を1本置く**（C5 の測定用）。置き場は `output/testclips/`、mp4・音声トラックつき。**顔が映っていて構わない**（このリポジトリは公開だが `output/` は gitignore なので履歴には入らない）。用意できたらファイル名を教えてください"
@@ -455,7 +457,7 @@
         "id": "R1.5-C1b",
         "condition": "**動かなかった工程を成功に数えない。** 例外・Hook 拒否・記録の書き出し失敗・リトライ全滅のいずれで工程が結果を返さなくても `completed` にならず、落ちた工程が実行記録に残る。判定は**最後の試行**で行う（リトライで通ったものは失敗に数えない）",
         "verify": "pytest backend/tests/test_pipeline_stage_failures.py backend/tests/test_agents_run_record.py",
-        "met": false
+        "met": true
       },
       {
         "id": "R1.5-C1c",
@@ -1067,7 +1069,7 @@
             "id": "R1.5-C1b",
             "condition": "**動かなかった工程を成功に数えない。** 例外・Hook 拒否・記録の書き出し失敗・リトライ全滅のいずれで工程が結果を返さなくても `completed` にならず、落ちた工程が実行記録に残る。判定は**最後の試行**で行う（リトライで通ったものは失敗に数えない）",
             "verify": "pytest backend/tests/test_pipeline_stage_failures.py backend/tests/test_agents_run_record.py",
-            "met": false
+            "met": true
           },
           {
             "id": "R1.5-C1c",
@@ -1120,7 +1122,9 @@
           "**投稿の自動化は対象外**（R5）。ここでやるのは偽の success を止めることだけ",
           "**video_pipeline は凍結する。** 検証用の基準実装として残すが、機能追加はしない",
           "**解決器の一致を保証する範囲は `model_policy` と `model_governance` の2者**（R1.5-C2 の検証で確定）。`backend/model_registry.py:99-101` の ImportError フォールバックは段の名前を生で返しうるが、到達には `backend/` が sys.path に無いことが要り、その状態では本線が import 時点で落ちる。塞がない",
-          "**突き合わせるのは宣言と deprecated 差替まで**（R1.5-C2 の検証で確定）。枠枯渇による降格は設計どおりの動きなので食い違いに数えない。`fallback_chain` の値はすべて実モデル ID で、段の名前は入っていない"
+          "**突き合わせるのは宣言と deprecated 差替まで**（R1.5-C2 の検証で確定）。枠枯渇による降格は設計どおりの動きなので食い違いに数えない。`fallback_chain` の値はすべて実モデル ID で、段の名前は入っていない",
+          "**記録を閉じる経路の外側は保証しない**（R1.5-C1b の検証で確定）。`_notify` / `_ws_broadcast` / `verify` / `_fire_post_hook` に例外を上げるコールバックを**外から差した**場合、`execute()` ごと抜けて記録が `running` のまま残る。本番の注入元（`pipeline_router` / `PipelineWSManager` / `hook_system`）はいずれも例外を握るので到達しない。塞がない",
+          "**記録そのものが書けない場合は保証の外**（R1.5-C1b の検証で確定）。`_record_dead_stage` の書き出しが失敗すると `stages` の行は欠ける（`health.failed_stages` には残る）。記録は実行を止めない側に倒してあるので、これは設計どおり"
         ],
         "cost_note": "**呼び出し数が増える。** R1 は1本あたり Gemini 1回だったが、提案の反映・テロップ配置・校正が入ると工程ごとに呼ぶことになる。無料枠の RPD を食い切らないかを実測で見る",
         "gates": [
