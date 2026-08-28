@@ -1410,6 +1410,44 @@ async def generate_retention_map(req: RetentionMapRequest) -> Dict[str, Any]:
 
 
 
+        # **未実装のものを「分析した」と言わない**（R1.5-C4）。
+
+        # 中身は `random.random()` で組み立てたモックで、同じリクエストでも
+
+        # 毎回違う値が返る。ここは `IMPLEMENTED` を見ずに直接呼んでおり、
+
+        # `success: True` を返したうえ HTML レポートまで書き出していた。
+
+        # 本線（`pipeline_coordinator._run_retention_analysis`）は同じ印を
+
+        # 見て飛ばしているのに、API 経路だけ素通しだった。
+
+        # 台帳: backend/config/feature_gaps.json の `retention_analysis`
+
+        if not getattr(retention_map_plugin, "IMPLEMENTED", True):
+
+            raise HTTPException(
+
+                status_code=501,
+
+                detail={
+
+                    "implemented": False,
+
+                    "feature": "retention_analysis",
+
+                    "reason": "映像・音声の解析が未実装です（現在の中身はモック）。"
+
+                              "結果を成果物や記録に混ぜないため、分析を行いません",
+
+                    "ledger": "backend/config/feature_gaps.json",
+
+                },
+
+            )
+
+
+
         report = retention_map_plugin.analyze_retention_risks(
 
             video_id=req.video_id,

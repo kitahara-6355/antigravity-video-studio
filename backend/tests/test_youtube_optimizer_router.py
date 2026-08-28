@@ -203,7 +203,11 @@ def test_feedback_loop_distillation_exception():
 # ===========================================================================
 
 def test_retention_map_exception():
-    with patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", side_effect=Exception("Retention error")):
+    # 501 の門（R1.5-C4）より先には進めないので、例外処理を試すときは
+    # IMPLEMENTED を立ててから通す。門そのものは
+    # test_retention_map_未実装なら501で止まる が押さえている
+    with patch("plugins.retention_map_plugin.retention_map_plugin.IMPLEMENTED", True), \
+         patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", side_effect=Exception("Retention error")):
         response = client.post("/api/youtube/retention-map", json={
             "video_id": "vid_123",
             "duration_sec": 300,
@@ -642,13 +646,47 @@ def test_feedback_loop_success_with_deviation():
         assert response.json()["evolution_log_updated"] is True
 
 
-def test_retention_map_success():
+def test_retention_map_未実装なら501で止まる():
+    """**未実装のものを「分析した」と言わない**（R1.5-C4）。
+
+    2026-08-28 まで、この経路は `IMPLEMENTED` を見ずに
+    `analyze_retention_risks()` を直接呼び、`success: True` を返したうえ
+    HTML レポートまで書き出していた。中身は `random.random()` の
+    モックなので、**同じリクエストで毎回違う値が API 応答と成果物に載る**。
+    本線（`pipeline_coordinator._run_retention_analysis`）は同じ印を見て
+    飛ばしているのに、API 経路だけ素通しだった。
+    """
+    from plugins.retention_map_plugin import retention_map_plugin
+
+    assert retention_map_plugin.IMPLEMENTED is False, \
+        "実装したら feature_gaps.json から retention_analysis を消し、このテストを直すこと"
+
+    with patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks") as 分析, \
+         patch("services.preview_report_generator.preview_report_generator.generate_html_report") as 書き出し:
+        response = client.post("/api/youtube/retention-map", json={
+            "video_id": "vid_123",
+            "duration_sec": 300,
+            "video_path": "dummy.mp4"
+        })
+
+    assert response.status_code == 501, response.text
+    detail = response.json()["detail"]
+    assert detail["implemented"] is False
+    assert detail["feature"] == "retention_analysis"
+    # **分析も成果物の書き出しも起きないこと**（モックの値が外に出ない）
+    分析.assert_not_called()
+    書き出し.assert_not_called()
+
+
+def test_retention_map_実装したら通る():
+    """`IMPLEMENTED` を立てれば従来どおり動く（門が恒真でないことの確認）。"""
     mock_report = MagicMock()
     mock_report.overall_risk_assessment = "Low"
     mock_report.suggestions = ["suggestion1"]
     mock_report.model_dump.return_value = {"dummy": "data"}
 
-    with patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", return_value=mock_report), \
+    with patch("plugins.retention_map_plugin.retention_map_plugin.IMPLEMENTED", True), \
+         patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", return_value=mock_report), \
          patch("services.preview_report_generator.preview_report_generator.generate_html_report", return_value="C:/path/report.html"):
         response = client.post("/api/youtube/retention-map", json={
             "video_id": "vid_123",
@@ -1027,7 +1065,11 @@ def test_record_post_publish_feedback_http_exception():
 
 
 def test_retention_map_http_exception():
-    with patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", side_effect=HTTPException(status_code=400, detail="Retention HTTP error")):
+    # 501 の門（R1.5-C4）より先には進めないので、例外処理を試すときは
+    # IMPLEMENTED を立ててから通す。門そのものは
+    # test_retention_map_未実装なら501で止まる が押さえている
+    with patch("plugins.retention_map_plugin.retention_map_plugin.IMPLEMENTED", True), \
+         patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", side_effect=HTTPException(status_code=400, detail="Retention HTTP error")):
         response = client.post("/api/youtube/retention-map", json={
             "video_id": "vid_123",
             "duration_sec": 300,
@@ -1411,7 +1453,11 @@ def test_hook_history_value_error():
 
 
 def test_retention_map_value_error():
-    with patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", side_effect=ValueError("Retention value error")):
+    # 501 の門（R1.5-C4）より先には進めないので、例外処理を試すときは
+    # IMPLEMENTED を立ててから通す。門そのものは
+    # test_retention_map_未実装なら501で止まる が押さえている
+    with patch("plugins.retention_map_plugin.retention_map_plugin.IMPLEMENTED", True), \
+         patch("plugins.retention_map_plugin.retention_map_plugin.analyze_retention_risks", side_effect=ValueError("Retention value error")):
         response = client.post("/api/youtube/retention-map", json={
             "video_id": "vid_123",
             "duration_sec": 300,

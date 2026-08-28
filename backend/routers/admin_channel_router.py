@@ -169,6 +169,7 @@ async def get_channel_detail(channel_id: str):
 async def get_effect_summary():
     """A-7 S4: Antigravity導入前後の効果比較"""
     return {
+        **DATA_SOURCE,
         "before": {"production_time_hours": 8.0, "quality_score": 72, "ctr_pct": 4.2, "retention_pct": 35},
         "after": {"production_time_hours": 2.5, "quality_score": 92, "ctr_pct": 6.8, "retention_pct": 52},
         "improvement_pct": {
@@ -186,6 +187,7 @@ async def get_effect_summary():
 async def get_production_efficiency():
     """A-7 S5: 制作時間の短縮率"""
     return {
+        **DATA_SOURCE,
         "reduction_pct": 68.75,
         "before_hours": 8.0,
         "after_hours": 2.5,
@@ -204,6 +206,7 @@ async def get_production_efficiency():
 async def get_quality_improvement():
     """A-7 S6: 品質スコアの平均向上率"""
     return {
+        **DATA_SOURCE,
         "average_improvement": 27.78,
         "trend": [
             {"month": "2026-02", "score": 72},
@@ -225,6 +228,7 @@ async def get_quality_improvement():
 async def get_ctr_improvement():
     """A-7 S7: AI最適化によるCTR改善率"""
     return {
+        **DATA_SOURCE,
         "improvement_pct": 61.90,
         "before": 4.2,
         "after": 6.8,
@@ -242,6 +246,7 @@ async def get_ctr_improvement():
 async def get_retention_improvement():
     """A-7 S8: SmartCut/品質ゲートによる維持率改善"""
     return {
+        **DATA_SOURCE,
         "improvement_pct": 48.57,
         "before": 35,
         "after": 52,
@@ -257,6 +262,7 @@ async def get_retention_improvement():
 async def get_roi():
     """A-7 S9: API費用 vs 効果のROI計算"""
     return {
+        **DATA_SOURCE,
         "roi_ratio": 5.2,
         "cost": {"api_monthly_usd": 45, "compute_monthly_usd": 30, "total_monthly_usd": 75},
         "benefit": {"time_saved_hours": 22, "time_value_usd": 330, "additional_revenue_usd": 60},
@@ -270,6 +276,7 @@ async def get_roi():
 async def get_channel_comparison():
     """A-7 S10: 複数チャンネル間のパフォーマンス比較"""
     return {
+        **DATA_SOURCE,
         "comparisons": [
             {"channel_id": "ch-001", "name": "Antigravity Tech", "subscribers": 12500, "ctr": 6.8, "retention": 52, "quality_score": 92},
             {"channel_id": "ch-002", "name": "AI Creative Studio", "subscribers": 8200, "ctr": 5.9, "retention": 48, "quality_score": 88},
@@ -286,6 +293,7 @@ async def get_channel_comparison():
 async def get_optimization_recommendations():
     """A-7 S11: チャンネル固有の最適化推奨"""
     return {
+        **DATA_SOURCE,
         "recommendations": [
             {"id": 1, "priority": "high", "title": "投稿頻度の増加(週2→週3)", "channel_id": "ch-002", "expected_impact": "登録者+15%"},
             {"id": 2, "priority": "medium", "title": "サムネイルA/Bテストの導入", "channel_id": "ch-001", "expected_impact": "CTR+8%"},
@@ -301,6 +309,7 @@ async def get_optimization_recommendations():
 async def get_template_recommendations():
     """A-7 S12: テンプレート推奨一覧"""
     return {
+        **DATA_SOURCE,
         "templates": [
             {"id": "tpl-001", "name": "Tech Tutorial", "genre_match": 95, "usage_count": 12},
             {"id": "tpl-002", "name": "Product Review", "genre_match": 88, "usage_count": 8},
@@ -314,6 +323,7 @@ async def get_template_recommendations():
 async def recommend_template(req: TemplateRecommendRequest):
     """A-7 S12: ジャンル別テンプレ推奨"""
     return {
+        **DATA_SOURCE,
         "status": "recommended",
         "channel_id": req.channel_id,
         "genre": req.genre,
@@ -328,6 +338,7 @@ async def recommend_template(req: TemplateRecommendRequest):
 async def get_post_schedule():
     """A-7 S13: 投稿スケジュールの一覧"""
     return {
+        **DATA_SOURCE,
         "schedule": [
             {"day": "Monday", "time": "18:00", "channel_id": "ch-001", "type": "tutorial"},
             {"day": "Thursday", "time": "18:00", "channel_id": "ch-001", "type": "review"},
@@ -341,7 +352,8 @@ async def get_post_schedule():
 @router.post("/post-schedule")
 async def update_post_schedule(req: ScheduleUpdateRequest):
     """A-7 S13: 投稿スケジュールの更新"""
-    return {"status": "updated", "channel_id": req.channel_id, "schedule": req.schedule}
+    return {**DATA_SOURCE, "status": "updated", "channel_id": req.channel_id,
+            "schedule": req.schedule}
 
 
 # ── S14: ペース分析 ──
@@ -350,6 +362,7 @@ async def update_post_schedule(req: ScheduleUpdateRequest):
 async def get_posting_pace():
     """A-7 S14: 投稿ペースの達成度"""
     return {
+        **DATA_SOURCE,
         "target": {"posts_per_week": 2},
         "actual": {"posts_per_week": 1.8, "posts_this_month": 7},
         "achievement_pct": 90.0,
@@ -363,6 +376,7 @@ async def get_posting_pace():
 async def get_comment_analysis():
     """A-7 S15: コメントのセンチメント/リクエスト分析"""
     return {
+        **DATA_SOURCE,
         "sentiment": {"positive": 72, "neutral": 20, "negative": 8},
         "requests": [
             {"topic": "チュートリアルの続編", "count": 15},
@@ -380,6 +394,7 @@ async def get_comment_analysis():
 async def get_competitor_benchmark():
     """A-7 S16: 同ジャンル競合チャンネルとのベンチマーク"""
     return {
+        **DATA_SOURCE,
         "channel_id": "ch-001",
         "genre": "tech",
         "benchmarks": [
@@ -397,6 +412,7 @@ async def get_competitor_benchmark():
 async def get_growth_prediction():
     """A-7 S17: チャンネル成長予測"""
     return {
+        **DATA_SOURCE,
         "channel_id": "ch-001",
         "predictions": {
             "subscribers_3m": 15000,
@@ -405,8 +421,11 @@ async def get_growth_prediction():
             "views_monthly_3m": 95000,
             "views_monthly_6m": 140000,
         },
-        "confidence": 0.78,
-        "model": "linear_regression_v2",
+        # **存在しない推論を自称しない**（R1.5-C4）。`linear_regression_v2`
+        # という模型はどこにも無く、上の数字は固定値
+        "confidence": None,
+        "model": None,
+        "method": "fixed_sample",
     }
 
 
@@ -416,6 +435,7 @@ async def get_growth_prediction():
 async def get_alert_settings():
     """A-7 S18: アラート閾値の一覧"""
     return {
+        **DATA_SOURCE,
         "alerts": [
             {"channel_id": "ch-001", "metric": "ctr", "threshold": 3.0, "condition": "below"},
             {"channel_id": "ch-001", "metric": "quality_score", "threshold": 80, "condition": "below"},
@@ -428,6 +448,7 @@ async def get_alert_settings():
 async def update_alert_settings(req: AlertSettingRequest):
     """A-7 S18: アラート閾値の設定"""
     return {
+        **DATA_SOURCE,
         "status": "configured",
         "channel_id": req.channel_id,
         "metric": req.metric,
@@ -442,6 +463,7 @@ async def update_alert_settings(req: AlertSettingRequest):
 async def generate_report(req: ReportGenerateRequest):
     """A-7 S19: チャンネル別月次レポートの生成"""
     return {
+        **DATA_SOURCE,
         "status": "generated",
         "channel_id": req.channel_id,
         "format": req.format,
@@ -457,6 +479,7 @@ async def generate_report(req: ReportGenerateRequest):
 async def get_owner_view():
     """A-7 S20: チャンネル主向け簡易ダッシュボード設定"""
     return {
+        **DATA_SOURCE,
         "enabled": True,
         "visible_sections": ["kpi", "posting_pace", "quality_score", "next_post"],
         "theme": "light",
@@ -469,20 +492,28 @@ async def get_owner_view():
 @router.get("/permissions")
 async def get_permissions():
     """A-7 S21: チャンネル主ごとの権限設定"""
-    return _permissions
+    return {**DATA_SOURCE, **_permissions}
 
 
 # ── S22: YouTube API連携 ──
 
 @router.get("/youtube-connection")
 async def get_youtube_connection():
-    """A-7 S22: YouTube API接続/チャンネルID連携"""
+    """A-7 S22: YouTube API接続/チャンネルID連携
+
+    **接続していないので `connected: false` を返す**（R1.5-C4）。
+    2026-08-28 まで `connected: true` と**現在時刻の `last_sync`** を
+    返していた。同じファイルの `DATA_SOURCE` が「接続していません」と
+    書いているのに、この 1 本だけ逆のことを言っていた。
+    現在時刻を返すのが特に悪く、**いま同期したように見える。**
+    """
     return {
-        "connected": True,
-        "channel_id": "UC_xxxxx1",
-        "api_key": "AIza***masked",
+        **DATA_SOURCE,
+        "connected": False,
+        "channel_id": None,
+        "api_key": None,
         "scopes": ["youtube.readonly", "youtube.upload"],
-        "last_sync": datetime.now(timezone.utc).isoformat(),
-        "quota_used_today": 450,
+        "last_sync": None,
+        "quota_used_today": 0,
         "quota_limit": 10000,
     }

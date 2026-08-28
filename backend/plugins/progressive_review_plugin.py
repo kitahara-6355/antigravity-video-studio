@@ -136,8 +136,11 @@ class ProgressiveReviewPlugin(Plugin):
             items, issues, suggestions = self._review_final(context)
         
         # スコア計算
-        passed_count = sum(1 for item in items if item.passed)
-        overall_score = (passed_count / len(items) * 100) if items else 100.0
+        # **測っていない項目は合否の分母に入れない**（R1.5-C4）。
+        # 合格に数えれば偽の success、不合格に数えれば偽の測定結果になる。
+        測った = [i for i in items if i.metadata.get("measured") is not False]
+        passed_count = sum(1 for item in 測った if item.passed)
+        overall_score = (passed_count / len(測った) * 100) if 測った else 100.0
         consistency_score = self._calculate_consistency(items, stage)
         
         return StageReview(
@@ -345,14 +348,29 @@ class ProgressiveReviewPlugin(Plugin):
                     issues.append(f"[{stage.value}] 修正が未完了です")
         
         # 品質スコア
-        quality_score = context.quality_score or 0
-        items.append(ReviewItem(
-            id="quality_score",
-            type="quality",
-            content=f"品質スコア: {quality_score:.1f}/100",
-            passed=quality_score >= 90,
-            metadata={"score": quality_score}
-        ))
+        # **未計測を「0.0点・不合格」という測定結果に見せない**（R1.5-C4）。
+        # この経路（`backend/core/context.py:67`）に品質ゲートは繋がっておらず、
+        # dataclass の既定値 0.0 がそのまま「0.0/100・不合格」として出ていた。
+        # `report_generator_plugin` で直したのと同じ経路の取りこぼし。
+        quality_score = context.quality_score
+        if not isinstance(quality_score, (int, float)) or not quality_score:
+            items.append(ReviewItem(
+                id="quality_score",
+                type="quality",
+                content="品質スコア: **未計測**（この経路に品質ゲートは繋がっていません）",
+                # **合否を主張しない。** `measured: False` の項目は
+                # 合格数の集計から外れる（`_review_stage`）
+                passed=True,
+                metadata={"score": None, "measured": False}
+            ))
+        else:
+            items.append(ReviewItem(
+                id="quality_score",
+                type="quality",
+                content=f"品質スコア: {quality_score:.1f}/100",
+                passed=quality_score >= 90,
+                metadata={"score": quality_score, "measured": True}
+            ))
         
         # BGM
         music = context.get_extension("music_layer")
@@ -430,7 +448,10 @@ class ProgressiveReviewPlugin(Plugin):
             lines.append("| ID | 内容 | 状態 | 問題 |")
             lines.append("|:---|:---|:---|:---|")
             for item in text_items[:20]:  # 最大20件
-                status = "✅" if item.passed else "⚠️"
+                if item.metadata.get("measured") is False:
+                    status = "—"      # 測っていない。合否を主張しない
+                else:
+                    status = "✅" if item.passed else "⚠️"
                 issues = ", ".join(item.issues) if item.issues else "-"
                 content = (item.content or "-")[:30]
                 lines.append(f"| {item.id} | {content} | {status} | {issues} |")

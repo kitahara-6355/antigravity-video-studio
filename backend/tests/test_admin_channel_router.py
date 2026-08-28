@@ -225,6 +225,15 @@ def test_get_growth_prediction(client):
     assert "predictions" in data
     assert data["channel_id"] == "ch-001"
 
+
+def test_growth_predictionは存在しない推論を自称しない(client):
+    """`"model": "linear_regression_v2"` という模型はどこにも無い（R1.5-C4）。"""
+    data = client.get("/api/admin/channel/growth-prediction").json()
+
+    assert data["model"] is None
+    assert data["confidence"] is None
+    assert data["method"] == "fixed_sample"
+
 # S18: Alert Settings
 def test_get_alert_settings(client):
     response = client.get("/api/admin/channel/alert-settings")
@@ -279,10 +288,19 @@ def test_get_permissions(client):
 
 # S22: YouTube Connection
 def test_get_youtube_connection(client):
+    """**接続していないので connected: false**（R1.5-C4）。
+
+    2026-08-28 まで `connected: true` と**現在時刻の `last_sync`** を
+    返しており、同じファイルの `DATA_SOURCE` が「接続していません」と
+    書いているのと逆のことを言っていた。現在時刻を返すのが特に悪く、
+    **いま同期したように見える。**
+    """
     response = client.get("/api/admin/channel/youtube-connection")
     assert response.status_code == 200
     data = response.json()
-    assert data["connected"] is True
+    assert data["connected"] is False
+    assert data["last_sync"] is None
+    assert data["channel_id"] is None
     assert "scopes" in data
 
 # Pydantic Validation tests
@@ -334,3 +352,55 @@ def test_pydantic_validation_report_generate():
     req = mod.ReportGenerateRequest(channel_id="ch-001")
     assert req.format == "pdf"
     assert req.period == "monthly"
+
+
+# ── R1.5-C4: 固定値に必ず印が付いていること ──────────────────────────────
+#
+# **1本ずつ人が選ばない。** 選んだから 20 本中 3 本しか付かなかった
+# （gate-verifier 1周目の指摘）。ここで全経路を掃く。
+
+
+def test_全エンドポイントが固定値の印を返す(client):
+    """**この router の応答は1つ残らず「実在の数字ではない」と名乗る**（R1.5-C4）。
+
+    `subscribers` も `watch_time_hours: 15200` も固定値で、YouTube
+    Analytics には一度も接続していない。収益化の到達度をこの数字で
+    判断すると嘘になる。**新しい経路を足して印を忘れたらここで落ちる。**
+    """
+    mod = get_admin_module()
+    印なし = []
+    for route in mod.router.routes:
+        for method in sorted(getattr(route, "methods", set()) - {"HEAD", "OPTIONS"}):
+            path = route.path.replace("{channel_id}", "ch-001")
+            if method == "GET":
+                resp = client.get(path)
+            else:
+                resp = client.post(path, json={
+                    "channel_id": "ch-001",
+                    "schedule": [{"day": "Monday", "time": "18:00", "type": "tutorial"}],
+                })
+            if resp.status_code != 200:
+                印なし.append((method, path, resp.status_code))
+                continue
+            body = resp.json()
+            if not isinstance(body, dict) or body.get("is_real") is not False:
+                印なし.append((method, path, str(body)[:120]))
+
+    assert not 印なし, 印なし
+
+
+def test_印は実在しないことを名乗る(client):
+    """印そのものが「実在の数字だ」と言っていないこと（恒真でない確認）。"""
+    mod = get_admin_module()
+
+    assert mod.DATA_SOURCE["is_real"] is False
+    assert mod.DATA_SOURCE["data_source"] == "sample"
+    assert "接続していません" in mod.DATA_SOURCE["note"]
+
+
+def test_チャンネル詳細の固定KPIにも印が付く(client):
+    """`watch_time_hours: 15200` は条件文が名指ししている固定値。"""
+    data = client.get("/api/admin/channel/channels/ch-001").json()
+
+    assert data["is_real"] is False
+    assert data["kpi"]["watch_time_hours"] == 15200   # 固定値のまま。**印で守る**

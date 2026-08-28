@@ -50,6 +50,12 @@ _StageFailed: quality_gate: スコア: 89点 (ランクB)
 サイドカー: score=89 / raw_score=89 / feedback 6件
 ```
 
+> **裏取り先を差し替えた**（2026-08-28）。この `run.json` は
+> `output/runs/` ごと消えている（テストの autouse フィクスチャが
+> `shutil.rmtree(Path("output"))` を実行していた。修正済み `60db9fa`）。
+> **同じ数字は `vault-outputs/final/final_20260828_012707.quality.json` に残っている**
+> — `score: 89` / `raw_score: 89` / `feedback` 6件 / `category_scores`。
+
 **本線の品質スコアは動いている**（89点／閾値90）。正典が名指ししていた
 「常に 0.0 になる quality_score」は**別経路**だった — `backend/core/context.py` を使う
 プラグイン経路で、品質ゲートが繋がっていないため dataclass の既定値 `0.0` が
@@ -83,16 +89,125 @@ metadata に retention_analysis があるか: False
 
 ## 再現
 
+**1ファイルずつ走らせる**（ファイル間に順序依存があり、まとめると別の場所で落ちる）。
+
 ```bash
 export GOOGLE_API_KEY=dummy_key_for_ci
-PYTHONPATH=./backend python -m pytest \
-  backend/tests/test_revenue_artifact_gate.py \
-  backend/tests/test_agents_run_record.py \
-  backend/tests/test_report_generator_plugin.py -q --no-cov
+PYTHONPATH=./backend python -m pytest backend/tests/test_revenue_artifact_gate.py -q --no-cov
+PYTHONPATH=./backend python -m pytest backend/tests/test_agents_run_record.py -q --no-cov
+PYTHONPATH=./backend python -m pytest backend/tests/test_report_generator_plugin.py -q --no-cov
+# 2周目で足した／直したもの
+PYTHONPATH=./backend python -m pytest backend/tests/test_youtube_optimizer_router.py -q --no-cov
+PYTHONPATH=./backend python -m pytest backend/tests/test_progressive_review_plugin.py -q --no-cov
+PYTHONPATH=./backend python -m pytest backend/tests/test_youtube_upload.py -q --no-cov
+PYTHONPATH=./backend python -m pytest tests/test_youtube_uploader_service.py -q --no-cov
+# backend/tests/test_admin_channel_router.py は単体では走らない（上の注記）。CI で見る
 ```
 
-①②④ の契約はテストで固定してある（`test_未実装の投稿は成功を返さない` /
-`test_未実装のretention分析を成果物に混ぜない` / `test_未計測の品質スコアを0点として出さない`）。
+**訂正（2026-08-28）。** ここには「①②④ の契約はテストで固定してある」と書いていたが
+**誤りだった。** 実際に固定されていたのは **①③④** で、**②を固定するテストは1件も無かった**
+（`grep -rn "is_real\|DATA_SOURCE" backend/tests/` が 0 件・gate-verifier 1周目の指摘 N-5）。
+2周目で②のテストを足した（下記）。
+
+---
+
+# 2周目 — gate-verifier の指摘4件を潰す（2026-08-28）
+
+1周目は **not_met**。「偽の success を止めたつもりが、**別経路で残っていた**」。
+
+## N-1 retention 分析の API 経路が素通しだった（決定的）
+
+`backend/routers/youtube_optimizer.py` の `/api/youtube/retention-map` は
+`IMPLEMENTED` を見ずに `analyze_retention_risks()` を直接呼び、`success: True` を
+返したうえ **HTML 成果物まで書き出していた**。中身は `random.random()` なので
+**同じリクエストで毎回違う値が API 応答と成果物に載る**。本線
+（`pipeline_coordinator._run_retention_analysis`）は同じ印を見て飛ばしているのに、
+API 経路だけ抜けていた。
+
+```
+POST /api/youtube/retention-map  → 501
+{"detail": {"implemented": false, "feature": "retention_analysis",
+            "reason": "映像・音声の解析が未実装です（現在の中身はモック）。
+                       結果を成果物や記録に混ぜないため、分析を行いません",
+            "ledger": "backend/config/feature_gaps.json"}}
+分析の呼び出し: 0 回 / HTML の書き出し: 0 回
+```
+
+**この挙動を `backend/tests/test_youtube_optimizer_router.py::test_retention_map_success` が
+`assert ...["success"] is True` で固定しており、CI で緑だった。**
+そのテストを `test_retention_map_未実装なら501で止まる` に置き換え、
+`test_retention_map_実装したら通る`（`IMPLEMENTED` を立てれば従来どおり）を足して
+**門が恒真でないこと**も押さえた。例外処理を試す既存3件は `IMPLEMENTED` を
+立ててから通すようにした。
+
+## N-2 品質スコアの「未計測 → 0.0点・不合格」がもう1経路に残っていた
+
+`backend/plugins/progressive_review_plugin.py:348-353` が
+`context.quality_score or 0` → `f"品質スコア: {quality_score:.1f}/100"` /
+`passed = quality_score >= 90`。**`report_generator_plugin` で直したのと同じ経路**
+（`backend/core/context.py:67` の既定値 0.0）の取りこぼし。
+`review_router.py:131` から公開されている。
+
+```
+content : 品質スコア: **未計測**（この経路に品質ゲートは繋がっていません）
+metadata: {'score': None, 'measured': False} / passed: True
+overall_score: 100.0        ← 未計測は合否の分母に入れない
+表      : | quality_score | 品質スコア: **未計測**… | — | - |
+```
+
+**合格に数えれば偽の success、不合格に数えれば偽の測定結果になる。**
+`measured: False` の項目は集計から外し、表の状態欄も `✅`/`⚠️` ではなく `—` にした。
+
+## N-3 チャンネル統計の印が 20 本中 3 本にしか付いていなかった
+
+1周目は `DATA_SOURCE` を**人が選んで3本にだけ**混ぜていた。残り17本は無印で
+固定値を返していた。特に `get_youtube_connection` が **`connected: true` と
+現在時刻の `last_sync`** を返しており、同じファイルの `DATA_SOURCE` が
+「接続していません」と書いているのと逆のことを言っていた
+（現在時刻を返すのが特に悪く、**いま同期したように見える**）。
+`get_growth_prediction` は `"model": "linear_regression_v2"` と**存在しない推論を
+自称**していた。
+
+**1本ずつ選ぶのをやめ、`return {` を機械的に全部拾って印を足した。**
+
+```
+経路 25 本 / 印なし 0 本
+youtube-connection: {'connected': False, 'channel_id': None, 'last_sync': None, 'is_real': False}
+growth-prediction : {'model': None, 'confidence': None, 'method': 'fixed_sample', 'is_real': False}
+```
+
+テストは `backend/tests/test_admin_channel_router.py` に3件足した
+（`test_全エンドポイントが固定値の印を返す` が**全経路を掃く**ので、
+新しい経路を足して印を忘れたら落ちる）。
+
+> このテストファイルは**単体では実行できない**（`google.genai` を MagicMock に
+> 差し替えており、他のモジュールの `from google.genai.errors import ...` が
+> 落ちる）。**変更前から 31 errors で、私の変更で増えた 4 errors は新しく足した
+> 4 件が同じ fixture で落ちているだけ。**CI はバッチで走らせるので緑になる（§6）。
+> 手元では `TestClient` を直接組んで全経路を掃き、上の結果を確認した。
+
+## N-4 testpaths の外で赤いまま残っていたテスト
+
+`tests/test_youtube_uploader_service.py:322-325` が
+`assert result.success is True` / `video_id == "placeholder_video_id"` を保持したまま
+**赤くなっていた**。`backend/tests/test_youtube_upload.py` の重複テストで、
+片方だけ直した取りこぼし。**`pytest.ini` の testpaths 外なので CI は見ていない。**
+
+```
+PYTHONPATH=./backend python -m pytest tests/test_youtube_uploader_service.py -q --no-cov
+22 passed
+```
+
+> **testpaths は触らない**（バッチの区切りが変わると既存の汚染が別の場所で発火する）。
+> 投稿の契約自体は testpaths 内の `backend/tests/test_youtube_upload.py` が
+> 固定しているので、CI の回帰防止は効いている。
+
+## N-5 この文書の記述が誤っていた
+
+「①②④ の契約はテストで固定してある」→ 正しくは **①③④**。上で訂正した。
+③の裏取り先も `run.json` の消失に合わせて差し替えた。
+
+---
 
 ## まだ直っていないこと
 

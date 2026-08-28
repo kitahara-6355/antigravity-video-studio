@@ -455,3 +455,70 @@ def test_image_path_url_encoding():
     report = plugin.generate_stage_report(ReviewStage.VISUAL, ctx)
     assert "````carousel" in report
     assert f"![thumbnail_0]({safe_japanese})" in report
+
+
+# --- R1.5-C4: 未計測を測定結果に見せない --------------------------------------
+
+
+def test_品質スコアが未計測なら0点不合格と言わない():
+    """**未計測を「0.0点・不合格」という測定結果に見せない**（R1.5-C4）。
+
+    `backend/core/context.py:67` の `quality_score` は dataclass の既定値
+    0.0 で、この経路に品質ゲートは繋がっていない。2026-08-28 まで
+    `f"品質スコア: {quality_score:.1f}/100"` と `passed = quality_score >= 90`
+    をそのまま通しており、**測っていないことが「0.0点・不合格」として
+    レポートに出ていた**（`review_router.py:131` から公開されている）。
+    """
+    plugin = ProgressiveReviewPlugin()
+    context = ProductionContext()
+    plugin.execute(context)
+
+    assert context.quality_score == 0.0, "前提: この経路では未計測のまま"
+
+    review = plugin._generate_stage_review(ReviewStage.FINAL, context)
+    quality_item = next(i for i in review.items if i.id == "quality_score")
+
+    assert "未計測" in (quality_item.content or "")
+    assert "0.0/100" not in (quality_item.content or "")
+    assert quality_item.metadata["measured"] is False
+    assert quality_item.metadata["score"] is None
+
+
+def test_未計測の項目は合否の分母に入らない():
+    """合格に数えれば偽の success、不合格に数えれば偽の測定結果になる。"""
+    plugin = ProgressiveReviewPlugin()
+    context = ProductionContext()
+    plugin.execute(context)
+
+    未計測 = plugin._generate_stage_review(ReviewStage.FINAL, context)
+    context.quality_score = 95.0
+    計測済み = plugin._generate_stage_review(ReviewStage.FINAL, context)
+
+    # 未計測の1件を分母から外すので、残りが全部合格なら 100.0 のまま
+    assert 未計測.overall_score == 100.0, 未計測.overall_score
+    assert 計測済み.overall_score == 100.0, 計測済み.overall_score
+
+    # 合否を主張しない項目は表でも ✅/⚠️ を出さない
+    表 = "\n".join(plugin._format_text_table_items(未計測.items))
+    quality行 = [行 for 行 in 表.splitlines() if "quality_score" in 行]
+    assert quality行, 表
+    assert "—" in quality行[0], quality行[0]
+    assert "✅" not in quality行[0] and "⚠️" not in quality行[0], quality行[0]
+
+
+def test_計測済みなら従来どおり合否が出る():
+    """**門が恒真でないことの確認。** 測ったときは合否を言う。"""
+    plugin = ProgressiveReviewPlugin()
+    context = ProductionContext()
+    plugin.execute(context)
+
+    context.quality_score = 89.9
+    落ちる = next(i for i in plugin._generate_stage_review(
+        ReviewStage.FINAL, context).items if i.id == "quality_score")
+    context.quality_score = 90.0
+    通る = next(i for i in plugin._generate_stage_review(
+        ReviewStage.FINAL, context).items if i.id == "quality_score")
+
+    assert 落ちる.passed is False and 落ちる.metadata["measured"] is True
+    assert 通る.passed is True and 通る.metadata["measured"] is True
+    assert "89.9/100" in (落ちる.content or "")
