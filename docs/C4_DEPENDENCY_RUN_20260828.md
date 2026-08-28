@@ -289,7 +289,14 @@ retention テスト3件に `mock_plugin.IMPLEMENTED = True` を明示した。
 | （参考）レビューの単体 | `backend/tests/test_progressive_review_plugin.py` | ❌ testpaths 外 |
 | （参考）投稿サービスの重複 | `tests/test_youtube_uploader_service.py` | ❌ testpaths 外 |
 
-## C-2 正典の `decision` と実装の食い違い（**ユーザー判断が要る**）
+## C-2 正典の `decision` と実装の食い違い（**2026-08-28 ユーザー決定で解決**）
+
+> **決定: 戻り値のままにし、`decision` の文言を実装に合わせる。**
+> 例外にすると `UploadResult` を受ける呼び出し元（ルーター・UI）が全部落ちるのに対し、
+> 戻り値なら「失敗した」を通常のエラー表示に載せられるため。正典2箇所を訂正済み。
+
+以下は決定の前に整理した内容。
+
 
 正典 `R1.5-C4` の `decision` は「**呼ばれたら明示的に例外で止める**」だが、
 実装（`backend/services/youtube_uploader.py:228-235`）は例外ではなく
@@ -316,3 +323,16 @@ UXラチェット   PASS   失敗0件
 CRITICAL負債   PASS   0件（参考: 全open 472件）
 全条件クリア。main へのマージ条件を満たしています。
 ```
+
+
+---
+
+## 統一感スコアの扱い（2026-08-28 ユーザー決定）
+
+`progressive_review` の**統一感スコア**は、1つも測れていなくても `100.0/100` を出す。
+
+- **`8eef716` から変わっておらず、退行ではない**
+- 数えているのは「報告された問題の件数」で、品質ゲート未接続とは別の指標
+- C4 の条件文が名指ししているのは `quality_score` だけ
+
+**R2（品質の担保）に送る**とユーザーが決定した。正典 `R1.5` の `limits` に記録済み。
