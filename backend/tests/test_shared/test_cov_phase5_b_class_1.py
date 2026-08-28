@@ -352,9 +352,12 @@ class TestWebSocketRouter:
             )
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
-            # fallback get_modelは任意のtaskで"gemini-2.5-flash"を返す
-            assert mod.get_model("any_task") == "gemini-2.5-flash"
-            assert mod.get_model("live_api") == "gemini-2.5-flash"
+            # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+            # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+            from model_policy import resolve
+            assert mod.get_model("any_task") == resolve("any_task").model
+            assert mod.get_model("live_api") == resolve("live_api").model
+            assert not mod.get_model("any_task").startswith("gemini-2.5")
         finally:
             if saved_mr is not None:
                 sys.modules["model_registry"] = saved_mr
