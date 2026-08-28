@@ -67,16 +67,19 @@ DATA_SOURCE = {
             "接続していません（未実装）。収益化の判断には使えません",
 }
 
+# **`connected` は `/youtube-connection` と揃える**（R1.5-C4）。
+# 2026-08-28 まで、ここだけ `True` のままで、同じ router の
+# `/youtube-connection` が `False` を返すという食い違いがあった。
 _channels = [
     {"id": "ch-001", "name": "Antigravity Tech", "status": "active", "genre": "tech",
      "youtube_channel_id": "UC_xxxxx1", "subscribers": 12500, "total_views": 850000,
-     "connected": True},
+     "connected": False},
     {"id": "ch-002", "name": "AI Creative Studio", "status": "active", "genre": "creative",
      "youtube_channel_id": "UC_xxxxx2", "subscribers": 8200, "total_views": 420000,
-     "connected": True},
+     "connected": False},
     {"id": "ch-003", "name": "Dev Digest", "status": "paused", "genre": "education",
      "youtube_channel_id": "UC_xxxxx3", "subscribers": 3100, "total_views": 180000,
-     "connected": True},
+     "connected": False},
 ]
 
 _permissions = {

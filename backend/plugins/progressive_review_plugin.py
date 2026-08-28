@@ -548,9 +548,19 @@ class ProgressiveReviewPlugin(Plugin):
             "overall_score": (
                 sum(s for s in _測ったスコア(self._reviews) ) / len(_測ったスコア(self._reviews))
                 if _測ったスコア(self._reviews) else None),
+            # **`overall_score` の出所が読めるようにする**（R1.5-C4）。
+            # `None` = 見るものはあったが測れなかった。
+            # `empty` = そもそも見るものが無い（点は 100.0 だが中身は無い）。
+            # これを書かないと「100.0」が品質の主張に読める
             "unmeasured_stages": [
                 stage.value for stage, r in self._reviews.items()
                 if r.overall_score is None],
+            "empty_stages": [
+                stage.value for stage, r in self._reviews.items()
+                if not r.items],
+            "scored_stages": [
+                stage.value for stage, r in self._reviews.items()
+                if r.items and r.overall_score is not None],
             "stages": {
                 stage.value: {
                     "name": self.STAGE_NAMES.get(stage),

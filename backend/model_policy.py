@@ -161,6 +161,20 @@ def known_tasks() -> list[str]:
     return sorted(set(mapping) | set(load_overrides()))
 
 
+def default_model() -> str:
+    """**工程に紐づいていないときに使われるモデル**（`text_generation.default_model`）。
+
+    `model_registry` / 各モジュールの ImportError フォールバックが返すのは
+    これ。テストが「gemini-3.6-flash」と直書きすると入替のたびに腐るので、
+    正典から引ける口を用意する（R1.5-C6）。
+    """
+    config = _load_config()
+    値 = (config.get("text_generation") or {}).get("default_model")
+    if not 値:
+        raise UnknownTier("既定モデルが設定にありません")
+    return 値
+
+
 def resolve(task: str) -> Decision:
     """この工程が**いまどのモデルで動くか**と、その根拠を返す。
 

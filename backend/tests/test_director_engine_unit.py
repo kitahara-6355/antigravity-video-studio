@@ -22,7 +22,12 @@ def test_import_error_fallback():
     # Force ImportError for model_registry on reload
     with patch.dict(sys.modules, {"model_registry": None}):
         importlib.reload(director_engine)
-        assert director_engine.get_model("director") == "gemini-2.5-flash"
+        # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+        # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+        # **この経路が返すのは工程別のモデルではなく既定モデル**
+        from model_policy import default_model
+        assert director_engine.get_model("director") == default_model()
+        assert not director_engine.get_model("director").startswith("gemini-2.5")
     
     # Restore original state
     importlib.reload(director_engine)

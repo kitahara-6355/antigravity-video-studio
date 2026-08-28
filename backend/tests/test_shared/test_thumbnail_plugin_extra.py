@@ -18,7 +18,12 @@ def test_tp_get_model_fallback():
         importlib.reload(plugins.thumbnail_plugin)
         
         # フォールバックされた get_model をテスト
-        assert plugins.thumbnail_plugin.get_model("thumbnail") == "gemini-2.5-flash"
+        # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+        # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+        # **この経路が返すのは工程別のモデルではなく既定モデル**
+        from model_policy import default_model
+        assert plugins.thumbnail_plugin.get_model("thumbnail") == default_model()
+        assert not plugins.thumbnail_plugin.get_model("thumbnail").startswith("gemini-2.5")
         
     # テスト後に正常な状態に戻すため、再度リロード
     importlib.reload(plugins.thumbnail_plugin)

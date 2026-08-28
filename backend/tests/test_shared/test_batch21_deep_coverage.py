@@ -315,21 +315,34 @@ class TestLiveApiHandler:
                 assert "error_fallback" in received
 
     def test_lah_10_import_error_fallback(self):
+        """**直書きの既定値に逃げない**（R1.5-C6）。
+
+        2026-08-28 まで `gemini-2.5-flash` を直書きしており、
+        2026-10-16 に提供終了するモデルが本番の実行経路に居座っていた。
+
+        あわせて `sys.modules` の後始末を `try/finally` に入れた。
+        `assert` で抜けると `sys.modules["model_registry"] = None` が
+        残り、**同ファイルの後続 37 件が連鎖で落ちていた。**
+        """
         import sys
         import importlib
+        from model_policy import resolve
+
         old_registry = sys.modules.get("model_registry")
         sys.modules["model_registry"] = None
-        
-        import live_api_handler
-        importlib.reload(live_api_handler)
-        
-        assert live_api_handler.get_model("live_api") == "gemini-2.5-flash"
-        
-        if old_registry:
-            sys.modules["model_registry"] = old_registry
-        else:
-            del sys.modules["model_registry"]
-        importlib.reload(live_api_handler)
+        try:
+            import live_api_handler
+            importlib.reload(live_api_handler)
+
+            assert live_api_handler.get_model("live_api") == resolve("live_api").model
+            assert not live_api_handler.get_model("live_api").startswith("gemini-2.5")
+        finally:
+            if old_registry:
+                sys.modules["model_registry"] = old_registry
+            else:
+                sys.modules.pop("model_registry", None)
+            import live_api_handler
+            importlib.reload(live_api_handler)
 
     @pytest.mark.asyncio
     async def test_lah_11_pending_task_cancel(self):

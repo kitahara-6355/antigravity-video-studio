@@ -85,7 +85,10 @@ async def test_youtube_opt_worker_governance_error():
         
         result = await worker.execute(ctx)
         assert result.success is True
-        assert result.data["model_used"] == "gemini-2.5-flash"
+        # **既定モデル名を直書きしない**（R1.5-C6）。正典は model_config.json
+        from model_policy import resolve
+        assert result.data["model_used"] == resolve("youtube_optimization").model
+        assert not result.data["model_used"].startswith("gemini-2.5")
 
 @pytest.mark.asyncio
 async def test_youtube_opt_worker_ai_exception_fallback():
