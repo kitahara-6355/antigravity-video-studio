@@ -287,6 +287,46 @@ jobs:
       - name: 実装不足項目の点検（静的のみ）
         run: PYTHONPATH=./backend python -m backend.feature_gaps --audit --static-only
 
+  outside-testpaths:
+    name: testpaths 外の退行検知
+    runs-on: ubuntu-latest
+    # 1ファイルずつ×2版なので本体のテストジョブより長くなりうる。
+    # 本体と並列に走るので、全体の所要は伸びない。
+    timeout-minutes: 120
+
+    steps:
+      # **基準の版を展開する**ので全履歴が要る
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: システム依存インストール
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends             ffmpeg fonts-noto-cjk fonts-noto-cjk-extra fonts-dejavu-core
+
+      - name: 依存関係インストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # **pytest.ini の testpaths に載っているのは 444 ファイルで、
+      # リポジトリには 887 ファイルの test_*.py がある。**
+      # 残りを CI は一度も走らせていない。R1.5 ではこの盲点で
+      # 同じクラスの取りこぼしが4度起きた（2026-08-28 ユーザー決定で追加）。
+      #
+      # testpaths そのものは触らない（バッチの区切りが変わると既存の汚染が
+      # 別の場所で発火する）。**変更に触れる testpaths 外のテストだけを、
+      # 基準の版と突き合わせて「新しく赤くなったか」を見る。**
+      # 元から赤いものは基準でも赤いので自動的に無視される。
+      - name: 変更に触れる testpaths 外のテストを基準と突き合わせる
+        run: python .github/scripts/outside_testpaths_guard.py --base origin/${{ github.base_ref || 'main' }}
+
   security:
     name: シークレットスキャン
     runs-on: ubuntu-latest
