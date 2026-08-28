@@ -491,6 +491,13 @@ class SunsetReport:
 # 数に入れない場所。テストは「2.5 系を使っている」のではなく
 # 「2.5 系の扱いを検査している」ので対象外。node_modules / .venv を
 # 数えると件数が意味を失う。
+#
+# **除くのはディレクトリだけで、ファイル名では除かない**（R1.5-C6・
+# gate-verifier 2周目の指摘）。`path.name.startswith("test_")` でも
+# 落としていたため、`backend/harness/test_adk_gemini.py`（実 API を
+# `gemini-2.5-flash` で叩くスクリプト）と `test_model_registry.py` が
+# **本番にも到達不能にも計上されず、数から消えていた。**
+# テストディレクトリの外にある `test_*` はテスト群ではなくスクリプト。
 _SCAN_SKIP_DIRS = frozenset({
     "tests", "test", "__pycache__", "archives", "_deprecated",
     "node_modules", ".venv", "venv", ".git", ".next", "dist", "build",
@@ -518,8 +525,6 @@ def scan_sunset_references(root: Path | None = None) -> dict[str, int]:
         # **走査器自身の目印（`SUNSET_PREFIX`）は依存ではない。**
         # これを数えると、2.5 系を全部消しても件数が 1 のまま残る
         if path.resolve() == 自分:
-            continue
-        if path.name.startswith("test_"):
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -641,6 +646,14 @@ def reachable_modules(root: Path | None = None) -> set[str]:
 # それが API に渡るわけではない）。**キーも依存ではない** — `deprecated` や
 # `fallback_chain` のキーは「訂正される入力」であって、使うモデルではない。
 _CONFIG_SUFFIXES = (".json", ".yaml", ".yml")
+# **実行時に書かれるものは設定ではない。** ここを除かないと
+# `output/**/run.json` の `models_used` が「設定データの値がそのまま API に
+# 渡ります」と誤ラベルされる（gate-verifier 2周目の指摘）。実行記録は
+# `runs_at_risk` という別の脚で数える。
+_RUNTIME_DIRS = frozenset({
+    "output", "vault-outputs", "vault-assets", "pipeline_work", "temp",
+    "htmlcov", ".pytest_cache", ".ruff_cache", "coverage",
+})
 _MODEL_ID_RE = re.compile(
     r"^(?:models/)?" + re.escape(SUNSET_PREFIX) + r"[A-Za-z0-9._-]*$")
 _YAML_VALUE_RE = re.compile(
@@ -676,7 +689,7 @@ def scan_config_model_ids(root: Path | None = None) -> dict[str, int]:
     for path in sorted(root.rglob("*")):
         if path.suffix.lower() not in _CONFIG_SUFFIXES or not path.is_file():
             continue
-        if set(path.parts) & _SCAN_SKIP_DIRS:
+        if set(path.parts) & (_SCAN_SKIP_DIRS | _RUNTIME_DIRS):
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -707,6 +720,12 @@ def split_code_and_doc(path: Path) -> tuple[int, int]:
 
     **docstring の例と、実際に使われる既定値を混ぜない。** 条件文が言う
     「依存」は前者だけで、使い方を説明する文は依存ではない。
+
+    **数え方は「文書の行の集合」を作ってから1回だけ数える**（R1.5-C6・
+    gate-verifier 2周目の指摘）。docstring・コメント・`__main__` の中を
+    それぞれ独立に足していたため、重なった行が二重に数えられ、
+    `文書 > 合計` になって `合計 - 文書` が 0 に潰れた。
+    **本番のコード参照を1行のコメントで隠せてしまう。**
     """
     import ast
 
@@ -721,33 +740,49 @@ def split_code_and_doc(path: Path) -> tuple[int, int]:
         # 読めないものは**文書側に倒さない**（fail-closed）
         return 合計, 0
 
-    docstrings: list[str] = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
-                             ast.ClassDef)):
-            doc = ast.get_docstring(node, clean=False)
-            if doc:
-                docstrings.append(doc)
-    文書 = sum(d.count(SUNSET_PREFIX) for d in docstrings)
-    # コメントは AST に無いので、行頭が `#` の行から数える
     lines = text.splitlines()
-    for line in lines:
-        if line.lstrip().startswith("#"):
-            文書 += line.count(SUNSET_PREFIX)
+    文書行: set[int] = set()          # 0 始まりの行番号
 
-    # **`if __name__ == "__main__":` の中は本番の実行経路ではない。**
-    # `model_governance.py` の自己テストは 2.5 を「訂正される入力」として
-    # 渡しており、依存ではない（2026-08-28）。
+    def _積む(始1: int, 終1: int) -> None:
+        """1 始まりの行範囲（両端含む）を 0 始まりで積む。"""
+        文書行.update(range(max(0, 始1 - 1), min(len(lines), 終1)))
+
+    # 1) docstring（モジュール・関数・クラス）
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.FunctionDef,
+                                 ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        body = getattr(node, "body", None)
+        if not body:
+            continue
+        先頭 = body[0]
+        if (isinstance(先頭, ast.Expr) and isinstance(先頭.value, ast.Constant)
+                and isinstance(先頭.value.value, str)):
+            _積む(先頭.lineno, getattr(先頭, "end_lineno", 先頭.lineno))
+
+    # 2) 行頭が `#` のコメント（AST に無いので行から拾う）
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("#"):
+            文書行.add(i)
+
+    # 3) **`if __name__ == "__main__":` の中は本番の実行経路ではない。**
+    #    `model_governance.py` の自己テストは 2.5 を「訂正される入力」として
+    #    渡しており、依存ではない（2026-08-28）。
     for node in tree.body:
         if not (isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
                 and isinstance(node.test.left, ast.Name)
                 and node.test.left.id == "__name__"):
             continue
-        始 = (node.body[0].lineno - 1) if node.body else node.lineno
-        終 = max(getattr(n, "end_lineno", n.lineno) for n in node.body) if node.body else 始
-        文書 += sum(line.count(SUNSET_PREFIX) for line in lines[始:終])
+        if not node.body:
+            continue
+        始 = node.body[0].lineno
+        終 = max(getattr(n, "end_lineno", n.lineno) for n in node.body)
+        _積む(始, 終)
 
-    return max(0, 合計 - 文書), min(合計, 文書)
+    文書 = sum(lines[i].count(SUNSET_PREFIX) for i in 文書行)
+    # 集合で数えているので二重計上は起きないが、念のため（fail-closed）
+    文書 = min(合計, 文書)
+    return 合計 - 文書, 文書
 
 
 def classify_sunset_references(root: Path | None = None) -> dict[str, dict[str, int]]:
@@ -774,20 +809,35 @@ def classify_sunset_references(root: Path | None = None) -> dict[str, dict[str, 
     return out
 
 
-def sunset_gate(分類: dict[str, dict[str, int]]) -> list[str]:
-    """**本番の実行経路にコード上の 2.5 系が残っていたら違反**（R1.5-C6）。
+def sunset_gate(分類: dict[str, dict[str, int]],
+                report: "SunsetReport | None" = None) -> list[str]:
+    """**段・実行記録・本番モジュールのいずれかに 2.5 系が残っていたら違反**（R1.5-C6）。
 
     文書と到達不能は数えるだけで落とさない。**区別できているからこそ
     落とさずに済む** — 区別できないうちは全部が疑わしいので落とす。
+
+    **`report` を渡さないと段と実行記録の脚を見ない。** 2026-08-28 まで
+    `分類` だけを見ており、実行記録に 2.5 が載っていても exit 0 だった
+    （報告文には出るのに、判定に繋がっていなかった。gate-verifier 2周目の指摘）。
     """
     残り = [(p, c, "本番の実行経路から辿れます")
             for p, c in (分類.get("production_code") or {}).items()]
     残り += [(p, c, "設定データの値がそのまま API に渡ります")
              for p, c in (分類.get("production_config") or {}).items()]
-    if not 残り:
-        return []
-    return [f"{path}: {count} 箇所（{なぜ}）"
+    違反 = [f"{path}: {count} 箇所（{なぜ}）"
             for path, count, なぜ in sorted(残り, key=lambda x: (-x[1], x[0]))]
+
+    if report is not None:
+        for tier, model in sorted(report.tiers_at_risk.items()):
+            違反.append(f"段 {tier}: {model}（段に 2.5 系が入っています）")
+        for rid, models in sorted(report.runs_at_risk.items()):
+            違反.append(f"実走 {rid}: {', '.join(models)}（実走で 2.5 系が動いています）")
+        if report.run_count == 0:
+            # **確かめていないことを緑にしない。** 条件文は「実行記録にも
+            # 2.5 系が無いこと」を求めており、記録が無ければ示せない
+            違反.append("実行記録が 0 件です"
+                        "（実走で 2.5 系が動いたかどうかを確かめられません）")
+    return 違反
 
 
 def sunset_report(tier_models: dict[str, str] | None = None,
@@ -978,7 +1028,8 @@ def main(argv: list[str] | None = None) -> int:
             runs = load_runs()
         except OSError:
             runs = []
-        print(format_sunset(sunset_report(runs=runs)))
+        report = sunset_report(runs=runs)
+        print(format_sunset(report))
 
         # **本番と到達不能を区別して数える**（R1.5-C6）。
         # 数えるだけでは条件を満たさない — 条件文は「区別できないうちは
@@ -995,15 +1046,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  到達不能（補助ツール・スクラッチ・フック等）: "
               f"{sum(分類['unreachable'].values())} 箇所 / "
               f"{len(分類['unreachable'])} ファイル")
-        違反 = sunset_gate(分類)
+        違反 = sunset_gate(分類, report)
         if 違反:
             print()
-            print(f"🚫 **本番の実行経路に 2.5 系が残っています**（{len(違反)} ファイル）:")
+            print(f"🚫 **2.5 系への依存が残っています**（{len(違反)} 件）:")
             for m in 違反:
                 print(f"    - {m}")
             return 1
         print()
-        print("  ✅ 本番の実行経路に 2.5 系のコード参照はありません。")
+        print("  ✅ 段・実行記録・本番の実行経路のいずれにも 2.5 系はありません。")
         return 0
 
     if args.audit:

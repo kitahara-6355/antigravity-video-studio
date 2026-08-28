@@ -350,3 +350,61 @@ def test_get_context_direct():
         context = _get_context("test_direct_task_id")
         assert context.task_id == "test_direct_task_id"
 
+
+
+# =====================================================================
+# R1.5-C4: 未計測を測定結果に見せない（**このファイルは pytest.ini の
+# testpaths 内**なので CI が回帰を止める。単体テストの
+# backend/tests/test_progressive_review_plugin.py は testpaths 外）
+# =====================================================================
+
+
+def test_最終レポートは未計測を点数で表さない():
+    """**測っていないことを「0.0点・不合格」にも「100.0点・合格」にもしない**（R1.5-C4）。
+
+    `backend/core/context.py:67` の `quality_score` は dataclass の既定値 0.0 で、
+    この経路に品質ゲートは繋がっていない。
+
+    - 2026-08-28 まで: 「品質スコア: 0.0/100」「全体スコア 0.0/100」
+    - 1周目の直し方: 未計測を分母から外した結果、分母が空で
+      **「全体スコア 100.0/100」「全チェック項目をパスしました！
+      レンダリング準備完了です」** になった。より強い偽の success で、
+      直し方が間違っていた（gate-verifier 2周目の指摘）
+    - いま: 「未計測」と言う
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.review_router import router as review_router
+
+    app = FastAPI()
+    app.include_router(review_router)
+    resp = TestClient(app).get("/api/review/stages/final/report")
+
+    assert resp.status_code == 200, resp.text
+    md = resp.json()["report_markdown"]
+
+    assert "| 全体スコア | **未計測**" in md, md
+    assert "全体スコア | **0.0**/100" not in md, md
+    assert "全体スコア | **100.0**/100" not in md, md
+    assert "品質スコア: **未計測**" in md, md
+    assert "全チェック項目をパスしました" not in md, md
+    assert "何も測れていません" in md, md
+
+
+def test_測れていれば点数を出す():
+    """**門が恒真でないことの確認。** 測ったときは点を出す（R1.5-C4）。"""
+    from core import ProductionContext
+    from plugins.progressive_review_plugin import ProgressiveReviewPlugin, ReviewStage as PStage
+
+    plugin = ProgressiveReviewPlugin()
+    ctx = ProductionContext()
+    plugin.execute(ctx)
+    ctx.quality_score = 95.0
+
+    review = plugin._generate_stage_review(PStage.FINAL, ctx)
+    md = plugin._format_stage_report(review)
+
+    assert review.overall_score == 100.0
+    assert "| 全体スコア | **100.0**/100 |" in md, md
+    assert "品質スコア: 95.0/100" in md, md
+    assert "未計測" not in md, md

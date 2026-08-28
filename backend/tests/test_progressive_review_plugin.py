@@ -494,9 +494,18 @@ def test_未計測の項目は合否の分母に入らない():
     context.quality_score = 95.0
     計測済み = plugin._generate_stage_review(ReviewStage.FINAL, context)
 
-    # 未計測の1件を分母から外すので、残りが全部合格なら 100.0 のまま
-    assert 未計測.overall_score == 100.0, 未計測.overall_score
+    # **1つも測っていないなら点をつけない。**
+    # ここに 100.0 を返していたら「全体スコア 100.0/100・レンダリング準備完了」を
+    # 名乗るようになり、0.0 を返す以前より強い偽の success になった
+    # （gate-verifier 2周目の指摘）
+    assert 未計測.overall_score is None, 未計測.overall_score
     assert 計測済み.overall_score == 100.0, 計測済み.overall_score
+
+    # 「全部パスしました」も言わない
+    assert not any("全チェック項目をパスしました" in x for x in 未計測.suggestions), 未計測.suggestions
+    assert any("何も測れていません" in x for x in 未計測.suggestions), 未計測.suggestions
+    # 測れたときはこの断り書きが消える
+    assert not any("何も測れていません" in x for x in 計測済み.suggestions), 計測済み.suggestions
 
     # 合否を主張しない項目は表でも ✅/⚠️ を出さない
     表 = "\n".join(plugin._format_text_table_items(未計測.items))
@@ -504,6 +513,19 @@ def test_未計測の項目は合否の分母に入らない():
     assert quality行, 表
     assert "—" in quality行[0], quality行[0]
     assert "✅" not in quality行[0] and "⚠️" not in quality行[0], quality行[0]
+
+
+def test_見るものが無いステージは従来どおり():
+    """**項目が空のステージ**（そのステージに見るものが無い）は 100.0 のまま。
+
+    「見るものが無い」と「見るものはあったが測れなかった」は別。
+    条件文が名指ししているのは後者（R1.5-C4）。
+    """
+    plugin = ProgressiveReviewPlugin()
+    review = plugin._generate_stage_review(ReviewStage.SUBTITLE, ProductionContext())
+
+    assert review.items == []
+    assert review.overall_score == 100.0
 
 
 def test_計測済みなら従来どおり合否が出る():

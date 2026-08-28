@@ -41,12 +41,22 @@ class ReviewItem:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+def _測ったスコア(reviews: Dict[Any, Any]) -> List[float]:
+    """**測ったステージのスコアだけ**（R1.5-C4）。
+
+    `None` は「1つも測っていない」の意味なので、0 や 100 に読み替えて
+    平均に混ぜない。
+    """
+    return [r.overall_score for r in reviews.values() if r.overall_score is not None]
+
+
 @dataclass
 class StageReview:
     """ステージレビュー結果"""
     stage: ReviewStage
     items: List[ReviewItem]
-    overall_score: float
+    # **None は「1つも測っていない」。** 0.0（＝全部落ちた）と区別する（R1.5-C4）
+    overall_score: Optional[float]
     consistency_score: float
     issues: List[str]
     suggestions: List[str]
@@ -138,9 +148,23 @@ class ProgressiveReviewPlugin(Plugin):
         # スコア計算
         # **測っていない項目は合否の分母に入れない**（R1.5-C4）。
         # 合格に数えれば偽の success、不合格に数えれば偽の測定結果になる。
+        #
+        # **1つも測っていないときは 100.0 ではなく None。** 分母が空のときに
+        # 100.0 を返していたら、何ひとつ測っていない状態で
+        # 「全体スコア 100.0/100・レンダリング準備完了」と名乗るようになった
+        # （gate-verifier 2周目の指摘）。0.0 を返す以前より強い偽の success で、
+        # 直し方が間違っていた。**測っていないなら点をつけない。**
+        # **見るものが無いステージ**（items が空）と、**見るものはあったが
+        # 1つも測れなかったステージ**は別。前者は元からの 100.0 のままにし、
+        # 後者だけ None にする。条件文が名指ししているのは後者。
         測った = [i for i in items if i.metadata.get("measured") is not False]
         passed_count = sum(1 for item in 測った if item.passed)
-        overall_score = (passed_count / len(測った) * 100) if 測った else 100.0
+        if 測った:
+            overall_score = passed_count / len(測った) * 100
+        elif items:
+            overall_score = None      # 測れなかった。点をつけない
+        else:
+            overall_score = 100.0     # 見るものが無い（従来どおり）
         consistency_score = self._calculate_consistency(items, stage)
         
         return StageReview(
@@ -382,8 +406,14 @@ class ProgressiveReviewPlugin(Plugin):
                 passed=bool(music)
             ))
         
-        if not issues:
+        # **1つも測れていないのに「全部パスしました」と言わない**（R1.5-C4）。
+        測った = [i for i in items if i.metadata.get("measured") is not False]
+        if not issues and 測った:
             suggestions.append("全チェック項目をパスしました！レンダリング準備完了です")
+        if items and not 測った:
+            suggestions.append(
+                "**このステージでは何も測れていません。**"
+                "品質ゲートが繋がっていないため、合否を判定できません")
         
         return items, issues, suggestions
     
@@ -471,7 +501,11 @@ class ProgressiveReviewPlugin(Plugin):
         lines.append("## 📊 スコア\n")
         lines.append(f"| 指標 | スコア |")
         lines.append("|:---|:---|")
-        lines.append(f"| 全体スコア | **{review.overall_score:.1f}**/100 |")
+        if review.overall_score is None:
+            # **測っていないことを点数で表さない**（R1.5-C4）
+            lines.append("| 全体スコア | **未計測**（測った項目がありません）|")
+        else:
+            lines.append(f"| 全体スコア | **{review.overall_score:.1f}**/100 |")
         lines.append(f"| 統一感スコア | **{review.consistency_score:.1f}**/100 |\n")
         
         # 項目一覧
@@ -510,7 +544,13 @@ class ProgressiveReviewPlugin(Plugin):
             "completed_stages": len(self._reviews),
             "approved_stages": sum(1 for r in self._reviews.values() if r.approved),
             "pending_revisions": sum(1 for r in self._reviews.values() if r.revision_requested),
-            "overall_score": sum(r.overall_score for r in self._reviews.values()) / len(self._reviews) if self._reviews else 0,
+            # **未計測のステージを 0 や 100 として平均に混ぜない**（R1.5-C4）
+            "overall_score": (
+                sum(s for s in _測ったスコア(self._reviews) ) / len(_測ったスコア(self._reviews))
+                if _測ったスコア(self._reviews) else None),
+            "unmeasured_stages": [
+                stage.value for stage, r in self._reviews.items()
+                if r.overall_score is None],
             "stages": {
                 stage.value: {
                     "name": self.STAGE_NAMES.get(stage),

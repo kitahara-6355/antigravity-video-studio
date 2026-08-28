@@ -416,3 +416,141 @@ def test_設定データの2_5系も本番として落とす():
     # 設定データの分だけを取り出しても、キーの重複が無いこと
     全部 = [k for v in 分類.values() for k in v]
     assert len(全部) == len(set(全部)), "同じファイルが2つの分類に入っている"
+
+
+# --- 走査器の穴・2周目（gate-verifier の指摘・2026-08-28）-------------------
+
+
+def test_文書を二重に数えない(tmp_path):
+    """**`文書 > 合計` になると本番のコード参照が 0 に潰れる。**
+
+    docstring・行頭 `#` のコメント・`__main__` の中を**それぞれ独立に
+    足していた**ため、重なった行が二重に数えられた
+    （gate-verifier 2周目の指摘）。`MODEL = "gemini-2.5-flash"` を持つ
+    ファイルに、`__main__` の中のコメント（または `__main__` の中の関数の
+    docstring）で同じ文字列を1回書くだけで `(コード, 文書) = (0, 2)` になり、
+    **本番の参照を隠せた。**
+    """
+    from backend.model_policy import split_code_and_doc
+
+    # ① `__main__` の中のコメント（コメント判定と __main__ 判定が重なる）
+    src1 = (
+        'MODEL = "gemini-2.5-flash"@n'
+        'if __name__ == "__main__":@n'
+        '    print(MODEL)@n'
+        '    # gemini-2.5-flash のコメント@n'
+        '    print(1)@n'
+    ).replace('@n', chr(10))
+    f1 = tmp_path / "a.py"
+    f1.write_text(src1, encoding="utf-8")
+    assert split_code_and_doc(f1) == (1, 1), split_code_and_doc(f1)
+
+    # ② `__main__` の中の関数の docstring（docstring 判定と重なる）
+    src2 = (
+        'MODEL = "gemini-2.5-flash"@n'
+        'if __name__ == "__main__":@n'
+        '    def f():@n'
+        '        """gemini-2.5-flash の例"""@n'
+        '        return MODEL@n'
+        '    f()@n'
+    ).replace('@n', chr(10))
+    f2 = tmp_path / "b.py"
+    f2.write_text(src2, encoding="utf-8")
+    assert split_code_and_doc(f2) == (1, 1), split_code_and_doc(f2)
+
+    # ③ 複数行 docstring の中の 2.5（行範囲で数えていることの確認）
+    src3 = (
+        'MODEL = "gemini-2.5-flash"@n'
+        'def g():@n'
+        '    """1行目@n'
+        '@n'
+        '    gemini-2.5-flash を使う例@n'
+        '    """@n'
+        '    return MODEL@n'
+    ).replace('@n', chr(10))
+    f3 = tmp_path / "c.py"
+    f3.write_text(src3, encoding="utf-8")
+    assert split_code_and_doc(f3) == (1, 1), split_code_and_doc(f3)
+
+
+def test_実行時に書かれるものは設定データではない(tmp_path):
+    """`output/**/run.json` の `models_used` は実行記録で、設定ではない。
+
+    除かないと「設定データの値がそのまま API に渡ります」と誤ラベルされる。
+    実行記録は `runs_at_risk` という別の脚で数える。
+    """
+    from backend.model_policy import scan_config_model_ids
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "conf.json").write_text(
+        '{"model": "gemini-2.5-flash"}', encoding="utf-8")
+    (tmp_path / "output" / "runs" / "r1").mkdir(parents=True)
+    (tmp_path / "output" / "runs" / "r1" / "run.json").write_text(
+        '{"models_used": ["gemini-2.5-flash"]}', encoding="utf-8")
+
+    hits = scan_config_model_ids(tmp_path)
+
+    assert hits == {"backend/conf.json": 1}, hits
+
+
+def test_段と実行記録もゲートに繋がっている():
+    """**報告に出るだけで判定に繋がっていなかった**（gate-verifier 2周目の指摘）。
+
+    条件文は「段・実行記録・本番モジュールの**いずれにも**」と言っている。
+    """
+    from datetime import date
+
+    from backend.model_policy import SunsetReport, sunset_gate
+
+    空 = {"production_code": {}, "production_config": {},
+          "production_doc": {}, "unreachable": {}}
+
+    段に残る = SunsetReport(days_left=49, tiers_at_risk={"standard": "gemini-2.5-flash"},
+                            runs_at_risk={}, source_hits={}, run_count=3)
+    実走に残る = SunsetReport(days_left=49, tiers_at_risk={},
+                              runs_at_risk={"r-1": ["gemini-2.5-flash"]},
+                              source_hits={}, run_count=3)
+    記録が無い = SunsetReport(days_left=49, tiers_at_risk={}, runs_at_risk={},
+                              source_hits={}, run_count=0)
+    綺麗 = SunsetReport(days_left=49, tiers_at_risk={}, runs_at_risk={},
+                        source_hits={}, run_count=3)
+
+    assert sunset_gate(空, 段に残る), "段の 2.5 を判定に繋いでいません"
+    assert sunset_gate(空, 実走に残る), "実走の 2.5 を判定に繋いでいません"
+    assert sunset_gate(空, 記録が無い), "確かめられないことを緑にしています"
+    assert sunset_gate(空, 綺麗) == []
+
+
+def test_テストディレクトリの外のtest_付きスクリプトも数える(tmp_path):
+    """**ファイル名では除かない**（gate-verifier 2周目の指摘）。
+
+    `backend/harness/test_adk_gemini.py` は実 API を `gemini-2.5-flash` で
+    叩くスクリプトなのに、`test_` 接頭辞で落ちて**本番にも到達不能にも
+    計上されず、数から消えていた。**
+    """
+    from backend.model_policy import scan_sunset_references
+
+    (tmp_path / "backend" / "harness").mkdir(parents=True)
+    (tmp_path / "backend" / "harness" / "test_thing.py").write_text(
+        'model = "gemini-2.5-flash"\n', encoding="utf-8")
+    (tmp_path / "backend" / "tests").mkdir()
+    (tmp_path / "backend" / "tests" / "test_x.py").write_text(
+        'assert m == "gemini-2.5-flash"\n', encoding="utf-8")
+
+    hits = scan_sunset_references(tmp_path)
+
+    assert hits == {"backend/harness/test_thing.py": 1}, hits
+
+
+def test_いまのリポジトリに本番の2_5系は残っていない():
+    """**回帰防止。** `--sunset` は CI から実行していない（実行記録が要るため）。
+
+    段・設定・本番モジュールの脚はこのテストで CI が見張る
+    （このファイルは `pytest.ini` の testpaths 内）。
+    """
+    from backend.model_policy import classify_sunset_references, sunset_gate
+
+    分類 = classify_sunset_references()
+    違反 = sunset_gate(分類)      # report を渡さない = 実行記録の脚は見ない
+
+    assert 違反 == [], 違反

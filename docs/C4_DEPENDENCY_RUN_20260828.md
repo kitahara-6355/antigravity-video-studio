@@ -199,8 +199,14 @@ PYTHONPATH=./backend python -m pytest tests/test_youtube_uploader_service.py -q 
 ```
 
 > **testpaths は触らない**（バッチの区切りが変わると既存の汚染が別の場所で発火する）。
-> 投稿の契約自体は testpaths 内の `backend/tests/test_youtube_upload.py` が
-> 固定しているので、CI の回帰防止は効いている。
+> 投稿の契約を CI で固定しているのは **`backend/tests/test_revenue_artifact_gate.py`**
+> （`test_未実装の投稿は成功を返さない`）。
+>
+> **訂正（3周目）。** ここには「testpaths 内の `backend/tests/test_youtube_upload.py` が
+> 固定している」と書いていたが**誤り。`test_youtube_upload.py` は testpaths の外**で、
+> CI は走らせていない（`grep -n "test_youtube_upload" pytest.ini` = 0 件）。
+> 1周目 N-5 と同じ「どのテストが契約を固定しているかの記述誤り」を、その訂正の中で
+> 再発させていた（gate-verifier 2周目の指摘 C-7）。
 
 ## N-5 この文書の記述が誤っていた
 
@@ -215,3 +221,86 @@ PYTHONPATH=./backend python -m pytest tests/test_youtube_uploader_service.py -q 
 実装は台帳 `backend/config/feature_gaps.json` に残っており、
 `python -m backend.feature_gaps --show` で一覧できる。C4 が求めているのは
 「偽の success を返さない」ことなので、ここまでが範囲。
+
+
+---
+
+# 3周目 — gate-verifier 2周目の指摘を潰す（2026-08-28）
+
+2周目も **not_met**。指摘は4件。
+
+## C-4 直し方が間違っていた（決定的・自分で作った退行）
+
+N-2 で「未計測を合否の分母から外す」ようにした結果、**分母が空のときに
+`overall_score = 100.0` を返すようになった。** 実測（`GET /api/review/stages/final/report`）:
+
+```
+基準 8eef716 : | 全体スコア | **0.0**/100 |
+2周目        : | 全体スコア | **100.0**/100 |
+               「全チェック項目をパスしました！レンダリング準備完了です」
+```
+
+**何ひとつ測っていない状態で「100点・準備完了」と名乗る。**
+0.0 を返す以前より強い偽の success で、直したつもりが悪化していた。
+
+いま:
+
+```
+| 全体スコア | **未計測**（測った項目がありません）|
+| quality_score | 品質スコア: **未計測**（この経路に品質ゲートは繋がって | — | - |
+- **このステージでは何も測れていません。**品質ゲートが繋がっていないため、合否を判定できません
+```
+
+- `overall_score` は **`None`**（`Optional[float]`）。`0.0`（全部落ちた）と区別する
+- **「見るものが無いステージ」（`items` が空）は 100.0 のまま。**「見るものはあったが
+  1つも測れなかった」とは別で、条件文が名指ししているのは後者
+- サマリーの平均は未計測のステージを混ぜない（`unmeasured_stages` に出す）
+
+**契約は `backend/tests/test_routers/test_review_router.py` に置いた**（testpaths 内 = CI が見張る）。
+`test_progressive_review_plugin.py` は testpaths の外なので、そこだけに置くと CI では守れない。
+
+## C-3 チャンネル統計の掃き残し（1周目 N-4 と同じクラス）
+
+`backend/tests/test_shared/test_cov_admin_channel_router.py`（testpaths 外）が
+`connected is True` / `confidence == 0.78` を保持したまま赤くなっていた。
+`backend/tests/e2e/test_e2e_m36_a7_channel_management.py:367,381` も同じ。
+
+```
+PYTHONPATH=./backend python -m pytest backend/tests/test_shared/test_cov_admin_channel_router.py -q --no-cov
+27 passed          （基準 8eef716 と同じ本数）
+```
+
+あわせて `backend/tests/test_shared/test_routers_youtube_optimizer.py` の
+retention テスト3件に `mock_plugin.IMPLEMENTED = True` を明示した。
+`MagicMock` だと `IMPLEMENTED` が truthy で **501 の門を偶然素通りしていた**ので、
+「実装済みなら通る」を試していることが読めなかった。
+
+## C-7 検証文書の記述が誤っていた（1周目 N-5 の再発）
+
+上で訂正した。**どのテストが CI で契約を守っているか**を、以後は実測して書く:
+
+| 契約 | 固定しているテスト | CI |
+|---|---|:--:|
+| 投稿は偽の success を返さない | `backend/tests/test_revenue_artifact_gate.py` | ✅ |
+| retention の API は 501 | `backend/tests/test_youtube_optimizer_router.py` | ✅ |
+| チャンネル統計は全経路に印 | `backend/tests/test_admin_channel_router.py` | ✅ |
+| 未計測を点数で表さない | `backend/tests/test_routers/test_review_router.py` | ✅ |
+| （参考）投稿の単体 | `backend/tests/test_youtube_upload.py` | ❌ testpaths 外 |
+| （参考）レビューの単体 | `backend/tests/test_progressive_review_plugin.py` | ❌ testpaths 外 |
+| （参考）投稿サービスの重複 | `tests/test_youtube_uploader_service.py` | ❌ testpaths 外 |
+
+## C-2 正典の `decision` と実装の食い違い（**ユーザー判断が要る**）
+
+正典 `R1.5-C4` の `decision` は「**呼ばれたら明示的に例外で止める**」だが、
+実装（`backend/services/youtube_uploader.py:228-235`）は例外ではなく
+`UploadResult(success=False, error="not_implemented")` を返している。
+
+**条件文（「偽の success を返さない」）は満たしているが、`decision` の字義とは違う。**
+`decision` はユーザーの領分（憲法第1条）なので、私からは変えない。ゲート報告で上げる。
+
+- 例外にすると `UploadResult` を受ける呼び出し元（ルーター・UI）が全部落ちる
+- 戻り値のままなら呼び出し元は「失敗した」を受け取って通常のエラー表示に載せられる
+
+## C-6 CI
+
+3周目の CI は下の「検証」に run ID を書く。

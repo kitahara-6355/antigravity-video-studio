@@ -20,7 +20,11 @@ def test_dch_02_get_model_fallback():
                 del sys.modules[key]
         
         from design_system.design_chat_handler import get_model
-        assert get_model("any_task") == "gemini-2.5-flash"
+        # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+        # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+        from model_policy import resolve
+        assert get_model("any_task") == resolve("any_task").model
+        assert not get_model("any_task").startswith("gemini-2.5")
 
 def test_dch_03_design_token_manager_lazy_load():
     from design_system.design_chat_handler import DesignChatHandler

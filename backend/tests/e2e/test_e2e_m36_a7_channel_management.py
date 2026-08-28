@@ -364,7 +364,9 @@ class TestA7L5EndToEnd:
         owner = app_page.request.get(f"{BASE}/owner-view").json()
         assert owner["enabled"] is True
         yt = app_page.request.get(f"{BASE}/youtube-connection").json()
-        assert yt["connected"] is True
+        # **接続していないので false**（R1.5-C4）
+        assert yt["connected"] is False
+        assert yt["is_real"] is False
 
     def test_a7_l5_08(self, app_page):
         """A7-L5-08 [S21]: チャンネル比較→維持率改善→ROI計算の完走"""
@@ -378,9 +380,12 @@ class TestA7L5EndToEnd:
     def test_a7_l5_09(self, app_page):
         """A7-L5-09 [S22]: YouTube連携にconnected状態が反映される"""
         d = app_page.request.get(f"{BASE}/youtube-connection").json()
-        assert d["connected"] is True
+        # **接続していないので false**（R1.5-C4）。連携の状態が
+        # 反映されていることが要件で、true であることではない
+        assert d["connected"] is False
         assert "channel_id" in d
         assert d["quota_used_today"] >= 0
+        assert d["is_real"] is False
 
     def test_a7_l5_10(self, app_page):
         """A7-L5-10 [S22]: 無効なチャンネルID指定で404エラーの完走"""
