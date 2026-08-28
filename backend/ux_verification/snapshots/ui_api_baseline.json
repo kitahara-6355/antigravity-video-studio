@@ -117,7 +117,7 @@
     "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
     "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/result": "static_route_scan: routers/pipeline_router.py:1125 GET /api/pipeline/proofreading/result",
     "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/status": "static_route_scan: routers/pipeline_router.py:1321 GET /api/pipeline/proofreading/status",
-    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1354 GET /api/pipeline/quality-gate/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1370 GET /api/pipeline/quality-gate/status",
     "src/gateway/endpoints.js|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
     "src/gateway/endpoints.js|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
     "src/gateway/endpoints.js|GET|/api/pipeline/transcription/models": "static_route_scan: routers/pipeline_router.py:1020 GET /api/pipeline/transcription/models",
@@ -156,7 +156,7 @@
     "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject": "static_route_scan: routers/pipeline_router.py:1156 POST /api/pipeline/proofreading/reject",
     "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject-all": "static_route_scan: routers/pipeline_router.py:1179 POST /api/pipeline/proofreading/reject-all",
     "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/skip": "static_route_scan: routers/pipeline_router.py:1340 POST /api/pipeline/proofreading/skip",
-    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
+    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1431 POST /api/pipeline/quality-gate/improve",
     "src/gateway/endpoints.js|POST|/api/pipeline/start": "static_route_scan: routers/pipeline_router.py:655 POST /api/pipeline/start",
     "src/gateway/endpoints.js|POST|/api/pipeline/transcription/model": "static_route_scan: routers/pipeline_router.py:1107 POST /api/pipeline/transcription/model",
     "src/gateway/endpoints.js|POST|/api/pipeline/videos/metadata": "static_route_scan: routers/pipeline_router.py:467 POST /api/pipeline/videos/metadata",
@@ -260,6 +260,20 @@
       "not_registered"
     ]
   },
+  "redeclarations": [
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status",
+      "before": "static_route_scan: routers/pipeline_router.py:1354 GET /api/pipeline/quality-gate/status",
+      "after": "static_route_scan: routers/pipeline_router.py:1370 GET /api/pipeline/quality-gate/status",
+      "reason": "R1.5-C4: /api/pipeline/quality-gate/* の6経路に QUALITY_GATE_DATA_SOURCE（is_real: false）を足したため、定義の行番号が下にずれた。当たり先のルーターも関数も同じで、宣言の中身は変えていない（2026-08-28）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve",
+      "before": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
+      "after": "static_route_scan: routers/pipeline_router.py:1431 POST /api/pipeline/quality-gate/improve",
+      "reason": "R1.5-C4: /api/pipeline/quality-gate/* の6経路に QUALITY_GATE_DATA_SOURCE（is_real: false）を足したため、定義の行番号が下にずれた。当たり先のルーターも関数も同じで、宣言の中身は変えていない（2026-08-28）"
+    }
+  ],
   "migrations": [
     {
       "key": "src/components/AISuggestionCard.jsx|POST|/api/quality/apply-suggestion",
