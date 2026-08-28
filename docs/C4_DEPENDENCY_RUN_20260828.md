@@ -336,3 +336,132 @@ CRITICAL負債   PASS   0件（参考: 全open 472件）
 - C4 の条件文が名指ししているのは `quality_score` だけ
 
 **R2（品質の担保）に送る**とユーザーが決定した。正典 `R1.5` の `limits` に記録済み。
+
+
+---
+
+# 4周目 — gate-verifier 3周目の指摘を潰す（2026-08-28）
+
+3周目は **not_met**。指摘は「同じクラスの掃き残しが3度目」だった。
+**「指摘されたファイルを直す」のをやめ、機械的に総当たりした。**
+
+## 総当たりの結果
+
+`pytest.ini` の testpaths の外にあり、R1.5 で変えた本番モジュールに触れている
+テスト **127 ファイル**を1ファイルずつ実行し、`8eef716` を `git worktree` に
+展開して**失敗テスト名の集合**を突き合わせた。
+
+```
+HEAD: 緑 68 / 赤 54
+  → R1.5 で新しく赤くなったのは **16 テスト**
+  → 残り 38 ファイルは基準でも同じだけ赤い（元から赤い・退行ではない）
+```
+
+**引継ぎ §6 の「元から赤いテスト」一覧は、これで実測の裏が取れた**（推測ではない）。
+
+16 件はすべて「モデル ID を直書きした期待値」で、**大半は C2（解決器一本化）の回で
+壊れたもの**だった。testpaths 外なので CI が一度も見ていない。
+
+| 直し方 | 件数 |
+|---|---|
+| ImportError フォールバックの期待値 → 正典から引き直す | 9 |
+| 既定モデルを返す経路 → `model_policy.default_model()` を新設して引く | 5 |
+| 「素通し」の目印に使えなくなったモデル名 → `_deprecation_map = {}` で趣旨を保つ | 2 |
+
+## 同じ突き合わせを CI ジョブにした
+
+`.github/scripts/outside_testpaths_guard.py` + `testpaths 外の退行検知` ジョブ。
+基準の版を worktree に展開して比べるので、**元から赤いものは自動的に無視される**
+（ベースラインをファイルに固定しない — 固定すると腐る）。
+
+**そのジョブが初回実行で17件目を捕まえた** —
+`test_cov_phase5_b_class_1.py::TestWebSocketRouter::test_model_registry_import_fallback`。
+手元（Windows）ではタイムアウトして「判定不能」に落ちており、
+**手作業の掃引では見つからなかった。**
+
+---
+
+# 5周目に向けて — 4周目の指摘を潰す（2026-08-28）
+
+4周目も **not_met**。指摘3件はいずれも実在する反例だった。
+
+## C-5 サマリー側に「何も測っていないのに100点」が残っていた
+
+ステージレポートは直っていたが、`GET /api/review/summary` が
+
+```
+基準 8eef716 : overall_score = 80.0
+4周目の HEAD : overall_score = 100.0 / scored_stages = [] / ready_for_render = true
+```
+
+**1項目も採点していないのに 100.0 を名乗っていた。** ステージごとの 100.0
+（見るものが無い）を4つ平均しただけ。3周目に「決定的・自分で作った退行」と
+呼ばれた形が、ステージレポートからサマリーへ移動しただけだった。
+`empty_stages` / `scored_stages` を足したのは**出所の開示であって数字の訂正ではない**。
+
+いま:
+
+```
+overall_score = null / scored_stages = [] / ready_for_render = false
+ready_for_render_reason = 採点できたステージがありません（品質ゲートが繋がっていません）
+```
+
+- `_測ったスコア()` が **`items` が空のステージも除く**ようにした
+- `ready_for_render` は `pending_revisions == 0` **だけでは true にしない**。
+  それは「修正を要求した人が誰もいない」の意味でしかなく、品質の主張ではない
+- 契約は `backend/tests/test_routers/test_review_router.py`（**testpaths 内**）に2件
+
+## C-6 同じ偽の success が1ファイル隣に残っていた
+
+`backend/routers/admin_analytics_router.py`（`backend/main.py:280` でマウント済み＝
+本番で到達可能）が未修正のままだった。`grep -c is_real` = **0**。
+
+| 場所 | 何だったか |
+|---|---|
+| `:72-77` | `connected: True` + `last_sync: datetime.now()` — **一度も接続していないのに** |
+| `:475` | 設定を更新しただけで `last_sync` に現在時刻。**設定画面を開くと「いま同期した」ように見える** |
+| `:165-177` | `/retention-trend` が `40.0 + i*0.3 + (i%5)*0.5` で30日分の維持率を合成 |
+| `:259-277` | `/chapter-effect` が固定の視聴時間 |
+
+2周目 N-3 が `admin_channel_router` で「特に悪い」として直した挙動そのもの。
+**24 経路すべてに `DATA_SOURCE` を機械的に付け**、`connected` を `False`、
+`last_sync` を `None` にした。契約は
+`backend/tests/test_admin_analytics_router.py`（**testpaths 内**）に3件。
+
+## C-7 新しい CI ジョブが過去3周の掃き残しを1つも選べていなかった
+
+`_参照形()` が `import {mod}` の形しか見ておらず、**いちばん普通の書き方である
+`from {mod} import {Name}` に当たらなかった。** 実測で3件とも MATCHED=False:
+
+- `test_report_generator_plugin_robustness.py`（3周目の未達根拠）
+- `test_cov_admin_channel_router.py`（2周目 C-3）
+- `tests/test_youtube_uploader_service.py`（1周目 N-4）
+
+さらに `SKIP_TEST_DIRS = {"e2e"}` で `backend/tests/e2e/` を恒久除外しており、
+2周目の掃き残し `test_e2e_m36_a7_channel_management.py:367,381` がそこにあった。
+
+直した:
+
+- **ドット付きのモジュール名はそのまま部分一致で見る**（書き方を問わない）。
+  トップレベルの語だけ import の文脈に限る（`generator` のような一般語の誤ヒット回避）
+- **`APIRouter(prefix=...)` の値も照合に足す。** e2e テストはモジュールを import せず
+  `BASE = "http://localhost:8000/api/admin/channel"` と書くので、import 照合では
+  原理的に当たらない
+- **e2e を対象に戻した。** 基準の版と突き合わせる方式なので、サーバが無くて
+  両方の版で同じように落ちるものは差が出ず、誤検知にならない
+
+実測で5ファイルとも選ばれるようになった（過去3周の3件 + e2e の1件 + 17件目）。
+
+## C-8 CI run ID の誤り（訂正）
+
+3周目・4周目の報告で `33154713247` と書いたが**この run は存在しない**。
+`4f17172` の実際の run は **`33159123056`**（conclusion success）。
+
+## 変異テスト（新しい門が空振りでないことの確認）
+
+```
+analytics の1経路から印を外す              → 1 failed
+サマリーの平均から items 空の除外を戻す      → 1 failed
+ready_for_render を pending_revisions だけに → 1 failed
+guard: testpaths 外に赤を1件作る            → 🚫 exit 1
+```

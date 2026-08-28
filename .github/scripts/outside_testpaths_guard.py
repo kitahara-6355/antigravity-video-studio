@@ -62,8 +62,11 @@ SKIP_DIRS = frozenset({
     "antigravity_phase19_experimental_v1", ".next", "dist", "build",
 })
 
-# **e2e は実サーバが要る**ので、この検知の対象にしない（CI では起動していない）。
-SKIP_TEST_DIRS = frozenset({"e2e"})
+# **e2e も対象にする。** 当初は「実サーバが要るから」と除いていたが、
+# 2周目の掃き残し（`backend/tests/e2e/test_e2e_m36_a7_channel_management.py:367,381`）が
+# まさにそこにあった（gate-verifier 4周目の指摘）。基準の版と突き合わせる方式なので、
+# サーバが無くて両方の版で同じように落ちるものは差が出ず、誤検知にならない。
+SKIP_TEST_DIRS: frozenset[str] = frozenset()
 
 # 本番として扱わないもの。テスト自身の変更で自分を回しても意味が無い。
 NOT_PRODUCTION = re.compile(
@@ -133,12 +136,25 @@ def changed_production(base: str) -> list[str]:
     return out
 
 
+_PREFIX = re.compile(r"""APIRouter\([^)]*?prefix\s*=\s*["']([^"']+)["']""", re.S)
+
+
 def _参照形(rel: str) -> list[str]:
     """本番ファイル1つを指しうる書き方を並べる。
 
     **裸の語では照合しない。** `generator` のような一般的な語を素の部分一致で
     拾うと、無関係なテストが山ほど当たる（実測 180 → 誤ヒット多数）。
-    import の形か、パス／ファイル名として書かれているものだけを見る。
+
+    **ドット付きのモジュール名はそのまま部分一致で見る**（`plugins.foo_plugin`）。
+    当初は `import {mod}` の形しか見ておらず、**いちばん普通の書き方である
+    `from {mod} import {Name}` に当たらなかった**。そのせいで過去3周の
+    掃き残し3件（`test_report_generator_plugin_robustness.py` /
+    `test_cov_admin_channel_router.py` / `test_youtube_uploader_service.py`）を
+    1つも選べていなかった（gate-verifier 4周目の指摘）。
+
+    **ルーターは HTTP のルートでも参照される。** e2e テストはモジュールを
+    import せず `BASE = "http://localhost:8000/api/admin/channel"` と書く。
+    `APIRouter(prefix=...)` の値も照合に足す。
     """
     p = Path(rel)
     parts = list(p.parts)
@@ -151,18 +167,28 @@ def _参照形(rel: str) -> list[str]:
         return [p.name]
     mod = ".".join(parts)[: -len(".py")]
     末尾 = mod.rsplit(".", 1)[-1]
-    親 = mod.rsplit(".", 1)[0] if "." in mod else ""
     形 = [
-        f"import {mod}",           # import a.b.c / from a.b.c import x
-        f"backend.{mod}",          # from backend.a.b.c import x
-        f'"{mod}"',                # patch("a.b.c.foo")
-        f"'{mod}'",
+        f"backend.{mod}",                # from backend.a.b.c import x
         mod.replace(".", "/") + ".py",   # パスで指している
     ]
-    if 親:
-        形 += [f"from {親} import {末尾}", f"from .{末尾} import"]
+    if "." in mod:
+        # ドット付きは十分に具体的なので、書き方を問わず部分一致で見る
+        # （import / from-import / patch("a.b.c.foo") のどれにも当たる）
+        形.append(mod)
+        形.append(f"from .{末尾} import")
     else:
-        形 += [f"from {末尾} import", f"import {末尾}"]
+        # トップレベルは語が一般的すぎるので import の文脈でだけ見る
+        形 += [f"import {mod}", f"from {mod} import", f'"{mod}"', f"'{mod}'"]
+
+    # ルーターの HTTP ルート（e2e テストはこれで参照する）
+    try:
+        text = (ROOT / rel).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        text = ""
+    for m in _PREFIX.finditer(text):
+        値 = m.group(1).strip()
+        if len(値) >= 4:      # "/" だけのような広すぎる接頭辞は採らない
+            形.append(値)
     return 形
 
 

@@ -42,12 +42,20 @@ class ReviewItem:
 
 
 def _測ったスコア(reviews: Dict[Any, Any]) -> List[float]:
-    """**測ったステージのスコアだけ**（R1.5-C4）。
+    """**中身を採点したステージのスコアだけ**（R1.5-C4）。
 
-    `None` は「1つも測っていない」の意味なので、0 や 100 に読み替えて
-    平均に混ぜない。
+    除くのは2種類:
+
+    - `overall_score is None` — 見るものはあったが1つも測れなかった
+    - `items` が空 — **そもそも見るものが無い**（点は 100.0 だが中身は無い）
+
+    後者を混ぜていたため、**1項目も採点していないのに
+    `summary.overall_score = 100.0` を名乗っていた**（基準 `8eef716` は 80.0。
+    gate-verifier 4周目の指摘 C-5）。ステージごとの 100.0 は元からの挙動なので
+    残すが、**それを集計して「全体の点」として出すのは別の主張**になる。
     """
-    return [r.overall_score for r in reviews.values() if r.overall_score is not None]
+    return [r.overall_score for r in reviews.values()
+            if r.items and r.overall_score is not None]
 
 
 @dataclass

@@ -287,6 +287,9 @@ def test_get_review_summary_success(client):
     mock_context_instance = MagicMock()
     mock_context_instance.get_extension.return_value = {
         "pending_revisions": 0,
+        # **採点できたステージが要る**（R1.5-C4）。修正待ちが 0 なだけでは
+        # 「レンダリング準備完了」と言えない（誰も修正を求めていない、の意味しかない）
+        "scored_stages": ["subtitle"],
         "completed": True
     }
     mock_progressive_review.execute.return_value = mock_context_instance
@@ -408,3 +411,63 @@ def test_測れていれば点数を出す():
     assert "| 全体スコア | **100.0**/100 |" in md, md
     assert "品質スコア: 95.0/100" in md, md
     assert "未計測" not in md, md
+
+
+def test_採点できたステージが無ければレンダリング準備完了と言わない(client):
+    """**1つも測っていないのに「準備完了」と言わない**（R1.5-C4）。
+
+    `pending_revisions == 0` だけを見ていたので、**何も測っていない
+    セッションでも `ready_for_render: true`** になっていた。
+    `pending_revisions` が 0 なのは「修正を要求した人が誰もいない」の意味で
+    しかなく、品質の主張ではない（gate-verifier 4周目の指摘 C-5）。
+    """
+    # **共有の module-level モックを使わない。** ファイル内の他のテストが
+    # `execute.return_value` を書き換えるため、順序に依存して落ちる
+    mock_ctx = MagicMock()
+    mock_ctx.get_extension.return_value = {
+        "pending_revisions": 0,
+        "scored_stages": [],          # 採点できたステージが無い
+        "empty_stages": ["subtitle", "telop", "visual", "video"],
+        "unmeasured_stages": ["final"],
+        "overall_score": None,
+    }
+    自前 = MagicMock()
+    自前.execute.return_value = mock_ctx
+
+    with patch.dict("sys.modules", {
+        "plugins.progressive_review_plugin": MagicMock(progressive_review=自前),
+        "core": MagicMock(ProductionContext=MockProductionContext),
+    }):
+        data = client.get("/api/review/summary").json()
+
+    assert data["ready_for_render"] is False
+    assert "品質ゲート" in data["ready_for_render_reason"]
+
+
+def test_サマリーの点は採点したステージだけから出す():
+    """**見るものが無いステージの 100.0 を集計して「全体の点」にしない**（R1.5-C4）。
+
+    2026-08-28 の途中まで `summary.overall_score` が 100.0 を返していた
+    （基準 `8eef716` は 80.0）。中身は「1項目も採点していない」状態で、
+    ステージごとの 100.0（見るものが無い）を4つ平均しただけだった。
+    """
+    from core import ProductionContext
+    from plugins.progressive_review_plugin import ProgressiveReviewPlugin
+
+    plugin = ProgressiveReviewPlugin()
+    ctx = ProductionContext()
+    plugin.execute(ctx)
+    summary = ctx.get_extension("progressive_review_summary", {})
+
+    assert summary["scored_stages"] == [], summary
+    assert summary["overall_score"] is None, summary["overall_score"]
+
+    # **門が恒真でないことの確認。** 採点できれば点が出る
+    ctx2 = ProductionContext()
+    ctx2.quality_score = 95.0
+    plugin2 = ProgressiveReviewPlugin()
+    plugin2.execute(ctx2)
+    summary2 = ctx2.get_extension("progressive_review_summary", {})
+
+    assert summary2["scored_stages"] == ["final"], summary2
+    assert summary2["overall_score"] == 100.0, summary2["overall_score"]

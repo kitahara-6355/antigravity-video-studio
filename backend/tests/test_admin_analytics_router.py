@@ -639,3 +639,74 @@ def test_unhandled_exception_bubbles_up(client):
     with patch("routers.admin_analytics_router._calculate_average_metrics", side_effect=RuntimeError("Unhandled RuntimeError")):
         with pytest.raises(RuntimeError):
             client.get("/api/admin/analytics/dashboard")
+
+
+# ── R1.5-C4: 固定値に必ず印が付いていること ────────────────────────────────
+#
+# `admin_channel_router` で直したのと同じ偽の success が、**1ファイル隣に
+# そのまま残っていた**（gate-verifier 4周目の指摘 C-6）:
+#   - `connected: True` + 現在時刻の `last_sync`（一度も接続していないのに）
+#   - `/retention-trend` が式で合成した30日分の維持率
+#   - `/chapter-effect` が固定の視聴時間
+# `grep -c is_real` は 0 件だった。
+
+
+def test_全エンドポイントが固定値の印を返す(client):
+    """**この router の応答は1つ残らず「実在の数字ではない」と名乗る**（R1.5-C4）。
+
+    YouTube Analytics には一度も接続していない。`_video_data` も
+    `_template_data` も `/retention-trend` の30日分も作り物で、
+    収益化の到達度をこの数字で判断すると嘘になる。
+    **新しい経路を足して印を忘れたらここで落ちる。**
+    """
+    from routers.admin_analytics_router import router
+
+    印なし = []
+    for route in router.routes:
+        for method in sorted(getattr(route, "methods", set()) - {"HEAD", "OPTIONS"}):
+            body = {"suggestion_id": 1, "period": "monthly",
+                    "update_interval_minutes": 60, "enabled": True,
+                    "target_ctr": 5.0, "target_retention": 50.0}
+            resp = (client.get(route.path) if method == "GET"
+                    else client.post(route.path, json=body))
+            if resp.status_code != 200:
+                印なし.append((method, route.path, resp.status_code))
+                continue
+            payload = resp.json()
+            if not isinstance(payload, dict) or payload.get("is_real") is not False:
+                印なし.append((method, route.path, str(payload)[:120]))
+
+    assert not 印なし, 印なし
+
+
+def test_接続していないので接続済みと名乗らない(client):
+    """**現在時刻の `last_sync` を返さない**（R1.5-C4）。
+
+    設定を書き換えただけで `last_sync` に現在時刻を入れていたので、
+    設定画面を開くだけで「いま同期した」ように見えていた。
+    """
+    from routers.admin_analytics_router import _api_connection
+
+    assert _api_connection["connected"] is False
+    assert _api_connection["last_sync"] is None
+
+    data = client.get("/api/admin/analytics/api-connection").json()
+    assert data["connected"] is False
+    assert data["last_sync"] is None
+    assert data["is_real"] is False
+
+    # 設定の更新では「同期した」ことにならない
+    client.post("/api/admin/analytics/api-connection",
+                json={"update_interval_minutes": 30, "enabled": True})
+    assert _api_connection["last_sync"] is None
+    assert client.get("/api/admin/analytics/cache-fallback").json()[
+        "last_successful_sync"] is None
+
+
+def test_合成した維持率にも印が付く(client):
+    """`/retention-trend` は式で組み立てた30日分を返す（実測ではない）。"""
+    data = client.get("/api/admin/analytics/retention-trend").json()
+
+    assert data["is_real"] is False
+    assert data["data_source"] == "sample"
+    assert len(data["history"]) == 30
