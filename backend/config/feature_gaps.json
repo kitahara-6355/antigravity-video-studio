@@ -79,6 +79,19 @@
       }
     },
     {
+      "id": "pipeline_quality_gate_ui",
+      "title": "画面の品質ゲート（定数を返す UI の足場）",
+      "kind": "gap",
+      "why": "`/api/pipeline/quality-gate/*` は `pipeline_default_states.INITIAL_QUALITY_GATE_STATE` の定数（音声88 / 映像82 / 字幕90 / 構成80 → 加重平均 85）を返すだけで、音声も映像も一切読まない。`POST /check` も定数を平均し直すだけ。**UI（`frontend/src/components/QualityGate.jsx`）が「QUALITY SCORE」として画面に出す**ので、印が無いと実測値と区別が付かない。本物の品質ゲートは本線（agents）側にあり、実走で 89・94 点を出している。2026-08-28 に `is_real: false` を付け、検査していないのに `checked_at` へ現在時刻を打つのをやめた（R1.5-C4・gate-verifier 5周目の指摘 C-6）",
+      "handled_in": "将来",
+      "surfaces_as": "品質ゲート(UI)",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/pipeline_router.py",
+        "marker": "QUALITY_GATE_DATA_SOURCE"
+      }
+    },
+    {
       "id": "channel_stats",
       "title": "チャンネル統計（固定値）",
       "kind": "gap",

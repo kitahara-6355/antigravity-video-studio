@@ -78,8 +78,10 @@ NOT_PRODUCTION = re.compile(
 # 1ファイルあたりの上限（秒）。超えたら「判定不能」として違反にはしない。
 PER_FILE_TIMEOUT = 240
 
-# 対象が多すぎるときの上限。**黙って切らずに必ず報告する。**
-MAX_FILES = 160
+# 対象が多すぎるときの上限。**超えたら exit 1**（見ていないものを緑にしない）。
+# R1.5 のブランチ全体では 142 ファイルが対象になる。上限 160 では余裕が
+# 18 しか無く、本番の変更が少し増えるだけで頭打ちになる（5周目の指摘 C-8）。
+MAX_FILES = 400
 
 
 def _run(args: list[str], cwd: Path | None = None) -> str:
@@ -136,7 +138,7 @@ def changed_production(base: str) -> list[str]:
     return out
 
 
-_PREFIX = re.compile(r"""APIRouter\([^)]*?prefix\s*=\s*["']([^"']+)["']""", re.S)
+_PREFIX = re.compile(r"""APIRouter\([^)]*?prefix\s*=\s*["']([^"']+)["']""", re.DOTALL)
 
 
 def _参照形(rel: str) -> list[str]:
@@ -177,8 +179,12 @@ def _参照形(rel: str) -> list[str]:
         形.append(mod)
         形.append(f"from .{末尾} import")
     else:
-        # トップレベルは語が一般的すぎるので import の文脈でだけ見る
-        形 += [f"import {mod}", f"from {mod} import", f'"{mod}"', f"'{mod}'"]
+        # トップレベルは語が一般的すぎるので import の文脈でだけ見る。
+        # **`patch("model_registry.get_model")` の形も足す**（gate-verifier
+        # 5周目の指摘 C-3）。テストで最も普通の書き方なのに
+        # `"{mod}"` にも `import {mod}` にも当たらず、16 ファイルが対象外だった。
+        形 += [f"import {mod}", f"from {mod} import",
+               f'"{mod}"', f"'{mod}'", f'"{mod}.', f"'{mod}."]
 
     # ルーターの HTTP ルート（e2e テストはこれで参照する）
     try:
@@ -313,16 +319,25 @@ def main() -> int:
         shutil.rmtree(tmp, ignore_errors=True)
 
     print()
+    # **確かめられなかったことを緑にしない**（gate-verifier 5周目の指摘 C-8）。
+    # 2026-08-28 まで、上限超過もタイムアウトも「⚠ を出して exit 0」だった。
+    # 本番の変更が少し増えるだけで、静かに（警告つきで）通ってしまう。
+    未判定 = []
     if 切った:
-        print(f"⚠ 対象が上限 {MAX_FILES} を超えたので {len(切った)} ファイルを見ていません:")
+        print(f"🚫 対象が上限 {MAX_FILES} を超えたので {len(切った)} ファイルを見ていません:")
         for f in 切った:
             print(f"    {f}")
+        print("  MAX_FILES を上げるか、変更を小さく分けてください。"
+              "**見ていないものを「赤なし」とは言えません。**")
         print()
+        未判定.append(f"上限超過 {len(切った)} ファイル")
     if 確かめられず:
-        print(f"⚠ 確かめられなかったもの（{len(確かめられず)} 件・退行として数えていません）:")
+        print(f"🚫 確かめられなかったもの（{len(確かめられず)} 件）:")
         for m in 確かめられず:
             print(f"    {m}")
+        print("  PER_FILE_TIMEOUT を延ばすか、そのファイルを速くしてください。")
         print()
+        未判定.append(f"判定不能 {len(確かめられず)} 件")
     if 基準に無い:
         print(f"⚠ 基準に存在しないファイルの失敗（{len(基準に無い)} 件・退行として数えていません）:")
         for m in 基準に無い:
@@ -342,6 +357,12 @@ def main() -> int:
               "ここが赤くても本体のテストジョブは緑のままです。")
         print("  旧い契約を固定しているテストなら、**期待値を正典から引き直して**"
               "ください（モデル ID や既定値の直書きをやめる）。")
+        return 1
+
+    if 未判定:
+        print(f"🚫 **判定できていない範囲があります**（{' / '.join(未判定)}）。")
+        print("  新しい赤は見つかりませんでしたが、"
+              "**見ていない範囲があるので「赤なし」とは言えません。**")
         return 1
 
     print(f"✅ testpaths の外に新しい赤はありません（{len(files)} ファイルを"
