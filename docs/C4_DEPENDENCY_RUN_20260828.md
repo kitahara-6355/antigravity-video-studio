@@ -304,3 +304,15 @@ retention テスト3件に `mock_plugin.IMPLEMENTED = True` を明示した。
 ## C-6 CI
 
 3周目の CI は下の「検証」に run ID を書く。
+
+## 検証（CI）
+
+**run `33131860127`** / headSha `416b8f6` — **conclusion: success**。
+
+```
+テスト全PASS   PASS   10,199件中 失敗0 エラー0    （要求 失敗0件）
+UXラチェット   PASS   失敗0件
+カバレッジ     PASS   76.0%                     （要求 70.0%以上）
+CRITICAL負債   PASS   0件（参考: 全open 472件）
+全条件クリア。main へのマージ条件を満たしています。
+```
