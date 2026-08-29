@@ -160,12 +160,27 @@ class QualityGateAgent:
 
         脚本も字幕もシーンも無いときに 100 点を出さないための門。
         **「問題が見つからなかった」と「見ていない」は別物。**
+
+        `scenes: [{}]`（空の dict 1個）のような**中身の無い入れ物では通さない**。
+        7周目の検証で、それが `score: 100 / 「✅ 優秀な品質です」` を通していた
+        （4検査のうち3つは空を見たままだった）。
         """
         if not isinstance(content, dict):
             return False
         if str(content.get("full_text") or "").strip():
             return True
-        return bool(content.get("scenes")) or bool(content.get("segments"))
+
+        def _中身がある(items, 鍵: str) -> bool:
+            if not isinstance(items, list):
+                return False
+            return any(
+                isinstance(x, dict) and str(x.get(鍵) or "").strip()
+                for x in items
+            )
+
+        # シーンは名前、字幕は本文が無ければ「見るもの」にならない
+        return _中身がある(content.get("scenes"), "name") or \
+            _中身がある(content.get("segments"), "text")
 
     def _calculate_score(self, issues: List[QualityIssue]) -> int:
         """スコア計算"""

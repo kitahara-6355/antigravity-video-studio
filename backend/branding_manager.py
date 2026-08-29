@@ -507,39 +507,21 @@ class BrandingManager:
     def get_evolution_log_for_display(self):
         """**外へ出す用**。作り物の「実績」に印を付けてから返す（R1.5-C4）。
 
-        `post_publish_feedbacks` には `YOUTUBE_API_MODE=mock` 時代に
-        `random` で組み立てた CTR・維持率・再生数が `actual_*` の名前で
-        焼き付いている（`backend/branding/evolution_log.json` は Git 追跡下）。
-        書き込みは `youtube_optimizer._record_post_publish_feedback` で止めたが、
-        **既にある行は消さずに印を付ける**（記録は残す）。
-
-        読み口が2つ（`GET /api/evolution` と `GET /api/director/evolution`）
-        あるので、**印を付ける場所は1つにする。**1経路ずつ塞ぐと、
-        gate-verifier が6周かけて見つけ続けた「同じクラスの別経路」になる。
+        印そのものは `backend/evolution_log_marks.py` にある。
+        読み口が3つ（`GET /api/evolution` / `GET /api/director/evolution` /
+        `GET /api/v1/mcp/resources/evolution_log`）あり、**3つ目は
+        `branding_manager` を通らない**ので、両方が依存できる場所へ出した
+        （gate-verifier 7周目 指摘1）。
 
         保存側（`get_evolution_log()`）は素のまま。**印がファイルへ
         書き戻らないように、読み書きの入口を分けている。**
         """
-        log = self.get_evolution_log()
-        if not isinstance(log, dict):
-            return log
+        try:  # backend/ を直接 sys.path に載せている経路にも対応する
+            from backend.evolution_log_marks import 実績に印を付ける
+        except ImportError:
+            from evolution_log_marks import 実績に印を付ける
 
-        行 = log.get("post_publish_feedbacks")
-        if not isinstance(行, list):
-            return log
-
-        log = dict(log)
-        log["post_publish_feedbacks"] = [
-            fb if fb.get("is_real") is True else {
-                **fb,
-                "is_real": False,
-                "data_source": "sample",
-                "note": "**YouTube から取得した実績ではありません。**"
-                        "YOUTUBE_API_MODE=mock 時代に random で組み立てた値です",
-            }
-            for fb in 行 if isinstance(fb, dict)
-        ]
-        return log
+        return 実績に印を付ける(self.get_evolution_log())
 
     def save_evolution_log(self, data):
         """evolution_log.json を保存する"""

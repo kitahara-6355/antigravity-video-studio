@@ -384,7 +384,11 @@ class TestDirectorBrain:
             brain = DirectorBrain()
             res = brain.verify_production_quality("text", [], [])
         parsed = json.loads(res)
-        assert parsed["is_ready"] is True
+        # **検査が落ちたら「進行可能」と言わない**（R1.5-C4）。旧 `is_ready: True /
+        # score: 80` は「自動チェックに失敗しましたが、進行可能です。」と対で返っており、
+        # **QA エンジンが一度も走っていなくてもレンダリングへ進めた。**
+        assert parsed["is_ready"] is False
+        assert parsed["score"] is None
         assert "QAエンジンエラー" in parsed["final_verdict"]
 
     def test_consult_error(self):

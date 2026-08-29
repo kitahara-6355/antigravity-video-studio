@@ -49,6 +49,27 @@ DEMO_PREFIXES = ("/api/pipeline/quality-gate", "/api/pipeline/improvement")
 
 
 @pytest.fixture(autouse=True)
+def 実体のモジュールを使う():
+    """他のテストが `sys.modules` に残した MagicMock を掃除する。
+
+    `test_render_router.py` などが `patch.dict("sys.modules", {...})` で
+    `branding_manager` を差し替えたまま漏らすことがある。**単体では緑なのに
+    CI の全件実行だけ落ちる**という形で実際に踏んだ（`ae93f60` の CI
+    run 33232106707）。私の判定が「前に走ったテストの後始末」で変わらないよう、
+    **モジュールでないものだけ**を落とす（実体はそのまま使う）。
+    """
+    import sys
+    import types
+
+    for 名 in ("branding_manager", "branding.analytics_manager",
+               "director_engine", "quality_gate_agent"):
+        m = sys.modules.get(名)
+        if m is not None and not isinstance(m, types.ModuleType):
+            del sys.modules[名]
+    yield
+
+
+@pytest.fixture(autouse=True)
 def インメモリ状態を戻す():
     """`_improvement_state` はモジュール変数なので、テスト間で汚れる。
 
@@ -263,20 +284,49 @@ def test_作り物の実績を台帳に書かない(tmp_path, monkeypatch):
     assert not 書いた, "作り物なのに台帳を開いた"
 
 
-def test_企画立案は作り物の学びを混ぜない():
+def test_企画立案は作り物の学びを混ぜない(monkeypatch):
     """`POST /api/youtube/pre-plan` の学び収集（R1.5-C4・6周目 指摘1）。
 
     `evolution_log.json` には mock 時代の「実績」が12件焼き付いている
     （`actual_ctr 5.2` / `actual_retention 65.0` / `actual_views 1000`）。
     `is_real: true` が無い行は作り物とみなす（fail-closed）。
+
+    **このテストは以前ソース文字列の grep だった**（`assert 'fb.get("is_real")
+    is True' in src`）。挙動を一度も呼んでいないので、**絞り込みを外しても
+    文字列がコメントに残るだけで緑のまま**だった（gate-verifier 7周目 指摘2 で
+    変異生存が実測された）。挙動で見る形に書き直した。
     """
-    from pathlib import Path
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
 
-    src = (Path(__file__).resolve().parent.parent.parent
-           / "routers" / "youtube_optimizer.py").read_text(encoding="utf-8")
+    from routers import youtube_optimizer
 
-    assert 'fb.get("is_real") is True' in src, \
-        "企画立案が post_publish_feedbacks を無条件に読んでいる"
+    台帳 = {"post_publish_feedbacks": [
+        {"wagamama_id": "偽", "actual_ctr": 5.2,
+         "lessons_learned": ["これは作り物の学びです"]},
+        {"wagamama_id": "真", "is_real": True, "actual_ctr": 3.1,
+         "lessons_learned": ["これは実測の学びです"]},
+    ]}
+
+    class _在るパス:
+        @staticmethod
+        def exists():
+            return True
+
+    monkeypatch.setattr(youtube_optimizer, "_writable_path",
+                        lambda *_a, **_k: _在るパス())
+    monkeypatch.setattr(youtube_optimizer, "safe_load_json",
+                        lambda *_a, **_k: 台帳)
+
+    app = FastAPI()
+    app.include_router(youtube_optimizer.router)
+    data = TestClient(app, raise_server_exceptions=False).post(
+        "/api/youtube/pre-plan", json={"topic": "一人キャンプ飯"}
+    ).json()
+
+    学び = data.get("past_lessons") or []
+    assert "これは作り物の学びです" not in 学び,         "作り物の『実績』から出た学びを企画立案に混ぜた"
+    assert "これは実測の学びです" in 学び,         "実測の学びまで落としている（門が広すぎる）"
 
 
 def test_チャンネル統計が実測を名乗らない():
@@ -408,3 +458,104 @@ def test_QAエンジンが落ちたら進行可能と言わない():
     assert result["score"] is None, "検査していないのに点を名乗った"
     assert result["is_real"] is False
     assert "QAエンジンエラー" in result["final_verdict"]
+
+
+# ── 7周目の指摘（gate-verifier）──────────────────────────────────────
+
+
+def test_成長ログの読み口が3つとも印を通る():
+    """**印を付ける場所は1つ**（R1.5-C4・7周目 指摘1）。
+
+    6周目に `branding_manager.get_evolution_log_for_display()` へ集約し、
+    その docstring に「読み口が2つあるので1箇所にする」と書いた。
+    **読み口は3つあった。**
+
+    | 読み口 | 経路 |
+    |---|---|
+    | `GET /api/evolution` | `routers/trinity.py` |
+    | `GET /api/director/evolution` | `routers/legacy_director_router.py` |
+    | `GET /api/v1/mcp/resources/evolution_log` | `mcp_server.py` |
+
+    3つ目は `branding_manager` を通らず JSON を直接読むので、集約点を
+    **迂回して印の無い `actual_ctr: 5.2` を 200 で返していた。**
+    印そのものを `backend/evolution_log_marks.py` へ出し、
+    **両方がそこに依存する**形にした。
+    """
+    import mcp_server
+    from evolution_log_marks import 実績に印を付ける
+
+    台帳 = {"post_publish_feedbacks": [
+        {"wagamama_id": "偽", "actual_ctr": 5.2},
+        {"wagamama_id": "真", "is_real": True, "actual_ctr": 3.1},
+    ]}
+
+    # 集約点そのもの
+    行 = 実績に印を付ける(台帳)["post_publish_feedbacks"]
+    assert 行[0]["is_real"] is False and 行[0]["data_source"] == "sample"
+    assert 行[1]["is_real"] is True and "data_source" not in 行[1]
+    assert "is_real" not in 台帳["post_publish_feedbacks"][0], "元の dict を書き換えた"
+
+    # 第3の読み口が集約点を通っていること
+    assert mcp_server.MCP_RESOURCES["evolution_log"]["loader"].__code__.co_names, \
+        "loader が読めない"
+    src = __import__("inspect").getsource(mcp_server._印つきで読む)
+    assert "実績に印を付ける" in src
+
+
+def test_MCPの読み口が印つきで返す(monkeypatch):
+    """`GET /api/v1/mcp/resources/evolution_log` の実体（R1.5-C4・7周目 指摘1）。"""
+    import mcp_server
+
+    台帳 = {"post_publish_feedbacks": [{"wagamama_id": "偽", "actual_ctr": 5.2}]}
+    monkeypatch.setattr(mcp_server, "_load_json_safely", lambda *_a, **_k: 台帳)
+
+    出力 = mcp_server.MCP_RESOURCES["evolution_log"]["loader"]()
+    行 = 出力["post_publish_feedbacks"]
+
+    assert 行[0]["is_real"] is False, "MCP の読み口が印なしで作り物を返した"
+    assert 行[0]["data_source"] == "sample"
+
+
+def test_MCPの品質スコアは見ていないのに0点を返さない(monkeypatch):
+    """`mcp_server._calculate_quality_score`（R1.5-C4・7周目）。
+
+    `round(completed / max(len(stages), 1) * 100)` なので、**ステージが
+    1つも無いと `0/1*100 = 0` になり、未計測が「0点」として出ていた。**
+    条件文が名指しする「常に 0.0 になる quality_score」と同型。
+    """
+    import mcp_server
+
+    未計測 = mcp_server._calculate_quality_score({"stages": [], "approved_at": None})
+    assert 未計測["score"] is None, "見ていないのに 0 点を返した"
+    assert 未計測["scored"] is False
+
+    採点 = mcp_server._calculate_quality_score(
+        {"stages": [{"completed": True}, {"completed": False}]})
+    assert 採点["scored"] is True
+    assert 採点["score"] == 50
+
+
+def test_中身の無い入れ物では品質を採点しない():
+    """材料の門が緩すぎないこと（R1.5-C4・7周目の副次指摘）。
+
+    `POST /api/quality/check {"scenes":[{}]}`（空の dict 1個）が
+    `score: 100 / 「✅ 優秀な品質です。レンダリングを推奨します。」` を
+    通していた。4検査のうち3つは空を見たままだった。
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.quality import router
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    for body in ({"scenes": [{}]}, {"segments": [{}]}, {"scenes": [{"name": ""}]}):
+        data = client.post("/api/quality/check", json=body).json()
+        assert data["scored"] is False, f"{body}: 中身が無いのに採点した"
+        assert data["score"] is None, f"{body}: 見ていないのに点を名乗った"
+
+    # 中身があれば従来どおり採点する（門が広すぎないこと）
+    採点 = client.post("/api/quality/check",
+                       json={"scenes": [{"name": "冒頭", "source_type": "LIVE"}]}).json()
+    assert 採点["scored"] is True

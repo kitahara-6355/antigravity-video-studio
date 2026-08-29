@@ -268,7 +268,11 @@ def test_calculate_quality_score_invalid():
 
     # Stages not a list
     res2 = mcp_server._calculate_quality_score({"stages": "not_a_list"})
-    assert res2["score"] == 0
+    # **見ていないのに 0 点を返さない**（R1.5-C4）。ここは以前 `score == 0` を
+    # 期待していたが、それは `round(0 / max(0, 1) * 100)` の産物であって
+    # 採点結果ではない。**未計測が「0点・不合格」として出ていた。**
+    assert res2["score"] is None
+    assert res2["scored"] is False
     assert res2["stages_total"] == 0
 
 

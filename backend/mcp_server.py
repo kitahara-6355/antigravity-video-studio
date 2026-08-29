@@ -61,6 +61,23 @@ def _load_json_safely(file_path: Path) -> Dict[str, Any]:
     return {}
 
 
+try:  # backend/ を直接 sys.path に載せている経路にも対応する
+    from backend.evolution_log_marks import 実績に印を付ける
+except ImportError:
+    from evolution_log_marks import 実績に印を付ける
+
+
+def _印つきで読む(path) -> Dict[str, Any]:
+    """`evolution_log.json` を**作り物の印つき**で読む（R1.5-C4・7周目 指摘1）。
+
+    ここは `branding_manager` を通らない**第3の読み口**で、
+    `GET /api/v1/mcp/resources/evolution_log` として本番にマウントされている
+    （`api_versioning.py:67`）。6周目に `branding_manager` へ集約した印を
+    **迂回して、印の無い `actual_ctr: 5.2` などを 200 で返していた。**
+    """
+    return 実績に印を付ける(_load_json_safely(path))
+
+
 def _format_pipeline_status(state_data: Dict[str, Any]) -> Dict[str, Any]:
     """パイプライン状態データをフォーマット"""
     if not state_data:
@@ -95,7 +112,21 @@ def _calculate_quality_score(review_data: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(stages, list):
         stages = []
     completed_stages_count = sum(1 for s in stages if isinstance(s, dict) and s.get("completed"))
+    if not stages:
+        # **見るものが無いのに 0 点を返さない**（R1.5-C4）。
+        # `max(len(stages), 1)` のせいで、ステージが 1 つも無いと
+        # `0/1*100 = 0` になり、**未計測が「0点・不合格」として出ていた。**
+        # 2周目 N-2 で直した「未計測 → 0.0点」と同型
+        return {
+            "score": None,
+            "scored": False,
+            "stages_total": 0,
+            "stages_completed": 0,
+            "approved_at": review_data.get("approved_at"),
+            "message": "採点していません（レビュー対象のステージがありません）",
+        }
     return {
+        "scored": True,
         "score": round(completed_stages_count / max(len(stages), 1) * 100),
         "stages_total": len(stages),
         "stages_completed": completed_stages_count,
@@ -154,8 +185,8 @@ def _summarize_evolution_log(evo_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_evolution_log() -> Dict[str, Any]:
-    """演出哲学と成長記録を取得"""
-    evo_data = _load_json_safely(EVOLUTION_LOG_PATH)
+    """演出哲学と成長記録を取得（R1.5-C4: 作り物の印つきで読む）"""
+    evo_data = _印つきで読む(EVOLUTION_LOG_PATH)
     return _summarize_evolution_log(evo_data)
 
 
@@ -186,7 +217,7 @@ MCP_RESOURCES = {
         "description": "演出哲学・成長記録の全データ",
         "uri": str(EVOLUTION_LOG_PATH),
         "mime_type": "application/json",
-        "loader": lambda: _load_json_safely(EVOLUTION_LOG_PATH),
+        "loader": lambda: _印つきで読む(EVOLUTION_LOG_PATH),
     },
     "constitution": {
         "description": "ブランド憲法（ブランド個性・コンテンツポリシー・デザイントークン）",

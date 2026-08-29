@@ -817,3 +817,115 @@ POST /api/quality/check  {}
 
 **元から赤（確認済み・追加分）:** `test_quality_unified.py` は
 `ModuleNotFoundError: No module named 'unified'` で収集できない（testpaths 外・基準でも同じ）。
+
+---
+
+# 8周目に向けて — 7周目の指摘2件と CI の赤を潰す（2026-08-29）
+
+7周目も **not_met**。指摘は2件とも実在した。加えて `ae93f60` の CI
+（run **33232106707**）が赤くなっており、そちらも同時に直した。
+
+## 指摘1 — 成長ログの読み口は**3つ**あった（決定的）
+
+6周目に `branding_manager.get_evolution_log_for_display()` へ印を集約し、
+その docstring に**「読み口が2つあるので印を付ける場所は1つにする。
+1経路ずつ塞ぐと同じクラスの別経路になる」**と書いた。**その文章自身が間違っていた。**
+
+| 読み口 | 経路 | 6周目の状態 |
+|---|---|:--:|
+| `GET /api/evolution` | `routers/trinity.py` | ✅ 印あり |
+| `GET /api/director/evolution` | `routers/legacy_director_router.py` | ✅ 印あり |
+| **`GET /api/v1/mcp/resources/evolution_log`** | `mcp_server.py` → `api_versioning.py:67` | ❌ **印なし** |
+
+3つ目は `branding_manager` を通さず JSON を直接読むので、集約点を**迂回**していた。
+同一プロセスでの対照（gate-verifier 実測）:
+
+```
+GET /api/v1/mcp/resources/evolution_log  →  post_publish_feedbacks 12件 / 印のある行 0件
+GET /api/evolution                        →  同 12件 / 印のある行 12件
+```
+
+**過去7周の総当たりは `/api/v1/*` を一度も含んでいなかった**（この文書に `v1` も
+`mcp` も1度も出てこない）。MCP ルーターは v1 プレフィクスの下にしか存在しない。
+
+直し方を変えた。**印そのものを `backend/evolution_log_marks.py` に出し、
+`branding_manager` と `mcp_server` の両方がそこに依存する形にした。**
+`mcp_server` は起動を軽く保つため `branding_manager` を import しないので、
+**両方が依存できる、依存を持たない場所**が要る。「読み口を増やしたら印も付ける」
+ではなく「**印を付けずに読む道が無い**」に寄せる。
+
+ついでに `mcp_server._calculate_quality_score()` も直した。
+`round(completed / max(len(stages), 1) * 100)` なので、**ステージが1つも無いと
+`0/1*100 = 0`** になり、未計測が「0点」として出ていた。条件文が名指しする
+「常に 0.0 になる quality_score」と同型（2周目 N-2 と同じ形）。
+
+## 指摘2 — 私の契約テストが**また空振り**だった
+
+`test_企画立案は作り物の学びを混ぜない` は
+
+```python
+assert 'fb.get("is_real") is True' in src   # ソース文字列の grep
+```
+
+で、**挙動を一度も呼んでいなかった。** 絞り込みを `list(feedbacks)` に戻しても
+文字列がコメントに残るだけで緑のまま（gate-verifier が変異生存を実測）。
+
+**空振りを作るのはこれで2件目。**（1件目は `test_成長ログの作り物に印が付く` で、
+実ファイルが空だと `if 行:` で素通りしていた。）
+挙動で見る形に書き直し、変異させて落ちることを確かめた:
+
+```
+実績 = [fb for fb in feedbacks if fb.get("is_real") is True]  →  実績 = list(feedbacks)
+  → test_企画立案は作り物の学びを混ぜない  1 failed
+```
+
+**教訓: 「テストが緑」は証拠にならない。「変異させたら赤くなる」が証拠。**
+
+## 副次の指摘 — 材料の門が緩かった
+
+`POST /api/quality/check {"scenes":[{}]}`（空の dict 1個）が
+`score: 100 / 「✅ 優秀な品質です。レンダリングを推奨します。」` を通していた。
+`ae93f60` で足した門は `bool(content.get("scenes"))` を見ていたので、
+**中身の無い入れ物でも通った**（4検査のうち3つは空を見たまま）。
+`name` / `text` に中身がある行を数える形に締めた。
+
+## CI が赤くなっていた件（run 33232106707）
+
+| ジョブ | 何が落ちたか | 原因 |
+|---|---|---|
+| Python テストスイート | `test_c4_quality_marks.py` の2件 | **他のテストが `sys.modules` に残した MagicMock。**`test_render_router.py` などが `patch.dict("sys.modules", {...})` で `branding_manager` を差し替えたまま漏らす。**単体では緑なのに全件実行だけ落ちる** |
+| testpaths 外の退行検知 | 5件 / 3ファイル | 下記 |
+
+**手元（Windows）では再現しなかった。** 汚染は
+`pytest backend/tests/test_render_router.py backend/tests/test_routers/test_c4_quality_marks.py`
+の2ファイル同時実行で再現できた。**モジュールでないものだけ**を `sys.modules` から
+落とす autouse フィクスチャを入れた（実体はそのまま使う）。
+
+testpaths 外の3ファイル:
+
+- `tests/test_quality_gate_agent.py` — **`backend/tests/` 側と同名の重複**。
+  `backend/tests/` だけ直して root 側を見落としていた
+- `test_shared/test_director_engine.py::test_verify_production_quality_fallback` —
+  `is_ready: True` を期待していた（`ae93f60` で直した挙動の取り残し）
+- `test_e2e_stability.py` の2件 — **私の変更とは無関係の環境依存だった。**
+  `create_test_video` は `subprocess.run` の前に `os.access(output_dir, os.W_OK)` を見る。
+  `Path.mkdir` をモックしているのでディレクトリは作られず、**Linux では
+  `os.access` が False を返して `PermissionError` になり `unlink` へ到達しない。**
+  `/tmp/test_dir` が実在するかどうかで結果が変わっていた。
+  `os.access` もモックして決定的にした
+
+## 契約テスト（17件・すべて変異テストで確認済み）
+
+| 変異 | 結果 |
+|---|---|
+| MCP の読み口から印を外す | 1 failed |
+| MCP の「0点ガード」を外す | 1 failed |
+| 材料の門を `bool(scenes)` に戻す | 1 failed |
+| 企画立案の fail-closed を戻す（**7周目に生存した変異**）| 1 failed |
+
+## 旧来の挙動を固定していたテスト（更新）
+
+`tests/test_quality_gate_agent.py`(2) / `test_shared/test_director_engine.py`(1) /
+`test_shared/test_mcp_server.py`(1) / `tests/test_mcp_server.py`(2)。
+
+**元から赤（基準 `main` と突き合わせ済み）:** `test_shared/test_branding_manager.py`(5)。
