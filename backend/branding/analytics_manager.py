@@ -60,7 +60,16 @@ class AnalyticsManager:
         1. Nemesis: +10% ~ +50% Subscribers
         2. Benchmark: x10 ~ x100 Subscribers
         """
+        # **ライバルも作り物**（R1.5-C4・8周目の本文掃引で見つけた）。
+        # `mock_rival_db` の固定値（TechStarter 180人 / TechMastery 15,000人）から
+        # `random.choice` で選ぶだけで、YouTube を検索してもいない。
+        # `GET /api/status` がこれを `subs` / `views` つきで返すので、
+        # 印が無いと実在のチャンネルの実測に見える。
         rivals = {
+            "data_source": "sample",
+            "is_real": False,
+            "note": "**実在のチャンネルを調べた結果ではありません。**"
+                    "既定のサンプルから選んでいます",
             "nemesis": None,
             "benchmark": None
         }

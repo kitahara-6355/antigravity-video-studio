@@ -264,14 +264,47 @@ def test_list_available_videos(tmp_path):
         assert res.json()["videos"][0]["name"] == "video1.mp4"
 
 
-def test_start_render_default_quality():
-    # _get_quality_score を mock しない場合、デフォルトの95が返るため、ブロックされずに開始するはず。
-    with patch("routers.render.detect_gpu") as mock_detect:
+def test_start_render_未計測なら点を名乗らない():
+    """**測っていないのに 95 点で通さない**（R1.5-C4・gate-verifier 8周目の指摘）。
+
+    ここは以前「`_get_quality_score` を mock しない場合、デフォルトの 95 が返るため、
+    ブロックされずに開始するはず」と書いてあり、**testpaths 内のこのテストが
+    偽の success を緑で固定していた。**95 は直書きの定数で、
+    そのせいで `if quality_score < 90` の品質ブロック（S17）は永久に偽だった。
+
+    いまは本線が書き出す `*.quality.json` を読む。**無ければ点を名乗らない。**
+    """
+    with patch("routers.render.detect_gpu") as mock_detect,          patch("routers.render._get_quality_score", return_value=None),          patch("routers.render._品質の出所", return_value=None):
         mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
         res = client.post("/api/render/start", json={"encoder": "libx264"})
         assert res.status_code == 200
-        assert res.json()["success"] is True
-        assert res.json()["quality_score"] == 95
+        data = res.json()
+        assert data["success"] is True, "未計測でも書き出し自体は止めない（従来の挙動）"
+        assert data["quality_score"] is None, "測っていないのに点を名乗った"
+        assert data["quality_checked"] is False
+        assert data["is_real"] is False
+        assert "未計測" in data["message"]
+
+
+def test_start_render_実測が90未満ならブロックする():
+    """**S17 の品質ブロックが実際に効く**（R1.5-C4・8周目の指摘）。
+
+    `_get_quality_score()` が定数 95 だったので、この分岐は**一度も通らなかった**。
+    `force_render` も意味を失っていた。
+    """
+    with patch("routers.render.detect_gpu") as mock_detect,          patch("routers.render._get_quality_score", return_value=89),          patch("routers.render._品質の出所", return_value="/dummy/x.quality.json"):
+        mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
+
+        止まった = client.post("/api/render/start", json={"encoder": "libx264"}).json()
+        assert 止まった["success"] is False
+        assert 止まった["error"] == "quality_block"
+        assert 止まった["quality_score"] == 89
+        assert 止まった["is_real"] is True
+
+        越えた = client.post("/api/render/start",
+                             json={"encoder": "libx264", "force_render": True}).json()
+        assert 越えた["success"] is True, "force_render で越えられない"
+        assert 越えた["quality_score"] == 89
 
 def test_video_processing_progress_callback():
     from video_processor import video_processor

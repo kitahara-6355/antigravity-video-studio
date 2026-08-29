@@ -154,9 +154,9 @@ def test_review_exception(mock_gemini_client, mock_get_model):
     engine = SelfReviewEngine()
     result = engine.review("content", "telop", {})
 
-    assert result.passed is True
-    assert result.score.overall == 0.75
-    assert len(result.issues) == 0
+    assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+    assert result.score.overall == 0.0  # 採点していない（0点という評価ではない）
+    assert result.issues, "採点していないことを伝えていない"
 
 
 def test_parse_review_invalid_json():
@@ -164,12 +164,12 @@ def test_parse_review_invalid_json():
     engine = SelfReviewEngine()
     
     result1 = engine._parse_review("no json here")
-    assert result1.passed is True
-    assert result1.score.overall == 0.75
+    assert result1.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+    assert result1.score.overall == 0.0  # 採点していない（0点という評価ではない）
     
     result2 = engine._parse_review("{ 'context_fit': invalid }")
-    assert result2.passed is True
-    assert result2.score.overall == 0.75
+    assert result2.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+    assert result2.score.overall == 0.0  # 採点していない（0点という評価ではない）
 
 
 def test_parse_review_missing_keys(mock_gemini_client, mock_get_model):

@@ -244,8 +244,15 @@ async def get_tool_quality_score():
 
 @router.get("/tool/evolution-log")
 async def get_tool_evolution_log():
-    """A-6 S5: 進化ログツールの動作状態"""
+    """A-6 S5: 進化ログツールの動作状態
+
+    **セッションごとの点も日時も定数**（R1.5-C4・8周目の本文掃引）。
+    `/tool/quality-score` に印を付けたのと同じクラスが隣に残っていた。
+    """
     return {
+        "data_source": "sample",
+        "is_real": False,
+        "note": "**実際のセッション記録ではありません。**この経路は UI の足場です",
         "entries": [
             {"session_id": "sess_001", "score": 88, "philosophy": "初回制作の基準確立", "timestamp": "2026-04-28"},
             {"session_id": "sess_002", "score": 91, "philosophy": "品質基準の向上", "timestamp": "2026-04-30"},

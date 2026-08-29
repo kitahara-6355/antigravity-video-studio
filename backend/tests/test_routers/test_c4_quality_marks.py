@@ -559,3 +559,97 @@ def test_中身の無い入れ物では品質を採点しない():
     採点 = client.post("/api/quality/check",
                        json={"scenes": [{"name": "冒頭", "source_type": "LIVE"}]}).json()
     assert 採点["scored"] is True
+
+
+# ── 8周目の指摘と、本文ベースの掃引で見つけたもの ──────────────────
+#
+# 8周目の指摘で分かった構造的な穴: **過去8周の掃引はパス文字列で母集団を作っていた。**
+# `/api/render/start` はパスに4カテゴリの語を1つも持たないが、
+# **応答本文に `quality_score` を持つ。**絞り込みを本文へ移して掃き直した。
+
+
+def test_書き出し前の品質は本線の実測を読む():
+    """`POST /api/render/start`（R1.5-C4・8周目の指摘）。
+
+    `_get_quality_score()` は `return 95` の直書きだった。そのせいで:
+
+    - 何も測っていないのに `quality_score: 95` を `success: true` で返し
+    - **S17 の品質ブロック（`< 90`）が永久に偽**になり一度も止まらず
+    - `force_render` が意味を失っていた
+
+    本線（`pipeline_coordinator._write_quality_sidecar`）は最終動画の隣へ
+    `*.quality.json` を書いている。**その文書自身が「消費者として宣言していた
+    render は quality_score しか読んでおらず」と書いていた** —
+    宣言していた消費者が、実は読んでいなかった。
+    """
+    import json as _json
+    import unittest.mock as _m
+    from pathlib import Path
+
+    from routers import render as R
+
+    # **ソース文字列の grep はしない。**7周目に「文字列がコメントに残るだけで
+    # 通る」空振りを指摘されたので、挙動だけで見る
+
+    # サイドカーが無ければ点を名乗らない
+    with _m.patch.object(R, "_品質の出所", return_value=None):
+        assert R._get_quality_score() is None, "測っていないのに点を返した"
+
+    # サイドカーがあればその点を読む
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "final_x.quality.json"
+        p.write_text(_json.dumps({"score": 89}), encoding="utf-8")
+        with _m.patch.object(R, "_品質の出所", return_value=str(p)):
+            assert R._get_quality_score() == 89, "実測を読めていない"
+
+
+def test_レビューできなかったら合格と言わない():
+    """`SelfReviewEngine._fallback_review()`（R1.5-C4・8周目の本文掃引）。
+
+    docstring が**「フォールバックレビュー（デフォルト合格）」**で、
+    `passed: True / overall: 0.75` を返していた。
+    `POST /api/antigravity/self-review/check` が本番にマウントされており、
+    **AI レビューが一度も走らなくても `{"passed": true, "score": 0.75}`**
+    が返っていた。`calculate_quality_score` /
+    `verify_production_quality` と同じクラスの3件目。
+    """
+    from self_review_engine import SelfReviewEngine
+
+    engine = SelfReviewEngine.__new__(SelfReviewEngine)
+    r = engine._fallback_review()
+
+    assert r.passed is False, "レビューしていないのに合格と言った"
+    assert r.score.details.get("scored") is False
+    assert r.score.details.get("is_real") is False
+    assert r.issues, "採点していないことを伝えていない"
+
+
+def test_ライバルの登録者数が実測を名乗らない():
+    """`AnalyticsManager.scout_rivals()`（R1.5-C4・8周目の本文掃引）。
+
+    `mock_rival_db` の固定値（TechStarter 180人 / TechMastery 15,000人）から
+    `random.choice` で選ぶだけで、YouTube を検索してもいない。
+    `GET /api/status` がこれを `subs` / `views` つきで返す。
+    """
+    from branding.analytics_manager import AnalyticsManager
+
+    m = AnalyticsManager()
+    r = m.scout_rivals({"subscribers": 150})
+
+    assert r["is_real"] is False, "作り物のライバルに印が無い"
+    assert r["data_source"] == "sample"
+
+
+def test_進化ログツールが実測を名乗らない():
+    """`GET /api/admin/integration/tool/evolution-log`（R1.5-C4・8周目）。"""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.admin_integration_router import router
+
+    app = FastAPI()
+    app.include_router(router)
+    d = TestClient(app).get("/api/admin/integration/tool/evolution-log").json()
+
+    assert d["is_real"] is False
+    assert d["data_source"] == "sample"

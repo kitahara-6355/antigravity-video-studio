@@ -165,8 +165,8 @@
     "src/gateway/endpoints.js|POST|/api/quality/decision/quick": "static_route_scan: routers/quality.py:128 POST /api/quality/decision/quick",
     "src/gateway/endpoints.js|POST|/api/quality/review/approve": "static_route_scan: routers/quality.py:182 POST /api/quality/review/approve",
     "src/gateway/endpoints.js|POST|/api/quality/undo-suggestion": "static_route_scan: routers/quality.py:166 POST /api/quality/undo-suggestion",
-    "src/gateway/endpoints.js|POST|/api/render": "static_route_scan: routers/render.py:386 POST /api/render",
-    "src/gateway/endpoints.js|POST|/api/render/start": "static_route_scan: routers/render.py:165 POST /api/render/start",
+    "src/gateway/endpoints.js|POST|/api/render": "static_route_scan: routers/render.py:445 POST /api/render",
+    "src/gateway/endpoints.js|POST|/api/render/start": "static_route_scan: routers/render.py:166 POST /api/render/start",
     "src/gateway/endpoints.js|POST|/api/rhythm/split": "static_route_scan: routers/legacy_production_router.py:157 POST /api/rhythm/split",
     "src/gateway/endpoints.js|POST|/api/segments": "static_route_scan: routers/segments.py:78 POST /api/segments",
     "src/gateway/endpoints.js|POST|/api/settings/identity": "static_route_scan: routers/legacy_management_router.py:197 POST /api/settings/identity",
@@ -296,6 +296,18 @@
       "before": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
       "after": "static_route_scan: routers/youtube_optimizer.py:597 POST /api/youtube/optimize",
       "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render",
+      "before": "static_route_scan: routers/render.py:386 POST /api/render",
+      "after": "static_route_scan: routers/render.py:445 POST /api/render",
+      "reason": "R1.5-C4（gate-verifier 8周目の指摘）: render.py の _get_quality_score() を本線の *.quality.json を読む形にしたので、以降の @router 行が下へずれた。/api/render と /api/render/start の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render/start",
+      "before": "static_route_scan: routers/render.py:165 POST /api/render/start",
+      "after": "static_route_scan: routers/render.py:166 POST /api/render/start",
+      "reason": "R1.5-C4（gate-verifier 8周目の指摘）: render.py の _get_quality_score() を本線の *.quality.json を読む形にしたので、以降の @router 行が下へずれた。/api/render と /api/render/start の中身は無変更（行番号だけの差し替え）"
     }
   ],
   "migrations": [

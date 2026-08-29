@@ -929,3 +929,115 @@ testpaths 外の3ファイル:
 `test_shared/test_mcp_server.py`(1) / `tests/test_mcp_server.py`(2)。
 
 **元から赤（基準 `main` と突き合わせ済み）:** `test_shared/test_branding_manager.py`(5)。
+
+---
+
+# 9周目に向けて — 8周目の指摘と、掃引の絞り方そのものを直す（2026-08-29）
+
+8周目も **not_met**。指摘は1件だが、**掃引の作り方が間違っていた**ことが分かった。
+
+## 指摘 — 書き出し前の品質スコアが `return 95` の直書きだった（決定的）
+
+`backend/routers/render.py`
+
+```python
+def _get_quality_score() -> int:
+    """品質スコアを取得（O-6連携）"""
+    # 実装ではquality_gate APIから取得する
+    # テスト用にデフォルト95を返す
+    return 95
+```
+
+```
+POST /api/render/start → 200
+{"success": true, "quality_score": 95, "message": "レンダリングを開始しました", ...}
+```
+
+三重に悪い:
+
+1. **何も測っていないのに `quality_score: 95` を `success: true` で返す**
+2. **S17 の品質ブロックが死んでいた。** `if quality_score < 90 and not req.force_render:`
+   は 95 が定数なので永久に偽。**書き出し前の品質ゲートは一度も止まらず、
+   `force_render` も意味を失っていた**
+3. 同じ 95 が `_render_jobs[job_id]["quality_score"]` に記録される
+
+本番マウント済み（`main.py:227`）で、**UI から呼ばれる**
+（`ProductionPipeline.jsx:1015` → `endpoints.js:75`）。リポジトリ自身の UI-API
+ラチェット台帳がこの結線を記録している（`ui_api_baseline.json:507`）。**元から**で、
+`limits` のどの除外にも当たらない。
+
+**しかも `backend/tests/test_render_router.py:268`（testpaths 内）が
+「デフォルトの95が返るため、ブロックされずに開始するはず」と書いて、
+この偽 success を CI 緑で積極的に保証していた。**
+
+### 直し方
+
+本線（`agents.pipeline_coordinator._write_quality_sidecar`）は最終動画の隣へ
+`*.quality.json` を書いており、**実測はそこにある**（実走で 89 / 94 / 88 / 89）。
+その関数の docstring 自身が「**消費者として宣言していた render は
+`quality_score`（数値）しか読んでおらず**」と書いていた。
+**宣言していた消費者が、実は読んでいなかった。**
+
+直近の `*.quality.json` を読む形にした。実測が入ったので **S17 のブロックが
+初めて生きた**:
+
+```
+POST /api/render/start                        → 200 {"success": false, "error": "quality_block",
+                                                     "quality_score": 89, "is_real": true}
+POST /api/render/start {"force_render": true} → 200 {"success": true, "quality_score": 89}
+```
+
+サイドカーが無い（＝本線を実走していない）ときは**点を名乗らずに通す**。
+`quality_score: null / quality_checked: false` を返す。
+**ここで止めないのは、以前も 95 の直書きで素通りしていたから**で、
+止める方針に変えるなら UI の書き出しから本線の品質ゲートを直接呼ぶ結線が先
+（台帳に `render_quality_gate` として登録）。
+
+## なぜ8周も出なかったか — **掃引の絞り方が間違っていた**
+
+過去8周の掃引は「**パス文字列**に4カテゴリの語を含むか」で母集団を作っていた
+（6周目: 460→148→GET 103 / 7周目: POST 50 / 8周目: v1 固有 7）。
+`/api/render/start` は**パスに語を1つも持たないが、応答本文に `quality_score` を持つ**。
+絞り込みが本文ではなくパスに掛かっていたので、**どの周回でも母集団に入っていなかった**。
+
+そこで**応答本文で絞る掃引**に作り直した。200 を返した **345 経路**のうち、
+4カテゴリの数字を無印で返すものが **14 件**。うち実在の欠陥は3件だった。
+
+| 見つかったもの | 何が偽だったか |
+|---|---|
+| `SelfReviewEngine._fallback_review()` | docstring が**「フォールバックレビュー（デフォルト合格）」**。`passed: True / overall: 0.75` を返し、`POST /api/antigravity/self-review/check` が AI レビュー未実行でも `{"passed": true, "score": 0.75}` を返していた。**`calculate_quality_score` / `verify_production_quality` と同じクラスの3件目** |
+| `AnalyticsManager.scout_rivals()` | `mock_rival_db` の固定値（TechStarter 180人 / TechMastery 15,000人）から `random.choice` で選ぶだけ。`GET /api/status` が `subs` / `views` つきで返す |
+| `/api/admin/integration/tool/evolution-log` | セッションごとの点（88 / 91 / 93）と日時が定数。`/tool/quality-score` の隣 |
+
+**誤検知だったもの**: `/api/thumbnail/history`（`actual_ctr: null` で正直）、
+`/api/admin/integration/dashboard`（`sections` の文字列に "quality_score" が入るだけ）、
+`/openapi.json`（スキーマ文書）、`/themes/recommend`・`/api/smartcut/finalize`・
+`/api/shorts/candidates`（入力から計算する実値）。
+
+## 8周目の note も直した（未達根拠ではない）
+
+- `routers/pipeline_report.py:196` `quality.get("score", 0)` — 未計測が「スコア: 0点」と出ていた
+- `ProductionWizard.jsx:176` `quality_score || 0` — 同上（`品質スコア0点`）
+
+## 契約テスト（21件・新規4件はすべて変異テストで確認）
+
+| 変異 | 結果 |
+|---|---|
+| `render` を `return 95` に戻す | 1 failed |
+| レビューを「デフォルト合格」に戻す | 1 failed |
+| ライバルの印を外す | 1 failed |
+| 進化ログツールの印を外す | 1 failed |
+
+**新しいテストからソース文字列の grep を外した。** 7周目に「文字列がコメントに
+残るだけで通る」空振りを指摘されており、**実際、書きかけの版で自分のコメントに
+`return 95` が入って誤検知した。** 挙動だけで見る。
+
+## 旧来の挙動を固定していたテスト（更新）
+
+`test_render_router.py::test_start_render_default_quality`（**偽 success を緑で
+固定していた張本人**）を、未計測とブロックの2本に置き換えた。ほか
+`tests/test_self_review_engine.py`(2) / `test_scratch_self_review_engine.py`(5) /
+`test_shared/test_cov_phase5_a_class.py`(3) / `test_analytics_manager.py`(3)。
+
+**元から赤（基準と突き合わせ済み・追加分）:**
+`test_shared/test_batch17_engines_plugins.py::test_cr_04_collect_model_requirements_exceptions`。

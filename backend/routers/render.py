@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+import json
 import uuid
 import asyncio
 import time
@@ -173,13 +174,22 @@ async def start_render(req: RenderStartRequest = RenderStartRequest()) -> Dict[s
     job_id = str(uuid.uuid4())[:8]
 
     # 品質チェック (S17: 品質ブロック)
+    # **未計測を「合格」に読み替えない**（R1.5-C4）。本線の実測が無いときは
+    # 点を名乗らずに進む。**ここで止めないのは、以前も 95 の直書きで素通り
+    # していたから**で、止める方針に変えるなら品質ゲートを本線へ繋ぐのが先
+    # （台帳: `backend/config/feature_gaps.json` の `render_quality_gate`）。
     quality_score = _get_quality_score()
-    if quality_score < 90 and not req.force_render:
+    出所 = _品質の出所()
+    if quality_score is not None and quality_score < 90 and not req.force_render:
         return {
             "success": False,
             "error": "quality_block",
             "message": f"品質スコア {quality_score} < 90。強制書出するには force_render=true を指定してください。",
             "quality_score": quality_score,
+            "quality_checked": True,
+            "quality_source": 出所,
+            "is_real": True,
+            "data_source": "derived",
             "force_render_available": True,
         }
 
@@ -203,6 +213,10 @@ async def start_render(req: RenderStartRequest = RenderStartRequest()) -> Dict[s
         "gpu_fallback": gpu_fallback,
         "force_render": req.force_render,
         "quality_score": quality_score,
+        # **測っていないことを記録に残す**（R1.5-C4）。`None` を後から
+        # 「0点」や「合格」と読み替えられないようにする
+        "quality_checked": quality_score is not None,
+        "quality_source": 出所,
         "progress": 0,
         "current_stage": "encoding",
         "stages": {
@@ -247,7 +261,15 @@ async def start_render(req: RenderStartRequest = RenderStartRequest()) -> Dict[s
         "gpu_fallback": gpu_fallback,
         "force_render": req.force_render,
         "quality_score": quality_score,
-        "message": "レンダリングを開始しました",
+        # **測ったのかどうかを応答でも名乗る**（R1.5-C4）。
+        # `quality_score: null` は「0点」でも「合格」でもない
+        "quality_checked": quality_score is not None,
+        "quality_source": 出所,
+        "is_real": quality_score is not None,
+        "data_source": "derived" if quality_score is not None else "unavailable",
+        "message": ("レンダリングを開始しました" if quality_score is not None else
+                    "レンダリングを開始しました（**品質スコアは未計測です。**"
+                    "本線の実走が書き出す *.quality.json がまだありません）"),
     }
 
 
@@ -376,11 +398,48 @@ async def force_render(job_id: str) -> Dict[str, Any]:
     return await start_render(RenderStartRequest(force_render=True))
 
 
-def _get_quality_score() -> int:
-    """品質スコアを取得（O-6連携）"""
-    # 実装ではquality_gate APIから取得する
-    # テスト用にデフォルト95を返す
-    return 95
+# **書き出し前の品質スコアは、本線が実際に出した点を読む**（R1.5-C4・
+# gate-verifier 8周目の指摘）。ここは以前 `return 95` の直書きで、
+#
+#   - 何も測っていないのに `quality_score: 95` を `success: true` で返し
+#   - **S17 の品質ブロック（`if quality_score < 90`）が永久に偽**になって
+#     一度も止まらず（`force_render` が意味を失っていた）
+#   - 同じ 95 が `_render_jobs[job_id]["quality_score"]` に記録されていた
+#
+# 本線（`agents.pipeline_coordinator._write_quality_sidecar`）は最終動画の隣へ
+# `*.quality.json` を書いており、**実測はそこにある**（実走で 89 / 94 / 88 / 89）。
+# その文書自身が「消費者として宣言していた render は `quality_score` しか
+# 読んでおらず」と書いている。**宣言していた消費者が、実は読んでいなかった。**
+_QUALITY_SIDECAR_DIR = "vault-outputs/final"
+
+
+def _品質の出所() -> Optional[str]:
+    """直近の `*.quality.json` の場所。無ければ None。"""
+    try:
+        d = _writable_path(_QUALITY_SIDECAR_DIR)
+        側 = sorted(d.glob("*.quality.json"), key=lambda p: p.stat().st_mtime)
+        return str(側[-1]) if 側 else None
+    except (OSError, AttributeError) as e:
+        logger.warning(f"品質サイドカーを探せませんでした: {e}")
+        return None
+
+
+def _get_quality_score() -> Optional[int]:
+    """本線が実際に出した品質スコアを返す。**測っていなければ None**（R1.5-C4）。
+
+    `None` は「0点」でも「合格」でもない。**見ていない**という意味で、
+    呼び出し側はそれを点として名乗ってはいけない。
+    """
+    path = _品質の出所()
+    if not path:
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            score = json.load(f).get("score")
+        return int(score) if isinstance(score, (int, float)) else None
+    except (OSError, ValueError, TypeError) as e:
+        logger.warning(f"品質サイドカーを読めませんでした（{path}）: {e}")
+        return None
 
 
 @router.post("/render")

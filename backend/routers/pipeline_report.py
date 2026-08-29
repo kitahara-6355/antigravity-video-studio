@@ -193,14 +193,21 @@ async def pipeline_report():
     for item in cat_report:
         if isinstance(item, dict):
             categories_found.add(item.get("category", ""))
-    quality_score = quality.get("score", 0)
+    # **未計測を「0点」と表示しない**（R1.5-C4）。既定値 0 のせいで、
+    # 品質ゲートを一度も通していない実走が「スコア: 0点」と出ていた。
+    # 2周目 N-2 で直した「未計測 → 0.0点・不合格」と同じクラス
+    # （こちらは `ok: False` なので偽の success ではないが、**数字が嘘**）。
+    quality_score = quality.get("score")
+    採点した = isinstance(quality_score, (int, float))
     # 判定: スコア90点以上（憲法§8.2準拠）
-    quality_ok = isinstance(quality_score, (int, float)) and quality_score >= 90
-    cat_display = ', '.join(categories_found) if categories_found else f"{quality_score}点"
+    quality_ok = 採点した and quality_score >= 90
+    点表示 = f"{quality_score}点" if 採点した else "未計測"
+    cat_display = ', '.join(categories_found) if categories_found else 点表示
     checks.append({
         "id": "⑤", "name": "品質ゲート",
         "ok": quality_ok,
-        "detail": f"スコア: {quality_score}点 / カテゴリ: {cat_display}",
+        "scored": 採点した,
+        "detail": f"スコア: {点表示} / カテゴリ: {cat_display}",
         "stage": next((s for s in stages if "品質" in s.get("name", "")), None),
     })
 

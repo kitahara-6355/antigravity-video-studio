@@ -173,20 +173,27 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
   // ── 品質ゲートデータ統合（D-6解消） ──
   // IMP-003: category_reportが空の場合のフォールバック
   const qualityGateData = useMemo(() => {
-    const effectiveScore = quality_score || 0;
+    // **未計測を「0点」と表示しない**（R1.5-C4）。`|| 0` のせいで、
+    // 品質ゲートを一度も通していないセッションが「品質スコア0点」と出ていた。
+    // バックエンド側（run_gate / _get_quality_score）で `null` を返すようにしたのと同じ扱い。
+    const 採点した = typeof quality_score === 'number';
+    const effectiveScore = 採点した ? quality_score : null;
     const effectiveFeedback = quality_feedback.length > 0
       ? quality_feedback
       : (category_report.length > 0
           ? category_report.filter(c => c.score !== null && c.score < 70).map(c => `${c.label}: ${c.status} (${c.score}点)`)
           : []);
     return {
-      is_ready: effectiveScore >= 80,
+      is_ready: 採点した && effectiveScore >= 80,
+      scored: 採点した,
       score: effectiveScore,
       critical_issues: effectiveFeedback.filter((_, i) => i < 3),
       suggestions: [],
-      final_verdict: effectiveScore >= 80
-        ? `品質スコア${effectiveScore}点 — 出力準備完了です。`
-        : `品質スコア${effectiveScore}点 — 改善を推奨しますが、強制続行も可能です。`,
+      final_verdict: !採点した
+        ? '品質スコアは**未計測**です。品質ゲートを通してから判断してください。'
+        : effectiveScore >= 80
+          ? `品質スコア${effectiveScore}点 — 出力準備完了です。`
+          : `品質スコア${effectiveScore}点 — 改善を推奨しますが、強制続行も可能です。`,
     };
   }, [quality_score, quality_feedback, category_report]);
 

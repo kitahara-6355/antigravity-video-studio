@@ -191,6 +191,19 @@
         "path": "backend/services/post_publish_collector.py",
         "marker": "_generate_mock_data"
       }
+    },
+    {
+      "id": "render_quality_gate",
+      "title": "書き出し前の品質ブロック（本線の品質ゲートに繋がっていない）",
+      "kind": "gap",
+      "why": "`routers/render.py` の `_get_quality_score()` は `return 95` の直書きで、**何も測っていないのに `quality_score: 95` を `success: true` で返していた**。そのせいで S17 の品質ブロック（`if quality_score < 90 and not force_render`）は**永久に偽**になり、レンダリング前の品質ゲートは一度も止まらず `force_render` も意味を失っていた。`POST /api/render/start` は本番マウント済みで、UI（`ProductionPipeline.jsx:1015` → `endpoints.js:75`）から呼ばれる。2026-08-29 に本線が書き出す `vault-outputs/final/*.quality.json` を読む形にして、**ブロックが実際に効くようにした**（実測 89 点で止まることを確認）。ただし**サイドカーが無い＝実走していないときは点を名乗らずに通す**。止める方針に変えるなら、UI の書き出しから本線の品質ゲートを直接呼ぶ結線が先（R1.5-C4・gate-verifier 8周目の指摘）",
+      "handled_in": "将来",
+      "surfaces_as": "書き出し前品質ブロック",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/render.py",
+        "marker": "_QUALITY_SIDECAR_DIR"
+      }
     }
   ]
 }
