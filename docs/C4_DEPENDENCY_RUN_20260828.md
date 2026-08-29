@@ -760,3 +760,60 @@ python -m backend.feature_gaps --audit --static-only             exit 0
 回すと効かない**ことが分かった。掃引の初回に `backend/list_models.py` が
 実際に googleapis.com へ出ている（400 API_KEY_INVALID・課金なし）。
 **手元で本番アプリを起こすときは、自分で外向きを塞いでから叩くこと。**
+
+## 自前の POST 掃引（6周目の指摘を受けて）
+
+「総当たりが GET だけだった」と分かったので、**POST も掃いた**
+（`net_guard` は pytest 専用なので、外向き接続は自分で塞いでから叩いた）。
+4カテゴリに当たる POST は 50 経路、200 で無印だったのは 12 件。
+そのうち条件文の「品質スコア」に当たるのが2件あった。
+
+### 見るものが無いのに満点を返していた（`/api/quality/check`・`/verify`）
+
+```
+POST /api/quality/check  {}
+  →  {"is_ready": true, "score": 100,
+      "summary": "✅ 優秀な品質です。レンダリングを推奨します。"}
+```
+
+`_calculate_score()` は 100 点からの**減点式**なので、**入力が空だと減点対象が
+1つも見つからず必ず満点になる。** 動画を1フレームも見ていないのに
+「優秀・レンダリング推奨」。4周目 C-5（`/api/review/summary` が1項目も採点せず
+100.0）と同型だが、**あちらは死蔵で、こちらはフロントエンドが呼ぶ本番経路**
+（`frontend/src/gateway/endpoints.js` の `/api/quality/*`）。
+
+`run_gate()` に「採点する材料が1つでもあるか」の門を足し、
+無ければ `score: None / scored: False / is_ready: False` を返す。
+`QualityReport` に `scored` を追加した（**「問題ゼロで満点」と「見ていない」を
+取り違えないための印**）。
+
+```
+POST /api/quality/check  {}
+  →  {"is_ready": false, "score": null, "scored": false,
+      "summary": "⚠️ 採点していません（脚本・シーン・字幕のいずれも渡されていません）。
+                  **品質を保証する材料がありません。**"}
+```
+
+### QA エンジンが落ちても「進行可能」と言っていた（`verify_production_quality`）
+
+`director_engine.py:724` の except が
+`{"is_ready": True, "score": 80, "suggestions": ["自動チェックに失敗しましたが、進行可能です。"]}`
+を返していた。**QA エンジンが一度も走っていなくてもレンダリングへ進めた。**
+6周目に直した `calculate_quality_score()` の except と**同じ関数群の隣**。
+`is_ready: False / score: None / is_real: False` にした。
+
+### 変異テスト
+
+| 変異 | 結果 |
+|---|---|
+| 空入力の門を `if False` にする | 1 failed |
+| `verify_production_quality` の except を `is_ready: True / score: 80` に戻す | 1 failed |
+
+### 旧来の挙動を固定していたテスト（更新）
+
+`test_quality_gate_agent.py`(3) / `test_shared/test_batch7_zero_pct.py`(4) /
+`test_director_engine_unit.py`(1) / `test_shared/test_batch13_director_preview.py`(1)。
+いずれも**空入力で満点・検査失敗で進行可能**を期待していた。
+
+**元から赤（確認済み・追加分）:** `test_quality_unified.py` は
+`ModuleNotFoundError: No module named 'unified'` で収集できない（testpaths 外・基準でも同じ）。

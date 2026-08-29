@@ -538,7 +538,11 @@ def test_verify_production_quality_fallback(mock_gemini, mock_branding):
     mock_gemini.models.generate_content.side_effect = RuntimeError("API Error")
     res = brain.verify_production_quality("script", [], [])
     parsed = json.loads(res)
-    assert parsed["is_ready"] is True
-    assert parsed["score"] == 80
+    # **検査が落ちたら「進行可能」と言わない**（R1.5-C4）。ここは以前
+    # `is_ready: True / score: 80` を期待していたので、**QA エンジンが
+    # 一度も走っていなくてもレンダリングへ進めた。**
+    assert parsed["is_ready"] is False
+    assert parsed["score"] is None
+    assert parsed["is_real"] is False
     assert "QAエンジンエラー" in parsed["final_verdict"]
 

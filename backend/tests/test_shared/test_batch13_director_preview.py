@@ -227,7 +227,9 @@ class TestDirectorBrainGeneration:
         mock_brain.client.models.generate_content.side_effect = Exception("err")
         result = mock_brain.verify_production_quality("text", [], [])
         data = json.loads(result)
-        assert data["is_ready"] is True
+        # **検査が落ちたら「進行可能」と言わない**（R1.5-C4）。旧 `is_ready: True` を置換
+        assert data["is_ready"] is False
+        assert data["score"] is None
         mock_brain.client.models.generate_content.side_effect = None
 
     def test_de_26_analyze_resource_needs(self, mock_brain):

@@ -339,3 +339,72 @@ def test_成長ログの作り物に印が付く(monkeypatch):
 
     # 印が保存側へ書き戻らないこと
     assert "data_source" not in 作り物
+
+
+# ── 7周目に向けた自前の POST 掃引で見つかったもの ──────────────────
+#
+# 6周目の指摘で「総当たりが GET だけだった」と分かったので、POST も掃いた。
+# 4カテゴリに当たる POST 50 経路のうち、200 で無印だったのは 12 件。
+# そのうち条件文の「品質スコア」に当たるのが下の2件だった。
+
+
+def test_見るものが無ければ品質は満点にならない():
+    """`POST /api/quality/check` と `/verify`（R1.5-C4）。
+
+    `_calculate_score()` は 100 点から減点する形なので、**入力が空だと
+    減点対象が1つも見つからず必ず 100 点になる。**空の body を投げると
+    `{"is_ready": true, "score": 100, "summary": "✅ 優秀な品質です。
+    レンダリングを推奨します。"}` が返っていた。**動画を1フレームも
+    見ていないのに「優秀・レンダリング推奨」。**
+
+    4周目 C-5（`/api/review/summary` が1項目も採点せず 100.0）と同型。
+    ただし**あちらは死蔵で、こちらはフロントエンドが呼ぶ本番経路**
+    （`frontend/src/gateway/endpoints.js`）。
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.quality import router
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    for path in ("/api/quality/check", "/api/quality/verify"):
+        data = client.post(path, json={}).json()
+        assert data["scored"] is False, f"{path}: 何も渡していないのに採点したと言った"
+        assert data["score"] is None, f"{path}: 見ていないのに点を名乗った"
+        assert data["is_ready"] is False, f"{path}: 見ていないのに合格と言った"
+
+    # 材料があるときは従来どおり採点する（門が広すぎないこと）
+    採点 = client.post("/api/quality/check",
+                       json={"full_text": "これは検査対象の脚本です。"}).json()
+    assert 採点["scored"] is True
+    assert isinstance(採点["score"], int)
+
+
+def test_QAエンジンが落ちたら進行可能と言わない():
+    """`DirectorBrain.verify_production_quality()` の except（R1.5-C4）。
+
+    `is_ready: True / score: 80 / 「自動チェックに失敗しましたが、進行可能です。」`
+    を返していた。**QA エンジンが一度も走っていなくてもレンダリングへ進めた。**
+    `calculate_quality_score()` の except を直したのと同じ形。
+    """
+    import json
+
+    from director_engine import DirectorBrain
+
+    brain = DirectorBrain()
+
+    class _落ちるクライアント:
+        class models:
+            @staticmethod
+            def generate_content(*_a, **_k):
+                raise RuntimeError("接続できません")
+
+    brain.client = _落ちるクライアント()
+    result = json.loads(brain.verify_production_quality("脚本", [{"name": "s1"}], [{"text": "t"}]))
+
+    assert result["is_ready"] is False, "検査が落ちたのに進行可能と言った"
+    assert result["score"] is None, "検査していないのに点を名乗った"
+    assert result["is_real"] is False
+    assert "QAエンジンエラー" in result["final_verdict"]

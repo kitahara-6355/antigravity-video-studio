@@ -720,8 +720,20 @@ class DirectorBrain:
             return response.text
         except Exception as e:
             print(f"Quality Gate Error: {e}")
+            # **検査が落ちたら「進行可能」と言わない**（R1.5-C4）。
+            # ここは `is_ready: True / score: 80` を返していたので、
+            # **QA エンジンが一度も走っていなくてもレンダリングへ進めた。**
+            # `calculate_quality_score()` の except を直したのと同じ扱い。
             return json.dumps({
-                "is_ready": True, "score": 80, "critical_issues": [], "suggestions": ["自動チェックに失敗しましたが、進行可能です。"], "final_verdict": "QAエンジンエラーのため、手動確認を推奨します。"
+                "is_ready": False,
+                "score": None,
+                "critical_issues": [],
+                "suggestions": ["通信とAPIキーを確認して、もう一度検査してください。"],
+                "final_verdict": f"QAエンジンエラーのため、検査は行われていません（{type(e).__name__}）。"
+                                 "手動確認を推奨します。",
+                "is_real": False,
+                "data_source": "unavailable",
+                "error": str(e),
             })
 
 # Instantiate the Brain
