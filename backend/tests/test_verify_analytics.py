@@ -7,6 +7,20 @@ import requests
 # ?????????????????????????
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+def _表示用の読み口(mock):
+    """実物と同じ経路にする — `user_model` を読み、印の集約点へ通す。
+
+    `GET /api/status` と `get_all_settings()` は `user_model` を直に読むのを
+    やめ、`branding_manager.get_user_model_for_display()` を通すようになった
+    （R1.5-C4・gate-verifier 10周目 N-1）。素通しの `return_value` にすると
+    **集約点を迂回しても気づけない**ので、実物と同じ形にする。
+    """
+    def 読む():
+        from user_model_marks import 実績を持つ値に印を付ける
+        return 実績を持つ値に印を付ける(mock.user_model)
+    return 読む
+
+
 def test_verify_analytics_import_error():
     with mock.patch.dict("sys.modules", {"requests": None}):
         sys.modules.pop("backend.verify_analytics", None)
@@ -139,6 +153,8 @@ def test_verify_analytics_with_testclient():
     from unittest import mock
     mock_branding_manager = mock.MagicMock()
     mock_branding_manager.user_model = {'ranks': {'biz_rank': {'xp': 100}}}
+    mock_branding_manager.get_user_model_for_display.side_effect = \
+        _表示用の読み口(mock_branding_manager)
     mock_branding_manager.process_analytics_update.return_value = {
         'biz_xp': 120,
         'rivals': {

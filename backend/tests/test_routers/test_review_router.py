@@ -402,6 +402,8 @@ def test_測れていれば点数を出す():
     plugin = ProgressiveReviewPlugin()
     ctx = ProductionContext()
     plugin.execute(ctx)
+    # **「測った」は値ではなく旗で表す**（R1.5-C4・10周目 N-3）
+    ctx.quality_scored = True
     ctx.quality_score = 95.0
 
     review = plugin._generate_stage_review(PStage.FINAL, ctx)
@@ -464,6 +466,7 @@ def test_サマリーの点は採点したステージだけから出す():
 
     # **門が恒真でないことの確認。** 採点できれば点が出る
     ctx2 = ProductionContext()
+    ctx2.quality_scored = True
     ctx2.quality_score = 95.0
     plugin2 = ProgressiveReviewPlugin()
     plugin2.execute(ctx2)
