@@ -1301,7 +1301,15 @@ class PipelineCoordinator:
                 "video": Path(ctx.video_path).name,
                 "segments_total": len(ctx.segments),
                 "segments_selected": len(ctx.selected_segments),
-                "quality_score": ctx.quality_score,
+                # **未計測を 0 点として記録しない**（R1.5-C4・12周目の指摘）。
+                # `QualityGateWorker` は `FATAL_WORKERS` に入っていないので、
+                # 品質ゲートが結果を返さなくても実走は `degraded` で続き、
+                # **ここは必ず走る**。そのとき `ctx.quality_score` は既定の 0 で、
+                # 既存の記録（`run_20260826_060153.json` の `"quality_score": 50`）と
+                # 同じ形になり、**読み手に実測 0 点と未計測が区別できない**。
+                # 値ではなく旗で表す（9周目に本線で根治したのと同じ形）。
+                "quality_score": ctx.quality_score if getattr(ctx, "quality_scored", False) else None,
+                "quality_scored": bool(getattr(ctx, "quality_scored", False)),
                 "stage_durations": {
                     r.stage_name: r.duration_seconds
                     for r in ctx.stage_results

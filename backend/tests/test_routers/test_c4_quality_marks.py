@@ -1149,3 +1149,114 @@ def test_レポートは未計測を全項目クリアと書かない():
     finally:
         _pipeline_state.clear()
         _pipeline_state.update(元の状態)
+
+
+def test_実行記録は未計測を0点として残さない(tmp_path, monkeypatch):
+    """`_trigger_dream_learning` の制作ナレッジ（R1.5-C4・12周目の指摘）。
+
+    **応答本文に出ない経路**で、名指しされた `quality_score` が旗なしの
+    値として残っていた。`QualityGateWorker` は `FATAL_WORKERS` に入って
+    いないので、品質ゲートが結果を返さなくても実走は `degraded` で続き、
+    **ここは必ず走る**。そのとき `ctx.quality_score` は既定の 0 で、
+    既存の記録（`run_20260826_060153.json` の `"quality_score": 50`）と
+    **同じ形になり、読み手に実測 0 点と未計測が区別できない**。
+    """
+    import asyncio
+    import json as _json
+    import sys
+    import types
+
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    # DreamEngine の副作用（VERIFIED_FACTS.md 等の追跡ファイル書き換え）を止める
+    偽エンジン = types.ModuleType("agents.dream_engine")
+
+    class _偽:
+        def increment_session_count(self): pass
+        async def should_dream(self): return False
+
+    偽エンジン.dream_engine = _偽()
+    monkeypatch.setitem(sys.modules, "agents.dream_engine", 偽エンジン)
+
+    import agents.pipeline_coordinator as PC
+    monkeypatch.setattr(PC, "_writable_path", lambda *_a, **_k: tmp_path)
+    monkeypatch.delenv("AVS_SKIP_LEARNING_SIDE_EFFECTS", raising=False)
+
+    coordinator = PipelineCoordinator.__new__(PipelineCoordinator)
+
+    def 記録を読む():
+        files = sorted(tmp_path.glob("run_*.json"))
+        assert files, "ナレッジが書かれていない"
+        return _json.loads(files[-1].read_text(encoding="utf-8"))
+
+    # ① 未計測（品質ゲートが結果を返さなかった degraded 実走）
+    ctx = PipelineContext(video_path="never_scored.mp4", session_id="s-k1")
+    asyncio.run(coordinator._trigger_dream_learning(ctx))
+    記録 = 記録を読む()
+    assert 記録["quality_scored"] is False
+    assert 記録["quality_score"] is None, "未計測を 0 点として記録した"
+
+    # ② 採点した 0 点は 0 点として残す（門が広すぎないこと）
+    for f in tmp_path.glob("run_*.json"):
+        f.unlink()
+    ctx2 = PipelineContext(video_path="scored_zero.mp4", session_id="s-k2")
+    ctx2.quality_scored = True
+    ctx2.quality_score = 0
+    asyncio.run(coordinator._trigger_dream_learning(ctx2))
+    記録2 = 記録を読む()
+    assert 記録2["quality_scored"] is True
+    assert 記録2["quality_score"] == 0, "採点した 0 点まで消している"
+
+
+def test_未計測の実走から確かめた事実を作らない(tmp_path, monkeypatch):
+    """`tick_loop._action_pipeline_knowledge`（R1.5-C4・12周目の指摘）。
+
+    書き込み先は **`VERIFIED_FACTS.md`（恒久的に残る「確かめた事実」）**。
+    もとは `score > 0` で判断していた——**番兵値で「測ったか」を決める**
+    読み方で、9周目に本線で根治したのと同じ型。旧い記録には旗が無いので
+    **旗が無ければ採点していないとみなす**（fail-closed）。
+    """
+    import asyncio
+    import json as _json
+
+    import agents.tick_loop as TL
+
+    knowledge_dir = tmp_path / "pipeline_knowledge"
+    knowledge_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(TL, "_writable_path", lambda *_a, **_k: knowledge_dir)
+
+    足された = []
+
+    class _偽ストア:
+        def add_fact(self, **kw):
+            足された.append(kw)
+
+    import agents.memory.verified_facts as VF
+    monkeypatch.setattr(VF, "verified_facts_store", _偽ストア())
+
+    def 走らせる(記録):
+        for f in knowledge_dir.glob("run_*.json"):
+            f.unlink()
+        (knowledge_dir / "run_001.json").write_text(
+            _json.dumps(記録, ensure_ascii=False), encoding="utf-8")
+        足された.clear()
+        asyncio.run(TL.TickLoop()._action_pipeline_knowledge())
+        return [f for f in 足された if "品質スコア" in f.get("content", "")]
+
+    # ① 未計測（旗なし・0点）— **事実にしない**
+    assert 走らせる({"video": "a.mp4", "quality_score": 0}) == [], \
+        "未計測から品質スコアの『確かめた事実』を作った"
+
+    # ② 旗なしで点だけある旧い記録 — 測ったか分からないので作らない
+    assert 走らせる({"video": "b.mp4", "quality_score": 50}) == [], \
+        "旗の無い記録を実測として扱った"
+
+    # ③ 採点した 0 点 — **事実にする**（門が広すぎないこと）
+    事実 = 走らせる({"video": "c.mp4", "quality_score": 0, "quality_scored": True})
+    assert len(事実) == 1, "採点した 0 点を落とした"
+    assert "0点" in 事実[0]["content"]
+
+    # ④ 採点した 85 点
+    事実 = 走らせる({"video": "d.mp4", "quality_score": 85, "quality_scored": True})
+    assert len(事実) == 1 and "85点" in 事実[0]["content"]
