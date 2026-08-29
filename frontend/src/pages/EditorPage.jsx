@@ -1639,9 +1639,23 @@ export default function EditorPage() {
         onClose={() => setShowPipeline(false)}
         onWizardStart={(pipelineResult) => {
           setShowPipeline(false);
+          // **`|| 0` で未計測を 0 点に潰さない**（R1.5-C4・13周目の指摘）。
+          // `ProductionWizard` 側は 9周目（7f8198a）に「未計測」の枝を入れたが、
+          // **点を注入しているこの呼び出し元が直っていなかった**ので、
+          // その枝には本番から到達できなかった（9・10周目と同じ「門が
+          // 本番から到達不能」の型）。
+          //
+          // `||` は 0 を falsy として弾くので、実測 0 点まで握り潰す。
+          // `??` にしたうえで、**旗も一緒に渡す**（0 は実際に取りうる点なので
+          // 値だけでは未計測と区別できない）。
           setWizardContext({
             segments: segments,
-            quality_score: pipelineResult?.quality_details?.score || pipelineResult?.quality_score || 0,
+            quality_score: pipelineResult?.quality_details?.score
+              ?? pipelineResult?.quality_score
+              ?? null,
+            quality_scored: pipelineResult?.quality_details?.scored
+              ?? pipelineResult?.quality_scored
+              ?? false,
             quality_feedback: pipelineResult?.quality_details?.feedback || [],
             category_report: pipelineResult?.quality_details?.category_report || [],
             metadata: pipelineResult?.metadata || {},

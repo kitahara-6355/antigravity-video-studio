@@ -1260,3 +1260,51 @@ def test_未計測の実走から確かめた事実を作らない(tmp_path, mon
     # ④ 採点した 85 点
     事実 = 走らせる({"video": "d.mp4", "quality_score": 85, "quality_scored": True})
     assert len(事実) == 1 and "85点" in 事実[0]["content"]
+
+
+def test_採点できなかった実走を完了と呼ばない():
+    """**未計測なら `completed` にならない**（R1.5-C4・13周目の裏取り）。
+
+    13周目は「`QualityGateWorker` は `FATAL_WORKERS` に入っていないので
+    未計測でも `completed` に到達する」と述べて UI の反例を挙げたが、
+    **その到達性は成り立たない**。`_settle_outcomes()` は落ちた工程を
+    致命／劣化に分け、**劣化があれば `degraded`**（`completed` ではない）。
+    品質ゲートが例外・Hook 拒否で結果を返さなければ劣化に入る。
+
+    UI 側（`ProductionPipeline.jsx:385`）は `status === "completed"` でしか
+    仕上げウィザードを出さないので、**未計測のまま UI に届く経路が無い**
+    ことがこの不変条件で決まる。
+
+    **ここが崩れたら UI の「未計測」の枝が本当に必要になる**ので、
+    不変条件そのものを固定しておく。
+    """
+    from agents.pipeline_coordinator import (
+        FATAL_STAGES, PipelineCoordinator, STATUS_COMPLETED, STATUS_DEGRADED)
+    from agents.pipeline_types import PipelineContext
+
+    coordinator = PipelineCoordinator.__new__(PipelineCoordinator)
+    ctx = PipelineContext(video_path="d.mp4", session_id="s-settle")
+    ctx.skipped_features = []
+
+    # 品質ゲートが結果を返さなかった実走
+    coordinator._outcomes = {"文字起こし": True, "品質チェック": False}
+    致命, 劣化 = coordinator._settle_outcomes(ctx)
+
+    assert "品質チェック" not in FATAL_STAGES, "前提が変わった（致命に昇格した）"
+    assert 致命 == [], 致命
+    assert 劣化 == ["品質チェック"], 劣化
+
+    # 呼び出し側と同じ式で状態を決める
+    final_status = STATUS_DEGRADED if 劣化 else STATUS_COMPLETED
+    assert final_status == STATUS_DEGRADED
+    assert final_status != STATUS_COMPLETED, \
+        "未計測の実走が completed になった（UI が仕上げウィザードを出す）"
+    assert "品質チェック" in ctx.skipped_features, "落ちた工程が記録に出ていない"
+
+    # 全部通ったときだけ completed
+    ctx2 = PipelineContext(video_path="d.mp4", session_id="s-settle2")
+    ctx2.skipped_features = []
+    coordinator._outcomes = {"文字起こし": True, "品質チェック": True}
+    致命2, 劣化2 = coordinator._settle_outcomes(ctx2)
+    assert (STATUS_DEGRADED if 劣化2 else STATUS_COMPLETED) == STATUS_COMPLETED, \
+        "全部通ったのに完了と呼べない（門が広すぎる）"

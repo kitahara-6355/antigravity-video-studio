@@ -721,9 +721,19 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                                 ]);
                                 const statusData = statusRes.ok ? await statusRes.json() : {};
                                 const improveData = improveRes.ok ? await improveRes.json() : {};
+                                // **未計測を「0点」と描かない**（R1.5-C4・13周目）。
+                                // 点が無いときに `?? 0` で 0 を置くと、
+                                // 測っていないものが「0点・未達」という
+                                // **測定結果**として出る（9周目に潰した型）。
+                                const 点 = statusData.overall_score
+                                  ?? stage.data?.quality_score
+                                  ?? null;
+                                const 採点した = typeof 点 === 'number';
                                 setQualityGateData({
-                                  is_ready: statusData.passed ?? statusData.overall_score >= 90,
-                                  score: statusData.overall_score ?? stage.data?.quality_score ?? 0,
+                                  is_ready: 採点した
+                                    && (statusData.passed ?? 点 >= 90),
+                                  scored: 採点した,
+                                  score: 点,
                                   critical_issues: (improveData.suggestions || [])
                                     .filter(s => s.severity === 'critical')
                                     .map(s => s.suggestion),

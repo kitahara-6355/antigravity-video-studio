@@ -203,7 +203,9 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
           ? `品質スコア${effectiveScore}点 — 出力準備完了です。`
           : `品質スコア${effectiveScore}点 — 改善を推奨しますが、強制続行も可能です。`,
     };
-  }, [quality_score, quality_feedback, category_report]);
+    // **旗も依存に入れる**（R1.5-C4・13周目）。入れないと、旗だけが
+    // 変わったときに古い判定が残る
+  }, [quality_score, quality_scored, quality_feedback, category_report]);
 
   // ── ステップレビューデータ（D-3解消） ──
   const stepReviewData = useMemo(() => ({
