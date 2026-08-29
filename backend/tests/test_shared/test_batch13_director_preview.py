@@ -254,7 +254,9 @@ class TestDirectorBrainGeneration:
         mock_brain.client.models.generate_content.side_effect = Exception("err")
         result = mock_brain.calculate_quality_score([])
         data = json.loads(result)
-        assert data["rank"] == "C"
+        # **採点が落ちたら点も合格も名乗らない**（R1.5-C4）。旧 `rank: "C"` を置換
+        assert data["rank"] is None
+        assert data["is_acceptable"] is False
         mock_brain.client.models.generate_content.side_effect = None
 
     def test_de_30_analyze_script_fallback(self, mock_brain):

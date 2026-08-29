@@ -908,6 +908,11 @@ class TestC7CoverageExtension:
         ctx = create_mock_ctx(segments=5)
         ctx.segments = _make_segments(5)
         ctx.metadata = None  # dict ではない値
+        # **SNS の実データを渡す**（R1.5-C4）。渡さないと本線は分析しない
+        # （作り物のフォロワー数から投稿先を推奨しないため）
+        ctx.metadata_source = {"sns_data": {"X": {"followers": 320, "posts": [
+            {"text": "#AI", "impressions": 1200, "engagement": 45,
+             "posted_at": "2026-05-20T19:15:00"}]}}}
 
         # CrossMediaService をモックして正常に結果が返るようにする
         mock_service = MagicMock()

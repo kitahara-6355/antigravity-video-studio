@@ -444,8 +444,14 @@ def test_calculate_quality_score_fallback(mock_gemini, mock_branding):
     mock_gemini.models.generate_content.side_effect = RuntimeError("API Error")
     res = brain.calculate_quality_score([], "Novice")
     parsed = json.loads(res)
-    assert parsed["score"] == 50
-    assert parsed["rank"] == "C"
+    # **採点が落ちたら点も合格も名乗らない**（R1.5-C4）。
+    # ここは以前 `score: 50 / rank: "C" / is_acceptable: True` を期待していたが、
+    # UI（`DirectorBriefing.jsx:531,552`）が `is_acceptable` で緑の
+    # 「制作開始 (Go)」を出すので、**採点が一度も走っていないのに合格に見えていた。**
+    assert parsed["score"] is None
+    assert parsed["rank"] is None
+    assert parsed["is_acceptable"] is False
+    assert parsed["is_real"] is False
 
 
 # -------------------------------------------------------------

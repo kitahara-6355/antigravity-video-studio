@@ -465,3 +465,154 @@ analytics の1経路から印を外す              → 1 failed
 ready_for_render を pending_revisions だけに → 1 failed
 guard: testpaths 外に赤を1件作る            → 🚫 exit 1
 ```
+
+---
+
+# 6周目に向けて — 5周目の指摘を潰し、総当たりで残りを洗う（2026-08-29）
+
+5周目も **not_met**。指摘3件は `08dfcff` で対応済みだったが、**この文書に
+書いていなかった**ので先に記録する。そのうえで、5周連続で落ちた原因
+（「同じクラスの別経路」の見落とし）に対して**先に総当たりを回した。**
+
+## 5周目の指摘（`08dfcff` で対応済み）
+
+| # | 指摘 | 対応 |
+|---|---|---|
+| **C-6** | 5周かけて直していた `/api/review/*` は本番にマウントされていない（ルート数 0）。本番で生きている品質スコアは `/api/pipeline/quality-gate/*` | quality-gate 系6経路に `QUALITY_GATE_DATA_SOURCE`（`is_real: false`）。検査していないのに `checked_at` へ現在時刻を打つのをやめた |
+| **C-3** | guard の `_参照形()` が `patch("model_registry.get_model")` 形をトップレベルモジュールで拾えず、16ファイルが対象外 | `"{mod}.` / `'{mod}.` を照合に追加。対象 142 → **158 ファイル** |
+| **C-8** | guard が `MAX_FILES` 超過とタイムアウトのどちらでも exit 0 | どちらも **exit 1**。`MAX_FILES` を 160 → 400 |
+
+**ただし `08dfcff` は印を付けただけで契約テストを1件も足していなかった。**
+`grep -rn is_real backend/tests` に quality-gate が出てこない状態だったので、
+印を外しても何も落ちない。6周目に向けて
+`backend/tests/test_routers/test_c4_quality_marks.py`（**testpaths 内**）を新設した。
+
+## 総当たり（指摘を待たずに自分で洗った）
+
+本番の全ルートを `TestClient` で起こして数えた。**460経路**のうち、
+条件文の4カテゴリ（投稿・チャンネル統計・品質スコア・retention 分析）に
+当たる語を含むものが **148経路**、GET で実際に叩けたものが **103経路**。
+そのうち印が付いていたのは **43経路**だった。
+
+### 見つかった残り（すべて本番マウント済み・すべて未検証で残っていた）
+
+| # | 経路 | 何を偽っていたか |
+|---|---|---|
+| **1** | `pipeline_router` の O-7 品質改善ループ **6経路** | 72→85 のスコア推移。`apply` の実体は `improvement = 4  # シミュレーション: +4点` で、音量正規化もリエンコードも走らない。**初期状態からして `act-001` と `act-002` が `completed`**（開く前から2件の改善が終わったことになっている）。5周目に印を付けた O-6 の**190行下**で、出所は同じ `pipeline_default_states` |
+| **2** | `/api/admin/integration/tool/quality-score` | `score: 92 / rank: "A"` を工程別の内訳つき・**現在時刻つき**で返す |
+| **3** | `/api/admin/incident/quality-degradation` | `current_score: 72` と3点の推移を現在時刻つきで返す。**一度も測っていない品質低下を「検知した」と言っていた** |
+| **4** | `director_engine.calculate_quality_score()` の except | 採点が落ちても `score: 50 / rank: "C" / **is_acceptable: True**` |
+
+**4番がいちばん重い。** `is_acceptable` は
+`frontend/src/components/DirectorBriefing.jsx:531,552,554` で
+**緑の「制作開始 (Go)」ボタンを直接駆動している。** API キーが無効でも
+通信が落ちても、画面には「合格しました・制作開始 (Go)」が出ていた。
+**採点が一度も走っていないのに合格に見える**のは、条件文の「偽の success」そのもの。
+
+いま:
+
+```
+score: null / rank: null / is_acceptable: false / is_real: false
+comment: スコア計算に失敗しました（RuntimeError）。**採点は行われていません。**
+```
+
+### 誤検知として落としたもの（総当たりの結果を全部は直していない）
+
+- `template_constants.py` / `soul_router.py` — 字幕の秒あたり文字数、CTR 平均 3.5% など。
+  **編集の設計値と業界ベンチマークであって、このチャンネルの実測ではない**
+- `services/thumbnail_analyzer.py` — 入力で分岐する規則ベースの採点（定数ではない）
+- `video_pipeline/soul_feedback_engine.py` — 凍結（`limits` に記載済み）
+- `backend/scratch/` と `agents/orchestration/mark_*` — 使い捨てスクリプト。本番経路ではない
+
+## ユーザーに上げた範囲の判断（2026-08-29・3件とも決定済み）
+
+| 問い | 決定 |
+|---|---|
+| 本線が使う SNS 統計のねつ造（`cross_media_service`）は「チャンネル統計」か | **含める。** 直した |
+| 4カテゴリ外の admin デモ層（約110経路） | **対象外。** `limits` に記録。**6周目以降これを未達根拠にしない** |
+| 開発プロセスの品質（`admin_quality_router` 25経路） | **「印」ではなく「実データへの接続」で扱う**（下記） |
+
+### SNS クロスメディア相関分析（決定: 含める）
+
+`metadata_source["sns_data"]` を埋める経路が**どこにも無い**ので、
+`YouTubeOptWorker._run_cross_media_analysis()` は**常に**
+`get_default_sns_data()` の作り物（X 12,500 フォロワー・Instagram 8,400 …）で
+相関を取り、そこから決めた「最適な投稿先プラットフォーム」と推奨ハッシュタグを
+**本線の `ctx.metadata["cross_media_correlation"]` に埋めていた。**
+
+`retention_analysis` を本線で飛ばしているのと同じ扱いにした
+（SNS の実データが無ければ分析しない・`skipped_features` に出る）。
+サービスを直接呼ぶ経路（デモ・単体テスト）には `is_real` を付けた。
+台帳: `sns_cross_media`。
+
+### 開発プロセスの品質 — 「数字は出所を名乗る」規則を入れた
+
+ユーザーの指示は「整合性をつけてどちらも大切にしたい。過去の開発資産は
+最大限有効活用するとともに開発思想をブレずに」。開発思想を読み直して決めた:
+
+- **憲法 §7.3.2 A-4**「push時にテスト/リント/セキュリティが自動実行」は
+  **実際に GitHub Actions で動いている。** 画面が定数を返しているのは
+  「実装が繋がっていない」状態であって、作り物だと札を貼って固定する話ではない
+- **ペルソナ #23 選択的保持** / **憲法 §13.3 既存資産の優先活用** —
+  再利用できる基盤を壊さない
+- **ペルソナ #28 スコアベースの絶対評価** — 品質は客観的スコアで管理する
+
+そこで出所を3段にした。`measured`（この実行で測った）/
+`derived`（リポジトリの実データから引いた・`source` に出所）/
+`sample`（作り物・`is_real: false`）。
+
+**繋いだ結果、作り物と実体が食い違っていた:**
+
+| 経路 | 画面の作り物 | リポジトリの実体 |
+|---|---|---|
+| `/ratchet` | `770/770`・連動率 **100.0%** | pass **75** / fail 16 / skip 954（`snapshots/v8_baseline.json`）|
+| `/lint` | issues **2件** | **28,842件**（`.github/ruff-baseline.json`・うち W293 が 27,393件）|
+| `/vision-gap` | score **60.35**（独自の定数） | **65.95**（正典 `vision_backlog.json`）|
+
+`/vision-gap` がとくに悪い。**現在地の正典は `vision_backlog.json`**（憲法第5条）
+なのに、画面が別の数字を持っていた。**台帳が2つあると、どちらが本当か分からない。**
+
+残り22経路（テスト件数・カバレッジ・E2E・FV・各種トレンド）は **CI の実行結果が
+要る**ので `sample` のまま。**無いものを繋いだことにしない。** そこは R2。
+
+## 契約テスト（印を外したら落ちる）
+
+| ファイル | testpaths | 内容 |
+|---|:--:|---|
+| `backend/tests/test_routers/test_c4_quality_marks.py`（新規）| ✅ | O-6/O-7 の**総当たり**・admin 2経路・`is_acceptable` の失敗時 |
+| `backend/tests/test_admin_quality_router.py` | ✅ | 25経路の**総当たり**（出所が3段のどれかであること）・実データ接続3件・正典との一致 |
+| `backend/tests/test_workers/test_cross_media_analyzer.py` | ✅ | SNS 実データが無ければ分析しない・サンプルはそう名乗る |
+
+**総当たりにしたのは、人が25回思い出すのをやめるため。**
+新しい経路を足して出所を書き忘れたら CI で落ちる。
+
+## 旧来の挙動を固定していたテスト（新しい契約に更新した）
+
+| ファイル | 何を期待していたか |
+|---|---|
+| `test_director_engine_unit.py::test_calculate_quality_score_fallback` | 採点失敗時に `score == 50 / rank == "C"` |
+| `test_shared/test_director_engine.py::TestDirectorBrain::test_calculate_quality_score_fallback` | 同上 |
+| `test_shared/test_batch13_director_preview.py::test_de_29_...` | 同上（`rank == "C"`）|
+| `test_admin_quality_router.py::test_ratchet` | `valid is True`（**作り物が 770/770 だったから通っていた**）|
+| `test_workers/test_cross_media_analyzer.py` ほか3件 | SNS データ無しで相関分析が走ること |
+
+## 検証（手元）
+
+```
+pytest backend/tests/test_routers/test_c4_quality_marks.py     6 passed
+pytest backend/tests/test_admin_quality_router.py             36 passed
+pytest backend/tests/test_workers/test_cross_media_analyzer.py 8 passed
+pytest backend/tests/test_director_engine_unit.py             34 passed
+python .github/scripts/ruff_ratchet.py                        28842 → 28832（-10）
+python .github/scripts/abspath_ratchet.py                     維持
+python -m backend.ux_verification.ui_api_ratchet              95 → 95（新規 0）
+python -m backend.feature_gaps --audit --static-only          exit 0
+```
+
+**基準（`8eef716`）と突き合わせて、退行が無いことを確認した赤:**
+`test_ux_snapshot.py`(1) / `test_model_registry.py`(4) / `test_api_contract.py`(2) /
+`test_batch18_pipeline_misc.py`(1) / `test_batch22_23_deep.py`(1) /
+`test_batch14_pipeline_ws_补完.py`(2→base は 3) / `test_journey_integration.py`(1) /
+`test_main_coverage.py`(2) / `test_batch29_30_deep_exec.py`(1) /
+`test_youtube_opt_worker.py`(6) — **すべて `git worktree add --detach <path> main` で
+基準を展開して同じ失敗を確認済み。**

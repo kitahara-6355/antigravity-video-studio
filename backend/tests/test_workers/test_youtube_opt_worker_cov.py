@@ -37,7 +37,12 @@ async def test_youtube_opt_worker_get_val_coverage():
         ]
     )
     ctx.metadata = None
-    
+    # **SNS の実データを渡す**（R1.5-C4）。渡さないと本線は分析しない
+    # （作り物のフォロワー数から投稿先を推奨しないため）
+    ctx.metadata_source = {"sns_data": {"X": {"followers": 320, "posts": [
+        {"text": "#AI", "impressions": 1200, "engagement": 45,
+         "posted_at": "2026-05-20T19:15:00"}]}}}
+
     mock_response = MagicMock()
     mock_response.text = json.dumps({
         "titles": ["AIによる動画自動化の未来"],
@@ -156,6 +161,11 @@ def test_youtube_opt_worker_run_cross_media_analysis_direct():
         segments=[]
     )
     ctx.metadata = None
+    # **SNS の実データを渡す**（R1.5-C4）。渡さないと本線は分析しない
+    # （作り物のフォロワー数から投稿先を推奨しないため）
+    ctx.metadata_source = {"sns_data": {"X": {"followers": 320, "posts": [
+        {"text": "#AI", "impressions": 1200, "engagement": 45,
+         "posted_at": "2026-05-20T19:15:00"}]}}}
     
     with patch("services.cross_media_service.CrossMediaService") as mock_service_class:
         mock_service = mock_service_class.return_value

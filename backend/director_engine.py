@@ -554,8 +554,21 @@ class DirectorBrain:
             return response.text
         except Exception as e:
             print(f"Scoring Error: {e}")
+            # **採点が落ちたときに「合格」を返さない**（R1.5-C4）。
+            # ここは以前 `score: 50 / is_acceptable: True` を返していた。
+            # UI（`frontend/src/components/DirectorBriefing.jsx:531,552,554`）は
+            # `is_acceptable` で緑の「制作開始 (Go)」を出すので、
+            # **API が落ちていても「品質チェックに通った」と見えていた。**
+            # 点を出せないときは点を名乗らない（`score: None`）。
             return json.dumps({
-                "score": 50, "rank": "C", "comment": "スコア計算に失敗しました。", "advice": "内容を確認してください。", "is_acceptable": True
+                "score": None,
+                "rank": None,
+                "comment": f"スコア計算に失敗しました（{type(e).__name__}）。**採点は行われていません。**",
+                "advice": "API キーと通信状態を確認して、もう一度採点してください。",
+                "is_acceptable": False,
+                "is_real": False,
+                "data_source": "unavailable",
+                "error": str(e),
             })
 
     def process_batch_image_task(self, task_id, scenes, style_prompt):

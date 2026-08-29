@@ -170,13 +170,29 @@ async def test_youtube_opt_worker_integration():
     ctx.metadata = {}
     
     # YouTubeアナリティクスのダミーをメタデータソースとして設定
+    # **SNS の実データを渡す**（R1.5-C4）。渡さないと本線は分析しない
+    # （作り物のフォロワー数から投稿先を推奨しないため）。
+    # スキップ側の契約は `test_sns_実データが無ければ相関分析しない` にある。
     ctx.metadata_source = {
         "youtube_analytics": {
             "video_id": "vid_999",
             "publish_time": "2026-05-20T19:00:00",
             "views": 5000,
             "ctr": 8.0
-        }
+        },
+        "sns_data": {
+            "X": {
+                "followers": 320,
+                "posts": [
+                    {
+                        "text": "新しい動画を公開しました #AI #自動化",
+                        "impressions": 1200,
+                        "engagement": 45,
+                        "posted_at": "2026-05-20T19:15:00",
+                    }
+                ],
+            }
+        },
     }
     
     # Gemini APIのモック設定
@@ -315,3 +331,52 @@ async def test_youtube_opt_worker_json_error_fallback():
         assert "YouTube最適化(Gemini)" in ctx.skipped_features
         assert "titles" in ctx.metadata
         assert len(ctx.metadata["tags"]) >= 5
+
+
+def test_sns_実データが無ければ相関分析しない():
+    """**作り物のフォロワー数から投稿先を推奨しない**（R1.5-C4）。
+
+    `metadata_source["sns_data"]` を入れる経路は本線のどこにも無いので、
+    以前はここが**常に** `CrossMediaService.get_default_sns_data()` の作り物
+    （X 12,500 フォロワー・Instagram 8,400 …）で相関を取り、
+    「最適な投稿先プラットフォーム」と推奨ハッシュタグを `ctx.metadata` に
+    埋めていた。収益化の判断に使う数字なので、作り物から出した推奨は嘘になる。
+
+    `retention_analysis` を本線で飛ばしているのと同じ扱いにした。
+    台帳: `backend/config/feature_gaps.json` の `sns_cross_media`
+    """
+    worker = YouTubeOptWorker()
+    ctx = PipelineContext(
+        video_path="dummy.mp4",
+        session_id="test_session_no_sns",
+        segments=[],
+    )
+    ctx.metadata = {}
+    ctx.metadata_source = {"youtube_analytics": {"ctr": 8.0}}
+
+    worker._run_cross_media_analysis(ctx)
+
+    assert "cross_media_correlation" not in ctx.metadata, \
+        "SNS の実データが無いのに相関分析の結果を成果物へ埋めた"
+    assert any("クロスメディア" in s for s in ctx.skipped_features), \
+        "飛ばしたことが実行記録に残っていない"
+
+
+def test_サンプルのSNSデータから出した相関はそう名乗る():
+    """`CrossMediaService` を直接呼ぶ経路（デモ・単体テスト）の印（R1.5-C4）。"""
+    from services.cross_media_service import CrossMediaService
+
+    service = CrossMediaService()
+
+    作り物 = service.analyze_cross_media_correlation({"ctr": 8.0})
+    assert 作り物["is_real"] is False
+    assert 作り物["data_source"] == "sample"
+
+    実データ = service.analyze_cross_media_correlation(
+        {"ctr": 8.0, "publish_time": "2026-05-20T19:00:00"},
+        {"X": {"followers": 320, "posts": [
+            {"text": "#AI", "impressions": 1200, "engagement": 45,
+             "posted_at": "2026-05-20T19:15:00"}]}},
+    )
+    assert 実データ["is_real"] is True
+    assert 実データ["data_source"] == "measured"

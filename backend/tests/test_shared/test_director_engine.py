@@ -145,8 +145,12 @@ class TestDirectorBrain:
             brain = DirectorBrain()
             result = brain.calculate_quality_score([], "Novice")
         parsed = json.loads(result)
-        assert parsed["score"] == 50
-        assert parsed["rank"] == "C"
+        # **採点が落ちたら点も合格も名乗らない**（R1.5-C4）。
+        # 旧 `score: 50 / rank: "C"` は「合格」を意味する `is_acceptable: True`
+        # と一緒に返っていた。
+        assert parsed["score"] is None
+        assert parsed["rank"] is None
+        assert parsed["is_acceptable"] is False
 
     def test_generate_production_report_fallback(self):
         """generate_production_report: API失敗 → フォールバック"""

@@ -9,6 +9,7 @@ E2E/品質ゲート/vision-gap/品質トレンド/失敗分析/手動実行/レ�
 設計書: design_admin_a1_a7_full.md.resolved (推移表転記済み/)
 """
 
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -19,6 +20,67 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/quality", tags=["Admin Quality"])
+
+
+# ============================================================
+# 数字は出所を名乗る（R1.5-C4・2026-08-29 ユーザー決定）
+# ============================================================
+#
+# **出所は3段しかない。**どの数字がどれなのかを、画面を見た人が
+# 区別できるようにする。憲法 §7.3.2 の A-4「push時にテスト/リント/
+# セキュリティが自動実行」は**実際に動いている**（GitHub Actions）のに、
+# この画面は定数を返していた。実体があるものは繋ぐ（ペルソナ #23
+# 選択的保持・憲法 §13.3 既存資産の優先活用）。
+#
+#   measured : この実行で測った
+#   derived  : リポジトリにある実データから引いた（`source` に出所のファイル）
+#   sample   : 作り物（`is_real: false`）
+#
+# **繋いだ結果、作り物と実体が食い違っていることが分かった。**
+# 例: ラチェットは画面上「770/770・連動率 100.0%」だったが、
+# 実体（`snapshots/v8_baseline.json`）は pass 75 / fail 16 / skip 954。
+#
+# 実体がまだ無いもの（テスト件数・カバレッジ・E2E・FV・各種トレンド）は
+# CI の実行結果が要る。ローカルにもリポジトリにも無いので `sample` のまま。
+# **無いものを繋いだことにしない。**
+#
+# 台帳: `backend/config/feature_gaps.json` の `admin_quality_dashboard`
+QUALITY_SAMPLE = {
+    "data_source": "sample",
+    "is_real": False,
+    "note": "**実測ではありません。**この経路は UI の足場で、定数を返しています。"
+            "実際のテスト・リント・セキュリティは GitHub Actions で動いています",
+}
+
+
+def _実データ(source: str, payload: dict) -> dict:
+    """リポジトリ内の実データから引いた数字であることを名乗る。"""
+    return {
+        "data_source": "derived",
+        "is_real": True,
+        "source": source,
+        "note": None,
+        **payload,
+    }
+
+
+def _読む(相対パス: str):
+    """リポジトリ内の JSON を読む。読めなければ None（`sample` へ落ちる）。
+
+    **読めなかったことを「問題なし」にしない**ので、呼び出し側は
+    `None` を受けたら `QUALITY_SAMPLE` のまま返し、作り物だと名乗る
+    （ペルソナ #20 安全な最終フォールバック）。
+    """
+    from pathlib import Path
+
+    try:
+        p = Path(__file__).resolve().parent.parent.parent / 相対パス
+        if not p.exists():
+            return None
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        logger.warning(f"実データを読めませんでした（{相対パス}）: {e}")
+        return None
 
 # ── リクエストモデル ──
 
@@ -182,6 +244,7 @@ async def get_quality_dashboard():
     """A-4 S1: CI/CD品質保証ダッシュボードの全体情報"""
     try:
         return {
+            **QUALITY_SAMPLE,
             "title": "CI/CD品質保証",
             "status": "healthy" if _test_results["failed"] <= 10 else "degraded",
             "summary": {
@@ -219,7 +282,7 @@ async def get_quality_dashboard():
 async def get_test_results():
     """A-4 S2: 最新pytestの結果(passed/failed/skipped)"""
     try:
-        return _test_results
+        return {**QUALITY_SAMPLE, **_test_results}
     except HTTPException:
         raise
     except Exception as e:
@@ -233,7 +296,7 @@ async def get_test_results():
 async def get_coverage():
     """A-4 S3: 現在のブランチカバレッジ(%)"""
     try:
-        return _coverage_data
+        return {**QUALITY_SAMPLE, **_coverage_data}
     except HTTPException:
         raise
     except Exception as e:
@@ -257,7 +320,7 @@ async def get_coverage_trend():
                 "branch_pct": round(min(base_cov, 78.0), 1),
                 "line_pct": round(min(base_cov + 6.0, 85.0), 1),
             })
-        return {"history": history, "period_days": 30}
+        return {**QUALITY_SAMPLE, "history": history, "period_days": 30}
     except HTTPException:
         raise
     except Exception as e:
@@ -273,6 +336,7 @@ async def get_fitness_results():
     try:
         passed = sum(1 for f in _fitness_functions if f["passed"])
         return {
+            **QUALITY_SAMPLE,
             "passed": passed,
             "total": len(_fitness_functions),
             "functions": _fitness_functions,
@@ -289,9 +353,33 @@ async def get_fitness_results():
 
 @router.get("/ratchet")
 async def get_ratchet_results():
-    """A-4 S6: UXラチェット検証の結果"""
+    """A-4 S6: UXラチェット検証の結果
+
+    **実体に繋いだ**（R1.5-C4）。ここは以前 `total_items: 770 /
+    pass_items: 770 / correlation_rate: 100.0` を返していたが、
+    リポジトリにある実測（`snapshots/v8_baseline.json`）は
+    **pass 75 / fail 16 / skip 954・pass_rate 7.18** だった。
+    **作り物のほうが 100 点で、実体は 7 点だった。**
+    """
     try:
-        return _ratchet_results
+        実 = _読む("backend/ux_verification/snapshots/v8_baseline.json")
+        if 実:
+            合計 = 実.get("pass_count", 0) + 実.get("fail_count", 0) + 実.get("skip_count", 0)
+            return _実データ(
+                "backend/ux_verification/snapshots/v8_baseline.json",
+                {
+                    "valid": 実.get("fail_count", 0) == 0,
+                    "total_items": 合計,
+                    "pass_items": 実.get("pass_count", 0),
+                    "fail_items": 実.get("fail_count", 0),
+                    "skip_items": 実.get("skip_count", 0),
+                    "correlation_rate": 実.get("pass_rate"),
+                    "layer_distribution": _ratchet_results["layer_distribution"],
+                    "version": "v8.0",
+                    "measured_at": 実.get("timestamp"),
+                },
+            )
+        return {**QUALITY_SAMPLE, **_ratchet_results}
     except HTTPException:
         raise
     except Exception as e:
@@ -305,7 +393,7 @@ async def get_ratchet_results():
 async def get_fv_results():
     """A-4 S7: FV(機能実効性)検証の結果"""
     try:
-        return _fv_results
+        return {**QUALITY_SAMPLE, **_fv_results}
     except HTTPException:
         raise
     except Exception as e:
@@ -319,7 +407,7 @@ async def get_fv_results():
 async def get_e2e_results():
     """A-4 S8: Playwright E2Eテストの結果"""
     try:
-        return _e2e_results
+        return {**QUALITY_SAMPLE, **_e2e_results}
     except HTTPException:
         raise
     except Exception as e:
@@ -333,7 +421,7 @@ async def get_e2e_results():
 async def get_quality_gates():
     """A-4 S9: ゲートA/B/C/Dの通過状態"""
     try:
-        return _quality_gates
+        return {**QUALITY_SAMPLE, **_quality_gates}
     except HTTPException:
         raise
     except Exception as e:
@@ -345,9 +433,31 @@ async def get_quality_gates():
 
 @router.get("/vision-gap")
 async def get_vision_gap():
-    """A-4 S10: /vision-gap-audit の最新スコア"""
+    """A-4 S10: /vision-gap-audit の最新スコア
+
+    **正典に繋いだ**（R1.5-C4）。現在地の正典は
+    `backend/branding/vision_backlog.json`（憲法第5条）で、
+    実現度も軸ごとの点もそこにある。ここが独自の定数（60.35）を
+    持っていると、**画面と正典で現在地が2つある**ことになる。
+    """
     try:
-        return _vision_gap
+        正典 = _読む("backend/branding/vision_backlog.json")
+        if 正典 and "vision_realization_score" in 正典:
+            軸 = [
+                {"name": 名, "score": v.get("score"), "weight": v.get("weight"),
+                 "confidence": v.get("confidence"), "measured_at": v.get("measured_at")}
+                for 名, v in (正典.get("axis_scores") or {}).items()
+            ]
+            return _実データ(
+                "backend/branding/vision_backlog.json",
+                {
+                    "score": 正典["vision_realization_score"],
+                    "weighted": 正典["vision_realization_score"],
+                    "axes": 軸,
+                    "last_audit_date": 正典.get("last_audit_date"),
+                },
+            )
+        return {**QUALITY_SAMPLE, **_vision_gap}
     except HTTPException:
         raise
     except Exception as e:
@@ -372,7 +482,7 @@ async def get_quality_trend():
                 "tests_passed": 1800 + i * 10,
                 "coverage": round(min(45.0 + i * 0.9, 78.0), 1),
             })
-        return {"history": history, "period_days": 30}
+        return {**QUALITY_SAMPLE, "history": history, "period_days": 30}
     except HTTPException:
         raise
     except Exception as e:
@@ -387,6 +497,7 @@ async def get_failure_analysis():
     """A-4 S12: 失敗テストの原因分類(regression/flaky/new)"""
     try:
         return {
+            **QUALITY_SAMPLE,
             "failures": [
                 {"test": "test_harness_async_1", "category": "flaky", "last_seen": "2026-04-30", "count": 3},
                 {"test": "test_harness_async_2", "category": "flaky", "last_seen": "2026-04-30", "count": 2},
@@ -417,6 +528,7 @@ async def run_tests(req: RunTestRequest):
         if req.suite not in _valid_suites:
             raise HTTPException(status_code=400, detail=f"Invalid suite: {req.suite}. Must be one of {_valid_suites}")
         return {
+            **QUALITY_SAMPLE,
             "status": "started",
             "suite": req.suite,
             "estimated_duration_seconds": 180 if req.suite == "all" else 30,
@@ -439,6 +551,7 @@ async def generate_report(req: ReportGenerateRequest):
         if req.format not in valid_formats:
             raise HTTPException(status_code=400, detail=f"Invalid format: {req.format}. Must be one of {valid_formats}")
         return {
+            **QUALITY_SAMPLE,
             "status": "generated",
             "format": req.format,
             "download_url": f"/api/admin/quality/download/report.{req.format}",
@@ -455,9 +568,34 @@ async def generate_report(req: ReportGenerateRequest):
 
 @router.get("/lint")
 async def get_lint_results():
-    """A-4 S15: コードリント(ruff/mypy)の結果"""
+    """A-4 S15: コードリント(ruff/mypy)の結果
+
+    **ラチェットのベースラインに繋いだ**（R1.5-C4）。ここは以前
+    「issues 2件」という作り物を返していたが、実体は
+    `.github/ruff-baseline.json` の **28,842件**（うち W293 が 27,393件）。
+    CI の「コード品質ラチェット」ジョブが毎 push これを見て、
+    増えていたら落とす。**2件と28,842件では画面の意味がまるで違う。**
+    """
     try:
+        base = _読む(".github/ruff-baseline.json")
+        if base and "total" in base:
+            by_rule = base.get("by_rule") or {}
+            return _実データ(
+                ".github/ruff-baseline.json",
+                {
+                    "issues": [
+                        {"rule": r, "count": c,
+                         "severity": "info" if r.startswith("W") else "warning"}
+                        for r, c in sorted(by_rule.items(), key=lambda kv: -kv[1])
+                    ],
+                    "total": base["total"],
+                    "tools": {"ruff": {"issues": base["total"]}},
+                    "note": "ラチェットのベースライン（増えたら CI が落ちる基準値）です。"
+                            "この場で ruff を実行した結果ではありません",
+                },
+            )
         return {
+            **QUALITY_SAMPLE,
             "issues": [
                 {"file": "agents/workers/transcribe_worker.py", "line": 45, "rule": "E501", "severity": "warning", "message": "Line too long (120 > 88)"},
                 {"file": "routers/pipeline_router.py", "line": 102, "rule": "F401", "severity": "info", "message": "Unused import"},
@@ -479,6 +617,7 @@ async def get_security_results():
     """A-4 S16: セキュリティスキャン(bandit)の結果"""
     try:
         return {
+            **QUALITY_SAMPLE,
             "issues": [],
             "total": 0,
             "severity_summary": {"high": 0, "medium": 0, "low": 0},
@@ -499,7 +638,7 @@ async def get_security_results():
 async def get_deploy_status():
     """A-4 S17: 最新デプロイのバージョン/時刻"""
     try:
-        return _deploy_status
+        return {**QUALITY_SAMPLE, **_deploy_status}
     except HTTPException:
         raise
     except Exception as e:
@@ -517,6 +656,7 @@ async def rollback(req: RollbackRequest):
         if not re.match(r"^v?\d+\.\d+\.\d+$", req.target_version):
             raise HTTPException(status_code=400, detail="Invalid target_version format. Must be semver like '3.5.0'")
         return {
+            **QUALITY_SAMPLE,
             "status": "rolled_back",
             "from_version": _deploy_status["version"],
             "to_version": req.target_version,
@@ -536,6 +676,7 @@ async def get_changelog():
     """A-4 S19: 最近のコード変更(git log)"""
     try:
         return {
+            **QUALITY_SAMPLE,
             "commits": [
                 {"hash": "abc1234", "message": "feat: A-3 Analytics Router追加", "author": "agent", "date": "2026-05-01T08:00:00"},
                 {"hash": "def5678", "message": "feat: A-2 Quota Router追加", "author": "agent", "date": "2026-05-01T04:00:00"},
@@ -558,7 +699,7 @@ async def get_changelog():
 async def get_quality_settings():
     """品質基準設定の現在値を取得"""
     try:
-        return _quality_settings
+        return {**QUALITY_SAMPLE, **_quality_settings}
     except HTTPException:
         raise
     except Exception as e:
@@ -574,7 +715,7 @@ async def update_quality_settings(req: QualitySettingsRequest):
             raise HTTPException(status_code=400, detail=f"Invalid coverage_threshold: {req.coverage_threshold}. Must be 0-100")
         _quality_settings["coverage_threshold"] = req.coverage_threshold
         _quality_settings["tests_required"] = req.tests_required
-        return {"status": "updated", **_quality_settings}
+        return {**QUALITY_SAMPLE, "status": "updated", **_quality_settings}
     except HTTPException:
         raise
     except Exception as e:
@@ -588,7 +729,7 @@ async def update_quality_settings(req: QualitySettingsRequest):
 async def get_notification_settings():
     """A-4 S21: テスト失敗時の通知先"""
     try:
-        return _notification_settings
+        return {**QUALITY_SAMPLE, **_notification_settings}
     except HTTPException:
         raise
     except Exception as e:
@@ -605,7 +746,7 @@ async def update_notification_settings(req: NotificationSettingsRequest):
         _notification_settings["channels"] = req.channels
         _notification_settings["enabled"] = req.enabled
         _notification_settings["last_updated"] = datetime.now().isoformat()
-        return {"status": "updated", **_notification_settings}
+        return {**QUALITY_SAMPLE, "status": "updated", **_notification_settings}
     except HTTPException:
         raise
     except Exception as e:
@@ -619,7 +760,7 @@ async def update_notification_settings(req: NotificationSettingsRequest):
 async def get_quick_fixes():
     """A-4 S22: 利用可能なワンクリック修復パターン一覧"""
     try:
-        return {"fixes": _quick_fixes, "total": len(_quick_fixes)}
+        return {**QUALITY_SAMPLE, "fixes": _quick_fixes, "total": len(_quick_fixes)}
     except HTTPException:
         raise
     except Exception as e:
@@ -637,6 +778,7 @@ async def apply_quick_fix(req: QuickFixRequest):
         if fix is None:
             raise HTTPException(status_code=404, detail=f"Fix ID {req.fix_id} not found")
         return {
+            **QUALITY_SAMPLE,
             "status": "applied",
             "fix_id": req.fix_id,
             "fix_name": fix["name"],
