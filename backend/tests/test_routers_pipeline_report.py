@@ -140,8 +140,29 @@ def test_build_category_html_with_data():
 # ==========================================
 
 def test_build_feedback_html_empty():
-    """フィードバックが無い場合の表示確認"""
-    assert "✅ フィードバック: なし" in _build_feedback_html({})
+    """**採点したうえで**指摘が無い場合の表示確認。
+
+    R1.5-C4・11周目: `{}`（＝未計測）を「全項目クリア」と出していた。
+    指摘0件は「採点して問題が無かった」ときだけ言える。
+    """
+    assert "✅ フィードバック: なし" in _build_feedback_html(
+        {"scored": True, "feedback": []})
+
+
+def test_build_feedback_html_未計測():
+    """**未計測を「全項目クリア」と言わない**（R1.5-C4・11周目の指摘）。
+
+    採点していなければ指摘は当然0件なので、空を「クリア」と読むと
+    **測っていないことが合格として出る**。実際、同じページに
+    「⑤ ❌ 品質ゲート スコア: 未計測」「0/8合格」と並べて緑の
+    「✅ 全項目クリア」が出ていた。
+    """
+    for 未計測 in ({}, {"feedback": []}, {"scored": False, "feedback": []},
+                   {"score": 0.0, "scored": False, "feedback": []}):
+        html = _build_feedback_html(未計測)
+        assert "未計測" in html, 未計測
+        assert "全項目クリア" not in html, 未計測
+        assert "✅" not in html, 未計測
 
 
 def test_build_feedback_html_with_data():

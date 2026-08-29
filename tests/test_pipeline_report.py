@@ -153,8 +153,20 @@ def test_build_category_html_valid_items():
 # --- 3. _build_feedback_html 関数のテスト ---
 
 def test_build_feedback_html_empty():
-    res = report_mod._build_feedback_html({})
+    # **採点したうえで**指摘0件のときだけ「クリア」と言える（R1.5-C4・11周目）
+    res = report_mod._build_feedback_html({"scored": True, "feedback": []})
     assert "✅ フィードバック: なし" in res
+
+
+def test_build_feedback_html_未計測():
+    """**未計測を「全項目クリア」と言わない**（R1.5-C4・11周目の指摘）。
+
+    採点していなければ指摘は当然0件なので、空を「クリア」と読むと
+    **測っていないことが合格として出る**。
+    """
+    res = report_mod._build_feedback_html({})
+    assert "未計測" in res
+    assert "全項目クリア" not in res
 
 def test_build_feedback_html_with_items():
     quality = {

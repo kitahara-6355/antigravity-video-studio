@@ -1067,3 +1067,85 @@ def test_段階レビューも採点の有無を旗で決める():
     assert 項目.metadata["measured"] is True, "採点した 0 点まで未計測にしている"
     assert 項目.metadata["score"] == 0.0
     assert "未計測" not in 項目.content
+
+
+def test_レポートは未計測を全項目クリアと書かない():
+    """`GET /api/pipeline/report` のフィードバック欄（R1.5-C4・11周目の指摘）。
+
+    **「確かめられなかった」を「問題なし」にしない。** 採点していなければ
+    指摘は当然0件なので、空を「全項目クリア」と読むと**測っていないことが
+    合格として出る**。実走なしでサーバを起動して叩くだけで、同じページに
+
+        ⑤ ❌ 品質ゲート  スコア: 未計測 / カテゴリ: 未計測
+        0/8合格
+        総合スコア: 未計測（品質ゲートを通していません）
+        ✅ フィードバック: なし（全項目クリア）   ← これ
+
+    と並んで出ていた。**N-2 で直した⑤行の3行下**、同じ関数ブロックの中。
+    「1ファイル隣」どころか「3行下」で、4周目・9周目・10周目と同じ型。
+
+    リポジトリ自身が `cost_guard.py` / `feature_gaps.py` / `artifact_gate.py` で
+    「『確かめられなかった』を『問題なし』にしない」と書いているのに、
+    ここだけ破れていた。
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from routers import pipeline_report as PR
+    from routers.pipeline_router import _pipeline_state
+
+    app = FastAPI()
+    app.include_router(PR.router)  # router 側が prefix="/api/pipeline" を持つ
+    client = TestClient(app, raise_server_exceptions=False)
+
+    元の状態 = dict(_pipeline_state)
+    try:
+        # ① 実走していない（起動直後そのもの）
+        _pipeline_state.clear()
+        html = client.get("/api/pipeline/report").text
+        assert "全項目クリア" not in html, "実走していないのに全項目クリアと出した"
+
+        # ② 実走はしたが品質ゲートを通していない
+        _pipeline_state["status"] = "completed"
+        _pipeline_state["result"] = {
+            "stage_results": [],
+            "quality_details": {"score": 0.0, "scored": False, "feedback": [],
+                                "category_report": [], "category_scores": {}},
+        }
+        html = client.get("/api/pipeline/report").text
+        assert "全項目クリア" not in html, "未計測なのに全項目クリアと出した"
+        assert "未計測" in html
+
+        # ③ 採点して指摘0件 — **ここは緑でよい**（門が広すぎないことの確認）
+        _pipeline_state["result"] = {
+            "stage_results": [],
+            "quality_details": {"score": 95, "scored": True, "feedback": [],
+                                "category_report": [], "category_scores": {}},
+        }
+        html = client.get("/api/pipeline/report").text
+        assert "全項目クリア" in html, "採点して指摘0件まで未計測にしている"
+
+        # ④ 採点して指摘あり
+        _pipeline_state["result"] = {
+            "stage_results": [],
+            "quality_details": {"score": 70, "scored": True,
+                                "feedback": ["音量が小さすぎます"],
+                                "category_report": [], "category_scores": {}},
+        }
+        html = client.get("/api/pipeline/report").text
+        assert "音量が小さすぎます" in html
+        assert "全項目クリア" not in html
+
+        # ⑤ 指摘はあるが旗が無い — **指摘は必ず出す**。
+        # 旗の有無で隠すと、実際に出た指摘を握り潰すことになる（未計測より悪い）。
+        # 旗を見てよいのは**空だったときだけ**
+        _pipeline_state["result"] = {
+            "stage_results": [],
+            "quality_details": {"feedback": ["音量が小さすぎます"],
+                                "category_report": [], "category_scores": {}},
+        }
+        html = client.get("/api/pipeline/report").text
+        assert "音量が小さすぎます" in html, "実際に出た指摘を旗の都合で隠した"
+    finally:
+        _pipeline_state.clear()
+        _pipeline_state.update(元の状態)

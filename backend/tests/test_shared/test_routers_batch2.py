@@ -371,8 +371,12 @@ class TestPipelineReportRouter:
 
     def test_build_feedback_html_empty(self):
         from routers.pipeline_report import _build_feedback_html
-        html = _build_feedback_html({"feedback": []})
+        # **採点したうえで**指摘0件（R1.5-C4・11周目）。旗が無ければ未計測
+        html = _build_feedback_html({"scored": True, "feedback": []})
         assert len(html) > 0
+        assert "全項目クリア" in html
+        未計測 = _build_feedback_html({"feedback": []})
+        assert "未計測" in 未計測, "未計測を全項目クリアと出した"
 
     def test_build_feedback_html_with_items(self):
         from routers.pipeline_report import _build_feedback_html

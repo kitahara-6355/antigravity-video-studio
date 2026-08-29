@@ -113,11 +113,29 @@ def _build_category_html(quality: dict) -> str:
 
 
 def _build_feedback_html(quality: dict) -> str:
-    """フィードバック一覧のHTMLを生成"""
+    """フィードバック一覧のHTMLを生成。
+
+    **「確かめられなかった」を「問題なし」にしない**（R1.5-C4・11周目の指摘）。
+    採点していなければ指摘は当然0件なので、空を「全項目クリア」と読むと
+    **測っていないことが合格として出る**。実際、同じページに
+    「⑤ ❌ 品質ゲート スコア: 未計測」「0/8合格」と並べて緑の
+    「✅ 全項目クリア」が出ていた（実走なしで再現する）。
+
+    ⑤行と同じ旗（`quality_details["scored"]`）で見る。**N-2 で直した⑤行の
+    3行下、同じ関数ブロックの中に同じ欠陥が残っていた** — 「1ファイル隣」
+    どころか「3行下」で、4周目・9周目・10周目と同じ型。
+    """
     feedback = quality.get("feedback", [])
+    # **指摘があるなら必ず出す。** 旗の有無で隠すと、実際に出た指摘を
+    # 握り潰すことになる（それは「未計測」より悪い）。旗を見るのは
+    # **空だったときだけ** — 空を「クリア」と読んでよいかの判断にだけ要る
     if not feedback:
+        # **値ではなく旗で見る**（0.0 は実際に取りうる点なので値では区別できない）
+        if not bool(quality.get("scored")):
+            return ("<p style='color:#a1a1aa;margin-top:12px;'>フィードバック: "
+                    "<b>未計測</b>（品質ゲートを通していないので指摘の有無を言えません）</p>")
         return "<p style='color:#22c55e;margin-top:12px;'>✅ フィードバック: なし（全項目クリア）</p>"
-    
+
     items = "".join(f"<li style='margin:4px 0;'>{f}</li>" for f in feedback)
     return f"""
     <div style="margin-top:12px;">
