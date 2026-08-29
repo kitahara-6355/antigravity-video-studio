@@ -765,3 +765,305 @@ def test_書き出しの点はその動画のもの():
             点, 出所 = R._品質の実測("final_A.mp4")
             assert 点 == 89
             assert 出所.endswith("final_A.quality.json")
+
+
+def test_品質ゲートを通ったら旗が立つ():
+    """`QualityGateWorker` が `ctx.quality_scored` を**実際に立てる**
+    （R1.5-C4・gate-verifier 10周目 N-2・空振り①）。
+
+    9周目に旗そのものは足したが、**立つことを確かめるテストが1件も無かった。**
+    `quality_gate_worker.py` の `ctx.quality_scored = True` を消しても
+    **26件が緑のまま**だった（変異が生存）。
+
+    旗が立たなければ `GET /api/pipeline/report` の⑤行と
+    `POST /api/render/start` は**採点済みの実走まで「未計測」で止める**。
+    fail-closed 側なので偽の success にはならないが、**門が常に閉じるなら
+    門が無いのと同じ**（9周目に「旗が常に同じ値なら何も変えていない」と
+    書いたのと同型）。
+    """
+    import asyncio
+
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    ctx = PipelineContext(video_path="d.mp4", session_id="s-flag")
+    ctx.segments = [{"text": "あ", "start": 0.0, "end": 1.0}]
+    ctx.declared_gaps = set()  # 台帳の読み込みを避ける（実行は止めない）
+
+    assert ctx.quality_scored is False, "実行前から採点済みになっている"
+
+    asyncio.run(QualityGateWorker().execute(ctx))
+
+    assert ctx.quality_scored is True, \
+        "品質ゲートを通したのに旗が立たない（門が常に閉じる＝門が無いのと同じ）"
+    assert isinstance(ctx.quality_score, (int, float)), "点が入っていない"
+
+
+def test_レポートの品質行が未計測を0点と書かない():
+    """`GET /api/pipeline/report` の**⑤行**（R1.5-C4・10周目 N-2・空振り②）。
+
+    9周目の欠陥そのものを戻す変異——`採点した` を値判定
+    （`isinstance(quality_score, (int, float))`）に戻す——で
+    **26件が緑のまま**だった。
+
+    既存の `test_レポートは未計測を0点と書かない` が守っているのは
+    `_品質の表示()`（HTML 埋め込み側）で、**⑤行は別の場所に同じ判定を
+    持っている**。生産側の既定は `score: 0.0`（float）なので、値で判定すると
+    未計測の実走が「スコア: 0点 / カテゴリ: 0点」に戻る。
+
+    **経路経由で見る**（直接呼べる関数が無いため）。
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from routers import pipeline_report as PR
+    from routers.pipeline_router import _pipeline_state
+
+    app = FastAPI()
+    app.include_router(PR.router)  # router 側が prefix="/api/pipeline" を持つ
+    client = TestClient(app, raise_server_exceptions=False)
+
+    元の状態 = dict(_pipeline_state)
+    try:
+        # 生産側が未計測のときに実際に出す形。**`score` は 0.0 が入る**
+        _pipeline_state["status"] = "completed"
+        _pipeline_state["result"] = {
+            "stage_results": [],
+            "quality_details": {"score": 0.0, "scored": False,
+                                "category_report": [], "category_scores": {}},
+        }
+        html = client.get("/api/pipeline/report").text
+        assert "スコア: 未計測" in html, \
+            "未計測の実走の⑤行が未計測と出ない（値判定に戻っている）"
+        assert "スコア: 0点" not in html, "未計測を 0 点と書いた"
+        assert "スコア: 0.0点" not in html, "未計測を 0.0 点と書いた"
+
+        # 採点した 0 点は 0 点と書く（未計測と混ぜない＝門が広すぎないこと）
+        _pipeline_state["result"] = {
+            "stage_results": [],
+            "quality_details": {"score": 0.0, "scored": True,
+                                "category_report": [], "category_scores": {}},
+        }
+        html = client.get("/api/pipeline/report").text
+        assert "スコア: 0.0点" in html, "採点した 0 点まで未計測にしている"
+        assert "スコア: 未計測" not in html
+
+        # 採点した 89 点
+        _pipeline_state["result"] = {
+            "stage_results": [],
+            "quality_details": {"score": 89, "scored": True,
+                                "category_report": [], "category_scores": {}},
+        }
+        assert "スコア: 89点" in client.get("/api/pipeline/report").text
+    finally:
+        _pipeline_state.clear()
+        _pipeline_state.update(元の状態)
+
+
+def test_実行結果の採点の有無は挙動で確かめる():
+    """`_build_result` が `quality_scored` を**実際に持ち回す**（R1.5-C4・10周目）。
+
+    既存の `test_実行結果に採点の有無が載る` は**ソース文字列の grep** で、
+    引継ぎに「grep をテストにしない（コメントに文字列が残るだけで通る）」と
+    書いた罠そのものだった。**呼んで確かめる。**
+    """
+    import unittest.mock as _m
+
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    coordinator = PipelineCoordinator.__new__(PipelineCoordinator)
+
+    ctx = PipelineContext(video_path="d.mp4", session_id="s-build")
+    with _m.patch.object(PipelineCoordinator, "_generate_improvement_suggestions",
+                         return_value=[]):
+        未計測 = coordinator._build_result(ctx, "completed", 0.0)
+        assert 未計測["quality_scored"] is False
+        assert 未計測["quality_details"]["scored"] is False, \
+            "未計測なのに採点済みで出た"
+
+        ctx.quality_scored = True
+        ctx.quality_score = 89
+        採点済み = coordinator._build_result(ctx, "completed", 0.0)
+        assert 採点済み["quality_scored"] is True
+        assert 採点済み["quality_details"]["scored"] is True, \
+            "採点したのに旗が伝わっていない"
+        assert 採点済み["quality_details"]["score"] == 89
+
+
+def test_チャンネル統計の読み口が2つとも印を通る():
+    """**印を付ける場所は1つ**（R1.5-C4・gate-verifier 10周目 N-1）。
+
+    6周目・8周目の印は `branding/analytics_manager.py` の**中**に付けた。
+    そこを通るのは `POST /api/analytics/sync` を**叩いた後**だけで、
+    **永続台帳 `branding/user_model.json` を素で返す読み口には届いて
+    いなかった。** `GET /api/status` が登録者 150 人・総再生 4,500 回・
+    ライバル「TechStarter」を**無印**で、しかも
+    `last_updated: "2026-06-28T02:53:11.581892"` 付きで返していた。
+
+    `evolution_log` でまったく同じことをやって集約したのに、こちらには
+    同じ手当てをしていなかった。**読み口は2つある**:
+
+    | 読み口 | 経路 |
+    |---|---|
+    | `GET /api/status` | `routers/trinity.py` |
+    | `GET /api/settings` | `settings_manager.get_all_settings()` |
+
+    10周目が名指ししたのは前者だけ。**後者は同じクラスの別経路**
+    （8周目と同じ轍）なので、経路ごとではなく集約点で塞ぐ。
+    """
+    from user_model_marks import 実績を持つ値に印を付ける
+
+    台帳 = {
+        "external_status": {
+            "youtube": {"subscribers": 150, "total_views": 4500,
+                        "last_updated": "2026-06-28T02:53:11.581892"},
+            "rivals": {"nemesis": {"name": "TechStarter", "subs": 180}},
+            "quests": [{"type": "NEMESIS_BATTLE", "target_val": 180,
+                        "current_val": 150}],
+        }
+    }
+
+    印つき = 実績を持つ値に印を付ける(台帳)["external_status"]
+    assert 印つき["youtube"]["is_real"] is False
+    assert 印つき["youtube"]["data_source"] == "sample"
+    assert 印つき["youtube"]["last_updated"] is None, \
+        "一度も同期していないのに同期時刻が残っている"
+    assert 印つき["rivals"]["is_real"] is False
+    assert 印つき["rivals"]["nemesis"]["is_real"] is False, \
+        "外側だけの印は、UI が nemesis を取り出した時点で消える"
+    assert 印つき["quests"][0]["is_real"] is False
+    assert 印つき["quests"][0]["data_source"] == "derived"
+
+    # **元の dict を書き換えない**（印がファイルへ書き戻ると本物と区別できない）
+    assert "is_real" not in 台帳["external_status"]["youtube"]
+    assert 台帳["external_status"]["youtube"]["last_updated"] == \
+        "2026-06-28T02:53:11.581892"
+
+    # 本物には付けない（門が広すぎないこと）
+    本物 = 実績を持つ値に印を付ける(
+        {"external_status": {"youtube": {"subscribers": 9, "is_real": True}}})
+    assert 本物["external_status"]["youtube"]["is_real"] is True
+    assert "data_source" not in 本物["external_status"]["youtube"]
+
+
+def test_永続台帳の読み口が印つきで返す():
+    """`GET /api/status` と `GET /api/settings` の実体（R1.5-C4・10周目 N-1）。
+
+    **集約点を通っていること自体を経路で確かめる。**
+    """
+    import unittest.mock as _m
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    import branding_manager as BM
+    from routers.trinity import router
+
+    台帳 = {
+        "profiles": {},
+        "external_status": {
+            "youtube": {"subscribers": 150, "total_views": 4500,
+                        "last_updated": "2026-06-28T02:53:11.581892"},
+            "rivals": {"benchmark": {"name": "TechMastery", "subs": 15000}},
+        },
+    }
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    with _m.patch.object(BM.branding_manager, "user_model", 台帳):
+        status = client.get("/api/status").json()
+        assert status["external_status"]["youtube"]["is_real"] is False, \
+            "GET /api/status が無印のチャンネル統計を返した"
+        assert status["external_status"]["youtube"]["last_updated"] is None
+        assert status["external_status"]["rivals"]["benchmark"]["is_real"] is False
+
+        # 同じ台帳を返すもう1つの読み口
+        from settings_manager import settings_manager
+        with _m.patch.object(settings_manager, "_ensure_constitution",
+                             return_value={}):
+            設定 = settings_manager.get_all_settings()
+        assert 設定["user_model"]["external_status"]["youtube"]["is_real"] is False, \
+            "GET /api/settings が無印のチャンネル統計を返した"
+
+    # 台帳そのものは素のまま（印が保存側へ回り込んでいない）
+    assert "is_real" not in 台帳["external_status"]["youtube"]
+
+
+def test_旧いコンテキストでも採点の有無は旗で決まる():
+    """`ProductionContext.quality_scored` を**繋ぐ**（R1.5-C4・10周目 N-3）。
+
+    9周目に旗を足したが、`core/context.py` の側は
+    **どこからも代入されず・読まれず・`to_dict`/`from_dict` にも
+    載っていない死んだ旗**だった。消費側
+    （`progressive_review_plugin` / `report_generator_plugin`）は
+    `not quality_score` の**値判定**のままで、
+    **9周目に直したのとまったく同じ欠陥が1ファイル隣に残っていた**
+    （「1ファイル隣に同じものが残っていた」は4周目にも踏んだ型）。
+
+    値判定だと「測って 0 点」と「未計測」が区別できない。**旗で決める。**
+    """
+    from core.context import ProductionContext
+    from plugins.report_generator_plugin import ReportGeneratorPlugin
+
+    # 旗は値と一緒に運ばれる
+    ctx = ProductionContext()
+    assert ctx.quality_scored is False, "既定で採点済みになっている"
+    ctx.quality_score = 89.0
+    ctx.quality_scored = True
+    復元 = ProductionContext.from_dict(ctx.to_dict())
+    assert 復元.quality_scored is True, "旗が往復で消えた（点だけ戻ると未計測に化ける）"
+    assert ProductionContext.from_dict({}).quality_scored is False
+
+    # 消費側が旗を見ている
+    plugin = ReportGeneratorPlugin()
+
+    未計測 = ProductionContext()
+    未計測.quality_score = 0.0
+    assert "未計測" in plugin._generate_report(未計測)
+
+    測って0点 = ProductionContext()
+    測って0点.quality_score = 0.0
+    測って0点.quality_scored = True
+    出力 = plugin._generate_report(測って0点)
+    assert "0.0/100" in 出力, "採点した 0 点まで未計測にしている（門が広すぎる）"
+    assert "未計測" not in 出力
+
+
+def test_段階レビューも採点の有無を旗で決める():
+    """`progressive_review_plugin._review_final()`（R1.5-C4・10周目 N-3）。
+
+    **自分の変異テストで見つけた5件目の空振り。** N-3 を直したあと
+    `report_generator_plugin` の変異は死ぬのに、**1ファイル隣の
+    `progressive_review_plugin` は値判定に戻しても緑のまま**だった。
+    「1ファイル隣に同じものが残っていた」を**また**やりかけた。
+
+    `metadata["measured"]` は `_review_stage` の合格数の集計に効くので、
+    ここが値判定に戻ると**未計測の実走が「0.0/100・不合格」という
+    測定結果**として集計に入る。
+    """
+    from core.context import ProductionContext
+    from plugins.progressive_review_plugin import ProgressiveReviewPlugin
+
+    plugin = ProgressiveReviewPlugin()
+
+    def 品質の項目(ctx):
+        items, _issues, _sug = plugin._review_final(ctx)
+        return next(i for i in items if i.id == "quality_score")
+
+    未計測 = ProductionContext()
+    未計測.quality_score = 0.0
+    項目 = 品質の項目(未計測)
+    assert 項目.metadata["measured"] is False
+    assert 項目.metadata["score"] is None
+    assert "未計測" in 項目.content
+
+    測って0点 = ProductionContext()
+    測って0点.quality_score = 0.0
+    測って0点.quality_scored = True
+    項目 = 品質の項目(測って0点)
+    assert 項目.metadata["measured"] is True, "採点した 0 点まで未計測にしている"
+    assert 項目.metadata["score"] == 0.0
+    assert "未計測" not in 項目.content

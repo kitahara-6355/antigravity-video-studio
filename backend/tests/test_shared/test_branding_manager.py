@@ -308,7 +308,12 @@ class TestBrandingManager:
              patch("branding_manager.USER_MODEL_PATH", str(bdir / "user_model.json")):
             
             result = mgr.process_analytics_update()
-            assert result["stats"] == mock_stats
+            # **外へ出す値は印の集約点を通る**（R1.5-C4・10周目 N-1）。
+            # 中身は変えず、作り物であることを名乗る鍵だけが増える
+            assert result["stats"]["subscribers"] == 1000
+            assert result["stats"]["total_views"] == 50000
+            assert result["stats"]["is_real"] is False
+            assert result["stats"]["data_source"] == "sample"
             assert result["biz_xp"] == 500  # 50000 / 100 = 500
             mgr.update_user_rank.assert_called_once()
 
@@ -606,7 +611,10 @@ class TestBrandingManager:
         with patch("branding.analytics_manager.analytics_manager", mock_analytics), \
              patch("branding_manager.USER_MODEL_PATH", str(bdir / "user_model.json")):
             res = mgr.process_analytics_update()
-            assert res["stats"] == {"subscribers": 0, "total_views": 0}
+            # 印の集約点を通るので鍵が増える（R1.5-C4・10周目 N-1）
+            assert res["stats"]["subscribers"] == 0
+            assert res["stats"]["total_views"] == 0
+            assert res["stats"]["is_real"] is False
             assert res["biz_xp"] == 0
 
         # 4.2. stats 内の数値が文字列などの場合

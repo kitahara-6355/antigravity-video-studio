@@ -457,13 +457,21 @@ class BrandingManager:
         ext_status['quests'] = quests
         
         self._save_json(USER_MODEL_PATH, self.user_model)
-        
-        return {
+
+        # **保存の後に印を付ける。** `stats` / `rivals` は `analytics_manager` が
+        # 既に印を持っているが、`quests`（`target_val: 180` / `current_val: 150`）は
+        # 素のままだった。外へ出す値は集約点を通す（R1.5-C4・10周目 N-1）。
+        try:  # backend/ を直接 sys.path に載せている経路にも対応する
+            from backend.user_model_marks import 外部実績に印を付ける
+        except ImportError:
+            from user_model_marks import 外部実績に印を付ける
+
+        return 外部実績に印を付ける({
             "stats": stats,
             "rivals": rivals,
             "quests": quests,
             "biz_xp": calculated_xp
-        }
+        })
 
     def update_user_model(self, note=None):
         if note:
@@ -499,6 +507,31 @@ class BrandingManager:
             "xp_granted": xp,
             "agenda": report_data.get('agenda_proposal', "")
         }
+
+    def get_user_model_for_display(self):
+        """**外へ出す用**。`external_status` の作り物に印を付けてから返す（R1.5-C4）。
+
+        印そのものは `backend/user_model_marks.py` にある
+        （gate-verifier 10周目 N-1）。**読み口が2つある**:
+
+        | 読み口 | 経路 |
+        |---|---|
+        | `GET /api/status` | `routers/trinity.py` |
+        | `GET /api/settings` | `settings_manager.get_all_settings()` |
+
+        10周目が名指ししたのは前者だけだが、**後者は同じクラスの別経路**
+        だったので、経路ごとに塞がず1箇所に寄せた。
+
+        保存側（`self.user_model` そのもの）は素のまま。**印がファイルへ
+        書き戻らないように、読み書きの入口を分けている**
+        （`get_evolution_log_for_display()` と同じ形）。
+        """
+        try:  # backend/ を直接 sys.path に載せている経路にも対応する
+            from backend.user_model_marks import 実績を持つ値に印を付ける
+        except ImportError:
+            from user_model_marks import 実績を持つ値に印を付ける
+
+        return 実績を持つ値に印を付ける(self.user_model)
 
     def get_evolution_log(self):
         EVOLUTION_LOG_PATH = str(_writable_path("backend/branding/evolution_log.json"))

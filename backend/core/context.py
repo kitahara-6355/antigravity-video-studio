@@ -145,6 +145,9 @@ class ProductionContext:
             "output_path": self.output_path,
             "preview_url": self.preview_url,
             "quality_score": self.quality_score,
+            # **旗も一緒に運ぶ**（R1.5-C4・10周目 N-3）。値だけ復元すると
+            # 受け側が 0.0 を「測って 0 点」と読むか「未計測」と読むかで割れる
+            "quality_scored": self.quality_scored,
             "extensions": self._extensions,
             "output_dir": str(self.output_dir),
             "subtitle_data": self.subtitle_data,
@@ -189,6 +192,7 @@ class ProductionContext:
         ctx.output_path = data.get("output_path")
         ctx.preview_url = data.get("preview_url")
         ctx.quality_score = data.get("quality_score", 0.0)
+        ctx.quality_scored = bool(data.get("quality_scored", False))
         
         extensions_val = data.get("extensions")
         ctx._extensions = extensions_val if isinstance(extensions_val, dict) else {}

@@ -247,6 +247,8 @@ def test_review_final_boundaries():
     plugin.execute(context)
     
     # 1. 品質スコアが90未満の場合の境界値検証
+    # **「測った」は値ではなく旗で表す**（R1.5-C4・10周目 N-3）
+    context.quality_scored = True
     context.quality_score = 89.9
     review = plugin._generate_stage_review(ReviewStage.FINAL, context)
     quality_item = next(item for item in review.items if item.id == "quality_score")
@@ -491,6 +493,7 @@ def test_未計測の項目は合否の分母に入らない():
     plugin.execute(context)
 
     未計測 = plugin._generate_stage_review(ReviewStage.FINAL, context)
+    context.quality_scored = True
     context.quality_score = 95.0
     計測済み = plugin._generate_stage_review(ReviewStage.FINAL, context)
 
@@ -534,6 +537,7 @@ def test_計測済みなら従来どおり合否が出る():
     context = ProductionContext()
     plugin.execute(context)
 
+    context.quality_scored = True
     context.quality_score = 89.9
     落ちる = next(i for i in plugin._generate_stage_review(
         ReviewStage.FINAL, context).items if i.id == "quality_score")

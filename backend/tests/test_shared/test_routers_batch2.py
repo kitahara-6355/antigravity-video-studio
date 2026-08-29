@@ -589,6 +589,10 @@ class TestPipelineReportRouter:
                 "preview_path": str(dummy_preview),
                 "quality_details": {
                     "score": 95,
+                    # **測ったことは値と別に持つ**（R1.5-C4・9周目）。この作り物は
+                    # 「全機能適用済み」を主張するので、採点済みでなければならない。
+                    # 旗を足す前の形のままだと⑤行が「未計測」になる
+                    "scored": True,
                     "category_report": [
                         {"category": "audio", "label": "audio", "score": 95, "status": "PASS", "deductions": 0, "plugin_count": 2}
                     ],

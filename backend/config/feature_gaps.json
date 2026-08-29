@@ -95,7 +95,7 @@
       "id": "channel_stats",
       "title": "チャンネル統計（固定値）",
       "kind": "gap",
-      "why": "`admin_channel_router` が `watch_time_hours: 15200` などの固定値を返す。**収益化の到達度をこの数字で判断すると嘘になる**",
+      "why": "`admin_channel_router` が `watch_time_hours: 15200` などの固定値を返す。**収益化の到達度をこの数字で判断すると嘘になる**。\n\n**出所は2つある**（gate-verifier 10周目 N-1）。もう1つは**Git 追跡下の `backend/branding/user_model.json` に焼き付いた `external_status`**（登録者150人・総再生4,500回・ライバル「TechStarter」）で、過去の `POST /api/analytics/sync` が書いたもの。6周目・8周目の印は `branding/analytics_manager.py` の**中**に付けたので、**sync を叩いた後にしか効かず、永続台帳を素で返す読み口には届いていなかった**。読み口は2つ — `GET /api/status`（`routers/trinity.py`）と `GET /api/settings`（`settings_manager.get_all_settings()`）。2026-08-29 に `backend/user_model_marks.py` へ印を集約し、`branding_manager.get_user_model_for_display()` を唯一の表示用読み口にした（`evolution_log_marks.py` と同じ形）。**保存側は素のまま**にして、印がファイルへ書き戻らないようにしている（R1.5-C4）",
       "handled_in": "R1.5-C4",
       "surfaces_as": "channel_stats",
       "done_when": {
@@ -196,7 +196,7 @@
       "id": "render_quality_gate",
       "title": "書き出し前の品質ブロック（本線の品質ゲートに繋がっていない）",
       "kind": "gap",
-      "why": "`routers/render.py` の `_get_quality_score()` は `return 95` の直書きで、**何も測っていないのに `quality_score: 95` を `success: true` で返していた**。そのせいで S17 の品質ブロック（`if quality_score < 90 and not force_render`）は**永久に偽**になり、レンダリング前の品質ゲートは一度も止まらず `force_render` も意味を失っていた。`POST /api/render/start` は本番マウント済みで、UI（`ProductionPipeline.jsx:1015` → `endpoints.js:75`）から呼ばれる。2026-08-29 に本線が書き出す `vault-outputs/final/*.quality.json` を読む形にして、**ブロックが実際に効くようにした**（実測 89 点で止まることを確認）。ただし**サイドカーが無い＝実走していないときは点を名乗らずに通す**。止める方針に変えるなら、UI の書き出しから本線の品質ゲートを直接呼ぶ結線が先（R1.5-C4・gate-verifier 8周目の指摘）",
+      "why": "`routers/render.py` の `_get_quality_score()` は `return 95` の直書きで、**何も測っていないのに `quality_score: 95` を `success: true` で返していた**。そのせいで S17 の品質ブロック（`if quality_score < 90 and not force_render`）は**永久に偽**になり、レンダリング前の品質ゲートは一度も止まらず `force_render` も意味を失っていた。`POST /api/render/start` は本番マウント済みで、UI（`ProductionPipeline.jsx:1015` → `endpoints.js:75`）から呼ばれる。2026-08-29 に本線が書き出す `vault-outputs/final/*.quality.json` を読む形にして、**ブロックが実際に効くようにした**（実測 89 点で止まることを確認）。**2026-08-29 のユーザー決定で、未計測は必ず止める方針に変えた** — `force_render` でも越えられない（90点未満なら「悪いと分かったうえで出す」判断ができるが、未計測は判断の材料そのものが無い。UI は `force_render: !is_ready` で常に押してくるので、越えられるようにすると門が無いのと同じになる）。止めても実作業は1つも止まらない — **この経路は何もレンダリングしていない**（R1.5-C4・gate-verifier 8周目の指摘）",
       "handled_in": "将来",
       "surfaces_as": "書き出し前品質ブロック",
       "done_when": {

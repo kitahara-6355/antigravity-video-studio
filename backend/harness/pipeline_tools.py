@@ -71,6 +71,9 @@ def _get_or_create_context(args: Dict[str, Any]) -> tuple[Any, Any]:
         ctx.final_path = meta["final_path"]
     if "quality_score" in meta:
         ctx.quality_score = meta["quality_score"]
+    # **値と旗は一緒に運ぶ**（R1.5-C4・10周目 N-3）。点だけ戻すと、
+    # 採点済みの実走が再開後に「未計測」に化ける
+    ctx.quality_scored = bool(meta.get("quality_scored", False))
     if "metadata" in meta:
         ctx.metadata = meta["metadata"]
 
@@ -119,6 +122,7 @@ def _save_context(ctx: Any, session: Any) -> None:
     session.metadata["preview_path"] = ctx.preview_path
     session.metadata["final_path"] = ctx.final_path
     session.metadata["quality_score"] = ctx.quality_score
+    session.metadata["quality_scored"] = getattr(ctx, "quality_scored", False)
     session.metadata["metadata"] = ctx.metadata
 
     session_manager._save_session(session)

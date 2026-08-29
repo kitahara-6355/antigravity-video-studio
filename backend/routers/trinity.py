@@ -60,10 +60,18 @@ def _register_router_debt(line_number: int, pattern: str, error_msg: str, endpoi
 
 @router.get("/status")
 async def get_trinity_status():
-    """Returns the full User Model including Ranks and Analytics."""
+    """Returns the full User Model including Ranks and Analytics.
+
+    **永続台帳の `external_status` は作り物**（R1.5-C4・gate-verifier 10周目 N-1）。
+    過去の `sync` が焼き付けた登録者 150 人・総再生 4,500 回・ライバル
+    「TechStarter」が `backend/branding/user_model.json` に残っている。
+    6周目・8周目の印は `analytics_manager` の**中**に付けたので、
+    **`sync` を叩いた後にしか効かず、この読み口には届いていなかった。**
+    印は `backend/user_model_marks.py` に集約した。
+    """
     from branding_manager import branding_manager
     try:
-        model = branding_manager.user_model
+        model = branding_manager.get_user_model_for_display()
         if model is None:
             raise HTTPException(status_code=404, detail="User Model not found")
         return model

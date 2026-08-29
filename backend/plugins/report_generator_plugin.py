@@ -91,8 +91,14 @@ class ReportGeneratorPlugin(Plugin):
         # この経路（`backend/core/context.py`）に品質ゲートは繋がっておらず、
         # dataclass の既定値 0.0 がそのまま「0.0/100」と表示されていた。
         # **測っていないことを、0点という測定結果に見せない。**
+        # **値ではなく旗で判定する**（R1.5-C4・10周目 N-3）。
+        # ここは `PipelineContext` 側で 9周目に直したのと同じ形。
+        # 値で見ると「測って 0 点」と「未計測」が区別できず、
+        # **1ファイル隣に同じ欠陥が残る**（4回踏んだ型）。
         quality_score = context.quality_score
-        if not isinstance(quality_score, (int, float)) or not quality_score:
+        採点した = (getattr(context, "quality_scored", False)
+                    and isinstance(quality_score, (int, float)))
+        if not 採点した:
             lines.append("| 品質スコア | **未計測**（この経路に品質ゲートは"
                          "繋がっていません）|" + chr(10))
         else:

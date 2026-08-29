@@ -24,6 +24,8 @@ def test_report_generator_plugin_execute_success(tmp_path):
     context.thumbnail_candidates = ["thumbs/thumb1.png", "thumbs/thumb2.png"]
     context.opening = "opening.mp4"
     context.ending = "ending.mp4"
+    # **「測った」は値ではなく旗で表す**（R1.5-C4・10周目 N-3）
+    context.quality_scored = True
     context.quality_score = 92.5
     context.quality_report = {
         "score": 92.5,
