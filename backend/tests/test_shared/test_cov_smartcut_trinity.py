@@ -398,6 +398,10 @@ def mock_branding_manager():
     mock.user_model = {"rank": "A", "xp": 100, "tech_rank": "S", "biz_rank": "A"}
     mock.process_analytics_update.return_value = {"updates": 2, "status": "ok"}
     mock.get_evolution_log.return_value = {"entries": [], "philosophies": []}
+    # **表示用の読み口は別**（R1.5-C4・6周目 指摘1）。`post_publish_feedbacks` に
+    # 焼き付いた作り物の「実績」への印は `get_evolution_log_for_display()` に
+    # 1箇所だけ置いてある
+    mock.get_evolution_log_for_display.return_value = {"entries": [], "philosophies": []}
     return mock
 
 

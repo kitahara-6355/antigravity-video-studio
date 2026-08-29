@@ -127,7 +127,7 @@
     "src/gateway/endpoints.js|GET|/api/segments": "static_route_scan: routers/segments.py:33 GET /api/segments",
     "src/gateway/endpoints.js|GET|/api/settings": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
     "src/gateway/endpoints.js|GET|/api/smartcut/all-candidates": "static_route_scan: routers/smartcut.py:317 GET /api/smartcut/all-candidates",
-    "src/gateway/endpoints.js|GET|/api/status": "static_route_scan: routers/trinity.py:48 GET /api/status",
+    "src/gateway/endpoints.js|GET|/api/status": "static_route_scan: routers/trinity.py:61 GET /api/status",
     "src/gateway/endpoints.js|GET|/api/transcribe/status": "static_route_scan: routers/legacy_production_router.py:217 GET /api/transcribe/status",
     "src/gateway/endpoints.js|GET|/api/usage/dashboard": "static_route_scan: routers/usage_router.py:84 GET /api/usage/dashboard",
     "src/gateway/endpoints.js|GET|/api/usage/governance": "static_route_scan: routers/usage_router.py:559 GET /api/usage/governance",
@@ -184,9 +184,9 @@
     "src/gateway/endpoints.js|POST|/api/usage/select-option": "static_route_scan: routers/usage_router.py:452 POST /api/usage/select-option",
     "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
     "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
-    "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
-    "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
-    "src/gateway/endpoints.js|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
+    "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:943 POST /api/youtube/apply-hook",
+    "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:771 POST /api/youtube/improve-hook",
+    "src/gateway/endpoints.js|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:597 POST /api/youtube/optimize",
     "src/gateway/endpoints.js|POST|/api/youtube/pre-plan": "static_route_scan: routers/youtube_optimizer.py:230 POST /api/youtube/pre-plan",
     "src/gateway/endpoints.js|PUT|/api/pipeline/transcription/segments/{segment_id}": "static_route_scan: routers/pipeline_router.py:1078 PUT /api/pipeline/transcription/segments/{segment_id}",
     "src/gateway/endpoints.js|WEBSOCKET|/api/pipeline/ws/pipeline": "static_route_scan: routers/pipeline_router.py:933 WEBSOCKET /api/pipeline/ws/pipeline",
@@ -272,6 +272,30 @@
       "before": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
       "after": "static_route_scan: routers/pipeline_router.py:1431 POST /api/pipeline/quality-gate/improve",
       "reason": "R1.5-C4: /api/pipeline/quality-gate/* の6経路に QUALITY_GATE_DATA_SOURCE（is_real: false）を足したため、定義の行番号が下にずれた。当たり先のルーターも関数も同じで、宣言の中身は変えていない（2026-08-28）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/status",
+      "before": "static_route_scan: routers/trinity.py:48 GET /api/status",
+      "after": "static_route_scan: routers/trinity.py:61 GET /api/status",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/youtube/apply-hook",
+      "before": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
+      "after": "static_route_scan: routers/youtube_optimizer.py:943 POST /api/youtube/apply-hook",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/youtube/improve-hook",
+      "before": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
+      "after": "static_route_scan: routers/youtube_optimizer.py:771 POST /api/youtube/improve-hook",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/youtube/optimize",
+      "before": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
+      "after": "static_route_scan: routers/youtube_optimizer.py:597 POST /api/youtube/optimize",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
     }
   ],
   "migrations": [

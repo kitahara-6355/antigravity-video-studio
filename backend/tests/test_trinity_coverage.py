@@ -19,6 +19,9 @@ def mock_branding_manager():
     mock.user_model = {"rank": "A", "xp": 100, "tech_rank": "S", "biz_rank": "A"}
     mock.process_analytics_update.return_value = {"updates": 2, "status": "ok"}
     mock.get_evolution_log.return_value = {"entries": [], "philosophies": []}
+    # **表示用の読み口は別**（R1.5-C4・6周目 指摘1）。作り物の「実績」への印は
+    # `get_evolution_log_for_display()` に1箇所だけ置いてある
+    mock.get_evolution_log_for_display.return_value = {"entries": [], "philosophies": []}
     return mock
 
 @pytest.fixture
@@ -44,7 +47,12 @@ class TestTrinityRouterCoverage:
             client = TestClient(app)
             resp = client.post("/api/analytics/sync")
         assert resp.status_code == 200
-        assert resp.json() == {"updates": 2, "status": "ok"}
+        payload = resp.json()
+        # **チャンネル統計は YouTube に繋がっていない**（R1.5-C4・6周目 指摘2）。
+        # 出所の印が増えたので、完全一致ではなく包含で見る
+        assert payload["updates"] == 2 and payload["status"] == "ok"
+        assert payload["is_real"] is False
+        assert payload["data_source"] == "sample"
 
     def test_simulate_analytics(self, mock_branding_manager, mock_analytics_manager):
         """TR-C03: POST /analytics/simulate → 200"""
@@ -331,14 +339,14 @@ class TestTrinityRouterCoverage:
 
         # 5. /evolution (例外)
         mock_bm5 = MagicMock()
-        mock_bm5.get_evolution_log.side_effect = Exception("Log Error")
+        mock_bm5.get_evolution_log_for_display.side_effect = Exception("Log Error")
         with patch("branding_manager.branding_manager", mock_bm5):
             resp = client.get("/api/evolution")
         assert resp.status_code == 500
 
         # 5.5. /evolution (None の場合)
         mock_bm5_none = MagicMock()
-        mock_bm5_none.get_evolution_log.return_value = None
+        mock_bm5_none.get_evolution_log_for_display.return_value = None
         with patch("branding_manager.branding_manager", mock_bm5_none):
             resp = client.get("/api/evolution")
         assert resp.status_code == 404

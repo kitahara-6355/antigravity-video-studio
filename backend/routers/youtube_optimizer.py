@@ -289,9 +289,23 @@ async def pre_plan_content(req: PrePlanRequest) -> Dict[str, Any]:
 
                 feedbacks = evo_data.get("post_publish_feedbacks", [])
 
+                # **実績だと名乗っている行だけ混ぜる**（R1.5-C4・6周目 指摘1）。
+
+                # `evolution_log.json` には `YOUTUBE_API_MODE=mock` 時代に
+
+                # `random` で組み立てた「実績」が12件焼き付いている
+
+                # （actual_ctr 5.2 / actual_retention 65.0 / actual_views 1000）。
+
+                # **企画立案がそれを学びとして読んでいた。**
+
+                # `is_real: true` が無い行は作り物とみなす（fail-closed）。
+
+                実績 = [fb for fb in feedbacks if fb.get("is_real") is True]
+
                 # 直近10件の学びを収集
 
-                for fb in feedbacks[-10:]:
+                for fb in 実績[-10:]:
 
                     lessons = fb.get("lessons_learned", [])
 
@@ -1091,6 +1105,62 @@ async def trigger_feedback_loop(wagamama_id: str) -> Dict[str, Any]:
 
 
 
+        # **作り物を「実績」と呼ばない**（R1.5-C4・gate-verifier 6周目 指摘1）。
+
+        # `post_publish_collector` の既定は `YOUTUBE_API_MODE=mock` で、
+
+        # `_generate_mock_data()` が `random.Random(seed)` で CTR・維持率・再生数を
+
+        # 組み立てて返す（`real` は `NotImplementedError` を投げる＝**本番の既定で
+
+        # 必ず作り物になる**）。ここは以前それを:
+
+        #   - `validation_report.actual` として `success: true` で返し
+
+        #   - `evolution_log.json`（Git 追跡下）に `actual_ctr` / `actual_retention` /
+
+        #     `drop_off_points` として現在時刻つきで**焼き付け**
+
+        #   - `GET /api/evolution` と `POST /api/youtube/pre-plan` が読み戻して
+
+        #     次の企画立案に混ぜていた
+
+        # 収集側は `is_mock: True` を持っているのに、ここから先へ伝わっていなかった。
+
+        #
+
+        # `POST /api/youtube/retention-map` を 501 で止めたのと同じ扱いにする
+
+        # （2周目 N-1）。台帳: backend/config/feature_gaps.json の `post_publish_feedback`
+
+        if actual_metrics.get("is_mock"):
+
+            raise HTTPException(
+
+                status_code=501,
+
+                detail={
+
+                    "implemented": False,
+
+                    "feature": "post_publish_feedback",
+
+                    "reason": "YouTube Analytics API の統合が未実装です"
+
+                              "（YOUTUBE_API_MODE=mock の既定では random で"
+
+                              "組み立てた数字が返ります）。作り物を実績として記録し、"
+
+                              "次回の企画立案に混ぜないため、検証を行いません",
+
+                    "ledger": "backend/config/feature_gaps.json",
+
+                },
+
+            )
+
+
+
         # 2. 予測と実績の検証レポート (2.2)
 
         validation_report = await prediction_validator.validate_prediction(
@@ -1214,6 +1284,28 @@ def _record_post_publish_feedback(
 
 
 
+    # **作り物は書かない**（R1.5-C4・6周目 指摘1）。呼び出し元が 501 で止めるので
+
+    # 通常ここには来ないが、**この台帳は Git 追跡下で、一度書くと残る。**
+
+    # `GET /api/evolution` が読み戻し、`POST /api/youtube/pre-plan` が
+
+    # 直近10件の `lessons_learned` を企画立案に混ぜるので、二重に止める。
+
+    if actual_metrics.get("is_mock"):
+
+        logger.warning(
+
+            "作り物の実績なので evolution_log に記録しません"
+
+            f"（wagamama_id={wagamama_id} / video_id={video_id}）"
+
+        )
+
+        return
+
+
+
     try:
 
         log_path = _writable_path("backend/branding/evolution_log.json")
@@ -1235,6 +1327,16 @@ def _record_post_publish_feedback(
         entry = {
 
             "timestamp": datetime.now().isoformat(),
+
+            # **実績であることを行に残す**（R1.5-C4・6周目 指摘1）。
+
+            # ここへ来るのは `is_mock` でないときだけなので必ず真だが、
+
+            # 読み手（企画立案・`GET /api/evolution`）が古い作り物の行と
+
+            # 区別できるように明示する
+
+            "is_real": True,
 
             "wagamama_id": wagamama_id,
 

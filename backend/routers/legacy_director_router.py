@@ -109,8 +109,13 @@ async def verify_quality(request: Request):
 
 @router.get("/api/director/evolution")
 def get_evolution():
-    """Returns the qualitative growth narrative log."""
-    return branding_manager.get_evolution_log()
+    """Returns the qualitative growth narrative log.
+
+    **`GET /api/evolution` と同じ読み口を使う**（R1.5-C4・6周目 指摘1）。
+    `post_publish_feedbacks` に焼き付いた作り物の「実績」への印は
+    `branding_manager.get_evolution_log_for_display()` に1箇所だけ置いてある。
+    """
+    return branding_manager.get_evolution_log_for_display()
 
 
 @router.get("/api/director/profile")

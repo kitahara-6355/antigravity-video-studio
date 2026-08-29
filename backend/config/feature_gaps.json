@@ -178,6 +178,19 @@
         "path": "backend/routers/admin_quality_router.py",
         "marker": "QUALITY_SAMPLE"
       }
+    },
+    {
+      "id": "post_publish_feedback",
+      "title": "公開後フィードバックループ（YouTube Analytics 未統合・random の「実績」）",
+      "kind": "gap",
+      "why": "`services/post_publish_collector.py` の既定は `YOUTUBE_API_MODE=mock`（`real` は `NotImplementedError` を投げる＝**本番の既定で必ず作り物になる**）。`_generate_mock_data()` が `random.Random(seed)` で CTR・維持率・再生数を組み立てて `is_mock: true` 付きで返すのに、その印が先へ伝わっていなかった。`POST /api/youtube/feedback-loop/{id}` がそれを `validation_report.actual` として `success: true` で返し、`evolution_log.json`（Git 追跡下）へ `actual_ctr` / `actual_retention` / `drop_off_points` として現在時刻つきで焼き付け、`GET /api/evolution` と `POST /api/youtube/pre-plan` が読み戻して次の企画立案に混ぜていた。2026-08-29 に `retention-map` と同じ 501 で止め、書き込みも塞ぎ、既存12件の作り物には読み口（`branding_manager.get_evolution_log_for_display()`）で印を付けた（R1.5-C4・gate-verifier 6周目 指摘1）",
+      "handled_in": "将来",
+      "surfaces_as": "公開後フィードバック",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/services/post_publish_collector.py",
+        "marker": "_generate_mock_data"
+      }
     }
   ]
 }

@@ -16,11 +16,28 @@ class AnalyticsManager:
     """
     def __init__(self):
         # Mock Data Store
+        #
+        # **これは YouTube から取ってきた数字ではない**（R1.5-C4・gate-verifier 6周目 指摘2）。
+        # `get_my_stats()` は `# TODO: Replace with real YouTube API call` のまま、
+        # ここの固定値を返している。読み口は2つあって、どちらも本番:
+        #   - `POST /api/analytics/sync`（`branding_manager.process_analytics_update()` 経由）
+        #   - `backend/agents/analyst.py:80`（本線のアナリスト）
+        # **登録者数と総再生数は収益化の到達度そのもの**なので、印が無いと
+        # 「登録者 150 人・4,500 回」を実績として読んでしまう。
+        #
+        # `last_updated` に現在時刻を打つのもやめた。一度も同期していないのに
+        # 「いま更新した」に見える（2周目 N-3・4周目 C-6 で直した
+        # `last_sync = datetime.now()` と同型）。
+        # 台帳: `backend/config/feature_gaps.json` の `channel_stats`
         self.mock_my_stats = {
+            "data_source": "sample",
+            "is_real": False,
+            "note": "**YouTube から取得した数字ではありません。**Analytics API に"
+                    "一度も接続していません。収益化の到達度の判断に使わないでください",
             "subscribers": 150,
             "total_views": 4500,
             "videos": 12,
-            "last_updated": datetime.now().isoformat()
+            "last_updated": None
         }
         
         # Mock Database of potential rivals

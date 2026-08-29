@@ -616,3 +616,147 @@ python -m backend.feature_gaps --audit --static-only          exit 0
 `test_main_coverage.py`(2) / `test_batch29_30_deep_exec.py`(1) /
 `test_youtube_opt_worker.py`(6) — **すべて `git worktree add --detach <path> main` で
 基準を展開して同じ失敗を確認済み。**
+
+---
+
+# 7周目に向けて — 6周目の指摘2件を潰す（2026-08-29）
+
+6周目も **not_met**。指摘はどちらも実在する反例で、**本番にマウントされ 200 を返し、
+死蔵コードのラチェットにも載っていなかった。**
+
+## なぜ6周目の総当たりで漏れたか
+
+**GET しか叩いていなかった。** 460経路のうち「GET で実際に叩けた 103 経路」を数えて
+「これで尽きた」と書いたが、今回の2件は**どちらも POST**で、片方は path パラメータと
+台帳レコードが要る。過去5周と同じ「同じクラスの別経路」が、今度は POST 側に残っていた。
+
+## 指摘1 — 公開後フィードバックが `random` を「実績」と呼び、台帳に焼き付けていた（決定的）
+
+`POST /api/youtube/feedback-loop/{wagamama_id}`（`main.py:236` でマウント）。
+
+`services/post_publish_collector.py` の既定は **`YOUTUBE_API_MODE=mock`**（`real` は
+`NotImplementedError` を投げる＝**本番の既定で必ず作り物になる**）。
+`_generate_mock_data()` が `random.Random(seed)` で CTR・維持率・再生数を組み立てる。
+
+```
+HTTP 200 {"success": true, ...
+  "validation_report": {"actual": {"ctr": 3.6, "elapsed_hours": 24}, ...},
+  "knowledge_distilled": true, "evolution_log_updated": true}
+
+evolution_log.json に書かれた行:
+  {"actual_ctr": 3.6, "actual_retention": 37.9, "actual_views": 27829,
+   "drop_off_points": ["01:24"], "lessons_learned": ["離脱集中ポイント: 01:24。…"]}
+```
+
+**収集側は `is_mock: true` を持っているのに、そこから先へ伝わっていなかった。**
+しかもこれは読み戻されている:
+
+- `GET /api/evolution` と `GET /api/director/evolution` が印なしで公開
+- `youtube_optimizer.py:290` が直近10件の `lessons_learned` を読み、
+  `POST /api/youtube/pre-plan` の**企画立案に混ぜていた**
+
+`backend/branding/evolution_log.json` は **Git 追跡下**で、既に12件焼き付いている
+（`actual_ctr 5.2` / `actual_retention 65.0` / `actual_views 1000` が繰り返し）。
+
+直したのは4箇所:
+
+| 場所 | 何をしたか |
+|---|---|
+| `youtube_optimizer.trigger_feedback_loop` | `is_mock` なら **501**（`retention-map` を止めたのと同じ形・2周目 N-1）|
+| `_record_post_publish_feedback` | `is_mock` なら書かずに返る。**台帳は一度書くと残る**ので二重に止める |
+| 同・書き込む行 | 実績には `is_real: True` を残す（読み手が古い作り物と区別できる）|
+| `youtube_optimizer.py:290`（企画立案）| `is_real: true` が無い行は混ぜない（**fail-closed**）|
+
+既存12件は**消さずに印を付ける**（記録は残す・ペルソナ #23 選択的保持）。
+**印を付ける場所は `branding_manager.get_evolution_log_for_display()` の1箇所だけ。**
+読み口が2つあるので、1経路ずつ塞ぐとまた「同じクラスの別経路」になる。
+保存側（`get_evolution_log()`）は素のままなので、**印はファイルへ書き戻らない。**
+
+## 指摘2 — チャンネル統計が「Real-World Link」を名乗って固定値を返していた
+
+`POST /api/analytics/sync`（`routers/trinity.py`・`main.py:224` でマウント）。
+docstring は `Triggers the Real-World Link` だが、出所は
+`branding/analytics_manager.py` の `mock_my_stats`（`# TODO: Replace with real YouTube API call`）。
+
+```
+200 {"stats": {"subscribers": 150, "total_views": 4500, "videos": 12,
+                "last_updated": "<現在時刻>"}, ..., "biz_xp": 45}
+```
+
+`admin_channel_router` の `watch_time_hours: 15200` を直したのと**同じクラスが本番の
+別ルーターに無印で残っていた**。`last_updated` に現在時刻を打つのも、
+2周目 N-3・4周目 C-6 で直した `last_sync = datetime.now()` と同型。
+
+さらに悪いことに、`POST /api/analytics/simulate` が任意の数値を注入でき、
+`sync` がそれを印なしの「stats」として返していた:
+
+```
+simulate?views=500000  →  sync stats: {"subscribers": 5150, "total_views": 504500}
+```
+
+**収益化の閾値（登録者1,000人）を任意に超えた数字が、実績の顔で通っていた。**
+
+`mock_my_stats` に印を付け（読み口は `get_my_stats()` の1箇所で、消費者は
+`POST /api/analytics/sync` と**本線の `agents/analyst.py:80`** の2つ）、
+`last_updated` を `None` にし、`sync` / `simulate` の包みにも `ANALYTICS_DATA_SOURCE` を付けた。
+
+## ついでに直した（6周目の note・未達根拠ではない）
+
+`frontend/src/components/DirectorBriefing.jsx:225` の
+`quality_score: qualityScore || { score: 50 }, // fallback if skipped`。
+**品質チェックを一度も通していないセッションのレポートに 50 点が載っていた。**
+バックエンド側の `calculate_quality_score()` を直したのと同じ扱いにして、
+`score: null / is_acceptable: false / data_source: 'skipped'` を送る。
+
+## 契約テスト（すべて変異テストで空振りでないことを確認済み）
+
+`backend/tests/test_routers/test_c4_quality_marks.py`（**testpaths 内**）に5件追加、計11件。
+
+| 変異 | 結果 |
+|---|---|
+| `feedback-loop` の 501 を `if False` にする | 1 failed |
+| `sync` から `ANALYTICS_DATA_SOURCE` を外す | 1 failed |
+| `get_evolution_log_for_display` の印を外す | 1 failed |
+| 企画立案の `is_real is True` 絞り込みを戻す | 1 failed |
+
+**1回目の `test_成長ログの作り物に印が付く` は変異させても落ちなかった**（実ファイルの
+`post_publish_feedbacks` が空だと `if 行:` で黙って素通りする空振りだった）。
+既知の中身を差し込む形に書き直して、落ちることを確かめた。
+**変異テストをやらなければ、緑の空振りをそのまま証拠として出していた。**
+
+## 旧来の挙動を固定していたテスト（新しい契約に更新）
+
+| ファイル | 何を期待していたか |
+|---|---|
+| `test_trinity_coverage.py::test_sync_analytics` | `resp.json()` の完全一致（印が増えて崩れた）|
+| `test_trinity_coverage.py::test_get_evolution` / `test_all_endpoints_exceptions` | `get_evolution_log` をモックしていた（表示用の読み口が別になった）|
+| `test_shared/test_cov_smartcut_trinity.py::test_get_evolution` | 同上（**唯一の実退行**。基準では緑だった）|
+
+## 検証（手元）
+
+```
+pytest backend/tests/test_routers/test_c4_quality_marks.py       11 passed
+pytest backend/tests/test_trinity_coverage.py                    20 passed
+pytest backend/tests/test_shared/test_cov_smartcut_trinity.py    44 passed
+pytest backend/tests/test_shared/test_routers_youtube_optimizer.py  123 passed
+pytest backend/tests/test_youtube_optimizer_router.py           126 passed
+pytest backend/tests/test_analytics_manager.py                   24 passed
+pytest backend/tests/test_legacy_director_router.py              20 passed
+pytest tests/test_ux_ratchet.py                                  37 passed
+python .github/scripts/ruff_ratchet.py                           28842 → 28832（-10）
+python -m backend.ux_verification.ui_api_ratchet --redeclare …   受理（行番号ずれのみ）
+python -m backend.feature_gaps --audit --static-only             exit 0
+```
+
+`4a7eddd` の CI（run **33229835413**）は「Python テストスイート (3.13)」
+「コード品質ラチェット」「シークレットスキャン」が success。
+
+**基準（`8eef716`）と突き合わせて元から赤だと確認したもの（追加分）:**
+`test_analyst.py`(14) / `test_shared/test_branding_manager.py`(5)。
+
+## gate-verifier 自身が報告した測定の不備（記録として残す）
+
+6周目の検証で、`net_guard` は pytest フィクスチャなので **`TestClient` を pytest の外で
+回すと効かない**ことが分かった。掃引の初回に `backend/list_models.py` が
+実際に googleapis.com へ出ている（400 API_KEY_INVALID・課金なし）。
+**手元で本番アプリを起こすときは、自分で外向きを塞いでから叩くこと。**

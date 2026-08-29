@@ -222,7 +222,15 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
         try {
             const res = await apiFetch('postDirectorGenerateReport', { body: {
                     storyboard_plan: storyboardPlan,
-                    quality_score: qualityScore || { score: 50 }, // fallback if skipped
+                    // **採点を飛ばしたら点を名乗らない**（R1.5-C4）。
+                    // ここは `{ score: 50 }` を送っていたので、品質チェックを
+                    // 一度も通していないセッションのレポートに 50 点が載っていた。
+                    // バックエンド側（`director_engine.calculate_quality_score()`）で
+                    // 失敗時に `score: null / is_acceptable: false` を返すようにしたのと同じ扱い。
+                    quality_score: qualityScore || {
+                        score: null, rank: null, is_acceptable: false,
+                        is_real: false, data_source: 'skipped',
+                    },
                     biz_rank: 'Novice' // Should come from props/context ideally
                 } });
             const data = await res.json();

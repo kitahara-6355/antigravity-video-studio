@@ -206,3 +206,136 @@ def test_採点に失敗したら合格と名乗らない():
     assert result["is_acceptable"] is False, "採点が落ちたのに合格と名乗った"
     assert result["is_real"] is False
     assert result["score"] is None, "採点していないのに点を名乗った"
+
+
+# ── 6周目の指摘（gate-verifier）──────────────────────────────────────
+#
+# 6周目の総当たりは **GET だけ**だったので、POST 側に2件残っていた。
+# どちらも本番マウント済み・死蔵ではない・`8eef716` から変わっていない。
+
+
+def test_公開後フィードバックは作り物を実績と呼ばない():
+    """`POST /api/youtube/feedback-loop/{id}`（R1.5-C4・6周目 指摘1）。
+
+    `post_publish_collector` の既定は `YOUTUBE_API_MODE=mock` で、
+    `_generate_mock_data()` が `random.Random(seed)` で CTR・維持率・再生数を
+    組み立てる（`real` は `NotImplementedError`＝**本番の既定で必ず作り物**）。
+    それを `validation_report.actual` として `success: true` で返し、
+    **`evolution_log.json`（Git 追跡下）へ現在時刻つきで焼き付け**、
+    `GET /api/evolution` と `POST /api/youtube/pre-plan` が読み戻していた。
+
+    `POST /api/youtube/retention-map` を 501 で止めたのと同じ扱いにする。
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.youtube_optimizer import router
+
+    app = FastAPI()
+    app.include_router(router)
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        "/api/youtube/feedback-loop/W-テスト"
+    )
+
+    assert resp.status_code == 501, f"作り物の実績で {resp.status_code} を返した"
+    detail = resp.json()["detail"]
+    assert detail["implemented"] is False
+    assert detail["feature"] == "post_publish_feedback"
+    assert detail["ledger"] == "backend/config/feature_gaps.json"
+
+
+def test_作り物の実績を台帳に書かない(tmp_path, monkeypatch):
+    """`_record_post_publish_feedback` は `is_mock` を弾く（R1.5-C4・6周目 指摘1）。
+
+    呼び出し元が 501 で止めるので通常ここには来ないが、
+    **この台帳は Git 追跡下で、一度書くと残る。**二重に止める。
+    """
+    from routers import youtube_optimizer
+
+    書いた = []
+    monkeypatch.setattr(youtube_optimizer, "safe_load_json",
+                        lambda *_a, **_k: 書いた.append("読んだ") or {})
+
+    youtube_optimizer._record_post_publish_feedback(
+        wagamama_id="W-テスト", video_id="vid",
+        actual_metrics={"is_mock": True, "metrics": {"click_through_rate": 5.2}},
+        validation={"analysis": {}},
+    )
+    assert not 書いた, "作り物なのに台帳を開いた"
+
+
+def test_企画立案は作り物の学びを混ぜない():
+    """`POST /api/youtube/pre-plan` の学び収集（R1.5-C4・6周目 指摘1）。
+
+    `evolution_log.json` には mock 時代の「実績」が12件焼き付いている
+    （`actual_ctr 5.2` / `actual_retention 65.0` / `actual_views 1000`）。
+    `is_real: true` が無い行は作り物とみなす（fail-closed）。
+    """
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent.parent
+           / "routers" / "youtube_optimizer.py").read_text(encoding="utf-8")
+
+    assert 'fb.get("is_real") is True' in src, \
+        "企画立案が post_publish_feedbacks を無条件に読んでいる"
+
+
+def test_チャンネル統計が実測を名乗らない():
+    """`POST /api/analytics/sync` と `/simulate`（R1.5-C4・6周目 指摘2）。
+
+    出所は `branding/analytics_manager.py` の `mock_my_stats`
+    （`# TODO: Replace with real YouTube API call`）。
+    **登録者数と総再生数は収益化の到達度そのもの。**
+    `simulate` で注入した数字が `sync` から実績の顔で出てきており、
+    **収益化の閾値（登録者1,000人）を任意に超えた数字が通っていた。**
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.trinity import router
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    sync = client.post("/api/analytics/sync").json()
+    assert sync["is_real"] is False
+    assert sync["data_source"] == "sample"
+    assert sync["stats"]["is_real"] is False
+    assert sync["stats"]["last_updated"] is None, "同期していないのに同期時刻を打った"
+
+    sim = client.post("/api/analytics/simulate?views=500000").json()
+    assert sim["is_real"] is False
+    assert sim["sync"]["stats"]["is_real"] is False
+
+
+def test_成長ログの作り物に印が付く(monkeypatch):
+    """`GET /api/evolution` / `GET /api/director/evolution`（R1.5-C4・6周目 指摘1）。
+
+    **印を付ける場所は1箇所**（`get_evolution_log_for_display()`）。
+    1経路ずつ塞ぐと「同じクラスの別経路」になる。
+    保存側（`get_evolution_log()`）は素のままで、印はファイルへ書き戻らない。
+
+    実ファイルの中身に依存すると、行が空のときに黙って素通りする空振りテストに
+    なるので（**変異テストで実際にそうなっていた**）、既知の中身を差して見る。
+    """
+    from branding_manager import branding_manager
+
+    作り物 = {"timestamp": "2026-06-08T09:05:08", "wagamama_id": "waga_001",
+              "actual_ctr": 5.2, "actual_retention": 65.0, "actual_views": 1000}
+    実績 = {"timestamp": "2026-08-29T00:00:00", "wagamama_id": "waga_002",
+            "is_real": True, "actual_ctr": 3.1}
+    元の台帳 = {"entries": [], "post_publish_feedbacks": [作り物, 実績]}
+
+    monkeypatch.setattr(branding_manager, "get_evolution_log",
+                        lambda: {**元の台帳,
+                                 "post_publish_feedbacks": [dict(作り物), dict(実績)]})
+
+    行 = branding_manager.get_evolution_log_for_display()["post_publish_feedbacks"]
+
+    assert 行[0]["is_real"] is False, "作り物の『実績』に印が付いていない"
+    assert 行[0]["data_source"] == "sample"
+    assert 行[0]["actual_ctr"] == 5.2, "元の値を落としてはいけない"
+    assert 行[1]["is_real"] is True, "本物の実績に作り物の印を付けた"
+    assert "data_source" not in 行[1]
+
+    # 印が保存側へ書き戻らないこと
+    assert "data_source" not in 作り物

@@ -9,6 +9,19 @@ from fastapi import APIRouter, HTTPException, Body
 router = APIRouter(prefix="/api", tags=["trinity"])
 
 
+# **チャンネル統計は YouTube に繋がっていない**（R1.5-C4・gate-verifier 6周目 指摘2）。
+# 出所は `branding/analytics_manager.py` の `mock_my_stats`（登録者 150・総再生 4,500）。
+# `admin_channel_router` の `watch_time_hours: 15200` を直したのと同じクラスが、
+# **本番の別ルーターに無印で残っていた。**
+# 台帳: `backend/config/feature_gaps.json` の `channel_stats`
+ANALYTICS_DATA_SOURCE = {
+    "data_source": "sample",
+    "is_real": False,
+    "note": "**YouTube から取得した実績ではありません。**Analytics API に一度も"
+            "接続していません。収益化の到達度の判断に使わないでください",
+}
+
+
 def _register_router_debt(line_number: int, pattern: str, error_msg: str, endpoint_name: str):
     import sys
     import logging
@@ -63,13 +76,20 @@ async def get_trinity_status():
 
 @router.post("/analytics/sync")
 async def sync_analytics():
-    """Triggers the Real-World Link: Analytics -> Biz Rank update."""
+    """Triggers the Real-World Link: Analytics -> Biz Rank update.
+
+    **「Real-World Link」と言っているが、実世界には繋がっていない**
+    （R1.5-C4・gate-verifier 6周目 指摘2）。出所は
+    `branding/analytics_manager.py` の `mock_my_stats` で、YouTube Analytics に
+    一度も接続していない。**登録者数と総再生数は収益化の到達度そのもの**なので、
+    包みの側でも名乗る。台帳: `backend/config/feature_gaps.json` の `channel_stats`
+    """
     from branding_manager import branding_manager
     try:
         result = branding_manager.process_analytics_update()
         if result is None:
             raise HTTPException(status_code=500, detail="Failed to process analytics update")
-        return result
+        return {**ANALYTICS_DATA_SOURCE, **result}
     except HTTPException:
         raise
     except Exception as e:
@@ -79,7 +99,12 @@ async def sync_analytics():
 
 @router.post("/analytics/simulate")
 async def simulate_analytics(views: int = 1000):
-    """Debug: Simulates obtaining views."""
+    """Debug: Simulates obtaining views.
+
+    **注入した数字が `sync` から実績の顔で出てくる**（R1.5-C4・6周目 指摘2）。
+    `views=500000` を入れると `sync` の `stats.subscribers` が 5,150 になり、
+    **収益化の閾値（登録者1,000人）を任意に超えた数字が通っていた。**
+    """
     if views < 0:
         raise HTTPException(status_code=400, detail="Views must be non-negative")
     if views > 1000000000:
@@ -91,6 +116,7 @@ async def simulate_analytics(views: int = 1000):
         result = analytics_manager.sim_add_views(views)
         sync_result = branding_manager.process_analytics_update()
         return {
+            **ANALYTICS_DATA_SOURCE,
             "simulation": result,
             "sync": sync_result
         }
@@ -119,10 +145,18 @@ async def get_models():
 
 @router.get("/evolution")
 async def get_evolution():
-    """Returns the qualitative growth narrative log."""
+    """Returns the qualitative growth narrative log.
+
+    **`post_publish_feedbacks` には作り物の「実績」が焼き付いている**
+    （R1.5-C4・gate-verifier 6周目 指摘1）。`YOUTUBE_API_MODE=mock` 時代に
+    `random` で組み立てた CTR・維持率・再生数が12件、`actual_*` の名前で
+    `evolution_log.json`（Git 追跡下）に残っている。書き込みは止めたが、
+    **既にある行は消さずに印を付ける**（記録は残す・ペルソナ #23 選択的保持）。
+    `is_real: true` が無い行は作り物とみなす（fail-closed）。
+    """
     from branding_manager import branding_manager
     try:
-        log = branding_manager.get_evolution_log()
+        log = branding_manager.get_evolution_log_for_display()
         if log is None:
             raise HTTPException(status_code=404, detail="Evolution log not found")
         return log
