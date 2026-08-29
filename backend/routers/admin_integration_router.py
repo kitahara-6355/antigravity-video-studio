@@ -259,7 +259,7 @@ async def get_tool_evolution_log():
             {"session_id": "sess_003", "score": 93, "philosophy": "視聴維持率の最適化", "timestamp": "2026-05-01"},
         ],
         "total": 3,
-        "last_updated": datetime.now().isoformat(),
+        "last_updated": None,  # 検査していないのに現在時刻を打たない（R1.5-C4）
     }
 
 

@@ -147,7 +147,11 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
   // ── コンテキストから展開 ──
   const {
     segments = [],
-    quality_score = 0,
+    // **既定値を 0 にしない**（R1.5-C4・9周目の指摘）。`= 0` だと
+    // `typeof quality_score === 'number'` が真になり、下の「未計測」の枝へ
+    // **本番から到達できなかった。**0 は実際に取りうる点なので、値では区別できない
+    quality_score = null,
+    quality_scored = null,
     quality_feedback = [],
     category_report = [],
     metadata = {},
@@ -176,7 +180,11 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
     // **未計測を「0点」と表示しない**（R1.5-C4）。`|| 0` のせいで、
     // 品質ゲートを一度も通していないセッションが「品質スコア0点」と出ていた。
     // バックエンド側（run_gate / _get_quality_score）で `null` を返すようにしたのと同じ扱い。
-    const 採点した = typeof quality_score === 'number';
+    // **旗があれば旗を見る**（R1.5-C4）。バックエンドの `_build_result` が
+    // `quality_scored` を載せる。無い応答（古い形）は値で判断する
+    const 採点した = quality_scored === null
+      ? typeof quality_score === 'number'
+      : quality_scored === true;
     const effectiveScore = 採点した ? quality_score : null;
     const effectiveFeedback = quality_feedback.length > 0
       ? quality_feedback

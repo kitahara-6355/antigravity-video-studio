@@ -212,6 +212,9 @@ def test_pipeline_report_all_ok(clean_pipeline_states, tmp_path):
                 {"name": "サムネイル生成ステージ", "success": True, "duration": 1.0, "detail": "サムネイル完了"},
             ],
             "quality_details": {
+                # **採点したかどうかを持つ**（R1.5-C4・9周目）。実走の `_build_result` は
+                # この旗を付ける。生産側の既定 0.0 と「未計測」を取り違えないため
+                "scored": True,
                 "score": 95,
                 "category_report": [
                     {"category": "transcription", "label": "文字起こし", "score": 95, "status": "PASS"}
@@ -266,6 +269,9 @@ def test_pipeline_report_some_fail(clean_pipeline_states):
                 {"name": "最終レンダリングステージ", "success": False, "duration": 1.0, "detail": "失敗"},
             ],
             "quality_details": {
+                # **採点したかどうかを持つ**（R1.5-C4・9周目）。実走の `_build_result` は
+                # この旗を付ける。生産側の既定 0.0 と「未計測」を取り違えないため
+                "scored": True,
                 "score": 85,  # 品質スコアNG (<90)
                 "category_report": [],
                 "feedback": ["修正点あり"]
@@ -385,6 +391,9 @@ def test_pipeline_report_thumbnail_glob_fallback(clean_pipeline_states, tmp_path
                 {"name": "サムネイル生成ステージ", "success": True, "duration": 1.0, "detail": "サムネイル完了"},
             ],
             "quality_details": {
+                # **採点したかどうかを持つ**（R1.5-C4・9周目）。実走の `_build_result` は
+                # この旗を付ける。生産側の既定 0.0 と「未計測」を取り違えないため
+                "scored": True,
                 "score": 95,
                 "category_report": [
                     {"category": "transcription", "label": "文字起こし", "score": 95, "status": "PASS"}

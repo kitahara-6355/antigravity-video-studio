@@ -196,6 +196,9 @@ class QualityGateWorker(PipelineStageWorker):
         score = max(0, min(100, score))
         rank = "S" if score >= 95 else "A" if score >= 90 else "B" if score >= 80 else "C"
         ctx.quality_score = score
+        # **ここでしか立たない**（R1.5-C4）。0.0 は実際に取りうる点なので、
+        # 「測った」を値ではなくこの旗で表す
+        ctx.quality_scored = True
         ctx.quality_feedback = feedback
         ctx.quality_gate_report = {
             "raw_score": raw_score,

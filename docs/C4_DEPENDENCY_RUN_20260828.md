@@ -1041,3 +1041,105 @@ POST /api/render/start {"force_render": true} → 200 {"success": true, "quality
 
 **元から赤（基準と突き合わせ済み・追加分）:**
 `test_shared/test_batch17_engines_plugins.py::test_cr_04_collect_model_requirements_exceptions`。
+
+---
+
+# 10周目に向けて — 未計測の番兵値を根から直す（2026-08-29）
+
+9周目も **not_met**。指摘は3件だが**根は1つ**だった。
+
+## 根本原因 — 未計測の番兵値が生産側と判定側で食い違っていた
+
+```
+生産側: PipelineContext.quality_score: int = 0      （agents/pipeline_types.py:120）
+判定側: 採点した = isinstance(quality_score, (int, float))  ← 0 でも True
+```
+
+**8周目に入れた「`None` なら未計測」の門は、本番から一度も通らなかった。**
+生産側が出すのは `0`（int）なので、`isinstance` は常に真になる。
+つまり `GET /api/pipeline/report` は相変わらず「総合スコア: **0.0点**」を出し、
+UI は「0点 / ❌ 不合格」を描いていた。**条件文が名指しする
+「常に 0.0 になる quality_score」は、まだ生きていた。**
+
+しかも `pipeline_report.py:392` の HTML は
+`{quality.get('score', 'N/A')}点` を直接埋めており、**私が足した門を
+まったく通っていなかった。**
+
+### 直し方 — 値で「無い」を表すのをやめる
+
+**0 は実際に取りうる点なので、値の側で「無い」を表そうとすると必ず取り違える。**
+「測ったかどうか」を値と別に持つことにした。
+
+| 場所 | 何をしたか |
+|---|---|
+| `agents/pipeline_types.py` | `quality_scored: bool = False` を追加（本線の context）|
+| `core/context.py` | 同上（`ProductionContext` にも同じ取り違えがあった）|
+| `agents/workers/quality_gate_worker.py` | **ここでしか立てない**（採点した瞬間に True）|
+| `agents/pipeline_coordinator.py` | `_build_result` が `quality_scored` と `quality_details["scored"]` を持ち回す |
+| `routers/pipeline_report.py` | 門を旗に繋ぎ、**HTML 側にも `_品質の表示()` を通した** |
+| `ProductionWizard.jsx` | 分割代入の既定 `quality_score = 0` が `typeof === 'number'` を真にしていた → `null` に |
+| `ProductionPipeline.jsx` | 「0点 / ❌不合格」を「未計測」と描き分ける |
+
+**`0 点`（採点して 0 だった）と `未計測`（見ていない）を書き分けられる**ようになった。
+
+## 指摘A — 書き出しの未計測ブロック（2026-08-29 ユーザー決定）
+
+**「必ず止める。`force_render` でも越えられない」**に決まった。ユーザーへ示した事実:
+
+- **この経路は何もレンダリングしていない。**`_render_jobs` に dict を登録して
+  `status: "rendering"` を返すだけで、ffmpeg も背景タスクも出力ファイルも無い
+- **本線は通らない。**`pipeline_coordinator` は `RenderWorker` で自分で書き出す
+- UI は既に `force_render: !is_ready` で呼ぶ設計なので、
+  「強制で越えられる」にすると**門が無いのと同じ**になる
+
+止めても実作業は1つも止まらない、と分かった上での決定。
+
+## 指摘A の付随 — **別の動画の点を付けていた**
+
+9周目が見つけた鋭い点。`_品質の出所()` は
+`vault-outputs/final/*.quality.json` を **mtime 最新で1件**返すだけで、
+`/api/render/start` は**どの動画を書き出すのかを言う引数を持っていなかった**。
+つまり「直前に測った**別の動画**の点」が
+`is_real: true / data_source: "derived"` として今回のジョブに付いていた。
+**8周目に私が入れた `derived` の主張自体が根拠を欠いていた。**
+
+`_品質の実測(video)` に作り替え、`RenderStartRequest.video_path` を足した。
+**動画を言われなければ未計測**（fail-closed）。UI も `final_path` を渡すようにした。
+
+```
+{}                                        → quality_unmeasured（force_render 不可）
+{"force_render": true}                    → 同上
+{"video_path": "final_20260828_091542.mp4"} → quality_block（実測 89 < 90）
+上に force_render: true                    → success（89点・出所つき）
+```
+
+## ついでに
+
+`/api/admin/integration/tool/evolution-log` に残っていた
+`last_updated: datetime.now().isoformat()` を `None` にした
+（9周目の「参考」で指摘された、2周目・4周目・5周目と同型の残り）。
+
+## 契約テスト（26件・新規5件はすべて変異テストで確認）
+
+| 変異 | 結果 |
+|---|---|
+| `quality_scored` の既定を True にする | 1 failed |
+| レポートの門を値判定に戻す | 1 failed |
+| 未計測でも書き出しを通す | 1 failed |
+| 動画を言われなくても最新のサイドカーを拾う | 1 failed |
+
+## 9周目が確認したこと（こちらは met）
+
+- **契約テスト21件すべてが変異で死ぬ**ことを、24変異の総当たりで確認された
+  （空振り3件目は無し）
+- **CI が完走して緑になった** — `aa7e62f` の run **33240074434** は4ジョブすべて success。
+  `testpaths 外の退行検知` が初めて完走した（228ファイル×2版）。
+  テスト **10,231件 失敗0 / カバレッジ 76.0%**
+
+### CI が長らく緑にならなかった理由（記録）
+
+`ci.yml` の `concurrency` は PR イベントで `cancel-in-progress: true`。
+`testpaths 外の退行検知` は1時間超かかるので、**1周ごとに push するたび
+走行中の run が打ち切られていた**（`908eeff` の run 33237682523 は
+228 中 36 で cancelled）。**周回のたびに push しない**か、
+run の完走を待つ運用が要る。

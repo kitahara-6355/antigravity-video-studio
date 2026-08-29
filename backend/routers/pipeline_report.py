@@ -66,6 +66,20 @@ def _probe_video(path: str) -> dict:
     return {"valid": False, "error": "ffprobe不可"}
 
 
+def _品質の表示(quality: dict) -> str:
+    """HTML に出す品質スコアの文字列（R1.5-C4・9周目の指摘）。
+
+    ここは `{quality.get('score', 'N/A')}点` を直接埋めており、**上の
+    `採点した` の門をまったく通っていなかった。** 生産側の既定が 0.0 なので、
+    品質ゲートを一度も通していない実走のレポートに
+    「総合スコア: **0.0点**」と書かれていた。
+    """
+    if not quality.get("scored"):
+        return "未計測（品質ゲートを通していません）"
+    score = quality.get("score")
+    return f"{score}点" if isinstance(score, (int, float)) else "N/A"
+
+
 def _build_category_html(quality: dict) -> str:
     """カテゴリ別スコアのHTMLテーブルを生成"""
     cat_report = quality.get("category_report", [])
@@ -198,7 +212,12 @@ async def pipeline_report():
     # 2周目 N-2 で直した「未計測 → 0.0点・不合格」と同じクラス
     # （こちらは `ok: False` なので偽の success ではないが、**数字が嘘**）。
     quality_score = quality.get("score")
-    採点した = isinstance(quality_score, (int, float))
+    # **番兵値で判断しない**（R1.5-C4・9周目の指摘）。8周目はここを
+    # `isinstance(..., (int, float))` にしたが、**生産側（`PipelineContext`）の
+    # 既定は `0.0`（float）なので、未計測の枝に本番から到達できなかった。**
+    # 0.0 は実際に取りうる点なので、値では区別できない。
+    # `quality_details["scored"]` を見る（`QualityGateWorker` が立てる旗）。
+    採点した = bool(quality.get("scored")) and isinstance(quality_score, (int, float))
     # 判定: スコア90点以上（憲法§8.2準拠）
     quality_ok = 採点した and quality_score >= 90
     点表示 = f"{quality_score}点" if 採点した else "未計測"
@@ -389,7 +408,7 @@ async def pipeline_report():
 
 <div class="section">
   <h2>🎯 品質ゲート詳細</h2>
-  <p>総合スコア: <strong>{quality.get('score', 'N/A')}点</strong></p>
+  <p>総合スコア: <strong>{_品質の表示(quality)}</strong></p>
   {_build_category_html(quality)}
   {_build_feedback_html(quality)}
 </div>

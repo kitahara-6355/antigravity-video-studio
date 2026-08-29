@@ -801,11 +801,17 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                           : pipelineStatus.result.quality_score >= 80 ? '#eab308' : '#ef4444',
                         lineHeight: 1,
                       }}>
-                        {pipelineStatus.result.quality_score}<span style={{ fontSize: '0.9rem' }}>点</span>
+                        {/* **未計測を「0点」と描かない**（R1.5-C4・9周目の指摘）。
+                            `quality_score` の 0.0 は既定値であって採点結果ではない */}
+                        {pipelineStatus.result.quality_scored === false
+                          ? <span style={{ fontSize: '1rem' }}>未計測</span>
+                          : <>{pipelineStatus.result.quality_score}<span style={{ fontSize: '0.9rem' }}>点</span></>}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                          品質ゲート {pipelineStatus.result.quality_score >= 80 ? '✅ 合格' : '❌ 不合格'}
+                          品質ゲート {pipelineStatus.result.quality_scored === false
+                            ? '⚠️ 未計測（品質ゲートを通していません）'
+                            : pipelineStatus.result.quality_score >= 80 ? '✅ 合格' : '❌ 不合格'}
                         </div>
                         {/* カテゴリ別ミニバー */}
                         <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
@@ -1012,7 +1018,12 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
         onConfirm={() => {
           setShowQualityGate(false);
           // レンダリング開始 or 強制書出
-          apiFetch('postRenderStart', { body: { force_render: !qualityGateData?.is_ready } }).catch(err => console.error('Render start failed:', err));
+          // **どの動画を書き出すのかを渡す**（R1.5-C4・9周目の指摘）。
+          // 渡さないと品質サイドカーを引けず、サーバは未計測として止める
+          apiFetch('postRenderStart', { body: {
+            video_path: pipelineStatus?.result?.final_path || null,
+            force_render: !qualityGateData?.is_ready,
+          } }).catch(err => console.error('Render start failed:', err));
         }}
         data={qualityGateData}
       />

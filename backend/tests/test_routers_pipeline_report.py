@@ -232,6 +232,9 @@ def test_pipeline_report_all_ok(mock_state, tmp_path):
             "duration_seconds": 120.0,
             "session_id": "session-1234567890",
             "quality_details": {
+                # **採点したかどうかを持つ**（R1.5-C4・9周目）。実走の
+                # `_build_result` はこの旗を付ける
+                "scored": True,
                 "score": 95,
                 "category_report": [{"category": "UX", "score": 95}]
             },

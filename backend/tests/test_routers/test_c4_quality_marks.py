@@ -591,17 +591,15 @@ def test_書き出し前の品質は本線の実測を読む():
     # **ソース文字列の grep はしない。**7周目に「文字列がコメントに残るだけで
     # 通る」空振りを指摘されたので、挙動だけで見る
 
-    # サイドカーが無ければ点を名乗らない
-    with _m.patch.object(R, "_品質の出所", return_value=None):
-        assert R._get_quality_score() is None, "測っていないのに点を返した"
-
-    # サイドカーがあればその点を読む
     import tempfile
     with tempfile.TemporaryDirectory() as d:
-        p = Path(d) / "final_x.quality.json"
-        p.write_text(_json.dumps({"score": 89}), encoding="utf-8")
-        with _m.patch.object(R, "_品質の出所", return_value=str(p)):
-            assert R._get_quality_score() == 89, "実測を読めていない"
+        (Path(d) / "final_x.quality.json").write_text(
+            _json.dumps({"score": 89}), encoding="utf-8")
+        with _m.patch.object(R, "_writable_path", return_value=Path(d)):
+            # サイドカーがあればその点を読む
+            assert R._品質の実測("final_x.mp4")[0] == 89, "実測を読めていない"
+            # 無ければ点を名乗らない
+            assert R._品質の実測("final_無い.mp4")[0] is None, "測っていないのに点を返した"
 
 
 def test_レビューできなかったら合格と言わない():
@@ -653,3 +651,117 @@ def test_進化ログツールが実測を名乗らない():
 
     assert d["is_real"] is False
     assert d["data_source"] == "sample"
+
+
+# ── 9周目の指摘 — 未計測の番兵値が生産側 0.0 / 判定側 None で食い違っていた ──
+#
+# 8周目に入れた門は `None` を未計測の印にしていたが、**生産側
+# （`PipelineContext.quality_score`）の既定は `0.0`（float）**なので、
+# 未計測の枝に**本番から到達できなかった**。0.0 は実際に取りうる点なので、
+# 値の側で「無い」を表そうとすると必ず取り違える。
+# **「測ったかどうか」を値と別に持つ**（`quality_scored`）ことで根を断つ。
+
+
+def test_採点したかどうかを値と別に持つ():
+    """`PipelineContext.quality_scored`（R1.5-C4・9周目の指摘）。
+
+    立てるのは `QualityGateWorker` だけ。**既定は False。**
+    """
+    from agents.pipeline_types import PipelineContext
+    from core.context import ProductionContext
+
+    ctx = PipelineContext(video_path="d.mp4", session_id="s1")
+    assert ctx.quality_scored is False, "既定で採点済みになっている"
+    assert ctx.quality_score == 0, "既定値は 0 のまま（消費側が多いので変えない）"
+
+    # 旧い方の context にも同じ取り違えがあったので揃える
+    pc = ProductionContext()
+    assert pc.quality_scored is False
+    assert pc.quality_score == 0.0
+
+
+def test_実行結果に採点の有無が載る():
+    """`_build_result` が `quality_scored` を持ち回す（R1.5-C4・9周目）。"""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent.parent
+           / "agents" / "pipeline_coordinator.py").read_text(encoding="utf-8")
+    # 挙動で見たいが `_build_result` は大量の ctx を要求するので、
+    # ここでは載っていることだけ確かめ、表示側は下の2件で挙動を見る
+    assert '"quality_scored"' in src
+    assert '"scored": getattr(ctx, "quality_scored", False)' in src
+
+
+def test_レポートは未計測を0点と書かない():
+    """`GET /api/pipeline/report`（R1.5-C4・9周目 指摘B）。
+
+    生産側が出す `quality_details["score"] = 0.0` をそのまま
+    「総合スコア: **0.0点**」と HTML に埋めていた。しかも HTML の埋め込みは
+    `採点した` の門をまったく通っていなかった。
+    """
+    from routers.pipeline_report import _品質の表示
+
+    assert _品質の表示({"score": 0.0}) == "未計測（品質ゲートを通していません）"
+    assert _品質の表示({"score": 0.0, "scored": False}) == \
+        "未計測（品質ゲートを通していません）"
+    assert _品質の表示({"score": 0.0, "scored": True}) == "0.0点", \
+        "採点した 0 点は 0 点と書く（未計測と混ぜない）"
+    assert _品質の表示({"score": 89, "scored": True}) == "89点"
+
+
+def test_書き出しは未計測なら止まる():
+    """`POST /api/render/start`（R1.5-C4・2026-08-29 ユーザー決定）。
+
+    **`force_render` でも越えられない。** 90点未満なら「悪いと分かったうえで
+    出す」判断ができるが、未計測は判断の材料そのものが無い。
+    UI は `force_render: !is_ready` で常に押してくるので、越えられるように
+    すると門が無いのと同じになる。
+
+    止めても実作業は1つも止まらない — **この経路は何もレンダリングしていない**
+    （`_render_jobs` に dict を登録するだけ）。本線は `RenderWorker` で書き出す。
+    """
+    import unittest.mock as _m
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers import render as R
+
+    app = FastAPI()
+    app.include_router(R.router)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    with _m.patch.object(R, "_品質の実測", return_value=(None, None)), \
+         _m.patch.object(R, "detect_gpu",
+                         return_value={"gpu_available": False,
+                                       "recommended_encoder": "libx264"}):
+        for body in ({}, {"force_render": True}):
+            d = client.post("/api/render/start", json=body).json()
+            assert d["success"] is False, f"{body}: 未計測なのに通した"
+            assert d["error"] == "quality_unmeasured"
+            assert d["force_render_available"] is False
+
+
+def test_書き出しの点はその動画のもの():
+    """`_品質の実測()` は**動画を指定しないと点を返さない**（R1.5-C4・9周目）。
+
+    8周目は「最新の `*.quality.json` を mtime で1件」返していたので、
+    **直前に測った別の動画の点**が `is_real: true / data_source: "derived"`
+    としてこの書き出しに付いていた。**どの動画の点か分からないなら実測ではない。**
+    """
+    import json as _json
+    import tempfile
+    import unittest.mock as _m
+    from pathlib import Path
+
+    from routers import render as R
+
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "final_A.quality.json").write_text(
+            _json.dumps({"score": 89}), encoding="utf-8")
+
+        with _m.patch.object(R, "_writable_path", return_value=Path(d)):
+            assert R._品質の実測() == (None, None), "動画を言わずに点を得た"
+            assert R._品質の実測("存在しない.mp4") == (None, None)
+            点, 出所 = R._品質の実測("final_A.mp4")
+            assert 点 == 89
+            assert 出所.endswith("final_A.quality.json")

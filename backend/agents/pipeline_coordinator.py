@@ -1133,6 +1133,10 @@ class PipelineCoordinator:
         # ctxから直接取得（StageResult.dataの伝達に依存しない）
         quality_details = {
             "score": ctx.quality_score,
+            # **採点したかどうかを持ち回す**（R1.5-C4・9周目の指摘）。
+            # 読み手（`GET /api/pipeline/report` / UI）が 0.0 を
+            # 「未計測」と取り違えないようにする
+            "scored": getattr(ctx, "quality_scored", False),
             "feedback": getattr(ctx, 'quality_feedback', []),
             "category_report": getattr(ctx, 'quality_category_report', []),
             "category_scores": getattr(ctx, 'quality_category_scores', {}),
@@ -1162,6 +1166,7 @@ class PipelineCoordinator:
             "preview_path": ctx.preview_path,
             "metadata": ctx.metadata,
             "quality_score": ctx.quality_score,
+            "quality_scored": getattr(ctx, "quality_scored", False),
             "quality_details": quality_details,
             "quality_gate_report": quality_gate_report,  # T-032
             "segments_count": len(ctx.segments) if ctx.segments else 0,
