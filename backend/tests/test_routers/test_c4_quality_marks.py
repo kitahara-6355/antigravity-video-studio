@@ -1362,3 +1362,84 @@ def test_実体から引いたと名乗る数字が実体と一致する():
     # 作り物の 770 がどこにも出ていないこと
     本文 = json.dumps(data, ensure_ascii=False)
     assert "770" not in 本文, f"作り物の合計 770 が実測の札で出ている: {本文[:200]}"
+
+
+def test_戦略会議室が読む鍵が印つきで揃っている():
+    """`Boardroom.jsx` の「ライバル出現」カードの供給契約（R1.5-C4・15周目の指摘）。
+
+    あのカードは `GadgetReviewer / You: 200 / Target: 250 / 差分: 50 人 /
+    TechMastery / 目標: 10,000 人` を **JSX に直書き**していた。
+    `external_status` を受け取っているのに一度も使っておらず、
+    **バックエンドの作り物の値（登録者150・TechStarter 180・差分30）とも
+    食い違う数字**を「You:」＝利用者自身の登録者数として描いていた。
+    `admin_channel_router` の `watch_time_hours: 15200` と同じクラスが、
+    印の付かないままフロントに残っていた。
+
+    直書きをやめて `GET /api/settings` の `external_status` から描くようにした。
+    **ここではその供給側の契約を固定する** — フロントに test runner が無いので
+    JSX そのものは自動検証できないが、**画面が読む鍵が消えたり無印になったら
+    ここで落ちる**。
+    """
+    import unittest.mock as _m
+
+    import branding_manager as BM
+
+    台帳 = {
+        "profiles": {},
+        "external_status": {
+            "youtube": {"subscribers": 150, "total_views": 4500},
+            "rivals": {
+                "nemesis": {"name": "TechStarter", "subs": 180},
+                "benchmark": {"name": "TechMastery", "subs": 15000, "genre": "Tech"},
+            },
+        },
+    }
+
+    with _m.patch.object(BM.branding_manager, "user_model", 台帳):
+        from settings_manager import settings_manager
+        with _m.patch.object(settings_manager, "_ensure_constitution", return_value={}):
+            外部 = settings_manager.get_all_settings()["user_model"]["external_status"]
+
+    # 画面が「作り物です」の帯を出すための旗
+    assert 外部["rivals"]["is_real"] is False, "画面が警告を出せない"
+
+    # 画面が描く鍵（消えたら「未取得」表示に落ちる＝嘘は出ないが、契約は保つ）
+    assert 外部["rivals"]["nemesis"]["name"] == "TechStarter"
+    assert 外部["rivals"]["nemesis"]["subs"] == 180
+    assert 外部["rivals"]["benchmark"]["name"] == "TechMastery"
+    assert 外部["rivals"]["benchmark"]["subs"] == 15000
+    assert 外部["rivals"]["benchmark"]["genre"] == "Tech"
+    assert 外部["youtube"]["subscribers"] == 150
+
+    # 中身にも印が要る（UI が nemesis を取り出した時点で消えないこと）
+    assert 外部["rivals"]["nemesis"]["is_real"] is False
+    assert 外部["rivals"]["benchmark"]["is_real"] is False
+
+
+def test_戦略会議室に数字を直書きしない():
+    """**直書きの再発を止める**（R1.5-C4・15周目の指摘）。
+
+    フロントに test runner が無いので、ここだけは描画ではなくソースを見る。
+    **文字列 grep をテストにするのは本来避ける**（コメントに残るだけで通る）
+    が、ここでは逆向き——**「この数字が JSX の描画部に出てはいけない」**——
+    なので、コメントに書いてあっても落ちないよう**コメント行を除いてから**
+    数える。
+    """
+    from pathlib import Path as _Path
+
+    js = (_Path(__file__).resolve().parent.parent.parent.parent
+          / "frontend" / "src" / "components" / "Boardroom.jsx"
+          ).read_text(encoding="utf-8")
+
+    # ブロックコメントを落とす（説明文に旧値を残せるようにするため）
+    import re
+    描画部 = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+    描画部 = "\n".join(l for l in 描画部.splitlines()
+                     if not l.strip().startswith("//"))
+
+    for 旧値 in ("GadgetReviewer", "You: 200", "Target: 250",
+                "差分: 50 人", "目標: 10,000 人"):
+        assert 旧値 not in 描画部, f"作り物のチャンネル統計が直書きで戻っている: {旧値}"
+
+    # 供給元から描いていること
+    assert "external_status" in 描画部, "external_status を使わずに描いている"

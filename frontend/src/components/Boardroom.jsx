@@ -165,21 +165,65 @@ export default function Boardroom({ onClose, initialQuery }) {
                         <h3 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-heading)', color: 'var(--text-primary)' }}>
                             <RefreshCw size={20} color="#EC4899" /> ライバル出現 (RIVAL DETECTED)
                         </h3>
+                        {/*
+                          **数字を JSX に直書きしない**（R1.5-C4・gate-verifier 15周目の指摘）。
+                          ここは `GadgetReviewer / You: 200 / Target: 250 / 差分: 50 人 /
+                          TechMastery / 目標: 10,000 人` を literal で描いており、
+                          **`external_status` を 56 行目で受け取っているのに一度も使っていなかった**。
+                          `admin_channel_router` の `watch_time_hours: 15200` と同じクラスが、
+                          印の付かないままフロントに残っていた（`docs/dead_code_inventory_20260806.md`
+                          が「画面に出ているのはモックのほう」と記録している）。
+
+                          出所は `GET /api/settings` → `branding_manager.get_user_model_for_display()`
+                          で、`backend/user_model_marks.py` が `is_real: false` を付けている。
+                          **印ごと画面に出す。** 数字が無ければ作らずに「未取得」と言う。
+                        */}
+                        {external_status?.rivals?.is_real === false && (
+                            <div style={{ marginBottom: '1rem', padding: '10px 12px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', fontSize: '0.8rem', color: '#b45309', lineHeight: 1.6 }}>
+                                ⚠️ <strong>YouTube に接続していません。</strong>
+                                下の数字は既定のサンプルから選んだもので、実在のチャンネルを調べた結果ではありません。
+                            </div>
+                        )}
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '1rem', borderRadius: '12px', color: 'var(--text-primary)' }}>
                                 <div style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 600 }}>好敵手 (NEMESIS)</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>GadgetReviewer</div>
-                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>You: 200 <span style={{ opacity: 0.6 }}>Target: 250</span></div>
-                                <div style={{ marginTop: '5px', height: '6px', background: 'rgba(0,0,0,0.05)', borderRadius: '3px' }}>
-                                    <div style={{ width: '80%', height: '100%', background: '#ef4444', borderRadius: '3px', boxShadow: '0 0 8px rgba(239,68,68,0.3)' }}></div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>
+                                    {external_status?.rivals?.nemesis?.name || '未取得'}
                                 </div>
-                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#ef4444', fontWeight: 'bold' }}>🔥 差分: 50 人</div>
+                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    You: {external_status?.youtube?.subscribers ?? '—'}
+                                    {' '}<span style={{ opacity: 0.6 }}>Target: {external_status?.rivals?.nemesis?.subs ?? '—'}</span>
+                                </div>
+                                <div style={{ marginTop: '5px', height: '6px', background: 'rgba(0,0,0,0.05)', borderRadius: '3px' }}>
+                                    <div style={{
+                                        width: (typeof external_status?.youtube?.subscribers === 'number'
+                                            && typeof external_status?.rivals?.nemesis?.subs === 'number'
+                                            && external_status.rivals.nemesis.subs > 0)
+                                            ? `${Math.min(100, Math.round(external_status.youtube.subscribers / external_status.rivals.nemesis.subs * 100))}%`
+                                            : '0%',
+                                        height: '100%', background: '#ef4444', borderRadius: '3px', boxShadow: '0 0 8px rgba(239,68,68,0.3)'
+                                    }}></div>
+                                </div>
+                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#ef4444', fontWeight: 'bold' }}>
+                                    {(typeof external_status?.youtube?.subscribers === 'number'
+                                        && typeof external_status?.rivals?.nemesis?.subs === 'number')
+                                        ? `🔥 差分: ${external_status.rivals.nemesis.subs - external_status.youtube.subscribers} 人`
+                                        : '差分: 未取得'}
+                                </div>
                             </div>
                             <div style={{ flex: 1, background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '1rem', borderRadius: '12px', color: 'var(--text-primary)' }}>
                                 <div style={{ fontSize: '0.8rem', color: '#0ea5e9', fontWeight: 600 }}>師匠 (BENCHMARK)</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>TechMastery</div>
-                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>目標: 10,000 人</div>
-                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#0ea5e9', fontWeight: 'bold' }}>スタイルモデル: Tech</div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>
+                                    {external_status?.rivals?.benchmark?.name || '未取得'}
+                                </div>
+                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    目標: {typeof external_status?.rivals?.benchmark?.subs === 'number'
+                                        ? `${external_status.rivals.benchmark.subs.toLocaleString()} 人`
+                                        : '未取得'}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#0ea5e9', fontWeight: 'bold' }}>
+                                    スタイルモデル: {external_status?.rivals?.benchmark?.genre || '未取得'}
+                                </div>
                             </div>
                         </div>
                     </div>
