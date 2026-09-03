@@ -1308,3 +1308,57 @@ def test_採点できなかった実走を完了と呼ばない():
     致命2, 劣化2 = coordinator._settle_outcomes(ctx2)
     assert (STATUS_DEGRADED if 劣化2 else STATUS_COMPLETED) == STATUS_COMPLETED, \
         "全部通ったのに完了と呼べない（門が広すぎる）"
+
+
+def test_実体から引いたと名乗る数字が実体と一致する():
+    """**印があっても嘘なら同じこと**（R1.5-C4・gate-verifier 14周目の指摘）。
+
+    `GET /api/admin/quality/ratchet` は `is_real: true /
+    data_source: "derived" / source: "…/v8_baseline.json"` を名乗りながら、
+    `layer_distribution` に**そのファイルに存在しない固定値**
+    （L1:168/L2:140/L3:182/L4:140/L5:140 = **合計 770**）を混ぜていた。
+
+    **770 はこの経路の docstring が「作り物」と名指しした旧値そのもの**で、
+    しかも同じ応答の `total_items` は 1045。**内部で矛盾したまま
+    「実測」の札が付いていた。**
+
+    これまでの掃引は**「印が無いもの」を探していた**ので、
+    **印はあるが中身が嘘**というこの形を素通りさせていた。
+    だからここでは印の有無ではなく、**数字が出所と一致するか**を見る。
+    """
+    import json
+    from pathlib import Path as _Path
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers.admin_quality_router import router
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+    出所 = ルート / "backend/ux_verification/snapshots/v8_baseline.json"
+    実体 = json.loads(出所.read_text(encoding="utf-8"))
+
+    data = client.get("/api/admin/quality/ratchet").json()
+    assert data["is_real"] is True and data["data_source"] == "derived"
+
+    # 名乗ったからには一致していること
+    assert data["pass_items"] == 実体["pass_count"]
+    assert data["fail_items"] == 実体["fail_count"]
+    assert data["skip_items"] == 実体["skip_count"]
+    assert data["correlation_rate"] == 実体["pass_rate"]
+    assert data["total_items"] == (
+        実体["pass_count"] + 実体["fail_count"] + 実体["skip_count"])
+
+    # **出所に無いものを値として出さない。**
+    assert "layer_distribution" not in 実体, \
+        "出所が層別分布を持つようになった。引いて返すよう直すこと"
+    assert data["layer_distribution"] is None, \
+        "出所に無い層別分布を『実測』として返した"
+    assert data.get("note"), "引けなかったことを言っていない"
+
+    # 作り物の 770 がどこにも出ていないこと
+    本文 = json.dumps(data, ensure_ascii=False)
+    assert "770" not in 本文, f"作り物の合計 770 が実測の札で出ている: {本文[:200]}"

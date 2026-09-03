@@ -374,7 +374,28 @@ async def get_ratchet_results():
                     "fail_items": 実.get("fail_count", 0),
                     "skip_items": 実.get("skip_count", 0),
                     "correlation_rate": 実.get("pass_rate"),
-                    "layer_distribution": _ratchet_results["layer_distribution"],
+                    # **実体に無いものを「実体から引いた」と名乗らない**
+                    # （R1.5-C4・gate-verifier 14周目の指摘）。
+                    # ここは `_ratchet_results["layer_distribution"]`
+                    # （L1:168/L2:140/L3:182/L4:140/L5:140 = **合計 770**）を
+                    # そのまま混ぜていた。**770 はこの関数の docstring が
+                    # 「作り物」と名指しした旧値そのもの**で、しかも
+                    # `is_real: true / source: v8_baseline.json` の札の下に
+                    # 並んでいた（同じ応答の `total_items` は 1045）。
+                    #
+                    # `v8_baseline.json` のキーは
+                    # `timestamp / metrics / pass_count / fail_count /
+                    # skip_count / pass_rate / story_summary` だけで、
+                    # **層別の分布は持っていない**（`story_summary` は
+                    # ストーリー ID 別）。だから引けない。**引けないものは
+                    # 値を作らず、引けないと言う。**
+                    #
+                    # 実体は `ux_verification/snapshot.py` が算出できるが、
+                    # スナップショットに保存されていないので、繋ぐなら
+                    # 保存側を直すのが先。
+                    "layer_distribution": None,
+                    "note": "`layer_distribution` は出所のスナップショットに"
+                            "含まれていないため引けません（他の数字は実測）",
                     "version": "v8.0",
                     "measured_at": 実.get("timestamp"),
                 },
