@@ -205,7 +205,7 @@ export default function Boardroom({ onClose, initialQuery }) {
                           印の付かないままフロントに残っていた（`docs/dead_code_inventory_20260806.md`
                           が「画面に出ているのはモックのほう」と記録している）。
 
-                          出所は `GET /api/settings` → `branding_manager.get_user_model_for_display()`
+                          出所は 呼び出し口 `getSettings` → `branding_manager.get_user_model_for_display()`
                           で、`backend/user_model_marks.py` が `is_real: false` を付けている。
                           **印ごと画面に出す。** 数字が無ければ作らずに「未取得」と言う。
                         */}

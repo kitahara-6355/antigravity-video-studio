@@ -11,7 +11,7 @@ const QualityGate = ({ isOpen, onClose, onConfirm, data }) => {
     // **未計測を「不合格」とも「0点」とも描かない**（R1.5-C4・面(b)の掃引）。
     // 供給元は3つあり、いずれも「測ったか」を渡している:
     //   - ProductionPipeline / ProductionWizard … `scored`
-    //   - EditorPage（`POST /api/director/verify-quality`）… 失敗時 `score: null` + `is_real: false`
+    //   - EditorPage（呼び出し口 `postDirectorVerifyQuality`）… 失敗時 `score: null` + `is_real: false`
     // **どれも受け取っていなかった**ので、採点が落ちた回まで
     // 「⚠️ 修正を推奨」という**判定**が出ていた（測っていないので判定できない）。
     // `score || '--'` も、実測 0 点を '--' に潰していた。

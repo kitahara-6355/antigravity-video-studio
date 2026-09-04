@@ -728,7 +728,7 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                                 //
                                 // **さらに: 定数を「採点した」と名乗らない**
                                 // （R1.5-C4・16周目の指摘）。
-                                // `/api/pipeline/quality-gate/status` は UI の
+                                // 呼び出し口 `getPipelineQualityGateStatus` は UI の
                                 // 足場で、**動画を見ずに定数 85 点**を
                                 // `is_real:false` 付きで返す。13周目の私は
                                 // `?? 0` だけ直して**印を捨てたまま
