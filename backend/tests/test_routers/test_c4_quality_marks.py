@@ -1434,8 +1434,8 @@ def test_戦略会議室に数字を直書きしない():
     # ブロックコメントを落とす（説明文に旧値を残せるようにするため）
     import re
     描画部 = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
-    描画部 = "\n".join(l for l in 描画部.splitlines()
-                     if not l.strip().startswith("//"))
+    描画部 = "\n".join(行 for 行 in 描画部.splitlines()
+                     if not 行.strip().startswith("//"))
 
     for 旧値 in ("GadgetReviewer", "You: 200", "Target: 250",
                 "差分: 50 人", "目標: 10,000 人"):
@@ -1481,7 +1481,7 @@ def test_作り物の再生数から出たXPに印が付く():
     # **無い段位を作らない。** `biz_rank` を持たないプロファイルに
     # `tech_rank` の中身を写して段位をでっち上げると、`tech_rank` 自体は
     # 無印のまま通ってしまう（この行が無いと変異 M24 が生き残る）
-    assert "biz_rank" not in 印つき["admin"]["ranks"], \\
+    assert "biz_rank" not in 印つき["admin"]["ranks"], \
         "biz_rank を持たないプロファイルに biz_rank を作った"
     assert 印つき["admin"]["ranks"]["tech_rank"]["xp"] == 185, "tech_rank を書き換えた"
 
@@ -1493,3 +1493,104 @@ def test_作り物の再生数から出たXPに印が付く():
         {"profiles": {"owner": {"ranks": {"biz_rank": {"xp": 9, "is_real": True}}}}})
     assert 本物["profiles"]["owner"]["ranks"]["biz_rank"]["is_real"] is True
     assert "data_source" not in 本物["profiles"]["owner"]["ranks"]["biz_rank"]
+
+
+def test_品質ゲートの画面が未計測を判定として描かない():
+    """`QualityGate.jsx`（R1.5-C4・面(b)「人が読む文字列」の掃引）。
+
+    `is_ready ? '✅ 出力準備完了' : '⚠️ 修正を推奨'` と二択で描いており、
+    **未計測でも「⚠️ 修正を推奨」という判定**が出ていた（測っていないので
+    判定できない）。`score || '--'` も**実測 0 点を '--' に潰して**いた。
+
+    供給元は3つあり、**いずれも「測ったか」を渡している**のに、
+    受け側が1つも受け取っていなかった:
+
+    | 供給元 | 渡していたもの |
+    |---|---|
+    | `ProductionPipeline.jsx` | `scored` |
+    | `ProductionWizard.jsx` | `scored` |
+    | `EditorPage.jsx`（`POST /api/director/verify-quality`）| 失敗時 `score: null` + `is_real: false` |
+
+    **フロントに test runner が無い**ので、ここだけはソースを見る。
+    コメントに旧コードを残せるよう、**コメントを外してから**数える。
+    """
+    import re
+    from pathlib import Path as _Path
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+    js = (ルート / "frontend" / "src" / "components" / "QualityGate.jsx"
+          ).read_text(encoding="utf-8")
+
+    描画部 = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+    描画部 = "\n".join(行 for 行 in 描画部.splitlines()
+                     if not 行.strip().startswith("//"))
+
+    assert "採点した" in 描画部, "「測ったか」を見ずに描いている"
+    assert "'⚠️ 未計測'" in 描画部 or '"⚠️ 未計測"' in 描画部, \
+        "未計測の表示が無い（測っていないのに判定を出す）"
+    assert "{score || '--'}" not in 描画部, \
+        "実測 0 点を '--' に潰している（`||` は 0 を falsy として弾く）"
+
+
+def test_供給元が品質ゲートの画面に旗を渡している():
+    """上のテストの相方 — **供給側が旗を渡していること**（R1.5-C4）。
+
+    受け側が旗を見るようになっても、**渡す側が落としたら元に戻る**
+    （10周目・13周目・15周目がすべてこの形だった）。
+    """
+    import re
+    from pathlib import Path as _Path
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+
+    for 相対 in ("frontend/src/components/ProductionPipeline.jsx",
+                "frontend/src/components/ProductionWizard.jsx"):
+        js = (ルート / 相対).read_text(encoding="utf-8")
+        描画部 = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        描画部 = "\n".join(行 for 行 in 描画部.splitlines()
+                         if not 行.strip().startswith("//"))
+        assert "scored:" in 描画部, f"{相対} が品質ゲートへ旗を渡していない"
+
+
+def test_不合格レポートの有無を番兵値で決めない():
+    """`_build_result` の `quality_gate_report`（R1.5-C4・面(a)の掃引）。
+
+    `if ctx.quality_score < 90 and ctx.quality_score > 0:` という
+    **番兵値**で組み立てていた。`> 0` のせいで**採点して 0 点**の実走は
+    レポートが作られず、`POST /api/pipeline/force-render` が
+
+        品質ゲート不合格レポートが存在しません（**品質合格済みの可能性**）
+
+    と返す——**最悪の点なのに「合格したかも」と言う**。
+    9周目に本線で根治したのと同じ型が、`_build_result` の中に残っていた。
+    """
+    import unittest.mock as _m
+
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    coordinator = PipelineCoordinator.__new__(PipelineCoordinator)
+
+    def 作る(点, 旗):
+        ctx = PipelineContext(video_path="d.mp4", session_id="s-gate")
+        ctx.quality_score = 点
+        ctx.quality_scored = 旗
+        with _m.patch.object(PipelineCoordinator,
+                             "_generate_improvement_suggestions", return_value=[]):
+            return coordinator._build_result(ctx, "completed", 0.0)["quality_gate_report"]
+
+    # **採点した 0 点はレポートを作る**（ここが番兵値だと落ちる）
+    零点 = 作る(0, True)
+    assert 零点 is not None, "採点した 0 点でレポートが作られない（force-render が『合格済みの可能性』と言う）"
+    assert 零点["status"] == "blocked"
+    assert 零点["score"] == 0
+    assert 零点["gap"] == 90
+
+    # 採点した 85 点も作る
+    assert 作る(85, True) is not None
+
+    # 未計測は作らない（fail-closed。門が広すぎないこと）
+    assert 作る(0, False) is None, "未計測なのに不合格レポートを作った"
+
+    # 合格はレポート不要
+    assert 作る(95, True) is None

@@ -6,14 +6,25 @@ import AISuggestionCard from './AISuggestionCard';
 const QualityGate = ({ isOpen, onClose, onConfirm, data }) => {
     if (!isOpen) return null;
 
-    const { is_ready, score, critical_issues, suggestions, final_verdict } = data || {};
+    const { is_ready, score, scored, is_real, critical_issues, suggestions, final_verdict } = data || {};
+
+    // **未計測を「不合格」とも「0点」とも描かない**（R1.5-C4・面(b)の掃引）。
+    // 供給元は3つあり、いずれも「測ったか」を渡している:
+    //   - ProductionPipeline / ProductionWizard … `scored`
+    //   - EditorPage（`POST /api/director/verify-quality`）… 失敗時 `score: null` + `is_real: false`
+    // **どれも受け取っていなかった**ので、採点が落ちた回まで
+    // 「⚠️ 修正を推奨」という**判定**が出ていた（測っていないので判定できない）。
+    // `score || '--'` も、実測 0 点を '--' に潰していた。
+    const 採点した = scored === undefined
+        ? (typeof score === 'number' && is_real !== false)
+        : scored === true;
 
     return (
         <div className="quality-gate-overlay">
             <div className="quality-gate-modal">
                 <div className="gate-header">
                     <div className="header-icon">
-                        <Shield size={24} color={score > 80 ? "#10b981" : "#f59e0b"} />
+                        <Shield size={24} color={(採点した && score > 80) ? "#10b981" : "#f59e0b"} />
                     </div>
                     <h3>最終品質検査 (Quality Gate)</h3>
                     <button className="close-btn" onClick={onClose}><X size={20} /></button>
@@ -21,12 +32,14 @@ const QualityGate = ({ isOpen, onClose, onConfirm, data }) => {
 
                 <div className="gate-content">
                     <div className="score-section">
-                        <div className="score-circle" style={{ borderColor: score > 80 ? '#10b981' : '#f59e0b' }}>
-                            <span className="score-value">{score || '--'}</span>
+                        <div className="score-circle" style={{ borderColor: (採点した && score > 80) ? '#10b981' : '#f59e0b' }}>
+                            <span className="score-value">{採点した ? score : '--'}</span>
                             <span className="score-label">QUALITY SCORE</span>
                         </div>
-                        <div className={`verdict-badge ${is_ready ? 'ready' : 'not-ready'}`}>
-                            {is_ready ? '✅ 出力準備完了' : '⚠️ 修正を推奨'}
+                        <div className={`verdict-badge ${(採点した && is_ready) ? 'ready' : 'not-ready'}`}>
+                            {!採点した
+                                ? '⚠️ 未計測'
+                                : is_ready ? '✅ 出力準備完了' : '⚠️ 修正を推奨'}
                         </div>
                     </div>
 

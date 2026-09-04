@@ -758,6 +758,9 @@ def test_build_result_and_improvement_suggestions():
     coordinator = PipelineCoordinator()
     ctx = PipelineContext(video_path="/dummy/path.mp4")
     ctx.quality_score = 85 # 90点未満
+    # **「測った」は値ではなく旗で表す**（R1.5-C4）。`quality_gate_report` は
+    # `> 0` の番兵値ではなく旗で組み立てるようになった
+    ctx.quality_scored = True
     ctx.quality_feedback = ["音量が小さい", "字幕テキストに誤字があります", "メタデータにタグがない", "セグメント構成の尺が長い"]
     
     res = coordinator._build_result(ctx, "completed", 0.0)

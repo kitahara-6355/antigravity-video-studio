@@ -1143,8 +1143,15 @@ class PipelineCoordinator:
         }
 
         # T-032: 品質不合格レポートの構築
+        #
+        # **番兵値で「測ったか」を決めない**（R1.5-C4・12周目が記録した残り）。
+        # `> 0` だと**採点して 0 点**の実走が「レポート無し」になり、
+        # `POST /api/pipeline/force-render` が
+        # 「品質ゲート不合格レポートが存在しません（**品質合格済みの可能性**）」
+        # と返す——**最悪の点なのに「合格したかも」と言う**。
+        # 9周目に本線で根治したのと同じ型なので、旗で判断する。
         quality_gate_report = None
-        if ctx.quality_score < 90 and ctx.quality_score > 0:
+        if getattr(ctx, "quality_scored", False) and ctx.quality_score < 90:
             quality_gate_report = {
                 "status": "blocked",
                 "score": ctx.quality_score,
