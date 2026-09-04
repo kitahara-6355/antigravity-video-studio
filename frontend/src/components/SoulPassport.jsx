@@ -112,7 +112,7 @@ export default function SoulPassport({ onClose }) {
                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '4px' }}>OWNER (BIZ)</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                                    {owner.ranks?.biz_rank?.level || "Dreamer"}
+                                    {owner.ranks?.biz_rank?.level || "ランク未設定"}
                                 </div>
                                 {/*
                                   **この XP は作り物のチャンネル統計から出ている**

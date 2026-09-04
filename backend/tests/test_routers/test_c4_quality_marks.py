@@ -1444,6 +1444,18 @@ def test_戦略会議室に数字を直書きしない():
     # 供給元から描いていること
     assert "external_status" in 描画部, "external_status を使わずに描いている"
 
+    # **同じファイルの別カードも見る**（R1.5-C4・gate-verifier 17周目の指摘）。
+    # 15周目はライバルカードだけを直し、禁止語もその5個だけにしたので、
+    # **同ファイル上部のレーダーが無検査のまま残っていた** —
+    # `ranks?.biz_rank?.xp || 10` の `ranks` は**トップレベルには存在せず**
+    # （実体は `profiles.<役割>.ranks`）、レーダーは
+    # 「クリエイター能力分布」と称して **10 / 20 / 50 の定数を常時描いていた。**
+    for 旧値 in ("|| 10", "|| 20", "|| 50", '"Identify"',
+                '"Create your first masterpiece"'):
+        assert 旧値 not in 描画部, f"レーダー／ミッションの定数が戻っている: {旧値}"
+    assert "profiles?.owner?.ranks" in 描画部 or "profiles?.admin?.ranks" in 描画部, \
+        "段位を `profiles.<役割>.ranks` から読んでいない（存在しない鍵に落ちる）"
+
 
 def test_作り物の再生数から出たXPに印が付く():
     """`profiles.*.ranks.biz_rank`（R1.5-C4・2026-09-03 ユーザー決定）。

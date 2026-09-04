@@ -53,14 +53,33 @@ export default function Boardroom({ onClose, initialQuery }) {
 
     if (!dashboardData) return null;
 
-    const { ranks, external_status } = dashboardData;
+    const { external_status } = dashboardData;
 
-    // Radar Data
+    // **鍵を取り違えていた**（R1.5-C4・gate-verifier 17周目の指摘）。
+    // `dashboardData` は `user_model` そのもので、段位は
+    // **`profiles.<役割>.ranks`** の下にある（`branding_manager.update_user_rank()`
+    // はそこにしか書かない）。**トップレベルの `ranks` は存在しない**ので
+    // `ranks?.biz_rank?.xp || 10` は**常に 10** に落ちていた。
+    // つまりレーダーは「クリエイター能力分布」と称して
+    // **10 / 20 / 50 という JSX の定数を常時描いていた。**
+    //
+    // 15周目にこのファイルのライバルカードは直したが、**同じファイルの
+    // 上部にある このカードは無検査のまま残っていた。**
+    const ranks = dashboardData.profiles?.owner?.ranks
+        || dashboardData.profiles?.admin?.ranks
+        || {};
+    const bizRank = dashboardData.profiles?.owner?.ranks?.biz_rank;
+    const techRank = dashboardData.profiles?.admin?.ranks?.tech_rank;
+
+    // **無い軸は 50 で埋めない。** `brand_rank` はどこにも無いので、
+    // 定数を置くと「ブランド力 50」という測定結果に見える
     const radarData = [
-        { subject: 'ビジネス力', A: ranks?.biz_rank?.xp || 10, fullMark: 100 },
-        { subject: '技術力', A: ranks?.tech_rank?.xp || 20, fullMark: 100 },
-        { subject: 'ブランド力', A: ranks?.brand_rank?.score || 50, fullMark: 100 },
+        { subject: 'ビジネス力', A: bizRank?.xp ?? 0, fullMark: 100 },
+        { subject: '技術力', A: techRank?.xp ?? 0, fullMark: 100 },
+        { subject: 'ブランド力', A: dashboardData.profiles?.owner?.ranks?.brand_rank?.score ?? 0, fullMark: 100 },
     ];
+    // ビジネス力は作り物のチャンネル統計から出ている（`int(総再生 / 100)`）
+    const biz作り物 = bizRank?.is_real === false;
 
     return (
         <div className="boardroom-page fade-in" style={{
@@ -114,6 +133,12 @@ export default function Boardroom({ onClose, initialQuery }) {
                             </ResponsiveContainer>
                         </div>
 
+                        {/* ビジネス力の出どころを名乗る（R1.5-C4・17周目）*/}
+                        {biz作り物 && (
+                            <div style={{ marginTop: '10px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', fontSize: '0.75rem', color: '#b45309', lineHeight: 1.6 }}>
+                                ⚠️ 「ビジネス力」は<strong>作り物のチャンネル統計から計算した値</strong>です（YouTube に接続していません）。
+                            </div>
+                        )}
                         <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(139, 92, 246, 0.1)' }}>
                             <div style={{ marginBottom: '10px' }}>
                                 <strong style={{ fontSize: '1.2rem', color: '#8B5CF6' }}>Level {Math.floor((dashboardData.interaction_history?.total_sessions || 0) / 10) + 1}</strong>
@@ -130,13 +155,19 @@ export default function Boardroom({ onClose, initialQuery }) {
                             <Target size={20} color="#EC4899" /> 次のミッション
                         </h3>
                         <div style={{ marginBottom: '1rem' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>{ranks?.tech_rank?.title || "Identify"}</div>
+                            {/* `title` / `next_milestone` / `ai_notes` はデータに存在せず、
+                                常に既定の文字列が出ていた（R1.5-C4・17周目）。
+                                段位は実在するので `level` を出し、無いものは
+                                **無いと書く**（作り物の励ましを実績の顔で出さない）*/}
+                            <div style={{ fontSize: '0.8rem', color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+                                {techRank?.level || "ランク未設定"}
+                            </div>
                             <h2 style={{ fontSize: '1.5rem', margin: '5px 0', fontFamily: 'var(--font-heading)', color: 'var(--text-primary)' }}>
-                                {ranks?.tech_rank?.next_milestone || "Create your first masterpiece"}
+                                {techRank?.next_milestone || "次のマイルストーンは未設定です"}
                             </h2>
                         </div>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6' }}>
-                            {dashboardData.ai_notes || "ユーザーは高い志を持っています。効率を重視しつつ、深い論理の学習にも意欲的です。"}
+                            {dashboardData.ai_notes || "AI による所見はまだありません。"}
                         </p>
                     </div>
                 </div>
