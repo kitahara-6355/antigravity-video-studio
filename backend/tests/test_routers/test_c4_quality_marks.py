@@ -1543,13 +1543,29 @@ def test_供給元が品質ゲートの画面に旗を渡している():
 
     ルート = _Path(__file__).resolve().parent.parent.parent.parent
 
+    def 描画部を読む(相対):
+        js = (ルート / 相対).read_text(encoding="utf-8")
+        s = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        return "\n".join(行 for 行 in s.splitlines()
+                         if not 行.strip().startswith("//"))
+
+    # **`scored:` の有無だけを見ない。** 失敗時の `scored: false` でも
+    # 満たせてしまうので、**計算した旗を渡していること**を見る
     for 相対 in ("frontend/src/components/ProductionPipeline.jsx",
                 "frontend/src/components/ProductionWizard.jsx"):
-        js = (ルート / 相対).read_text(encoding="utf-8")
-        描画部 = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
-        描画部 = "\n".join(行 for 行 in 描画部.splitlines()
-                         if not 行.strip().startswith("//"))
-        assert "scored:" in 描画部, f"{相対} が品質ゲートへ旗を渡していない"
+        assert "scored: 採点した" in 描画部を読む(相対), \
+            f"{相対} が品質ゲートへ「計算した旗」を渡していない"
+
+    # **旗を立てるだけでは足りない**（R1.5-C4・16周目の指摘）。
+    # 16周目は「`scored: true` を立てているが、その中身は
+    # `is_real:false` の定数 85 点」という状態を見つけた。
+    # このテストは当時 `"scored:"` の有無しか見ておらず**素通りさせた**。
+    描画部 = 描画部を読む("frontend/src/components/ProductionPipeline.jsx")
+    assert "statusData.is_real" in 描画部, \
+        "供給元が応答の `is_real` を見ていない（定数を『採点した』と名乗れてしまう）"
+    assert "stage.data?.quality_score" not in 描画部, \
+        "実測の鍵名を取り違えている（`StageResult.data` は `score`）"
+    assert "stage.data?.score" in 描画部, "本線の実測を読んでいない"
 
 
 def test_不合格レポートの有無を番兵値で決めない():

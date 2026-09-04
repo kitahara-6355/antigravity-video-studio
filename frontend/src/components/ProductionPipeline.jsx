@@ -725,15 +725,41 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                                 // 点が無いときに `?? 0` で 0 を置くと、
                                 // 測っていないものが「0点・未達」という
                                 // **測定結果**として出る（9周目に潰した型）。
-                                const 点 = statusData.overall_score
-                                  ?? stage.data?.quality_score
-                                  ?? null;
+                                //
+                                // **さらに: 定数を「採点した」と名乗らない**
+                                // （R1.5-C4・16周目の指摘）。
+                                // `/api/pipeline/quality-gate/status` は UI の
+                                // 足場で、**動画を見ずに定数 85 点**を
+                                // `is_real:false` 付きで返す。13周目の私は
+                                // `?? 0` だけ直して**印を捨てたまま
+                                // `scored: true` を立てていた**ので、
+                                // 画面は 85 点を「QUALITY SCORE」として
+                                // 実測の顔で出していた。
+                                //
+                                // 併せて**取り違えていた鍵名も直す** —
+                                // 本線の実測は `StageResult.data["score"]`
+                                // （`quality_gate_worker.py:217`）であって
+                                // `quality_score` ではない。**実測を持って
+                                // いるのに定数を出していた。**
+                                const 足場の定数 = statusData.is_real === false;
+                                const 点 = 足場の定数
+                                  ? (stage.data?.score ?? null)
+                                  : (statusData.overall_score
+                                     ?? stage.data?.score
+                                     ?? null);
                                 const 採点した = typeof 点 === 'number';
                                 setQualityGateData({
                                   is_ready: 採点した
-                                    && (statusData.passed ?? 点 >= 90),
+                                    && (足場の定数
+                                        ? 点 >= 90
+                                        : (statusData.passed ?? 点 >= 90)),
                                   scored: 採点した,
                                   score: 点,
+                                  // 足場の定数だったことを画面まで運ぶ
+                                  is_real: 採点した ? undefined : false,
+                                  note: (!採点した && 足場の定数)
+                                    ? statusData.note
+                                    : undefined,
                                   critical_issues: (improveData.suggestions || [])
                                     .filter(s => s.severity === 'critical')
                                     .map(s => s.suggestion),
@@ -746,17 +772,22 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                                       priority: s.severity || s.priority || 'medium',
                                       estimated_improvement: s.estimated_improvement || '+3-5点',
                                     })),
-                                  final_verdict: statusData.passed
-                                    ? '品質基準を満たしています。レンダリングに進めます。'
-                                    : '品質基準未達です。AI改善提案を確認してください。',
+                                  final_verdict: !採点した
+                                    ? 'この画面の品質ゲートは**まだ動画を見ていません**（UI の足場が定数を返しています）。本線の品質スコアはパイプラインの結果をご覧ください。'
+                                    : statusData.passed
+                                      ? '品質基準を満たしています。レンダリングに進めます。'
+                                      : '品質基準未達です。AI改善提案を確認してください。',
                                 });
                                 setShowQualityGate(true);
                               } catch (err) {
                                 console.error('Quality gate fetch failed:', err);
+                                // **取得に失敗したのを「0点」と描かない**
+                                // （R1.5-C4・16周目）。取れなかったことと
+                                // 0 点だったことは別
                                 setQualityGateData({
-                                  is_ready: false, score: 0,
+                                  is_ready: false, score: null, scored: false,
                                   critical_issues: [], suggestions: [],
-                                  final_verdict: '品質データの取得に失敗しました',
+                                  final_verdict: '品質データの取得に失敗しました（点は取れていません）',
                                 });
                                 setShowQualityGate(true);
                               }

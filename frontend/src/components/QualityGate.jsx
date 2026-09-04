@@ -41,6 +41,13 @@ const QualityGate = ({ isOpen, onClose, onConfirm, data }) => {
                                 ? '⚠️ 未計測'
                                 : is_ready ? '✅ 出力準備完了' : '⚠️ 修正を推奨'}
                         </div>
+                        {/* 供給元が「作り物です」と言っていたら、そのまま画面に出す
+                            （R1.5-C4・16周目。印を受け取っても描かなければ同じこと）*/}
+                        {is_real === false && note && (
+                            <div style={{ marginTop: '10px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', fontSize: '0.75rem', color: '#b45309', lineHeight: 1.6 }}>
+                                ⚠️ {note}
+                            </div>
+                        )}
                     </div>
 
                     <div className="details-section">
