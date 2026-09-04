@@ -136,16 +136,53 @@ def 外部実績に印を付ける(external_status: Any) -> Any:
     return 写し
 
 
+def _事業ランクに印(profiles: Any) -> Any:
+    """`profiles.*.ranks.biz_rank` の写しに印を付ける（2026-09-03 ユーザー決定）。
+
+    **`biz_rank` の XP は作り物のチャンネル統計から出ている。**
+    `branding_manager.process_analytics_update()` が
+    `calculated_xp = int(current_views / 100)` で作っており、
+    総再生 4,500（作り物）から **XP 45** になる。それを
+    `SoulPassport.jsx` が `XP 45` と**無印で**描いていた
+    （R1.5-C4・gate-verifier 15周目の記録）。
+
+    `quests` と同じ **`derived`**（統計そのものではないが、統計から出た値）。
+
+    **`tech_rank` には付けない。** あちらは `ingest_report()` の
+    XP 付与から積まれるもので、チャンネル統計から出ていない。
+    """
+    if not isinstance(profiles, dict):
+        return profiles
+
+    写し = dict(profiles)
+    for 役割, 中身 in profiles.items():
+        if not isinstance(中身, dict):
+            continue
+        ranks = 中身.get("ranks")
+        if not isinstance(ranks, dict):
+            continue
+        biz = ranks.get("biz_rank")
+        if not isinstance(biz, dict) or _本物か(biz):
+            continue
+        写し[役割] = {**中身, "ranks": {**ranks, "biz_rank": {**biz, **派生の印}}}
+    return 写し
+
+
 def 実績を持つ値に印を付ける(model: Any) -> Any:
     """`user_model` 丸ごとの写しを返す。**外へ出す読み口はこれを通す。**
 
-    `external_status` を持たない dict はそのまま返す（写しだけ作る）。
+    印が要るのは2箇所:
+      - `external_status`（チャンネル統計・ライバル・クエスト）
+      - `profiles.*.ranks.biz_rank`（作り物の総再生から出た XP）
     """
     if not isinstance(model, dict):
         return model
-    if "external_status" not in model:
+    if "external_status" not in model and "profiles" not in model:
         return model
 
     写し = dict(model)
-    写し["external_status"] = 外部実績に印を付ける(model["external_status"])
+    if "external_status" in model:
+        写し["external_status"] = 外部実績に印を付ける(model["external_status"])
+    if "profiles" in model:
+        写し["profiles"] = _事業ランクに印(model["profiles"])
     return 写し

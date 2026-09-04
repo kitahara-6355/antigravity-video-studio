@@ -1443,3 +1443,53 @@ def test_戦略会議室に数字を直書きしない():
 
     # 供給元から描いていること
     assert "external_status" in 描画部, "external_status を使わずに描いている"
+
+
+def test_作り物の再生数から出たXPに印が付く():
+    """`profiles.*.ranks.biz_rank`（R1.5-C4・2026-09-03 ユーザー決定）。
+
+    `branding_manager.process_analytics_update()` の
+    `calculated_xp = int(current_views / 100)` は、**作り物の総再生 4,500**
+    から **XP 45** を作る。それを `SoulPassport.jsx` が `XP 45` と
+    **無印で**描いていた（15周目の記録）。
+
+    ユーザー判断で C4 の対象に含めた。`quests` と同じ **`derived`**
+    （統計そのものではないが、統計から出た値）。
+
+    **`tech_rank` には付けない** — あちらは `ingest_report()` の XP 付与から
+    積まれるもので、チャンネル統計から出ていない（門が広すぎないこと）。
+    """
+    from user_model_marks import 実績を持つ値に印を付ける
+
+    台帳 = {
+        "external_status": {"youtube": {"subscribers": 150, "total_views": 4500}},
+        "profiles": {
+            "owner": {"ranks": {"biz_rank": {"xp": 45}}},
+            "admin": {"ranks": {"tech_rank": {"level": "Editor", "xp": 185}}},
+        },
+    }
+
+    印つき = 実績を持つ値に印を付ける(台帳)["profiles"]
+
+    biz = 印つき["owner"]["ranks"]["biz_rank"]
+    assert biz["is_real"] is False, "作り物の再生数から出た XP が無印で出た"
+    assert biz["data_source"] == "derived"
+    assert biz["xp"] == 45, "値まで消している"
+
+    tech = 印つき["admin"]["ranks"]["tech_rank"]
+    assert "is_real" not in tech, "tech_rank はチャンネル統計から出ていない（門が広すぎる）"
+    # **無い段位を作らない。** `biz_rank` を持たないプロファイルに
+    # `tech_rank` の中身を写して段位をでっち上げると、`tech_rank` 自体は
+    # 無印のまま通ってしまう（この行が無いと変異 M24 が生き残る）
+    assert "biz_rank" not in 印つき["admin"]["ranks"], \\
+        "biz_rank を持たないプロファイルに biz_rank を作った"
+    assert 印つき["admin"]["ranks"]["tech_rank"]["xp"] == 185, "tech_rank を書き換えた"
+
+    # 元の dict を書き換えない
+    assert "is_real" not in 台帳["profiles"]["owner"]["ranks"]["biz_rank"]
+
+    # 本物には付けない
+    本物 = 実績を持つ値に印を付ける(
+        {"profiles": {"owner": {"ranks": {"biz_rank": {"xp": 9, "is_real": True}}}}})
+    assert 本物["profiles"]["owner"]["ranks"]["biz_rank"]["is_real"] is True
+    assert "data_source" not in 本物["profiles"]["owner"]["ranks"]["biz_rank"]
