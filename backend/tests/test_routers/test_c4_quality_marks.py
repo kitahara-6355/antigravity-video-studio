@@ -1622,3 +1622,309 @@ def test_不合格レポートの有無を番兵値で決めない():
 
     # 合格はレポート不要
     assert 作る(95, True) is None
+
+
+# ============================================================
+# 18周目（gate-verifier）— 反例1 と、契約の穴2件
+#
+# 反例1: `director_engine.generate_production_report()` の except が
+#   `issue_detected: "特になし" / xp_grant: 50` を**印なしで**返し、
+#   `routers/director.py` の `if xp > 0:` がその 50 を
+#   `user_model.json` の `tech_rank` に**恒久保存**していた。
+#   分析が一度も走っていないのに「問題は検出されなかった」と言い、
+#   その失敗が実績として台帳に残る。
+#
+# 契約の穴: 18周目の verifier が変異を当てたところ、**C4 の条件文が
+#   名指ししている2つ**を変異させても、この44件は全部緑のままだった:
+#     - `youtube_uploader.upload_video()` の placeholder success
+#     - `admin_channel_router` の固定値
+#   条件文が名指しするものを契約が守っていないのは穴なので、ここで塞ぐ。
+# ============================================================
+
+
+def test_18周目_分析が落ちたレポートが実績を名乗らない():
+    """`generate_production_report()` の except（R1.5-C4・18周目 反例1）。
+
+    ここは以前こう返していた:
+
+        {"summary": "セッション完了", "success_factor": "完了したこと",
+         "issue_detected": "特になし", "xp_grant": 50}
+
+    `"特になし"` は**分析が走っていないのに「問題は検出されなかった」**という判定。
+    さらに `xp_grant: 50` が `routers/director.py` を通って
+    `user_model.json` の `tech_rank` に恒久保存されていた。
+    `backend/user_model_marks.py` は「`tech_rank` は実行動で稼ぐ値だから
+    印を付けない」と宣言しているので、この経路がその宣言ごと嘘にしていた。
+    """
+    import json as _json
+    import unittest.mock as _m
+
+    from director_engine import DirectorBrain
+
+    brain = DirectorBrain.__new__(DirectorBrain)
+    brain.chat_model = "gemini-3.6-flash"
+    brain.client = _m.MagicMock()
+    brain.client.models.generate_content.side_effect = RuntimeError("API Error")
+
+    出力 = _json.loads(brain.generate_production_report([], {}, "Novice"))
+
+    # **実績を出さない**（これが台帳に焼き付いていた）
+    assert 出力["xp_grant"] == 0, "分析が落ちたのに実績 XP を出した"
+
+    # **判定を名乗らない**
+    assert 出力["issue_detected"] is None, "分析していないのに『問題なし』と判定した"
+    assert 出力["success_factor"] is None
+
+    # **印が付く**
+    assert 出力["is_real"] is False
+    assert 出力["data_source"] == "unavailable"
+    assert "分析は行われていません" in 出力["summary"]
+
+
+def test_18周目_分析できたレポートには出所の印が付く():
+    """反例1の相方 — **成功側にも印が要る**（R1.5-C4・18周目）。
+
+    失敗側だけ `is_real: false` にしても、成功側が無印だと
+    「印が無い＝どちらか分からない」状態が残る。工程ごとにどのモデルが
+    出したかを残すのは `CLAUDE.md` のモデル見える化の要求でもある。
+    """
+    import json as _json
+    import unittest.mock as _m
+
+    from director_engine import DirectorBrain
+
+    brain = DirectorBrain.__new__(DirectorBrain)
+    brain.chat_model = "gemini-3.6-flash"
+    brain.client = _m.MagicMock()
+    応答 = _m.MagicMock()
+    応答.text = '{"summary": "ok", "xp_grant": 70}'
+    brain.client.models.generate_content.return_value = 応答
+
+    出力 = _json.loads(brain.generate_production_report([], {}, "Novice"))
+    assert 出力["is_real"] is True
+    assert 出力["data_source"] == "gemini:gemini-3.6-flash", \
+        "どのモデルが出した分析か分からない"
+    assert 出力["xp_grant"] == 70, "実際の分析結果を握り潰した"
+
+
+def test_18周目_印のないレポートで実績台帳を書き換えない():
+    """`routers/director.py` の XP 付与（R1.5-C4・18周目 反例1の到達点）。
+
+    エンジン側が直っても、**ルーターが `is_real: false` を無視したら元に戻る**
+    （10周目・13周目・15周目がすべて「片側だけ直して戻る」形だった）。
+    """
+    import asyncio
+    import unittest.mock as _m
+
+    import routers.director as D
+
+    def 叩く(レポート):
+        要求 = D.ReportRequest(storyboard_plan=[], quality_score={})
+        脳 = _m.MagicMock()
+        脳.generate_production_report.return_value = レポート
+        台帳 = _m.MagicMock()
+        with _m.patch.dict("sys.modules", {
+            "director_engine": _m.MagicMock(brain=脳),
+            "branding_manager": _m.MagicMock(branding_manager=台帳),
+        }):
+            結果 = asyncio.run(D.generate_report(要求))
+        return 結果, 台帳.update_user_rank
+
+    # 分析していないレポート → **台帳を触らない**
+    結果, 書き込み = 叩く('{"xp_grant": 50, "is_real": false, "data_source": "unavailable"}')
+    assert 結果["xp_grant"] == 50, "応答からレポートが消えた"
+    assert 書き込み.call_count == 0, "分析していないレポートで tech_rank を書き換えた"
+
+    # 分析できたレポート → 通常どおり付与する（門が広すぎないこと）
+    結果, 書き込み = 叩く('{"xp_grant": 70, "is_real": true}')
+    書き込み.assert_called_once_with("tech_rank", amount=70)
+
+    # 印が無いレポート（旧来の形）は従来どおり付与する
+    # ——**門を広げすぎて既存の挙動を壊していないこと**の確認
+    結果, 書き込み = 叩く('{"xp_grant": 30}')
+    書き込み.assert_called_once_with("tech_rank", amount=30)
+
+
+def test_18周目_XPを持たないレポートに既定の実績を与えない():
+    """`branding_manager.ingest_report()`（R1.5-C4・18周目 反例1と同型）。
+
+    `report_data.get('xp_grant', 50)` という既定値だったので、
+    **実績を主張していないレポートに黙って 50 XP** が付いていた。
+    """
+    import unittest.mock as _m
+
+    from branding_manager import BrandingManager
+
+    bm = BrandingManager.__new__(BrandingManager)
+    bm.log_evolution = _m.MagicMock()
+    bm.update_user_rank = _m.MagicMock()
+
+    # `xp_grant` が無い → 0。台帳を触らない
+    結果 = bm.ingest_report({"agenda_proposal": "次の一手"})
+    assert 結果["xp_granted"] == 0, "実績を主張していないレポートに XP を与えた"
+    assert bm.update_user_rank.call_count == 0
+
+    # 分析していない印がある → 0
+    bm.update_user_rank.reset_mock()
+    assert bm.ingest_report({"xp_grant": 50, "is_real": False})["xp_granted"] == 0
+    assert bm.update_user_rank.call_count == 0
+
+    # 通常の付与は通る（門が広すぎないこと）
+    bm.update_user_rank.reset_mock()
+    assert bm.ingest_report({"xp_grant": 30})["xp_granted"] == 30
+    bm.update_user_rank.assert_called_once_with("tech_rank", amount=30)
+
+
+def test_18周目_段位は存在する鍵から読む():
+    """存在しない鍵へのフォールバックが定数を作らないこと（R1.5-C4・18周目）。
+
+    17周目に `Boardroom.jsx` のレーダーで見つけたのと同じ形が
+    バックエンドにも残っていた:
+
+        user_model.get('ranks', {}).get('biz_rank', {}).get('level', 'Novice')
+
+    **`user_model` に top-level の `ranks` は存在しない**（実体は
+    `profiles.<役割>.ranks.<段位>`）。つまりこの読み口は
+    **どんな段位の利用者でも常に 'Novice'** に落ちていた。
+    """
+    from director_engine import DirectorBrain
+
+    解決 = DirectorBrain._resolve_rank_level
+
+    実体の形 = {
+        "profiles": {
+            "owner": {"ranks": {"biz_rank": {"level": "Expert"}}},
+            "admin": {"ranks": {"tech_rank": {"level": "Editor"}}},
+        }
+    }
+    assert 解決(実体の形, "owner", "biz_rank") == "Expert"
+    assert 解決(実体の形, "admin", "tech_rank") == "Editor"
+
+    # **架空の形からは読めない**（読めたら旧実装のまま）
+    架空の形 = {"ranks": {"biz_rank": {"level": "Expert"}}}
+    assert 解決(架空の形, "owner", "biz_rank") is None, \
+        "存在しない鍵の形から段位を読んでいる（旧実装のまま）"
+
+    # 読めないときは定数を名乗らない
+    assert 解決({}, "owner", "biz_rank") is None
+    assert 解決(None, "owner", "biz_rank") is None
+    assert 解決({"profiles": {"owner": {}}}, "owner", "biz_rank") is None
+
+
+def test_18周目_採点の入力に段位を捏造しない():
+    """`calculate_quality_score()` の既定引数（R1.5-C4・18周目）。
+
+    既定が `biz_rank="Novice"` だったので、画面が段位を送らない限り
+    **どの利用者の絵コンテも「Novice / 期待値 Basic」で採点**されていた。
+    品質スコアは C4 が名指しする4カテゴリの1つ。
+    """
+    import inspect
+
+    from director_engine import DirectorBrain
+
+    for 名前 in ("calculate_quality_score", "generate_production_report"):
+        既定 = inspect.signature(getattr(DirectorBrain, 名前)).parameters["biz_rank"].default
+        assert 既定 is None, f"{名前}() が段位の既定値に定数を置いている（{既定!r}）"
+
+    # 呼び出し口（リクエスト模型）も同様
+    from routers.director import QualityScoreRequest, ReportRequest
+
+    for 模型 in (QualityScoreRequest, ReportRequest):
+        assert 模型.model_fields["biz_rank"].default is None, \
+            f"{模型.__name__} が段位の既定値に定数を置いている"
+
+
+
+def test_18周目_投稿の未実装は成功を名乗らない(tmp_path):
+    """**C4 条件文が名指しする `upload_video()`**（18周目・契約の穴）。
+
+    18周目の verifier が `success=False, status="failed"` を
+    `success=True, status="uploaded"` に変異させたところ、
+    **この契約ファイル44件は全部緑のままだった。**
+    条件文が名指ししているものを契約が守っていなかったので塞ぐ。
+    """
+    import asyncio
+
+    from services.youtube_uploader import (YouTubeCredentials, YouTubeUploaderService,
+                                           youtube_uploader)
+
+    # **手前の門（未認証・ファイル無し）で止まると、未実装の枝に届かない。**
+    # verifier の変異 M3 が刺さるのはこの枝なので、認証済み・実ファイルありで叩く。
+    動画 = tmp_path / "d.mp4"
+    動画.write_bytes(bytes(1))
+
+    投稿器 = YouTubeUploaderService()
+    投稿器._credentials = YouTubeCredentials(access_token="dummy-token", client_id="cid", client_secret="cs")
+
+    結果 = asyncio.run(投稿器.upload_video(str(動画), "題", "説明", ["tag"]))
+
+    assert 結果.success is False, "未実装の投稿が成功を名乗った"
+    assert 結果.status != "uploaded", f"投稿していないのに uploaded と記録した（{結果.status!r}）"
+    assert 結果.error == "not_implemented", f"未実装の理由が消えている（{結果.error!r}）"
+    assert not 結果.video_id, f"実在しない動画 ID を返した（{結果.video_id!r}）"
+
+    # 手前の門も成功を名乗らないこと
+    未認証 = asyncio.run(youtube_uploader.upload_video(str(動画), "題", "説明", ["tag"]))
+    assert 未認証.success is False
+    assert not 未認証.video_id
+
+
+def test_18周目_チャンネル統計の固定値が印を落とさない():
+    """**C4 条件文が名指しする `admin_channel_router` の固定値**（18周目・契約の穴）。
+
+    18周目の verifier が `"data_source": "sample", "is_real": False` を
+    `"measured", True` に変異させたところ、**この契約ファイル44件は
+    全部緑のままだった。** 条件文が名指ししているので塞ぐ。
+    """
+    import asyncio
+
+    import routers.admin_channel_router as A
+
+    # 印そのもの（ここが verifier の変異 M4 の対象）
+    assert A.DATA_SOURCE["is_real"] is False, \
+        "YouTube に接続していない固定値が実測を名乗っている"
+    assert A.DATA_SOURCE["data_source"] == "sample", \
+        f"出所の印が sample でない（{A.DATA_SOURCE['data_source']!r}）"
+
+    # **印が実際に応答へ載ること。** 定数だけ直しても経路が付け忘れたら戻る
+    本文 = asyncio.run(A.get_channel_detail(A._channels[0]["id"]))
+    assert 本文["is_real"] is False
+    assert 本文["data_source"] == "sample"
+
+    # C4 の条件文が名指しした 15200 が、印なしで出ていないこと
+    assert 本文["kpi"]["watch_time_hours"] == 15200, "経路が変わった（テストを見直す）"
+    assert 本文["connected"] is False, "接続していないのに接続済みと名乗っている"
+
+
+def test_18周目_魂パスポートが段位を定数で描かない():
+    """`SoulPassport.jsx` の admin(tech) 側（R1.5-C4・18周目・自力発見）。
+
+    17周目に owner(biz) 側だけ直して **admin(tech) 側が取り残されていた**:
+      - `level || "Apprentice"` … 段位が読めなくても "Apprentice" と名乗る
+      - `xp || 0`               … 未取得と実際の 0 が区別できない
+    """
+    import re
+    from pathlib import Path as _Path
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+
+    def 描画部を読む(相対):
+        js = (ルート / 相対).read_text(encoding="utf-8")
+        s = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        return "\n".join(行 for 行 in s.splitlines()
+                         if not 行.strip().startswith("//"))
+
+    描画部 = 描画部を読む("frontend/src/components/SoulPassport.jsx")
+
+    assert '"Apprentice"' not in 描画部, \
+        "段位が読めないときに 'Apprentice' と名乗っている"
+    assert "tech_rank?.xp || 0" not in 描画部, \
+        "未取得の XP と実際の 0 が区別できない（`??` を使う）"
+
+    # 相方の biz 側も戻っていないこと（17周目の修正の回帰防止）
+    assert '"Dreamer"' not in 描画部
+
+    # 段位を送る側も捏造しないこと
+    送り出し = 描画部を読む("frontend/src/components/DirectorBriefing.jsx")
+    assert "biz_rank: 'Novice'" not in 送り出し, \
+        "画面が段位 'Novice' を捏造して送っている"

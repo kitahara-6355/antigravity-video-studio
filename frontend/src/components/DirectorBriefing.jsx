@@ -231,7 +231,8 @@ function DirectorBriefing({ isOpen, onClose, segments, scenes, onUpdateAllScenes
                         score: null, rank: null, is_acceptable: false,
                         is_real: false, data_source: 'skipped',
                     },
-                    biz_rank: 'Novice' // Should come from props/context ideally
+                    // **段位を捏造して送らない**（R1.5-C4・18周目）。ここは 'Novice' 固定だったので、どの利用者のレポートも初心者向けに書かれていた。
+                    // 送らなければバックエンドが利用者モデルから読む（読めなければ未設定と書く）。
                 } });
             const data = await res.json();
             setFinalReport(data);

@@ -24,12 +24,14 @@ with patch("director_engine.get_gemini_client", return_value=MagicMock()), \
         "channel_name": "テストチャンネル",
         "visual_identity": {"style_prompt": "modern"},
     }
+    # **実体と同じ形にする**（R1.5-C4・18周目）。
+    # top-level の `ranks` / `automation_settings` は `user_model.json` に存在しない。
     mock_bm.user_model = {
-        "ranks": {
-            "biz_rank": {"level": "Novice"},
-            "tech_rank": {"level": "Novice"},
+        "profiles": {
+            "owner": {"ranks": {"biz_rank": {"level": "Novice", "xp": 0}}},
+            "admin": {"ranks": {"tech_rank": {"level": "Novice", "xp": 0}}},
         },
-        "automation_settings": {"auto_pilot_ratio": 0.9},
+        "collaborative_settings": {"auto_pilot_ratio": 0.9},
     }
     mock_bm.get_context_block.return_value = "テストコンテキスト"
     mock_bm.get_deep_context.return_value = "テストディープコンテキスト"
@@ -161,7 +163,13 @@ class TestDirectorBrain:
             brain = DirectorBrain()
             result = brain.generate_production_report([], {}, "Novice")
         parsed = json.loads(result)
-        assert parsed["xp_grant"] == 50
+        # **分析が落ちたら実績 XP を出さない**（R1.5-C4・18周目 反例1）。
+        # ここは `xp_grant == 50` を期待していたが、その 50 は
+        # `routers/director.py` を通って `user_model.json` の `tech_rank` に
+        # **恒久保存**されていた（＝失敗が実績として台帳に残る）。
+        assert parsed["xp_grant"] == 0
+        assert parsed["is_real"] is False
+        assert parsed["issue_detected"] is None
 
     def test_semantic_dispatch_success(self):
         with patch("director_engine.get_gemini_client") as mock_client:
@@ -209,12 +217,15 @@ class TestDirectorBrain:
         brain = DirectorBrain()
         with patch("director_engine.branding_manager") as mock_bm:
             mock_bm.constitution = {"channel_name": "チャンネル"}
+            # **実体と同じ形にする**（R1.5-C4・18周目）。
+            # `user_model` に top-level の `ranks` / `automation_settings` は存在しない。
+            # 実体は `profiles.<役割>.ranks.<段位>` と `collaborative_settings`。
             mock_bm.user_model = {
-                "ranks": {
-                    "biz_rank": {"level": "Expert"},
-                    "tech_rank": {"level": "Expert"}
+                "profiles": {
+                    "owner": {"ranks": {"biz_rank": {"level": "Expert"}}},
+                    "admin": {"ranks": {"tech_rank": {"level": "Expert"}}},
                 },
-                "automation_settings": {"auto_pilot_ratio": 0.5}
+                "collaborative_settings": {"auto_pilot_ratio": 0.5}
             }
             mock_bm.get_context_block.return_value = "C_BLOCK"
             mock_bm.get_deep_context.return_value = "D_BLOCK"
@@ -361,7 +372,12 @@ class TestDirectorBrain:
             
             brain = DirectorBrain()
             res = brain.generate_production_report([], {})
-            assert res == '{"summary": "ok"}'
+            # **成功したレポートには出所の印が付く**（R1.5-C4・18周目）。
+            # 印が無いと、except が返す「分析していないレポート」と区別できない。
+            parsed = json.loads(res)
+            assert parsed["summary"] == "ok"
+            assert parsed["is_real"] is True
+            assert parsed["data_source"].startswith("gemini:")
 
     def test_verify_production_quality_success(self):
         with patch("director_engine.get_gemini_client") as mock_client:

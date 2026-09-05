@@ -114,12 +114,22 @@ def mock_branding():
         }
         
         # Mock user_model
+        # **実体と同じ形にする**（R1.5-C4・18周目）。
+        # ここは以前 `{"ranks": {...}, "automation_settings": {...}}` という
+        # **`backend/branding/user_model.json` に存在しない形**を作っていた。
+        # そのせいで「存在しない鍵を読んで常に定数に落ちる」実装のバグが
+        # テストでは見えず、むしろ固定されていた。実体は次の4つで裏取り済み:
+        #   1. `backend/branding/user_model.json` の実キー（profiles / collaborative_settings）
+        #   2. `branding_manager.update_user_rank()` の書き込み先
+        #      （`user_model["profiles"][役割]["ranks"][段位]`）
+        #   3. `branding_manager.set_auto_pilot()` の書き込み先（`collaborative_settings`）
+        #   4. 画面側の読み口（`Boardroom.jsx` / `SoulPassport.jsx`）
         mock_bm.user_model = {
-            "ranks": {
-                "biz_rank": {"level": "Novice"},
-                "tech_rank": {"level": "Novice"}
+            "profiles": {
+                "owner": {"ranks": {"biz_rank": {"level": "Novice", "xp": 0}}},
+                "admin": {"ranks": {"tech_rank": {"level": "Novice", "xp": 0}}},
             },
-            "automation_settings": {
+            "collaborative_settings": {
                 "auto_pilot_ratio": 0.9
             }
         }
@@ -227,8 +237,8 @@ def test_get_system_instruction_novice(mock_gemini, mock_branding):
 
 def test_get_system_instruction_pro(mock_gemini, mock_branding):
     # Professional mode
-    mock_branding.user_model["ranks"]["biz_rank"]["level"] = "Professional"
-    mock_branding.user_model["ranks"]["tech_rank"]["level"] = "Professional"
+    mock_branding.user_model["profiles"]["owner"]["ranks"]["biz_rank"]["level"] = "Professional"
+    mock_branding.user_model["profiles"]["admin"]["ranks"]["tech_rank"]["level"] = "Professional"
     
     brain = DirectorBrain()
     inst_consult = brain._get_system_instruction(mode="consult")
@@ -520,8 +530,15 @@ def test_generate_production_report_fallback(mock_gemini, mock_branding):
     mock_gemini.models.generate_content.side_effect = RuntimeError("API Error")
     res = brain.generate_production_report([], {}, "Novice")
     parsed = json.loads(res)
-    assert parsed["summary"] == "セッション完了"
-    assert parsed["xp_grant"] == 50
+    # **分析が落ちたら「問題なし」も「実績 XP」も名乗らない**（R1.5-C4・18周目 反例1）。
+    # ここは以前 `summary == "セッション完了"` / `xp_grant == 50` を期待していた。
+    # その 50 XP は `routers/director.py` の `if xp > 0:` を通って
+    # `user_model.json` の `tech_rank` に**恒久保存**されていた。
+    assert parsed["xp_grant"] == 0
+    assert parsed["is_real"] is False
+    assert parsed["data_source"] == "unavailable"
+    assert parsed["issue_detected"] is None
+    assert "分析は行われていません" in parsed["summary"]
 
 
 # -------------------------------------------------------------

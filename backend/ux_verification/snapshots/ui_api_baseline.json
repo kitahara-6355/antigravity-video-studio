@@ -140,14 +140,14 @@
     "src/gateway/endpoints.js|POST|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:163 POST /api/collaboration/journal",
     "src/gateway/endpoints.js|POST|/api/council/decision": "static_route_scan: routers/collaboration.py:212 POST /api/council/decision",
     "src/gateway/endpoints.js|POST|/api/council/session": "static_route_scan: routers/collaboration.py:198 POST /api/council/session",
-    "src/gateway/endpoints.js|POST|/api/director/analyze-resources": "static_route_scan: routers/director.py:175 POST /api/director/analyze-resources",
-    "src/gateway/endpoints.js|POST|/api/director/analyze-script": "static_route_scan: routers/director.py:133 POST /api/director/analyze-script",
-    "src/gateway/endpoints.js|POST|/api/director/batch-generate": "static_route_scan: routers/director.py:256 POST /api/director/batch-generate",
-    "src/gateway/endpoints.js|POST|/api/director/chat": "static_route_scan: routers/director.py:72 POST /api/director/chat",
-    "src/gateway/endpoints.js|POST|/api/director/generate-image-async": "static_route_scan: routers/director.py:103 POST /api/director/generate-image-async",
-    "src/gateway/endpoints.js|POST|/api/director/generate-report": "static_route_scan: routers/director.py:196 POST /api/director/generate-report",
-    "src/gateway/endpoints.js|POST|/api/director/plan-storyboard": "static_route_scan: routers/director.py:233 POST /api/director/plan-storyboard",
-    "src/gateway/endpoints.js|POST|/api/director/quality-score": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-resources": "static_route_scan: routers/director.py:179 POST /api/director/analyze-resources",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-script": "static_route_scan: routers/director.py:137 POST /api/director/analyze-script",
+    "src/gateway/endpoints.js|POST|/api/director/batch-generate": "static_route_scan: routers/director.py:260 POST /api/director/batch-generate",
+    "src/gateway/endpoints.js|POST|/api/director/chat": "static_route_scan: routers/director.py:76 POST /api/director/chat",
+    "src/gateway/endpoints.js|POST|/api/director/generate-image-async": "static_route_scan: routers/director.py:107 POST /api/director/generate-image-async",
+    "src/gateway/endpoints.js|POST|/api/director/generate-report": "static_route_scan: routers/director.py:200 POST /api/director/generate-report",
+    "src/gateway/endpoints.js|POST|/api/director/plan-storyboard": "static_route_scan: routers/director.py:237 POST /api/director/plan-storyboard",
+    "src/gateway/endpoints.js|POST|/api/director/quality-score": "static_route_scan: routers/director.py:158 POST /api/director/quality-score",
     "src/gateway/endpoints.js|POST|/api/director/state": "static_route_scan: routers/legacy_director_router.py:79 POST /api/director/state",
     "src/gateway/endpoints.js|POST|/api/director/verify-quality": "static_route_scan: routers/legacy_director_router.py:96 POST /api/director/verify-quality",
     "src/gateway/endpoints.js|POST|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1215 POST /api/pipeline/dictionary",
@@ -320,6 +320,54 @@
       "before": "static_route_scan: routers/render.py:166 POST /api/render/start",
       "after": "static_route_scan: routers/render.py:170 POST /api/render/start",
       "reason": "R1.5-C4（gate-verifier 9周目の指摘）: render.py に未計測ブロックと _品質の実測() を入れたので、以降の @router 行が下へずれた。/api/render と /api/render/start の宣言そのものは無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/analyze-resources",
+      "before": "static_route_scan: routers/director.py:175 POST /api/director/analyze-resources",
+      "after": "static_route_scan: routers/director.py:179 POST /api/director/analyze-resources",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/analyze-script",
+      "before": "static_route_scan: routers/director.py:133 POST /api/director/analyze-script",
+      "after": "static_route_scan: routers/director.py:137 POST /api/director/analyze-script",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/batch-generate",
+      "before": "static_route_scan: routers/director.py:256 POST /api/director/batch-generate",
+      "after": "static_route_scan: routers/director.py:260 POST /api/director/batch-generate",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/chat",
+      "before": "static_route_scan: routers/director.py:72 POST /api/director/chat",
+      "after": "static_route_scan: routers/director.py:76 POST /api/director/chat",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/generate-image-async",
+      "before": "static_route_scan: routers/director.py:103 POST /api/director/generate-image-async",
+      "after": "static_route_scan: routers/director.py:107 POST /api/director/generate-image-async",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/generate-report",
+      "before": "static_route_scan: routers/director.py:196 POST /api/director/generate-report",
+      "after": "static_route_scan: routers/director.py:200 POST /api/director/generate-report",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/plan-storyboard",
+      "before": "static_route_scan: routers/director.py:233 POST /api/director/plan-storyboard",
+      "after": "static_route_scan: routers/director.py:237 POST /api/director/plan-storyboard",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/quality-score",
+      "before": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
+      "after": "static_route_scan: routers/director.py:158 POST /api/director/quality-score",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
     }
   ],
   "migrations": [

@@ -496,9 +496,21 @@ class BrandingManager:
         2. Logs qualitative evolution.
         3. Returns the agenda for the Boardroom.
         """
-        xp = report_data.get('xp_grant', 50)
-        self.update_user_rank("tech_rank", amount=xp)
-        
+        # **XP の既定値を 50 にしない**（R1.5-C4・18周目 反例1と同じ形）。
+        # `xp_grant` を持たないレポート（＝実績を主張していないレポート）に
+        # 黙って 50 XP を与えると、`user_model.json` の `tech_rank` に
+        # **実行動から出ていない実績**が積まれる。`tech_rank` は
+        # `backend/user_model_marks.py` が「実行動で稼ぐ値だから印を付けない」
+        # と宣言している値なので、ここが崩れるとその宣言ごと嘘になる。
+        xp = report_data.get('xp_grant', 0)
+        if not isinstance(xp, (int, float)) or isinstance(xp, bool):
+            xp = 0
+        if report_data.get("is_real") is False:
+            # 分析されていないレポート（`generate_production_report` の except が返す形）
+            xp = 0
+        if xp > 0:
+            self.update_user_rank("tech_rank", amount=xp)
+
         # [NEW] Log Narrative Evolution automatically
         self.log_evolution(report_data)
         

@@ -103,9 +103,9 @@ export default function SoulPassport({ onClose }) {
                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '4px' }}>ADMIN (TECH)</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ background: 'var(--color-semantic-theme-indigo-bg)', color: 'var(--color-semantic-theme-indigo-dark)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                                    {admin.ranks?.tech_rank?.level || "Apprentice"}
+                                    {admin.ranks?.tech_rank?.level || "ランク未設定"}
                                 </div>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>XP {admin.ranks?.tech_rank?.xp || 0}</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>XP {admin.ranks?.tech_rank?.xp ?? '—'}</span>
                             </div>
                         </div>
                         <div>

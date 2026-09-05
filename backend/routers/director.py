@@ -8,6 +8,7 @@ except ImportError:
 
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from pydantic import BaseModel, Field
+from typing import Optional
 import json
 
 router = APIRouter(prefix="/api/director", tags=["director"])
@@ -54,7 +55,10 @@ class BatchGenRequest(BaseModel):
 
 class QualityScoreRequest(BaseModel):
     storyboard_plan: list
-    biz_rank: str = "Novice"
+    # **既定を "Novice" にしない**（R1.5-C4・18周目）。画面は段位を送っていないので、
+    # 既定値がそのまま採点の入力になり「全員 Novice」で採点されていた。
+    # 送られてこなければエンジンが利用者モデルから読む（読めなければ未設定と書く）。
+    biz_rank: Optional[str] = None
 
 
 class StoryboardPlanRequest(BaseModel):
@@ -66,7 +70,7 @@ class StoryboardPlanRequest(BaseModel):
 class ReportRequest(BaseModel):
     storyboard_plan: list
     quality_score: dict
-    biz_rank: str = "Novice"
+    biz_rank: Optional[str] = None  # 同上（R1.5-C4・18周目）
 
 
 @router.post("/chat")
@@ -212,7 +216,7 @@ async def generate_report(req: ReportRequest):
             report = report_raw
         
         xp = report.get("xp_grant", report.get("xp_earned", 0))
-        if xp > 0:
+        if xp > 0 and report.get("is_real") is not False:  # 分析していないレポートで実績を積まない（C4）
             try:
                 branding_manager.update_user_rank("tech_rank", amount=xp)
             except HTTPException:
