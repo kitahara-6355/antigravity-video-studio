@@ -119,6 +119,10 @@ class AIRuleCheck(QualityCheckPlugin):
     category = "core"
     
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
         
@@ -134,10 +138,12 @@ class AIRuleCheck(QualityCheckPlugin):
                     feedback.append(f"⚠ {pred}")
         except ImportError:
             logger.debug("quality_gate_ai not available — AI rule check skipped")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
         except (AttributeError, TypeError, ValueError, KeyError, RuntimeError) as e:
             logger.warning(f"AI rule check failed with expected error: {e}", exc_info=True)
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
         
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 # ============================================================
@@ -540,6 +546,10 @@ class LoudnessCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -574,11 +584,13 @@ class LoudnessCheck(QualityCheckPlugin):
                                 feedback.append(f"📡 音量が大きすぎる: {lufs:.1f} LUFS (基準: -24〜-16)")
                         except (ValueError, _json.JSONDecodeError):
                             pass
+                            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
                         break
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as e:
             logger.warning(f"Loudness check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class ResolutionCheck(QualityCheckPlugin):
@@ -587,6 +599,10 @@ class ResolutionCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -608,8 +624,9 @@ class ResolutionCheck(QualityCheckPlugin):
                     feedback.append(f"📡 解像度注意: {width}x{height} (1080p推奨)")
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError) as e:
             logger.warning(f"Resolution check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class CodecCheck(QualityCheckPlugin):
@@ -618,6 +635,10 @@ class CodecCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -639,8 +660,9 @@ class CodecCheck(QualityCheckPlugin):
                     feedback.append(f"📡 音声コーデック注意: {acodec} (AAC推奨)")
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError) as e:
             logger.warning(f"Codec check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 # ============================================================
@@ -740,6 +762,10 @@ class AudioPresenceCheck(QualityCheckPlugin):
     category = "core"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -757,8 +783,9 @@ class AudioPresenceCheck(QualityCheckPlugin):
                     feedback.append("🔇 音声トラックが存在しない — 動画として不完全")
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError) as e:
             logger.warning(f"Audio presence check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class BitrateCheck(QualityCheckPlugin):
@@ -767,6 +794,10 @@ class BitrateCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -787,6 +818,7 @@ class BitrateCheck(QualityCheckPlugin):
                     duration = info.get("duration", 0) if info else 0
                 except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError):
                     pass
+                    checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
                 except Exception as e:
                     try:
                         from agents.memory.technical_debt import TechnicalDebtStore
@@ -803,6 +835,8 @@ class BitrateCheck(QualityCheckPlugin):
                         )
                     except Exception as tdr_err:
                         logger.error(f"Failed to register TDR debt: {tdr_err}")
+                        checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
+                    checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
             
             if duration > 0:
                 bitrate_mbps = (file_size * 8) / duration / 1_000_000
@@ -814,8 +848,9 @@ class BitrateCheck(QualityCheckPlugin):
                     feedback.append(f"📡 ビットレート注意: {bitrate_mbps:.1f}Mbps (プレビュー品質)")
         except (OSError, ZeroDivisionError, TypeError, ValueError) as e:
             logger.warning(f"Bitrate check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class DurationSanityCheck(QualityCheckPlugin):
@@ -902,6 +937,10 @@ class ThumbnailQualityCheck(QualityCheckPlugin):
     capability = "thumbnail"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
         
@@ -958,11 +997,12 @@ class ThumbnailQualityCheck(QualityCheckPlugin):
         except (ImportError, OSError, ValueError, SyntaxError) as e:
             deductions += 25
             feedback.append(f"▶ サムネイル画像のロード中にエラーが発生しました: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
             
         if deductions == 0:
             feedback.append("✅ サムネイル品質検証合格 (1280x720以上, 16:9, 4MB未満)")
             
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 # ============================================================
@@ -1120,6 +1160,27 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
             deductions = result.get("deductions", 0)
             all_feedback.extend(result.get("feedback", []))
             plugin_results[plugin.name] = result
+
+            # **例外が外へ出てこなくても「検査できなかった」を拾う**
+            # （R1.5-C4・19周目 CE-1）。
+            # 下の `except` は **`analyze()` の外へ出た例外しか拾わない**。
+            # 実際に登録されているプラグイン（Loudness / Resolution / Codec /
+            # AudioPresence / Bitrate / AIRule / ThumbnailQuality）は
+            # **自分の中で例外を握り潰し**、try の前で 0 に初期化した
+            # `deductions` をそのまま返す。つまり ffmpeg が壊れているだけで
+            # 「検査していない」が「検査して減点ゼロだった」に化け、
+            # broadcast / core が 100.0「✅ 優秀」になっていた。
+            # プラグイン側が `checked: False` を返したらここで同じ扱いにする。
+            if result.get("checked") is False:
+                failed_plugins.append({
+                    "name": plugin.name,
+                    "category": plugin.category,
+                    "error": result.get("skip_reason") or "検査を実行できませんでした",
+                })
+                all_feedback.append(
+                    f"⚠️ 品質チェック「{plugin.name}」を実行できませんでした。"
+                    "**この項目は検査されていません。**"
+                )
 
             cat = plugin.category
             category_deductions[cat] = category_deductions.get(cat, 0) + deductions

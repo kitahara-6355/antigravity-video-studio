@@ -2167,3 +2167,73 @@ def test_19周目_AIスコアで人間のチェックを自動でONにしない(
 
     # AI スコアの表示自体は残っていること（情報を消しただけにしない）
     assert "getStageScore" in 描画部, "AI スコアのバッジまで消してしまった"
+
+
+def test_19周目_CE1_実登録プラグインが検査できなくても見逃さない(tmp_path):
+    """`analyze()` の中で握り潰した例外を拾う（R1.5-C4・19周目 CE-1）。
+
+    19周目に入れた門（`run_all_plugins` の try）は
+    **`analyze()` の外へ出た例外しか拾わない**。ところが実際に登録されている
+    プラグイン（Loudness / Resolution / Codec / AudioPresence / Bitrate /
+    AIRule / ThumbnailQuality）は**自分の中で例外を握り潰し**、try の前で 0 に
+    初期化した `deductions` をそのまま返す。つまり:
+
+        **ffmpeg が壊れているだけで broadcast / core が 100.0「✅ 優秀」になり、
+        `all_plugins_ran: true` / `failed_plugins: []` のまま force-render まで通る。**
+
+    「検査していない」が「検査して減点ゼロだった」に化けていた。
+
+    **このテストは合成プラグインを使わない。** 19周目に最初に書いた契約は
+    `analyze()` が `RuntimeError` を投げる合成プラグインで `PLUGIN_REGISTRY` を
+    差し替えていたため、**実登録プラグインは一度もこの契約を通らなかった**
+    （gate-verifier 19周目の指摘）。ここでは実レジストリのまま ffmpeg だけ壊す。
+    """
+    import asyncio
+    import unittest.mock as _m
+
+    import video_editor_engine
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    # プレビューが実在しないと各プラグインは早期 return するので実ファイルを置く
+    プレビュー = tmp_path / "preview.mp4"
+    プレビュー.write_bytes(b"x" * 4096)
+
+    def 走らせる(壊す):
+        ctx = PipelineContext(video_path="d.mp4", session_id="s-ce1")
+        ctx.preview_path = str(プレビュー)
+        ctx.segments = [{"text": "あ", "start": 0.0, "end": 1.0}]
+        ctx.declared_gaps = set()
+        if not 壊す:
+            asyncio.run(QualityGateWorker().execute(ctx))
+            return ctx
+        落ちる = _m.MagicMock(
+            side_effect=FileNotFoundError("ffmpeg: No such file or directory"))
+        with _m.patch.object(video_editor_engine.video_editor.ffmpeg,
+                             "get_video_info", 落ちる),              _m.patch.object(video_editor_engine.video_editor.ffmpeg,
+                             "run_command", 落ちる):
+            asyncio.run(QualityGateWorker().execute(ctx))
+        return ctx
+
+    # ── ffmpeg が壊れている（本番で普通に起きる状態） ──
+    ctx = 走らせる(壊す=True)
+    報告 = ctx.quality_gate_report
+
+    assert 報告.get("all_plugins_ran") is False,         "ffmpeg が壊れて検査できていないのに『全項目を検査した』と名乗った"
+
+    落ちた名 = {p.get("name") for p in (報告.get("failed_plugins") or [])}
+    # verifier が名指しした4件。**握り潰しは analyze() の中なので、
+    # 外側の try だけでは1件も拾えない**
+    for 名 in ("loudness_check", "resolution_check", "codec_check",
+              "audio_presence_check"):
+        assert 名 in 落ちた名,             f"{名} が検査できていないのに記録に残っていない（{sorted(落ちた名)}）"
+
+    # 利用者向けの文言にも出る（記録だけでは画面に届かない）
+    assert any("検査されていません" in f for f in (ctx.quality_feedback or [])),         "検査できなかったことが利用者向けの文言に出ていない"
+
+    # ── ffmpeg が生きている（門が広すぎないこと） ──
+    正常 = 走らせる(壊す=False)
+    落ちた名2 = {p.get("name") for p in (正常.quality_gate_report.get("failed_plugins") or [])}
+    for 名 in ("loudness_check", "resolution_check", "codec_check",
+              "audio_presence_check"):
+        assert 名 not in 落ちた名2,             f"ffmpeg が生きているのに {名} を『検査できなかった』と記録した"
