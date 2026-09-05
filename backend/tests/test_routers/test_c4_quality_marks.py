@@ -2237,3 +2237,91 @@ def test_19周目_CE1_実登録プラグインが検査できなくても見逃�
     for 名 in ("loudness_check", "resolution_check", "codec_check",
               "audio_presence_check"):
         assert 名 not in 落ちた名2,             f"ffmpeg が生きているのに {名} を『検査できなかった』と記録した"
+
+
+def test_19周目_維持率予測に捏造した成分を混ぜない():
+    """`RetentionPredictionCheck`（R1.5-C4・19周目・保留リスト #2）。
+
+    **条件文が名指しする「retention 分析」そのもの。** 2つ偽があった:
+
+    1. `+ 70 * weights["hook_strength_weight"]` — コメントに
+       「フック強度はHookStrengthCheckから」と書きながら**一度も参照しておらず**、
+       予測維持率の **25% が捏造**だった
+    2. ペーシングが測れないとき `pacing_score = 50`。**50 は実際に取りうる点**なので、
+       実測した 50 と測れなかった 50 が区別できない
+
+    `HookStrengthCheck` は `PLUGIN_REGISTRY` でこのプラグインより前に走るので、
+    `run_all_plugins` が積んだ実測値を引く。引けなければ予測を名乗らない。
+    """
+    import quality_gate_plugins as Q
+
+    重み = {
+        "target_retention_percent": 80,
+        "dead_air_max": 3.0,
+        "scoring": {
+            "segment_density_weight": 0.3,
+            "hook_strength_weight": 0.25,
+            "dead_air_penalty_weight": 0.25,
+            "pacing_consistency_weight": 0.2,
+        },
+    }
+
+    class 設定:
+        is_active = True
+        template_id = "t"
+
+        def get_retention_prediction_config(self):
+            return 重み
+
+    def 文脈(フック=None, segs=None):
+        class C:
+            preview_path = None
+            declared_gaps = set()
+        c = C()
+        c.segments = segs if segs is not None else [
+            {"text": "あ", "start": float(i * 3), "end": float(i * 3 + 2.0)}
+            for i in range(6)
+        ]
+        if フック is not None:
+            c._quality_plugin_results = {
+                "hook_strength_check": {"details": {"hook_score": フック}}
+            }
+        return c
+
+    # ── フック強度が実測されている → 予測を出し、**その実測値を使う** ──
+    低い = Q.RetentionPredictionCheck().analyze(文脈(フック=10), 設定())
+    高い = Q.RetentionPredictionCheck().analyze(文脈(フック=100), 設定())
+    assert 低い["checked"] is True and 高い["checked"] is True
+    assert 低い["details"]["hook_score"] == 10
+    assert 高い["details"]["hook_score"] == 100
+    assert 低い["details"]["predicted_retention"] != 高い["details"]["predicted_retention"],         "フック強度を変えても予測が動かない（定数を足している）"
+    差 = 高い["details"]["predicted_retention"] - 低い["details"]["predicted_retention"]
+    assert abs(差 - (100 - 10) * 0.25) < 0.2,         f"実測のフック強度が重みどおりに効いていない（差 {差}）"
+
+    # ── フック強度が無い → **予測を名乗らない** ──
+    無し = Q.RetentionPredictionCheck().analyze(文脈(フック=None), 設定())
+    assert 無し["checked"] is False, "フック強度が無いのに予測を出した"
+    assert 無し["details"]["predicted_retention"] is None
+    assert 無し["deductions"] == 0
+    assert "hook_strength" in (無し["details"].get("unmeasured") or [])
+
+    # ── ペーシングが測れない → **定数 50 で埋めない** ──
+    測れない = Q.RetentionPredictionCheck().analyze(
+        文脈(フック=70, segs=[{"text": "あ", "start": 0.0, "end": 2.0}]
+            + [{"text": "い", "start": float(i), "end": float(i)} for i in range(3, 8)]),
+        設定())
+    assert 測れない["details"]["pacing_score"] is None, "測れなかったペーシングを 50 で埋めた"
+    assert 測れない["checked"] is False
+    assert 測れない["details"]["predicted_retention"] is None
+
+    # ── 本線（run_all_plugins）では実測フックが渡る ──
+    class 本線文脈:
+        preview_path = None
+        declared_gaps = set()
+        segments = [{"text": "あ", "start": float(i * 3), "end": float(i * 3 + 2.5)}
+                    for i in range(8)]
+
+    結果 = Q.run_all_plugins(本線文脈(), None)
+    予測 = (結果["plugin_results"].get("retention_prediction_check") or {})
+    assert 予測.get("checked") is True,         "本線でフック強度の実測値が渡っていない（配線が切れている）"
+    assert isinstance(予測.get("details", {}).get("hook_score"), (int, float))

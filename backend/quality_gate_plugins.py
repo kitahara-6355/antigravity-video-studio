@@ -496,25 +496,71 @@ class RetentionPredictionCheck(QualityCheckPlugin):
             s.get("end", 0) - s.get("start", 0)
             for s in ctx.segments if (s.get("end", 0) - s.get("start", 0)) > 0
         ]
+        # **測れなかったペーシングを定数 50 で埋めない**（R1.5-C4・19周目）。
+        # ここは `except` と `else` の両方で `pacing_score = 50` に落ちていた。
+        # 50 は実際に取りうる点なので、**実測した 50 と測れなかった 50 が
+        # 区別できない**。測れなければ `None` にして、下で予測ごと止める。
+        pacing_score = None
         if durations:
             import statistics
             try:
                 cv = statistics.stdev(durations) / statistics.mean(durations)
                 pacing_score = max(0, 100 - cv * 50)
             except (statistics.StatisticsError, ZeroDivisionError):
-                pacing_score = 50
-        else:
-            pacing_score = 50
-        
-        # 加重平均で予測維持率を算出
+                pacing_score = None
+
+        # **フック強度を定数 70 で埋めない**（R1.5-C4・19周目）。
+        # ここは `+ 70 * weights["hook_strength_weight"]` と書きながら
+        # コメントに「フック強度はHookStrengthCheckから」と付けてあった。
+        # **一度も参照しておらず、予測維持率の 25% は捏造だった。**
+        # `HookStrengthCheck` は `PLUGIN_REGISTRY` でこのプラグインより前に
+        # 走るので、`run_all_plugins` が積んだ結果から実測値を引く。
+        これまでの結果 = getattr(ctx, "_quality_plugin_results", None) or {}
+        hook_score = (
+            (これまでの結果.get("hook_strength_check") or {})
+            .get("details", {})
+            .get("hook_score")
+        )
+        if not isinstance(hook_score, (int, float)) or isinstance(hook_score, bool):
+            hook_score = None
+
+        # **どれか1つでも測れていなければ予測を名乗らない。**
+        # 予測維持率は C4 が名指しする「retention 分析」そのもので、
+        # 捏造した成分が混ざった数字は実測と区別できなくなる。
+        測れなかった = [
+            名 for 名, 値 in (("pacing_consistency", pacing_score),
+                            ("hook_strength", hook_score))
+            if 値 is None
+        ]
+        if 測れなかった:
+            feedback.append(
+                f"⚠️ [{tmpl_id}] 維持率予測を出せません（{', '.join(測れなかった)} を測れていません）。"
+                "**予測は行われていません。**"
+            )
+            return {
+                "deductions": 0,
+                "feedback": feedback,
+                "checked": False,
+                "skip_reason": f"未計測: {', '.join(測れなかった)}",
+                "details": {
+                    "predicted_retention": None,
+                    "density_score": density_score,
+                    "dead_air_score": dead_air_score,
+                    "pacing_score": pacing_score,
+                    "hook_score": hook_score,
+                    "unmeasured": 測れなかった,
+                },
+            }
+
+        # 加重平均で予測維持率を算出（全成分が実測）
         predicted = (
             density_score * weights["segment_density_weight"]
-            + 70 * weights["hook_strength_weight"]  # フック強度はHookStrengthCheckから
+            + hook_score * weights["hook_strength_weight"]
             + dead_air_score * weights["dead_air_penalty_weight"]
             + pacing_score * weights["pacing_consistency_weight"]
         )
         predicted = round(predicted, 1)
-        
+
         if predicted < target * 0.7:
             deductions = 10
             feedback.append(
@@ -523,15 +569,17 @@ class RetentionPredictionCheck(QualityCheckPlugin):
             deductions = 5
             feedback.append(
                 f"📊 [{tmpl_id}] 維持率予測: {predicted}%（目標: {target}%）— 改善推奨")
-        
+
         return {
             "deductions": deductions,
             "feedback": feedback,
+            "checked": True,
             "details": {
                 "predicted_retention": predicted,
                 "density_score": density_score,
                 "dead_air_score": dead_air_score,
                 "pacing_score": round(pacing_score, 1),
+                "hook_score": hook_score,
             },
         }
 
@@ -1160,6 +1208,11 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
             deductions = result.get("deductions", 0)
             all_feedback.extend(result.get("feedback", []))
             plugin_results[plugin.name] = result
+            # **後続のプラグインが前の実測値を読めるようにする**（R1.5-C4・19周目）。
+            # `RetentionPredictionCheck` は「フック強度は HookStrengthCheck から」と
+            # コメントしながら**定数 70 を足していた**（＝予測維持率の 25% が捏造）。
+            # レジストリ上 `HookStrengthCheck` のほうが先に走るので、ここで渡す。
+            ctx._quality_plugin_results = plugin_results
 
             # **例外が外へ出てこなくても「検査できなかった」を拾う**
             # （R1.5-C4・19周目 CE-1）。

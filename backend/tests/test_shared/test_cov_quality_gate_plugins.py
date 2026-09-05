@@ -20,6 +20,13 @@ def _make_ctx(segments=None, preview_path=None, selected_segments=None, metadata
     ctx.preview_path = preview_path
     ctx.selected_segments = selected_segments
     ctx.metadata = metadata or {}
+    # **維持率予測はフック強度の実測値を要る**（R1.5-C4・19周目）。
+    # 以前は `+ 70 * hook_strength_weight` と定数を足していて、
+    # **予測維持率の 25% が捏造**だった。本番では HookStrengthCheck が
+    # 先に走って実測値を積むので、テストでも同じものを渡す。
+    ctx._quality_plugin_results = {
+        "hook_strength_check": {"details": {"hook_score": 70}}
+    }
     return ctx
 
 
@@ -655,14 +662,22 @@ class TestRetentionPredictionAdditions:
             {"start": 5.0, "end": 5.0, "text": "e"},
         ]
         result = RetentionPredictionCheck().analyze(_make_ctx(segments=segs))
-        assert result["details"]["pacing_score"] == 50
+        # **測れなかったペーシングを定数 50 で埋めない**（R1.5-C4・19周目）。
+        # 測れなければ `None` にして予測ごと止める。
+        assert result["details"]["pacing_score"] is None
+        assert result["checked"] is False
+        assert result["details"]["predicted_retention"] is None
 
     def test_durations_empty(self):
         from quality_gate_plugins import RetentionPredictionCheck
         # durations が空、かつ len(segs) >= 5
         segs = [{"start": float(i), "end": float(i), "text": "a"} for i in range(5)]
         result = RetentionPredictionCheck().analyze(_make_ctx(segments=segs))
-        assert result["details"]["pacing_score"] == 50
+        # **測れなかったペーシングを定数 50 で埋めない**（R1.5-C4・19周目）。
+        # 測れなければ `None` にして予測ごと止める。
+        assert result["details"]["pacing_score"] is None
+        assert result["checked"] is False
+        assert result["details"]["predicted_retention"] is None
 
 
 class TestLoudnessCheckAdditions:
