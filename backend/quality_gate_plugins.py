@@ -1090,6 +1090,16 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
     all_feedback = []
     plugin_results = {}
 
+    # **落ちたプラグインを黙って捨てない**（R1.5-C4・19周目）。
+    # 下の `except Exception` はプラグインの失敗をログに出すだけで、
+    # そのプラグインの `deductions` も「そのカテゴリを検査した」という事実も
+    # 丸ごと消えていた。減点方式（100点から引く）なので、
+    # **検査が壊れているほどスコアが上がる。**
+    # しかも `quality_gate_worker` は直後に `ctx.quality_scored = True` を立てるので、
+    # 「22項目を検査した実測値」として通ってしまう。
+    # 落ちたものは必ず記録して外へ出す。
+    failed_plugins = []
+
     # カテゴリ別の減点トラッキング
     category_deductions = {}
     category_max = {}
@@ -1116,6 +1126,17 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
             category_max[cat] = category_max.get(cat, 0) + 30
         except Exception as e:
             logger.warning(f"Plugin {plugin.name} failed: {e} (Expected safety catch)", exc_info=True)
+            # **落ちた検査を記録に残す**（R1.5-C4・19周目）。
+            # ここで捨てると「検査が壊れているほど高得点」になる。
+            failed_plugins.append({
+                "name": plugin.name,
+                "category": plugin.category,
+                "error": f"{type(e).__name__}: {e}",
+            })
+            all_feedback.append(
+                f"⚠️ 品質チェック「{plugin.name}」が実行できませんでした"
+                f"（{type(e).__name__}）。**この項目は検査されていません。**"
+            )
 
     # ━━━ 重み付きスコア算出 ━━━
     # 100点から重み付き減点を引く
@@ -1199,5 +1220,10 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
         "category_scores": category_scores,
         "category_report": category_report,
         "block_recommended": block_recommended,
+        # **この点が「全項目を検査した結果」かどうか**（R1.5-C4・19周目）。
+        # 落ちたプラグインがあると、その項目は検査されていないのに
+        # 減点 0 として点に効いてしまう。値ではなくこの2つで表す。
+        "failed_plugins": failed_plugins,
+        "all_plugins_ran": not failed_plugins,
     }
 

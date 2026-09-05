@@ -200,10 +200,19 @@ class QualityGateWorker(PipelineStageWorker):
         # 「測った」を値ではなくこの旗で表す
         ctx.quality_scored = True
         ctx.quality_feedback = feedback
+        # **落ちた検査を実行記録に残す**（R1.5-C4・19周目）。
+        # `run_all_plugins` の中でプラグインが落ちると、その項目の減点が
+        # 消えて**壊れているほど点が上がる**。`quality_scored` は
+        # 「採点しようとしたか」の旗なので、「**全項目を検査できたか**」は
+        # 別に持つ。ここが無いと「22項目を検査した 95点」と
+        # 「3項目が壊れていて残りだけで出た 95点」が区別できない。
+        落ちた検査 = result.get("failed_plugins", []) or []
         ctx.quality_gate_report = {
             "raw_score": raw_score,
             "clamped": raw_score != score,
             "deductions": 100 - raw_score,
+            "all_plugins_ran": result.get("all_plugins_ran", True),
+            "failed_plugins": 落ちた検査,
         }
         # カテゴリ情報を直接ctxに保存（_build_resultで確実に取得するため）
         ctx.quality_category_report = result.get("category_report", [])
@@ -218,6 +227,9 @@ class QualityGateWorker(PipelineStageWorker):
                 "rank": rank, "feedback": feedback,
                 "category_report": ctx.quality_category_report,
                 "category_scores": ctx.quality_category_scores,
+                # 画面まで届かせる（R1.5-C4・19周目）
+                "all_plugins_ran": result.get("all_plugins_ran", True),
+                "failed_plugins": 落ちた検査,
             },
             duration_seconds=round(time.time() - start, 1),
         )

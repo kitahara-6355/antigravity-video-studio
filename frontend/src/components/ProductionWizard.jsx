@@ -270,9 +270,23 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
             </div>
             <div className="wizard-summary-card">
               <div className="label">品質スコア</div>
-              <div className="value score-counter" style={{ color: quality_score >= 80 ? '#10b981' : '#f59e0b' }}>
-                {quality_score}点
-              </div>
+              {/*
+                **採点の旗を見る**（R1.5-C4・19周目）。
+                このカードだけが `qualityGateData` を通さず生の `quality_score` を
+                描いていた。同じファイルの上（`採点した` / `effectiveScore`）で
+                旗を組み立てているのに、ここがそれを迂回していた。
+                16周目に ProductionPipeline.jsx で直したのと同じ形。
+                未計測を「0点」や「null点」として出さない。
+              */}
+              {qualityGateData.scored ? (
+                <div className="value score-counter" style={{ color: qualityGateData.score >= 80 ? '#10b981' : '#f59e0b' }}>
+                  {qualityGateData.score}点
+                </div>
+              ) : (
+                <div className="value score-counter" style={{ color: '#64748b', fontSize: '1rem' }} title="品質ゲートを通していないため、点はありません">
+                  未計測
+                </div>
+              )}
             </div>
           </div>
           <button className="wizard-btn wizard-btn-render" onClick={onRender}>

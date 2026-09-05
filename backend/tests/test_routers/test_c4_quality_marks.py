@@ -1714,9 +1714,17 @@ def test_18周目_印のないレポートで実績台帳を書き換えない()
     （10周目・13周目・15周目がすべて「片側だけ直して戻る」形だった）。
     """
     import asyncio
+    import importlib
     import unittest.mock as _m
 
-    import routers.director as D
+    # **`import routers.director as D` と書かない**（R1.5-C4・19周目）。
+    # `backend/routers/__init__.py` は `from .X import router as X` で
+    # **モジュール名と同じ名前を APIRouter オブジェクトに束縛する**。
+    # 単体実行ではこのファイルが `routers` をスタブ化しているのでモジュールが
+    # 取れるが、**全件実行で本物の `__init__` が読まれていると
+    # `import a.b as c` の属性参照が APIRouter を掴む**（CI で実際に踏んだ）。
+    # `importlib.import_module` は `sys.modules` から引くのでこれを避けられる。
+    D = importlib.import_module("routers.director")
 
     def 叩く(レポート):
         要求 = D.ReportRequest(storyboard_plan=[], quality_score={})
@@ -1911,8 +1919,10 @@ def test_18周目_チャンネル統計の固定値が印を落とさない():
     全部緑のままだった。** 条件文が名指ししているので塞ぐ。
     """
     import asyncio
+    import importlib
 
-    import routers.admin_channel_router as A
+    # 属性参照で APIRouter を掴まないよう `importlib` で引く（上と同じ理由）
+    A = importlib.import_module("routers.admin_channel_router")
 
     # 印そのもの（ここが verifier の変異 M4 の対象）
     assert A.DATA_SOURCE["is_real"] is False, \
@@ -1962,3 +1972,198 @@ def test_18周目_魂パスポートが段位を定数で描かない():
     送り出し = 描画部を読む("frontend/src/components/DirectorBriefing.jsx")
     assert "biz_rank: 'Novice'" not in 送り出し, \
         "画面が段位 'Novice' を捏造して送っている"
+
+
+# ============================================================
+# 19周目（18周目の反例を受けた自主掃引で見つけたもの）
+#
+# 18周目の反例は「except 節の辞書リテラル」で、17周目に作った式単位の掃引を
+# すり抜けた。そこで掃引軸を4本足して掃いた結果、**本線から到達する同種が
+# 3件**出た。いずれも「計測していない／検査していないのに、実測・確認済みを
+# 名乗る」形で、うち2件は永続化される。
+# ============================================================
+
+
+def test_19周目_落ちた品質検査を黙って捨てない():
+    """`quality_gate_plugins.run_all_plugins()` の except（R1.5-C4・19周目）。
+
+    プラグインが1本でも例外を投げると、except がログを出すだけで
+    **その項目の減点も「そのカテゴリを検査した」という事実も丸ごと消えて**いた。
+    品質ゲートは 100点からの減点方式なので、
+
+        **検査が壊れているほどスコアが上がる。**
+
+    しかも呼び出し元（`agents/workers/quality_gate_worker.py`）は直後に
+    `ctx.quality_scored = True` を立てるので、「22項目を検査した実測値」として
+    force-render の判定まで通ってしまう。
+
+    本線から到達する: `quality_gate_worker.py:153` が `run_all_plugins` を呼ぶ。
+    """
+    import quality_gate_plugins as Q
+
+    class 落ちる検査:
+        name = "gv19_always_fails"
+        category = "core"
+        capability = None
+
+        def analyze(self, ctx, template_config=None):
+            raise RuntimeError("わざと落とす")
+
+    class 通る検査:
+        name = "gv19_deducts"
+        category = "core"
+        capability = None
+
+        def analyze(self, ctx, template_config=None):
+            return {"deductions": 20, "feedback": ["減点20"]}
+
+    class 文脈:
+        declared_gaps = set()
+
+    元 = Q.PLUGIN_REGISTRY[:]
+    try:
+        Q.PLUGIN_REGISTRY[:] = [通る検査(), 落ちる検査()]
+        結果 = Q.run_all_plugins(文脈(), None)
+    finally:
+        Q.PLUGIN_REGISTRY[:] = 元
+
+    # **落ちた検査が記録に残る**
+    assert 結果["all_plugins_ran"] is False, "検査が落ちたのに『全項目を検査した』と名乗った"
+    落ちた = 結果["failed_plugins"]
+    assert len(落ちた) == 1, f"落ちた検査が記録されていない（{落ちた}）"
+    assert 落ちた[0]["name"] == "gv19_always_fails"
+    assert 落ちた[0]["category"] == "core"
+    assert "RuntimeError" in 落ちた[0]["error"]
+
+    # **利用者が読む文言にも出る**（記録だけでは画面に届かない）
+    assert any("検査されていません" in f for f in 結果["feedback"]), \
+        "落ちた検査が利用者向けの文言に出ていない"
+
+    # 通った検査の減点は生きている（門が広すぎないこと）
+    assert 結果["total_deductions"] > 0
+
+    # 全部通ったときは印が立つ（fail-open になっていないこと）
+    try:
+        Q.PLUGIN_REGISTRY[:] = [通る検査()]
+        正常 = Q.run_all_plugins(文脈(), None)
+    finally:
+        Q.PLUGIN_REGISTRY[:] = 元
+    assert 正常["all_plugins_ran"] is True
+    assert 正常["failed_plugins"] == []
+
+
+def test_19周目_落ちた検査が実行記録まで届く():
+    """上の相方 — **worker が拾わなければ画面にも記録にも届かない**（R1.5-C4・19周目）。
+
+    10周目・13周目・15周目はすべて「片側だけ直して元に戻る」形だった。
+    **`quality_gate_worker` を実際に走らせて確かめる**（ソース文字列の検査だと、
+    同じ語が別の場所に残っているだけで素通りする——実際に1度素通りさせた）。
+    """
+    import asyncio
+
+    import quality_gate_plugins as Q
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    class 落ちる検査:
+        name = "gv19_worker_fails"
+        category = "core"
+        capability = None
+
+        def analyze(self, ctx, template_config=None):
+            raise RuntimeError("わざと落とす")
+
+    def 走らせる(登録):
+        ctx = PipelineContext(video_path="d.mp4", session_id="s-gv19w")
+        ctx.segments = [{"text": "あ", "start": 0.0, "end": 1.0}]
+        ctx.declared_gaps = set()
+        元 = Q.PLUGIN_REGISTRY[:]
+        try:
+            Q.PLUGIN_REGISTRY[:] = 登録
+            結果 = asyncio.run(QualityGateWorker().execute(ctx))
+        finally:
+            Q.PLUGIN_REGISTRY[:] = 元
+        return ctx, 結果
+
+    # ── 検査が落ちた実走 ──
+    ctx, 結果 = 走らせる([落ちる検査()])
+
+    報告 = ctx.quality_gate_report
+    assert 報告.get("all_plugins_ran") is False,         "検査が落ちたのに実行記録が『全項目を検査した』と言っている"
+    落ちた = 報告.get("failed_plugins") or []
+    assert any(p.get("name") == "gv19_worker_fails" for p in 落ちた),         f"落ちた検査が実行記録に残っていない（{落ちた}）"
+
+    # **画面へ渡る側にも載る**（記録だけだと UI に届かない）
+    assert 結果.data.get("all_plugins_ran") is False,         "画面へ渡すデータに『全項目を検査したか』が無い"
+    assert any(p.get("name") == "gv19_worker_fails"
+               for p in (結果.data.get("failed_plugins") or [])),         "画面へ渡すデータに落ちた検査が無い"
+
+    # ── 全部通った実走（門が広すぎないこと） ──
+    class 通る検査:
+        name = "gv19_worker_ok"
+        category = "core"
+        capability = None
+
+        def analyze(self, ctx, template_config=None):
+            return {"deductions": 0, "feedback": []}
+
+    ctx2, 結果2 = 走らせる([通る検査()])
+    assert ctx2.quality_gate_report.get("all_plugins_ran") is True
+    assert (ctx2.quality_gate_report.get("failed_plugins") or []) == []
+
+
+
+def test_19周目_完了サマリーが採点の旗を見る():
+    """`ProductionWizard.jsx` の完了サマリー（R1.5-C4・19周目）。
+
+    同じファイルの上（`採点した` / `effectiveScore`）で旗を組み立てているのに、
+    **完了サマリーのカードだけがそれを迂回して生の `quality_score` を描いていた。**
+    16周目に `ProductionPipeline.jsx` で直したのと同じ形が姉妹ファイルに残っていた。
+    """
+    import re
+    from pathlib import Path as _Path
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+
+    def 描画部を読む(相対):
+        js = (ルート / 相対).read_text(encoding="utf-8")
+        s = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        return "\n".join(行 for 行 in s.splitlines()
+                         if not 行.strip().startswith("//"))
+
+    描画部 = 描画部を読む("frontend/src/components/ProductionWizard.jsx")
+
+    assert "qualityGateData.scored ?" in 描画部, \
+        "完了サマリーが採点の旗を見ていない"
+    assert "{quality_score}点" not in 描画部, \
+        "完了サマリーが旗を迂回して生の点を描いている"
+    assert "未計測" in 描画部, "未計測のときに未計測と書いていない"
+
+
+def test_19周目_AIスコアで人間のチェックを自動でONにしない():
+    """`StepReviewPanel.jsx` の自動チェック（R1.5-C4・19周目）。
+
+    AI のカテゴリスコアが 70点以上だと、そのステージの**人間用チェック項目を
+    全部 true に自動で倒していた**。倒される項目は
+    「固有名詞（人名・地名・社名）は正しいですか？」のような、
+    **人が目で見ないと答えられない問い**。
+
+    `isStageComplete()` はチェック状態だけを見るので、自動 ON のまま
+    `handleApprove()` が `completed: true` を送り、
+    **誰も見ていないレビューが「確認済み」として永続化**されていた。
+    """
+    import re
+    from pathlib import Path as _Path
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+    js = (ルート / "frontend/src/components/StepReviewPanel.jsx").read_text(encoding="utf-8")
+    s = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+    描画部 = "\n".join(行 for 行 in s.splitlines() if not 行.strip().startswith("//"))
+
+    assert "autoChecks" not in 描画部, \
+        "AI スコアで人間のチェック項目を自動 ON にしている"
+    assert "checkItems.forEach((_, i) => { checks[i] = true; })" not in 描画部, \
+        "人間用チェック項目を機械が全部 true にしている"
+
+    # AI スコアの表示自体は残っていること（情報を消しただけにしない）
+    assert "getStageScore" in 描画部, "AI スコアのバッジまで消してしまった"
