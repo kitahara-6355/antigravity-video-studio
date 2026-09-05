@@ -289,7 +289,17 @@ class DirectorBrain:
             base_persona = self._build_director_persona(user_model)
 
         # Resolve Auto-Pilot Ratio
-        auto_pilot_ratio = user_model.get('automation_settings', {}).get('auto_pilot_ratio', 0.9)
+        # **`automation_settings` という鍵は `user_model.json` に存在しない**（R1.5-C4・18周目）。
+        # 実体は `collaborative_settings.auto_pilot_ratio`（`branding_manager.set_auto_pilot()` が
+        # そこへ書き、同 `_build_context_block` もそこから読む）。
+        # つまりここは**利用者がオートパイロット率を何に設定しても常に 0.9** を読んでいた。
+        # `_resolve_rank_level` と同じ「存在しない鍵へのフォールバックが定数を作る」形。
+        collab_settings = user_model.get('collaborative_settings')
+        if not isinstance(collab_settings, dict):
+            collab_settings = {}
+        auto_pilot_ratio = collab_settings.get('auto_pilot_ratio', 0.9)
+        if not isinstance(auto_pilot_ratio, (int, float)) or isinstance(auto_pilot_ratio, bool):
+            auto_pilot_ratio = 0.9
         auto_pilot_percent = int(auto_pilot_ratio * 100)
         
         automation_directive = f"""

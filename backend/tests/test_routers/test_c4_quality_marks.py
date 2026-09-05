@@ -1834,6 +1834,40 @@ def test_18周目_採点の入力に段位を捏造しない():
             f"{模型.__name__} が段位の既定値に定数を置いている"
 
 
+def test_18周目_オートパイロット率は実際の設定から読む():
+    """存在しない鍵へのフォールバック（R1.5-C4・18周目・4カテゴリの周辺）。
+
+    `user_model.get('automation_settings', {})` は**存在しない鍵**で、
+    実体は `collaborative_settings`（`branding_manager.set_auto_pilot()` の
+    書き込み先）。**利用者が何％に設定しても常に 0.9** を読んでいた。
+    """
+    import unittest.mock as _m
+
+    from director_engine import DirectorBrain
+
+    brain = DirectorBrain.__new__(DirectorBrain)
+    brain.persona_consultant = "{channel_name}{biz_rank}{biz_advice_mode}"
+    brain.persona_director = "{tech_rank}{tech_advice_mode}"
+    brain.persona_common = "{auto_pilot_percent}"
+
+    利用者 = {
+        "profiles": {
+            "owner": {"ranks": {"biz_rank": {"level": "Novice"}}},
+            "admin": {"ranks": {"tech_rank": {"level": "Novice"}}},
+        },
+        "collaborative_settings": {"auto_pilot_ratio": 0.5},
+    }
+
+    with _m.patch("director_engine.branding_manager") as 台帳:
+        台帳.constitution = {"channel_name": "C"}
+        台帳.user_model = 利用者
+        台帳.get_context_block.return_value = ""
+        台帳.get_deep_context.return_value = ""
+        指示 = brain._get_system_instruction(mode="consult")
+
+    assert "50" in 指示, "利用者の設定（0.5）が指示書に届いていない"
+    assert "90" not in 指示, "存在しない鍵の既定値 0.9 を読んでいる"
+
 
 def test_18周目_投稿の未実装は成功を名乗らない(tmp_path):
     """**C4 条件文が名指しする `upload_video()`**（18周目・契約の穴）。
