@@ -134,7 +134,7 @@
     "src/gateway/endpoints.js|GET|/api/usage/retry-budget": "static_route_scan: routers/usage_router.py:172 GET /api/usage/retry-budget",
     "src/gateway/endpoints.js|GET|/api/usage/switch-history": "static_route_scan: routers/usage_router.py:340 GET /api/usage/switch-history",
     "src/gateway/endpoints.js|GET|/api/usage/two-tier-status": "static_route_scan: routers/usage_router.py:413 GET /api/usage/two-tier-status",
-    "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
+    "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "static_route_scan: routers/themes_router.py:413 GET /themes/current/active",
     "src/gateway/endpoints.js|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
     "src/gateway/endpoints.js|POST|/api/collaboration/feedback": "static_route_scan: routers/legacy_management_router.py:123 POST /api/collaboration/feedback",
     "src/gateway/endpoints.js|POST|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:163 POST /api/collaboration/journal",
@@ -182,8 +182,8 @@
     "src/gateway/endpoints.js|POST|/api/thumbnail/select": "static_route_scan: routers/ab_test_tracker.py:79 POST /api/thumbnail/select",
     "src/gateway/endpoints.js|POST|/api/transcribe": "static_route_scan: routers/legacy_production_router.py:172 POST /api/transcribe",
     "src/gateway/endpoints.js|POST|/api/usage/select-option": "static_route_scan: routers/usage_router.py:452 POST /api/usage/select-option",
-    "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
-    "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:301 POST /themes/apply",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:483 POST /themes/recommend",
     "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:943 POST /api/youtube/apply-hook",
     "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:771 POST /api/youtube/improve-hook",
     "src/gateway/endpoints.js|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:597 POST /api/youtube/optimize",
@@ -368,6 +368,24 @@
       "before": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
       "after": "static_route_scan: routers/director.py:158 POST /api/director/quality-score",
       "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/v1/themes/current/active",
+      "before": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
+      "after": "static_route_scan: routers/themes_router.py:413 GET /themes/current/active",
+      "reason": "R1.5-C4 案A: themes_router.py に『集計できなかったこと』の印と、未評価テンプレートに中央値 3.0 を付けない処理を足したため、同ファイルの経路の行番号がずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/v1/themes/apply",
+      "before": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
+      "after": "static_route_scan: routers/themes_router.py:301 POST /themes/apply",
+      "reason": "R1.5-C4 案A: themes_router.py に『集計できなかったこと』の印と、未評価テンプレートに中央値 3.0 を付けない処理を足したため、同ファイルの経路の行番号がずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/v1/themes/recommend",
+      "before": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
+      "after": "static_route_scan: routers/themes_router.py:483 POST /themes/recommend",
+      "reason": "R1.5-C4 案A: themes_router.py に『集計できなかったこと』の印と、未評価テンプレートに中央値 3.0 を付けない処理を足したため、同ファイルの経路の行番号がずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
     }
   ],
   "migrations": [

@@ -2325,3 +2325,659 @@ def test_19周目_維持率予測に捏造した成分を混ぜない():
     予測 = (結果["plugin_results"].get("retention_prediction_check") or {})
     assert 予測.get("checked") is True,         "本線でフック強度の実測値が渡っていない（配線が切れている）"
     assert isinstance(予測.get("details", {}).get("hook_score"), (int, float))
+
+
+def test_19周目_予測検証が計測していない実測を名乗らない():
+    """`services/prediction_validator.py` の `validate_prediction`（R1.5-C4・19周目）。
+
+    `actual`（＝実測）という名前の下に**既定値**が入っていた:
+
+        "ctr": metrics.get("click_through_rate", 0.0)
+        "elapsed_hours": actual_metrics_dict.get("elapsed_hours", 24)
+
+    `elapsed_hours` は `services/post_publish_collector.py` の `_generate_mock_data()`
+    でしか産出されない鍵で、実 API 統合（api_mode が real）は NotImplementedError を
+    投げる。**実データが流れ始めた日にこそ 24 が効き続ける。**
+    CTR が届かないほうはもっと悪く、0.0 が「実測 CTR」になり、予測 5.0% に対して
+    「誤差 100%・重大な乖離」という**計測していない判定**まで出ていた。
+
+    しかもこのレポートは台帳（Wagamama Ledger）の feedback レーンへ入り
+    `wagamama_manager._save()` で**恒久保存される**（18周目に直した
+    「作り物が台帳に焼き付く」と同型）。だから返り値だけでなく
+    **保存された側**まで確かめる。
+
+    本線から到達する: `routers/youtube_optimizer.py:1062` の feedback-loop が
+    :1166 で `validate_prediction` を呼び、:1178 で status を見て success を決める。
+    """
+    import asyncio
+    from services.prediction_validator import PredictionValidator
+
+    class 台帳:
+        def __init__(self, 予測):
+            self.record = {
+                "wagamama_id": "W-001",
+                "lanes": {"experience": {"predicted_ctr": 予測}},
+            }
+            self.saved = 0
+
+        def get_record(self, wagamama_id):
+            return self.record
+
+        def _save(self):
+            self.saved += 1
+
+    v = PredictionValidator()
+
+    # ── 正常系（実測が揃っている）は今までどおり通す。門が常に閉じたら門が無いのと同じ ──
+    m = 台帳(5.0)
+    r = asyncio.run(v.validate_prediction(
+        "W-001",
+        {"metrics": {"click_through_rate": 8.0}, "elapsed_hours": 72},
+        wagamama_manager=m))
+    assert r.get("status") not in ("error", "skipped"), "実測が揃っているのに止めた（正常系まで塞いだ）"
+    assert r["analysis"]["checked"] is True
+    assert r["analysis"]["difference"] == 3.0
+    assert r["analysis"]["significant_deviation"] is True
+    assert m.saved == 1
+    保存 = m.record["lanes"]["feedback"]["validation_report"]
+    assert 保存["actual"]["is_real"] is True, "台帳側に実測の印が届いていない"
+    assert 保存["actual"]["data_source"] == "measured"
+
+    # ── elapsed_hours を既定値 24 で埋めない。**台帳側も** ──
+    m2 = 台帳(5.0)
+    r2 = asyncio.run(v.validate_prediction(
+        "W-001", {"metrics": {"click_through_rate": 5.2}}, wagamama_manager=m2))
+    assert r2["actual"]["elapsed_hours"] is None, "計測していない経過時間を 24 で埋めた"
+    assert m2.record["lanes"]["feedback"]["validation_report"]["actual"]["elapsed_hours"] is None, \
+        "台帳に既定値の 24 が焼き付いた（返り値だけ直しても意味がない）"
+    assert r2["actual"]["measured_at"] is None, "計測していないのに収集時刻を付けた"
+
+    # ── 実測 CTR が届いていない → 0.0 を実績と呼ばない・乖離を判定しない・台帳に書かない ──
+    m3 = 台帳(5.0)
+    r3 = asyncio.run(v.validate_prediction(
+        "W-001", {"elapsed_hours": 30}, wagamama_manager=m3))
+    assert r3.get("status") == "skipped", "計測していないのに success 側へ返した"
+    assert r3["actual"]["ctr"] is None, "届いていない CTR を 0.0 で埋めた"
+    assert r3["actual"]["is_real"] is False
+    assert r3["actual"]["data_source"] == "unavailable"
+    assert r3["analysis"]["checked"] is False
+    assert r3["analysis"]["significant_deviation"] is None, "計測していないのに乖離を判定した"
+    assert r3["analysis"]["error_margin_pct"] is None
+    assert m3.saved == 0, "未計測のレポートで台帳を保存した"
+    assert "feedback" not in m3.record["lanes"], "未計測のレポートを台帳へ恒久保存した"
+
+    # ── 収集側が作り物（is_mock）だと言っている → 実測として台帳に焼き付けない ──
+    m4 = 台帳(5.0)
+    r4 = asyncio.run(v.validate_prediction(
+        "W-001",
+        {"metrics": {"click_through_rate": 4.4}, "elapsed_hours": 24, "is_mock": True},
+        wagamama_manager=m4))
+    assert r4.get("status") == "skipped"
+    assert r4["actual"]["data_source"] == "sample"
+    assert r4["actual"]["ctr"] is None
+    assert m4.saved == 0, "作り物のレポートで台帳を保存した"
+
+    # ── 予測 CTR が 0 以下 → 誤差率は割れない。「誤差 0%・乖離なし」と名乗らない ──
+    m5 = 台帳(0.0)
+    r5 = asyncio.run(v.validate_prediction(
+        "W-001",
+        {"metrics": {"click_through_rate": 2.0}, "elapsed_hours": 24},
+        wagamama_manager=m5))
+    assert r5["analysis"]["error_margin_pct"] is None, "割れない誤差率を 0 で埋めた"
+    assert r5["analysis"]["significant_deviation"] is None, "判定していないのに『乖離なし』と書いた"
+    assert r5["analysis"]["difference"] == 2.0, "実際に引き算できる差まで消した"
+
+
+def test_19周目_YouTube全体スコアが分析の有無を見る():
+    """`YouTubeOptimizerPanel.jsx` のヘッダー「全体スコア」（R1.5-C4・19周目）。
+
+    以前は 4 要素を **三項の定数だけ**で足していた
+    （`(hook_score || 0)*0.3 + (候補3件以上 ? 100 : 50)*0.3 + ...`）。
+    どの項も「件数が閾値以上か」しか見ておらず、**その分析が走ったかを
+    見ていなかった。** サムネ生成が候補を返せなくても 50 点、SEO メタデータが
+    null でも 60 点が付き、4 要素すべて未計測でもヘッダーに数字が出ていた。
+    16周目 `ProductionPipeline.jsx` / 19周目 `ProductionWizard.jsx` と同型。
+
+    「消えたこと」だけでは弱いので、**新しい判定を実際に見ていること**
+    （要素ごとの `走った` と、走った要素だけを分母にする加重平均）も見る。
+    """
+    import re
+    from pathlib import Path as _Path
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+
+    def 描画部を読む(相対):
+        js = (ルート / 相対).read_text(encoding="utf-8")
+        s = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        return "\n".join(行 for 行 in s.splitlines()
+                         if not 行.strip().startswith("//"))
+
+    描画部 = 描画部を読む("frontend/src/components/YouTubeOptimizerPanel.jsx")
+
+    # (1) 分析の有無を見ない定数フォールバックが戻っていない
+    for 旧式 in (
+        "(optimizationData.hook_score || 0) * 0.3",
+        "optimizationData.thumbnail_candidates?.length >= 3 ? 100 : 50",
+        "optimizationData.seo_metadata?.tags?.length >= 15 ? 100 : 60",
+        "optimizationData.highlights?.length >= 3 ? 100 : 50",
+    ):
+        assert 旧式 not in 描画部, f"分析の有無を見ない定数フォールバックが戻っている: {旧式}"
+
+    # (2) 4 要素それぞれが「分析が走ったか」を実際に見ている
+    assert "!!optimizationData?.hook_analysis" in 描画部, \
+        "フックが分析の有無を見ずに採点されている"
+    assert "Array.isArray(optimizationData?.thumbnail_candidates)" in 描画部, \
+        "サムネが分析の有無を見ずに採点されている"
+    assert "!!optimizationData?.seo_metadata" in 描画部 \
+        and "Array.isArray(optimizationData.seo_metadata.tags)" in 描画部, \
+        "SEO が判定の材料の有無を見ずに採点されている"
+    assert "Array.isArray(optimizationData?.highlights)" in 描画部, \
+        "山場が分析の有無を見ずに採点されている"
+    assert "走った: true" not in 描画部, \
+        "常に採点済みの旗を立てている（門が開きっぱなし）"
+    assert 描画部.count("走った") >= 6, \
+        "要素ごとの「走ったか」の旗が足りない"
+
+    # (3) 走っていない要素を点に含めない（分母が走った要素の重みで動く）
+    assert "採点要素.filter(e => e.走った)" in 描画部, \
+        "走った要素だけを集めていない"
+    assert "/ 重みの合計" in 描画部, \
+        "分母が固定で、走らなかった要素の分まで薄めて採点している"
+
+    # (4) 1 つも走っていなければ点を出さない（0 は実際に取りうる点なので印にならない）
+    assert re.search(r"重みの合計 > 0[\s\S]{0,400}?:\s*null;", 描画部), \
+        "採点できた要素が無いときに 0 を置いている"
+
+    # (5) 描画が採点の旗を見て「未計測」と書く
+    assert "{全体スコアを採点した ? (" in 描画部, "描画が採点の旗を見ていない"
+    assert "全体スコア: 未計測" in 描画部, "未計測のときに未計測と書いていない"
+    assert "未計測の要素.length > 0 &&" in 描画部, \
+        "どの要素が未計測だったかを画面に出していない"
+    assert 描画部.index("全体スコアを採点した ?") < 描画部.index("Math.round(overallScore)"), \
+        "旗より先に数字を描いている"
+
+    # (6) 巻き込み事故の防止 — footer の SEO 表示はユーザー決定で limits 送り。
+    #     未取得時に悲観側へ倒れるので偽の success ではなく、消してはいけない
+    assert "tags?.length >= 15 ? '良好' : '改善余地あり'" in 描画部, \
+        "limits 送りにした footer の SEO 表示を巻き込んで消している"
+
+
+def test_19周目_チャンネル統計は未計測を実測として返さない():
+    """**C4 条件文の「チャンネル統計」**（R1.5-C4・19周目・保留リスト #6）。
+
+    `services/youtube_analytics_client.py` の `get_channel_performance()` は、
+    3つの経路が**どれも同じ見た目の `ChannelPerformance`** を返していた:
+
+    | 経路 | 何を偽っていたか |
+    |---|---|
+    | API 未接続・キャッシュ無し | 生成したままの `avg_ctr=0.0` / `total_views=0` |
+    | API 未接続・キャッシュあり | いつのものか分からない値。取得時刻も付かない。`cached.get(key, 0)` で欠損まで 0 に化け、`total_subscribers` は復元すらしていなかった |
+    | API 呼び出しが落ちた | except が log を出すだけで**空の `perf` がそのまま返る** |
+
+    最後の1件が19周目の掃引が「いちばん取りこぼしやすい」と名指しした形
+    （**例外を握り潰した後、try の前で初期化済みの変数がそのまま成果として返る**）。
+    `avg_ctr=0.0` は「計測したら CTR 0% だった」と読めるので呼び手からは
+    成功と区別が付かず、`performance_cache.json` と
+    `get_performance_benchmarks` の基準値へ流れていた。
+
+    到達: `main.py` → `routers/__init__.py` → `admin_quota_router`
+    → `service_container` の `youtube_analytics` → `YouTubeAnalyticsClient`。
+    """
+    import asyncio
+
+    from unittest.mock import MagicMock
+
+    from services.youtube_analytics_client import (ChannelPerformance,
+                                                   YouTubeAnalyticsClient)
+
+    def 客(接続):
+        c = YouTubeAnalyticsClient()
+        c._save_cache = lambda: None            # 共有の状態ファイルを書かない
+        c._cache = {"videos": {}, "channel": {}, "last_updated": ""}
+        c._available = 接続
+        return c
+
+    # ── 1. API 未接続・キャッシュ無し → 0 を実測として返さない ──
+    未接続 = asyncio.run(客(False).get_channel_performance())
+    assert 未接続.is_real is False, "一度も接続していないチャンネル統計が実測を名乗った"
+    assert 未接続.data_source == "unavailable", f"出所の印が無い（{未接続.data_source!r}）"
+    assert 未接続.total_views is None, "計測していない総再生数を 0 として返した"
+    assert 未接続.avg_ctr is None, "計測していない CTR を 0.0 として返した"
+    assert 未接続.total_subscribers is None, "計測していない登録者数を 0 として返した"
+    assert 未接続.last_sync is None, "同期していないのに同期時刻が入っている"
+    assert 未接続.unavailable_reason, "なぜ実測でないかが残っていない"
+
+    # ── 2. API 呼び出しが落ちた → except の後で空の perf が実測として返らない ──
+    落ちた客 = 客(True)
+    壊れた = MagicMock()
+    壊れた.reports().query.side_effect = OSError("boom")
+    落ちた客._analytics_service = 壊れた
+    落ちた = asyncio.run(落ちた客.get_channel_performance())
+    assert 落ちた.is_real is False, "取得が落ちたのに実測を名乗った"
+    assert 落ちた.total_views is None, "取得が落ちたのに総再生数 0 を実測として返した"
+    assert 落ちた.avg_ctr is None, "取得が落ちたのに CTR 0.0 を実測として返した"
+    assert 落ちた.last_sync is None, "取得していないのに同期時刻が入っている"
+    assert "OSError" in (落ちた.unavailable_reason or ""), \
+        f"失敗の理由が握り潰されている（{落ちた.unavailable_reason!r}）"
+    assert 落ちた客._cache["channel"] == {}, "取得が落ちた値が台帳に焼き付いた"
+
+    # ── 3. キャッシュ由来 → 値は残すが、実測でも「いま同期した」でもない ──
+    キャッシュ客 = 客(False)
+    キャッシュ客._cache["channel"] = {"avg_ctr": 4.5, "total_views": 8000}
+    キャッシュ客._cache["last_updated"] = ""     # 取得時刻が残っていない
+    キャッシュ = asyncio.run(キャッシュ客.get_channel_performance())
+    assert キャッシュ.avg_ctr == 4.5, "キャッシュの値まで捨てた（門が常に閉じている）"
+    assert キャッシュ.is_real is False, "キャッシュ由来の値が実測を名乗った"
+    assert キャッシュ.data_source == "cache", \
+        f"出所の印が cache でない（{キャッシュ.data_source!r}）"
+    assert キャッシュ.last_sync is None, \
+        "取得時刻が無いのに現在時刻を付けた（いま同期したように見える）"
+    assert キャッシュ.total_subscribers is None, \
+        "キャッシュに無い登録者数を 0 で埋めた（0 は実際に取りうる値なので印にならない）"
+
+    # ── 4. 正常系は今までどおり実測を返す（門が常に閉じるなら門が無いのと同じ）──
+    正常客 = 客(True)
+    応答 = MagicMock()
+    応答.reports().query().execute.return_value = {"rows": [
+        ["2026-05-22", 100, 500, 0.04, 150.0, 40.0, 5],
+        ["2026-05-21", 200, 1000, 0.06, 170.0, 44.0, 10],
+    ]}
+    正常客._analytics_service = 応答
+    正常 = asyncio.run(正常客.get_channel_performance(days=7))
+    assert 正常.is_real is True, "API が返した実測値に印が付かない（門が常に閉じている）"
+    assert 正常.data_source == "analytics_api"
+    assert 正常.last_sync, "実測したのに取得時刻が残っていない"
+    assert (正常.total_views, 正常.total_subscribers, 正常.avg_ctr) == (300, 15, 5.0), \
+        "正常系の集計が変わった（テストを見直す）"
+    # 印は台帳へ書き戻さない。書き戻すと次に読んだとき本物と区別できなくなる
+    assert set(正常客._cache["channel"]) & {"is_real", "data_source", "last_sync"} == set(), \
+        "印がキャッシュへ焼き付いている"
+    assert 正常客._cache["channel"]["total_views"] == 300
+
+    # ── 5. 辞書にしても印が落ちない（外へ出るのはこの形）──
+    素 = ChannelPerformance().to_dict()
+    assert 素["is_real"] is False and 素["data_source"] == "unavailable", \
+        "既定が fail-closed でない（初期化しただけの値が実測を名乗る）"
+    assert 素["last_sync"] is None
+    assert 落ちた.to_dict()["is_real"] is False, "辞書にした時点で印が消えた"
+
+
+def test_19周目_SmartCut戦略が未応答のとき実測を名乗らない():
+    """R1.5-C4: Strategist が答えていないカット戦略が、実測の顔で台帳に載らないこと。
+
+    保留リスト #8。本番の smartcut ルーター（backend/routers/smartcut.py:414,433）が
+    SmartCutStrategyService を生成し、その CutStrategy は
+    evolution_sync_service.record_strategy から evolution_log.json の
+    strategy_detail に丸ごと永続化される。
+
+    | 何が偽だったか | どこ |
+    |---|---|
+    | 未応答の定数戦略に generated_at だけ現在時刻が付く（「いま算出した」に見える） | CutStrategy.default() |
+    | JSON がパースできさえすれば、鍵が欠けても項目ごとの既定値で埋まり、model_used に本物のモデル名が入る | _parse_response |
+
+    後者がとくに悪い。`{}` を返しただけで「AI生成戦略・ブランド整合性0.50」という
+    実測の顔の戦略が出来上がり、default() が持っている「Strategist未応答」の印を迂回していた。
+    """
+    import json
+    from unittest.mock import MagicMock
+    from services.smartcut_strategy_service import SmartCutStrategyService, CutStrategy
+
+    def 応答(payload):
+        m = MagicMock()
+        m.text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
+        return m
+
+    サービス = SmartCutStrategyService(max_sessions=2)
+
+    # ── (a) 未応答の定数戦略が「いま算出した」に見えないこと ──
+    既定 = CutStrategy.default()
+    assert 既定.generated_at is None, "生成していないのに現在時刻を名乗っている"
+    assert 既定.model_used == "default"
+    assert "未応答" in 既定.summary
+
+    # ── 正常系は今までどおり通ること。門が常に閉じるなら門が無いのと同じ ──
+    満額 = {
+        "summary": "実測の戦略",
+        "position_weights": {"intro": 1.2, "body": 1.0, "highlight": 1.1, "outro": 0.9},
+        "brand_alignment_score": 0.87,
+        "recommended_cut_rate": 0.45,
+    }
+    正常 = サービス._parse_response(応答(満額), "gemini-3.6-flash")
+    assert 正常.model_used == "gemini-3.6-flash", "正常系まで止めている（門が常に閉じている）"
+    assert 正常.summary == "実測の戦略"
+    assert 正常.brand_alignment_score == 0.87
+    assert 正常.recommended_cut_rate == 0.45
+    assert isinstance(正常.generated_at, str) and 正常.generated_at, "実応答なのに生成時刻が消えている"
+
+    囲み = サービス._parse_response(
+        応答("```json\n" + json.dumps(満額, ensure_ascii=False) + "\n```"), "gemini-3.6-flash")
+    assert 囲み.model_used == "gemini-3.6-flash" and 囲み.summary == "実測の戦略"
+
+    # 0 は「実際に取りうる値」。欠落と混同して門を閉じないこと
+    ゼロ = サービス._parse_response(
+        応答(dict(満額, brand_alignment_score=0, recommended_cut_rate=0)), "gemini-3.6-flash")
+    assert ゼロ.model_used == "gemini-3.6-flash", "0 は実際に取りうる値なのに欠落と誤判定している"
+    assert ゼロ.brand_alignment_score == 0.0
+
+    # ── (b) 鍵が1つでも欠けたら、既定値で黙って埋めずに default() と同じ印を付けること ──
+    for 欠落 in ("summary", "position_weights", "brand_alignment_score", "recommended_cut_rate"):
+        壊れ = dict(満額)
+        壊れ.pop(欠落)
+        結果 = サービス._parse_response(応答(壊れ), "gemini-3.6-flash")
+        assert 結果.model_used == "default", f"{欠落} が無いのに本物のモデル名を名乗った"
+        assert 結果.summary == 既定.summary, f"{欠落} が無いのに AI が書いた戦略の顔をしている"
+        assert 結果.generated_at is None, f"{欠落} が無いのに生成時刻が付いた"
+
+    # 鍵はあるが答えていない（null）も同じ扱い
+    null応答 = サービス._parse_response(
+        応答(dict(満額, brand_alignment_score=None)), "gemini-3.6-flash")
+    assert null応答.model_used == "default" and null応答.generated_at is None
+
+    # 数値として読めないスコアを 0.5 で埋めないこと
+    不正 = サービス._parse_response(
+        応答(dict(満額, brand_alignment_score="invalid_score")), "gemini-3.6-flash")
+    assert 不正.model_used == "default", "数値として読めないスコアを 0.5 で埋めて実測の顔にした"
+    assert 不正.generated_at is None
+
+    非辞書 = サービス._parse_response(応答("[1, 2, 3]"), "gemini-3.6-flash")
+    assert 非辞書.model_used == "default" and 非辞書.generated_at is None
+
+    # ── 台帳（evolution_sync_service.record_strategy が組む形）が壊れず、印が残ること ──
+    台帳 = {
+        "insight": f"ブランド整合性: {既定.brand_alignment_score:.2f}, "
+                   f"推奨カット率: {既定.recommended_cut_rate:.1%}",
+        "model_used": 既定.model_used,
+        "generated_at": 既定.generated_at,
+    }
+    復元 = json.loads(json.dumps(台帳, ensure_ascii=False))
+    assert 復元["generated_at"] is None, "台帳に作り物の時刻が残っている"
+    assert 復元["model_used"] == "default"
+
+
+def test_19周目_評価の無いテンプレートが平均満足度を名乗らない(tmp_path, monkeypatch):
+    """`themes_router.get_template_stats()` の満足度と件数（R1.5-C4・19周目）。
+
+    19周目の verifier の指摘:
+
+    > 「テンプレート選択統計」は4カテゴリのどれにも素直に入らない。**むしろ
+    > 同関数 L183 の `avg_satisfaction[tid] = 3.0`（誰も評価していないのに
+    > 中央値を「平均満足度」として返す）のほうが偽の success として明確。**
+
+    あわせて、台帳（`backend/branding/evolution_log.json`）が無い・壊れている
+    ときに `total_selections: 0` を返し、**「集計できなかった」が
+    「集計して0件だった」に化けていた**のも塞ぐ。
+
+    どちらも管理者向けのテンプレート選択統計（getTemplateStats）がそのまま
+    画面に描く数字で、`backend/main.py:253` で本番にマウントされている。
+
+    **本丸は書き込み側だった。** `POST /themes/apply` が記録のたびに
+    `satisfaction: 3` を台帳へ焼き付けるので、統計側の 3.0 だけ止めても
+    実運用では平均が常に 3.0 のままになる（同じクラスの別経路）。
+    """
+    import asyncio
+    import importlib
+    import json
+
+    monkeypatch.setenv("ANTIGRAVITY_WRITABLE_ROOT", str(tmp_path))
+    台帳 = tmp_path / "backend" / "branding" / "evolution_log.json"
+    台帳.parent.mkdir(parents=True, exist_ok=True)
+
+    # 属性参照で APIRouter を掴まないよう importlib で引く（このファイルの他と同じ）
+    T = importlib.import_module("routers.themes_router")
+
+    # 本番にマウントされている読み口であること（経路が消えたら気付く）
+    assert "/themes/stats" in {getattr(r, "path", "") for r in T.router.routes}, \
+        "統計の読み口がルーターから外れている（テストを見直す）"
+
+    def 統計():
+        return asyncio.run(T.get_template_stats())
+
+    def 台帳を書く(obj):
+        台帳.write_bytes(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
+
+    # ── ① 誰も評価していない → 平均満足度を名乗らない ──
+    台帳を書く({"template_selections": [
+        {"template_id": "nhk_documentary", "theme_id": "cool"},
+        {"template_id": "nhk_documentary", "theme_id": "warm", "satisfaction": "未評価"},
+    ]})
+    無評価 = 統計()
+    assert 無評価["total_selections"] == 2, "選択の件数まで消してはいけない"
+    assert 無評価["avg_satisfaction"]["nhk_documentary"] is None, \
+        f"評価が1件も無いのに平均満足度を返した（{無評価['avg_satisfaction']['nhk_documentary']!r}）"
+    assert 無評価["rated_counts"]["nhk_documentary"] == 0
+    assert "nhk_documentary" in 無評価["unrated_templates"]
+
+    # ── ② 評価が実在する → 今までどおり平均を出す（門が常に閉じないこと）──
+    台帳を書く({"template_selections": [
+        {"template_id": "nhk_documentary", "theme_id": "cool", "satisfaction": 4},
+        {"template_id": "nhk_documentary", "theme_id": "warm", "satisfaction": 5},
+        {"template_id": "mrbeast_entertainment", "theme_id": "energetic", "satisfaction": 2},
+    ]})
+    実測 = 統計()
+    assert 実測["avg_satisfaction"]["nhk_documentary"] == 4.5
+    assert 実測["avg_satisfaction"]["mrbeast_entertainment"] == 2.0
+    assert 実測["rated_counts"]["nhk_documentary"] == 2
+    assert 実測["checked"] is True and 実測["is_real"] is True
+    assert 実測["total_selections"] == 3
+
+    # ── ③ 台帳を集計できない → 0 件と名乗らない ──
+    for 壊し方, 中身 in (
+        ("0バイト", b""),
+        ("壊れたJSON", b"{broken"),
+        ("dictでない", b"[]"),
+        ("選択欄の型が違う", b'{"template_selections": {}}'),
+    ):
+        台帳.write_bytes(中身)
+        不能 = 統計()
+        assert 不能["total_selections"] is None, \
+            f"{壊し方}: 集計できなかったのに件数 {不能['total_selections']!r} を名乗った"
+        assert 不能["checked"] is False and 不能["is_real"] is False, \
+            f"{壊し方}: 未集計が実測を名乗っている"
+        assert 不能["data_source"] == "unavailable", \
+            f"{壊し方}: 出所の印が unavailable でない（{不能['data_source']!r}）"
+        assert 不能.get("skip_reason"), f"{壊し方}: 集計できなかった理由が残っていない"
+
+    # 台帳そのものが無いときも同じ
+    台帳.unlink()
+    無し = 統計()
+    assert 無し["total_selections"] is None and 無し["is_real"] is False, \
+        "台帳が無いのに「集計して0件だった」と名乗った"
+    assert 無し["skip_reason"] == "ledger_missing"
+
+    # ── ④ 台帳は読めて記録が無い → **こちらは本物の 0 件** ──
+    台帳.write_bytes(b"{}")
+    本物のゼロ = 統計()
+    assert 本物のゼロ["total_selections"] == 0, "読めた台帳の0件まで未集計にしてはいけない"
+    assert 本物のゼロ["checked"] is True and 本物のゼロ["is_real"] is True
+    assert 本物のゼロ["data_source"] == "measured"
+
+    # ── ⑤ 書き込み側が作り物の評価を台帳へ焼き付けない ──
+    台帳.unlink()
+    T._record_template_selection("nhk_documentary", "warm")
+    行 = json.loads(台帳.read_text(encoding="utf-8"))["template_selections"]
+    assert len(行) == 1
+    assert 行[0]["satisfaction"] is None, \
+        f"誰も評価していないのに評価値 {行[0]['satisfaction']!r} を台帳へ書いた"
+    適用後 = 統計()
+    assert 適用後["total_selections"] == 1
+    assert 適用後["avg_satisfaction"]["nhk_documentary"] is None, \
+        "台帳の既定値から平均満足度が生えている（3.0 の再発）"
+
+
+# ── R1.5-C4（19周目）: サムネイル品質スコアが「見ていない画像」を採点したと名乗る ──
+#
+# `backend/services/thumbnail_analyzer.py` の `analyze_image` は
+# `result.get("face_score", 50)` を4軸ぶん並べていた。Gemini Vision が
+# **JSON としてはパースできるが採点キーを持たない**応答（キー欠落・別スキーマ・
+# 数値でない値）を返すと、4軸すべてが黙って 50 点に化け、`overall_score` 50.0 /
+# `verdict`「⚠️ 改善推奨」/ `detail`「Vision API分析: 50点」/
+# `analysis_mode`「gemini_vision」がそのまま返っていた。
+# **画像を一度も採点できていないのに「Vision API で分析した 50点」**を名乗る。
+# `JSONDecodeError` のときだけ `text_match` に落ちて正直だったので、
+# 「パースは通るが中身が違う」経路にだけ印が無かった（gate-verifier 19周目 保留リスト #1）。
+#
+# 到達: backend/main.py:236 `include_router(youtube_optimizer_router)`
+#   → backend/routers/youtube_optimizer.py:2308 `analyze_thumbnail_image`
+#   → :2324 `thumbnail_analyzer.analyze_image(req.image_path)`（戻り値を加工せず応答にする）
+
+
+def test_19周目_サムネイル採点キーが欠けた応答は軸の点も総合点も名乗らない(tmp_path):
+    """採点キーが無い軸は点を名乗らない。総合点・判定・CTR予測も出さない。
+
+    以前は既定値 50 で4軸すべてが埋まり、`analysis_mode` は `gemini_vision` のままだった。
+    """
+    import sys
+    import types
+    from unittest.mock import MagicMock, patch
+
+    偽ファクトリ = types.ModuleType("gemini_client_factory")
+    クライアント = MagicMock()
+    応答 = MagicMock()
+    応答.text = '{"face_score": 90}'  # text / contrast / composition が無い
+    クライアント.models.generate_content.return_value = 応答
+    偽ファクトリ.get_gemini_client = lambda *a, **k: クライアント
+
+    画像 = tmp_path / "c4_19_missing.jpg"
+    画像.write_bytes(b"dummy jpg data")
+
+    with patch.dict(sys.modules, {"gemini_client_factory": 偽ファクトリ}):
+        from services.thumbnail_analyzer import ThumbnailAnalyzer
+        結果 = ThumbnailAnalyzer().analyze_image(str(画像))
+
+    assert 結果["analysis_mode"] != "gemini_vision", (
+        f"3軸の採点が無いのに Vision の採点を名乗っている: {結果['analysis_mode']}"
+    )
+    assert 結果["overall_score"] is None, (
+        f"4軸そろっていないのに総合点を名乗っている: {結果['overall_score']}"
+    )
+    assert 結果["verdict"] is None, f"総合判定を名乗っている: {結果['verdict']}"
+    assert 結果["predicted_ctr_impact"] is None, (
+        f"CTR予測を名乗っている: {結果['predicted_ctr_impact']}"
+    )
+    assert 結果.get("is_real") is False, f"is_real の印が無い: {結果.get('is_real')}"
+    assert 結果.get("data_source") == "unavailable", (
+        f"data_source の印が無い: {結果.get('data_source')}"
+    )
+
+    軸 = {c["name"]: c for c in 結果["checks"]}
+    for 名前 in ("テキスト可読性", "カラーコントラスト", "構図パターン"):
+        assert 軸[名前]["score"] is None, (
+            f"{名前}: 採点が無いのに {軸[名前]['score']} 点を名乗っている"
+        )
+        assert "Vision API分析" not in 軸[名前]["detail"], (
+            f"{名前}: 採点していないのに分析したと読める detail: {軸[名前]['detail']}"
+        )
+    # 読めた軸まで捨てない。門が常に閉じるなら門が無いのと同じ
+    assert 軸["顔クローズアップ"]["score"] == 90, "読めた軸まで捨てている（門が閉じすぎ）"
+
+
+def test_19周目_サムネイル採点が数値でない応答も未計測として扱う(tmp_path):
+    """文字列・範囲外・bool・null は採点として読めない。0〜100 の数値だけを本物とみなす。
+
+    `true` を黙って 1 点、`"85"` を 85 点として扱うと、やはり見ていない画像の点になる。
+    """
+    import sys
+    import types
+    from unittest.mock import MagicMock, patch
+
+    偽ファクトリ = types.ModuleType("gemini_client_factory")
+    クライアント = MagicMock()
+    応答 = MagicMock()
+    応答.text = (
+        '{"face_score": "85", "text_score": 150, '
+        '"contrast_score": true, "composition_score": null}'
+    )
+    クライアント.models.generate_content.return_value = 応答
+    偽ファクトリ.get_gemini_client = lambda *a, **k: クライアント
+
+    画像 = tmp_path / "c4_19_bogus.jpg"
+    画像.write_bytes(b"dummy jpg data")
+
+    with patch.dict(sys.modules, {"gemini_client_factory": 偽ファクトリ}):
+        from services.thumbnail_analyzer import ThumbnailAnalyzer
+        結果 = ThumbnailAnalyzer().analyze_image(str(画像))
+
+    assert 結果["analysis_mode"] != "gemini_vision", (
+        f"採点として読めない値しか無いのに Vision の採点を名乗っている: {結果['analysis_mode']}"
+    )
+    assert 結果["overall_score"] is None, (
+        f"採点として読めない値から総合点を作っている: {結果['overall_score']}"
+    )
+    for 軸 in 結果["checks"]:
+        assert 軸["score"] is None, (
+            f"{軸['name']}: 採点として読めない値を {軸['score']} 点として名乗っている"
+        )
+
+
+def test_19周目_サムネイル4軸すべて読めた正常系はこれまでどおり実測を名乗る(tmp_path):
+    """**門が常に閉じるなら門が無いのと同じ。** 正常系は修正前と同じ値を返す。
+
+    0 点も「実際に取りうる採点」なので、印と取り違えて止めてはいけない。
+    """
+    import sys
+    import types
+    from unittest.mock import MagicMock, patch
+
+    偽ファクトリ = types.ModuleType("gemini_client_factory")
+    クライアント = MagicMock()
+    応答 = MagicMock()
+    応答.text = (
+        '```json\n{"face_score": 85, "text_score": 75, "contrast_score": 90, '
+        '"composition_score": 80, "overall_impression": "良い", '
+        '"top_improvement": "特にありません"}\n```'
+    )
+    クライアント.models.generate_content.return_value = 応答
+    偽ファクトリ.get_gemini_client = lambda *a, **k: クライアント
+
+    画像 = tmp_path / "c4_19_ok.jpg"
+    画像.write_bytes(b"dummy jpg data")
+
+    with patch.dict(sys.modules, {"gemini_client_factory": 偽ファクトリ}):
+        from services.thumbnail_analyzer import ThumbnailAnalyzer
+        分析器 = ThumbnailAnalyzer()
+        結果 = 分析器.analyze_image(str(画像))
+
+        零点 = MagicMock()
+        零点.text = (
+            '{"face_score": 0, "text_score": 0, '
+            '"contrast_score": 0, "composition_score": 0}'
+        )
+        クライアント.models.generate_content.return_value = 零点
+        零の結果 = 分析器.analyze_image(str(画像))
+
+    assert 結果["analysis_mode"] == "gemini_vision", f"正常系まで止めている: {結果['analysis_mode']}"
+    assert 結果["overall_score"] == 82.5, f"正常系の総合点が変わった: {結果['overall_score']}"
+    assert 結果["verdict"] == "✅ 高品質", f"正常系の判定が変わった: {結果['verdict']}"
+    assert 結果["predicted_ctr_impact"] is not None, "正常系の CTR 予測まで消している"
+    assert [c["score"] for c in 結果["checks"]] == [85, 75, 90, 80], (
+        f"正常系の軸の点が変わった: {[c['score'] for c in 結果['checks']]}"
+    )
+    assert 結果["checks"][0]["detail"] == "Vision API分析: 85点", (
+        f"正常系の detail が変わった: {結果['checks'][0]['detail']}"
+    )
+
+    assert 零の結果["analysis_mode"] == "gemini_vision", (
+        "0点は実際に取りうる採点なので止めてはいけない"
+    )
+    assert 零の結果["overall_score"] == 0.0, f"0点の総合点が出ていない: {零の結果['overall_score']}"
+
+
+def test_19周目_サムネイル4軸に既定点のフォールバックが戻っていない():
+    """`result.get("<軸>_score", 50)` 型の既定値が実コードへ復活していないことの静的ガード。
+
+    「何が偽だったか」を残すコメント内の引用は対象外にする（このリポジトリの慣習）。
+    """
+    import re
+    from pathlib import Path
+
+    import services.thumbnail_analyzer as サムネ
+
+    ソース = Path(サムネ.__file__).read_text(encoding="utf-8")
+    実コード = "\n".join(
+        行 for 行 in ソース.splitlines() if not 行.lstrip().startswith("#")
+    )
+    見つかった = re.findall(
+        r"get\(\s*[\"'](?:face|text|contrast|composition)_score[\"']\s*,\s*[0-9]",
+        実コード,
+    )
+    assert 見つかった == [], f"採点キーの既定値フォールバックが戻っている: {見つかった}"

@@ -279,7 +279,15 @@ class TestThumbnailAnalyzerImageVision:
             assert face_check["suggestion"] == "文字を大きくしてください"
 
     def test_analyze_image_api_success_missing_fields(self, tmp_path):
-        """Vision API の返却 JSON に一部のキーが欠損している場合、デフォルト値 50 が適用されることを確認"""
+        """Vision API の応答に採点キーが欠けている軸は、**点を名乗らない**ことを確認"""
+        # **測れていない値を定数で埋めない**（R1.5-C4・19周目）。
+        # ここは docstring からして「デフォルト値 50 が適用されること」を固定していたが、
+        # その 50 は `result.get("text_score", 50)` が黙って入れていた捏造そのものだった。
+        # 応答は face_score しか持っていないのに残り3軸が 50 点に化け、
+        # overall_score 60.0 / analysis_mode「gemini_vision」を名乗って、
+        # **一度も採点していない軸まで「Vision API分析: 50点」**として画面まで届いていた。
+        # いまは読めなかった軸が score None ＋ ❓ になり、1軸でも読めなければ
+        # 総合点も判定も CTR 予測も出さず、analysis_mode は "vision_unscored" になる。
         analyzer = ThumbnailAnalyzer()
         temp_file = tmp_path / "temp_thumb.jpg"
         temp_file.write_bytes(b"dummy jpg data")
@@ -291,15 +299,31 @@ class TestThumbnailAnalyzerImageVision:
 
         with patch("gemini_client_factory.get_gemini_client", return_value=mock_client):
             res = analyzer.analyze_image(str(temp_file))
-            
-            assert res["analysis_mode"] == "gemini_vision"
-            assert res["overall_score"] == 60.0
-            assert res["verdict"] == "⚠️ 改善推奨"
-            
+
+            # gemini_vision を名乗れるのは4軸すべての採点を実際に読めたときだけ
+            assert res["analysis_mode"] == "vision_unscored"
+            assert res["overall_score"] is None
+            assert res["verdict"] is None
+            assert res["predicted_ctr_impact"] is None
+            assert res["is_real"] is False
+            assert res["data_source"] == "unavailable"
+            assert res["unscored_axes"] == ["text_score", "contrast_score", "composition_score"]
+
             checks = res["checks"]
+            # 採点が無かった軸は点を持たない。0 も 50 も「実際に取りうる点」なので印にならない
             text_check = next(c for c in checks if c["name"] == "テキスト可読性")
-            assert text_check["score"] == 50
-            assert text_check["status"] == "⚠️"
+            assert text_check["score"] is None
+            assert text_check["status"] == "❓"
+            assert text_check["is_real"] is False
+            assert text_check["data_source"] == "unavailable"
+
+            # 実際に読めた軸だけは、今までどおり実測として点を名乗ってよい
+            face_check = next(c for c in checks if c["name"] == "顔クローズアップ")
+            assert face_check["score"] == 90
+            assert face_check["status"] == "✅"
+            assert face_check["detail"] == "Vision API分析: 90点"
+            assert face_check["is_real"] is True
+            assert face_check["data_source"] == "gemini_vision"
 
     def test_analyze_image_api_json_parse_error(self, tmp_path, caplog):
         """Vision API が不正な JSON (パースエラー) を返したとき、例外をキャッチしてテキスト分析にフォールバックすることを確認 (TD-532検証)"""

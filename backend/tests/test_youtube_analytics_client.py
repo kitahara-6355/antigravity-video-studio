@@ -467,7 +467,24 @@ async def test_get_channel_performance_api_error():
     client._analytics_service = mock_analytics
 
     perf = await client.get_channel_performance()
-    assert perf.total_views == 0
+
+    # **落ちた取得を実測 0 として返さない**（R1.5-C4・19周目）。
+    # ここは `perf.total_views == 0` を期待していたが、その 0 は
+    # 「API が 400 で落ちたのに、再生数を実測 0 回として呼び手に渡す」
+    # という捏造そのものだった。0 は本当に取りうる値なので、
+    # 受け取った側には「計測していない」と「計測したら 0 だった」の区別が付かない。
+    # いまは計測値が None に潰れ、印で理由まで分かる。
+    assert perf.total_views is None
+    assert perf.avg_ctr is None
+    assert perf.total_subscribers is None
+    assert perf.top_performing_videos is None
+    assert perf.ctr_trend is None
+
+    # 印まで見る。例外はキャッチされてオブジェクト自体は返る（元の検証内容）
+    assert perf.is_real is False
+    assert perf.data_source == "unavailable"
+    assert perf.last_sync is None
+    assert "HttpError" in perf.unavailable_reason
 
 
 def test_get_performance_benchmarks():

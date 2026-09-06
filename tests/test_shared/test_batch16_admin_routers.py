@@ -560,9 +560,23 @@ async def test_get_template_stats_invalid_elements(setup_evolution_log):
 @pytest.mark.asyncio
 async def test_get_template_stats_read_text_error(setup_evolution_log):
     log_path = setup_evolution_log
+    # 台帳を実在させてから read_text を落とす（R1.5-C4・19周目）。
+    # フィクスチャは既存の台帳を退避して**消した状態**で渡してくるので、
+    # 以前はこのテストは exists() が False の枝に入って read_text まで到達せず、
+    # 「読み取りが落ちたとき」を1度も通っていなかった。
+    # それでも通っていたのは、本番が「無い」と「読めない」の両方に
+    # 同じ `{"stats": {}, "total_selections": 0}` を返していたからで、
+    # **テスト名が主張する経路を検証できていなかった。**
+    log_path.write_text('{"template_selections": []}', encoding="utf-8")
     with patch.object(Path, "read_text", side_effect=OSError("Read error")):
         data = await themes_router.get_template_stats()
-        assert data == {"stats": {}, "total_selections": 0}
+        # **読めなかったことを 0 件と名乗らせない**（R1.5-C4・19周目）。
+        assert data["stats"] == {}
+        assert data["total_selections"] is None
+        assert data["checked"] is False
+        assert data["is_real"] is False
+        assert data["data_source"] == "unavailable"
+        assert data["skip_reason"] == "ledger_unreadable: OSError"
 
 @pytest.mark.asyncio
 async def test_get_template_stats_general_exception_on_exists(setup_evolution_log):
