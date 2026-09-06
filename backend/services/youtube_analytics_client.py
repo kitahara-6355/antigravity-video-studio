@@ -518,8 +518,21 @@ class YouTubeAnalyticsClient:
 
     def _aggregate_channel_performance(
         self, response: Any, perf: ChannelPerformance
-    ) -> None:
-        """API レスポンスデータを集計して ChannelPerformance オブジェクトにマッピングする"""
+    ) -> bool:
+        """API レスポンスデータを集計して ChannelPerformance にマッピングする。
+
+        **集計が1行でも成立したかを返す**（R1.5-C4・20周目 CE-2）。
+
+        以前は `None` を返していて、呼び出し元が直後に `mark_measured()` を
+        **無条件で**呼んでいた。この関数は
+        「`response` が dict でない」「`rows` が空」「`len(r) >= 7` を満たす行が
+        1つも無い」のいずれでも**何も代入せずに帰る**ので、
+        コンストラクタの `avg_ctr=0.0 / total_views=0 / total_subscribers=0` が
+        そのまま `is_real: True` / `data_source: "analytics_api"` /
+        `last_sync: 現在時刻` を得ていた。
+        **API が空の応答を返しただけで「実測して 0 回」になる。**
+        しかもその 0 が `_save_cache()` でキャッシュに焼き付いていた。
+        """
         if not isinstance(response, dict):
             response = {}
 
@@ -552,6 +565,10 @@ class YouTubeAnalyticsClient:
                         "date": str(r[0]),
                         "ctr": round(_safe_float(r[3]) * 100, 2)
                     })
+
+                return True
+
+        return False
 
     async def get_channel_performance(
         self, days: int = 28
@@ -613,7 +630,21 @@ class YouTubeAnalyticsClient:
             from googleapiclient.errors import HttpError
 
             response = await self._fetch_channel_analytics_report(days)
-            self._aggregate_channel_performance(response, perf)
+            # **集計が1行でも成立したときだけ「実測」を名乗る**（R1.5-C4・20周目 CE-2）。
+            # ここは戻り値を見ずに `mark_measured()` を無条件で呼んでいたので、
+            # **API が空の応答を返しただけで「実測して 0 回・CTR 0.0%」**になり、
+            # `last_sync` に現在時刻まで付いて「いま同期した」に見えていた。
+            集計できた = self._aggregate_channel_performance(response, perf)
+            if not 集計できた:
+                perf.mark_unmeasured(
+                    "YouTube Analytics API は応答しましたが、集計できる行が"
+                    "1つもありませんでした（チャンネル統計は計測できていません）"
+                )
+                logger.warning(
+                    "📊 Channel: API の応答に集計できる行が無いため未計測として扱います"
+                )
+                return perf
+
             # ここまで来た値だけが「今回 API が返した実測」。
             # 印を付けるのはこの1行だけで、他の経路からは True にならない
             perf.mark_measured()

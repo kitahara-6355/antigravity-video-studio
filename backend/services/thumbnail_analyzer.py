@@ -104,6 +104,47 @@ class ThumbnailAnalyzer:
             "analysis_mode": "text_match",
         }
 
+    # **画像を一度も開けなかったときの軸名**（R1.5-C4・20周目 CE-3）
+    _軸名 = ("顔クローズアップ", "テキスト可読性", "カラーコントラスト", "構図パターン")
+
+    def _画像を見ていない結果(self, 理由: str) -> Dict[str, Any]:
+        """画像を一度も解析していないことを結果に残す（R1.5-C4・20周目 CE-3）。
+
+        ここは以前 `self.analyze({"concept": path.stem})` の戻り値を素で返していた。
+        `analyze()` は `text_overlay` も `style` も無い辞書を採点するので、
+        **ファイル名の長さを「テキスト可読性」として採点**し、
+        「テキスト12文字 — モバイルでギリギリ読める」のような**画像を見ていない所見**と
+        総合点 57.5 / `verdict: "❌ 要修正"` を 200 で返していた。
+        `is_real` / `data_source` の印は1つも無かった。
+
+        **部分失敗（1軸だけ読めない）では総合点を出さないのに、
+        4軸すべてを一度も見ていないこの経路だけが点を出す**という逆転が起きていた。
+        """
+        return {
+            "overall_score": None,
+            "verdict": None,
+            "checks": [
+                {
+                    "name": 名前,
+                    "score": None,
+                    "status": "❓",
+                    "detail": "画像を解析していません（**採点されていません**）",
+                    "suggestion": "画像を解析できていないため、この軸の改善提案は出せません",
+                    "is_real": False,
+                    "data_source": "unavailable",
+                }
+                for 名前 in self._軸名
+            ],
+            "predicted_ctr_impact": None,
+            "top_improvement": None,
+            "overall_impression": None,
+            "analysis_mode": "image_unanalyzed",
+            "is_real": False,
+            "data_source": "unavailable",
+            "unavailable_reason": 理由,
+            "unscored_axes": list(self._軸名),
+        }
+
     def analyze_image(self, image_path: str) -> Dict[str, Any]:
         """IMP-007: Gemini Vision APIによる実画像分析
 
@@ -116,14 +157,14 @@ class ThumbnailAnalyzer:
         path = Path(image_path)
         if not path.exists():
             logger.warning(f"サムネイル画像が見つかりません: {image_path}")
-            return self.analyze({"concept": path.stem})
+            return self._画像を見ていない結果(f"画像が見つかりません: {image_path}")
 
         try:
             from gemini_client_factory import get_gemini_client
             client = get_gemini_client()
             if client is None:
-                logger.info("Gemini API未設定 — テキスト分析にフォールバック")
-                return self.analyze({"concept": path.stem})
+                logger.info("Gemini API未設定 — 画像は解析できません")
+                return self._画像を見ていない結果("Gemini API が未設定のため画像を解析していません")
 
             # 画像をBase64エンコード
             image_bytes = path.read_bytes()
@@ -288,14 +329,14 @@ class ThumbnailAnalyzer:
             }
 
         except json.JSONDecodeError as jde:
-            logger.error(f"Gemini Vision分析応答パースエラー — テキスト分析にフォールバック: {jde}")
+            logger.error(f"Gemini Vision分析応答パースエラー — 画像は解析できません: {jde}")
             logger.debug(f"Failed to parse text: {response.text if 'response' in locals() else 'None'}", exc_info=True)
-            return self.analyze({"concept": path.stem})
+            return self._画像を見ていない結果(f"Vision の応答を解釈できませんでした: {type(jde).__name__}")
         except Exception as e:
-            logger.error(f"Gemini Vision分析エラー — テキスト分析にフォールバック: {e}")
+            logger.error(f"Gemini Vision分析エラー — 画像は解析できません: {e}")
             # TDRへの登録等がない場合でも、例外トレースが確実にログに出るようにする
             logger.debug("Gemini Vision API fallback stack trace:", exc_info=True)
-            return self.analyze({"concept": path.stem})
+            return self._画像を見ていない結果(f"Vision の呼び出しに失敗しました: {type(e).__name__}")
 
     def _check_face_closeup(self, concept: Dict) -> Dict:
         """顔のクローズアップ比率（CTRに最も影響する要因）"""

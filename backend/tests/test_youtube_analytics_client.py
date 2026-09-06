@@ -440,7 +440,13 @@ async def test_get_channel_performance_api(mock_cache_file):
 
 @pytest.mark.asyncio
 async def test_get_channel_performance_api_empty():
-    """APIの返却行が空の場合でも、デフォルトのChannelPerformanceオブジェクトが返ることを検証"""
+    """API の返却行が空なら**実測を名乗らない**ことを検証（R1.5-C4・20周目 CE-2）。
+
+    以前は `total_views == 0` / `avg_ctr == 0.0` を期待していた。その 0 は
+    「集計できる行が1つも無い」のに `mark_measured()` が無条件で呼ばれて
+    `is_real: True` / `data_source: "analytics_api"` / `last_sync: 現在時刻` を
+    得ていた**捏造そのもの**で、しかもキャッシュに焼き付いていた。
+    """
     client = YouTubeAnalyticsClient()
     client._available = True
 
@@ -449,8 +455,11 @@ async def test_get_channel_performance_api_empty():
     client._analytics_service = mock_analytics
 
     perf = await client.get_channel_performance()
-    assert perf.total_views == 0
-    assert perf.avg_ctr == 0.0
+    assert perf.total_views is None, "集計できる行が無いのに再生数 0 を実測として返した"
+    assert perf.avg_ctr is None
+    assert perf.is_real is False
+    assert perf.data_source != "analytics_api"
+    assert perf.last_sync is None, "未計測なのに同期時刻が付いた"
 
 
 @pytest.mark.asyncio
@@ -693,7 +702,10 @@ async def test_get_channel_performance_api_invalid_types():
     client._analytics_service = mock_analytics
 
     perf = await client.get_channel_performance()
-    assert perf.total_views == 0
+    # **dict でない応答から実測を名乗らない**（R1.5-C4・20周目 CE-2）
+    assert perf.total_views is None
+    assert perf.is_real is False
+    assert perf.last_sync is None
 
     # 2. rows の列数が不足、または値が None/異常値の混在
     mock_analytics2 = MagicMock()

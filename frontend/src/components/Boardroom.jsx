@@ -71,13 +71,27 @@ export default function Boardroom({ onClose, initialQuery }) {
     const bizRank = dashboardData.profiles?.owner?.ranks?.biz_rank;
     const techRank = dashboardData.profiles?.admin?.ranks?.tech_rank;
 
-    // **無い軸は 50 で埋めない。** `brand_rank` はどこにも無いので、
-    // 定数を置くと「ブランド力 50」という測定結果に見える
-    const radarData = [
-        { subject: 'ビジネス力', A: bizRank?.xp ?? 0, fullMark: 100 },
-        { subject: '技術力', A: techRank?.xp ?? 0, fullMark: 100 },
-        { subject: 'ブランド力', A: dashboardData.profiles?.owner?.ranks?.brand_rank?.score ?? 0, fullMark: 100 },
+    // **測っていない軸をレーダーに描かない**（R1.5-C4・20周目 CE-1）。
+    //
+    // ここは `?? 0` で3軸を組み立てていた。`?? 50` よりはましだが、
+    // **0 は実際に取りうる値なので印にならない。** とくに `brand_rank` は
+    // **リポジトリ全体でこのファイルにしか存在せず**（他のヒットは自身の
+    // ビルド成果物だけ）、バックエンドに産出元が無い。つまり
+    // 「ブランド力」は**恒久的に 0** を測定値の顔で描いていた。
+    // 隣の「ビジネス力」には作り物の警告帯が出るのに、こちらには何も無い。
+    //
+    // 17周目にこのレーダーの `|| 10/20/50` を直したとき、
+    // **3軸のうち2軸だけを直していた。**
+    const 数値なら = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const 軸の候補 = [
+        { subject: 'ビジネス力', value: 数値なら(bizRank?.xp) },
+        { subject: '技術力', value: 数値なら(techRank?.xp) },
+        { subject: 'ブランド力', value: 数値なら(dashboardData.profiles?.owner?.ranks?.brand_rank?.score) },
     ];
+    const radarData = 軸の候補
+        .filter((x) => x.value !== null)
+        .map((x) => ({ subject: x.subject, A: x.value, fullMark: 100 }));
+    const 未計測の軸 = 軸の候補.filter((x) => x.value === null).map((x) => x.subject);
     // ビジネス力は作り物のチャンネル統計から出ている（`int(総再生 / 100)`）
     const biz作り物 = bizRank?.is_real === false;
 
@@ -132,6 +146,15 @@ export default function Boardroom({ onClose, initialQuery }) {
                                 </RadarChart>
                             </ResponsiveContainer>
                         </div>
+
+                        {/* **測っていない軸があることを隠さない**（R1.5-C4・20周目 CE-1）。
+                            レーダーから外すだけだと、利用者には「その軸が無い」ことも
+                            「まだ測っていない」ことも見えない */}
+                        {未計測の軸.length > 0 && (
+                            <div style={{ marginTop: '10px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(100,116,139,0.08)', border: '1px solid rgba(100,116,139,0.3)', fontSize: '0.75rem', color: '#475569', lineHeight: 1.6 }}>
+                                ❓ <strong>{未計測の軸.join('・')}</strong> は<strong>まだ計測していません</strong>（産出元が無いため、レーダーには描いていません）。
+                            </div>
+                        )}
 
                         {/* ビジネス力の出どころを名乗る（R1.5-C4・17周目）*/}
                         {biz作り物 && (

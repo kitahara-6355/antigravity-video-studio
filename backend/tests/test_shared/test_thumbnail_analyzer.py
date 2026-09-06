@@ -175,8 +175,18 @@ class TestThumbnailAnalyzerImageVision:
         with caplog.at_level(logging.WARNING):
             res = analyzer.analyze_image(non_existent_path)
             assert "サムネイル画像が見つかりません" in caplog.text
-            assert res["analysis_mode"] == "text_match"
-            assert res["top_improvement"] is not None
+            # **画像を見ずにファイル名を採点した結果を期待しない**（R1.5-C4・20周目 CE-3）。
+            # 以前はここが `text_match` で、`analyze({"concept": path.stem})` の
+            # 戻り値＝**ファイル名の長さを「テキスト可読性」として採点**した
+            # 総合点 57.5 をそのまま受け取っていた。
+            assert res["analysis_mode"] == "image_unanalyzed"
+            assert res["overall_score"] is None
+            assert res["is_real"] is False
+            assert res["data_source"] == "unavailable"
+            # **画像を見ていないので改善提案も出さない**（R1.5-C4・20周目 CE-3）。
+            # 以前はファイル名を採点した結果から「最も低い軸の提案」を返していた。
+            assert res["top_improvement"] is None
+            assert all(c["score"] is None for c in res["checks"])
 
     def test_analyze_image_api_client_none(self, tmp_path, caplog):
         """Gemini API クライアントが None の場合、テキスト分析にフォールバックすることを確認"""
@@ -188,8 +198,15 @@ class TestThumbnailAnalyzerImageVision:
         with patch("gemini_client_factory.get_gemini_client", return_value=None), \
              caplog.at_level(logging.INFO):
             res = analyzer.analyze_image(str(temp_file))
-            assert "Gemini API未設定 — テキスト分析にフォールバック" in caplog.text
-            assert res["analysis_mode"] == "text_match"
+            assert "Gemini API未設定 — 画像は解析できません" in caplog.text
+            # **画像を見ずにファイル名を採点した結果を期待しない**（R1.5-C4・20周目 CE-3）。
+            # 以前はここが `text_match` で、`analyze({"concept": path.stem})` の
+            # 戻り値＝**ファイル名の長さを「テキスト可読性」として採点**した
+            # 総合点 57.5 をそのまま受け取っていた。
+            assert res["analysis_mode"] == "image_unanalyzed"
+            assert res["overall_score"] is None
+            assert res["is_real"] is False
+            assert res["data_source"] == "unavailable"
 
     def test_analyze_image_api_success_json_block(self, tmp_path):
         """Vision API が markdown コードブロック形式の JSON を返したとき、正常にパースできることを確認"""
@@ -342,7 +359,14 @@ class TestThumbnailAnalyzerImageVision:
             res = analyzer.analyze_image(str(temp_file))
             
             assert "Gemini Vision分析応答パースエラー" in caplog.text
-            assert res["analysis_mode"] == "text_match"
+            # **画像を見ずにファイル名を採点した結果を期待しない**（R1.5-C4・20周目 CE-3）。
+            # 以前はここが `text_match` で、`analyze({"concept": path.stem})` の
+            # 戻り値＝**ファイル名の長さを「テキスト可読性」として採点**した
+            # 総合点 57.5 をそのまま受け取っていた。
+            assert res["analysis_mode"] == "image_unanalyzed"
+            assert res["overall_score"] is None
+            assert res["is_real"] is False
+            assert res["data_source"] == "unavailable"
 
     def test_analyze_image_api_exception(self, tmp_path, caplog):
         """Vision API 呼び出し自体が例外を投げたとき、例外をキャッチしてテキスト分析にフォールバックすることを確認 (TD-532検証)"""
@@ -358,8 +382,15 @@ class TestThumbnailAnalyzerImageVision:
              caplog.at_level(logging.ERROR):
             res = analyzer.analyze_image(str(temp_file))
             
-            assert "Gemini Vision分析エラー — テキスト分析にフォールバック" in caplog.text
-            assert res["analysis_mode"] == "text_match"
+            assert "Gemini Vision分析エラー — 画像は解析できません" in caplog.text
+            # **画像を見ずにファイル名を採点した結果を期待しない**（R1.5-C4・20周目 CE-3）。
+            # 以前はここが `text_match` で、`analyze({"concept": path.stem})` の
+            # 戻り値＝**ファイル名の長さを「テキスト可読性」として採点**した
+            # 総合点 57.5 をそのまま受け取っていた。
+            assert res["analysis_mode"] == "image_unanalyzed"
+            assert res["overall_score"] is None
+            assert res["is_real"] is False
+            assert res["data_source"] == "unavailable"
 
     def test_analyze_image_dynamic_suggestions(self, tmp_path):
         """Vision APIの分析結果において、スコアに応じた動的な改善提案(suggestion)が設定されること、および最低スコアの項目には top_improvement が適用されることを検証"""
@@ -1045,4 +1076,11 @@ class TestThumbnailAnalyzerGenerationAndValidation:
             # ログに新しいエラーメッセージが含まれていること
             assert "Gemini Vision分析応答パースエラー" in caplog.text
             # テキスト分析にフォールバックしていること
-            assert res["analysis_mode"] == "text_match"
+            # **画像を見ずにファイル名を採点した結果を期待しない**（R1.5-C4・20周目 CE-3）。
+            # 以前はここが `text_match` で、`analyze({"concept": path.stem})` の
+            # 戻り値＝**ファイル名の長さを「テキスト可読性」として採点**した
+            # 総合点 57.5 をそのまま受け取っていた。
+            assert res["analysis_mode"] == "image_unanalyzed"
+            assert res["overall_score"] is None
+            assert res["is_real"] is False
+            assert res["data_source"] == "unavailable"

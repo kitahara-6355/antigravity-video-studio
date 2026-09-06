@@ -2981,3 +2981,246 @@ def test_19周目_サムネイル4軸に既定点のフォールバックが戻�
         実コード,
     )
     assert 見つかった == [], f"採点キーの既定値フォールバックが戻っている: {見つかった}"
+
+
+# ============================================================
+# 20周目（gate-verifier）
+#
+# CE-1 産出元の無い軸を 0 として測定値の顔で描く（Boardroom.jsx）
+# CE-2 集計が1行も成立していないのに実測を名乗る（**19周目の修正が作った偽**）
+# CE-3 画像を一度も開かずに総合点と所見を返す（thumbnail_analyzer）
+# M9   `elapsed_hours` の既定値 24 の再発を契約が捕まえなかった（空振り）
+# ============================================================
+
+
+def test_20周目_CE1_産出元の無い軸をレーダーに描かない():
+    """`Boardroom.jsx` のレーダー（R1.5-C4・20周目 CE-1）。
+
+    `brand_rank` は**リポジトリ全体でこのファイルにしか存在しない**
+    （他のヒットは自身のビルド成果物のみ）。産出元が無いので
+    `?? 0` は**恒久的に 0** で、それが domain=[0,100] のレーダー
+    「クリエイター能力分布」の3軸目として描かれていた。
+    隣の「ビジネス力」には作り物の警告帯が付くのに、
+    **一度も計算されていないブランド力にだけ印が無かった。**
+
+    17周目にこのレーダーの `|| 10/20/50` を直したとき、
+    **3軸のうち2軸だけを直していた。**
+    """
+    import re
+    from pathlib import Path as _Path
+
+    ルート = _Path(__file__).resolve().parent.parent.parent.parent
+
+    def 描画部を読む(相対):
+        js = (ルート / 相対).read_text(encoding="utf-8")
+        s = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        return "\n".join(行 for 行 in s.splitlines()
+                         if not 行.strip().startswith("//"))
+
+    描画部 = 描画部を読む("frontend/src/components/Boardroom.jsx")
+
+    # **値が無い軸を 0 や定数で埋めない**
+    assert "?? 0, fullMark: 100" not in 描画部, \
+        "測っていない軸を 0 としてレーダーに描いている"
+    assert "|| 10" not in 描画部 and "|| 20" not in 描画部 and "|| 50" not in 描画部, \
+        "17周目に直した定数フォールバックが戻っている"
+
+    # **描くのは実測できた軸だけ**
+    assert "軸の候補" in 描画部, "軸ごとに実測できたかを判定していない"
+    assert "x.value !== null" in 描画部, "未計測の軸をレーダーから外していない"
+
+    # **外すだけで隠さない**（利用者に未計測だと分かること）。
+    # **文言の存在だけを見ない** — 20周目に自分で当てた変異 Q2 が
+    # `{未計測の軸.length > 0 && (` を `{false && (` にしても緑のまま通った。
+    # 条件式そのものが生きていることを見る
+    assert "{未計測の軸.length > 0 && (" in 描画部, \
+        "未計測の軸を出す条件が切られている（文言だけ残っても画面には出ない）"
+    assert "まだ計測していません" in 描画部, \
+        "軸を外しただけで、未計測であることが画面に出ていない"
+
+
+def test_20周目_CE2_集計できていないのに実測を名乗らない():
+    """`youtube_analytics_client.get_channel_performance()`（R1.5-C4・20周目 CE-2）。
+
+    **19周目の修正が新しく作った偽。** `_aggregate_channel_performance()` は
+    `response` が dict でない／`rows` が空／`len(r) >= 7` を満たす行が1つも無い、
+    のいずれでも**何も代入せずに帰る**のに、呼び出し元が直後に
+    `mark_measured()` を**無条件で**呼んでいた。
+
+    その結果、**API が空の応答を返しただけで**
+    `avg_ctr: 0.0 / total_views: 0` が `is_real: True` /
+    `data_source: "analytics_api"` / `last_sync: 現在時刻` を得ていた。
+    さらにその 0 が `_save_cache()` でキャッシュに焼き付いていた。
+    """
+    import asyncio
+    import unittest.mock as _m
+
+    from services.youtube_analytics_client import (ChannelPerformance,
+                                                   YouTubeAnalyticsClient)
+
+    def 走らせる(応答):
+        c = YouTubeAnalyticsClient()
+        # API 経路に入れる（`_available` が False だとキャッシュ経路に落ちる）
+        c._available = True
+        c._cache = {}          # 実ファイルのキャッシュを持ち込まない
+        c._save_cache = _m.MagicMock()  # 実ファイルを汚さない
+        with _m.patch.object(c, "_fetch_channel_analytics_report",
+                             new=_m.AsyncMock(return_value=応答)):
+            return asyncio.run(c.get_channel_performance(28)), c
+
+    # ── 集計できる行が1つも無い応答（本番で普通に起きる） ──
+    for 名, 応答 in (("rows なし", {"rows": []}),
+                   ("列が足りない", {"rows": [[1, 2, 3]]}),
+                   ("dict でない", None),
+                   ("エラー本文", {"error": {"code": 403}})):
+        perf, c = 走らせる(応答)
+        assert perf.is_real is False, f"{名}: 集計できていないのに実測を名乗った"
+        assert perf.data_source != "analytics_api", \
+            f"{名}: 集計できていないのに analytics_api を名乗った"
+        assert perf.last_sync is None, f"{名}: 未計測なのに同期時刻が付いた"
+        assert perf.total_views is None, f"{名}: 未計測の再生数を 0 で埋めた"
+        assert perf.avg_ctr is None, f"{名}: 未計測の CTR を 0.0 で埋めた"
+        assert c._save_cache.call_count == 0, f"{名}: 作り物をキャッシュに焼き付けた"
+
+    # ── 集計できる行がある（門が広すぎないこと） ──
+    行 = [["2026-09-01", 100, 10, 0.05, 30.0, 50.0, 3]]
+    perf, c = 走らせる({"rows": 行})
+    assert perf.is_real is True, "実測できたのに未計測に倒した（門が常に閉じる）"
+    assert perf.data_source == "analytics_api"
+    assert perf.total_views == 100
+    assert perf.last_sync is not None
+    assert c._save_cache.call_count == 1
+
+    # 集計関数そのものが「集計できたか」を返すこと
+    c2 = YouTubeAnalyticsClient()
+    assert c2._aggregate_channel_performance({"rows": []}, ChannelPerformance()) is False
+    assert c2._aggregate_channel_performance({"rows": 行}, ChannelPerformance()) is True
+
+
+def test_20周目_CE3_画像を見ずに総合点を出さない(tmp_path):
+    """`thumbnail_analyzer.analyze_image()` のフォールバック（R1.5-C4・20周目 CE-3）。
+
+    画像が無い / クライアント未設定 / JSONDecodeError / 汎用 except の4経路が
+    すべて `self.analyze({"concept": path.stem})` に落ちていた。
+    `analyze()` は `text_overlay` も `style` も無い辞書を採点するので、
+    **ファイル名の長さを「テキスト可読性」として採点**し、
+    「テキスト12文字 — モバイルでギリギリ読める」という**画像を見ていない所見**と
+    総合点 57.5 / `verdict: "❌ 要修正"` を 200 で返していた。印は1つも無かった。
+
+    **部分失敗（1軸だけ読めない）では総合点を出さないのに、
+    4軸すべてを一度も見ていないこの経路だけが点を出す**逆転が起きていた。
+    """
+    import sys as _sys
+    import types as _types
+    import unittest.mock as _m
+
+    from services.thumbnail_analyzer import thumbnail_analyzer
+
+    def 未計測であること(結果, 名):
+        assert 結果["overall_score"] is None, f"{名}: 画像を見ずに総合点を出した"
+        assert 結果["verdict"] is None, f"{名}: 画像を見ずに判定を出した"
+        assert 結果["predicted_ctr_impact"] is None, f"{名}: 画像を見ずに CTR 予測を出した"
+        assert 結果["analysis_mode"] == "image_unanalyzed", \
+            f"{名}: 解析していないのに {結果['analysis_mode']} を名乗った"
+        assert 結果["is_real"] is False and 結果["data_source"] == "unavailable"
+        assert len(結果["checks"]) == 4
+        for c in 結果["checks"]:
+            assert c["score"] is None, f"{名}: 見ていない軸に点が付いた"
+            assert "文字" not in (c["detail"] or ""), \
+                f"{名}: ファイル名の長さを所見にしている（{c['detail']}）"
+
+    # 1) 画像が存在しない
+    未計測であること(thumbnail_analyzer.analyze_image(str(tmp_path / "無い.png")), "画像なし")
+
+    # 2) クライアント未設定
+    画像 = tmp_path / "サムネ_テスト.png"
+    画像.write_bytes(b"x" * 32)
+    偽 = _types.ModuleType("gemini_client_factory")
+    偽.get_gemini_client = lambda: None
+    with _m.patch.dict(_sys.modules, {"gemini_client_factory": 偽}):
+        未計測であること(thumbnail_analyzer.analyze_image(str(画像)), "クライアント未設定")
+
+    # 3) Vision の応答が JSON として壊れている
+    偽2 = _types.ModuleType("gemini_client_factory")
+    client = _m.MagicMock()
+    応答 = _m.MagicMock()
+    応答.text = "{壊れた"
+    client.models.generate_content.return_value = 応答
+    偽2.get_gemini_client = lambda: client
+    with _m.patch.dict(_sys.modules, {"gemini_client_factory": 偽2}):
+        未計測であること(thumbnail_analyzer.analyze_image(str(画像)), "応答が壊れている")
+
+    # 4) 正常系（4軸すべて読める）は今までどおり点を出す（門が広すぎないこと）
+    偽3 = _types.ModuleType("gemini_client_factory")
+    client3 = _m.MagicMock()
+    応答3 = _m.MagicMock()
+    応答3.text = ('{"face_score": 85, "text_score": 75, '
+                 '"contrast_score": 90, "composition_score": 80}')
+    client3.models.generate_content.return_value = 応答3
+    偽3.get_gemini_client = lambda: client3
+    with _m.patch.dict(_sys.modules, {"gemini_client_factory": 偽3}):
+        正常 = thumbnail_analyzer.analyze_image(str(画像))
+    assert 正常["analysis_mode"] == "gemini_vision", "正常系まで止めている"
+    assert 正常["overall_score"] == 82.5
+    assert 正常["is_real"] is True
+
+
+def test_20周目_M9_経過時間の既定値24が戻らない():
+    """19周目の変異 M9 が生き残った穴を塞ぐ（R1.5-C4・20周目）。
+
+    gate-verifier 20周目が `elapsed_hours ... else None` を `else 24` に
+    変異させたところ、契約69件が**全部緑のまま**だった。
+    C4 の条件文が名指しした `.get("elapsed_hours", 24)` の**再発を
+    契約が捕まえられない**という空振りなので塞ぐ。
+    """
+    import asyncio
+
+    from services.prediction_validator import PredictionValidator
+
+    class 台帳:
+        def __init__(self):
+            self.record = {"wagamama_id": "W",
+                           "lanes": {"experience": {"predicted_ctr": 5.0}}}
+            self.saved = 0
+
+        def get_record(self, i):
+            return self.record
+
+        def _save(self):
+            self.saved += 1
+
+    v = PredictionValidator()
+
+    # 経過時間が届いていない → **24 で埋めない**
+    m = 台帳()
+    r = asyncio.run(v.validate_prediction(
+        "W", {"metrics": {"click_through_rate": 5.2}}, wagamama_manager=m))
+    assert r["actual"]["elapsed_hours"] is None, "経過時間を既定値 24 で埋めた"
+    assert r["actual"]["elapsed_hours"] != 24
+    # **台帳側にも 24 が焼き付かないこと**
+    保存 = m.record.get("lanes", {}).get("feedback", {}).get("validation_report")
+    if 保存 is not None:
+        assert 保存["actual"]["elapsed_hours"] is None
+
+    # **実測 CTR が無い側でも 24 で埋めない**（ここが 20周目の変異 M9 / Q8 の枝）。
+    # `計測できている` は CTR だけで決まるので、CTR がある限り三項の else 側に
+    # 一度も入らない。**CTR が無いケースを通さないと既定値 24 の再発を捕まえられない。**
+    m3 = 台帳()
+    r3 = asyncio.run(v.validate_prediction(
+        "W", {"elapsed_hours": 30}, wagamama_manager=m3))
+    assert r3["actual"]["elapsed_hours"] is None, \
+        "実測 CTR が無いのに経過時間を既定値で埋めた"
+    assert r3["actual"]["elapsed_hours"] != 24
+    assert r3["status"] == "skipped"
+
+    m4 = 台帳()
+    r4 = asyncio.run(v.validate_prediction("W", {}, wagamama_manager=m4))
+    assert r4["actual"]["elapsed_hours"] is None
+    assert r4["actual"]["elapsed_hours"] != 24
+
+    # 届いていれば通す（門が広すぎないこと）
+    m2 = 台帳()
+    r2 = asyncio.run(v.validate_prediction(
+        "W", {"metrics": {"click_through_rate": 5.2}, "elapsed_hours": 72},
+        wagamama_manager=m2))
+    assert r2["actual"]["elapsed_hours"] == 72
