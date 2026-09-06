@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+import json
 import uuid
 import asyncio
 import time
@@ -80,6 +81,10 @@ class RealtimePreviewRequest(BaseModel):
 
 class RenderStartRequest(BaseModel):
     """レンダリング開始リクエスト (O-8対応)"""
+    # **どの動画を書き出すのかを言ってもらう**（R1.5-C4・9周目の指摘）。
+    # これが無いと品質サイドカーを引けず、8周目は「直前に測った別の動画の点」を
+    # この書き出しの実測として付けていた。**渡されなければ未計測**（fail-closed）
+    video_path: Optional[str] = None
     encoder: str = "auto"  # auto / nvenc / libx264
     bgm_volume: float = 50.0  # 0-100%
     bgm_ducking: bool = True
@@ -173,13 +178,46 @@ async def start_render(req: RenderStartRequest = RenderStartRequest()) -> Dict[s
     job_id = str(uuid.uuid4())[:8]
 
     # 品質チェック (S17: 品質ブロック)
-    quality_score = _get_quality_score()
+    # **未計測なら書き出さない**（R1.5-C4・2026-08-29 ユーザー決定）。
+    #
+    # 「未計測」は「合格」でも「0点」でもない。**測っていないものを通すのは、
+    # 品質ゲートが無いのと同じ。**以前はここが定数 95 で常に素通りしており、
+    # S17 のブロックは一度も働いていなかった。
+    #
+    # **`force_render` でも越えられない。** 90点未満なら「悪いと分かったうえで
+    # 出す」判断ができるが、未計測は判断の材料そのものが無いので越える先が無い。
+    # UI は `force_render: !is_ready` で常に押してくるので、
+    # 「強制で越えられる」にすると実質この門が無いのと同じになる。
+    #
+    # 止めても実作業は1つも止まらない — **この経路は何もレンダリングしていない**
+    # （`_render_jobs` に dict を登録するだけで ffmpeg も背景タスクも無い）。
+    # 本線（`agents.pipeline_coordinator`）は `RenderWorker` で自分で書き出す。
+    # 台帳: `backend/config/feature_gaps.json` の `render_quality_gate`
+    quality_score, 出所 = _品質の実測(req.video_path)
+    if quality_score is None:
+        return {
+            "success": False,
+            "error": "quality_unmeasured",
+            "message": "**品質スコアが未計測です。**本線（agents）を実走して"
+                       "最終動画の隣に *.quality.json を作ってから書き出してください。"
+                       "未計測は「合格」ではないので、force_render でも越えられません。",
+            "quality_score": None,
+            "quality_checked": False,
+            "quality_source": None,
+            "is_real": False,
+            "data_source": "unavailable",
+            "force_render_available": False,
+        }
     if quality_score < 90 and not req.force_render:
         return {
             "success": False,
             "error": "quality_block",
             "message": f"品質スコア {quality_score} < 90。強制書出するには force_render=true を指定してください。",
             "quality_score": quality_score,
+            "quality_checked": True,
+            "quality_source": 出所,
+            "is_real": True,
+            "data_source": "derived",
             "force_render_available": True,
         }
 
@@ -203,6 +241,10 @@ async def start_render(req: RenderStartRequest = RenderStartRequest()) -> Dict[s
         "gpu_fallback": gpu_fallback,
         "force_render": req.force_render,
         "quality_score": quality_score,
+        # **測っていないことを記録に残す**（R1.5-C4）。`None` を後から
+        # 「0点」や「合格」と読み替えられないようにする
+        "quality_checked": quality_score is not None,
+        "quality_source": 出所,
         "progress": 0,
         "current_stage": "encoding",
         "stages": {
@@ -247,7 +289,15 @@ async def start_render(req: RenderStartRequest = RenderStartRequest()) -> Dict[s
         "gpu_fallback": gpu_fallback,
         "force_render": req.force_render,
         "quality_score": quality_score,
-        "message": "レンダリングを開始しました",
+        # **測ったのかどうかを応答でも名乗る**（R1.5-C4）。
+        # `quality_score: null` は「0点」でも「合格」でもない
+        "quality_checked": quality_score is not None,
+        "quality_source": 出所,
+        "is_real": quality_score is not None,
+        "data_source": "derived" if quality_score is not None else "unavailable",
+        "message": ("レンダリングを開始しました" if quality_score is not None else
+                    "レンダリングを開始しました（**品質スコアは未計測です。**"
+                    "本線の実走が書き出す *.quality.json がまだありません）"),
     }
 
 
@@ -376,11 +426,53 @@ async def force_render(job_id: str) -> Dict[str, Any]:
     return await start_render(RenderStartRequest(force_render=True))
 
 
-def _get_quality_score() -> int:
-    """品質スコアを取得（O-6連携）"""
-    # 実装ではquality_gate APIから取得する
-    # テスト用にデフォルト95を返す
-    return 95
+# **書き出し前の品質スコアは、本線が実際に出した点を読む**（R1.5-C4・
+# gate-verifier 8周目の指摘）。ここは以前 `return 95` の直書きで、
+#
+#   - 何も測っていないのに `quality_score: 95` を `success: true` で返し
+#   - **S17 の品質ブロック（`if quality_score < 90`）が永久に偽**になって
+#     一度も止まらず（`force_render` が意味を失っていた）
+#   - 同じ 95 が `_render_jobs[job_id]["quality_score"]` に記録されていた
+#
+# 本線（`agents.pipeline_coordinator._write_quality_sidecar`）は最終動画の隣へ
+# `*.quality.json` を書いており、**実測はそこにある**（実走で 89 / 94 / 88 / 89）。
+# その文書自身が「消費者として宣言していた render は `quality_score` しか
+# 読んでおらず」と書いている。**宣言していた消費者が、実は読んでいなかった。**
+_QUALITY_SIDECAR_DIR = "vault-outputs/final"
+
+
+def _品質の実測(video: Optional[str] = None) -> tuple:
+    """**この動画の**品質サイドカーから実測を読む（R1.5-C4・9周目の指摘）。
+
+    戻り値は `(スコア, 出所のパス)`。測れなければ `(None, None)`。
+
+    8周目は「最新の `*.quality.json` を mtime で1件」返していたが、
+    **この経路は動画を特定する引数を持たない**ので、
+    「直前に測った**別の動画**の点」が `is_real: true / data_source: "derived"`
+    として今回のジョブに付いていた（gate-verifier 9周目の指摘）。
+    **どの動画の点かが分からないなら、それは実測ではない。**
+
+    `video` は最終動画のパスかその stem（`final_20260828_091542` 等）。
+    渡されなければ**未計測として扱う**（fail-closed）。
+    """
+    if not video:
+        return None, None
+    try:
+        stem = Path(str(video)).stem
+        # `final_x.mp4` → `final_x.quality.json`。`final_x` 自体でも当たる
+        d = _writable_path(_QUALITY_SIDECAR_DIR)
+        側 = d / f"{stem}.quality.json"
+        if not 側.exists():
+            logger.info(f"品質サイドカーがありません: {側}")
+            return None, None
+        with open(側, "r", encoding="utf-8") as f:
+            score = json.load(f).get("score")
+        if not isinstance(score, (int, float)):
+            return None, None
+        return int(score), str(側)
+    except (OSError, ValueError, TypeError, AttributeError) as e:
+        logger.warning(f"品質サイドカーを読めませんでした（{video}）: {e}")
+        return None, None
 
 
 @router.post("/render")

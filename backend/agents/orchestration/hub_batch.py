@@ -1682,33 +1682,55 @@ class BatchMixin:
                         stale_reset_count += 1
         return stale_reset_count
 
+    @staticmethod
+    def _model_of_tier(config_data: dict, tier: str) -> str:
+        """段（tier）から実モデル ID を引く。**直書きしない**（R1.5-C6）。
+
+        正典は `model_config.json` の `text_generation.tiers`。段に紐づけて
+        おかないと、モデルを入れ替えるたびに全箇所を書き換えることになり、
+        実際それで提供終了する 2.5 系が残っていた。
+        """
+        tiers = ((config_data or {}).get("text_generation") or {}).get("tiers") or {}
+        return ((tiers.get(tier) or {}).get("model") or "")
+
     def _calculate_max_concurrent(self, phase: int, batch_size: int, session: dict) -> int:
         """クォータ制限回避のために動的な最大同時実行数を計算する"""
         # 1. 動的スロットリング上限 (429検出時=2, 通常=15)
         dynamic_limit = self._calculate_dynamic_limit(session)
         
         # 2. 予防的総量配分（model_config.json の RPM 制限に基づく上限）
+        # **モデル ID を直書きしない**（R1.5-C6）。段（tier）から引く。
+        # 直書きしていたせいで、提供終了する 2.5 系の枠を見ていた
+        tier = "batch" if phase == 5 else "standard"
         rpm_limit = 15
+        model_name = ""
         model_config_path = _PROJECT_ROOT / "backend" / "model_config.json"
         if model_config_path.exists():
             try:
                 config_data = safe_read_json(str(model_config_path), {})
-                model_name = "gemini-2.5-flash-lite" if phase == 5 else "gemini-2.5-flash"
+                model_name = self._model_of_tier(config_data, tier)
                 limits = config_data.get("free_tier_limits", {}).get(model_name, {})
                 rpm_limit = limits.get("rpm", 15)
-            except (json.JSONDecodeError, KeyError, AttributeError):
+            except (json.JSONDecodeError, KeyError, AttributeError, TypeError):
                 pass
         preventive_limit = int(rpm_limit * 0.8)  # 安全係数 0.8
         
         # 3. UsageTracker による今日の残リクエスト数上限
+        # **段からモデルを引けなかったときは絞らない。**「モデル名が空 →
+        # 残り 0 件 → 同時実行 2」と読み替えてしまうと、設定の読み損ねが
+        # 処理速度の低下として現れて原因が見えなくなる
         remaining_requests = 9999
-        try:
-            from backend.usage_tracker.tracker import usage_tracker
-            model_name = "gemini-2.5-flash-lite" if phase == 5 else "gemini-2.5-flash"
-            remaining_requests = usage_tracker.get_remaining_requests(model_name)
-        except Exception as e:
-            logger.warning(f"Failed to get remaining requests from usage_tracker: {e}")
-            remaining_requests = 9999
+        if model_name:
+            try:
+                from backend.usage_tracker.tracker import usage_tracker
+                remaining_requests = usage_tracker.get_remaining_requests(model_name)
+            except Exception as e:
+                logger.warning(f"Failed to get remaining requests from usage_tracker: {e}")
+                remaining_requests = 9999
+        else:
+            logger.warning(
+                f"model_config.json から段 '{tier}' のモデルを引けませんでした。"
+                "残リクエスト数の上限は掛けません")
         
         # 最終上限の決定（最小値は2を保証）
         max_concurrent = min(batch_size, dynamic_limit, preventive_limit, remaining_requests)

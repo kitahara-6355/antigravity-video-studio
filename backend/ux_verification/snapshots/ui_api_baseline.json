@@ -117,7 +117,7 @@
     "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1274 GET /api/pipeline/proofreading/export/{export_format}",
     "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/result": "static_route_scan: routers/pipeline_router.py:1125 GET /api/pipeline/proofreading/result",
     "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/status": "static_route_scan: routers/pipeline_router.py:1321 GET /api/pipeline/proofreading/status",
-    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1354 GET /api/pipeline/quality-gate/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1370 GET /api/pipeline/quality-gate/status",
     "src/gateway/endpoints.js|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:722 GET /api/pipeline/status",
     "src/gateway/endpoints.js|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:947 GET /api/pipeline/stream/{video_type}",
     "src/gateway/endpoints.js|GET|/api/pipeline/transcription/models": "static_route_scan: routers/pipeline_router.py:1020 GET /api/pipeline/transcription/models",
@@ -127,27 +127,27 @@
     "src/gateway/endpoints.js|GET|/api/segments": "static_route_scan: routers/segments.py:33 GET /api/segments",
     "src/gateway/endpoints.js|GET|/api/settings": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
     "src/gateway/endpoints.js|GET|/api/smartcut/all-candidates": "static_route_scan: routers/smartcut.py:317 GET /api/smartcut/all-candidates",
-    "src/gateway/endpoints.js|GET|/api/status": "static_route_scan: routers/trinity.py:48 GET /api/status",
+    "src/gateway/endpoints.js|GET|/api/status": "static_route_scan: routers/trinity.py:61 GET /api/status",
     "src/gateway/endpoints.js|GET|/api/transcribe/status": "static_route_scan: routers/legacy_production_router.py:217 GET /api/transcribe/status",
     "src/gateway/endpoints.js|GET|/api/usage/dashboard": "static_route_scan: routers/usage_router.py:84 GET /api/usage/dashboard",
     "src/gateway/endpoints.js|GET|/api/usage/governance": "static_route_scan: routers/usage_router.py:559 GET /api/usage/governance",
     "src/gateway/endpoints.js|GET|/api/usage/retry-budget": "static_route_scan: routers/usage_router.py:172 GET /api/usage/retry-budget",
     "src/gateway/endpoints.js|GET|/api/usage/switch-history": "static_route_scan: routers/usage_router.py:340 GET /api/usage/switch-history",
     "src/gateway/endpoints.js|GET|/api/usage/two-tier-status": "static_route_scan: routers/usage_router.py:413 GET /api/usage/two-tier-status",
-    "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
+    "src/gateway/endpoints.js|GET|/api/v1/themes/current/active": "static_route_scan: routers/themes_router.py:413 GET /themes/current/active",
     "src/gateway/endpoints.js|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
     "src/gateway/endpoints.js|POST|/api/collaboration/feedback": "static_route_scan: routers/legacy_management_router.py:123 POST /api/collaboration/feedback",
     "src/gateway/endpoints.js|POST|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:163 POST /api/collaboration/journal",
     "src/gateway/endpoints.js|POST|/api/council/decision": "static_route_scan: routers/collaboration.py:212 POST /api/council/decision",
     "src/gateway/endpoints.js|POST|/api/council/session": "static_route_scan: routers/collaboration.py:198 POST /api/council/session",
-    "src/gateway/endpoints.js|POST|/api/director/analyze-resources": "static_route_scan: routers/director.py:175 POST /api/director/analyze-resources",
-    "src/gateway/endpoints.js|POST|/api/director/analyze-script": "static_route_scan: routers/director.py:133 POST /api/director/analyze-script",
-    "src/gateway/endpoints.js|POST|/api/director/batch-generate": "static_route_scan: routers/director.py:256 POST /api/director/batch-generate",
-    "src/gateway/endpoints.js|POST|/api/director/chat": "static_route_scan: routers/director.py:72 POST /api/director/chat",
-    "src/gateway/endpoints.js|POST|/api/director/generate-image-async": "static_route_scan: routers/director.py:103 POST /api/director/generate-image-async",
-    "src/gateway/endpoints.js|POST|/api/director/generate-report": "static_route_scan: routers/director.py:196 POST /api/director/generate-report",
-    "src/gateway/endpoints.js|POST|/api/director/plan-storyboard": "static_route_scan: routers/director.py:233 POST /api/director/plan-storyboard",
-    "src/gateway/endpoints.js|POST|/api/director/quality-score": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-resources": "static_route_scan: routers/director.py:179 POST /api/director/analyze-resources",
+    "src/gateway/endpoints.js|POST|/api/director/analyze-script": "static_route_scan: routers/director.py:137 POST /api/director/analyze-script",
+    "src/gateway/endpoints.js|POST|/api/director/batch-generate": "static_route_scan: routers/director.py:260 POST /api/director/batch-generate",
+    "src/gateway/endpoints.js|POST|/api/director/chat": "static_route_scan: routers/director.py:76 POST /api/director/chat",
+    "src/gateway/endpoints.js|POST|/api/director/generate-image-async": "static_route_scan: routers/director.py:107 POST /api/director/generate-image-async",
+    "src/gateway/endpoints.js|POST|/api/director/generate-report": "static_route_scan: routers/director.py:200 POST /api/director/generate-report",
+    "src/gateway/endpoints.js|POST|/api/director/plan-storyboard": "static_route_scan: routers/director.py:237 POST /api/director/plan-storyboard",
+    "src/gateway/endpoints.js|POST|/api/director/quality-score": "static_route_scan: routers/director.py:158 POST /api/director/quality-score",
     "src/gateway/endpoints.js|POST|/api/director/state": "static_route_scan: routers/legacy_director_router.py:79 POST /api/director/state",
     "src/gateway/endpoints.js|POST|/api/director/verify-quality": "static_route_scan: routers/legacy_director_router.py:96 POST /api/director/verify-quality",
     "src/gateway/endpoints.js|POST|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1215 POST /api/pipeline/dictionary",
@@ -156,7 +156,7 @@
     "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject": "static_route_scan: routers/pipeline_router.py:1156 POST /api/pipeline/proofreading/reject",
     "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject-all": "static_route_scan: routers/pipeline_router.py:1179 POST /api/pipeline/proofreading/reject-all",
     "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/skip": "static_route_scan: routers/pipeline_router.py:1340 POST /api/pipeline/proofreading/skip",
-    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
+    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1431 POST /api/pipeline/quality-gate/improve",
     "src/gateway/endpoints.js|POST|/api/pipeline/start": "static_route_scan: routers/pipeline_router.py:655 POST /api/pipeline/start",
     "src/gateway/endpoints.js|POST|/api/pipeline/transcription/model": "static_route_scan: routers/pipeline_router.py:1107 POST /api/pipeline/transcription/model",
     "src/gateway/endpoints.js|POST|/api/pipeline/videos/metadata": "static_route_scan: routers/pipeline_router.py:467 POST /api/pipeline/videos/metadata",
@@ -165,8 +165,8 @@
     "src/gateway/endpoints.js|POST|/api/quality/decision/quick": "static_route_scan: routers/quality.py:128 POST /api/quality/decision/quick",
     "src/gateway/endpoints.js|POST|/api/quality/review/approve": "static_route_scan: routers/quality.py:182 POST /api/quality/review/approve",
     "src/gateway/endpoints.js|POST|/api/quality/undo-suggestion": "static_route_scan: routers/quality.py:166 POST /api/quality/undo-suggestion",
-    "src/gateway/endpoints.js|POST|/api/render": "static_route_scan: routers/render.py:386 POST /api/render",
-    "src/gateway/endpoints.js|POST|/api/render/start": "static_route_scan: routers/render.py:165 POST /api/render/start",
+    "src/gateway/endpoints.js|POST|/api/render": "static_route_scan: routers/render.py:478 POST /api/render",
+    "src/gateway/endpoints.js|POST|/api/render/start": "static_route_scan: routers/render.py:170 POST /api/render/start",
     "src/gateway/endpoints.js|POST|/api/rhythm/split": "static_route_scan: routers/legacy_production_router.py:157 POST /api/rhythm/split",
     "src/gateway/endpoints.js|POST|/api/segments": "static_route_scan: routers/segments.py:78 POST /api/segments",
     "src/gateway/endpoints.js|POST|/api/settings/identity": "static_route_scan: routers/legacy_management_router.py:197 POST /api/settings/identity",
@@ -182,11 +182,11 @@
     "src/gateway/endpoints.js|POST|/api/thumbnail/select": "static_route_scan: routers/ab_test_tracker.py:79 POST /api/thumbnail/select",
     "src/gateway/endpoints.js|POST|/api/transcribe": "static_route_scan: routers/legacy_production_router.py:172 POST /api/transcribe",
     "src/gateway/endpoints.js|POST|/api/usage/select-option": "static_route_scan: routers/usage_router.py:452 POST /api/usage/select-option",
-    "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
-    "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
-    "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
-    "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
-    "src/gateway/endpoints.js|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/apply": "static_route_scan: routers/themes_router.py:301 POST /themes/apply",
+    "src/gateway/endpoints.js|POST|/api/v1/themes/recommend": "static_route_scan: routers/themes_router.py:483 POST /themes/recommend",
+    "src/gateway/endpoints.js|POST|/api/youtube/apply-hook": "static_route_scan: routers/youtube_optimizer.py:943 POST /api/youtube/apply-hook",
+    "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:771 POST /api/youtube/improve-hook",
+    "src/gateway/endpoints.js|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:597 POST /api/youtube/optimize",
     "src/gateway/endpoints.js|POST|/api/youtube/pre-plan": "static_route_scan: routers/youtube_optimizer.py:230 POST /api/youtube/pre-plan",
     "src/gateway/endpoints.js|PUT|/api/pipeline/transcription/segments/{segment_id}": "static_route_scan: routers/pipeline_router.py:1078 PUT /api/pipeline/transcription/segments/{segment_id}",
     "src/gateway/endpoints.js|WEBSOCKET|/api/pipeline/ws/pipeline": "static_route_scan: routers/pipeline_router.py:933 WEBSOCKET /api/pipeline/ws/pipeline",
@@ -260,6 +260,134 @@
       "not_registered"
     ]
   },
+  "redeclarations": [
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status",
+      "before": "static_route_scan: routers/pipeline_router.py:1354 GET /api/pipeline/quality-gate/status",
+      "after": "static_route_scan: routers/pipeline_router.py:1370 GET /api/pipeline/quality-gate/status",
+      "reason": "R1.5-C4: /api/pipeline/quality-gate/* の6経路に QUALITY_GATE_DATA_SOURCE（is_real: false）を足したため、定義の行番号が下にずれた。当たり先のルーターも関数も同じで、宣言の中身は変えていない（2026-08-28）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve",
+      "before": "static_route_scan: routers/pipeline_router.py:1412 POST /api/pipeline/quality-gate/improve",
+      "after": "static_route_scan: routers/pipeline_router.py:1431 POST /api/pipeline/quality-gate/improve",
+      "reason": "R1.5-C4: /api/pipeline/quality-gate/* の6経路に QUALITY_GATE_DATA_SOURCE（is_real: false）を足したため、定義の行番号が下にずれた。当たり先のルーターも関数も同じで、宣言の中身は変えていない（2026-08-28）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/status",
+      "before": "static_route_scan: routers/trinity.py:48 GET /api/status",
+      "after": "static_route_scan: routers/trinity.py:61 GET /api/status",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/youtube/apply-hook",
+      "before": "static_route_scan: routers/youtube_optimizer.py:929 POST /api/youtube/apply-hook",
+      "after": "static_route_scan: routers/youtube_optimizer.py:943 POST /api/youtube/apply-hook",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/youtube/improve-hook",
+      "before": "static_route_scan: routers/youtube_optimizer.py:757 POST /api/youtube/improve-hook",
+      "after": "static_route_scan: routers/youtube_optimizer.py:771 POST /api/youtube/improve-hook",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/youtube/optimize",
+      "before": "static_route_scan: routers/youtube_optimizer.py:583 POST /api/youtube/optimize",
+      "after": "static_route_scan: routers/youtube_optimizer.py:597 POST /api/youtube/optimize",
+      "reason": "R1.5-C4（gate-verifier 6周目 指摘1）: youtube_optimizer.py の feedback-loop に 501 の門を足したので、以降の @router 行が下へずれた。improve-hook と optimize の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render",
+      "before": "static_route_scan: routers/render.py:386 POST /api/render",
+      "after": "static_route_scan: routers/render.py:445 POST /api/render",
+      "reason": "R1.5-C4（gate-verifier 8周目の指摘）: render.py の _get_quality_score() を本線の *.quality.json を読む形にしたので、以降の @router 行が下へずれた。/api/render と /api/render/start の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render/start",
+      "before": "static_route_scan: routers/render.py:165 POST /api/render/start",
+      "after": "static_route_scan: routers/render.py:166 POST /api/render/start",
+      "reason": "R1.5-C4（gate-verifier 8周目の指摘）: render.py の _get_quality_score() を本線の *.quality.json を読む形にしたので、以降の @router 行が下へずれた。/api/render と /api/render/start の中身は無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render",
+      "before": "static_route_scan: routers/render.py:445 POST /api/render",
+      "after": "static_route_scan: routers/render.py:478 POST /api/render",
+      "reason": "R1.5-C4（gate-verifier 9周目の指摘）: render.py に未計測ブロックと _品質の実測() を入れたので、以降の @router 行が下へずれた。/api/render と /api/render/start の宣言そのものは無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render/start",
+      "before": "static_route_scan: routers/render.py:166 POST /api/render/start",
+      "after": "static_route_scan: routers/render.py:170 POST /api/render/start",
+      "reason": "R1.5-C4（gate-verifier 9周目の指摘）: render.py に未計測ブロックと _品質の実測() を入れたので、以降の @router 行が下へずれた。/api/render と /api/render/start の宣言そのものは無変更（行番号だけの差し替え）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/analyze-resources",
+      "before": "static_route_scan: routers/director.py:175 POST /api/director/analyze-resources",
+      "after": "static_route_scan: routers/director.py:179 POST /api/director/analyze-resources",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/analyze-script",
+      "before": "static_route_scan: routers/director.py:133 POST /api/director/analyze-script",
+      "after": "static_route_scan: routers/director.py:137 POST /api/director/analyze-script",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/batch-generate",
+      "before": "static_route_scan: routers/director.py:256 POST /api/director/batch-generate",
+      "after": "static_route_scan: routers/director.py:260 POST /api/director/batch-generate",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/chat",
+      "before": "static_route_scan: routers/director.py:72 POST /api/director/chat",
+      "after": "static_route_scan: routers/director.py:76 POST /api/director/chat",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/generate-image-async",
+      "before": "static_route_scan: routers/director.py:103 POST /api/director/generate-image-async",
+      "after": "static_route_scan: routers/director.py:107 POST /api/director/generate-image-async",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/generate-report",
+      "before": "static_route_scan: routers/director.py:196 POST /api/director/generate-report",
+      "after": "static_route_scan: routers/director.py:200 POST /api/director/generate-report",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/plan-storyboard",
+      "before": "static_route_scan: routers/director.py:233 POST /api/director/plan-storyboard",
+      "after": "static_route_scan: routers/director.py:237 POST /api/director/plan-storyboard",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/director/quality-score",
+      "before": "static_route_scan: routers/director.py:154 POST /api/director/quality-score",
+      "after": "static_route_scan: routers/director.py:158 POST /api/director/quality-score",
+      "reason": "R1.5-C4 18周目: routers/director.py に Optional の import と、段位の既定値を定数にしない理由のコメントを足したため、同ファイルの全経路の行番号が4行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/v1/themes/current/active",
+      "before": "static_route_scan: routers/themes_router.py:329 GET /themes/current/active",
+      "after": "static_route_scan: routers/themes_router.py:413 GET /themes/current/active",
+      "reason": "R1.5-C4 案A: themes_router.py に『集計できなかったこと』の印と、未評価テンプレートに中央値 3.0 を付けない処理を足したため、同ファイルの経路の行番号がずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/v1/themes/apply",
+      "before": "static_route_scan: routers/themes_router.py:217 POST /themes/apply",
+      "after": "static_route_scan: routers/themes_router.py:301 POST /themes/apply",
+      "reason": "R1.5-C4 案A: themes_router.py に『集計できなかったこと』の印と、未評価テンプレートに中央値 3.0 を付けない処理を足したため、同ファイルの経路の行番号がずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/v1/themes/recommend",
+      "before": "static_route_scan: routers/themes_router.py:399 POST /themes/recommend",
+      "after": "static_route_scan: routers/themes_router.py:483 POST /themes/recommend",
+      "reason": "R1.5-C4 案A: themes_router.py に『集計できなかったこと』の印と、未評価テンプレートに中央値 3.0 を付けない処理を足したため、同ファイルの経路の行番号がずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    }
+  ],
   "migrations": [
     {
       "key": "src/components/AISuggestionCard.jsx|POST|/api/quality/apply-suggestion",

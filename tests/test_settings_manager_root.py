@@ -30,6 +30,16 @@ def mock_branding_manager():
         "profiles": {}
     }
     
+    # **表示用の読み口を実物と同じ形にする**（R1.5-C4・10周目 N-1）。
+    # `get_all_settings()` は `user_model` を直に読むのをやめ、
+    # 印の集約点 `get_user_model_for_display()` を通すようになった。
+    # 素通しの `return_value` にすると迂回しても気づけないので、
+    # **実物と同じく `user_model` を読んで集約点へ通す**
+    def _表示用の読み口():
+        from user_model_marks import 実績を持つ値に印を付ける
+        return 実績を持つ値に印を付ける(mock_bm.user_model)
+    mock_bm.get_user_model_for_display.side_effect = _表示用の読み口
+
     # _save_json をモック化
     mock_bm._save_json = MagicMock()
     
@@ -67,7 +77,14 @@ def test_get_all_settings(test_manager, mock_branding_manager, mock_video_path):
     
     res = test_manager.get_all_settings()
     assert res["constitution"] == mock_branding_manager.constitution
+    # **`user_model` は印の集約点を通す**（R1.5-C4・10周目 N-1）。
+    # `GET /api/settings` は `GET /api/status` と同じ台帳を返すので、
+    # 同じ読み口を通らなければ無印のチャンネル統計が外へ出る
+    # この台帳には `external_status` が無いので印は増えず、中身はそのまま
+    # （門が広すぎないことも兼ねる）。**通ったこと自体**は下の行で見る
     assert res["user_model"] == mock_branding_manager.user_model
+    assert mock_branding_manager.get_user_model_for_display.called, \
+        "印の集約点を通らずに user_model を外へ出した"
     assert res["video_exists"] is False
     
     # ビデオが存在する場合
@@ -118,6 +135,8 @@ def test_update_identity(test_manager, mock_branding_manager):
 
 def test_export_soul_passport(test_manager, mock_branding_manager):
     assert test_manager.export_soul_passport() == mock_branding_manager.user_model
+    assert mock_branding_manager.get_user_model_for_display.called, \
+        "印の集約点を通らずに user_model を外へ出した"
 
 def test_reset_workspace_success(test_manager, mock_branding_manager, mock_video_path, tmp_path):
     # ビデオファイルとセグメントファイルを作成

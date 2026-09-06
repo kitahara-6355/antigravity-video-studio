@@ -51,9 +51,16 @@ class SettingsManager:
         return {"status": "error", "message": str(error)}
 
     def get_all_settings(self) -> dict:
-        """Returns consolidated settings for the frontend."""
+        """Returns consolidated settings for the frontend.
+
+        **`user_model` の `external_status` は作り物**（R1.5-C4・10周目 N-1）。
+        `GET /api/status` と**同じ台帳を同じ素のまま返していた**ので、
+        こちらも `get_user_model_for_display()`（印の集約点）を通す。
+        """
         constitution = self._ensure_constitution()
-        user_model = branding_manager.user_model if isinstance(branding_manager.user_model, dict) else {}
+        user_model = branding_manager.get_user_model_for_display()
+        if not isinstance(user_model, dict):
+            user_model = {}
         return {
             "constitution": constitution,
             "user_model": user_model,
@@ -99,8 +106,13 @@ class SettingsManager:
             return self._handle_error(e)
 
     def export_soul_passport(self) -> dict:
-        """Exports the User Model as a downloadable JSON (Passport)."""
-        return branding_manager.user_model if isinstance(branding_manager.user_model, dict) else {}
+        """Exports the User Model as a downloadable JSON (Passport).
+
+        **いまは呼び出し元が無い**（本番から到達しない）。それでも印の集約点を
+        通すのは、繋いだ瞬間に無印の `external_status` が外へ出るのを防ぐため。
+        """
+        model = branding_manager.get_user_model_for_display()
+        return model if isinstance(model, dict) else {}
 
     def reset_workspace(self) -> dict:
         """Resets the workspace by clearing video and segments data."""

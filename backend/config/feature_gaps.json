@@ -1,0 +1,209 @@
+{
+  "_comment": "**実装が足りていない機能の一覧。**技術負債（backend/agents/memory/technical_debt_index.json・1,463件）とは別物で、あちらは `file_path:line_number` を持つ既存コードの負債。**存在しない機能は行番号を持てない**し、7件の戦略的な項目を1,463件の中に入れたら確実に埋もれる。設計は docs/specs/2026-08-27-feature-gaps-design.md。点検は `python -m backend.feature_gaps --audit`",
+  "_rules": [
+    "**一覧は台帳、期限は正典。** `handled_in` にフェーズの条件 ID（例 R1.5-C4）か `将来` を書く。正典 vision_backlog.json の条件文はここからは書き換えない（フェーズの定義はユーザーの領分・憲法第1条）",
+    "**kind は2種類。** `gap` は実装が足りていないもの。`intentional` は意図して止めているもので実装漏れではない。実行記録には両方が同じ顔で出るので、区別しないと点検が誤検知する",
+    "**`surfaces_as` は実行記録の health.skipped_features / failed_stages に出るときの名前。**部分一致で照合する",
+    "**`gate_checks` は品質ゲートで回さないプラグイン名。**本線に無い機能を減点し続けると、ゲートは原理的に閾値へ到達できない",
+    "**実装したらこの台帳から消す。**消し忘れは `--audit` が検出して FAIL する"
+  ],
+  "gaps": [
+    {
+      "id": "thumbnail_generation",
+      "title": "サムネイルの自動生成",
+      "kind": "gap",
+      "why": "品質ゲートが要求するが、本線（agents）にサムネイル工程が無い。物理チェックで -20、プラグインで -15、完走チェックで -5 の固定減点になっており、**構成上どうやっても閾値90に届かない**。`generate_pipeline_coordinator_thumbnail()` はあるが StageBoundAgent 用の別タスクで、パイプラインからは呼ばれない",
+      "handled_in": "将来",
+      "surfaces_as": "サムネイル",
+      "capability": "thumbnail",
+      "gate_checks": [
+        "thumbnail_quality_check"
+      ],
+      "done_when": {
+        "kind": "artifact_present",
+        "suffixes": [
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".webp"
+        ]
+      }
+    },
+    {
+      "id": "thumbnail_insert",
+      "title": "サムネイルの自動インサート",
+      "kind": "gap",
+      "why": "生成しても `ctx.metadata['thumbnail_path']` を誰も設定しないので、下流（品質ゲート・YouTube 最適化）から見えない。生成と設定は別の実装",
+      "handled_in": "将来",
+      "surfaces_as": "サムネイル",
+      "capability": "thumbnail",
+      "done_when": {
+        "kind": "run_record_clean"
+      }
+    },
+    {
+      "id": "retention_analysis",
+      "title": "retention 分析（現在はモック）",
+      "kind": "gap",
+      "why": "実走ログに `[STUB] 現状は映像・音声解析をモック稼働` が出る。視聴維持率の分析は収益化の判断材料そのものなので、モックのままだと数字を信じられない",
+      "handled_in": "R1.5-C4",
+      "surfaces_as": "retention",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/plugins/retention_map_plugin.py",
+        "marker": "[STUB]"
+      }
+    },
+    {
+      "id": "bgm_mixing",
+      "title": "BGM ミキシング（アセット未配置）",
+      "kind": "gap",
+      "why": "実走のたびに `BGMミキシング(ファイルなし)` が落ちる。実装はあるが音源が置かれていない。**落ちた工程として毎回記録に出るので、本物の失敗が埋もれる**",
+      "handled_in": "将来",
+      "surfaces_as": "BGMミキシング",
+      "done_when": {
+        "kind": "run_record_clean"
+      }
+    },
+    {
+      "id": "youtube_upload",
+      "title": "YouTube 投稿（placeholder を返す）",
+      "kind": "gap",
+      "why": "`youtube_uploader.upload_video()` が `placeholder_video_id` を返す。**投稿していないのに success を返す**ので、収益化の前提が崩れる。2026-08-26 のユーザー決定で「未実装として失敗させる」方針",
+      "handled_in": "R1.5-C4",
+      "surfaces_as": "youtube_upload",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/services/youtube_uploader.py",
+        "marker": "placeholder_video_id"
+      }
+    },
+    {
+      "id": "pipeline_quality_gate_ui",
+      "title": "画面の品質ゲート（定数を返す UI の足場）",
+      "kind": "gap",
+      "why": "`/api/pipeline/quality-gate/*` は `pipeline_default_states.INITIAL_QUALITY_GATE_STATE` の定数（音声88 / 映像82 / 字幕90 / 構成80 → 加重平均 85）を返すだけで、音声も映像も一切読まない。`POST /check` も定数を平均し直すだけ。**UI（`frontend/src/components/QualityGate.jsx`）が「QUALITY SCORE」として画面に出す**ので、印が無いと実測値と区別が付かない。本物の品質ゲートは本線（agents）側にあり、実走で 89・94 点を出している。2026-08-28 に `is_real: false` を付け、検査していないのに `checked_at` へ現在時刻を打つのをやめた（R1.5-C4・gate-verifier 5周目の指摘 C-6）",
+      "handled_in": "将来",
+      "surfaces_as": "品質ゲート(UI)",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/pipeline_router.py",
+        "marker": "QUALITY_GATE_DATA_SOURCE"
+      }
+    },
+    {
+      "id": "channel_stats",
+      "title": "チャンネル統計（固定値）",
+      "kind": "gap",
+      "why": "`admin_channel_router` が `watch_time_hours: 15200` などの固定値を返す。**収益化の到達度をこの数字で判断すると嘘になる**。\n\n**出所は2つある**（gate-verifier 10周目 N-1）。もう1つは**Git 追跡下の `backend/branding/user_model.json` に焼き付いた `external_status`**（登録者150人・総再生4,500回・ライバル「TechStarter」）で、過去の `POST /api/analytics/sync` が書いたもの。6周目・8周目の印は `branding/analytics_manager.py` の**中**に付けたので、**sync を叩いた後にしか効かず、永続台帳を素で返す読み口には届いていなかった**。読み口は2つ — `GET /api/status`（`routers/trinity.py`）と `GET /api/settings`（`settings_manager.get_all_settings()`）。2026-08-29 に `backend/user_model_marks.py` へ印を集約し、`branding_manager.get_user_model_for_display()` を唯一の表示用読み口にした（`evolution_log_marks.py` と同じ形）。**保存側は素のまま**にして、印がファイルへ書き戻らないようにしている（R1.5-C4）",
+      "handled_in": "R1.5-C4",
+      "surfaces_as": "channel_stats",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/admin_channel_router.py",
+        "marker": "15200"
+      }
+    },
+    {
+      "id": "dream_learning",
+      "title": "学習の副作用（意図して止めている）",
+      "kind": "intentional",
+      "why": "`AVS_SKIP_LEARNING_SIDE_EFFECTS=1` で止めている。止めないと DreamEngine が `VERIFIED_FACTS.md` などの追跡ファイルを書き換える（2026-08-26 に1回起こし、138行と28行が消えた）。**実装漏れではない**",
+      "surfaces_as": "dream_learning",
+      "done_when": {
+        "kind": "run_record_clean"
+      }
+    },
+    {
+      "id": "pipeline_improvement_loop_ui",
+      "title": "画面の品質改善ループ（加点をシミュレートする UI の足場）",
+      "kind": "gap",
+      "why": "`/api/pipeline/improvement/*` の6経路は動画を直していない。`apply` がやるのは `current_score` に定数 +4 を足すことだけで（`improvement = 4  # シミュレーション: +4点`）、音量正規化もリエンコードも走らない。初期状態からして `act-001` と `act-002` が `completed`・72→78→82 の履歴つきで、**開く前から2件の改善が終わったことになっている**。`pipeline_quality_gate_ui`（O-6）と同じ `pipeline_default_states` を出所にしているのに、5周目はこちらへ印を付け忘れた（O-6 の190行下）。2026-08-29 に `IMPROVEMENT_DATA_SOURCE` を付けた（R1.5-C4）",
+      "handled_in": "将来",
+      "surfaces_as": "品質改善ループ(UI)",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/pipeline_router.py",
+        "marker": "IMPROVEMENT_DATA_SOURCE"
+      }
+    },
+    {
+      "id": "admin_tool_quality_score",
+      "title": "ツール連携の品質スコア（固定値）",
+      "kind": "gap",
+      "why": "`/api/admin/integration/tool/quality-score` が `score: 92 / rank: \"A\"` と工程別の内訳を**現在時刻つきで**返していた。文字起こしも校閲も一度も走っていない。2周目・4周目・5周目で直した `last_sync = datetime.now()` と同型で、**測っていないものに「いま測った」時刻が付いていた**。2026-08-29 に `is_real: false` を付け、`timestamp` を `None` にした（R1.5-C4）",
+      "handled_in": "将来",
+      "surfaces_as": "品質スコアツール",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/admin_integration_router.py",
+        "marker": "\"score\": 92"
+      }
+    },
+    {
+      "id": "admin_quality_degradation",
+      "title": "品質低下の検知（固定値）",
+      "kind": "gap",
+      "why": "`/api/admin/incident/quality-degradation` が `current_score: 72` と3点の推移を現在時刻つきで返していた。**`QualityGateWorker` が劣化したという観測は一度も無い。**障害対応の画面なので、印が無いと「いま品質低下を検知した」と読める。2026-08-29 に `is_real: false` を付け、`timestamp` を `None` にした（R1.5-C4）",
+      "handled_in": "将来",
+      "surfaces_as": "品質低下検知",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/admin_incident_router.py",
+        "marker": "\"current_score\": 72"
+      }
+    },
+    {
+      "id": "sns_cross_media",
+      "title": "SNS クロスメディア相関分析（SNS の実データを取る経路が無い）",
+      "kind": "gap",
+      "why": "`metadata_source[\"sns_data\"]` を埋める経路がどこにも無いので、`CrossMediaService.analyze_cross_media_correlation()` は**常に** `get_default_sns_data()` の作り物（X 12,500 フォロワー・Instagram 8,400 …）で相関を取っていた。そこから決めた「最適な投稿先プラットフォーム」と推奨ハッシュタグを、本線（`YouTubeOptWorker`）が `ctx.metadata[\"cross_media_correlation\"]` に埋めていた。**収益化の判断に使う数字なので、作り物から出した推奨は嘘になる。**2026-08-29 に本線では分析しないことにし（`skipped_features` に出る）、サービスを直接呼ぶ経路（デモ・テスト）には `is_real` を付けた（R1.5-C4・ユーザー決定）",
+      "handled_in": "将来",
+      "surfaces_as": "クロスメディア",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/services/cross_media_service.py",
+        "marker": "get_default_sns_data"
+      }
+    },
+    {
+      "id": "admin_quality_dashboard",
+      "title": "管理者の品質ダッシュボード（実体はあるのに定数を返していた）",
+      "kind": "gap",
+      "why": "憲法 §7.3.2 の A-4「push時にテスト/リント/セキュリティが自動実行」は**実際に GitHub Actions で動いている**のに、`/api/admin/quality/*` の25経路は定数＋現在時刻を返していた。2026-08-29 に「数字は出所を名乗る」規則（`measured` / `derived` / `sample`）を入れ、**リポジトリに実体があるものは繋いだ**。繋いだ結果、作り物と実体が食い違っていた: ラチェットは画面「770/770・連動率 100.0%」に対し実体 `snapshots/v8_baseline.json` が pass 75 / fail 16 / skip 954、lint は「2件」に対し `.github/ruff-baseline.json` が 28,842件、vision-gap は独自の定数 60.35 に対し正典が 65.95。**残り（テスト件数・カバレッジ・E2E・FV・各種トレンド）は CI の実行結果が要るので `sample` のまま**（R1.5-C4・ユーザー決定）",
+      "handled_in": "将来",
+      "surfaces_as": "品質ダッシュボード",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/admin_quality_router.py",
+        "marker": "QUALITY_SAMPLE"
+      }
+    },
+    {
+      "id": "post_publish_feedback",
+      "title": "公開後フィードバックループ（YouTube Analytics 未統合・random の「実績」）",
+      "kind": "gap",
+      "why": "`services/post_publish_collector.py` の既定は `YOUTUBE_API_MODE=mock`（`real` は `NotImplementedError` を投げる＝**本番の既定で必ず作り物になる**）。`_generate_mock_data()` が `random.Random(seed)` で CTR・維持率・再生数を組み立てて `is_mock: true` 付きで返すのに、その印が先へ伝わっていなかった。`POST /api/youtube/feedback-loop/{id}` がそれを `validation_report.actual` として `success: true` で返し、`evolution_log.json`（Git 追跡下）へ `actual_ctr` / `actual_retention` / `drop_off_points` として現在時刻つきで焼き付け、`GET /api/evolution` と `POST /api/youtube/pre-plan` が読み戻して次の企画立案に混ぜていた。2026-08-29 に `retention-map` と同じ 501 で止め、書き込みも塞ぎ、既存12件の作り物には読み口（`branding_manager.get_evolution_log_for_display()`）で印を付けた（R1.5-C4・gate-verifier 6周目 指摘1）",
+      "handled_in": "将来",
+      "surfaces_as": "公開後フィードバック",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/services/post_publish_collector.py",
+        "marker": "_generate_mock_data"
+      }
+    },
+    {
+      "id": "render_quality_gate",
+      "title": "書き出し前の品質ブロック（本線の品質ゲートに繋がっていない）",
+      "kind": "gap",
+      "why": "`routers/render.py` の `_get_quality_score()` は `return 95` の直書きで、**何も測っていないのに `quality_score: 95` を `success: true` で返していた**。そのせいで S17 の品質ブロック（`if quality_score < 90 and not force_render`）は**永久に偽**になり、レンダリング前の品質ゲートは一度も止まらず `force_render` も意味を失っていた。`POST /api/render/start` は本番マウント済みで、UI（`ProductionPipeline.jsx:1015` → `endpoints.js:75`）から呼ばれる。2026-08-29 に本線が書き出す `vault-outputs/final/*.quality.json` を読む形にして、**ブロックが実際に効くようにした**（実測 89 点で止まることを確認）。**2026-08-29 のユーザー決定で、未計測は必ず止める方針に変えた** — `force_render` でも越えられない（90点未満なら「悪いと分かったうえで出す」判断ができるが、未計測は判断の材料そのものが無い。UI は `force_render: !is_ready` で常に押してくるので、越えられるようにすると門が無いのと同じになる）。止めても実作業は1つも止まらない — **この経路は何もレンダリングしていない**（R1.5-C4・gate-verifier 8周目の指摘）",
+      "handled_in": "将来",
+      "surfaces_as": "書き出し前品質ブロック",
+      "done_when": {
+        "kind": "marker_gone",
+        "path": "backend/routers/render.py",
+        "marker": "_QUALITY_SIDECAR_DIR"
+      }
+    }
+  ]
+}

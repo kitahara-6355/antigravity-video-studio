@@ -219,3 +219,338 @@ def test_sunset_reportの既定も走査根を狭めない():
         assert outside in report.source_hits, (
             f"{outside} が数に入っていない（走査根が backend/ に狭まっている）"
         )
+
+
+# --- 本番と到達不能を区別する（R1.5-C6・2026-08-28）---------------------------
+#
+# 条件文: 「`--sunset` が段・実行記録・**本番モジュール**のいずれにも 2.5 系が
+# 無いことを示し、残った参照（テスト・アーカイブ・到達不能な経路）は本番と
+# 区別して数えられている。**区別できないうちは FAIL する**」
+#
+# 直す前は 71 箇所を1つの数として出すだけで、本番かどうかを言えなかった。
+
+
+def test_本番の実行経路を静的に辿れる():
+    """**本線の入口から import を辿って「本番」を定義する。**
+
+    「本番かどうか」を人の感覚で決めない。`agents.pipeline_coordinator`
+    （本線）と `main`（API）から辿れるものを本番とする。
+    """
+    from backend.model_policy import reachable_modules
+
+    到達 = reachable_modules()
+
+    assert "backend/agents/pipeline_coordinator.py" in 到達
+    assert "backend/model_governance.py" in 到達
+    # アーカイブは本線から辿れない
+    assert not any("archives/" in p for p in 到達), [p for p in 到達 if "archives/" in p][:3]
+
+
+def test_2_5系の参照を本番と到達不能に分ける():
+    from backend.model_policy import classify_sunset_references
+
+    分類 = classify_sunset_references()
+
+    assert set(分類) == {"production_code", "production_config",
+                        "production_doc", "unreachable"}
+    # 分類の合計が走査の合計と一致すること（**取りこぼしを作らない**）
+    from backend.model_policy import scan_config_model_ids, scan_sunset_references
+    合計 = (sum(scan_sunset_references().values())
+            + sum(scan_config_model_ids().values()))
+    分類合計 = sum(sum(v.values()) for v in 分類.values())
+    assert 分類合計 == 合計, (分類合計, 合計)
+
+
+def test_文書の中の2_5系は依存ではない(tmp_path):
+    """**docstring の例と、実際に使われる既定値を混ぜない。**
+
+    `cost_guard.py` の 2 箇所は使い方を示す docstring で、依存ではない。
+    """
+    from backend.model_policy import split_code_and_doc
+
+    src = '''"""使い方: guard.before_call("gemini-2.5-flash")"""
+既定 = "gemini-2.5-flash"
+# gemini-2.5-flash はコメント
+'''
+    f = tmp_path / "x.py"
+    f.write_text(src, encoding="utf-8")
+
+    コード, 文書 = split_code_and_doc(f)
+
+    assert コード == 1, (コード, 文書)   # 代入だけが依存
+    assert 文書 == 2                      # docstring とコメント
+
+
+def test_本番にコード上の2_5系が残っていたらFAILする():
+    """**区別できないうちは FAIL する**（条件文）。"""
+    from backend.model_policy import sunset_gate
+
+    残っている = sunset_gate({"production_code": {"backend/x.py": 1},
+                              "production_config": {},
+                              "production_doc": {}, "unreachable": {}})
+    設定に残っている = sunset_gate({"production_code": {},
+                                    "production_config": {"backend/c.json": 2},
+                                    "production_doc": {}, "unreachable": {}})
+    消えた = sunset_gate({"production_code": {}, "production_config": {},
+                          "production_doc": {"backend/y.py": 3},
+                          "unreachable": {"scratch/z.py": 9}})
+
+    assert 残っている, "本番にコード参照が残っていたら違反を出すこと"
+    assert 設定に残っている, "設定データに残っていたら違反を出すこと"
+    assert 消えた == [], 消えた
+
+
+# --- 走査器の穴（gate-verifier 1周目の指摘・2026-08-28）--------------------
+#
+# 「本番 0 箇所」は**嘘だった**。到達可能性の判定に3つ穴があり、
+# `backend/routers/**` が丸ごと「到達不能」に落ちていた。
+
+
+def test_相対importを辿る(tmp_path):
+    """**`node.level == 0` で切っていたので相対 import を1つも辿れなかった。**
+
+    `backend/routers/__init__.py` は全行が相対 import で、
+    `backend/main.py` が `from routers import (...)` で実行する。
+    結果 `routers/**` 全体が「到達不能」に落ち、本番の 2.5 参照が隠れていた。
+    """
+    from backend.model_policy import reachable_modules
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "main.py").write_text(
+        "from pkg import router\n", encoding="utf-8")
+    pkg = tmp_path / "backend" / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text(
+        "from .leaf import router\n", encoding="utf-8")
+    (pkg / "leaf.py").write_text("router = 1\n", encoding="utf-8")
+
+    到達 = reachable_modules(tmp_path)
+
+    assert "backend/pkg/__init__.py" in 到達, sorted(到達)
+    assert "backend/pkg/leaf.py" in 到達, sorted(到達)
+
+
+def test_相対importの親参照を辿る(tmp_path):
+    """`from ..sibling import x`（level=2）も辿る。"""
+    from backend.model_policy import reachable_modules
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "main.py").write_text(
+        "import pkg.sub.deep\n", encoding="utf-8")
+    sub = tmp_path / "backend" / "pkg" / "sub"
+    sub.mkdir(parents=True)
+    (tmp_path / "backend" / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "backend" / "pkg" / "sibling.py").write_text("y = 1\n", encoding="utf-8")
+    (sub / "__init__.py").write_text("", encoding="utf-8")
+    (sub / "deep.py").write_text("from ..sibling import y\n", encoding="utf-8")
+
+    到達 = reachable_modules(tmp_path)
+
+    assert "backend/pkg/sibling.py" in 到達, sorted(到達)
+
+
+def test_from_pkg_import_sub_でサブモジュールを積む(tmp_path):
+    """**`from pkg import sub` で `pkg` しか積んでいなかった。**
+
+    `f"{module}.{name}"` も積まないと、`pkg/__init__.py` が
+    `sub` を再輸出していない場合にサブモジュールを取り落とす。
+    """
+    from backend.model_policy import reachable_modules
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "main.py").write_text(
+        "from pkg import sub\n", encoding="utf-8")
+    pkg = tmp_path / "backend" / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "sub.py").write_text("z = 1\n", encoding="utf-8")
+
+    到達 = reachable_modules(tmp_path)
+
+    assert "backend/pkg/sub.py" in 到達, sorted(到達)
+
+
+def test_本線からroutersに到達する():
+    """このリポジトリの実物で確かめる。**`main.py:167` が実行する経路。**"""
+    from backend.model_policy import reachable_modules
+
+    到達 = reachable_modules()
+
+    assert "backend/routers/__init__.py" in 到達
+    assert "backend/routers/websocket.py" in 到達
+    assert "backend/routers/admin_setup_router.py" in 到達
+
+
+def test_設定データの中のモデルIDも走査する(tmp_path):
+    """**`rglob("*.py")` だけでは設定データを見ていなかった。**
+
+    `model_config.json` の `deprecated[*].replacement` は
+    実行時に `validate_and_correct()` がそのまま返す値で、
+    2.5 系ならそれが API に渡る。
+    """
+    from backend.model_policy import scan_config_model_ids
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "conf.json").write_text(
+        '{"deprecated": {"gemini-2.5-pro": {"replacement": "gemini-2.5-flash",'
+        ' "reason": "gemini-2.5-flash を使う"}},'
+        ' "aliases": {"gemini-2.5-flash": "gemini-3.6-flash"}}',
+        encoding="utf-8")
+
+    hits = scan_config_model_ids(tmp_path)
+
+    # 値がまるごとモデル ID のものだけを数える。
+    # **キーは「訂正される入力」なので依存ではない**（aliases / deprecated のキー）。
+    # 散文の中の言及も依存ではない（reason）。
+    assert hits == {"backend/conf.json": 1}, hits
+
+
+def test_設定データの2_5系も本番として落とす():
+    """**設定データも分類に載る**（載らなければ数が合わない）。"""
+    from backend.model_policy import classify_sunset_references
+
+    分類 = classify_sunset_references()
+
+    合計 = sum(sum(v.values()) for v in 分類.values())
+    assert 合計 > 0
+    # 設定データの分だけを取り出しても、キーの重複が無いこと
+    全部 = [k for v in 分類.values() for k in v]
+    assert len(全部) == len(set(全部)), "同じファイルが2つの分類に入っている"
+
+
+# --- 走査器の穴・2周目（gate-verifier の指摘・2026-08-28）-------------------
+
+
+def test_文書を二重に数えない(tmp_path):
+    """**`文書 > 合計` になると本番のコード参照が 0 に潰れる。**
+
+    docstring・行頭 `#` のコメント・`__main__` の中を**それぞれ独立に
+    足していた**ため、重なった行が二重に数えられた
+    （gate-verifier 2周目の指摘）。`MODEL = "gemini-2.5-flash"` を持つ
+    ファイルに、`__main__` の中のコメント（または `__main__` の中の関数の
+    docstring）で同じ文字列を1回書くだけで `(コード, 文書) = (0, 2)` になり、
+    **本番の参照を隠せた。**
+    """
+    from backend.model_policy import split_code_and_doc
+
+    # ① `__main__` の中のコメント（コメント判定と __main__ 判定が重なる）
+    src1 = (
+        'MODEL = "gemini-2.5-flash"@n'
+        'if __name__ == "__main__":@n'
+        '    print(MODEL)@n'
+        '    # gemini-2.5-flash のコメント@n'
+        '    print(1)@n'
+    ).replace('@n', chr(10))
+    f1 = tmp_path / "a.py"
+    f1.write_text(src1, encoding="utf-8")
+    assert split_code_and_doc(f1) == (1, 1), split_code_and_doc(f1)
+
+    # ② `__main__` の中の関数の docstring（docstring 判定と重なる）
+    src2 = (
+        'MODEL = "gemini-2.5-flash"@n'
+        'if __name__ == "__main__":@n'
+        '    def f():@n'
+        '        """gemini-2.5-flash の例"""@n'
+        '        return MODEL@n'
+        '    f()@n'
+    ).replace('@n', chr(10))
+    f2 = tmp_path / "b.py"
+    f2.write_text(src2, encoding="utf-8")
+    assert split_code_and_doc(f2) == (1, 1), split_code_and_doc(f2)
+
+    # ③ 複数行 docstring の中の 2.5（行範囲で数えていることの確認）
+    src3 = (
+        'MODEL = "gemini-2.5-flash"@n'
+        'def g():@n'
+        '    """1行目@n'
+        '@n'
+        '    gemini-2.5-flash を使う例@n'
+        '    """@n'
+        '    return MODEL@n'
+    ).replace('@n', chr(10))
+    f3 = tmp_path / "c.py"
+    f3.write_text(src3, encoding="utf-8")
+    assert split_code_and_doc(f3) == (1, 1), split_code_and_doc(f3)
+
+
+def test_実行時に書かれるものは設定データではない(tmp_path):
+    """`output/**/run.json` の `models_used` は実行記録で、設定ではない。
+
+    除かないと「設定データの値がそのまま API に渡ります」と誤ラベルされる。
+    実行記録は `runs_at_risk` という別の脚で数える。
+    """
+    from backend.model_policy import scan_config_model_ids
+
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "conf.json").write_text(
+        '{"model": "gemini-2.5-flash"}', encoding="utf-8")
+    (tmp_path / "output" / "runs" / "r1").mkdir(parents=True)
+    (tmp_path / "output" / "runs" / "r1" / "run.json").write_text(
+        '{"models_used": ["gemini-2.5-flash"]}', encoding="utf-8")
+
+    hits = scan_config_model_ids(tmp_path)
+
+    assert hits == {"backend/conf.json": 1}, hits
+
+
+def test_段と実行記録もゲートに繋がっている():
+    """**報告に出るだけで判定に繋がっていなかった**（gate-verifier 2周目の指摘）。
+
+    条件文は「段・実行記録・本番モジュールの**いずれにも**」と言っている。
+    """
+    from datetime import date
+
+    from backend.model_policy import SunsetReport, sunset_gate
+
+    空 = {"production_code": {}, "production_config": {},
+          "production_doc": {}, "unreachable": {}}
+
+    段に残る = SunsetReport(days_left=49, tiers_at_risk={"standard": "gemini-2.5-flash"},
+                            runs_at_risk={}, source_hits={}, run_count=3)
+    実走に残る = SunsetReport(days_left=49, tiers_at_risk={},
+                              runs_at_risk={"r-1": ["gemini-2.5-flash"]},
+                              source_hits={}, run_count=3)
+    記録が無い = SunsetReport(days_left=49, tiers_at_risk={}, runs_at_risk={},
+                              source_hits={}, run_count=0)
+    綺麗 = SunsetReport(days_left=49, tiers_at_risk={}, runs_at_risk={},
+                        source_hits={}, run_count=3)
+
+    assert sunset_gate(空, 段に残る), "段の 2.5 を判定に繋いでいません"
+    assert sunset_gate(空, 実走に残る), "実走の 2.5 を判定に繋いでいません"
+    assert sunset_gate(空, 記録が無い), "確かめられないことを緑にしています"
+    assert sunset_gate(空, 綺麗) == []
+
+
+def test_テストディレクトリの外のtest_付きスクリプトも数える(tmp_path):
+    """**ファイル名では除かない**（gate-verifier 2周目の指摘）。
+
+    `backend/harness/test_adk_gemini.py` は実 API を `gemini-2.5-flash` で
+    叩くスクリプトなのに、`test_` 接頭辞で落ちて**本番にも到達不能にも
+    計上されず、数から消えていた。**
+    """
+    from backend.model_policy import scan_sunset_references
+
+    (tmp_path / "backend" / "harness").mkdir(parents=True)
+    (tmp_path / "backend" / "harness" / "test_thing.py").write_text(
+        'model = "gemini-2.5-flash"\n', encoding="utf-8")
+    (tmp_path / "backend" / "tests").mkdir()
+    (tmp_path / "backend" / "tests" / "test_x.py").write_text(
+        'assert m == "gemini-2.5-flash"\n', encoding="utf-8")
+
+    hits = scan_sunset_references(tmp_path)
+
+    assert hits == {"backend/harness/test_thing.py": 1}, hits
+
+
+def test_いまのリポジトリに本番の2_5系は残っていない():
+    """**回帰防止。** `--sunset` は CI から実行していない（実行記録が要るため）。
+
+    段・設定・本番モジュールの脚はこのテストで CI が見張る
+    （このファイルは `pytest.ini` の testpaths 内）。
+    """
+    from backend.model_policy import classify_sunset_references, sunset_gate
+
+    分類 = classify_sunset_references()
+    違反 = sunset_gate(分類)      # report を渡さない = 実行記録の脚は見ない
+
+    assert 違反 == [], 違反

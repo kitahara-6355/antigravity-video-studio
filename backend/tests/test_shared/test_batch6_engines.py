@@ -479,7 +479,11 @@ class TestThumbnailGenerator:
         with patch.dict("sys.modules", {"model_registry": None}):
             importlib.reload(generator_module)
             
-            assert generator_module.get_model("test") == "gemini-2.5-flash"
+            # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+            # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+            from model_policy import resolve
+            assert generator_module.get_model("test") == resolve("test").model
+            assert not generator_module.get_model("test").startswith("gemini-2.5")
             
         importlib.reload(generator_module)
 

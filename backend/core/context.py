@@ -64,7 +64,19 @@ class ProductionContext:
     mood_settings: Dict[str, Any] = field(default_factory=dict)
     
     # 品質チェック結果
+    #
+    # **`quality_score` の 0.0 は「未計測」ではない**（R1.5-C4・9周目の指摘）。
+    # 既定値が 0.0 なので、品質ゲートが一度も走らなくても「0.0点」が
+    # そのまま `_build_result` を通って `GET /api/pipeline/report` の
+    # 「総合スコア: 0.0点」や UI の「0点・❌不合格」になっていた。
+    # **条件文が名指しする「常に 0.0 になる quality_score」そのもの。**
+    #
+    # 0.0 は実際に取りうる点なので、値の側で「無い」を表そうとすると必ず
+    # 取り違える（8周目に入れた `None` 判定は、生産側が 0.0 を出すので
+    # **本番から到達できなかった**）。**「測ったかどうか」を別に持つ。**
+    # 立てるのは `QualityGateWorker` だけ。
     quality_score: float = 0.0
+    quality_scored: bool = False
     quality_report: Optional[Dict] = None
     
     # 拡張データ（プラグイン固有データ）
@@ -133,6 +145,9 @@ class ProductionContext:
             "output_path": self.output_path,
             "preview_url": self.preview_url,
             "quality_score": self.quality_score,
+            # **旗も一緒に運ぶ**（R1.5-C4・10周目 N-3）。値だけ復元すると
+            # 受け側が 0.0 を「測って 0 点」と読むか「未計測」と読むかで割れる
+            "quality_scored": self.quality_scored,
             "extensions": self._extensions,
             "output_dir": str(self.output_dir),
             "subtitle_data": self.subtitle_data,
@@ -177,6 +192,7 @@ class ProductionContext:
         ctx.output_path = data.get("output_path")
         ctx.preview_url = data.get("preview_url")
         ctx.quality_score = data.get("quality_score", 0.0)
+        ctx.quality_scored = bool(data.get("quality_scored", False))
         
         extensions_val = data.get("extensions")
         ctx._extensions = extensions_val if isinstance(extensions_val, dict) else {}

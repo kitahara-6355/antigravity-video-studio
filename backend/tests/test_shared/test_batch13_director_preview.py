@@ -213,7 +213,9 @@ class TestDirectorBrainGeneration:
         mock_brain.client.models.generate_content.side_effect = Exception("err")
         result = mock_brain.generate_production_report([], {})
         data = json.loads(result)
-        assert data["xp_grant"] == 50
+        # **分析が落ちたら実績 XP を出さない**（R1.5-C4・18周目 反例1）。
+        assert data["xp_grant"] == 0
+        assert data["is_real"] is False
         mock_brain.client.models.generate_content.side_effect = None
 
     def test_de_24_verify_production_quality(self, mock_brain):
@@ -227,7 +229,9 @@ class TestDirectorBrainGeneration:
         mock_brain.client.models.generate_content.side_effect = Exception("err")
         result = mock_brain.verify_production_quality("text", [], [])
         data = json.loads(result)
-        assert data["is_ready"] is True
+        # **検査が落ちたら「進行可能」と言わない**（R1.5-C4）。旧 `is_ready: True` を置換
+        assert data["is_ready"] is False
+        assert data["score"] is None
         mock_brain.client.models.generate_content.side_effect = None
 
     def test_de_26_analyze_resource_needs(self, mock_brain):
@@ -254,7 +258,9 @@ class TestDirectorBrainGeneration:
         mock_brain.client.models.generate_content.side_effect = Exception("err")
         result = mock_brain.calculate_quality_score([])
         data = json.loads(result)
-        assert data["rank"] == "C"
+        # **採点が落ちたら点も合格も名乗らない**（R1.5-C4）。旧 `rank: "C"` を置換
+        assert data["rank"] is None
+        assert data["is_acceptable"] is False
         mock_brain.client.models.generate_content.side_effect = None
 
     def test_de_30_analyze_script_fallback(self, mock_brain):

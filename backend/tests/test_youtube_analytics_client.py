@@ -440,7 +440,13 @@ async def test_get_channel_performance_api(mock_cache_file):
 
 @pytest.mark.asyncio
 async def test_get_channel_performance_api_empty():
-    """APIの返却行が空の場合でも、デフォルトのChannelPerformanceオブジェクトが返ることを検証"""
+    """API の返却行が空なら**実測を名乗らない**ことを検証（R1.5-C4・20周目 CE-2）。
+
+    以前は `total_views == 0` / `avg_ctr == 0.0` を期待していた。その 0 は
+    「集計できる行が1つも無い」のに `mark_measured()` が無条件で呼ばれて
+    `is_real: True` / `data_source: "analytics_api"` / `last_sync: 現在時刻` を
+    得ていた**捏造そのもの**で、しかもキャッシュに焼き付いていた。
+    """
     client = YouTubeAnalyticsClient()
     client._available = True
 
@@ -449,8 +455,11 @@ async def test_get_channel_performance_api_empty():
     client._analytics_service = mock_analytics
 
     perf = await client.get_channel_performance()
-    assert perf.total_views == 0
-    assert perf.avg_ctr == 0.0
+    assert perf.total_views is None, "集計できる行が無いのに再生数 0 を実測として返した"
+    assert perf.avg_ctr is None
+    assert perf.is_real is False
+    assert perf.data_source != "analytics_api"
+    assert perf.last_sync is None, "未計測なのに同期時刻が付いた"
 
 
 @pytest.mark.asyncio
@@ -467,7 +476,24 @@ async def test_get_channel_performance_api_error():
     client._analytics_service = mock_analytics
 
     perf = await client.get_channel_performance()
-    assert perf.total_views == 0
+
+    # **落ちた取得を実測 0 として返さない**（R1.5-C4・19周目）。
+    # ここは `perf.total_views == 0` を期待していたが、その 0 は
+    # 「API が 400 で落ちたのに、再生数を実測 0 回として呼び手に渡す」
+    # という捏造そのものだった。0 は本当に取りうる値なので、
+    # 受け取った側には「計測していない」と「計測したら 0 だった」の区別が付かない。
+    # いまは計測値が None に潰れ、印で理由まで分かる。
+    assert perf.total_views is None
+    assert perf.avg_ctr is None
+    assert perf.total_subscribers is None
+    assert perf.top_performing_videos is None
+    assert perf.ctr_trend is None
+
+    # 印まで見る。例外はキャッチされてオブジェクト自体は返る（元の検証内容）
+    assert perf.is_real is False
+    assert perf.data_source == "unavailable"
+    assert perf.last_sync is None
+    assert "HttpError" in perf.unavailable_reason
 
 
 def test_get_performance_benchmarks():
@@ -676,7 +702,10 @@ async def test_get_channel_performance_api_invalid_types():
     client._analytics_service = mock_analytics
 
     perf = await client.get_channel_performance()
-    assert perf.total_views == 0
+    # **dict でない応答から実測を名乗らない**（R1.5-C4・20周目 CE-2）
+    assert perf.total_views is None
+    assert perf.is_real is False
+    assert perf.last_sync is None
 
     # 2. rows の列数が不足、または値が None/異常値の混在
     mock_analytics2 = MagicMock()

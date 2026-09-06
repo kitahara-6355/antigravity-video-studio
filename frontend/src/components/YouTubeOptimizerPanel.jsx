@@ -487,12 +487,68 @@ const YouTubeOptimizerPanel = ({ isOpen, onClose, segments, topics }) => {
         { id: 'highlight', label: '⭐ 山場', component: HighlightTimeline }
     ];
 
-    const overallScore = optimizationData ? (
-        (optimizationData.hook_score || 0) * 0.3 +
-        (optimizationData.thumbnail_candidates?.length >= 3 ? 100 : 50) * 0.3 +
-        (optimizationData.seo_metadata?.tags?.length >= 15 ? 100 : 60) * 0.2 +
-        (optimizationData.highlights?.length >= 3 ? 100 : 50) * 0.2
-    ) : 0;
+    // ── 全体スコア（R1.5-C4・19周目） ──
+    // 以前ここは **三項の定数だけ**で 4 要素を足していた:
+    //   (hook_score || 0)*0.3 + (候補3件以上 ? 100 : 50)*0.3
+    //   + (タグ15個以上 ? 100 : 60)*0.2 + (山場3件以上 ? 100 : 50)*0.2
+    // どの項も「件数が閾値以上か」しか見ておらず、**その分析が走ったかを
+    // 一度も見ていなかった。** サムネ生成が候補を返せなくても 50 点、
+    // SEO メタデータが null でも 60 点が付き、フックは未分析でも `|| 0` で
+    // 「0 点」という**測定結果の顔**になっていた。取得そのものに失敗して
+    // optimizationData が null のときも `: 0` で「全体スコア 0」と出ていた。
+    // 結果、**4 要素すべてが未計測でも「全体スコア: 52」**がパネルの
+    // ヘッダーに出続け、YouTube 最適化パネルを開いた人はその数字で
+    // 最適化の成否を判断していた。
+    // 16周目 ProductionPipeline.jsx / 19周目 ProductionWizard.jsx で直したのと同型。
+    // **走った要素だけで加重平均を取り、1 つも走っていなければ点を出さない**
+    // （null にする。0 や 50 は実際に取りうる点なので印にならない）。
+    const 採点要素 = [
+        {
+            id: 'hook',
+            label: 'フック',
+            weight: 0.3,
+            // フック分析の結果そのものが無ければ分析は走っていない。
+            // 点だけがあって分析が無い応答も未計測として扱う
+            走った: !!optimizationData?.hook_analysis && typeof optimizationData?.hook_score === 'number',
+            採点: () => Math.max(0, Math.min(100, optimizationData.hook_score)),
+        },
+        {
+            id: 'thumbnail',
+            label: 'サムネ',
+            weight: 0.3,
+            // 候補生成は走れば 3 案返る。空配列・非配列は
+            // 「生成が走らなかった」であって「0 案という測定結果」ではない
+            走った: Array.isArray(optimizationData?.thumbnail_candidates) && optimizationData.thumbnail_candidates.length > 0,
+            採点: () => (optimizationData.thumbnail_candidates.length >= 3 ? 100 : 50),
+        },
+        {
+            id: 'seo',
+            label: 'SEO',
+            weight: 0.2,
+            // タグ配列が無ければ「15 個以上か」を判定する材料が無い
+            走った: !!optimizationData?.seo_metadata && Array.isArray(optimizationData.seo_metadata.tags),
+            採点: () => (optimizationData.seo_metadata.tags.length >= 15 ? 100 : 60),
+        },
+        {
+            id: 'highlight',
+            label: '山場',
+            weight: 0.2,
+            // 山場だけは 0 件が実際の測定結果になりうる（該当キーワード無し）。
+            // だから配列が届いていること自体を「走った」の証拠にする
+            走った: Array.isArray(optimizationData?.highlights),
+            採点: () => (optimizationData.highlights.length >= 3 ? 100 : 50),
+        },
+    ];
+
+    const 採点できた要素 = 採点要素.filter(e => e.走った);
+    const 重みの合計 = 採点できた要素.reduce((acc, e) => acc + e.weight, 0);
+    // 1 つも走っていなければ **点を出さない**。ここに 0 を置くと
+    // 「採点した結果が 0 点」に見える
+    const overallScore = 重みの合計 > 0
+        ? 採点できた要素.reduce((acc, e) => acc + e.採点() * e.weight, 0) / 重みの合計
+        : null;
+    const 全体スコアを採点した = typeof overallScore === 'number';
+    const 未計測の要素 = 採点要素.filter(e => !e.走った).map(e => e.label);
 
     return (
         <div className="youtube-optimizer-overlay">
@@ -500,7 +556,32 @@ const YouTubeOptimizerPanel = ({ isOpen, onClose, segments, topics }) => {
                 <div className="panel-header">
                     <h2>🚀 YouTube Optimizer</h2>
                     <div className="overall-score">
-                        全体スコア: <span className="score-value">{Math.round(overallScore)}</span>
+                        {/*
+                          走った要素が 1 つも無いときに数字を出さない（R1.5-C4・19周目）。
+                          「未計測」と書く。0 を出すと「採点して 0 点だった」に見える
+                        */}
+                        {全体スコアを採点した ? (
+                            <>
+                                全体スコア: <span className="score-value" data-testid="youtube-overall-score">{Math.round(overallScore)}</span>
+                                {未計測の要素.length > 0 && (
+                                    <span
+                                        className="score-partial-note"
+                                        data-testid="youtube-overall-score-partial"
+                                        title={`${未計測の要素.join('・')} は分析が走っていないため、点に含めていません`}
+                                    >
+                                        （{未計測の要素.join('・')}は未計測）
+                                    </span>
+                                )}
+                            </>
+                        ) : (
+                            <span
+                                className="score-value"
+                                data-testid="youtube-overall-score"
+                                title="どの要素も分析が走っていないため、点はありません"
+                            >
+                                全体スコア: 未計測
+                            </span>
+                        )}
                     </div>
                     <button className="close-btn" onClick={onClose}>✕</button>
                 </div>

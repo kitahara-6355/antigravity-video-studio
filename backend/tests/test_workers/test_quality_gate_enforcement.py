@@ -76,6 +76,9 @@ class TestT032QualityFailureReport:
         """品質不合格レポートが正しい構造で生成される"""
         coordinator = PipelineCoordinator()
         ctx = create_mock_ctx(segments=10)
+        # **「測った」は値ではなく旗で表す**（R1.5-C4）。`quality_gate_report` は
+        # `> 0` の番兵値ではなく旗で組み立てる
+        ctx.quality_scored = True
         ctx.quality_score = 75
         ctx.quality_feedback = ["音量が小さすぎる", "メタデータ未生成"]
         ctx.quality_category_scores = {"core": 60, "youtube": 40}
@@ -397,6 +400,9 @@ class TestT042ImprovementLoopNonDegradation:
 
         workflow = EvaluatorOptimizerWorkflow()
         ctx = create_mock_ctx(segments=10)
+        # **「測った」は値ではなく旗で表す**（R1.5-C4）。`quality_gate_report` は
+        # `> 0` の番兵値ではなく旗で組み立てる
+        ctx.quality_scored = True
         ctx.quality_score = 75
 
         # QualityGateWorker をモック: 常に同じスコアを返す
@@ -497,6 +503,8 @@ class TestT045ForceRenderFlow:
         """品質不合格 → build_result に force-render 情報が含まれる"""
         coordinator = PipelineCoordinator()
         ctx = create_mock_ctx(segments=10)
+        # **「測った」は値ではなく旗で表す**（R1.5-C4）
+        ctx.quality_scored = True
         ctx.quality_score = 81
         ctx.quality_feedback = ["テスト不合格"]
 

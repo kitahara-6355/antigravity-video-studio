@@ -348,7 +348,11 @@ def test_quota_manager_import_fallback():
         # モジュールの再ロード
         import usage_tracker.quota_manager as qm_mod
         # get_model が定義され、デフォルト値が返ることを確認
-        assert qm_mod.get_model("anything") == "gemini-2.5-flash"
+        # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+        # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+        from model_policy import resolve
+        assert qm_mod.get_model("anything") == resolve("anything").model
+        assert not qm_mod.get_model("anything").startswith("gemini-2.5")
     finally:
         sys.meta_path.remove(finder)
         if orig_registry:

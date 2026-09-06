@@ -73,15 +73,15 @@ def test_parse_review_json_decode_error():
     engine = self_review_engine.self_review_engine
     text = '{invalid json}'
     result = engine._parse_review(text)
-    assert result.passed is True
-    assert result.score.overall == 0.75
+    assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+    assert result.score.overall == 0.0  # 採点していない（0点という評価ではない）
 
 def test_parse_review_no_json_match():
     engine = self_review_engine.self_review_engine
     text = 'no json at all'
     result = engine._parse_review(text)
-    assert result.passed is True
-    assert result.score.overall == 0.75
+    assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+    assert result.score.overall == 0.0  # 採点していない（0点という評価ではない）
 
 def test_parse_review_missing_keys():
     engine = self_review_engine.self_review_engine
@@ -106,8 +106,8 @@ def test_review_exception(mock_gemini_client):
     with patch("self_review_engine.get_gemini_client", return_value=mock_gemini_client):
         engine = SelfReviewEngine()
         result = engine.review("content", "type", {"ctx": "val"})
-        assert result.passed is True
-        assert result.score.overall == 0.75
+        assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+        assert result.score.overall == 0.0  # 採点していない（0点という評価ではない）
 
 # 4. review_and_improve メソッド
 def test_review_and_improve_passed_immediately(mock_gemini_client):
@@ -330,6 +330,7 @@ def test_parse_review_string_scores():
     engine = self_review_engine.self_review_engine
     text = '{"context_fit": "0.9", "constitution_fit": "0.9", "technical_quality": "0.9", "issues": [], "suggestions": []}'
     result = engine._parse_review(text)
+    # こちらは正しくパースできる（文字列の "0.9" を float にする）ので合格でよい
     assert result.passed is True
     assert result.score.context_fit == 0.9
     assert result.score.overall == 0.9
@@ -337,8 +338,8 @@ def test_parse_review_string_scores():
     # 無効な文字列スコアの場合
     text_invalid = '{"context_fit": "bad_score", "constitution_fit": 0.9, "technical_quality": 0.9, "issues": [], "suggestions": []}'
     result_invalid = engine._parse_review(text_invalid)
-    assert result_invalid.passed is True
-    assert result_invalid.score.overall == 0.75  # fallback
+    assert result_invalid.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+    assert result_invalid.score.overall == 0.0  # 採点していない（0点という評価ではない）
 
 
 def test_review_null_response_text(mock_gemini_client):
@@ -346,6 +347,6 @@ def test_review_null_response_text(mock_gemini_client):
     with patch("self_review_engine.get_gemini_client", return_value=mock_gemini_client):
         engine = SelfReviewEngine()
         result = engine.review("content", "type", {"ctx": "val"})
-        assert result.passed is True
-        assert result.score.overall == 0.75  # fallback
+        assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+        assert result.score.overall == 0.0  # 採点していない（0点という評価ではない）
 

@@ -70,14 +70,14 @@ def test_detect_gpu_fail_or_timeout():
         assert res.json()["gpu_available"] is False
 
 def test_start_render_quality_blocked():
-    with patch("routers.render._get_quality_score", return_value=85):
+    with patch("routers.render._品質の実測", return_value=(85, "/dummy/x.quality.json")):
         res = client.post("/api/render/start", json={"force_render": False})
         assert res.status_code == 200
         assert res.json()["success"] is False
         assert res.json()["error"] == "quality_block"
 
 def test_start_render_nvenc_success():
-    with patch("routers.render._get_quality_score", return_value=95), \
+    with patch("routers.render._品質の実測", return_value=(95, "/dummy/x.quality.json")), \
          patch("routers.render.detect_gpu") as mock_detect:
         
         mock_detect.return_value = {"gpu_available": True, "recommended_encoder": "nvenc"}
@@ -88,7 +88,7 @@ def test_start_render_nvenc_success():
         assert res.json()["gpu_fallback"] is False
 
 def test_start_render_nvenc_fallback():
-    with patch("routers.render._get_quality_score", return_value=95), \
+    with patch("routers.render._品質の実測", return_value=(95, "/dummy/x.quality.json")), \
          patch("routers.render.detect_gpu") as mock_detect:
         
         mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
@@ -264,14 +264,54 @@ def test_list_available_videos(tmp_path):
         assert res.json()["videos"][0]["name"] == "video1.mp4"
 
 
-def test_start_render_default_quality():
-    # _get_quality_score を mock しない場合、デフォルトの95が返るため、ブロックされずに開始するはず。
-    with patch("routers.render.detect_gpu") as mock_detect:
+def test_start_render_未計測なら書き出さない():
+    """**測っていないのに 95 点で通さない**（R1.5-C4・gate-verifier 8周目の指摘）。
+
+    ここは以前「`_get_quality_score` を mock しない場合、デフォルトの 95 が返るため、
+    ブロックされずに開始するはず」と書いてあり、**testpaths 内のこのテストが
+    偽の success を緑で固定していた。**95 は直書きの定数で、
+    そのせいで `if quality_score < 90` の品質ブロック（S17）は永久に偽だった。
+
+    いまは本線が書き出す `*.quality.json` を読む。**無ければ点を名乗らない。**
+    """
+    with patch("routers.render.detect_gpu") as mock_detect,          patch("routers.render._品質の実測", return_value=(None, None)):
         mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
-        res = client.post("/api/render/start", json={"encoder": "libx264"})
-        assert res.status_code == 200
-        assert res.json()["success"] is True
-        assert res.json()["quality_score"] == 95
+        for body in ({"encoder": "libx264"},
+                     {"encoder": "libx264", "force_render": True}):
+            res = client.post("/api/render/start", json=body)
+            assert res.status_code == 200
+            data = res.json()
+            # **未計測は必ず止める。force_render でも越えられない**
+            # （2026-08-29 ユーザー決定）。UI は force_render: !is_ready で
+            # 常に押してくるので、越えられるようにすると門が無いのと同じになる
+            assert data["success"] is False, f"{body}: 未計測なのに書き出しを通した"
+            assert data["error"] == "quality_unmeasured"
+            assert data["force_render_available"] is False
+            assert data["quality_score"] is None
+            assert data["quality_checked"] is False
+            assert data["is_real"] is False
+
+
+def test_start_render_実測が90未満ならブロックする():
+    """**S17 の品質ブロックが実際に効く**（R1.5-C4・8周目の指摘）。
+
+    `_get_quality_score()` が定数 95 だったので、この分岐は**一度も通らなかった**。
+    `force_render` も意味を失っていた。
+    """
+    with patch("routers.render.detect_gpu") as mock_detect,          patch("routers.render._品質の実測",
+               return_value=(89, "/dummy/x.quality.json")):
+        mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
+
+        止まった = client.post("/api/render/start", json={"encoder": "libx264"}).json()
+        assert 止まった["success"] is False
+        assert 止まった["error"] == "quality_block"
+        assert 止まった["quality_score"] == 89
+        assert 止まった["is_real"] is True
+
+        越えた = client.post("/api/render/start",
+                             json={"encoder": "libx264", "force_render": True}).json()
+        assert 越えた["success"] is True, "force_render で越えられない"
+        assert 越えた["quality_score"] == 89
 
 def test_video_processing_progress_callback():
     from video_processor import video_processor
@@ -305,7 +345,7 @@ def test_video_processing_progress_callback():
 
 
 def test_start_render_auto_fallback():
-    with patch("routers.render._get_quality_score", return_value=95), \
+    with patch("routers.render._品質の実測", return_value=(95, "/dummy/x.quality.json")), \
          patch("routers.render.detect_gpu") as mock_detect:
         
         mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}

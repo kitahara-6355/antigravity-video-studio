@@ -270,8 +270,8 @@ class TestSelfReviewEngine:
             eng.client.models.generate_content.side_effect = Exception("API error")
             eng.model = "test-model"
             result = eng.review("test", "telop", {})
-            assert result.passed is True
-            assert result.score.overall == 0.75
+            assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+            assert result.score.overall == 0.0  # 採点していない（0点という評価ではない）
 
     # SR-05: パース - 正常JSON
     def test_parse_review_valid_json(self):
@@ -291,8 +291,8 @@ class TestSelfReviewEngine:
         with patch.object(SelfReviewEngine, "__init__", lambda self: None):
             eng = SelfReviewEngine()
             result = eng._parse_review("no json here at all")
-            assert result.passed is True  # fallback
-            assert result.score.overall == 0.75
+            assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
+            assert result.score.overall == 0.0  # 採点していない（0点という評価ではない）
 
     # SR-07: パース - 不正JSON
     def test_parse_review_invalid_json(self):
@@ -300,7 +300,7 @@ class TestSelfReviewEngine:
         with patch.object(SelfReviewEngine, "__init__", lambda self: None):
             eng = SelfReviewEngine()
             result = eng._parse_review("{invalid json content}")
-            assert result.passed is True  # fallback
+            assert result.passed is False  # R1.5-C4: `_fallback_review()` は docstring どおり「デフォルト合格」で、**AI レビューが一度も走らなくても合格**になっていた
 
     # SR-08: review_and_improve - 初回合格
     def test_review_and_improve_pass_first(self):

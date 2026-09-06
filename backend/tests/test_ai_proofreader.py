@@ -69,7 +69,7 @@ class TestGetCurrentModel:
             # キャッシュをクリアするために reload するか、インポートエラーを引き起こす
             with patch("builtins.__import__", side_effect=ImportError):
                 model_name = ai_proofreader._get_current_model()
-                assert model_name == "gemini-2.5-flash"
+                assert model_name == "gemini-3.6-flash"
 
 
 class TestBuildProperNounContext:
@@ -779,7 +779,7 @@ class TestCoverageEnhancementAdditional:
         with patch.dict("sys.modules", {"model_governance": mock_module}):
             from subtitle_engine import ai_proofreader
             model_name = ai_proofreader._get_current_model()
-            assert model_name == "gemini-2.5-flash"
+            assert model_name == "gemini-3.6-flash"
 
     def test_build_context_generic_exception(self):
         """_build_proper_noun_context で想定外の Exception が発生した際、警告文字列が返ることをテスト"""

@@ -66,6 +66,20 @@ def _probe_video(path: str) -> dict:
     return {"valid": False, "error": "ffprobe不可"}
 
 
+def _品質の表示(quality: dict) -> str:
+    """HTML に出す品質スコアの文字列（R1.5-C4・9周目の指摘）。
+
+    ここは `{quality.get('score', 'N/A')}点` を直接埋めており、**上の
+    `採点した` の門をまったく通っていなかった。** 生産側の既定が 0.0 なので、
+    品質ゲートを一度も通していない実走のレポートに
+    「総合スコア: **0.0点**」と書かれていた。
+    """
+    if not quality.get("scored"):
+        return "未計測（品質ゲートを通していません）"
+    score = quality.get("score")
+    return f"{score}点" if isinstance(score, (int, float)) else "N/A"
+
+
 def _build_category_html(quality: dict) -> str:
     """カテゴリ別スコアのHTMLテーブルを生成"""
     cat_report = quality.get("category_report", [])
@@ -99,11 +113,29 @@ def _build_category_html(quality: dict) -> str:
 
 
 def _build_feedback_html(quality: dict) -> str:
-    """フィードバック一覧のHTMLを生成"""
+    """フィードバック一覧のHTMLを生成。
+
+    **「確かめられなかった」を「問題なし」にしない**（R1.5-C4・11周目の指摘）。
+    採点していなければ指摘は当然0件なので、空を「全項目クリア」と読むと
+    **測っていないことが合格として出る**。実際、同じページに
+    「⑤ ❌ 品質ゲート スコア: 未計測」「0/8合格」と並べて緑の
+    「✅ 全項目クリア」が出ていた（実走なしで再現する）。
+
+    ⑤行と同じ旗（`quality_details["scored"]`）で見る。**N-2 で直した⑤行の
+    3行下、同じ関数ブロックの中に同じ欠陥が残っていた** — 「1ファイル隣」
+    どころか「3行下」で、4周目・9周目・10周目と同じ型。
+    """
     feedback = quality.get("feedback", [])
+    # **指摘があるなら必ず出す。** 旗の有無で隠すと、実際に出た指摘を
+    # 握り潰すことになる（それは「未計測」より悪い）。旗を見るのは
+    # **空だったときだけ** — 空を「クリア」と読んでよいかの判断にだけ要る
     if not feedback:
+        # **値ではなく旗で見る**（0.0 は実際に取りうる点なので値では区別できない）
+        if not bool(quality.get("scored")):
+            return ("<p style='color:#a1a1aa;margin-top:12px;'>フィードバック: "
+                    "<b>未計測</b>（品質ゲートを通していないので指摘の有無を言えません）</p>")
         return "<p style='color:#22c55e;margin-top:12px;'>✅ フィードバック: なし（全項目クリア）</p>"
-    
+
     items = "".join(f"<li style='margin:4px 0;'>{f}</li>" for f in feedback)
     return f"""
     <div style="margin-top:12px;">
@@ -193,14 +225,26 @@ async def pipeline_report():
     for item in cat_report:
         if isinstance(item, dict):
             categories_found.add(item.get("category", ""))
-    quality_score = quality.get("score", 0)
+    # **未計測を「0点」と表示しない**（R1.5-C4）。既定値 0 のせいで、
+    # 品質ゲートを一度も通していない実走が「スコア: 0点」と出ていた。
+    # 2周目 N-2 で直した「未計測 → 0.0点・不合格」と同じクラス
+    # （こちらは `ok: False` なので偽の success ではないが、**数字が嘘**）。
+    quality_score = quality.get("score")
+    # **番兵値で判断しない**（R1.5-C4・9周目の指摘）。8周目はここを
+    # `isinstance(..., (int, float))` にしたが、**生産側（`PipelineContext`）の
+    # 既定は `0.0`（float）なので、未計測の枝に本番から到達できなかった。**
+    # 0.0 は実際に取りうる点なので、値では区別できない。
+    # `quality_details["scored"]` を見る（`QualityGateWorker` が立てる旗）。
+    採点した = bool(quality.get("scored")) and isinstance(quality_score, (int, float))
     # 判定: スコア90点以上（憲法§8.2準拠）
-    quality_ok = isinstance(quality_score, (int, float)) and quality_score >= 90
-    cat_display = ', '.join(categories_found) if categories_found else f"{quality_score}点"
+    quality_ok = 採点した and quality_score >= 90
+    点表示 = f"{quality_score}点" if 採点した else "未計測"
+    cat_display = ', '.join(categories_found) if categories_found else 点表示
     checks.append({
         "id": "⑤", "name": "品質ゲート",
         "ok": quality_ok,
-        "detail": f"スコア: {quality_score}点 / カテゴリ: {cat_display}",
+        "scored": 採点した,
+        "detail": f"スコア: {点表示} / カテゴリ: {cat_display}",
         "stage": next((s for s in stages if "品質" in s.get("name", "")), None),
     })
 
@@ -382,7 +426,7 @@ async def pipeline_report():
 
 <div class="section">
   <h2>🎯 品質ゲート詳細</h2>
-  <p>総合スコア: <strong>{quality.get('score', 'N/A')}点</strong></p>
+  <p>総合スコア: <strong>{_品質の表示(quality)}</strong></p>
   {_build_category_html(quality)}
   {_build_feedback_html(quality)}
 </div>

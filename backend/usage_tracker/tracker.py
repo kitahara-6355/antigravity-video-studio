@@ -306,10 +306,10 @@ class UsageTracker:
             from model_registry import get_model
             return get_model(task)
         except (ImportError, AttributeError, NameError):
-            return "gemini-2.5-flash"
+            return "gemini-3.6-flash"
         except Exception as e:
             logger.error(f"Error in model_registry: {e}", exc_info=True)
-            return "gemini-2.5-flash"
+            return "gemini-3.6-flash"
 
     def _resolve_fallback_model(self, preferred: str) -> str | None:
         """制限に達したモデルのフォールバック先を取得する"""

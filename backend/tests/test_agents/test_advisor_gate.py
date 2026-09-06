@@ -20,7 +20,11 @@ def test_import_error_model_registry(monkeypatch):
     # advisor_gate をリロードして except ImportError のルートを通す
     importlib.reload(agents.advisor_gate)
     
-    assert agents.advisor_gate.get_model("any_task") == "gemini-2.5-flash"
+    # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+    # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+    from model_policy import resolve
+    assert agents.advisor_gate.get_model("any_task") == resolve("any_task").model
+    assert not agents.advisor_gate.get_model("any_task").startswith("gemini-2.5")
     
     # 元に戻す
     monkeypatch.delitem(sys.modules, "model_registry")
@@ -799,7 +803,11 @@ def test_import_error_model_registry_general_exception(monkeypatch):
     monkeypatch.setitem(sys.modules, "model_registry", BadModule())
     importlib.reload(agents.advisor_gate)
     
-    assert agents.advisor_gate.get_model("any_task") == "gemini-2.5-flash"
+    # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+    # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+    from model_policy import resolve
+    assert agents.advisor_gate.get_model("any_task") == resolve("any_task").model
+    assert not agents.advisor_gate.get_model("any_task").startswith("gemini-2.5")
     
     # 元に戻す
     monkeypatch.delitem(sys.modules, "model_registry")

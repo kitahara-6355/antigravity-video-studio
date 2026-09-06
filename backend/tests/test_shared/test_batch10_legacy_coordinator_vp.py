@@ -194,6 +194,9 @@ class TestCoordinatorHelpers:
         assert result["quality_gate_report"] is None
 
     def test_pc_09_build_result_quality_blocked(self, coord, ctx):
+        # **「測った」は値ではなく旗で表す**（R1.5-C4）。`quality_gate_report` は
+        # `> 0` の番兵値ではなく旗で組み立てる
+        ctx.quality_scored = True
         ctx.quality_score = 70
         ctx.quality_feedback = ["音声が小さい"]
         ctx.stage_results = []

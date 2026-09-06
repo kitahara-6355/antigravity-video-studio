@@ -15,6 +15,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from fastapi.testclient import TestClient
 
 
+def _表示用の読み口(mock):
+    """実物と同じ経路にする — `user_model` を読み、印の集約点へ通す。
+
+    `GET /api/status` と `get_all_settings()` は `user_model` を直に読むのを
+    やめ、`branding_manager.get_user_model_for_display()` を通すようになった
+    （R1.5-C4・gate-verifier 10周目 N-1）。素通しの `return_value` にすると
+    **集約点を迂回しても気づけない**ので、実物と同じ形にする。
+    """
+    def 読む():
+        from user_model_marks import 実績を持つ値に印を付ける
+        return 実績を持つ値に印を付ける(mock.user_model)
+    return 読む
+
+
 def get_error_message(resp) -> str:
     data = resp.json()
     if isinstance(data, dict):
@@ -396,8 +410,13 @@ class TestSmartCutHealth:
 def mock_branding_manager():
     mock = MagicMock()
     mock.user_model = {"rank": "A", "xp": 100, "tech_rank": "S", "biz_rank": "A"}
+    mock.get_user_model_for_display.side_effect = _表示用の読み口(mock)
     mock.process_analytics_update.return_value = {"updates": 2, "status": "ok"}
     mock.get_evolution_log.return_value = {"entries": [], "philosophies": []}
+    # **表示用の読み口は別**（R1.5-C4・6周目 指摘1）。`post_publish_feedbacks` に
+    # 焼き付いた作り物の「実績」への印は `get_evolution_log_for_display()` に
+    # 1箇所だけ置いてある
+    mock.get_evolution_log_for_display.return_value = {"entries": [], "philosophies": []}
     return mock
 
 

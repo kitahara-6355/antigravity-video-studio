@@ -150,10 +150,18 @@ class TestAdminChannelRouterCoverage:
         assert data["ranking"]["ctr"] == 1
 
     def test_get_growth_prediction(self):
+        """**存在しない推論を自称しない**（R1.5-C4）。
+
+        `"model": "linear_regression_v2"` という模型はどこにも無く、
+        `confidence: 0.78` はその模型の確信度を騙る固定値だった。
+        """
         r = self.client.get("/api/admin/channel/growth-prediction")
         assert r.status_code == 200
         data = r.json()
-        assert data["confidence"] == 0.78
+        assert data["confidence"] is None
+        assert data["model"] is None
+        assert data["method"] == "fixed_sample"
+        assert data["is_real"] is False
 
     def test_get_alert_settings(self):
         r = self.client.get("/api/admin/channel/alert-settings")
@@ -190,7 +198,15 @@ class TestAdminChannelRouterCoverage:
         assert "roles" in data
 
     def test_get_youtube_connection(self):
+        """**接続していないので connected: false**（R1.5-C4）。
+
+        2026-08-28 まで `connected: true` と現在時刻の `last_sync` を
+        返しており、同じファイルの `DATA_SOURCE` が「接続していません」と
+        書いているのと逆のことを言っていた。
+        """
         r = self.client.get("/api/admin/channel/youtube-connection")
         assert r.status_code == 200
         data = r.json()
-        assert data["connected"] is True
+        assert data["connected"] is False
+        assert data["last_sync"] is None
+        assert data["is_real"] is False

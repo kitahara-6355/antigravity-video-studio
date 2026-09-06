@@ -84,13 +84,22 @@ def test_auto_chapters_plugin_exception_handling(monkeypatch):
     assert res.get_extension("youtube_chapters") == ""
 
 def test_auto_chapters_plugin_import_error():
+    """model_registry を import できないときの逃げ先。
+
+    **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+    `gemini-2.5-flash` を直書きしており、2026-10-16 に提供終了する
+    モデルが本番の実行経路に居座っていた。正典から引き直す。
+    """
+    from model_policy import resolve
+
     # model_registry のインポートを失敗させる
     with patch.dict(sys.modules, {"model_registry": None}):
         import plugins.auto_chapters_plugin
         importlib.reload(plugins.auto_chapters_plugin)
         
         get_model = plugins.auto_chapters_plugin.get_model
-        assert get_model("lightweight_scan") == "gemini-2.5-flash"
+        assert get_model("lightweight_scan") == resolve("lightweight_scan").model
+        assert not get_model("lightweight_scan").startswith("gemini-2.5")
     
     # テスト後にモジュールを正常に戻しておく
     import plugins.auto_chapters_plugin

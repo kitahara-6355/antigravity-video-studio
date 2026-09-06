@@ -364,3 +364,228 @@ def test_直列で結果を返さなくても実行は落ちない(tmp_path):
     rec = _run_json(tmp_path)
     assert rec["status"] in ("failed", "degraded"), rec["status"]
     assert "proofread" in rec["health"]["failed_stages"], rec["health"]
+
+
+# --- 目標尺は素材から決める（2026-08-27 ユーザー決定）-------------------------
+
+
+def test_目標尺を素材の尺から決める():
+    """**付け忘れると黙って -50 点**になっていた。
+
+    `--target-minutes` の既定は20分で、30秒の素材に対して品質ゲートの
+    QV-01 が「出力尺異常（目標20分, 差19.6分）」で満額の減点を打っていた。
+    実測: 目標尺を素材に合わせるだけで **2点 → 52点**。
+    """
+    from agents import pipeline_coordinator as pc
+
+    assert pc._auto_target_minutes(30.0) == 1       # 30秒 → 1分（0分にしない）
+    assert pc._auto_target_minutes(90.0) == 2
+    assert pc._auto_target_minutes(1800.0) == 30    # C5 の30分素材
+
+
+def test_尺が読めなければ既定値にすり替えない():
+    """**「確かめられなかった」を「20分だった」にしない。**
+
+    既存の `get_video_duration()` は失敗を 15.0 秒に握り潰す。同じ形にすると
+    誤った目標尺が黙って入り、また -50 点が出る。
+    """
+    from agents import pipeline_coordinator as pc
+
+    assert pc._auto_target_minutes(None) is None
+    assert pc._auto_target_minutes(0.0) is None
+    assert pc._auto_target_minutes(-1.0) is None
+
+
+def test_明示した目標尺が自動より優先される(tmp_path, monkeypatch):
+    """**狙いがあるときは人が上書きできる。**"""
+    from agents import pipeline_coordinator as pc
+
+    video = tmp_path / "素材.mp4"
+    video.write_bytes(b"x")
+    monkeypatch.setattr(pc, "_probe_duration_sec", lambda p: 30.0)
+    渡された = {}
+
+    def _捕まえる(self, ctx):
+        渡された["target_minutes"] = ctx.target_minutes
+        raise SystemExit(0)
+
+    monkeypatch.setattr(pc.PipelineCoordinator, "execute", _捕まえる)
+
+    for argv, 期待 in (([str(video)], 1), ([str(video), "--target-minutes", "20"], 20)):
+        try:
+            pc.main(argv)
+        except SystemExit:
+            pass
+        assert 渡された["target_minutes"] == 期待, argv
+
+
+# --- 使われていない中間成果物（R1.5-C3）---------------------------------------
+
+
+def test_中間成果物の使われ方が記録に残る(tmp_path):
+    """**AI が金を使って作ったものが捨てられていないか。**
+
+    `youtube_opt` の titles / tags / description は `ctx.metadata` に入るだけで、
+    成果物にも実行記録にも残らない（CLI 実行では戻り値ごと消える）。
+    消費者である YouTube 投稿が未実装だから。**それを件数で出す。**
+    """
+    c = _coordinator(tmp_path)
+    for w in c.workers:
+        if type(w).__name__ == "YouTubeOptWorker":
+            async def _メタデータを作る(ctx, _w=w):
+                ctx.metadata = {"titles": ["案1"], "tags": ["t"], "description": "d"}
+                return StageResult(stage_name=_w.name, success=True, detail="やった")
+            w.execute = _メタデータを作る
+
+    _run(c, tmp_path)
+
+    中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
+    assert 中間["youtube_metadata"]["produced"] is True
+    # **動画が出来ていなければサイドカーも作らない**（置き場が無い）ので、
+    # この筋書きでは「作られたが使われていない」のまま
+    assert 中間["youtube_metadata"]["consumed"] is False
+    assert "サイドカー" in 中間["youtube_metadata"]["consumed_by"]
+
+
+def test_作られていない中間成果物は捨てられたと言わない(tmp_path):
+    """**作られていないものは「捨てられた」ではない。**"""
+    c = _coordinator(tmp_path)
+
+    _run(c, tmp_path)
+
+    中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
+    assert 中間["youtube_metadata"]["produced"] is False
+
+
+def test_AIのメタデータがサイドカーとして残る(tmp_path):
+    """**AI が金を使って作ったものを捨てない**（R1.5-C3・2026-08-27 ユーザー決定）。
+
+    `youtube_opt` の titles / tags / description は `ctx.metadata` に入るだけで、
+    CLI 実行では戻り値ごと消えていた。消費者である YouTube 投稿が未実装だから。
+    **投稿が未実装な以上、いまの現実は手動投稿**なので、そのまま貼れる形で
+    最終動画の隣に残す。
+    """
+    final = tmp_path / "final.mp4"
+    final.write_bytes(b"video")
+    c = _coordinator(tmp_path, final_path=final)
+    for w in c.workers:
+        if type(w).__name__ == "YouTubeOptWorker":
+            async def _メタデータを作る(ctx, _w=w):
+                ctx.metadata = {"titles": ["案1"], "tags": ["t"], "description": "d"}
+                return StageResult(stage_name=_w.name, success=True, detail="やった")
+            w.execute = _メタデータを作る
+
+    _run(c, tmp_path)
+
+    横 = final.with_suffix(".youtube.json")
+    assert 横.is_file(), list(tmp_path.iterdir())
+    assert json.loads(横.read_text(encoding="utf-8"))["titles"] == ["案1"]
+
+    rec = _run_json(tmp_path)
+    assert str(横) in rec["artifacts"], rec["artifacts"]
+    中間 = {i["name"]: i for i in rec["intermediates"]}
+    assert 中間["youtube_metadata"]["consumed"] is True
+
+
+def test_メタデータが無ければサイドカーを作らない(tmp_path):
+    """**空のファイルを置いて「使った」と言わない。**"""
+    final = tmp_path / "final.mp4"
+    final.write_bytes(b"video")
+    c = _coordinator(tmp_path, final_path=final)
+
+    _run(c, tmp_path)
+
+    assert not final.with_suffix(".youtube.json").exists()
+
+
+# --- 中間成果物の判定を恒真にしない（R1.5-C3・1周目の指摘）--------------------
+
+
+def test_品質フィードバックの使われ方が恒真でない(tmp_path):
+    """**恒真の判定式は測定ではない。**
+
+    `consumed` を `ctx.render_mode in ("safe", "production")` で判定していたが、
+    `render_mode` の既定値は `"production"` で `"force"` は本線のどこからも
+    設定されない。**何も実行していなくても True** になり、この行は原理的に
+    件数へ寄与できなかった（gate-verifier の指摘 N-1）。
+    """
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    c = PipelineCoordinator()
+    ctx = PipelineContext(video_path="x.mp4", session_id="s")
+    ctx.quality_feedback = ["🔴 音がおかしい"]   # 工程は一度も走らせない
+
+    中間 = {i["name"]: i for i in c._intermediates(ctx)}
+
+    assert 中間["quality_feedback"]["consumed"] is False, 中間["quality_feedback"]
+
+
+def test_品質の講評もサイドカーに残る(tmp_path):
+    """**なぜその点数なのかが分からなければ直せない。**
+
+    `quality_feedback` は API の戻り値に入るだけで CLI 実行では消えていた
+    （`youtube_metadata` とまったく同じ形）。動画の隣に残す。
+    """
+    final = tmp_path / "final.mp4"
+    final.write_bytes(b"video")
+    c = _coordinator(tmp_path, final_path=final)
+    for w in c.workers:
+        if type(w).__name__ == "QualityGateWorker":
+            async def _講評を出す(ctx, _w=w):
+                ctx.quality_score = 89
+                ctx.quality_feedback = ["📡 解像度注意: 1280x720 (1080p推奨)"]
+                return StageResult(stage_name=_w.name, success=True, detail="やった")
+            w.execute = _講評を出す
+
+    _run(c, tmp_path)
+
+    横 = final.with_suffix(".quality.json")
+    assert 横.is_file(), list(tmp_path.iterdir())
+    中身 = json.loads(横.read_text(encoding="utf-8"))
+    assert "score" in 中身 and "feedback" in 中身
+    中間 = {i["name"]: i for i in _run_json(tmp_path)["intermediates"]}
+    assert 中間["quality_feedback"]["consumed"] is True
+
+
+def test_AIが何も出していなければ生まれたと言わない(tmp_path):
+    """**`produced` が「AI が作ったか」を測っていなかった。**
+
+    `subtitles.produced = bool(ctx.segments)` だが、`ctx.segments` を作るのは
+    文字起こし（`local:whisper`）であって校閲ではない。**AI が1文字も出して
+    いない実走でも `produced=True`** になっていた（指摘 N-2）。
+    """
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    c = PipelineCoordinator()
+    ctx = PipelineContext(video_path="x.mp4", session_id="s")
+    ctx.segments = [{"start": 0.0, "end": 1.0, "text": "あ"}]
+    ctx.skipped_features.append("AI校閲(Gemini)")   # AI は動かなかった
+
+    中間 = {i["name"]: i for i in c._intermediates(ctx)}
+
+    assert 中間["subtitles"]["produced"] is False, 中間["subtitles"]
+
+
+def test_未実装のretention分析を成果物に混ぜない(tmp_path):
+    """**`random` で作った数字を「分析結果」として成果物に入れない**（R1.5-C4）。
+
+    `retention_map_plugin` は `[STUB]` と警告を出しながら
+    `random.random()` でセグメントを組み立て、`success=True` の
+    `StageResult` を返していた。その中身は `ctx.metadata["retention_analysis"]`
+    に入り、**AI メタデータのサイドカー（成果物）にまで載っていた。**
+    """
+    import asyncio
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import PipelineContext
+
+    c = PipelineCoordinator()
+    ctx = PipelineContext(video_path="x.mp4", session_id="s")
+    ctx.segments = [{"start": 0.0, "end": 30.0, "text": "あ"}]
+
+    r = asyncio.run(c._run_retention_analysis(ctx))
+
+    assert "retention_analysis" not in (ctx.metadata or {}), ctx.metadata
+    assert any("retention" in s for s in ctx.skipped_features), ctx.skipped_features
+    assert r is None or r.success is False, r

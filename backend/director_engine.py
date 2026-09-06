@@ -18,7 +18,7 @@ load_dotenv()
 try:
     from model_registry import get_model
 except ImportError:
-    def get_model(task): return "gemini-2.5-flash"
+    def get_model(task): return "gemini-3.6-flash"
 
 class TaskManager:
     def __init__(self):
@@ -208,13 +208,48 @@ class DirectorBrain:
         except Exception as e:
             return f"分析エラー: {e}"
 
+    @staticmethod
+    def _resolve_rank_level(user_model: dict, profile_key: str, rank_type: str):
+        """`user_model` から段位を読む。**無ければ `None`**（R1.5-C4・18周目）。
+
+        ここは以前 `user_model.get('ranks', {}).get(rank_type, {}).get('level', 'Novice')`
+        と書かれていたが、**`user_model` に top-level の `ranks` キーは存在しない。**
+        実体は `profiles.<役割>.ranks.<段位>`（`branding_manager.update_user_rank()` が
+        そう書き、`frontend/src/components/Boardroom.jsx:71` もそう読む）。
+        つまりこの読み口は**どんな段位の利用者でも常に 'Novice' に落ちていた** —
+        17周目に `Boardroom.jsx` のレーダーで見つかったのと同じ形（存在しない鍵への
+        フォールバックが定数を作る）のバックエンド版。
+        段位が分からないときは分かったふりをせず `None` を返す。
+        """
+        if not isinstance(user_model, dict):
+            return None
+        profiles = user_model.get('profiles')
+        if not isinstance(profiles, dict):
+            return None
+        profile = profiles.get(profile_key)
+        if not isinstance(profile, dict):
+            return None
+        ranks = profile.get('ranks')
+        if not isinstance(ranks, dict):
+            return None
+        rank = ranks.get(rank_type)
+        if not isinstance(rank, dict):
+            return None
+        level = rank.get('level')
+        return level if isinstance(level, str) and level else None
+
     def _build_consultant_persona(self, constitution: dict, user_model: dict) -> str:
         """戦略コンサルタントモードのペルソナ指示書を構築"""
         channel_name = constitution.get('channel_name', 'Channel')
-        biz_rank = user_model.get('ranks', {}).get('biz_rank', {}).get('level', 'Novice')
+        level = self._resolve_rank_level(user_model, 'owner', 'biz_rank')
+        # 段位が読めなかったことを AI にも隠さない（分かったふりをして
+        # 「あなたは Novice です」と言わない）。
+        biz_rank = level if level else '未設定'
+        # 段位が読めないときは**安全側（初心者向け）**に倒す。
+        # ただし上の `biz_rank` は '未設定' のままなので、AI に段位を偽らせない。
         biz_advice = (
             "初心者なので、専門用語を避け、具体的で簡単なアクションアイテム（Do This）を提示してください。"
-            if biz_rank == 'Novice' else
+            if level is None or level == 'Novice' else
             "プロ同士として、高度なマーケティング理論を用いた議論を行ってください。"
         )
         return self.persona_consultant.format(
@@ -225,10 +260,13 @@ class DirectorBrain:
 
     def _build_director_persona(self, user_model: dict) -> str:
         """映像監督モードのペルソナ指示書を構築"""
-        tech_rank = user_model.get('ranks', {}).get('tech_rank', {}).get('level', 'Novice')
+        # `_build_consultant_persona` と同じ理由（R1.5-C4・18周目）。
+        # ここも `user_model['ranks']` という存在しない鍵を読んでいて常に 'Novice' だった。
+        level = self._resolve_rank_level(user_model, 'admin', 'tech_rank')
+        tech_rank = level if level else '未設定'
         tech_advice = (
             "初心者なので、ツールの使い方は手取り足取り教え、複雑な演出は代わりにやってあげてください。"
-            if tech_rank == 'Novice' else
+            if level is None or level == 'Novice' else
             "上級者なので、抽象的なイメージ共有だけで意図を汲み取り、より洗練された演出を提案してください。"
         )
         return self.persona_director.format(
@@ -251,7 +289,17 @@ class DirectorBrain:
             base_persona = self._build_director_persona(user_model)
 
         # Resolve Auto-Pilot Ratio
-        auto_pilot_ratio = user_model.get('automation_settings', {}).get('auto_pilot_ratio', 0.9)
+        # **`automation_settings` という鍵は `user_model.json` に存在しない**（R1.5-C4・18周目）。
+        # 実体は `collaborative_settings.auto_pilot_ratio`（`branding_manager.set_auto_pilot()` が
+        # そこへ書き、同 `_build_context_block` もそこから読む）。
+        # つまりここは**利用者がオートパイロット率を何に設定しても常に 0.9** を読んでいた。
+        # `_resolve_rank_level` と同じ「存在しない鍵へのフォールバックが定数を作る」形。
+        collab_settings = user_model.get('collaborative_settings')
+        if not isinstance(collab_settings, dict):
+            collab_settings = {}
+        auto_pilot_ratio = collab_settings.get('auto_pilot_ratio', 0.9)
+        if not isinstance(auto_pilot_ratio, (int, float)) or isinstance(auto_pilot_ratio, bool):
+            auto_pilot_ratio = 0.9
         auto_pilot_percent = int(auto_pilot_ratio * 100)
         
         automation_directive = f"""
@@ -513,19 +561,30 @@ class DirectorBrain:
             print(f"Resource Audit Error: {e}")
             return json.dumps([])
 
-    def calculate_quality_score(self, storyboard_plan, biz_rank="Novice"):
+    def calculate_quality_score(self, storyboard_plan, biz_rank=None):
         """
         Calculates a 'Production Quality Score' based on the plan and user level.
         """
         try:
             # Convert plan to string context
             plan_str = str(storyboard_plan)
-            
+
+            # **段位を "Novice" で捏造しない**（R1.5-C4・18周目）。
+            # 既定引数が `"Novice"` だったので、呼び出し口（画面）が段位を送らない限り
+            # **どんな利用者の絵コンテも「Novice / 期待値 Basic」で採点**されていた。
+            # 品質スコアは C4 が名指しする4カテゴリの1つなので、
+            # 採点の入力を作り物にしない。読めなければ読めないと書く。
+            level = biz_rank or self._resolve_rank_level(
+                getattr(branding_manager, "user_model", None), 'owner', 'biz_rank'
+            )
+            rank_label = level if level else '未設定'
+            expectations = "High" if level and level != 'Novice' else "Basic"
+
             prompt = f"""
             You are a Quality Assurance Director. Evaluate the following Storyboard Plan.
-            
+
             ## User Level
-            {biz_rank} (Expectations: {"High" if biz_rank != 'Novice' else "Basic"})
+            {rank_label} (Expectations: {expectations})
             
             ## Storyboard Plan (Scenes & Sources)
             {plan_str}
@@ -554,8 +613,21 @@ class DirectorBrain:
             return response.text
         except Exception as e:
             print(f"Scoring Error: {e}")
+            # **採点が落ちたときに「合格」を返さない**（R1.5-C4）。
+            # ここは以前 `score: 50 / is_acceptable: True` を返していた。
+            # UI（`frontend/src/components/DirectorBriefing.jsx:531,552,554`）は
+            # `is_acceptable` で緑の「制作開始 (Go)」を出すので、
+            # **API が落ちていても「品質チェックに通った」と見えていた。**
+            # 点を出せないときは点を名乗らない（`score: None`）。
             return json.dumps({
-                "score": 50, "rank": "C", "comment": "スコア計算に失敗しました。", "advice": "内容を確認してください。", "is_acceptable": True
+                "score": None,
+                "rank": None,
+                "comment": f"スコア計算に失敗しました（{type(e).__name__}）。**採点は行われていません。**",
+                "advice": "API キーと通信状態を確認して、もう一度採点してください。",
+                "is_acceptable": False,
+                "is_real": False,
+                "data_source": "unavailable",
+                "error": str(e),
             })
 
     def process_batch_image_task(self, task_id, scenes, style_prompt):
@@ -611,7 +683,7 @@ class DirectorBrain:
             print(f"Batch Task Failed: {e}")
             task_manager.update_task(task_id, "failed", error=str(e))
 
-    def generate_production_report(self, storyboard_plan, quality_score, biz_rank="Novice"):
+    def generate_production_report(self, storyboard_plan, quality_score, biz_rank=None):
         """
         Analyzes the session results and generates a 'Production Post-Mortem' report.
         Suggests agenda items for the Strategy Council.
@@ -620,13 +692,20 @@ class DirectorBrain:
             # Convert context to string
             plan_str = str(storyboard_plan)
             score_str = str(quality_score)
-            
+
+            # `calculate_quality_score` と同じ理由（R1.5-C4・18周目）。
+            # 呼び出し口が段位を送らないときに `"Novice"` を捏造しない。
+            level = biz_rank or self._resolve_rank_level(
+                getattr(branding_manager, "user_model", None), 'owner', 'biz_rank'
+            )
+            rank_label = level if level else '未設定'
+
             prompt = f"""
             You are the Production Manager creating a Post-Mortem Report.
             Analyze the relationship between the PLAN and the RESULT (Score).
-            
+
             ## Context
-            - User Level: {biz_rank}
+            - User Level: {rank_label}
             - Storyboard Plan: {plan_str}
             - Final Quality Score: {score_str}
             
@@ -651,14 +730,37 @@ class DirectorBrain:
                     temperature=0.4
                 )
             )
-            return response.text
+            # **分析できたときは、どのモデルが出したかを応答に残す**（R1.5-C4・18周目 反例1）。
+            # 印が無いと、下の except が返す「分析していないレポート」と区別できない。
+            raw = response.text
+            try:
+                parsed = json.loads(raw)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                parsed = None
+            if isinstance(parsed, dict):
+                parsed["is_real"] = True
+                parsed["data_source"] = f"gemini:{self.chat_model}"
+                return json.dumps(parsed)
+            return raw
         except Exception as e:
             print(f"Report Error: {e}")
+            # **分析が落ちたときに「問題なし」と「実績 XP」を返さない**（R1.5-C4・18周目 反例1）。
+            # ここは以前 `issue_detected: "特になし" / xp_grant: 50` を返していた。
+            # `"特になし"` は**分析が一度も走っていないのに「問題は検出されなかった」**という判定で、
+            # `routers/director.py` の `if xp > 0:` が **失敗の産物である 50 XP を
+            # `user_model.json` の `tech_rank` に恒久保存**していた。
+            # `backend/user_model_marks.py` は「tech_rank は実行動で稼ぐ値だから印を付けない」
+            # という前提で書かれているので、この経路がその前提を壊していた。
+            # 分析できなかったときは分析結果を名乗らない（`None`）。XP も出さない（`0`）。
             return json.dumps({
-                "summary": "セッション完了",
-                "success_factor": "完了したこと",
-                "issue_detected": "特になし",
-                "xp_grant": 50
+                "summary": f"レポート生成に失敗しました（{type(e).__name__}）。**分析は行われていません。**",
+                "success_factor": None,
+                "issue_detected": None,
+                "agenda_proposal": None,
+                "xp_grant": 0,
+                "is_real": False,
+                "data_source": "unavailable",
+                "error": str(e),
             })
 
     def verify_production_quality(self, full_text, scenes, segments):
@@ -707,8 +809,20 @@ class DirectorBrain:
             return response.text
         except Exception as e:
             print(f"Quality Gate Error: {e}")
+            # **検査が落ちたら「進行可能」と言わない**（R1.5-C4）。
+            # ここは `is_ready: True / score: 80` を返していたので、
+            # **QA エンジンが一度も走っていなくてもレンダリングへ進めた。**
+            # `calculate_quality_score()` の except を直したのと同じ扱い。
             return json.dumps({
-                "is_ready": True, "score": 80, "critical_issues": [], "suggestions": ["自動チェックに失敗しましたが、進行可能です。"], "final_verdict": "QAエンジンエラーのため、手動確認を推奨します。"
+                "is_ready": False,
+                "score": None,
+                "critical_issues": [],
+                "suggestions": ["通信とAPIキーを確認して、もう一度検査してください。"],
+                "final_verdict": f"QAエンジンエラーのため、検査は行われていません（{type(e).__name__}）。"
+                                 "手動確認を推奨します。",
+                "is_real": False,
+                "data_source": "unavailable",
+                "error": str(e),
             })
 
 # Instantiate the Brain

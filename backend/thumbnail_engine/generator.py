@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from model_registry import get_model
 except ImportError:
-    def get_model(task): return "gemini-2.5-flash"
+    def get_model(task): return "gemini-3.6-flash"
 
 logger = logging.getLogger(__name__)
 

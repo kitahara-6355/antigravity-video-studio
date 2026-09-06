@@ -67,7 +67,11 @@ def test_report_generator_various_null_bounds(tmp_path):
     # 各項目がNone/未設定時のデフォルトフォールバックが機能していること
     assert "0枚" in content
     assert "❌" in content
-    assert "品質スコア | 0.0/100" in content
+    # **未計測を「0.0/100」という測定結果に見せない**（R1.5-C4）。
+    # `backend/core/context.py:67` の quality_score は dataclass の既定値 0.0 で、
+    # この経路に品質ゲートは繋がっていない
+    assert "品質スコア | **未計測**" in content
+    assert "品質スコア | 0.0/100" not in content
 
 
 def test_report_generator_execute_exception_safety(tmp_path):

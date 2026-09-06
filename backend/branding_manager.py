@@ -457,13 +457,21 @@ class BrandingManager:
         ext_status['quests'] = quests
         
         self._save_json(USER_MODEL_PATH, self.user_model)
-        
-        return {
+
+        # **保存の後に印を付ける。** `stats` / `rivals` は `analytics_manager` が
+        # 既に印を持っているが、`quests`（`target_val: 180` / `current_val: 150`）は
+        # 素のままだった。外へ出す値は集約点を通す（R1.5-C4・10周目 N-1）。
+        try:  # backend/ を直接 sys.path に載せている経路にも対応する
+            from backend.user_model_marks import 外部実績に印を付ける
+        except ImportError:
+            from user_model_marks import 外部実績に印を付ける
+
+        return 外部実績に印を付ける({
             "stats": stats,
             "rivals": rivals,
             "quests": quests,
             "biz_xp": calculated_xp
-        }
+        })
 
     def update_user_model(self, note=None):
         if note:
@@ -488,9 +496,21 @@ class BrandingManager:
         2. Logs qualitative evolution.
         3. Returns the agenda for the Boardroom.
         """
-        xp = report_data.get('xp_grant', 50)
-        self.update_user_rank("tech_rank", amount=xp)
-        
+        # **XP の既定値を 50 にしない**（R1.5-C4・18周目 反例1と同じ形）。
+        # `xp_grant` を持たないレポート（＝実績を主張していないレポート）に
+        # 黙って 50 XP を与えると、`user_model.json` の `tech_rank` に
+        # **実行動から出ていない実績**が積まれる。`tech_rank` は
+        # `backend/user_model_marks.py` が「実行動で稼ぐ値だから印を付けない」
+        # と宣言している値なので、ここが崩れるとその宣言ごと嘘になる。
+        xp = report_data.get('xp_grant', 0)
+        if not isinstance(xp, (int, float)) or isinstance(xp, bool):
+            xp = 0
+        if report_data.get("is_real") is False:
+            # 分析されていないレポート（`generate_production_report` の except が返す形）
+            xp = 0
+        if xp > 0:
+            self.update_user_rank("tech_rank", amount=xp)
+
         # [NEW] Log Narrative Evolution automatically
         self.log_evolution(report_data)
         
@@ -500,9 +520,53 @@ class BrandingManager:
             "agenda": report_data.get('agenda_proposal', "")
         }
 
+    def get_user_model_for_display(self):
+        """**外へ出す用**。`external_status` の作り物に印を付けてから返す（R1.5-C4）。
+
+        印そのものは `backend/user_model_marks.py` にある
+        （gate-verifier 10周目 N-1）。**読み口が2つある**:
+
+        | 読み口 | 経路 |
+        |---|---|
+        | `GET /api/status` | `routers/trinity.py` |
+        | `GET /api/settings` | `settings_manager.get_all_settings()` |
+
+        10周目が名指ししたのは前者だけだが、**後者は同じクラスの別経路**
+        だったので、経路ごとに塞がず1箇所に寄せた。
+
+        保存側（`self.user_model` そのもの）は素のまま。**印がファイルへ
+        書き戻らないように、読み書きの入口を分けている**
+        （`get_evolution_log_for_display()` と同じ形）。
+        """
+        try:  # backend/ を直接 sys.path に載せている経路にも対応する
+            from backend.user_model_marks import 実績を持つ値に印を付ける
+        except ImportError:
+            from user_model_marks import 実績を持つ値に印を付ける
+
+        return 実績を持つ値に印を付ける(self.user_model)
+
     def get_evolution_log(self):
         EVOLUTION_LOG_PATH = str(_writable_path("backend/branding/evolution_log.json"))
         return self._load_json(EVOLUTION_LOG_PATH)
+
+    def get_evolution_log_for_display(self):
+        """**外へ出す用**。作り物の「実績」に印を付けてから返す（R1.5-C4）。
+
+        印そのものは `backend/evolution_log_marks.py` にある。
+        読み口が3つ（`GET /api/evolution` / `GET /api/director/evolution` /
+        `GET /api/v1/mcp/resources/evolution_log`）あり、**3つ目は
+        `branding_manager` を通らない**ので、両方が依存できる場所へ出した
+        （gate-verifier 7周目 指摘1）。
+
+        保存側（`get_evolution_log()`）は素のまま。**印がファイルへ
+        書き戻らないように、読み書きの入口を分けている。**
+        """
+        try:  # backend/ を直接 sys.path に載せている経路にも対応する
+            from backend.evolution_log_marks import 実績に印を付ける
+        except ImportError:
+            from evolution_log_marks import 実績に印を付ける
+
+        return 実績に印を付ける(self.get_evolution_log())
 
     def save_evolution_log(self, data):
         """evolution_log.json を保存する"""

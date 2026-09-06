@@ -118,6 +118,17 @@ class PipelineContext:
     preview_path: Optional[str] = None
     final_path: Optional[str] = None
     quality_score: int = 0
+    # **`quality_score` の 0 は「未計測」ではない**（R1.5-C4・9周目の指摘）。
+    # 既定が 0 なので、品質ゲートが一度も走らなくても「0点」がそのまま
+    # `_build_result` を通り、`GET /api/pipeline/report` の「総合スコア: 0.0点」や
+    # UI の「0点・❌不合格」になっていた。**条件文が名指しする
+    # 「常に 0.0 になる quality_score」そのもの。**
+    #
+    # 0 は実際に取りうる点なので、値の側で「無い」を表そうとすると必ず
+    # 取り違える（8周目に入れた `None` 判定は、生産側が 0 を出すので
+    # **本番から到達できなかった**）。**「測ったかどうか」を別に持つ。**
+    # 立てるのは `QualityGateWorker` だけ。
+    quality_scored: bool = False
     quality_feedback: List[str] = field(default_factory=list)
     metadata: Dict = field(default_factory=dict)
     stage_results: List[StageResult] = field(default_factory=list)

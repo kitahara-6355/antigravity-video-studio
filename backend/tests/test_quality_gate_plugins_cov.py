@@ -14,6 +14,13 @@ class _MockCtx:
         self.preview_path = preview_path
         self.segments = segments or []
         self.selected_segments = selected_segments or []
+        # **維持率予測はフック強度の実測値を要る**（R1.5-C4・19周目）。
+        # 以前は `+ 70 * hook_strength_weight` と定数を足していて、
+        # **予測維持率の 25% が捏造**だった。本番では HookStrengthCheck が
+        # 先に走って実測値を積むので、テストでも同じものを渡す。
+        self._quality_plugin_results = {
+            "hook_strength_check": {"details": {"hook_score": 70}}
+        }
         if metadata is not None:
             self.metadata = metadata
 
@@ -157,7 +164,12 @@ def test_pacing_statistics_error():
     ])
     r = RetentionPredictionCheck().analyze(ctx)
     assert r["deductions"] >= 0
-    assert r["details"]["pacing_score"] == 50
+    # **測れなかったペーシングを定数 50 で埋めない**（R1.5-C4・19周目）。
+    # 50 は実際に取りうる点なので、**実測した 50 と測れなかった 50 が
+    # 区別できなかった**。測れなければ `None` にして予測ごと止める。
+    assert r["details"]["pacing_score"] is None
+    assert r["checked"] is False
+    assert r["details"]["predicted_retention"] is None
 
 
 def test_loudness_json_decode_error():

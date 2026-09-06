@@ -35,7 +35,7 @@ try:
     from model_registry import get_model
 except Exception as e:
     logger.warning(f"model_registryの読み込み失敗 (フォールバックを使用): {e}")
-    def get_model(task): return "gemini-2.5-flash"
+    def get_model(task): return "gemini-3.6-flash"
 
 logger = logging.getLogger(__name__)
 

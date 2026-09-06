@@ -153,8 +153,20 @@ def test_build_category_html_valid_items():
 # --- 3. _build_feedback_html 関数のテスト ---
 
 def test_build_feedback_html_empty():
-    res = report_mod._build_feedback_html({})
+    # **採点したうえで**指摘0件のときだけ「クリア」と言える（R1.5-C4・11周目）
+    res = report_mod._build_feedback_html({"scored": True, "feedback": []})
     assert "✅ フィードバック: なし" in res
+
+
+def test_build_feedback_html_未計測():
+    """**未計測を「全項目クリア」と言わない**（R1.5-C4・11周目の指摘）。
+
+    採点していなければ指摘は当然0件なので、空を「クリア」と読むと
+    **測っていないことが合格として出る**。
+    """
+    res = report_mod._build_feedback_html({})
+    assert "未計測" in res
+    assert "全項目クリア" not in res
 
 def test_build_feedback_html_with_items():
     quality = {
@@ -212,6 +224,9 @@ def test_pipeline_report_all_ok(clean_pipeline_states, tmp_path):
                 {"name": "サムネイル生成ステージ", "success": True, "duration": 1.0, "detail": "サムネイル完了"},
             ],
             "quality_details": {
+                # **採点したかどうかを持つ**（R1.5-C4・9周目）。実走の `_build_result` は
+                # この旗を付ける。生産側の既定 0.0 と「未計測」を取り違えないため
+                "scored": True,
                 "score": 95,
                 "category_report": [
                     {"category": "transcription", "label": "文字起こし", "score": 95, "status": "PASS"}
@@ -266,6 +281,9 @@ def test_pipeline_report_some_fail(clean_pipeline_states):
                 {"name": "最終レンダリングステージ", "success": False, "duration": 1.0, "detail": "失敗"},
             ],
             "quality_details": {
+                # **採点したかどうかを持つ**（R1.5-C4・9周目）。実走の `_build_result` は
+                # この旗を付ける。生産側の既定 0.0 と「未計測」を取り違えないため
+                "scored": True,
                 "score": 85,  # 品質スコアNG (<90)
                 "category_report": [],
                 "feedback": ["修正点あり"]
@@ -385,6 +403,9 @@ def test_pipeline_report_thumbnail_glob_fallback(clean_pipeline_states, tmp_path
                 {"name": "サムネイル生成ステージ", "success": True, "duration": 1.0, "detail": "サムネイル完了"},
             ],
             "quality_details": {
+                # **採点したかどうかを持つ**（R1.5-C4・9周目）。実走の `_build_result` は
+                # この旗を付ける。生産側の既定 0.0 と「未計測」を取り違えないため
+                "scored": True,
                 "score": 95,
                 "category_report": [
                     {"category": "transcription", "label": "文字起こし", "score": 95, "status": "PASS"}

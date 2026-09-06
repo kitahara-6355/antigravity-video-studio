@@ -41,20 +41,36 @@ class CutStrategy:
     brand_alignment_score: float              # 0.0-1.0
     applied_philosophies: List[str]           # 注入された哲学のサマリー
     recommended_cut_rate: float               # 推奨カット率 0.0-1.0
-    generated_at: str                         # ISO8601
+    generated_at: Optional[str]               # ISO8601。実際に生成した時刻のみ。未生成なら None
     model_used: str                           # 使用モデル名
     trust_score: float = 0.0                  # 信頼スコア（MVP=0.0固定）
 
     @staticmethod
     def default() -> "CutStrategy":
-        """タイムアウト/エラー時の安全なデフォルト"""
+        """タイムアウト/エラー時の安全なデフォルト（実測ではない印を付けて返す）
+
+        以前は generated_at に datetime.now() を入れていた。Strategist が一度も
+        応答していない（30秒タイムアウト・例外・Geminiクライアント未生成）のに、
+        **現在時刻だけが本物になる**という一番悪い形だった。この戦略は
+        evolution_sync_service.record_strategy から evolution_log の
+        strategy_detail に丸ごと保存される永続台帳なので、後から読むと
+        「その時刻に Strategist が算出した戦略」に見えていた。
+        作り物に現在時刻を付けると「いま算出した」に見えるため、生成していない
+        時刻は None にする。（R1.5-C4・19周目）
+
+        brand_alignment_score / recommended_cut_rate の 0.5 も測った値ではないが、
+        こちらは同じ台帳エントリに model_used="default" と
+        summary「Strategist未応答」が並んで載るので、印は付いている。
+        （0.5 を None にすると record_strategy の書式（:.2f / :.1%）が落ちるため、
+        値は保ったまま印で示す。）
+        """
         return CutStrategy(
             summary="デフォルト戦略（Strategist未応答）",
             position_weights={"intro": 1.0, "body": 1.0, "highlight": 1.0, "outro": 1.0},
             brand_alignment_score=0.5,
             applied_philosophies=[],
             recommended_cut_rate=0.5,
-            generated_at=datetime.now().isoformat(),
+            generated_at=None,  # 生成していないので時刻を名乗らない（R1.5-C4・19周目）
             model_used="default",
             trust_score=0.0,
         )
@@ -308,25 +324,66 @@ class SmartCutStrategyService:
         except (TypeError, ValueError):
             return 0.5
 
+    # _build_strategy_prompt の「出力形式」で Strategist に必ず返させている項目。
+    # 1つでも欠けていたら、その応答は戦略として成立していない。（R1.5-C4・19周目）
+    _REQUIRED_STRATEGY_KEYS = (
+        "summary",
+        "position_weights",
+        "brand_alignment_score",
+        "recommended_cut_rate",
+    )
+
     def _parse_response(self, response, model_name: str) -> CutStrategy:
-        """GeminiレスポンスをパースしてCutStrategyを生成"""
+        """GeminiレスポンスをパースしてCutStrategyを生成
+
+        以前は **JSON がパースできさえすれば** 項目ごとの既定値で埋めていた
+        （summary="AI生成戦略" / position_weights=全1.0 / スコア=0.5）。
+        そのため Strategist が実際には何も判断していない応答でも、
+        model_used に本物のモデル名が入った戦略が出来上がり、
+        CutStrategy.default() が持っている「Strategist未応答」の印を迂回して
+        evolution_log の strategy_detail に実測値の顔で焼き付いていた。
+        欠けている項目は黙って埋めず、default() と同じ印を付けて返す。
+        （R1.5-C4・19周目）
+        """
         try:
             response_text = response.text
             json_text = self._extract_json_text(response_text)
             data = json.loads(json_text)
 
-            raw_alignment_score = data.get("brand_alignment_score", 0.5)
+            if not isinstance(data, dict):
+                logger.warning(
+                    "[Strategist] 応答が JSON オブジェクトではない → デフォルト戦略"
+                )
+                return CutStrategy.default()
+
+            missing = [k for k in self._REQUIRED_STRATEGY_KEYS if data.get(k) is None]
+            if missing:
+                logger.warning(
+                    f"[Strategist] 必須項目が欠落 {missing} → デフォルト戦略"
+                )
+                return CutStrategy.default()
+
+            # 数値2項目は「測った値」なので、変換できないなら 0.5 で埋めずに落とす。
+            # （_clamp_brand_alignment_score の except は 0.5 を返すため、
+            #   ここを通す前に変換可能かどうかを確かめる）
+            try:
+                raw_alignment_score = float(data["brand_alignment_score"])
+                recommended_cut_rate = float(data["recommended_cut_rate"])
+            except (TypeError, ValueError):
+                logger.warning(
+                    "[Strategist] スコアが数値として読めない → デフォルト戦略"
+                )
+                return CutStrategy.default()
+
             brand_alignment_score = self._clamp_brand_alignment_score(raw_alignment_score)
 
             return CutStrategy(
-                summary=data.get("summary", "AI生成戦略"),
-                position_weights=data.get("position_weights", {
-                    "intro": 1.0, "body": 1.0, "highlight": 1.0, "outro": 1.0
-                }),
+                summary=data["summary"],
+                position_weights=data["position_weights"],
                 brand_alignment_score=brand_alignment_score,
                 applied_philosophies=[],
-                recommended_cut_rate=float(data.get("recommended_cut_rate", 0.5)),
-                generated_at=datetime.now().isoformat(),
+                recommended_cut_rate=recommended_cut_rate,
+                generated_at=datetime.now().isoformat(),  # 実際に応答があった時刻
                 model_used=model_name,
                 trust_score=0.0,  # MVP: 常に0.0
             )

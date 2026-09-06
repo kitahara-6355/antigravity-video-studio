@@ -349,8 +349,18 @@ async def test_get_template_stats_not_exist(setup_evolution_log):
         log_path.unlink()
         
     data = await themes_router.get_template_stats()
+    # **集計できなかったものを 0 件と名乗らせない**（R1.5-C4・19周目）。
+    # ここは `total_selections == 0` を期待していたが、その 0 は
+    # 「台帳が無くて数えられなかった」を「数えたら0件だった」に化けさせる
+    # 捏造そのものだった。0 は実際に取りうる値なので印にならない。
+    # いま本番は数え上げを None にし、checked / is_real / data_source /
+    # skip_reason で「なぜ集計できなかったか」を明示する。
     assert data["stats"] == {}
-    assert data["total_selections"] == 0
+    assert data["total_selections"] is None
+    assert data["checked"] is False
+    assert data["is_real"] is False
+    assert data["data_source"] == "unavailable"
+    assert data["skip_reason"] == "ledger_missing"
 
 @pytest.mark.asyncio
 async def test_get_template_stats_http_exception(setup_evolution_log):
@@ -538,20 +548,37 @@ async def test_get_template_stats_data_not_dict(setup_evolution_log):
     log_path = setup_evolution_log
     log_path.write_text("[]", encoding="utf-8")
     data = await themes_router.get_template_stats()
-    assert data == {"stats": {}, "total_selections": 0}
+    # **台帳が壊れていたことを 0 件と名乗らせない**（R1.5-C4・19周目）。
+    # 応答 dict 全体を `{"stats": {}, "total_selections": 0}` と等値比較していたが、
+    # その 0 は「JSON がオブジェクトでなくて数えられなかった」を
+    # 「数えたら0件だった」に化けさせる捏造だった。
+    # 印が増えたぶん全体等値では落ちるので、必要な鍵を個別に見る。
+    assert data["stats"] == {}
+    assert data["total_selections"] is None
+    assert data["checked"] is False
+    assert data["is_real"] is False
+    assert data["data_source"] == "unavailable"
+    assert data["skip_reason"] == "ledger_not_object"
 
 @pytest.mark.asyncio
 async def test_get_template_stats_selections_not_list(setup_evolution_log):
     log_path = setup_evolution_log
     log_path.write_text('{"template_selections": {}}', encoding="utf-8")
     data = await themes_router.get_template_stats()
-    assert data == {
-        "total_selections": 0,
-        "by_template": {},
-        "by_theme": {},
-        "avg_satisfaction": {},
-        "recent": []
-    }
+    # **中身を捨てたことを 0 件と名乗らせない**（R1.5-C4・19周目）。
+    # `total_selections: 0` を含む dict 全体との等値比較だったが、
+    # ここは template_selections が list ではなく中身を読めなかった経路で、
+    # その 0 は「集計して0件だった」の偽装だった。
+    # 空の集計結果そのものは以前どおり全鍵を固定したうえで、印まで見る。
+    assert data["total_selections"] is None
+    assert data["by_template"] == {}
+    assert data["by_theme"] == {}
+    assert data["avg_satisfaction"] == {}
+    assert data["recent"] == []
+    assert data["checked"] is False
+    assert data["is_real"] is False
+    assert data["data_source"] == "unavailable"
+    assert data["skip_reason"] == "selections_not_list"
 
 @pytest.mark.asyncio
 async def test_get_template_stats_invalid_elements(setup_evolution_log):
@@ -573,9 +600,26 @@ async def test_get_template_stats_invalid_elements(setup_evolution_log):
 @pytest.mark.asyncio
 async def test_get_template_stats_read_text_error(setup_evolution_log):
     log_path = setup_evolution_log
+    # 台帳を実在させてから read_text を落とす（R1.5-C4・19周目）。
+    # フィクスチャは既存の台帳を退避して**消した状態**で渡してくるので、
+    # 以前はこのテストは exists() が False の枝に入って read_text まで到達せず、
+    # 「読み取りが落ちたとき」を1度も通っていなかった。
+    # それでも通っていたのは、本番が「無い」と「読めない」の両方に
+    # 同じ `{"stats": {}, "total_selections": 0}` を返していたからで、
+    # **テスト名が主張する経路を検証できていなかった。**
+    log_path.write_text('{"template_selections": []}', encoding="utf-8")
     with patch.object(Path, "read_text", side_effect=OSError("Read error")):
         data = await themes_router.get_template_stats()
-        assert data == {"stats": {}, "total_selections": 0}
+        # **読めなかったことを 0 件と名乗らせない**（R1.5-C4・19周目）。
+        # 応答 dict 全体を `{"stats": {}, "total_selections": 0}` と等値比較していたが、
+        # 読み取りが OSError で落ちた経路の 0 は「数えたら0件だった」の偽装だった。
+        # 印が増えたぶん全体等値では落ちるので、必要な鍵を個別に見る。
+        assert data["stats"] == {}
+        assert data["total_selections"] is None
+        assert data["checked"] is False
+        assert data["is_real"] is False
+        assert data["data_source"] == "unavailable"
+        assert data["skip_reason"] == "ledger_unreadable: OSError"
 
 @pytest.mark.asyncio
 async def test_get_template_stats_general_exception_on_exists(setup_evolution_log):
@@ -701,14 +745,32 @@ async def test_get_template_stats_empty_file(setup_evolution_log):
     log_path = setup_evolution_log
     log_path.write_text("", encoding="utf-8")
     data = await themes_router.get_template_stats()
-    assert data == {"stats": {}, "total_selections": 0}
+    # **0 バイトの台帳を「0 件の集計結果」と名乗らせない**（R1.5-C4・19周目）。
+    # 応答 dict 全体を `{"stats": {}, "total_selections": 0}` と等値比較していたが、
+    # 空ファイルは書き込みが途中で切れた跡であって、集計結果ではない。
+    # 印が増えたぶん全体等値では落ちるので、必要な鍵を個別に見る。
+    assert data["stats"] == {}
+    assert data["total_selections"] is None
+    assert data["checked"] is False
+    assert data["is_real"] is False
+    assert data["data_source"] == "unavailable"
+    assert data["skip_reason"] == "ledger_empty_file"
 
 @pytest.mark.asyncio
 async def test_get_template_stats_json_decode_error(setup_evolution_log):
     log_path = setup_evolution_log
     log_path.write_text("{invalid_json", encoding="utf-8")
     data = await themes_router.get_template_stats()
-    assert data == {"stats": {}, "total_selections": 0}
+    # **JSON が壊れていたことを 0 件と名乗らせない**（R1.5-C4・19周目）。
+    # 応答 dict 全体を `{"stats": {}, "total_selections": 0}` と等値比較していたが、
+    # パースが落ちた経路の 0 は「数えたら0件だった」の偽装だった。
+    # 印が増えたぶん全体等値では落ちるので、必要な鍵を個別に見る。
+    assert data["stats"] == {}
+    assert data["total_selections"] is None
+    assert data["checked"] is False
+    assert data["is_real"] is False
+    assert data["data_source"] == "unavailable"
+    assert data["skip_reason"] == "ledger_unreadable: JSONDecodeError"
 
 @pytest.mark.asyncio
 async def test_get_template_stats_empty_satisfaction_sats(setup_evolution_log):
@@ -722,8 +784,24 @@ async def test_get_template_stats_empty_satisfaction_sats(setup_evolution_log):
     log_path.write_text(json.dumps(dummy_log), encoding="utf-8")
     
     data = await themes_router.get_template_stats()
-    assert data["avg_satisfaction"]["nhk_documentary"] == 3.0
-    assert data["avg_satisfaction"]["mrbeast_entertainment"] == 3.0
+    # **誰も評価していないのに平均満足度を名乗らせない**（R1.5-C4・19周目）。
+    # ここは両方に `== 3.0` を期待していたが、その 3.0 は
+    # 「satisfaction が数値として読めない／そもそも無い」テンプレートに
+    # 5 段階の中央値を「平均満足度」として返していた捏造そのものだった。
+    # 3.0 は実在しうる平均値なので印にならない。
+    # いまは平均が None になり、rated_counts / unrated_templates で
+    # 「評価が0件だから平均が無い」ことが読み取れる。
+    assert data["avg_satisfaction"]["nhk_documentary"] is None
+    assert data["avg_satisfaction"]["mrbeast_entertainment"] is None
+    assert data["rated_counts"]["nhk_documentary"] == 0
+    assert data["rated_counts"]["mrbeast_entertainment"] == 0
+    assert sorted(data["unrated_templates"]) == ["mrbeast_entertainment", "nhk_documentary"]
+    # 選択の件数のほうは実際に台帳を読んで数えられている。
+    # 名乗ってよいのはこちらだけなので、印が measured 側であることも固定する。
+    assert data["total_selections"] == 2
+    assert data["checked"] is True
+    assert data["is_real"] is True
+    assert data["data_source"] == "measured"
 
 
 # ============================================================

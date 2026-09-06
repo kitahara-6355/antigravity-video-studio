@@ -13,12 +13,32 @@ if backend_path not in sys.path:
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
 
+def _表示用の読み口(mock):
+    """実物と同じ経路にする — `user_model` を読み、印の集約点へ通す。
+
+    素通しの `return_value` にすると、`user_model` を
+    `PropertyMock(side_effect=OSError)` にした例外系のテストで
+    **例外が伝わらず 200 が返る**（門が無いのと同じになる）。
+    """
+    def 読む():
+        from user_model_marks import 実績を持つ値に印を付ける
+        return 実績を持つ値に印を付ける(mock.user_model)
+    return 読む
+
+
 @pytest.fixture
 def mock_branding_manager():
     mock = MagicMock()
     mock.user_model = {"rank": "A", "xp": 100, "tech_rank": "S", "biz_rank": "A"}
     mock.process_analytics_update.return_value = {"updates": 2, "status": "ok"}
     mock.get_evolution_log.return_value = {"entries": [], "philosophies": []}
+    # **表示用の読み口は別**（R1.5-C4・6周目 指摘1）。作り物の「実績」への印は
+    # `get_evolution_log_for_display()` に1箇所だけ置いてある
+    mock.get_evolution_log_for_display.return_value = {"entries": [], "philosophies": []}
+    # **チャンネル統計の印も同じ形**（R1.5-C4・10周目 N-1）。
+    # `GET /api/status` は `user_model` を直に読むのをやめ、
+    # `get_user_model_for_display()`（印の集約点）を通す
+    mock.get_user_model_for_display.side_effect = _表示用の読み口(mock)
     return mock
 
 @pytest.fixture
@@ -44,7 +64,12 @@ class TestTrinityRouterCoverage:
             client = TestClient(app)
             resp = client.post("/api/analytics/sync")
         assert resp.status_code == 200
-        assert resp.json() == {"updates": 2, "status": "ok"}
+        payload = resp.json()
+        # **チャンネル統計は YouTube に繋がっていない**（R1.5-C4・6周目 指摘2）。
+        # 出所の印が増えたので、完全一致ではなく包含で見る
+        assert payload["updates"] == 2 and payload["status"] == "ok"
+        assert payload["is_real"] is False
+        assert payload["data_source"] == "sample"
 
     def test_simulate_analytics(self, mock_branding_manager, mock_analytics_manager):
         """TR-C03: POST /analytics/simulate → 200"""
@@ -267,6 +292,7 @@ class TestTrinityRouterCoverage:
         # 1. /status (例外)
         mock_bm1 = MagicMock()
         type(mock_bm1).user_model = PropertyMock(side_effect=OSError("Status DB Error"))
+        mock_bm1.get_user_model_for_display.side_effect = _表示用の読み口(mock_bm1)
         with patch("branding_manager.branding_manager", mock_bm1):
             resp = client.get("/api/status")
         assert resp.status_code == 500
@@ -287,6 +313,7 @@ class TestTrinityRouterCoverage:
         # 1.5. /status (None の場合)
         mock_bm1_none = MagicMock()
         type(mock_bm1_none).user_model = PropertyMock(return_value=None)
+        mock_bm1_none.get_user_model_for_display.side_effect = _表示用の読み口(mock_bm1_none)
         with patch("branding_manager.branding_manager", mock_bm1_none):
             resp = client.get("/api/status")
         assert resp.status_code == 404
@@ -331,14 +358,14 @@ class TestTrinityRouterCoverage:
 
         # 5. /evolution (例外)
         mock_bm5 = MagicMock()
-        mock_bm5.get_evolution_log.side_effect = Exception("Log Error")
+        mock_bm5.get_evolution_log_for_display.side_effect = Exception("Log Error")
         with patch("branding_manager.branding_manager", mock_bm5):
             resp = client.get("/api/evolution")
         assert resp.status_code == 500
 
         # 5.5. /evolution (None の場合)
         mock_bm5_none = MagicMock()
-        mock_bm5_none.get_evolution_log.return_value = None
+        mock_bm5_none.get_evolution_log_for_display.return_value = None
         with patch("branding_manager.branding_manager", mock_bm5_none):
             resp = client.get("/api/evolution")
         assert resp.status_code == 404
@@ -441,6 +468,7 @@ class TestTrinityRouterCoverage:
         client = TestClient(app)
         mock_bm = MagicMock()
         type(mock_bm).user_model = PropertyMock(side_effect=OSError("Status Error"))
+        mock_bm.get_user_model_for_display.side_effect = _表示用の読み口(mock_bm)
         
         with patch("branding_manager.branding_manager", mock_bm), \
              patch("agents.memory.technical_debt.TechnicalDebtStore.register_debt", side_effect=Exception("TDR Fail")), \
@@ -459,6 +487,7 @@ class TestTrinityRouterCoverage:
         client = TestClient(app)
         mock_bm = MagicMock()
         type(mock_bm).user_model = PropertyMock(side_effect=OSError("Detailed Log Test Error"))
+        mock_bm.get_user_model_for_display.side_effect = _表示用の読み口(mock_bm)
         
         with patch("branding_manager.branding_manager", mock_bm), \
              patch("agents.memory.technical_debt.TechnicalDebtStore.register_debt") as mock_register, \

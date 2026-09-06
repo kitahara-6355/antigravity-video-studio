@@ -36,14 +36,18 @@ class QualityIssue:
 class QualityReport:
     """品質レポート"""
     is_ready: bool
-    score: int
+    score: Optional[int]
     issues: List[QualityIssue]
     summary: str
-    
+    # **採点したかどうか**（R1.5-C4）。`score is None` と対で読む。
+    # 「問題ゼロで満点」と「見るものが無い」を取り違えないための印
+    scored: bool = True
+
     def to_dict(self) -> dict:
         return {
             "is_ready": self.is_ready,
             "score": self.score,
+            "scored": self.scored,
             "issues": [
                 {
                     "level": issue.level.value,
@@ -104,28 +108,80 @@ class QualityGateAgent:
             except (AttributeError, IndexError, RuntimeError, re.error) as e:
                 logger.error(f"Unexpected quality check failure: {check_func.__name__} - {e}", exc_info=True)
         
+        # **見るものが無ければ点を名乗らない**（R1.5-C4・2026-08-29）。
+        # `_calculate_score()` は 100 点から減点する形なので、
+        # **入力が空だと減点対象が1つも見つからず、必ず 100 点になる。**
+        # 実際 `POST /api/quality/check` に空の body を投げると
+        # `{"is_ready": true, "score": 100, "summary": "✅ 優秀な品質です。
+        # レンダリングを推奨します。"}` が返っていた。**動画を1フレームも
+        # 見ていないのに「優秀・レンダリング推奨」。**
+        # 4周目 C-5（`/api/review/summary` が 1項目も採点せず 100.0）と同型で、
+        # あちらは死蔵だったが**こちらはフロントエンドが呼ぶ本番経路**
+        # （`frontend/src/gateway/endpoints.js` の `/api/quality/*`）。
+        検査対象 = self._検査対象があるか(content)
+
+        if not 検査対象:
+            report = QualityReport(
+                is_ready=False,
+                score=None,
+                issues=issues,
+                summary="⚠️ 採点していません（脚本・シーン・字幕のいずれも渡されていません）。"
+                        "**品質を保証する材料がありません。**",
+            )
+            report.scored = False
+            logger.info("Quality Gate: 検査対象が無いため採点しませんでした")
+            return report
+
         # スコア計算
         score = self._calculate_score(issues)
-        
+
         # 合格判定
         is_ready = score >= self.THRESHOLD_PASS and not any(
             issue.level == QualityLevel.CRITICAL for issue in issues
         )
-        
+
         # サマリー生成
         summary = self._generate_summary(score, issues, is_ready)
-        
+
         report = QualityReport(
             is_ready=is_ready,
             score=score,
             issues=issues,
             summary=summary
         )
+        report.scored = True
         
         logger.info(f"Quality Gate: Score={score}, Ready={is_ready}, Issues={len(issues)}")
         
         return report
     
+    def _検査対象があるか(self, content: Dict[str, Any]) -> bool:
+        """採点する材料が1つでもあるか（R1.5-C4）。
+
+        脚本も字幕もシーンも無いときに 100 点を出さないための門。
+        **「問題が見つからなかった」と「見ていない」は別物。**
+
+        `scenes: [{}]`（空の dict 1個）のような**中身の無い入れ物では通さない**。
+        7周目の検証で、それが `score: 100 / 「✅ 優秀な品質です」` を通していた
+        （4検査のうち3つは空を見たままだった）。
+        """
+        if not isinstance(content, dict):
+            return False
+        if str(content.get("full_text") or "").strip():
+            return True
+
+        def _中身がある(items, 鍵: str) -> bool:
+            if not isinstance(items, list):
+                return False
+            return any(
+                isinstance(x, dict) and str(x.get(鍵) or "").strip()
+                for x in items
+            )
+
+        # シーンは名前、字幕は本文が無ければ「見るもの」にならない
+        return _中身がある(content.get("scenes"), "name") or \
+            _中身がある(content.get("segments"), "text")
+
     def _calculate_score(self, issues: List[QualityIssue]) -> int:
         """スコア計算"""
         base_score = 100

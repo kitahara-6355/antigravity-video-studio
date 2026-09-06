@@ -117,11 +117,18 @@ class CostGuard:
     """使う前に止める。使ったら記録する。"""
 
     def __init__(self, limit_jpy: float, spent_jpy: float = 0.0,
-                 ledger_path: Path = LEDGER_PATH,
+                 ledger_path: Path | None = None,
                  budget_id: str = "", reserve_jpy: float = DEFAULT_RESERVE_JPY):
         self.limit_jpy = float(limit_jpy)
         self.spent_jpy = float(spent_jpy)
-        self.ledger_path = Path(ledger_path)
+        # **既定値を束縛せずに毎回モジュール変数を見る。**（2026-08-27）
+        # 既定引数に `LEDGER_PATH` を焼き込むと import 時に確定してしまい、
+        # テストの monkeypatch が効かない。`flush_to_budget` では同じ罠を
+        # 直してあったが、こちらは残っていた。実害が出た — CI run 33079706782 で
+        # `test_shared/test_model_governance.py` の統治プロキシ系5件が
+        # **本番の `.claude/cost_ledger.jsonl` に追記していた**（実費の記録に
+        # テストの数字が混ざると「いくら使ったか」が分からなくなる）。
+        self.ledger_path = Path(LEDGER_PATH if ledger_path is None else ledger_path)
         self.budget_id = budget_id
         self.reserve_jpy = float(reserve_jpy)
         self.calls = 0

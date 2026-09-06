@@ -206,8 +206,14 @@ def test_run_gate_exception_handling(caplog):
     # 各例外が発生してもクラッシュせず、正常にレポートが返ることを検証
     with caplog.at_level(logging.WARNING):
         report = agent.run_gate(content)
-        assert report.is_ready is True
-        assert report.score == 100
+        # **見るものが無ければ点を名乗らない**（R1.5-C4）。ここは以前
+        # `is_ready is True / score == 100` を期待していたが、それが通っていたのは
+        # `_calculate_score()` が 100 点からの減点式で、**入力が空だと減点対象が
+        # 1つも見つからず必ず満点になる**から。例外を握って落ちないことは
+        # 変わらず見る（このテストの本来の意図）。
+        assert report.scored is False
+        assert report.score is None
+        assert report.is_ready is False
 
         # 各例外に対するログ出力の検証
         log_messages = [record.message for record in caplog.records]
@@ -281,8 +287,10 @@ def test_run_gate_robustness():
     
     # 1. content が辞書ではない場合
     report_invalid_content = agent.run_gate(None)  # type: ignore
-    assert report_invalid_content.is_ready is True
-    assert report_invalid_content.score == 100
+    # **見るものが無ければ点を名乗らない**（R1.5-C4）。クラッシュしないことは変わらず見る
+    assert report_invalid_content.scored is False
+    assert report_invalid_content.score is None
+    assert report_invalid_content.is_ready is False
 
     # 2. segments や scenes がリストではない場合、要素が辞書でない場合
     content_invalid_types = {
@@ -304,6 +312,8 @@ def test_run_gate_robustness():
         "scenes": []
     }
     report_invalid_times = agent.run_gate(content_invalid_times)
+    # segments があるので採点はする（門が広すぎないことの確認・R1.5-C4）
+    assert report_invalid_times.scored is True
     assert report_invalid_times.is_ready is True
     assert report_invalid_times.score == 100
 
@@ -399,8 +409,14 @@ def test_run_gate_specific_exceptions(caplog):
 
     with caplog.at_level(logging.ERROR):
         report = agent.run_gate(content)
-        assert report.is_ready is True
-        assert report.score == 100
+        # **見るものが無ければ点を名乗らない**（R1.5-C4）。ここは以前
+        # `is_ready is True / score == 100` を期待していたが、それが通っていたのは
+        # `_calculate_score()` が 100 点からの減点式で、**入力が空だと減点対象が
+        # 1つも見つからず必ず満点になる**から。例外を握って落ちないことは
+        # 変わらず見る（このテストの本来の意図）。
+        assert report.scored is False
+        assert report.score is None
+        assert report.is_ready is False
 
         log_messages = [record.message for record in caplog.records]
         assert any("Unexpected quality check failure: check_attribute_error - attribute_error" in msg for msg in log_messages)

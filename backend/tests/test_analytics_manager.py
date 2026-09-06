@@ -64,15 +64,20 @@ def test_scout_rivals_invalid_stats():
     
     # Test with None
     rivals_none = manager.scout_rivals(None)
-    assert rivals_none == {"nemesis": None, "benchmark": None}
+    # **印が増えたので完全一致をやめる**（R1.5-C4）。ライバルは `mock_rival_db` の
+    # 固定値から選ぶだけなので、`GET /api/status` が実測に見えないよう名乗らせている
+    assert rivals_none["nemesis"] is None and rivals_none["benchmark"] is None
+    assert rivals_none["is_real"] is False
     
     # Test with list (invalid type)
     rivals_list = manager.scout_rivals([])
-    assert rivals_list == {"nemesis": None, "benchmark": None}
+    assert rivals_list["nemesis"] is None and rivals_list["benchmark"] is None
+    assert rivals_list["is_real"] is False  # R1.5-C4
     
     # Test with string (invalid type)
     rivals_str = manager.scout_rivals("not_a_dict")
-    assert rivals_str == {"nemesis": None, "benchmark": None}
+    assert rivals_str["nemesis"] is None and rivals_str["benchmark"] is None
+    assert rivals_str["is_real"] is False  # R1.5-C4
 
 def test_sim_add_views():
     manager = AnalyticsManager()

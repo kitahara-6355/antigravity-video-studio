@@ -27,6 +27,13 @@ class _MockCtx:
         self.segments = segments or []
         self.selected_segments = selected_segments or []
         self.metadata = metadata or {}
+        # **維持率予測はフック強度の実測値を要る**（R1.5-C4・19周目）。
+        # 以前は `+ 70 * hook_strength_weight` と定数を足していて、
+        # **予測維持率の 25% が捏造**だった。本番では HookStrengthCheck が
+        # 先に走って実測値を積むので、テストでも同じものを渡す。
+        self._quality_plugin_results = {
+            "hook_strength_check": {"details": {"hook_score": 70}}
+        }
 
 
 class TestQualityGateCore:

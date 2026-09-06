@@ -419,3 +419,435 @@ def test_過去のモデル記録で最新を免責しない(tmp_path):
     最新 = {"run_id": "new", "models_used": []}
 
     assert "no_models_recorded" in _kinds(check_models([過去, 最新]))
+
+
+# --- 実装不足項目の台帳（R1.5・2026-08-27 ユーザー決定）------------------------
+#
+# **実装が足りていない機能を1箇所に集める。** 分かっている7件のうち3件は正典の
+# 条件文に散らばって書かれ、残り4件はどこにも書かれていなかった（実走ログと
+# 品質ゲートの出力にしか現れない）。**一覧が無ければ思い出せない。**
+#
+# 技術負債の台帳（1,463件）とは別物。あれは `file_path:line_number` を持つ
+# 既存コードの負債で、**存在しない機能は行番号を持てない**。
+
+
+def test_台帳の全項目に理由と判定条件がある():
+    """**「あとで書く」を許さない。** 理由の無い項目は思い出せない。"""
+    from backend.feature_gaps import check_entries, load_gaps
+
+    assert check_entries(load_gaps()) == []
+
+
+def test_理由が無ければ不備として出る():
+    from backend.feature_gaps import check_entries
+
+    不備 = check_entries([{"id": "x", "title": "何か", "kind": "gap",
+                           "handled_in": "将来",
+                           "done_when": {"kind": "run_record_clean"}}])
+
+    assert any("why" in m for m in 不備), 不備
+
+
+def test_gapには行先が要る():
+    """`intentional` には要らないが、`gap` は**どこで直すか**が要る。"""
+    from backend.feature_gaps import check_entries
+
+    不備 = check_entries([{"id": "x", "title": "何か", "kind": "gap",
+                           "why": "理由", "done_when": {"kind": "run_record_clean"}}])
+
+    assert any("handled_in" in m for m in 不備), 不備
+
+
+def _記録(**over) -> dict:
+    run = {"run_id": "r", "status": "degraded",
+           "health": {"skipped_features": [], "failed_stages": []}}
+    run["health"].update(over)
+    return run
+
+
+def test_記録に出た未知の項目を見つける():
+    """**新しい実装漏れが黙って増えない。**"""
+    from backend.feature_gaps import unknown_from_record
+
+    出た = unknown_from_record(_記録(skipped_features=["字幕の焼き込み"]), [])
+
+    assert 出た == ["字幕の焼き込み"]
+
+
+def test_本線の工程名は実装漏れではない():
+    """`quality_gate` が落ちたのは**工程の失敗**であって実装不足ではない。"""
+    from backend.feature_gaps import unknown_from_record
+
+    assert unknown_from_record(
+        _記録(failed_stages=["quality_gate"], skipped_features=["quality_gate"]), []) == []
+
+
+def test_台帳に載っていれば実装漏れではない():
+    from backend.feature_gaps import unknown_from_record
+
+    gaps = [{"id": "bgm", "surfaces_as": "BGMミキシング", "kind": "gap"}]
+
+    assert unknown_from_record(_記録(skipped_features=["BGMミキシング(ファイルなし)"]), gaps) == []
+
+
+def test_意図して止めているものも実装漏れではない():
+    """**実行記録には gap と intentional が同じ顔で出る。** 区別しないと誤検知する。"""
+    from backend.feature_gaps import unknown_from_record
+
+    gaps = [{"id": "dream", "surfaces_as": "dream_learning", "kind": "intentional"}]
+
+    assert unknown_from_record(_記録(skipped_features=["dream_learning"]), gaps) == []
+
+
+def test_記録から消えたら実装済みとみなす():
+    """**片付け忘れが残らない。** 直したのに台帳に残っていたら FAIL する。"""
+    from backend.feature_gaps import is_done
+
+    gap = {"id": "bgm", "surfaces_as": "BGMミキシング",
+           "done_when": {"kind": "run_record_clean"}}
+
+    assert is_done(gap, _記録(skipped_features=[])) is True
+    assert is_done(gap, _記録(skipped_features=["BGMミキシング(ファイルなし)"])) is False
+
+
+def test_成果物が出たら実装済みとみなす():
+    from backend.feature_gaps import is_done
+
+    gap = {"id": "thumb",
+           "done_when": {"kind": "artifact_present", "suffixes": [".png", ".jpg"]}}
+
+    assert is_done(gap, {"artifacts": ["out.mp4"], "health": {}}) is False
+    assert is_done(gap, {"artifacts": ["out.mp4", "t.png"], "health": {}}) is True
+
+
+def test_印が残っている間は未実装(tmp_path):
+    """**印が消えても実装済みの証拠にはならない**（弱い証拠）。
+
+    `placeholder_video_id` が「書いてあるが動かない」の実例。だから実行記録で
+    判定できる項目にはこの種類を使わない。
+    """
+    from backend.feature_gaps import is_done
+
+    f = tmp_path / "x.py"
+    f.write_text("video_id = 'placeholder_video_id'", encoding="utf-8")
+    gap = {"id": "up", "done_when": {"kind": "marker_gone",
+                                     "path": str(f), "marker": "placeholder_video_id"}}
+
+    assert is_done(gap, None) is False
+    f.write_text("video_id = resp['id']", encoding="utf-8")
+    assert is_done(gap, None) is True
+
+
+def test_記録が無ければ確かめていないと言う():
+    """**「確かめられなかった」を「問題なし」にしない。**"""
+    from backend.feature_gaps import is_done
+
+    gap = {"id": "bgm", "surfaces_as": "BGM", "done_when": {"kind": "run_record_clean"}}
+
+    assert is_done(gap, None) is None
+
+
+def _台帳(**over) -> list[dict]:
+    g = {"id": "bgm", "kind": "gap", "title": "BGM", "why": "理由",
+         "handled_in": "将来", "surfaces_as": "BGM",
+         "done_when": {"kind": "run_record_clean"}}
+    g.update(over)
+    return [g]
+
+
+def test_静的点検は確かめなかった検査を列挙する():
+    """**黙って飛ばさない。**
+
+    `model_policy --audit` がダミーキーで exit 0 を返す問題と同じ形なので、
+    ここで同じ間違いを繰り返さない。CI は実走できない（実キーも実行記録も
+    無い）ので、評価しなかった検査は必ず名前を出す。
+    """
+    from backend.feature_gaps import audit
+
+    違反, 未確認 = audit(None, _台帳(), static_only=True)
+
+    assert 違反 == []
+    assert any("bgm" in m for m in 未確認), 未確認
+
+
+def test_点検が新しい実装漏れで落ちる():
+    from backend.feature_gaps import audit
+
+    違反, _ = audit(_記録(skipped_features=["字幕の焼き込み"]), _台帳())
+
+    assert any("字幕の焼き込み" in m for m in 違反), 違反
+
+
+def test_点検が片付け忘れで落ちる():
+    from backend.feature_gaps import audit
+
+    違反, _ = audit(_記録(skipped_features=[]), _台帳())
+
+    assert any("bgm" in m and "実装" in m for m in 違反), 違反
+
+
+def test_showは落ちない():
+    from backend import feature_gaps
+
+    assert feature_gaps.main(["--show"]) == 0
+
+
+def _品質ctx(tmp_path):
+    """品質ゲートに渡す最小のコンテキスト。"""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from agents.pipeline_types import PipelineContext
+
+    preview = tmp_path / "preview.mp4"
+    preview.write_bytes(b"0" * 2048)
+    ctx = PipelineContext(video_path=str(tmp_path / "src.mp4"), session_id="t")
+    ctx.preview_path = str(preview)
+    ctx.segments = [{"start": 0.0, "end": 3.0, "text": "あ", "score": 0.8}]
+    ctx.selected_segments = list(ctx.segments)
+    return ctx
+
+
+def test_台帳に載っている機能は減点しない(tmp_path):
+    """**構成上どうやっても届かない減点を止める。**
+
+    本線にサムネイル工程は無い。無い工程を減点し続けると品質ゲートは
+    **原理的に閾値へ到達できない**（実測: 物理 -20 / プラグイン -15 /
+    完走チェック -5）。台帳に載っている間は減点せず、「やっていない」として
+    `skipped_features` に出す。**実装したら台帳から消え、その瞬間から
+    ゲートが本気で見はじめる。**
+    """
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = {"thumbnail"}
+
+    結果 = QualityGateWorker()._thumbnail_physical_check(ctx)
+
+    assert 結果["failures"] == [], 結果
+    assert any("サムネイル" in s for s in ctx.skipped_features), ctx.skipped_features
+
+
+def test_台帳に無ければ従来どおり減点する(tmp_path):
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = set()
+
+    assert QualityGateWorker()._thumbnail_physical_check(ctx)["failures"]
+
+
+def test_宣言した能力のプラグインは回さない(tmp_path):
+    from quality_gate_plugins import run_all_plugins
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = {"thumbnail"}
+
+    結果 = run_all_plugins(ctx, None)
+
+    assert "thumbnail_quality_check" not in 結果["plugin_results"], 結果["plugin_results"].keys()
+    assert not any("サムネイル" in f for f in 結果["feedback"]), 結果["feedback"]
+
+
+def test_床打ちした素点が見える(tmp_path):
+    """**0点は「どれくらい悪いか」を何も言わない。**
+
+    実測では減点合計が -134（素点 -34）でも表示は 0 点だった。改善しても
+    数字が動かないので、改善ループが効いているかを判断できない
+    （実際、品質改善ループ3周がまったく動かなかった）。
+
+    `ctx.quality_score` の 0〜100 の範囲は変えない（消費側が多い）。
+    素点は detail と記録に残す。
+    """
+    import asyncio
+    from agents.workers.quality_gate_worker import QualityGateWorker
+
+    ctx = _品質ctx(tmp_path)
+    ctx.declared_gaps = set()
+    ctx.target_minutes = 20      # 30秒未満の素材に対して QV-01 が -50 を打つ
+
+    r = asyncio.run(QualityGateWorker().execute(ctx))
+
+    assert ctx.quality_score >= 0
+    assert "素点" in r.detail, r.detail
+    assert (ctx.quality_gate_report or {}).get("raw_score") is not None
+
+
+# --- AI が成果物に届いているか（R1.5-C3・2026-08-27）--------------------------
+#
+# **実測で確かめた前提**: AI なしで2回走らせると最終 mp4 の SHA256 は完全一致した
+# （`58b2511a…` / 2,988,566 bytes ×2）。**エンコーダは決定的**なので、AI ありとの
+# 差（`6b3d4495…` / 2,986,662 bytes）は AI に起因すると言い切れる。
+
+
+def _ai_run(rid: str, *, calls: int, digest: str) -> dict:
+    return {"run_id": rid, "status": "degraded", "calls": calls,
+            "artifacts": [f"/out/{rid}/final.mp4"],
+            "artifact_digests": {f"/out/{rid}/final.mp4": digest}}
+
+
+def test_AIありとなしで成果物が違えば通る():
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    assert check_ai_effect([_ai_run("a", calls=0, digest="x"),
+                            _ai_run("b", calls=2, digest="y")]) == []
+
+
+def test_AIを効かせても成果物が同じなら落ちる():
+    """**AI が動いていても、出力が成果物に届いていなければ意味がない。**"""
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    出た = check_ai_effect([_ai_run("a", calls=0, digest="same"),
+                            _ai_run("b", calls=2, digest="same")])
+
+    assert "ai_not_reaching_artifact" in _kinds(出た), 出た
+
+
+def test_片方しか無ければ確かめていないと言う():
+    """**「確かめられなかった」を「問題なし」にしない。**"""
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    出た = check_ai_effect([_ai_run("b", calls=2, digest="y")])
+
+    assert "ai_effect_unverified" in _kinds(出た), 出た
+
+
+def test_指紋が読めなければ確かめていないと言う():
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    出た = check_ai_effect([_ai_run("a", calls=0, digest=None),
+                            _ai_run("b", calls=2, digest="y")])
+
+    assert "ai_effect_unverified" in _kinds(出た), 出た
+
+
+# --- 使われていない中間成果物（R1.5-C3・後半）---------------------------------
+#
+# **AI が金を使って作ったものが捨てられていないか。** `youtube_opt` が生成する
+# titles / tags / description は `ctx.metadata` に入るだけで、成果物にも実行記録にも
+# 残らない（CLI 実行では戻り値ごと消える）。消費者である YouTube 投稿が未実装だから。
+
+
+def test_使われていない中間成果物を数える():
+    from backend.revenue.artifact_gate import unused_intermediates
+
+    run = {"run_id": "r", "intermediates": [
+        {"name": "youtube_metadata", "produced": True, "consumed": False},
+        {"name": "subtitles", "produced": True, "consumed": True},
+    ]}
+
+    出た = unused_intermediates(run)
+
+    assert [i["name"] for i in 出た] == ["youtube_metadata"]
+
+
+def test_生まれていないものは数えない():
+    """**作られていないものは「捨てられた」ではない。**"""
+    from backend.revenue.artifact_gate import unused_intermediates
+
+    run = {"run_id": "r", "intermediates": [
+        {"name": "youtube_metadata", "produced": False, "consumed": False}]}
+
+    assert unused_intermediates(run) == []
+
+
+def test_中間成果物の記録が無ければ確かめていないと言う():
+    from backend.revenue.artifact_gate import check_intermediates
+
+    出た = check_intermediates([{"run_id": "r"}])
+
+    assert "intermediates_unverified" in _kinds(出た), 出た
+
+
+def test_使われていない中間成果物があればゲートが落ちる():
+    """**0 でなければ FAIL**（正典 R1.5-C3）。"""
+    from backend.revenue.artifact_gate import check_intermediates
+
+    出た = check_intermediates([{"run_id": "r", "intermediates": [
+        {"name": "youtube_metadata", "produced": True, "consumed": False,
+         "consumed_by": "youtube_upload"}]}])
+
+    assert "unused_intermediate" in _kinds(出た), 出た
+
+
+def test_使われていない中間成果物があるとゲートが落ちる(tmp_path, monkeypatch):
+    """**0 でなければ成果物ゲートが FAIL する**（正典 R1.5-C3）。"""
+    from backend import cost_guard
+    from backend.revenue import artifact_gate as ag
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps({"metered": True, "known_price": True}) + "\n",
+                      encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+    monkeypatch.setattr(ag, "check_video", lambda p: (None, []))
+    runs = tmp_path / "runs"
+    d = runs / "20260827T120000000000-0000"
+    d.mkdir(parents=True)
+    (d / "run.json").write_text(json.dumps({
+        "run_id": "20260827T120000000000-0000", "started_at": "2026-08-27T00:00:00Z",
+        "status": "completed",
+        "stages": [{"name": "render", "status": "success", "model": "local:ffmpeg"}],
+        "models_used": ["local:ffmpeg"], "artifacts": ["out.mp4"],
+        "intermediates": [{"name": "youtube_metadata", "produced": True,
+                           "consumed": False, "consumed_by": "youtube_upload"}],
+    }), encoding="utf-8")
+
+    report = ag.run_gate(video=None, runs_dir=runs)
+
+    assert "unused_intermediate" in _kinds(report.findings), report.findings
+    assert not report.ok
+
+
+def test_別の素材どうしを比べない():
+    """**AI 以外の理由で違ったものを「AI が効いた」にしない。**
+
+    比べる2本の入力が違えば、成果物が違うのは当たり前。素材や目標尺が
+    違うペアで緑になっていた（gate-verifier の指摘 N-3）。
+    """
+    from backend.revenue.artifact_gate import check_ai_effect
+
+    def _run(rid, calls, digest, video, minutes=1):
+        return {"run_id": rid, "calls": calls,
+                "inputs": {"video_path": video, "target_minutes": minutes},
+                "artifacts": [f"/out/{rid}/final.mp4"],
+                "artifact_digests": {f"/out/{rid}/final.mp4": digest}}
+
+    別素材 = check_ai_effect([_run("a", 0, "x", "clip30s.mp4"),
+                              _run("b", 2, "y", "30min.mp4")])
+    別の尺 = check_ai_effect([_run("a", 0, "x", "clip30s.mp4", 1),
+                              _run("b", 2, "y", "clip30s.mp4", 20)])
+    同条件 = check_ai_effect([_run("a", 0, "x", "clip30s.mp4"),
+                              _run("b", 2, "y", "clip30s.mp4")])
+
+    assert "ai_effect_unverified" in _kinds(別素材), 別素材
+    assert "ai_effect_unverified" in _kinds(別の尺), 別の尺
+    assert 同条件 == []
+
+
+# --- 偽の success を返さない（R1.5-C4）----------------------------------------
+
+
+def test_未実装の投稿は成功を返さない(tmp_path):
+    """**投稿していないのに success を返していた。**
+
+    `upload_video()` は `video_id="placeholder_video_id"` と
+    `success=True` を返していた。**収益化の前提が崩れる** — 投稿できて
+    いないのに「できた」と記録されると、チャンネルの数字と実装の状態が
+    食い違う。2026-08-26 のユーザー決定で「実装も削除もせず、
+    **未実装として失敗させる**」。
+    """
+    import asyncio
+    from services.youtube_uploader import YouTubeCredentials, YouTubeUploaderService
+
+    動画 = tmp_path / "v.mp4"
+    動画.write_bytes(b"x")
+    up = YouTubeUploaderService()
+    # 認証もファイルも揃った状態＝**本来なら投稿できるはずの場面**で確かめる
+    up._credentials = YouTubeCredentials(
+        client_id="id", client_secret="secret", access_token="token")
+
+    r = asyncio.run(up.upload_video(video_path=str(動画), title="t",
+                                    description="d", tags=["t"]))
+
+    assert r.success is False, r
+    assert r.error == "not_implemented", r
+    assert not r.video_id, r
+    assert "未実装" in r.message, r.message

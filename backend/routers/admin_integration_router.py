@@ -214,8 +214,19 @@ async def get_tool_pipeline_status():
 
 @router.get("/tool/quality-score")
 async def get_tool_quality_score():
-    """A-6 S4: 品質スコアツールの動作状態"""
+    """A-6 S4: 品質スコアツールの動作状態
+
+    **この 92 点は動画を見て出した点ではない**（R1.5-C4）。
+    工程ごとの内訳も含めて定数で、文字起こしも校閲も一度も走っていない。
+    現在時刻を打つのもやめる — **測っていないものに「いま測った」時刻は付かない。**
+    2周目・4周目・5周目で直した `last_sync = now()` と同型。
+    台帳: `backend/config/feature_gaps.json` の `pipeline_quality_gate_ui`
+    """
     return {
+        "data_source": "sample",
+        "is_real": False,
+        "note": "**動画を見て出した点ではありません。**この経路は UI の足場で、"
+                "定数を返しています。本物の品質ゲートは本線（agents）側にあります",
         "score": 92,
         "rank": "A",
         "categories": {
@@ -225,7 +236,7 @@ async def get_tool_quality_score():
             "rendering": 94,
             "metadata": 93,
         },
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": None,
     }
 
 
@@ -233,15 +244,22 @@ async def get_tool_quality_score():
 
 @router.get("/tool/evolution-log")
 async def get_tool_evolution_log():
-    """A-6 S5: 進化ログツールの動作状態"""
+    """A-6 S5: 進化ログツールの動作状態
+
+    **セッションごとの点も日時も定数**（R1.5-C4・8周目の本文掃引）。
+    `/tool/quality-score` に印を付けたのと同じクラスが隣に残っていた。
+    """
     return {
+        "data_source": "sample",
+        "is_real": False,
+        "note": "**実際のセッション記録ではありません。**この経路は UI の足場です",
         "entries": [
             {"session_id": "sess_001", "score": 88, "philosophy": "初回制作の基準確立", "timestamp": "2026-04-28"},
             {"session_id": "sess_002", "score": 91, "philosophy": "品質基準の向上", "timestamp": "2026-04-30"},
             {"session_id": "sess_003", "score": 93, "philosophy": "視聴維持率の最適化", "timestamp": "2026-05-01"},
         ],
         "total": 3,
-        "last_updated": datetime.now().isoformat(),
+        "last_updated": None,  # 検査していないのに現在時刻を打たない（R1.5-C4）
     }
 
 

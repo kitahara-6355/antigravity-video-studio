@@ -119,6 +119,10 @@ class AIRuleCheck(QualityCheckPlugin):
     category = "core"
     
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
         
@@ -134,10 +138,12 @@ class AIRuleCheck(QualityCheckPlugin):
                     feedback.append(f"⚠ {pred}")
         except ImportError:
             logger.debug("quality_gate_ai not available — AI rule check skipped")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
         except (AttributeError, TypeError, ValueError, KeyError, RuntimeError) as e:
             logger.warning(f"AI rule check failed with expected error: {e}", exc_info=True)
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
         
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 # ============================================================
@@ -490,25 +496,71 @@ class RetentionPredictionCheck(QualityCheckPlugin):
             s.get("end", 0) - s.get("start", 0)
             for s in ctx.segments if (s.get("end", 0) - s.get("start", 0)) > 0
         ]
+        # **測れなかったペーシングを定数 50 で埋めない**（R1.5-C4・19周目）。
+        # ここは `except` と `else` の両方で `pacing_score = 50` に落ちていた。
+        # 50 は実際に取りうる点なので、**実測した 50 と測れなかった 50 が
+        # 区別できない**。測れなければ `None` にして、下で予測ごと止める。
+        pacing_score = None
         if durations:
             import statistics
             try:
                 cv = statistics.stdev(durations) / statistics.mean(durations)
                 pacing_score = max(0, 100 - cv * 50)
             except (statistics.StatisticsError, ZeroDivisionError):
-                pacing_score = 50
-        else:
-            pacing_score = 50
-        
-        # 加重平均で予測維持率を算出
+                pacing_score = None
+
+        # **フック強度を定数 70 で埋めない**（R1.5-C4・19周目）。
+        # ここは `+ 70 * weights["hook_strength_weight"]` と書きながら
+        # コメントに「フック強度はHookStrengthCheckから」と付けてあった。
+        # **一度も参照しておらず、予測維持率の 25% は捏造だった。**
+        # `HookStrengthCheck` は `PLUGIN_REGISTRY` でこのプラグインより前に
+        # 走るので、`run_all_plugins` が積んだ結果から実測値を引く。
+        これまでの結果 = getattr(ctx, "_quality_plugin_results", None) or {}
+        hook_score = (
+            (これまでの結果.get("hook_strength_check") or {})
+            .get("details", {})
+            .get("hook_score")
+        )
+        if not isinstance(hook_score, (int, float)) or isinstance(hook_score, bool):
+            hook_score = None
+
+        # **どれか1つでも測れていなければ予測を名乗らない。**
+        # 予測維持率は C4 が名指しする「retention 分析」そのもので、
+        # 捏造した成分が混ざった数字は実測と区別できなくなる。
+        測れなかった = [
+            名 for 名, 値 in (("pacing_consistency", pacing_score),
+                            ("hook_strength", hook_score))
+            if 値 is None
+        ]
+        if 測れなかった:
+            feedback.append(
+                f"⚠️ [{tmpl_id}] 維持率予測を出せません（{', '.join(測れなかった)} を測れていません）。"
+                "**予測は行われていません。**"
+            )
+            return {
+                "deductions": 0,
+                "feedback": feedback,
+                "checked": False,
+                "skip_reason": f"未計測: {', '.join(測れなかった)}",
+                "details": {
+                    "predicted_retention": None,
+                    "density_score": density_score,
+                    "dead_air_score": dead_air_score,
+                    "pacing_score": pacing_score,
+                    "hook_score": hook_score,
+                    "unmeasured": 測れなかった,
+                },
+            }
+
+        # 加重平均で予測維持率を算出（全成分が実測）
         predicted = (
             density_score * weights["segment_density_weight"]
-            + 70 * weights["hook_strength_weight"]  # フック強度はHookStrengthCheckから
+            + hook_score * weights["hook_strength_weight"]
             + dead_air_score * weights["dead_air_penalty_weight"]
             + pacing_score * weights["pacing_consistency_weight"]
         )
         predicted = round(predicted, 1)
-        
+
         if predicted < target * 0.7:
             deductions = 10
             feedback.append(
@@ -517,15 +569,17 @@ class RetentionPredictionCheck(QualityCheckPlugin):
             deductions = 5
             feedback.append(
                 f"📊 [{tmpl_id}] 維持率予測: {predicted}%（目標: {target}%）— 改善推奨")
-        
+
         return {
             "deductions": deductions,
             "feedback": feedback,
+            "checked": True,
             "details": {
                 "predicted_retention": predicted,
                 "density_score": density_score,
                 "dead_air_score": dead_air_score,
                 "pacing_score": round(pacing_score, 1),
+                "hook_score": hook_score,
             },
         }
 
@@ -540,6 +594,10 @@ class LoudnessCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -574,11 +632,13 @@ class LoudnessCheck(QualityCheckPlugin):
                                 feedback.append(f"📡 音量が大きすぎる: {lufs:.1f} LUFS (基準: -24〜-16)")
                         except (ValueError, _json.JSONDecodeError):
                             pass
+                            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
                         break
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as e:
             logger.warning(f"Loudness check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class ResolutionCheck(QualityCheckPlugin):
@@ -587,6 +647,10 @@ class ResolutionCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -608,8 +672,9 @@ class ResolutionCheck(QualityCheckPlugin):
                     feedback.append(f"📡 解像度注意: {width}x{height} (1080p推奨)")
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError) as e:
             logger.warning(f"Resolution check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class CodecCheck(QualityCheckPlugin):
@@ -618,6 +683,10 @@ class CodecCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -639,8 +708,9 @@ class CodecCheck(QualityCheckPlugin):
                     feedback.append(f"📡 音声コーデック注意: {acodec} (AAC推奨)")
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError) as e:
             logger.warning(f"Codec check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 # ============================================================
@@ -740,6 +810,10 @@ class AudioPresenceCheck(QualityCheckPlugin):
     category = "core"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -757,8 +831,9 @@ class AudioPresenceCheck(QualityCheckPlugin):
                     feedback.append("🔇 音声トラックが存在しない — 動画として不完全")
         except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError) as e:
             logger.warning(f"Audio presence check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class BitrateCheck(QualityCheckPlugin):
@@ -767,6 +842,10 @@ class BitrateCheck(QualityCheckPlugin):
     category = "broadcast"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
 
@@ -787,6 +866,7 @@ class BitrateCheck(QualityCheckPlugin):
                     duration = info.get("duration", 0) if info else 0
                 except (ImportError, FileNotFoundError, subprocess.SubprocessError, KeyError, ValueError):
                     pass
+                    checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
                 except Exception as e:
                     try:
                         from agents.memory.technical_debt import TechnicalDebtStore
@@ -803,6 +883,8 @@ class BitrateCheck(QualityCheckPlugin):
                         )
                     except Exception as tdr_err:
                         logger.error(f"Failed to register TDR debt: {tdr_err}")
+                        checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
+                    checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
             
             if duration > 0:
                 bitrate_mbps = (file_size * 8) / duration / 1_000_000
@@ -814,8 +896,9 @@ class BitrateCheck(QualityCheckPlugin):
                     feedback.append(f"📡 ビットレート注意: {bitrate_mbps:.1f}Mbps (プレビュー品質)")
         except (OSError, ZeroDivisionError, TypeError, ValueError) as e:
             logger.warning(f"Bitrate check failed or skipped: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
 
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 class DurationSanityCheck(QualityCheckPlugin):
@@ -899,8 +982,13 @@ class ThumbnailQualityCheck(QualityCheckPlugin):
     """サムネイル品質チェック (解像度, アスペクト比, ファイルサイズ, 破損確認)"""
     name = "thumbnail_quality_check"
     category = "youtube"
+    capability = "thumbnail"
 
     def analyze(self, ctx, template_config=None):
+        # **検査そのものができたか**（R1.5-C4・19周目 CE-1）。
+        # 下の except は例外を握り潰して「減点0」を返すので、
+        # これが無いと「検査していない」が「検査して問題なし」に化ける。
+        checked = True
         deductions = 0
         feedback = []
         
@@ -957,11 +1045,12 @@ class ThumbnailQualityCheck(QualityCheckPlugin):
         except (ImportError, OSError, ValueError, SyntaxError) as e:
             deductions += 25
             feedback.append(f"▶ サムネイル画像のロード中にエラーが発生しました: {e}")
+            checked = False  # 検査できなかった（R1.5-C4・19周目 CE-1）
             
         if deductions == 0:
             feedback.append("✅ サムネイル品質検証合格 (1280x720以上, 16:9, 4MB未満)")
             
-        return {"deductions": deductions, "feedback": feedback}
+        return {"deductions": deductions, "feedback": feedback, "checked": checked}
 
 
 # ============================================================
@@ -979,14 +1068,18 @@ class PipelineCompletionCheck(QualityCheckPlugin):
 
         # 必須成果物の存在チェック（品質ゲートはプレビュー生成前に実行される）
         has_thumb_path = bool(getattr(ctx, 'thumbnail_path', None) or (hasattr(ctx, 'metadata') and isinstance(ctx.metadata, dict) and ctx.metadata.get('thumbnail_path')))
+        declared = set(getattr(ctx, "declared_gaps", set()) or set())
         checks = [
-            (bool(ctx.segments and len(ctx.segments) > 0), "セグメント（文字起こし）", 15),
-            (bool(getattr(ctx, 'selected_segments', None)), "SmartCut結果", 5),
-            (bool(ctx.metadata), "メタデータ", 5),
-            (has_thumb_path, "サムネイル設定", 5),
+            (bool(ctx.segments and len(ctx.segments) > 0), "セグメント（文字起こし）", 15, None),
+            (bool(getattr(ctx, 'selected_segments', None)), "SmartCut結果", 5, None),
+            (bool(ctx.metadata), "メタデータ", 5, None),
+            # **台帳に載っている能力はここでも数えない**（R1.5・2026-08-27）
+            (has_thumb_path, "サムネイル設定", 5, "thumbnail"),
         ]
 
-        for ok, label, pts in checks:
+        for ok, label, pts, capability in checks:
+            if capability and capability in declared:
+                continue
             if not ok:
                 deductions += pts
                 feedback.append(f"🔴 {label}が未生成 — パイプライン中断の可能性")
@@ -1085,12 +1178,29 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
     all_feedback = []
     plugin_results = {}
 
+    # **落ちたプラグインを黙って捨てない**（R1.5-C4・19周目）。
+    # 下の `except Exception` はプラグインの失敗をログに出すだけで、
+    # そのプラグインの `deductions` も「そのカテゴリを検査した」という事実も
+    # 丸ごと消えていた。減点方式（100点から引く）なので、
+    # **検査が壊れているほどスコアが上がる。**
+    # しかも `quality_gate_worker` は直後に `ctx.quality_scored = True` を立てるので、
+    # 「22項目を検査した実測値」として通ってしまう。
+    # 落ちたものは必ず記録して外へ出す。
+    failed_plugins = []
+
     # カテゴリ別の減点トラッキング
     category_deductions = {}
     category_max = {}
 
+    # **台帳に載っている「まだ無い機能」のプラグインは回さない**
+    # （R1.5・2026-08-27 ユーザー決定）。本線に無い工程を減点し続けると、
+    # 品質ゲートは原理的に閾値へ到達できない。
+    declared = set(getattr(ctx, "declared_gaps", set()) or set())
+
     for plugin in PLUGIN_REGISTRY:
         if categories and plugin.category not in categories:
+            continue
+        if getattr(plugin, "capability", None) in declared:
             continue
 
         try:
@@ -1098,12 +1208,49 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
             deductions = result.get("deductions", 0)
             all_feedback.extend(result.get("feedback", []))
             plugin_results[plugin.name] = result
+            # **後続のプラグインが前の実測値を読めるようにする**（R1.5-C4・19周目）。
+            # `RetentionPredictionCheck` は「フック強度は HookStrengthCheck から」と
+            # コメントしながら**定数 70 を足していた**（＝予測維持率の 25% が捏造）。
+            # レジストリ上 `HookStrengthCheck` のほうが先に走るので、ここで渡す。
+            ctx._quality_plugin_results = plugin_results
+
+            # **例外が外へ出てこなくても「検査できなかった」を拾う**
+            # （R1.5-C4・19周目 CE-1）。
+            # 下の `except` は **`analyze()` の外へ出た例外しか拾わない**。
+            # 実際に登録されているプラグイン（Loudness / Resolution / Codec /
+            # AudioPresence / Bitrate / AIRule / ThumbnailQuality）は
+            # **自分の中で例外を握り潰し**、try の前で 0 に初期化した
+            # `deductions` をそのまま返す。つまり ffmpeg が壊れているだけで
+            # 「検査していない」が「検査して減点ゼロだった」に化け、
+            # broadcast / core が 100.0「✅ 優秀」になっていた。
+            # プラグイン側が `checked: False` を返したらここで同じ扱いにする。
+            if result.get("checked") is False:
+                failed_plugins.append({
+                    "name": plugin.name,
+                    "category": plugin.category,
+                    "error": result.get("skip_reason") or "検査を実行できませんでした",
+                })
+                all_feedback.append(
+                    f"⚠️ 品質チェック「{plugin.name}」を実行できませんでした。"
+                    "**この項目は検査されていません。**"
+                )
 
             cat = plugin.category
             category_deductions[cat] = category_deductions.get(cat, 0) + deductions
             category_max[cat] = category_max.get(cat, 0) + 30
         except Exception as e:
             logger.warning(f"Plugin {plugin.name} failed: {e} (Expected safety catch)", exc_info=True)
+            # **落ちた検査を記録に残す**（R1.5-C4・19周目）。
+            # ここで捨てると「検査が壊れているほど高得点」になる。
+            failed_plugins.append({
+                "name": plugin.name,
+                "category": plugin.category,
+                "error": f"{type(e).__name__}: {e}",
+            })
+            all_feedback.append(
+                f"⚠️ 品質チェック「{plugin.name}」が実行できませんでした"
+                f"（{type(e).__name__}）。**この項目は検査されていません。**"
+            )
 
     # ━━━ 重み付きスコア算出 ━━━
     # 100点から重み付き減点を引く
@@ -1187,5 +1334,10 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
         "category_scores": category_scores,
         "category_report": category_report,
         "block_recommended": block_recommended,
+        # **この点が「全項目を検査した結果」かどうか**（R1.5-C4・19周目）。
+        # 落ちたプラグインがあると、その項目は検査されていないのに
+        # 減点 0 として点に効いてしまう。値ではなくこの2つで表す。
+        "failed_plugins": failed_plugins,
+        "all_plugins_ran": not failed_plugins,
     }
 

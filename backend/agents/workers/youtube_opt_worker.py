@@ -57,7 +57,7 @@ class YouTubeOptWorker(PipelineStageWorker):
             model_name = _mg._resolve_model("youtube_optimization")
         except (ImportError, AttributeError) as e:
             logger.warning(f"モデル解決でエラーが発生したため、デフォルトを使用します: {e}")
-            model_name = "gemini-2.5-flash"  # フォールバック
+            model_name = "gemini-3.6-flash"  # フォールバック
 
         response = client.models.generate_content(
             model=model_name,
@@ -163,7 +163,19 @@ class YouTubeOptWorker(PipelineStageWorker):
         )
 
     def _run_cross_media_analysis(self, ctx: PipelineContext) -> None:
-        """クロスメディア相関分析を実行し、結果をメタデータに追加する"""
+        """クロスメディア相関分析を実行し、結果をメタデータに追加する。
+
+        **SNS データが無いときは分析しない**（R1.5-C4・2026-08-29 ユーザー決定）。
+        以前はここが素通しで、`sns_data` が `None`（＝常にそう。SNS の実データを
+        入れる経路がどこにも無い）だと `CrossMediaService.get_default_sns_data()` の
+        作り物（X フォロワー 12,500・Instagram 8,400 …）で相関を取り、
+        **「最適な投稿先プラットフォーム」と推奨ハッシュタグを本線の
+        `ctx.metadata` に埋めていた。** 収益化の判断に使う数字なので、
+        作り物から出した推奨は嘘になる。
+
+        `retention_analysis` を本線で飛ばしているのと同じ扱いにする。
+        台帳: `backend/config/feature_gaps.json` の `sns_cross_media`
+        """
         try:
             from services.cross_media_service import CrossMediaService
             service = CrossMediaService()
@@ -172,6 +184,16 @@ class YouTubeOptWorker(PipelineStageWorker):
             metadata_source = getattr(ctx, "metadata_source", {}) or {}
             youtube_analytics = metadata_source.get("youtube_analytics", {})
             sns_data = metadata_source.get("sns_data", None)
+
+            if not sns_data:
+                未実装 = "クロスメディア相関分析(SNS実データなし)"
+                if 未実装 not in ctx.skipped_features:
+                    ctx.skipped_features.append(未実装)
+                logger.info(
+                    "SNS の実データが無いのでクロスメディア相関分析を行いません"
+                    "（作り物のフォロワー数から投稿先を推奨しないため）"
+                )
+                return
 
             # 相関分析を実行
             correlation_result = service.analyze_cross_media_correlation(youtube_analytics, sns_data)

@@ -413,11 +413,18 @@ class TestE2EStabilityDockerRobustness(unittest.TestCase):
         self.assertIn("FFmpeg process timed out", str(cm.exception))
         mock_unlink.assert_called_once()
 
+    # **`/tmp/test_dir` が実在するかどうかで結果が変わらないようにする**（2026-08-29）。
+    # `create_test_video` は `subprocess.run` の前に `os.access(output_dir, os.W_OK)` を
+    # 見る。`Path.mkdir` をモックしているのでディレクトリは作られず、**Linux では
+    # `os.access` が False を返して `PermissionError` になり、`unlink` へ到達しない。**
+    # 手元（Windows）では通るのに CI だけ落ちるのはこれが理由だった
+    # （CI run 33232106707 の「testpaths 外の退行検知」）。
+    @patch("os.access", return_value=True)
     @patch("subprocess.run")
     @patch("pathlib.Path.exists", return_value=False)
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.unlink")
-    def test_create_test_video_called_process_error(self, mock_unlink, mock_mkdir, mock_exists, mock_run):
+    def test_create_test_video_called_process_error(self, mock_unlink, mock_mkdir, mock_exists, mock_run, mock_access):
         """create_test_video で CalledProcessError が発生した際、unlink が実行され RuntimeError が送出されること"""
         import subprocess
         mock_run.side_effect = subprocess.CalledProcessError(returncode=1, cmd="ffmpeg")
@@ -427,11 +434,18 @@ class TestE2EStabilityDockerRobustness(unittest.TestCase):
         self.assertIn("FFmpeg process failed", str(cm.exception))
         mock_unlink.assert_called_once()
 
+    # **`/tmp/test_dir` が実在するかどうかで結果が変わらないようにする**（2026-08-29）。
+    # `create_test_video` は `subprocess.run` の前に `os.access(output_dir, os.W_OK)` を
+    # 見る。`Path.mkdir` をモックしているのでディレクトリは作られず、**Linux では
+    # `os.access` が False を返して `PermissionError` になり、`unlink` へ到達しない。**
+    # 手元（Windows）では通るのに CI だけ落ちるのはこれが理由だった
+    # （CI run 33232106707 の「testpaths 外の退行検知」）。
+    @patch("os.access", return_value=True)
     @patch("subprocess.run")
     @patch("pathlib.Path.exists", return_value=False)
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.unlink")
-    def test_create_test_video_unlink_exception(self, mock_unlink, mock_mkdir, mock_exists, mock_run):
+    def test_create_test_video_unlink_exception(self, mock_unlink, mock_mkdir, mock_exists, mock_run, mock_access):
         """create_test_video のエラーハンドリング内で unlink が例外を投げても、無視されて RuntimeError が送出されること"""
         import subprocess
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="ffmpeg", timeout=30)
@@ -564,11 +578,18 @@ class TestE2EStabilityDockerRobustness(unittest.TestCase):
         res = e2e_stability.wait_backend_ready(max_wait=1)
         self.assertFalse(res)
 
+    # **`/tmp/test_dir` が実在するかどうかで結果が変わらないようにする**（2026-08-29）。
+    # `create_test_video` は `subprocess.run` の前に `os.access(output_dir, os.W_OK)` を
+    # 見る。`Path.mkdir` をモックしているのでディレクトリは作られず、**Linux では
+    # `os.access` が False を返して `PermissionError` になり、`unlink` へ到達しない。**
+    # 手元（Windows）では通るのに CI だけ落ちるのはこれが理由だった
+    # （CI run 33232106707 の「testpaths 外の退行検知」）。
+    @patch("os.access", return_value=True)
     @patch("subprocess.run")
     @patch("pathlib.Path.exists", return_value=False)
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.unlink")
-    def test_create_test_video_called_process_error_unlink_exception(self, mock_unlink, mock_mkdir, mock_exists, mock_run):
+    def test_create_test_video_called_process_error_unlink_exception(self, mock_unlink, mock_mkdir, mock_exists, mock_run, mock_access):
         """CalledProcessErrorが発生し、さらにunlinkでOSErrorが発生した場合"""
         import subprocess
         mock_run.side_effect = subprocess.CalledProcessError(returncode=1, cmd="ffmpeg")

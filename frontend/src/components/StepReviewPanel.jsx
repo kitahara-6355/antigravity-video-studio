@@ -99,25 +99,19 @@ const StepReviewPanel = ({ isOpen, onClose, onApprove, reviewData }) => {
         'accessibility': 'final',  // アクセシビリティ → 最終
     };
 
-    // 初回マウント時にAIスコア70点以上のステージを自動チェック
-    React.useEffect(() => {
-        if (!reviewData?.category_report?.length) return;
-        const autoChecks = {};
-        reviewData.category_report.forEach(cat => {
-            const stageId = CATEGORY_TO_STAGE[cat.category];
-            if (stageId && cat.score !== null && cat.score >= 70) {
-                const stage = REVIEW_STAGES.find(s => s.id === stageId);
-                if (stage) {
-                    const checks = {};
-                    stage.checkItems.forEach((_, i) => { checks[i] = true; });
-                    autoChecks[stageId] = checks;
-                }
-            }
-        });
-        if (Object.keys(autoChecks).length > 0) {
-            setCheckStates(prev => ({ ...autoChecks, ...prev }));
-        }
-    }, [reviewData]);
+    // **AI のスコアで人間のチェック項目を自動 ON にしない**（R1.5-C4・19周目）。
+    //
+    // ここは以前「初回マウント時に AI スコア 70点以上のステージを自動チェック」して
+    // いた。倒していたのは「固有名詞（人名・地名・社名）は正しいですか？」
+    // 「誤字や不自然な表現はありませんか？」といった、**人が目で見ないと
+    // 答えられない問い**で、AI のカテゴリスコアはその答えになっていない。
+    //
+    // `isStageComplete()` はこのチェック状態だけを見るので、自動 ON のまま
+    // `handleApprove()` が `completed: true` を送り、**誰も見ていないレビューが
+    // 「確認済み」として永続化**されていた。これは C4 が言う偽の success そのもの。
+    //
+    // AI スコアは `getStageScore()` のバッジで別途出しているので、
+    // 自動チェックを外してもスコアの情報は画面から失われない。
 
     // ステージごとのAIスコアバッジを取得
     const getStageScore = (stageId) => {

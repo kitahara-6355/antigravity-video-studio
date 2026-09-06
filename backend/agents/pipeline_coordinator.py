@@ -155,6 +155,9 @@ class PipelineCoordinator:
         self.runs_dir: Optional[Path] = None
         self.ledger_path: Optional[Path] = None
         self._recorder: Optional[RunRecorder] = None
+        # AI が作ったメタデータの置き場（R1.5-C3）
+        self._sidecar_path: Optional[str] = None
+        self._quality_sidecar_path: Optional[str] = None
         # 工程名 → 最後の試行が通ったか。**リトライで通ったものは失敗にしない**
         self._outcomes: Dict[str, bool] = {}
 
@@ -630,6 +633,8 @@ class PipelineCoordinator:
         """記録を開く。**開けなくても実行は続ける**（記録は実行を止めない）。"""
         self._recorder = None
         self._outcomes = {}
+        self._sidecar_path = None
+        self._quality_sidecar_path = None
         try:
             kwargs = {"inputs": {
                 "video_path": ctx.video_path,
@@ -651,13 +656,117 @@ class PipelineCoordinator:
         except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
             logger.warning(f"⚠️ 実行記録を開けませんでした: {e}")
 
+    def _write_sidecar(self, ctx: PipelineContext, 拡張子: str,
+                       中身: dict | None) -> Optional[str]:
+        """**AI が作ったものを捨てない**（R1.5-C3）。最終動画の隣に置く。
+
+        空のときは作らない（**空のファイルを置いて「使った」と言わない**）。
+        """
+        if not 中身 or not ctx.final_path:
+            return None
+        try:
+            横 = Path(ctx.final_path).with_suffix(拡張子)
+            横.write_text(json.dumps(中身, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+            logger.info(f"📝 {横}")
+            return str(横)
+        except Exception as e:  # noqa: BLE001 — 書けなくても実行は止めない
+            logger.warning(f"⚠️ {拡張子} を書き出せませんでした: {e}")
+            return None
+
+    def _ai_produced(self, ctx: PipelineContext, stage: str, 印: str) -> bool:
+        """**その工程の AI が実際に何かを出したか**（R1.5-C3）。
+
+        `bool(ctx.segments)` のような「下流に何か入っているか」では測れない。
+        文字起こし（`local:whisper`）が入れたものを校閲（AI）の成果と
+        取り違える（2026-08-27・gate-verifier の指摘 N-2）。
+        **工程が通り、かつ AI がスキップされていないこと**を見る。
+        中身があることは呼び出し側で併せて確かめる（AI は動いたが空だった、
+        という場合を「生まれた」に数えない）。
+        """
+        if not self._outcomes.get(stage):
+            return False
+        return not any(印 in s for s in ctx.skipped_features)
+
+    def _write_metadata_sidecar(self, ctx: PipelineContext) -> Optional[str]:
+        """**AI が作ったメタデータを捨てない**（R1.5-C3・2026-08-27 ユーザー決定）。
+
+        `youtube_opt` の titles / tags / description は `ctx.metadata` に入るだけで、
+        CLI 実行では戻り値ごと消えていた。**消費者の YouTube 投稿が未実装**
+        （`backend/config/feature_gaps.json` の `youtube_upload`）だから。
+
+        投稿が未実装な以上、**いまの現実は手動投稿**。そのまま貼れる形で
+        最終動画の隣に置く。空のときは作らない（**空のファイルを置いて
+        「使った」と言わない**）。
+        """
+        return self._write_sidecar(ctx, ".youtube.json", ctx.metadata)
+
+    def _write_quality_sidecar(self, ctx: PipelineContext) -> Optional[str]:
+        """**なぜその点数なのかを残す**（R1.5-C3）。
+
+        `quality_feedback` は API の戻り値に入るだけで、CLI 実行では
+        `youtube_metadata` とまったく同じように消えていた。**消費者として
+        宣言していた render は `quality_score`（数値）しか読んでおらず、
+        講評そのものは誰も読んでいなかった**（gate-verifier の指摘 N-1）。
+        """
+        if not ctx.quality_feedback:
+            return None
+        return self._write_sidecar(ctx, ".quality.json", {
+            "score": ctx.quality_score,
+            "raw_score": (ctx.quality_gate_report or {}).get("raw_score"),
+            "feedback": list(ctx.quality_feedback),
+            "category_scores": getattr(ctx, "quality_category_scores", {}),
+        })
+
+    def _intermediates(self, ctx: PipelineContext) -> list:
+        """**AI が生み出したものが下流で使われたか**（R1.5-C3）。
+
+        AI は金を使って中間成果物を作る。作ったものが誰にも読まれずに消えるなら、
+        **その呼び出しは成果物に何も足していない。**
+
+        - `subtitles`（校閲したテキスト）→ プレビューが焼き込む。
+          実際に届いていることは SHA256 の比較で別途確かめている
+          （`artifact_gate --ai-effect`）
+        - `youtube_metadata` → **消費者は YouTube 投稿で、本線に工程が無い**
+          （`backend/config/feature_gaps.json` の `youtube_upload`）。
+          いまは必ず「使われていない」になる
+        - `quality_feedback` → レンダリングモードの決定と改善ループが読む
+        """
+        使った工程 = {n for n, ok in self._outcomes.items() if ok}
+        return [
+            {"name": "subtitles", "produced_by": "proofread",
+             "produced": bool(ctx.segments) and self._ai_produced(
+                 ctx, "proofread", "AI校閲"),
+             "consumed_by": "preview",
+             "consumed": "preview" in 使った工程},
+            # **投稿が未実装なので、消費者は「手動投稿用のサイドカー」。**
+            # 自動投稿そのものは台帳の `youtube_upload` に残っている
+            {"name": "youtube_metadata", "produced_by": "youtube_opt",
+             "produced": bool(ctx.metadata) and self._ai_produced(
+                 ctx, "youtube_opt", "YouTube最適化"),
+             "consumed_by": "metadata サイドカー（手動投稿用）",
+             "consumed": bool(self._sidecar_path)},
+            # **恒真の判定式は測定ではない。** `render_mode` の既定は
+            # `"production"` で `"force"` はどこからも設定されないので、
+            # 以前の式は何も実行していなくても True になっていた。
+            # 宣言していた消費者（render）も `quality_score`（数値）しか
+            # 読んでおらず、講評そのものは誰も読んでいなかった。
+            {"name": "quality_feedback", "produced_by": "quality_gate",
+             "produced": bool(ctx.quality_feedback),
+             "consumed_by": "quality サイドカー（なぜその点数か）",
+             "consumed": bool(self._quality_sidecar_path)},
+        ]
+
     def _close_recorder(self, ctx: PipelineContext, status: str) -> None:
         """記録を閉じる。成果物のパスも残す。"""
         recorder = self._recorder
         if recorder is None:
             return
         try:
-            for path in (ctx.final_path, ctx.preview_path):
+            self._sidecar_path = self._write_metadata_sidecar(ctx)
+            self._quality_sidecar_path = self._write_quality_sidecar(ctx)
+            for path in (ctx.final_path, ctx.preview_path,
+                         self._sidecar_path, self._quality_sidecar_path):
                 if path:
                     recorder.artifact(path)
             # **記録だけを見て「何が落ちたか」が分かること**（R1.5-C1b）。
@@ -668,6 +777,7 @@ class PipelineCoordinator:
             # 通らないので空のまま閉じていた。`_outcomes` なら着手した工程が
             # 全部入っている。
             落ちた = [n for n, ok in self._outcomes.items() if not ok]
+            recorder.intermediates(self._intermediates(ctx))
             recorder.finish(status, health={
                 "skipped_features": list(ctx.skipped_features),
                 "failed_stages": 落ちた,
@@ -1023,14 +1133,25 @@ class PipelineCoordinator:
         # ctxから直接取得（StageResult.dataの伝達に依存しない）
         quality_details = {
             "score": ctx.quality_score,
+            # **採点したかどうかを持ち回す**（R1.5-C4・9周目の指摘）。
+            # 読み手（`GET /api/pipeline/report` / UI）が 0.0 を
+            # 「未計測」と取り違えないようにする
+            "scored": getattr(ctx, "quality_scored", False),
             "feedback": getattr(ctx, 'quality_feedback', []),
             "category_report": getattr(ctx, 'quality_category_report', []),
             "category_scores": getattr(ctx, 'quality_category_scores', {}),
         }
 
         # T-032: 品質不合格レポートの構築
+        #
+        # **番兵値で「測ったか」を決めない**（R1.5-C4・12周目が記録した残り）。
+        # `> 0` だと**採点して 0 点**の実走が「レポート無し」になり、
+        # `POST /api/pipeline/force-render` が
+        # 「品質ゲート不合格レポートが存在しません（**品質合格済みの可能性**）」
+        # と返す——**最悪の点なのに「合格したかも」と言う**。
+        # 9周目に本線で根治したのと同じ型なので、旗で判断する。
         quality_gate_report = None
-        if ctx.quality_score < 90 and ctx.quality_score > 0:
+        if getattr(ctx, "quality_scored", False) and ctx.quality_score < 90:
             quality_gate_report = {
                 "status": "blocked",
                 "score": ctx.quality_score,
@@ -1052,6 +1173,7 @@ class PipelineCoordinator:
             "preview_path": ctx.preview_path,
             "metadata": ctx.metadata,
             "quality_score": ctx.quality_score,
+            "quality_scored": getattr(ctx, "quality_scored", False),
             "quality_details": quality_details,
             "quality_gate_report": quality_gate_report,  # T-032
             "segments_count": len(ctx.segments) if ctx.segments else 0,
@@ -1095,6 +1217,21 @@ class PipelineCoordinator:
         """
         try:
             from plugins.retention_map_plugin import retention_map_plugin
+
+            # **未実装のものを「分析した」と言わない**（R1.5-C4）。
+            # 中身は `random.random()` で組み立てたモックで、それが
+            # `ctx.metadata["retention_analysis"]` 経由でサイドカー
+            # （成果物）にまで載っていた。
+            if not getattr(retention_map_plugin, "IMPLEMENTED", True):
+                印 = "retention分析（未実装）"
+                if 印 not in ctx.skipped_features:
+                    ctx.skipped_features.append(印)
+                logger.info("📊 retention 分析は未実装なので飛ばします"
+                            "（成果物には混ぜません）")
+                # **`stage_results` には積まない。** あれは「走った工程」の
+                # 並びで、未実装は工程の失敗ではない。宣言の置き場は
+                # `skipped_features`（C1b で決めた形）。
+                return None
 
             video_id = Path(ctx.video_path).stem
             # 動画の総尺（セグメントから推定）
@@ -1171,7 +1308,15 @@ class PipelineCoordinator:
                 "video": Path(ctx.video_path).name,
                 "segments_total": len(ctx.segments),
                 "segments_selected": len(ctx.selected_segments),
-                "quality_score": ctx.quality_score,
+                # **未計測を 0 点として記録しない**（R1.5-C4・12周目の指摘）。
+                # `QualityGateWorker` は `FATAL_WORKERS` に入っていないので、
+                # 品質ゲートが結果を返さなくても実走は `degraded` で続き、
+                # **ここは必ず走る**。そのとき `ctx.quality_score` は既定の 0 で、
+                # 既存の記録（`run_20260826_060153.json` の `"quality_score": 50`）と
+                # 同じ形になり、**読み手に実測 0 点と未計測が区別できない**。
+                # 値ではなく旗で表す（9周目に本線で根治したのと同じ形）。
+                "quality_score": ctx.quality_score if getattr(ctx, "quality_scored", False) else None,
+                "quality_scored": bool(getattr(ctx, "quality_scored", False)),
                 "stage_durations": {
                     r.stage_name: r.duration_seconds
                     for r in ctx.stage_results
@@ -1281,6 +1426,41 @@ async def resolve_pipeline_coordinator_thumbnail_task(task_id: str) -> str:
 # **これは課金経路。** 校閲・メタデータ・品質ゲートが Gemini を呼ぶ。
 # `cost_guard` が呼び出しごとに計上し、予算が尽きれば例外で止まる。
 
+def _probe_duration_sec(video: Path) -> Optional[float]:
+    """素材の尺を秒で返す。**読めなければ `None`。**
+
+    既存の `aligned_preview_generator.get_video_duration()` は失敗を 15.0 秒に
+    握り潰す。同じ形にすると、誤った目標尺が黙って入って品質ゲートが
+    -50 点を打つ（2026-08-27 に実際にそうなった）。**読めなかったことは
+    読めなかったと言う。**
+    """
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+            capture_output=True, text=True, check=True, timeout=30).stdout
+        return float(out.strip())
+    except Exception as e:  # noqa: BLE001 — 読めないことを 0 や既定値にしない
+        logger.warning(f"⚠️ 素材の尺を読めませんでした: {e}")
+        return None
+
+
+def _auto_target_minutes(duration_sec: Optional[float]) -> Optional[int]:
+    """**目標尺は素材から決める**（2026-08-27 ユーザー決定）。
+
+    `--target-minutes` の既定は20分だった。30秒の素材に対して品質ゲートの
+    QV-01 が「出力尺異常（目標20分, 差19.6分）」で満額 -50 を打ち、
+    スコアが 2/100 に張り付いていた。**目標尺を素材に合わせるだけで 52点。**
+
+    `target_minutes` は SmartCut では使われておらず、**品質ゲートが
+    「出来上がりはこれくらいのはず」と照らす期待値**としてだけ効く。
+    """
+    if duration_sec is None or duration_sec <= 0:
+        return None
+    return max(1, round(duration_sec / 60))
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     import argparse
     import uuid
@@ -1288,7 +1468,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="本線（agents）で動画を1本作る。**課金経路**")
     parser.add_argument("video", help="入力動画のパス")
-    parser.add_argument("--target-minutes", type=int, default=20)
+    parser.add_argument("--target-minutes", type=int, default=None,
+                        help="出来上がりの目安（分）。既定は素材の尺から決める")
     parser.add_argument("--runs-dir", default=None,
                         help="実行記録の置き場（既定 output/runs）")
     parser.add_argument("--no-ledger", action="store_true",
@@ -1300,6 +1481,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"🚫 入力がありません: {video}")
         return 1
 
+    target_minutes = args.target_minutes
+    if target_minutes is None:
+        target_minutes = _auto_target_minutes(_probe_duration_sec(video))
+        if target_minutes is None:
+            print("🚫 素材の尺を読めないので目標尺を決められません。"
+                  "`--target-minutes <分>` で明示してください")
+            return 1
+        print(f"📏 目標尺を素材から決めました: {target_minutes} 分")
+
     from backend import cost_guard as _cg
     _cg.load_env()
 
@@ -1310,7 +1500,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         coordinator.ledger_path = Path(_cg.LEDGER_PATH)
 
     ctx = PipelineContext(video_path=str(video),
-                          target_minutes=args.target_minutes,
+                          target_minutes=target_minutes,
                           session_id=f"cli-{uuid.uuid4().hex[:8]}")
 
     result = asyncio.run(coordinator.execute(ctx))
