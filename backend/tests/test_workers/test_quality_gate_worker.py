@@ -1342,7 +1342,14 @@ class TestC4ErrorResilience:
         ctx.segments = []
         plugin = SubtitleSpeedCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_17_hook_check_no_segments(self):
@@ -1352,7 +1359,14 @@ class TestC4ErrorResilience:
         ctx.segments = []
         plugin = HookCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_18_dead_air_check_single_segment(self):
@@ -1373,7 +1387,14 @@ class TestC4ErrorResilience:
         ctx.segments = [{"start": 0, "end": 10, "text": "1セグ"}]
         plugin = SubtitleDensityCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_20_chapter_coverage_short_video(self):
@@ -1434,7 +1455,14 @@ class TestC4ErrorResilience:
         ctx.selected_segments = None
         plugin = DurationSanityCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_25_run_all_plugins_plugin_exception_skip(self):
@@ -1513,7 +1541,14 @@ class TestC4ErrorResilience:
         ctx.segments = []
         plugin = HookStrengthCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_30_retention_prediction_less_than_5_segments(self):
@@ -1523,7 +1558,14 @@ class TestC4ErrorResilience:
         ctx.segments = _make_segments(3)
         plugin = RetentionPredictionCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_31_chapter_coverage_less_than_5_segments(self):
@@ -1533,7 +1575,14 @@ class TestC4ErrorResilience:
         ctx.segments = _make_segments(3)
         plugin = ChapterCoverageCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_32_ctr_ready_less_than_3_segments(self):
@@ -1543,7 +1592,14 @@ class TestC4ErrorResilience:
         ctx.segments = _make_segments(2)
         plugin = CTRReadyCheck()
         result = plugin.analyze(ctx)
-        assert result == {"deductions": 0, "feedback": []}
+        # **「検査していない」を「検査して減点0」と同じ形にしない**
+        # （R1.5-C4・案D 掃引）。以前はこの早期 return が `checked` を持たず、
+        # 集計側 `if result.get("checked") is False:` をすり抜けていたため、
+        # 一度も測っていないカテゴリが 100.0「✅ 優秀」になっていた。
+        assert result["deductions"] == 0
+        assert result["feedback"] == []
+        assert result["checked"] is False, "検査していないのに印が無い"
+        assert result["skip_reason"], "何が無くて測れなかったかが残っていない"
 
     @pytest.mark.asyncio
     async def test_c4_33_pipeline_completion_all_missing(self):

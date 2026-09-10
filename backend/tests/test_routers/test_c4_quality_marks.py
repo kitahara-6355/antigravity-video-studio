@@ -3224,3 +3224,101 @@ def test_20周目_M9_経過時間の既定値24が戻らない():
         "W", {"metrics": {"click_through_rate": 5.2}, "elapsed_hours": 72},
         wagamama_manager=m2))
     assert r2["actual"]["elapsed_hours"] == 72
+
+
+# ─────────────────────────────────────────────────────────────
+# 案D 掃引（2026-09-07）: 早期 return が `checked` を落としていた
+# ─────────────────────────────────────────────────────────────
+
+class _何も測れない文脈:
+    """プレビューも字幕も無い文脈。**各プラグインの早期 return に入る側。**"""
+    preview_path = None
+    segments = []
+    selected_segments = []
+    final_path = None
+    metadata = {}
+    target_minutes = 10
+    template = None
+    thumbnail_path = None
+
+    def __getattr__(self, name):
+        return None
+
+
+def test_案D_一度も測っていないカテゴリが優秀を名乗らない():
+    """**早期 return が `checked` を落としていた**（R1.5-C4・案D 掃引で発見）。
+
+    19周目 CE-1 は各プラグインの `except` に `checked = False` を入れたが、
+    **`preview_path` / `segments` が無いときの早期 return は最後の
+    `return {... "checked": checked}` を通らない**ので、`checked` を持たずに
+    `{"deductions": 0, "feedback": []}` を返していた。集計側は
+
+        if result.get("checked") is False:
+
+    で見るため、**鍵が無い＝False ではない＝検査済み**として通していた。
+    17箇所（登録プラグイン16件）が該当。
+
+    その結果、**何ひとつ測っていない実行**が baseline（`86e2532`）では
+
+        template: 100.0「✅ 優秀」/ broadcast: 100.0「✅ 優秀」
+        failed_plugins: 0 / all_plugins_ran: True
+
+    を返していた。これは `_build_result` → `quality_gate_report` として
+    `pipeline_router` の応答に出て、`_write_quality_sidecar` で保存もされる。
+
+    19周目の契約がこれを捕まえられなかったのは、
+    **「プレビューが実在しないと各プラグインは早期 return するので実ファイルを置く」**
+    と書いて、まさにこの分岐を避けていたため（§3 の「分岐に入る側のケースを
+    通さないと再発を捕まえられない」の実例）。
+    """
+    import quality_gate_plugins as Q
+
+    結果 = Q.run_all_plugins(_何も測れない文脈(), None)
+    点 = 結果["category_scores"]
+    報告 = {c["category"]: c for c in 結果["category_report"]}
+
+    # **測っていないカテゴリは点を名乗らない。**
+    for cat in ("template", "broadcast"):
+        assert 点[cat] is None, f"{cat} が測っていないのに {点[cat]} 点を名乗った"
+        assert 報告[cat]["status"] == "❓ 未計測", 報告[cat]["status"]
+        assert 報告[cat]["unchecked"] > 0
+
+    # **落ちた検査が記録に残る。**
+    assert 結果["all_plugins_ran"] is False
+    assert len(結果["failed_plugins"]) >= 16, len(結果["failed_plugins"])
+    assert any("検査されていません" in f for f in 結果["feedback"])
+
+    # **`skip_reason` が「何が無くて測れなかったか」を残す。**
+    理由 = [p.get("error") or "" for p in 結果["failed_plugins"]]
+    assert any("プレビュー" in r for r in 理由), 理由[:5]
+    assert any("セグメント" in r for r in 理由), 理由[:5]
+
+
+def test_案D_未実装と未計測を混ぜない():
+    """**「実装が無い」と「測れなかった」は別物。**
+
+    どちらも `score is None` なので、状態を1つに潰すと
+    「検査が全部落ちた回」を「まだ作っていないだけ」と読み違える。
+    `accessibility` は登録プラグインが 0 件なので「⬜ 未実装」のまま。
+    """
+    import quality_gate_plugins as Q
+
+    報告 = {c["category"]: c
+            for c in Q.run_all_plugins(_何も測れない文脈(), None)["category_report"]}
+    assert 報告["accessibility"]["status"] == "⬜ 未実装"
+    assert 報告["accessibility"]["unchecked"] == 0
+    assert 報告["broadcast"]["status"] == "❓ 未計測"
+
+
+def test_案D_測れているカテゴリは点を出す(tmp_path):
+    """**門が広すぎないこと。** 測れているのに未計測にしてしまうと役に立たない。
+
+    `stability` は文脈が空でも走る（ファイル存在など文脈に依存しない検査）ので、
+    何も測れない文脈でも数値が出る側に残る。
+    """
+    import quality_gate_plugins as Q
+
+    結果 = Q.run_all_plugins(_何も測れない文脈(), None)
+    assert isinstance(結果["category_scores"]["stability"], float),         "測れているカテゴリまで未計測に倒している"
+    報告 = {c["category"]: c for c in 結果["category_report"]}
+    assert 報告["stability"]["unchecked"] == 0

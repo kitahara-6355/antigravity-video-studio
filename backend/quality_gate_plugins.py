@@ -167,7 +167,11 @@ class SubtitleSpeedCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.segments:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントがありません"}
 
         # テンプレート設定がなくてもNHK放送基準のデフォルト値で最低限チェック
         if template_config and template_config.is_active:
@@ -255,7 +259,11 @@ class SubtitleLineCheck(QualityCheckPlugin):
         feedback = []
         
         if not ctx.segments:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントがありません"}
         
         if template_config and template_config.is_active:
             tmpl_id = template_config.template_id or "default"
@@ -289,7 +297,11 @@ class HookCheck(QualityCheckPlugin):
         feedback = []
         
         if not ctx.segments:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントがありません"}
         
         if template_config and template_config.is_active:
             tmpl_id = template_config.template_id or "default"
@@ -318,7 +330,11 @@ class DeadAirCheck(QualityCheckPlugin):
         feedback = []
         
         if not ctx.segments:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントがありません"}
         
         if template_config and template_config.is_active:
             tmpl_id = template_config.template_id or "default"
@@ -355,7 +371,11 @@ class SubtitleDensityCheck(QualityCheckPlugin):
         feedback = []
         
         if not ctx.segments or len(ctx.segments) < 2:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントが2件未満です"}
         
         if template_config and template_config.is_active:
             tmpl_id = template_config.template_id or "default"
@@ -386,7 +406,11 @@ class HookStrengthCheck(QualityCheckPlugin):
         feedback = []
         
         if not ctx.segments:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントがありません"}
         
         if template_config and template_config.is_active:
             tmpl_id = template_config.template_id or "default"
@@ -454,7 +478,11 @@ class RetentionPredictionCheck(QualityCheckPlugin):
         feedback = []
         
         if not ctx.segments or len(ctx.segments) < 5:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントが5件未満です"}
         
         if template_config and template_config.is_active:
             tmpl_id = template_config.template_id or "default"
@@ -476,7 +504,11 @@ class RetentionPredictionCheck(QualityCheckPlugin):
         
         total_dur = ctx.segments[-1].get("end", 0) - ctx.segments[0].get("start", 0)
         if total_dur <= 0:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "尺を測れません（開始と終了が同じ）"}
         
         # 字幕密度スコア（0-100）
         avg_interval = total_dur / len(ctx.segments)
@@ -602,7 +634,11 @@ class LoudnessCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.preview_path or not Path(ctx.preview_path).exists():
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "プレビュー動画がありません"}
 
         try:
             from video_editor_engine import video_editor
@@ -655,7 +691,11 @@ class ResolutionCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.preview_path or not Path(ctx.preview_path).exists():
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "プレビュー動画がありません"}
 
         try:
             from video_editor_engine import video_editor
@@ -691,7 +731,11 @@ class CodecCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.preview_path or not Path(ctx.preview_path).exists():
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "プレビュー動画がありません"}
 
         try:
             from video_editor_engine import video_editor
@@ -727,7 +771,11 @@ class ChapterCoverageCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.segments or len(ctx.segments) < 5:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントが5件未満です"}
 
         total_dur = ctx.segments[-1].get("end", 0)
         if total_dur > 600:  # 10分超
@@ -758,7 +806,11 @@ class ShortsReadyCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.segments:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントがありません"}
 
         # 感嘆詞・ハイライトワードを含むセグメントをカウント
         highlight_words = ["！", "!?", "すごい", "やばい", "衝撃", "最高", "神", "マジ"]
@@ -789,7 +841,11 @@ class CTRReadyCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.segments or len(ctx.segments) < 3:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "字幕セグメントが3件未満です"}
 
         # 冒頭セグメントからフックテキストが抽出可能か
         hook_text = " ".join(s.get("text", "") for s in ctx.segments[:5])
@@ -818,7 +874,11 @@ class AudioPresenceCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.preview_path or not Path(ctx.preview_path).exists():
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "プレビュー動画がありません"}
 
         try:
             from video_editor_engine import video_editor
@@ -850,7 +910,11 @@ class BitrateCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.preview_path or not Path(ctx.preview_path).exists():
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "プレビュー動画がありません"}
 
         try:
             file_size = Path(ctx.preview_path).stat().st_size
@@ -911,7 +975,11 @@ class DurationSanityCheck(QualityCheckPlugin):
         feedback = []
 
         if not ctx.segments or not ctx.selected_segments:
-            return {"deductions": 0, "feedback": []}
+            # **検査していないことを名乗る**（R1.5-C4・案D 掃引）。
+            # `checked` を落とすと集計側 `if result.get("checked") is False:` を
+            # すり抜け、**「検査して減点0」と同じ扱い**になる。
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "セグメントが選択されていません"}
 
         # 元の尺 vs 選択後の尺
         original_dur = ctx.segments[-1].get("end", 0) - ctx.segments[0].get("start", 0)
@@ -1191,6 +1259,8 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
     # カテゴリ別の減点トラッキング
     category_deductions = {}
     category_max = {}
+    # **検査できなかったプラグインの数**（R1.5-C4・案D 掃引）。分母から外した分を数える
+    category_skipped: dict = {}
 
     # **台帳に載っている「まだ無い機能」のプラグインは回さない**
     # （R1.5・2026-08-27 ユーザー決定）。本線に無い工程を減点し続けると、
@@ -1237,7 +1307,15 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
 
             cat = plugin.category
             category_deductions[cat] = category_deductions.get(cat, 0) + deductions
-            category_max[cat] = category_max.get(cat, 0) + 30
+            # **検査できなかったプラグインを分母に入れない**（R1.5-C4・案D 掃引）。
+            # 入れると「減点0 / 満点30」として数えられ、**一度も測っていない
+            # カテゴリが 100.0「✅ 優秀」になる。** 早期 return（プレビューや
+            # 字幕が無い）で checked=False になった分を分母から外すと、
+            # 全部落ちたカテゴリは max_ded=0 → score None に落ちる。
+            if result.get("checked") is False:
+                category_skipped[cat] = category_skipped.get(cat, 0) + 1
+            else:
+                category_max[cat] = category_max.get(cat, 0) + 30
         except Exception as e:
             logger.warning(f"Plugin {plugin.name} failed: {e} (Expected safety catch)", exc_info=True)
             # **落ちた検査を記録に残す**（R1.5-C4・19周目）。
@@ -1288,9 +1366,12 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
         max_ded = category_max.get(cat, 0)
         ded = category_deductions.get(cat, 0)
 
+        未計測 = category_skipped.get(cat, 0)
         if max_ded == 0:
             score = None
-            status = "⬜ 未実装"
+            # **「実装が無い」と「測れなかった」は別物。** 混ぜると、
+            # 検査が全部落ちた回を「まだ作っていないだけ」と読み違える
+            status = "❓ 未計測" if 未計測 else "⬜ 未実装"
         else:
             score = max(0, round(100 - (ded / max_ded * 100), 1))
             if score >= 90:
@@ -1311,6 +1392,7 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
             "status": status,
             "weight": weight,
             "deductions": ded,
+            "unchecked": 未計測,
             "plugin_count": sum(1 for p in PLUGIN_REGISTRY if p.category == cat),
         })
 
