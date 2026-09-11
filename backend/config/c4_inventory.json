@@ -28,6 +28,15 @@
    "fingerprint": []
   },
   {
+   "id": "backend/agents/_deprecated/pipeline_coordinator.py::PipelineCoordinator.__init__",
+   "file": "backend/agents/_deprecated/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator.__init__",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 15 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/agents/_deprecated/pipeline_coordinator.py::PipelineCoordinator._build_result",
    "file": "backend/agents/_deprecated/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._build_result",
@@ -97,7 +106,29 @@
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "形としては偽 success に最も近いが、モジュールが _deprecated/ で本番から到達しない（ブリーフの除外「本番から到達しないもの（…_deprecated/…）」）。本番の同名クラスは backend/agents/pipeline_coordinator.py 側にあり、そちらの `quality_gate_plugins.run_all_plugins` は台帳で既に修正済み",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/_deprecated/pipeline_coordinator.py::QualityGateWorker.get_definition_of_done",
+   "file": "backend/agents/_deprecated/pipeline_coordinator.py",
+   "symbol": "QualityGateWorker.get_definition_of_done",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 15 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
+  },
+  {
+   "id": "backend/agents/_deprecated/pipeline_coordinator.py::QualityGateWorker.verify",
+   "file": "backend/agents/_deprecated/pipeline_coordinator.py",
+   "symbol": "QualityGateWorker.verify",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "未取得時に不合格へ倒れる（悲観側）。かつ _deprecated/",
+   "fingerprint": [
+    "default:score"
+   ]
   },
   {
    "id": "backend/agents/_deprecated/pipeline_coordinator.py::TranscribeWorker.execute",
@@ -107,6 +138,20 @@
    "status": "out_of_scope",
    "reason": "文字起こしの結果であって4カテゴリ（投稿/チャンネル統計/品質スコア/retention）の数字ではない。加えてモジュール全体が _deprecated/ で本番から到達しない",
    "fingerprint": [
+    "except_returns",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/agents/_deprecated/production_pipeline.py::check_quality",
+   "file": "backend/agents/_deprecated/production_pipeline.py",
+   "symbol": "check_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "_deprecated/ 配下で本番未到達（ヒント外だが全文読みで発見）。本番の同名ツールは backend/harness/pipeline_tools.py:308 の別実装",
+   "fingerprint": [
+    "const_assign:score",
+    "except_returns",
     "except_returns",
     "except_returns"
    ]
@@ -163,6 +208,15 @@
    "fingerprint": []
   },
   {
+   "id": "backend/agents/orchestration/compliance_guard.py::DesignComplianceGuard.generate_report_markdown",
+   "file": "backend/agents/orchestration/compliance_guard.py",
+   "symbol": "DesignComplianceGuard.generate_report_markdown",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "設計乖離度＝開発プロセス品質。4カテゴリの数字ではない。本番未到達",
+   "fingerprint": []
+  },
+  {
    "id": "backend/agents/orchestration/daemon_manager.py::DaemonManager._setup_signal_handlers",
    "file": "backend/agents/orchestration/daemon_manager.py",
    "symbol": "DaemonManager._setup_signal_handlers",
@@ -170,6 +224,117 @@
    "status": "out_of_scope",
    "reason": "デーモン制御のみ ／ 掃引の所見: unreachable（本番参照なし）",
    "fingerprint": []
+  },
+  {
+   "id": "backend/agents/orchestration/evolution_roadmap_validator.py::RoadmapValidator._evaluate_stage1",
+   "file": "backend/agents/orchestration/evolution_roadmap_validator.py",
+   "symbol": "RoadmapValidator._evaluate_stage1",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "開発ロードマップ進捗率＝開発プロセス品質。limits#11。本番未到達。かつ本文に未計測の明記あり",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/orchestration/evolution_roadmap_validator.py::RoadmapValidator._evaluate_stage2",
+   "file": "backend/agents/orchestration/evolution_roadmap_validator.py",
+   "symbol": "RoadmapValidator._evaluate_stage2",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "4カテゴリ外の開発プロセス指標。未取得時は悲観側に倒れる",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/orchestration/evolution_roadmap_validator.py::RoadmapValidator._evaluate_stage3",
+   "file": "backend/agents/orchestration/evolution_roadmap_validator.py",
+   "symbol": "RoadmapValidator._evaluate_stage3",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "4カテゴリ外。かつ未計測の明記あり",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/orchestration/evolution_roadmap_validator.py::RoadmapValidator._evaluate_stage4",
+   "file": "backend/agents/orchestration/evolution_roadmap_validator.py",
+   "symbol": "RoadmapValidator._evaluate_stage4",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "開発プロセスの品質であり 4カテゴリの数字・判定ではない。本番未到達",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/orchestration/evolution_roadmap_validator.py::RoadmapValidator._evaluate_stage5",
+   "file": "backend/agents/orchestration/evolution_roadmap_validator.py",
+   "symbol": "RoadmapValidator._evaluate_stage5",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "4カテゴリ外の開発プロセス指標。本番未到達",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/orchestration/evolution_roadmap_validator.py::RoadmapValidator.evaluate_stages",
+   "file": "backend/agents/orchestration/evolution_roadmap_validator.py",
+   "symbol": "RoadmapValidator.evaluate_stages",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "4カテゴリ外 ／ 掃引の所見: unreachable（generate_subagent_reports.py:2353 のみ）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/agents/orchestration/evolution_roadmap_validator.py::RoadmapValidator.generate_report_markdown",
+   "file": "backend/agents/orchestration/evolution_roadmap_validator.py",
+   "symbol": "RoadmapValidator.generate_report_markdown",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "4カテゴリ外の開発プロセス指標。本番未到達",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/agents/orchestration/generate_subagent_reports.py::generate_efficiency_and_parallel_metrics",
+   "file": "backend/agents/orchestration/generate_subagent_reports.py",
+   "symbol": "generate_efficiency_and_parallel_metrics",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "開発プロセス（エージェント稼働効率）であり 4カテゴリ外。limits#11。本番未到達",
+   "fingerprint": [
+    "default:passed",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/agents/orchestration/generate_subagent_reports.py::generate_task_summary_top20",
+   "file": "backend/agents/orchestration/generate_subagent_reports.py",
+   "symbol": "generate_task_summary_top20",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "開発タスクのランキングで 4カテゴリ外。本番未到達",
+   "fingerprint": [
+    "const_dict:passed",
+    "except_returns",
+    "or_default"
+   ]
+  },
+  {
+   "id": "backend/agents/orchestration/harness_auditor.py::run_audit",
+   "file": "backend/agents/orchestration/harness_auditor.py",
+   "symbol": "run_audit",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "過去の周で「本番から到達しない／対象外」と判定済み（ブリーフ L61）。加えて未実装項目は SKIP の印が付く",
+   "fingerprint": [
+    "const_dict:passed",
+    "const_dict:score",
+    "except_returns"
+   ]
   },
   {
    "id": "backend/agents/orchestration/hub_gate.py::GateMixin.check_phase_gate",
@@ -183,13 +348,26 @@
    ]
   },
   {
+   "id": "backend/agents/orchestration/hub_gate.py::GateMixin.submit_batch_report",
+   "file": "backend/agents/orchestration/hub_gate.py",
+   "symbol": "GateMixin.submit_batch_report",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "default:passed"
+   ]
+  },
+  {
    "id": "backend/agents/orchestration/hub_reports.py::ReportsMixin._emit_harness_audit_log",
    "file": "backend/agents/orchestration/hub_reports.py",
    "symbol": "ReportsMixin._emit_harness_audit_log",
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "ここでいう quality_gate はバッチの非退行フラグ（開発ハーネスの監査ログ）で、C4 が名指しする動画の quality_score ではない。憲法 limits #11 の『開発プロセスの品質』側",
-   "fingerprint": []
+   "fingerprint": [
+    "default:passed"
+   ]
   },
   {
    "id": "backend/agents/orchestration/hub_reports.py::ReportsMixin._generate_phase_report",
@@ -199,6 +377,28 @@
    "status": "out_of_scope",
    "reason": "カバレッジ／テスト数／CRITICAL負債は開発指標で4カテゴリ外",
    "fingerprint": [
+    "const_assign:score",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
+    "const_dict:passed",
     "const_dict:score",
     "const_dict:score",
     "const_dict:score",
@@ -206,6 +406,7 @@
     "const_dict:score",
     "const_dict:score",
     "const_dict:score",
+    "default:passed",
     "or_default",
     "or_default",
     "or_default",
@@ -252,6 +453,20 @@
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "未取得は N/A 表示。正直な既定値",
+   "fingerprint": [
+    "const_assign:score",
+    "const_assign:score",
+    "const_assign:score",
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator.__init__",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator.__init__",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 12 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
   },
   {
@@ -259,7 +474,7 @@
    "file": "backend/agents/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._build_result",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1139 `\"scored\": getattr(ctx,\"quality_scored\",False)`、L1176 も同じ旗を返す。L1154 のブロックレポートも旗が立っているときだけ作る。未計測の 0 点は scored=False で区別できる。",
    "fingerprint": [
     "getattr_default",
@@ -336,7 +551,7 @@
    "file": "backend/agents/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._trigger_dream_learning",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1318 `ctx.quality_score if getattr(ctx,\"quality_scored\",False) else None`、L1319 で quality_scored も併記。未計測は None で残る（12周目の修正が効いている）。",
    "fingerprint": [
     "getattr_default",
@@ -400,8 +615,17 @@
    "file": "backend/agents/tick_loop.py",
    "symbol": "TickLoop._action_pipeline_knowledge",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L470-479: `採点した = bool(knowledge.get(\"quality_scored\")) and isinstance(score,(int,float))` が真のときだけ VERIFIED_FACTS に品質スコアを書く（旗が無ければ書かない fail-closed）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/agents/tick_loop.py::TickLoop._action_quality_trend",
+   "file": "backend/agents/tick_loop.py",
+   "symbol": "TickLoop._action_quality_trend",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
   },
   {
@@ -418,8 +642,48 @@
    "file": "backend/agents/workers/quality_gate_worker.py",
    "symbol": "QualityGateWorker.execute",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L195-216: raw_score/clamped/deductions を保持し、ctx.quality_scored=True と quality_gate_report{all_plugins_ran, failed_plugins} で「全項目を検査できたか」を別に持つ。印あり。",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/agents/workers/quality_gate_worker.py::QualityGateWorker.get_definition_of_done",
+   "file": "backend/agents/workers/quality_gate_worker.py",
+   "symbol": "QualityGateWorker.get_definition_of_done",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 5 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/agents/workers/quality_gate_worker.py::QualityGateWorker.verify",
+   "file": "backend/agents/workers/quality_gate_worker.py",
+   "symbol": "QualityGateWorker.verify",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 5 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "default:score"
+   ]
+  },
+  {
+   "id": "backend/agents/workers/smartcut_worker.py::SmartCutWorker._score_segments",
+   "file": "backend/agents/workers/smartcut_worker.py",
+   "symbol": "SmartCutWorker._score_segments",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "4カテゴリの数字ではない。セグメント選定用の内部ランキング（テキスト密度×位置重み+ギャップ加点）で、品質の良し悪しを名乗らない。正典 limits 1（動画の良し悪しは判定しない）にも該当",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/agents/workers/smartcut_worker.py::SmartCutWorker._select_segments_by_score",
+   "file": "backend/agents/workers/smartcut_worker.py",
+   "symbol": "SmartCutWorker._select_segments_by_score",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "選定ロジック。判定値を外部に返さない",
    "fingerprint": []
   },
   {
@@ -429,6 +693,17 @@
    "category": "retention",
    "status": "honest",
    "reason": "L184-196: metadata_source 既定 {} → sns_data=None → skipped_features に「クロスメディア相関分析(SNS実データなし)」を積んで return。ctx.metadata に相関値も推奨プラットフォームも書かない。作り物の get_default_sns_data() は呼ばれない",
+   "fingerprint": [
+    "getattr_default"
+   ]
+  },
+  {
+   "id": "backend/antigravity_api.py::run_self_review",
+   "file": "backend/antigravity_api.py",
+   "symbol": "run_self_review",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L279-288 詳細=getattr(result.score,'details',None) or {}; 'scored'/'is_real' を応答に載せる。self_review_engine.py:242 の失敗経路が details={'scored':False,'is_real':False} を返す",
    "fingerprint": [
     "getattr_default"
    ]
@@ -472,6 +747,24 @@
    "fingerprint": [
     "default:video_id"
    ]
+  },
+  {
+   "id": "backend/asset_library.py::CreativeAssetLibrary.search_assets",
+   "file": "backend/asset_library.py",
+   "symbol": "CreativeAssetLibrary.search_assets",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 4 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/auto_full_build.py::main",
+   "file": "backend/auto_full_build.py",
+   "symbol": "main",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "本番から到達しない CLI スクリプト（`if __name__ == \"__main__\"`）。本番 import は0件（grep は technical_debt_index.json / design_stock.json / tests のみ）",
+   "fingerprint": []
   },
   {
    "id": "backend/branding/analytics_manager.py::AnalyticsManager.__init__",
@@ -562,6 +855,15 @@
    "fingerprint": []
   },
   {
+   "id": "backend/c4_inventory.py::_印を属性で立てている",
+   "file": "backend/c4_inventory.py",
+   "symbol": "_印を属性で立てている",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "台帳の検査器そのもの。4カテゴリの語を正規表現として持つため網に掛かるが、数字・判定は作らない（この掃引の道具）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/check_pipeline_status.py::_print_result",
    "file": "backend/check_pipeline_status.py",
    "symbol": "_print_result",
@@ -622,7 +924,7 @@
    "file": "backend/core/context.py",
    "symbol": "ProductionContext.from_dict",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L194 quality_score=data.get('quality_score',0.0) だが L195 で quality_scored=bool(data.get('quality_scored',False)) を必ず復元。未計測なら scored=False が残り、pipeline_coordinator L1318 が quality_score を None にする。印は生きている",
    "fingerprint": [
     "default:quality_score"
@@ -633,9 +935,21 @@
    "file": "backend/core/context.py",
    "symbol": "ProductionContext.to_dict",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L147 'quality_score': self.quality_score と L150 'quality_scored': self.quality_scored を必ず対で出力。受け側（ProductionPipeline.jsx:847 / ProductionWizard.jsx:185）が scored===false を「未計測」と表示する",
    "fingerprint": []
+  },
+  {
+   "id": "backend/design_system/design_auto_learner.py::DesignAutoLearner.learn_from_quality_check",
+   "file": "backend/design_system/design_auto_learner.py",
+   "symbol": "DesignAutoLearner.learn_from_quality_check",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "既定値 0 は悲観側（報告しないもの）。加えて本番呼び出し元が0件",
+   "fingerprint": [
+    "const_assign:score",
+    "default:score"
+   ]
   },
   {
    "id": "backend/director_engine.py::DirectorBrain.__init__",
@@ -689,6 +1003,7 @@
    "status": "out_of_scope",
    "reason": "本番から到達しない（テスト専用）。main.py / routers/ からの呼び出し連鎖 0 件",
    "fingerprint": [
+    "const_dict:ctr_score",
     "except_returns",
     "except_returns"
    ]
@@ -700,7 +1015,20 @@
    "category": "チャンネル統計",
    "status": "out_of_scope",
    "reason": "本番から到達しない（テスト専用）。main.py / routers/ からの呼び出し連鎖 0 件",
-   "fingerprint": []
+   "fingerprint": [
+    "const_dict:ctr_score"
+   ]
+  },
+  {
+   "id": "backend/error_reporter.py::FAQManager.search",
+   "file": "backend/error_reporter.py",
+   "symbol": "FAQManager.search",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "score は FAQ 検索の関連度ランキング。動画の品質スコアでも投稿・チャンネル統計・retention でもない",
+   "fingerprint": [
+    "const_assign:score"
+   ]
   },
   {
    "id": "backend/feature_gaps.py::_mainline_stage_names",
@@ -763,11 +1091,65 @@
    ]
   },
   {
+   "id": "backend/harness/evaluator_optimizer.py::EvaluatorOptimizerWorkflow._run_quality_check",
+   "file": "backend/harness/evaluator_optimizer.py",
+   "symbol": "EvaluatorOptimizerWorkflow._run_quality_check",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "except ImportError → {\"score\":0,\"rank\":\"C\",\"feedback\":[f\"ImportError: {e}\"]}、他例外 → {\"score\":0,\"rank\":\"C\",\"feedback\":[str(e)]}。0点は passed=False を確定させる",
+   "fingerprint": [
+    "const_dict:score",
+    "const_dict:score",
+    "except_returns",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/harness/evaluator_optimizer.py::EvaluatorOptimizerWorkflow.run",
+   "file": "backend/harness/evaluator_optimizer.py",
+   "symbol": "EvaluatorOptimizerWorkflow.run",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "result.success=True は diagnosis.passed（score>=90）の分岐のみ。未達で抜けた場合は success=False のまま「⚠️ 改善ループ完了（不合格のまま）」を出す",
+   "fingerprint": [
+    "default:score"
+   ]
+  },
+  {
+   "id": "backend/harness/evaluator_optimizer.py::QualityEvaluator._classify_issues",
+   "file": "backend/harness/evaluator_optimizer.py",
+   "symbol": "QualityEvaluator._classify_issues",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "feedback 文字列と category_scores<70 から improvable/action/estimated_gain を付けた issue 辞書を作るだけ。合格やスコアを名乗る出力はない",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/harness/evaluator_optimizer.py::QualityEvaluator.evaluate",
+   "file": "backend/harness/evaluator_optimizer.py",
+   "symbol": "QualityEvaluator.evaluate",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "score=quality_result.get(\"score\", 0) / rank は既定 \"C\" / passed = score>=90。品質結果が空なら 0点・C・不合格になり、合格を名乗らない",
+   "fingerprint": [
+    "default:score"
+   ]
+  },
+  {
+   "id": "backend/harness/evaluator_optimizer.py::QualityOptimizer.plan",
+   "file": "backend/harness/evaluator_optimizer.py",
+   "symbol": "QualityOptimizer.plan",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "diagnosis.passed のときだけ「合格済み — 改善不要」を返す。それ以外は needed=90-score を明示し、到達困難なら「⚠️ 合格到達困難」と悲観側を書く",
+   "fingerprint": []
+  },
+  {
    "id": "backend/harness/pipeline_tools.py::_get_or_create_context",
    "file": "backend/harness/pipeline_tools.py",
    "symbol": "_get_or_create_context",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L72-76 meta の quality_score を復元し、quality_scored も bool(meta.get(...,False)) で一緒に復元。値だけ戻して「採点済み」に化ける穴は塞がれている。",
    "fingerprint": []
   },
@@ -776,10 +1158,22 @@
    "file": "backend/harness/pipeline_tools.py",
    "symbol": "_save_context",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L124-125 quality_score と getattr(ctx,\"quality_scored\",False) を対で保存。旗が無ければ False（未計測）に倒れる。既定値は悲観側で印として機能。",
    "fingerprint": [
     "getattr_default"
+   ]
+  },
+  {
+   "id": "backend/harness/pipeline_tools.py::check_quality_tool",
+   "file": "backend/harness/pipeline_tools.py",
+   "symbol": "check_quality_tool",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "本番未到達（_deprecated とハーネス自己テストのみ）。値自体も悲観側で偽の success ではない",
+   "fingerprint": [
+    "default:score",
+    "except_returns"
    ]
   },
   {
@@ -810,6 +1204,24 @@
    "fingerprint": []
   },
   {
+   "id": "backend/harness_audit_runner.py::HarnessAuditRunner._generate_reports",
+   "file": "backend/harness_audit_runner.py",
+   "symbol": "HarnessAuditRunner._generate_reports",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "本番から到達しない CLI 出力。かつ開発プロセス監査",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/harness_audit_runner.py::HarnessAuditRunner.run",
+   "file": "backend/harness_audit_runner.py",
+   "symbol": "HarnessAuditRunner.run",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 4 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/main.py::register_all_routers",
    "file": "backend/main.py",
    "symbol": "register_all_routers",
@@ -823,7 +1235,7 @@
    "file": "backend/mcp_server.py",
    "symbol": "_calculate_quality_score",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L113-129: stages が空なら score:None・scored:False・『採点していません』を返す。JSON壊れ時は get_quality_score が score:None。",
    "fingerprint": []
   },
@@ -832,7 +1244,7 @@
    "file": "backend/mcp_server.py",
    "symbol": "_印つきで読む",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L70-78: 実績に印を付ける() を通して evolution_log を返す。7周目に修正済みの印つき読み口。",
    "fingerprint": []
   },
@@ -855,6 +1267,15 @@
    "fingerprint": []
   },
   {
+   "id": "backend/plugins/lightweight_scan_plugin.py::LightweightScanPlugin._extract_highlight_candidates",
+   "file": "backend/plugins/lightweight_scan_plugin.py",
+   "symbol": "LightweightScanPlugin._extract_highlight_candidates",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "候補を append するのは if keyword in text が成立した時だけで、score=config[\"weight\"]（14〜20）はその一致に対応。一致0件なら候補も0件。adopted は None で未決を明示",
+   "fingerprint": []
+  },
+  {
    "id": "backend/plugins/progressive_review_plugin.py::ProgressiveReviewPlugin._format_stage_report",
    "file": "backend/plugins/progressive_review_plugin.py",
    "symbol": "ProgressiveReviewPlugin._format_stage_report",
@@ -868,9 +1289,11 @@
    "file": "backend/plugins/progressive_review_plugin.py",
    "symbol": "ProgressiveReviewPlugin._generate_stage_review",
    "category": "品質スコア",
-   "status": "out_of_scope",
-   "reason": "本番未到達（review_router 未登録の死蔵コード）。統一感スコアは limits 4 で対象外",
-   "fingerprint": []
+   "status": "marked",
+   "reason": "L170-175 測った項目なし かつ items も空 → overall_score=100.0（コメント通り「見るものが無い」ケース）。items があって測れないときは None。StageReview 自体に印は無い。",
+   "fingerprint": [
+    "const_assign:overall_score"
+   ]
   },
   {
    "id": "backend/plugins/progressive_review_plugin.py::ProgressiveReviewPlugin._generate_summary",
@@ -886,7 +1309,7 @@
    "file": "backend/plugins/progressive_review_plugin.py",
    "symbol": "ProgressiveReviewPlugin._review_final",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L391-411 quality_scored 旗で判定。未計測なら content に「未計測」、metadata={\"score\":None,\"measured\":False} を付け、合否集計から外す。印あり。",
    "fingerprint": [
     "getattr_default"
@@ -906,9 +1329,10 @@
    "file": "backend/plugins/report_generator_plugin.py",
    "symbol": "ReportGeneratorPlugin._generate_report",
    "category": "品質スコア",
-   "status": "out_of_scope",
-   "reason": "既に印あり（旗判定）。かつ本番から到達しない",
+   "status": "marked",
+   "reason": "L99-105: quality_scored 旗が False なら『**未計測**（この経路に品質ゲートは繋がっていません）』を出力。値ではなく旗で判定しており印がある。既修正。",
    "fingerprint": [
+    "const_assign:score",
     "default:score",
     "getattr_default"
    ]
@@ -929,6 +1353,27 @@
    "category": "retention",
    "status": "honest",
    "reason": "L41 IMPLEMENTED=False。呼び出し側2箇所（pipeline_coordinator.py:1225 は skipped_features に積んで return None、routers/youtube_optimizer.py:1529 は 501）が印を見て止める。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/plugins/smart_cut_plugin.py::SmartCutPlugin._select_segments",
+   "file": "backend/plugins/smart_cut_plugin.py",
+   "symbol": "SmartCutPlugin._select_segments",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "L240/L264 `h.get('score', 0)`。score 欠落時は 0 で最下位に落ち、採用もされにくい。選定用の重みであって品質判定を名乗らない。悲観側の既定値。",
+   "fingerprint": [
+    "default:score",
+    "default:score"
+   ]
+  },
+  {
+   "id": "backend/plugins/smart_cut_plugin.py::SmartCutPlugin.get_recommendation",
+   "file": "backend/plugins/smart_cut_plugin.py",
+   "symbol": "SmartCutPlugin.get_recommendation",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "`score: s.score` は _select_segments が入れた上流スキャンの実値をそのまま返すだけ。欠落時は 0（悲観）。合否・優秀といった判定は作らない。",
    "fingerprint": []
   },
   {
@@ -982,6 +1427,28 @@
    "status": "out_of_scope",
    "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 9 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
+  },
+  {
+   "id": "backend/plugins/youtube_optimizer_plugin.py::YouTubeOptimizerPlugin._calculate_importance",
+   "file": "backend/plugins/youtube_optimizer_plugin.py",
+   "symbol": "YouTubeOptimizerPlugin._calculate_importance",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 9 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/plugins/youtube_optimizer_plugin.py::YouTubeOptimizerPlugin._evaluate_hook",
+   "file": "backend/plugins/youtube_optimizer_plugin.py",
+   "symbol": "YouTubeOptimizerPlugin._evaluate_hook",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 9 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "const_assign:score"
+   ]
   },
   {
    "id": "backend/plugins/youtube_optimizer_plugin.py::YouTubeOptimizerPlugin._get_emotion_ctr_modifier",
@@ -1071,7 +1538,11 @@
    "category": "チャンネル統計",
    "status": "honest",
    "reason": "L331-346: predicted_ctr に 8.5/7.8/7.2 の固定値。ただし optimize_context L626 が直後に _apply_dynamic_ctr_to_thumbnails で入力由来の値へ上書きする。",
-   "fingerprint": []
+   "fingerprint": [
+    "const_dict:predicted_ctr",
+    "const_dict:predicted_ctr",
+    "const_dict:predicted_ctr"
+   ]
   },
   {
    "id": "backend/plugins/youtube_optimizer_plugin.py::YouTubeOptimizerPlugin.optimize_context",
@@ -1080,6 +1551,45 @@
    "category": "チャンネル統計",
    "status": "honest",
    "reason": "L592-630: 各工程を順に呼んで集約するだけ。握り潰しは無く、_integrate_director_brain の失敗のみ warning（スコアに影響しない）。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/quality_gate_agent.py::QualityGateAgent._generate_summary",
+   "file": "backend/quality_gate_agent.py",
+   "symbol": "QualityGateAgent._generate_summary",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "L204 `if is_ready` の内側でのみ「✅ 優秀」を出す。is_ready は L139 で score>=80 かつ CRITICAL 無し、さらに検査対象ありの経路でしか到達しない。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/quality_gate_agent.py::QualityGateAgent._検査対象があるか",
+   "file": "backend/quality_gate_agent.py",
+   "symbol": "QualityGateAgent._検査対象があるか",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "採点する材料があるかを判定する門そのもの。`content.get(\"full_text\") or \"\"` の 既定は**空＝材料なし＝False**に倒れる悲観側で、数字も判定も作らない。空の入れ物（`scenes: [{}]`）でも通さないことを 7周目に確かめている",
+   "fingerprint": [
+    "or_default",
+    "or_default"
+   ]
+  },
+  {
+   "id": "backend/quality_gate_agent.py::QualityGateAgent.run_gate",
+   "file": "backend/quality_gate_agent.py",
+   "symbol": "QualityGateAgent.run_gate",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "本番到達（backend/main.py:228 include_router(quality_router) → backend/routers/quality.py:37 で import）。材料が1つも無ければ L121 の _検査対象があるか で弾き、L125/131 で is_ready=False・**scored=False** を立てて返す。QualityReport.to_dict() L50 が \"scored\" を応答に出すので、未計測と「採点して満点」が区別できる（7周目に入れた門）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/quality_gate_agent.py::QualityReport.to_dict",
+   "file": "backend/quality_gate_agent.py",
+   "symbol": "QualityReport.to_dict",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "`scored` を必ず同梱する（L50-53）。未採点時は score=None + scored=False で出所が分かる。既に印あり。",
    "fingerprint": []
   },
   {
@@ -1108,7 +1618,7 @@
    "file": "backend/quality_gate_plugins.py",
    "symbol": "AIRuleCheck.analyze",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "9a247db（早期 return 17箇所に checked:False / 未検査を分母から除外） / L120-146: ImportError も想定例外も checked=False を立てて返す（L134/L138）。返り値に印がある。",
    "fingerprint": []
   },
@@ -1157,6 +1667,19 @@
    ]
   },
   {
+   "id": "backend/report_generator.py::_build_quality_section",
+   "file": "backend/report_generator.py",
+   "symbol": "_build_quality_section",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "本番から到達しない（generate_durability_report の import は backend/tests/ の2ファイルのみ。main.py・routers から参照なし）",
+   "fingerprint": [
+    "default:passed",
+    "default:passed",
+    "default:score"
+   ]
+  },
+  {
    "id": "backend/revenue/artifact_gate.py::_format",
    "file": "backend/revenue/artifact_gate.py",
    "symbol": "_format",
@@ -1192,7 +1715,9 @@
    "category": "チャンネル統計",
    "status": "honest",
    "reason": "L163-166: 対象動画が無ければ success False を返す。L137-144 は req 由来の実CTR/impressions/clicks を保存し prediction_error を実測差で算出。捏造なし",
-   "fingerprint": []
+   "fingerprint": [
+    "default:predicted_ctr"
+   ]
   },
   {
    "id": "backend/routers/ab_test_tracker.py::select_thumbnail",
@@ -1217,16 +1742,19 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_ai_suggestion_effect",
    "category": "retention",
-   "status": "honest",
+   "status": "marked",
    "reason": "L260 先頭 **DATA_SOURCE。adopted/rejected/impact_diff はすべて直書き定数だが印の下",
-   "fingerprint": []
+   "fingerprint": [
+    "const_dict:avg_retention",
+    "const_dict:avg_retention"
+   ]
   },
   {
    "id": "backend/routers/admin_analytics_router.py::get_analytics_dashboard",
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_analytics_dashboard",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L135 先頭で **DATA_SOURCE。status は L137 _api_connection[\"connected\"]=False より \"disconnected\"、api_connected も False",
    "fingerprint": []
   },
@@ -1235,7 +1763,7 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_benchmark",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L216 先頭 **DATA_SOURCE。industry_avg 3.5/40.0 も channel_avg も sample 印の下",
    "fingerprint": []
   },
@@ -1244,18 +1772,24 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_chapter_effect",
    "category": "retention",
-   "status": "honest",
+   "status": "marked",
    "reason": "L284 先頭 **DATA_SOURCE。with/without_chapters の avg_retention 53.2/42.1 は定数だが印あり",
-   "fingerprint": []
+   "fingerprint": [
+    "const_dict:avg_retention",
+    "const_dict:avg_retention"
+   ]
   },
   {
    "id": "backend/routers/admin_analytics_router.py::get_competitor_analysis",
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_competitor_analysis",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "危険形1: L431-433 subscribers=25000/18000/32000 と our_rank=2 は直書き。ただし L429 先頭で **DATA_SOURCE 展開、衝突キー無しで is_real:False が生きる",
    "fingerprint": [
+    "const_dict:avg_retention",
+    "const_dict:avg_retention",
+    "const_dict:avg_retention",
     "const_dict:subscribers",
     "const_dict:subscribers",
     "const_dict:subscribers"
@@ -1266,7 +1800,7 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_ctr_trend",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L173 式で組み立てた30日分。L178 で {**DATA_SOURCE, history, period_days} を返し印が生きる",
    "fingerprint": []
   },
@@ -1275,7 +1809,7 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_growth_forecast",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L564 先頭 **DATA_SOURCE。method:\"exponential_smoothing\"/confidence:0.82 と計算した風の記述だが定数、印は生きている",
    "fingerprint": []
   },
@@ -1284,7 +1818,7 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_kpi_achievement",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L387 先頭 **DATA_SOURCE。achievement_rate は sample の _video_data から算出だが印の下",
    "fingerprint": []
   },
@@ -1293,7 +1827,7 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_owner_dashboard",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "危険形3: L513-515 highlights が「業界平均を上回っています」「前月比+15%の成長」と断定文。だが L505 先頭 **DATA_SOURCE で is_real:False + note が付く",
    "fingerprint": []
   },
@@ -1302,16 +1836,19 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_period_comparison",
    "category": "retention",
-   "status": "honest",
+   "status": "marked",
    "reason": "L530 先頭 **DATA_SOURCE。period1/2 と diff は全部定数（引数の期間に依存しない）だが印の下",
-   "fingerprint": []
+   "fingerprint": [
+    "const_dict:avg_retention",
+    "const_dict:avg_retention"
+   ]
   },
   {
    "id": "backend/routers/admin_analytics_router.py::get_retention_trend",
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_retention_trend",
    "category": "retention",
-   "status": "honest",
+   "status": "marked",
    "reason": "L190 base_retention=40.0+i*0.3+... の作り物。L195 {**DATA_SOURCE, ...} で印あり",
    "fingerprint": []
   },
@@ -1320,7 +1857,7 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_smartcut_effect",
    "category": "retention",
-   "status": "honest",
+   "status": "marked",
    "reason": "L251 {**DATA_SOURCE, \"settings\": _smartcut_settings(L113 固定 avg_retention 55.3/49.1/43.8)}。印あり",
    "fingerprint": []
   },
@@ -1329,16 +1866,30 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_thumbnail_effect",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L308 先頭 **DATA_SOURCE。correlation_score 0.72・best_performing も定数だが印の下",
    "fingerprint": []
+  },
+  {
+   "id": "backend/routers/admin_analytics_router.py::get_trend_analysis",
+   "file": "backend/routers/admin_analytics_router.py",
+   "symbol": "get_trend_analysis",
+   "category": "チャンネル統計",
+   "status": "marked",
+   "reason": "L411 先頭 **DATA_SOURCE。trends の score 92/85/78/65 は定数だが印あり。ヒント外",
+   "fingerprint": [
+    "const_dict:score",
+    "const_dict:score",
+    "const_dict:score",
+    "const_dict:score"
+   ]
   },
   {
    "id": "backend/routers/admin_analytics_router.py::get_video_performance",
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "get_video_performance",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L203 {**DATA_SOURCE, \"videos\": _video_data(L98 固定5件), \"total\":5}。印あり",
    "fingerprint": []
   },
@@ -1347,7 +1898,7 @@
    "file": "backend/routers/admin_analytics_router.py",
    "symbol": "update_kpi_settings",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L370 {**DATA_SOURCE, \"status\":\"updated\", **_kpi_settings}。設定値の反映のみで測定値を主張しない",
    "fingerprint": []
   },
@@ -1356,8 +1907,8 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_alert_settings",
    "category": "チャンネル統計",
-   "status": "out_of_scope",
-   "reason": "quality_score の 80 は『閾値の設定値』で測定値ではない（ブリーフの『設計上の閾値分岐』に当たる）。かつ印が付いている",
+   "status": "marked",
+   "reason": "L440-447。alerts=[{metric:'ctr',threshold:3.0,condition:'below'},{metric:'quality_score',threshold:80,condition:'below'}], total=2。実行結果に data_source='sample', is_real=False あり",
    "fingerprint": []
   },
   {
@@ -1365,7 +1916,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_channel_comparison",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L283-289。AST が挙げた12件の危険形（ch-001 subscribers=12500/ctr=6.8/retention=52/quality_score=92、ch-002 8200/5.9/48/88、ch-003 3100/4.5/40/85）をそのまま返し、L289 best_performer='ch-001' という判定まで出す。ただし L282 の **DATA_SOURCE により実行結果は data_source='sample', is_real=False, note あり（実測）",
    "fingerprint": [
     "const_dict:ctr",
@@ -1387,7 +1938,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_channel_dashboard",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L105-126。実行結果: data_source='sample', is_real=False, note あり。L108 status は len(active)==len(_channels) の分岐で、ch-003 が paused のため実測値は 'partial'（healthy を騙らない）。L112-113 の total_subscribers=23800 / total_views=1450000 は _channels の合計だが L106 の **DATA_SOURCE で印付き",
    "fingerprint": []
   },
@@ -1396,7 +1947,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_channel_detail",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L145-166。条件文が名指しした L152 watch_time_hours=15200 は今も 15200 を返すが、L146 の **DATA_SOURCE が先に展開され、L147 の **ch にも衝突キーが無いため実行結果は data_source='sample', is_real=False, note あり（実測）。他に avg_view_duration_seconds=420, engagement_rate=4.8, videos_published=45, avg_views_per_video=18888, top_video_views=125000 も同じ印の下。connected=False。存在しない channel_id は L144 で 404",
    "fingerprint": [
     "const_dict:watch_time_hours"
@@ -1407,7 +1958,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_competitor_benchmark",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L403-408。AST が挙げた8件（Competitor A subscribers=25000/ctr=5.5、B 18000/4.8、Your Channel 12500/6.8）と L408 ranking={'subscribers':3,'ctr':1,'avg_views':3} という順位判定。L400 の **DATA_SOURCE で実行結果は data_source='sample', is_real=False, note あり",
    "fingerprint": [
     "const_dict:ctr",
@@ -1425,7 +1976,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_ctr_improvement",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L233-243。improvement_pct=61.90, before=4.2, after=6.8, factors の contribution_pct=35/40/25。L234 の **DATA_SOURCE で data_source='sample', is_real=False（実行で確認）",
    "fingerprint": []
   },
@@ -1434,7 +1985,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_effect_summary",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L176-183。before.quality_score=72 / after.quality_score=92 / improvement_pct.quality=27.78、ctr=61.90、retention=48.57 と、AST が挙げた危険形をそのまま返す。ただし L175 の **DATA_SOURCE で data_source='sample', is_real=False, note が同じ辞書に載る（実行で確認）。採点も維持率測定も行っていないことが本文で名乗られている",
    "fingerprint": [
     "const_dict:ctr",
@@ -1448,7 +1999,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_growth_prediction",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L417-432。predictions は固定（subscribers_3m=15000 … views_monthly_6m=140000）だが、L429-431 で confidence=None / model=None / method='fixed_sample' を返す（実行で確認）。過去に 'linear_regression_v2' を自称していた箇所は L427-428 のコメントどおり除去済み。加えて L418 の **DATA_SOURCE",
    "fingerprint": []
   },
@@ -1457,7 +2008,7 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_optimization_recommendations",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L298-306。expected_impact='登録者+15%' / 'CTR+8%' / 'エンゲージメント+20%' は根拠のない予測文字列だが、L299 の **DATA_SOURCE で data_source='sample', is_real=False, note あり（実行で確認）。数値予測ではなく推奨の見出し",
    "fingerprint": []
   },
@@ -1466,16 +2017,31 @@
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_owner_view",
    "category": "品質スコア",
-   "status": "out_of_scope",
-   "reason": "AST は 'quality_score' の文字列に反応したが、これは表示セクション名で採点結果ではない。数字・判定を作っていない",
+   "status": "marked",
+   "reason": "L484-490。visible_sections に文字列 'quality_score' が入るだけで、スコアの数値は一切返さない。enabled=True, theme='light', customizable=True。L485 の **DATA_SOURCE も付く",
    "fingerprint": []
+  },
+  {
+   "id": "backend/routers/admin_channel_router.py::get_quality_improvement",
+   "file": "backend/routers/admin_channel_router.py",
+   "symbol": "get_quality_improvement",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L211-225。average_improvement=27.78、trend の score=72/80/88/92、details の transcription_accuracy before=85 after=97 等がすべて固定。L212 の **DATA_SOURCE により実行結果は data_source='sample', is_real=False, note あり。採点器（director_engine.calculate_quality_score）とは一切接続していない",
+   "fingerprint": [
+    "const_dict:average_improvement",
+    "const_dict:score",
+    "const_dict:score",
+    "const_dict:score",
+    "const_dict:score"
+   ]
   },
   {
    "id": "backend/routers/admin_channel_router.py::get_retention_improvement",
    "file": "backend/routers/admin_channel_router.py",
    "symbol": "get_retention_improvement",
    "category": "retention",
-   "status": "honest",
+   "status": "marked",
    "reason": "L251-259。improvement_pct=48.57, before=35, after=52, smartcut_impact=65, quality_gate_impact=35, avg_watch_time_increase_pct=42.0 が固定。YouTube Analytics の retention は取得していない。L252 の **DATA_SOURCE により実行結果は data_source='sample', is_real=False, note あり",
    "fingerprint": []
   },
@@ -1487,10 +2053,47 @@
    "status": "marked",
    "reason": "L182-195 で返る辞書は data_source:\"sample\" / is_real:False / note「検知結果ではありません」/ timestamp:None を伴う。score:92 は定数だが印が3重に付いており衝突キーも無い。",
    "fingerprint": [
+    "const_dict:current_score",
     "const_dict:score",
     "const_dict:score",
     "const_dict:score"
    ]
+  },
+  {
+   "id": "backend/routers/admin_incident_router.py::get_recovery_check",
+   "file": "backend/routers/admin_incident_router.py",
+   "symbol": "get_recovery_check",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "L388 {\"item\":\"品質スコアが90以上\",\"passed\":False} は定数。未計測だが常に不合格側へ倒れ、L395 all_passed も False になる。悲観側なので偽の success ではない。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/routers/admin_integration_router.py::get_api_docs",
+   "file": "backend/routers/admin_integration_router.py",
+   "symbol": "get_api_docs",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 4 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/routers/admin_integration_router.py::get_api_logs",
+   "file": "backend/routers/admin_integration_router.py",
+   "symbol": "get_api_logs",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 4 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/routers/admin_integration_router.py::get_api_stats",
+   "file": "backend/routers/admin_integration_router.py",
+   "symbol": "get_api_stats",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 4 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
   },
   {
    "id": "backend/routers/admin_integration_router.py::get_integration_dashboard",
@@ -1553,6 +2156,24 @@
    "fingerprint": []
   },
   {
+   "id": "backend/routers/admin_quality_router.py::get_quality_trend",
+   "file": "backend/routers/admin_quality_router.py",
+   "symbol": "get_quality_trend",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 3 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/routers/admin_quality_router.py::get_vision_gap",
+   "file": "backend/routers/admin_quality_router.py",
+   "symbol": "get_vision_gap",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 3 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/routers/admin_setup_router.py::get_model_config",
    "file": "backend/routers/admin_setup_router.py",
    "symbol": "get_model_config",
@@ -1582,6 +2203,15 @@
    ]
   },
   {
+   "id": "backend/routers/legacy_council_router.py::apply_gavel",
+   "file": "backend/routers/legacy_council_router.py",
+   "symbol": "apply_gavel",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/routers/legacy_council_router.py::propose_thumbnail",
    "file": "backend/routers/legacy_council_router.py",
    "symbol": "propose_thumbnail",
@@ -1609,11 +2239,38 @@
    "fingerprint": []
   },
   {
+   "id": "backend/routers/pipeline_report.py::_build_category_html",
+   "file": "backend/routers/pipeline_report.py",
+   "symbol": "_build_category_html",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/routers/pipeline_report.py::_build_feedback_html",
+   "file": "backend/routers/pipeline_report.py",
+   "symbol": "_build_feedback_html",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L132-137: 指摘0件でも scored 旗が無ければ「未計測」。L77-80 も同様。L98 の score None は「—」表示。緑の全項目クリアは採点済みのときだけ",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/routers/pipeline_report.py::_品質の表示",
+   "file": "backend/routers/pipeline_report.py",
+   "symbol": "_品質の表示",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "出所の印（is_real / data_source）を持つ",
+   "fingerprint": []
+  },
+  {
    "id": "backend/routers/pipeline_report.py::pipeline_report",
    "file": "backend/routers/pipeline_report.py",
    "symbol": "pipeline_report",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L238-241: 採点した = bool(quality[\"scored\"]) かつ数値型。未計測なら「未計測」表示で quality_ok False。L302 の総合も改善余地あり側に倒れる",
    "fingerprint": []
   },
@@ -1624,6 +2281,15 @@
    "category": "品質スコア",
    "status": "honest",
    "reason": "L886 evolution_log.json の force_renders へ `quality_score` を永続化。値は force_render から渡る実測値。書込失敗時は L897 で warning のみ（success を返す経路ではない）。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/routers/pipeline_router.py::apply_improvement_action",
+   "file": "backend/routers/pipeline_router.py",
+   "symbol": "apply_improvement_action",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L1613 で +4点をシミュレートするが、L1624 応答は `**IMPROVEMENT_DATA_SOURCE`（is_real False / sample）を先頭展開。improvement/* 全6経路が同様。",
    "fingerprint": []
   },
   {
@@ -1646,7 +2312,7 @@
    "file": "backend/routers/pipeline_router.py",
    "symbol": "get_quality_gate_drilldown",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1416 `**QUALITY_GATE_DATA_SOURCE` を先頭展開。未一致カテゴリは L1424 で 404。印は生きている。",
    "fingerprint": []
   },
@@ -1655,7 +2321,7 @@
    "file": "backend/routers/pipeline_router.py",
    "symbol": "get_quality_gate_history",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1502 `**QUALITY_GATE_DATA_SOURCE` 先頭展開。history 空なら initial_score 0 / improvement は差分。すべて印の下。",
    "fingerprint": []
   },
@@ -1664,7 +2330,7 @@
    "file": "backend/routers/pipeline_router.py",
    "symbol": "get_quality_gate_scores",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1389 `**QUALITY_GATE_DATA_SOURCE` を先頭展開。overall_score/categories は定数だが印付き。衝突キーなし。",
    "fingerprint": []
   },
@@ -1673,7 +2339,7 @@
    "file": "backend/routers/pipeline_router.py",
    "symbol": "get_quality_gate_status",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1373 で `**QUALITY_GATE_DATA_SOURCE`（is_real False / data_source sample）を辞書先頭に展開。衝突キーなし。checked_at は pipeline_default_states.py:111 で None。印は生きている。",
    "fingerprint": []
   },
@@ -1682,16 +2348,31 @@
    "file": "backend/routers/pipeline_router.py",
    "symbol": "get_quality_improvement",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1490 `**QUALITY_GATE_DATA_SOURCE` を先頭展開。SoulFeedbackEngine 失敗時（L1485 except）は静的提案のみ返るが、応答全体が sample/is_real False。current_score:75 も印の下。",
-   "fingerprint": []
+   "fingerprint": [
+    "const_dict:current_score"
+   ]
+  },
+  {
+   "id": "backend/routers/pipeline_router.py::reset_improvement_loop",
+   "file": "backend/routers/pipeline_router.py",
+   "symbol": "reset_improvement_loop",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "出所の印（is_real / data_source）を持つ",
+   "fingerprint": [
+    "const_dict:current_score",
+    "const_dict:initial_score",
+    "const_dict:score"
+   ]
   },
   {
    "id": "backend/routers/pipeline_router.py::run_quality_check",
    "file": "backend/routers/pipeline_router.py",
    "symbol": "run_quality_check",
    "category": "品質スコア",
-   "status": "honest",
+   "status": "marked",
    "reason": "L1531 `**QUALITY_GATE_DATA_SOURCE` 先頭展開。定数の加重平均を返すのみ。checked_at を打ち直さない旨が L1517-1519 に明記済み（過去周で修正済み）。",
    "fingerprint": []
   },
@@ -1712,6 +2393,17 @@
    "status": "out_of_scope",
    "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
+  },
+  {
+   "id": "backend/routers/render.py::_品質の実測",
+   "file": "backend/routers/render.py",
+   "symbol": "_品質の実測",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "7fcee64 + 4176c31（既定値 5.0 を外し、生成器の印を運ぶ） / L458-475: video 未指定・サイドカー不在・score が数値でない・例外、いずれも (None, None)。捏造値を返す経路が無い。",
+   "fingerprint": [
+    "except_returns"
+   ]
   },
   {
    "id": "backend/routers/render.py::generate_thumbnail",
@@ -1751,6 +2443,15 @@
    "fingerprint": []
   },
   {
+   "id": "backend/routers/review_router.py::get_review_summary",
+   "file": "backend/routers/review_router.py",
+   "symbol": "get_review_summary",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "**ルーターとして登録されていない死蔵コード。** backend/main.py にも backend/routers/__init__.py にも review_router は無い（preview_router との 部分一致に注意）。ux_verification/dead_code.py も死蔵として名指ししている",
+   "fingerprint": []
+  },
+  {
    "id": "backend/routers/shorts.py::extract_shorts_candidates",
    "file": "backend/routers/shorts.py",
    "symbol": "extract_shorts_candidates",
@@ -1778,12 +2479,23 @@
    "fingerprint": []
   },
   {
+   "id": "backend/routers/themes_router.py::recommend_template",
+   "file": "backend/routers/themes_router.py",
+   "symbol": "recommend_template",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "default:score"
+   ]
+  },
+  {
    "id": "backend/routers/trinity.py::get_evolution",
    "file": "backend/routers/trinity.py",
    "symbol": "get_evolution",
    "category": "チャンネル統計",
-   "status": "out_of_scope",
-   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
+   "status": "marked",
+   "reason": "出所の印（is_real / data_source）を持つ",
    "fingerprint": []
   },
   {
@@ -1791,8 +2503,8 @@
    "file": "backend/routers/trinity.py",
    "symbol": "simulate_analytics",
    "category": "チャンネル統計",
-   "status": "out_of_scope",
-   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
+   "status": "marked",
+   "reason": "出所の印（is_real / data_source）を持つ",
    "fingerprint": []
   },
   {
@@ -1800,7 +2512,7 @@
    "file": "backend/routers/trinity.py",
    "symbol": "sync_analytics",
    "category": "チャンネル統計",
-   "status": "honest",
+   "status": "marked",
    "reason": "L17-22 の ANALYTICS_DATA_SOURCE(data_source:\"sample\", is_real:False) を L100・L127 で辞書の先頭に展開。status/evolution は user_model_marks / evolution_log_marks 側で既に印付け済み。",
    "fingerprint": []
   },
@@ -2022,13 +2734,24 @@
    "fingerprint": []
   },
   {
+   "id": "backend/run_self_improvement_loop.py::main",
+   "file": "backend/run_self_improvement_loop.py",
+   "symbol": "main",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "`__main__` の CLI。本番（backend/main.py / backend/routers/）からの参照は 0 件（grep 実測）。self_improvement_engine 側も同じ理由で掃引時に対象外判定",
+   "fingerprint": []
+  },
+  {
    "id": "backend/scratch/complete_batch_eeebc1.py::main",
    "file": "backend/scratch/complete_batch_eeebc1.py",
    "symbol": "main",
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "scratch/ の使い捨て報告スクリプト。本番から呼ばれない。",
-   "fingerprint": []
+   "fingerprint": [
+    "const_dict:passed"
+   ]
   },
   {
    "id": "backend/scripts/gen_session9.py::gen_o11",
@@ -2047,6 +2770,7 @@
    "status": "out_of_scope",
    "reason": "悲観側に倒れ、未測定カテゴリは None。かつ本番から到達しない",
    "fingerprint": [
+    "default:final_score",
     "except_returns",
     "except_returns"
    ]
@@ -2070,7 +2794,9 @@
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "永続化するだけで新たな数字を作らない。本番から到達しない",
-   "fingerprint": []
+   "fingerprint": [
+    "default:passed"
+   ]
   },
   {
    "id": "backend/self_review_engine.py::SelfReviewEngine.__init__",
@@ -2103,6 +2829,15 @@
    ]
   },
   {
+   "id": "backend/self_review_engine.py::SelfReviewEngine.review_and_improve",
+   "file": "backend/self_review_engine.py",
+   "symbol": "SelfReviewEngine.review_and_improve",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 6 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/self_review_engine.py::advisor_then_review",
    "file": "backend/self_review_engine.py",
    "symbol": "advisor_then_review",
@@ -2115,6 +2850,15 @@
    "id": "backend/semantic_store.py::SemanticSubtitleStoreV2.__init__",
    "file": "backend/semantic_store.py",
    "symbol": "SemanticSubtitleStoreV2.__init__",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/semantic_store.py::SemanticSubtitleStoreV2.get_key_moments",
+   "file": "backend/semantic_store.py",
+   "symbol": "SemanticSubtitleStoreV2.get_key_moments",
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
@@ -2148,6 +2892,24 @@
    "fingerprint": [
     "default:impressions"
    ]
+  },
+  {
+   "id": "backend/services/cross_media_service.py::CrossMediaService._determine_best_platform",
+   "file": "backend/services/cross_media_service.py",
+   "symbol": "CrossMediaService._determine_best_platform",
+   "category": "チャンネル統計",
+   "status": "honest",
+   "reason": "ヒント外。L158-163 は max_score=-1.0 から始めるため、全プラットフォームが 0.0 でも最初のキーが best_platform になる。実行確認（ケースA: 全件パース失敗）→ contribution_scores が全部 0.0 なのに best_platform=\"X\"。これが「どこに投稿すべきか」の判定として is_real=True と一緒に出る。ただし本番から到達しない",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/services/cross_media_service.py::CrossMediaService._determine_suggested_hashtags",
+   "file": "backend/services/cross_media_service.py",
+   "symbol": "CrossMediaService._determine_suggested_hashtags",
+   "category": "チャンネル統計",
+   "status": "honest",
+   "reason": "ヒント外。L170-171 は hashtag_scores が空のとき固定の [\"#動画編集\", \"#YouTube\", \"#自動化\"] を返す。実行確認（ケースA・B）→ 相関が1件も取れていないのに suggested_hashtags にこの3件が入り、L212-213 の data_source=\"measured\" / is_real=True と同居する。この面が本ファイルで唯一「測れていないのに測れた顔をする」形だが、youtube_opt_worker.py:188-196 で本番から到達しないため反例にしない",
+   "fingerprint": []
   },
   {
    "id": "backend/services/cross_media_service.py::CrossMediaService._process_single_post",
@@ -2196,6 +2958,116 @@
    ]
   },
   {
+   "id": "backend/services/evolution_sync_service.py::EvolutionSyncService.record_strategy",
+   "file": "backend/services/evolution_sync_service.py",
+   "symbol": "EvolutionSyncService.record_strategy",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "except (AttributeError,KeyError,TypeError,OSError,ValueError) で False を返し ERROR ログ。記録できなかったことを正直に返す。永続化する値は呼び出し元の CutStrategy そのままで捏造なし",
+   "fingerprint": [
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/services/hook_improver.py::HookImproverService.generate_improvements",
+   "file": "backend/services/hook_improver.py",
+   "symbol": "HookImproverService.generate_improvements",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "except で improvements=[] と analysis_summary=\"改善案の生成に失敗しました: {e}\" を返す（本文に失敗を明記＝印あり）。original_score はリクエストの current_score をそのまま返すだけで採点していない",
+   "fingerprint": [
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/services/nhk_quality_scorer.py::NHKQualityScorer._grade",
+   "file": "backend/services/nhk_quality_scorer.py",
+   "symbol": "NHKQualityScorer._grade",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 5 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/services/nhk_quality_scorer.py::NHKQualityScorer._score_audio",
+   "file": "backend/services/nhk_quality_scorer.py",
+   "symbol": "NHKQualityScorer._score_audio",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "反証で棄却: 到達しない。NHKQualityScorer の本番呼び出し元は backend/antigravity_pipeline.py:405 の _run_nhk_quality_scoring 1箇所のみ（他は backend/tests/** と archives/ だけ）。そこで L407 `video_path = None  # 将来的に動画パスも渡せるよう設計` とハードコードし、L409-411 で `video_path=video_path or \"\"` を渡す。よって score() は常に video_path=\"\" で入り、_score_audio L350 / _score_cuts L455 の `if not video_path:` 早期 return（grade",
+   "fingerprint": [
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "except_returns",
+    "except_returns",
+    "except_returns",
+    "except_returns",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/services/nhk_quality_scorer.py::NHKQualityScorer._score_cuts",
+   "file": "backend/services/nhk_quality_scorer.py",
+   "symbol": "NHKQualityScorer._score_cuts",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 5 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "const_kwarg:score",
+    "except_returns",
+    "except_returns",
+    "except_returns",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/services/nhk_quality_scorer.py::NHKQualityScorer._score_display_duration",
+   "file": "backend/services/nhk_quality_scorer.py",
+   "symbol": "NHKQualityScorer._score_display_duration",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "過去の周で決着済み（引継ぎの「対象外」一覧に `nhk_quality_scorer.py` の 50.0/\"Acceptable\" がある）。21周目の掃引でも到達性レンズは通ったが**定義レンズが反証**した。実測（空の SRT を渡して確認）: score=50.0 / grade=\"Acceptable\" / suggestion=\"SRTエントリが空です\"。50.0 は BUG_HUNTER_THRESHOLD=60.0 を**下回る**ので自動改善タスクが起票される側（悲観側）に倒れ、原因も suggestion に明記される。成功を騙っていないため「偽の success」の3条件を満たさない",
+   "fingerprint": [
+    "const_kwarg:score",
+    "const_kwarg:score"
+   ]
+  },
+  {
+   "id": "backend/services/nhk_quality_scorer.py::NHKQualityScorer._score_readability",
+   "file": "backend/services/nhk_quality_scorer.py",
+   "symbol": "NHKQualityScorer._score_readability",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "過去の周で決着済み（引継ぎの「対象外」一覧に `nhk_quality_scorer.py` の 50.0/\"Acceptable\" がある）。21周目の掃引でも到達性レンズは通ったが**定義レンズが反証**した。実測（空の SRT を渡して確認）: score=50.0 / grade=\"Acceptable\" / suggestion=\"SRTエントリが空です\"。50.0 は BUG_HUNTER_THRESHOLD=60.0 を**下回る**ので自動改善タスクが起票される側（悲観側）に倒れ、原因も suggestion に明記される。成功を騙っていないため「偽の success」の3条件を満たさない",
+   "fingerprint": [
+    "const_assign:score",
+    "const_kwarg:score",
+    "const_kwarg:score"
+   ]
+  },
+  {
+   "id": "backend/services/nhk_quality_scorer.py::NHKQualityScorer._score_timing",
+   "file": "backend/services/nhk_quality_scorer.py",
+   "symbol": "NHKQualityScorer._score_timing",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "過去の周で決着済み（引継ぎの「対象外」一覧に `nhk_quality_scorer.py` の 50.0/\"Acceptable\" がある）。21周目の掃引でも到達性レンズは通ったが**定義レンズが反証**した。実測（空の SRT を渡して確認）: score=50.0 / grade=\"Acceptable\" / suggestion=\"SRTエントリが空です\"。50.0 は BUG_HUNTER_THRESHOLD=60.0 を**下回る**ので自動改善タスクが起票される側（悲観側）に倒れ、原因も suggestion に明記される。成功を騙っていないため「偽の success」の3条件を満たさない",
+   "fingerprint": [
+    "const_kwarg:score",
+    "const_kwarg:score"
+   ]
+  },
+  {
    "id": "backend/services/nhk_quality_scorer.py::NHKQualityScorer.score",
    "file": "backend/services/nhk_quality_scorer.py",
    "symbol": "NHKQualityScorer.score",
@@ -2220,7 +3092,10 @@
    "category": "チャンネル統計",
    "status": "honest",
    "reason": "L275-281: ctr>=0.01 の枝なので ZeroDivision は起きず、失敗時は impressions=0（悲観側）。しかも呼び元は _generate_mock_data だけで、戻り値は is_mock: True の辞書に入る。",
-   "fingerprint": []
+   "fingerprint": [
+    "const_assign:impressions",
+    "const_assign:impressions"
+   ]
   },
   {
    "id": "backend/services/post_publish_collector.py::PostPublishCollector._build_retention_map",
@@ -2281,6 +3156,17 @@
    "status": "out_of_scope",
    "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
+  },
+  {
+   "id": "backend/services/preview_report_generator.py::PreviewReportGenerator._get_risk_color",
+   "file": "backend/services/preview_report_generator.py",
+   "symbol": "PreviewReportGenerator._get_risk_color",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 1 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "except_returns"
+   ]
   },
   {
    "id": "backend/services/preview_report_generator.py::PreviewReportGenerator.generate_html_report",
@@ -2371,6 +3257,43 @@
    ]
   },
   {
+   "id": "backend/services/smartcut_strategy_service.py::SmartCutStrategyService._clamp_brand_alignment_score",
+   "file": "backend/services/smartcut_strategy_service.py",
+   "symbol": "SmartCutStrategyService._clamp_brand_alignment_score",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "except → 0.5 だが、唯一の呼び出し L378 は L370 で float() 変換済みの値を渡す（変換不可なら L376 で default() に落ちる）。よって 0.5 の枝には入らない。20周目の修正済み",
+   "fingerprint": [
+    "const_return",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer._check_color_contrast",
+   "file": "backend/services/thumbnail_analyzer.py",
+   "symbol": "ThumbnailAnalyzer._check_color_contrast",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 7 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "const_dict:score",
+    "const_dict:score",
+    "const_dict:score"
+   ]
+  },
+  {
+   "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer._check_composition",
+   "file": "backend/services/thumbnail_analyzer.py",
+   "symbol": "ThumbnailAnalyzer._check_composition",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 7 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": [
+    "const_dict:score",
+    "const_dict:score"
+   ]
+  },
+  {
    "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer._check_face_closeup",
    "file": "backend/services/thumbnail_analyzer.py",
    "symbol": "ThumbnailAnalyzer._check_face_closeup",
@@ -2378,6 +3301,19 @@
    "status": "honest",
    "reason": "L347 の score=90 は concept[\"concept\"] にキーワードが実在したときだけ返る。入力テキストからの素直な導出で、例外握り・API 未接続・パース失敗のいずれでもない。analyze() は analysis_mode=\"text_match\" を名乗る。",
    "fingerprint": [
+    "const_dict:score",
+    "const_dict:score"
+   ]
+  },
+  {
+   "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer._check_text_readability",
+   "file": "backend/services/thumbnail_analyzer.py",
+   "symbol": "ThumbnailAnalyzer._check_text_readability",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "concept が空だと text=\"\" → text_len=0 → score=95 / \"✅\" /「テキスト0文字 — モバイルで大きく表示可能」。楽観側だが、例外や取得失敗ではなく与えられた入力の素直な採点であり、analysis_mode=\"text_match\" を名乗る。空入力は測定失敗ではないので偽 success とは判定しない。",
+   "fingerprint": [
+    "const_dict:score",
     "const_dict:score",
     "const_dict:score"
    ]
@@ -2392,12 +3328,30 @@
    "fingerprint": []
   },
   {
+   "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer._get_status_icon",
+   "file": "backend/services/thumbnail_analyzer.py",
+   "symbol": "ThumbnailAnalyzer._get_status_icon",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 7 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer._画像を見ていない結果",
    "file": "backend/services/thumbnail_analyzer.py",
    "symbol": "ThumbnailAnalyzer._画像を見ていない結果",
    "category": "チャンネル統計",
    "status": "marked",
    "reason": "出所の印（is_real / data_source）を持つ",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer._読める採点",
+   "file": "backend/services/thumbnail_analyzer.py",
+   "symbol": "ThumbnailAnalyzer._読める採点",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 7 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
   },
   {
@@ -2416,6 +3370,27 @@
    "category": "品質スコア",
    "status": "marked",
    "reason": "L334 は `_画像を見ていない結果(...)` を返す。実際の戻り値は overall_score=None / verdict=None / 各 check の score=None / is_real=False / data_source=\"unavailable\" / analysis_mode=\"image_unanalyzed\"。印あり。",
+   "fingerprint": [
+    "except_returns",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer.analyze_image.<locals>._軸",
+   "file": "backend/services/thumbnail_analyzer.py",
+   "symbol": "ThumbnailAnalyzer.analyze_image.<locals>._軸",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "出所の印（is_real / data_source）を持つ",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/services/vector_search.py::VectorSearchEngine.search",
+   "file": "backend/services/vector_search.py",
+   "symbol": "VectorSearchEngine.search",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "投稿・チャンネル統計・品質スコア・retention のいずれでもない。素材検索の関連度スコア。",
    "fingerprint": [
     "except_returns",
     "except_returns"
@@ -2484,9 +3459,11 @@
    "file": "backend/services/youtube_analytics_client.py",
    "symbol": "ChannelPerformance.__init__",
    "category": "チャンネル統計",
-   "status": "out_of_scope",
-   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 6 件のいずれもこの関数の範囲に無い）",
-   "fingerprint": []
+   "status": "marked",
+   "reason": "出所の印（is_real / data_source）を持つ",
+   "fingerprint": [
+    "const_assign:avg_view_duration"
+   ]
   },
   {
    "id": "backend/services/youtube_analytics_client.py::ChannelPerformance.to_dict",
@@ -2504,7 +3481,12 @@
    "category": "投稿",
    "status": "out_of_scope",
    "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 6 件のいずれもこの関数の範囲に無い）",
-   "fingerprint": []
+   "fingerprint": [
+    "const_assign:avg_view_duration",
+    "const_assign:ctr",
+    "const_assign:impressions",
+    "const_assign:views"
+   ]
   },
   {
    "id": "backend/services/youtube_analytics_client.py::VideoPerformance.from_dict",
@@ -2686,6 +3668,67 @@
    "fingerprint": []
   },
   {
+   "id": "backend/template_recommender.py::TemplateRecommender._apply_learning_bias",
+   "file": "backend/template_recommender.py",
+   "symbol": "TemplateRecommender._apply_learning_bias",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "4 カテゴリ外。かつ学習バイアス不適用は値を作らない。",
+   "fingerprint": [
+    "except_returns",
+    "except_returns",
+    "except_returns",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/template_recommender.py::TemplateRecommender._calculate_scores",
+   "file": "backend/template_recommender.py",
+   "symbol": "TemplateRecommender._calculate_scores",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "テンプレートの適合度であって、投稿・チャンネル統計・品質スコア・retention のいずれでもない（成果物の良し悪しを判定していない）。",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/template_recommender.py::TemplateRecommender._score_silence",
+   "file": "backend/template_recommender.py",
+   "symbol": "TemplateRecommender._score_silence",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/template_recommender.py::TemplateRecommender._score_speech_density",
+   "file": "backend/template_recommender.py",
+   "symbol": "TemplateRecommender._score_speech_density",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/template_recommender.py::TemplateRecommender.recommend",
+   "file": "backend/template_recommender.py",
+   "symbol": "TemplateRecommender.recommend",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/template_recommender.py::TemplateRecommender.recommend_with_alternatives",
+   "file": "backend/template_recommender.py",
+   "symbol": "TemplateRecommender.recommend_with_alternatives",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 2 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/thumbnail_engine/generator.py::ThumbnailGenerator._generate_concepts",
    "file": "backend/thumbnail_engine/generator.py",
    "symbol": "ThumbnailGenerator._generate_concepts",
@@ -2746,12 +3789,30 @@
    ]
   },
   {
+   "id": "backend/ux_verification/api_contract.py::_handler_fields",
+   "file": "backend/ux_verification/api_contract.py",
+   "symbol": "_handler_fields",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 7 件のいずれもこの関数の範囲に無い）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/ux_verification/api_contract.py::_literal_index",
    "file": "backend/ux_verification/api_contract.py",
    "symbol": "_literal_index",
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "例外を握るが悲観側に倒れる。かつ4カテゴリの数字でない",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/ux_verification/api_contract.py::_match_path",
+   "file": "backend/ux_verification/api_contract.py",
+   "symbol": "_match_path",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 7 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
   },
   {
@@ -2822,6 +3883,147 @@
    "fingerprint": []
   },
   {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::AxisResult.ratio",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "AxisResult.ratio",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._compute_grade",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._compute_grade",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._evaluate",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._evaluate",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._generate_suggestions",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._generate_suggestions",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._score_audio_sync",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._score_audio_sync",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._score_chars_per_line",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._score_chars_per_line",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._score_contrast",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._score_contrast",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._score_display_time",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._score_display_time",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._score_font_consistency",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._score_font_consistency",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._score_line_break",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._score_line_break",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer._score_safe_area",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer._score_safe_area",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::NHKSubtitleScorer.score",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "NHKSubtitleScorer.score",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::_analyze_line_break_quality_fugashi",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "_analyze_line_break_quality_fugashi",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": [
+    "const_assign:score",
+    "const_return"
+   ]
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::_analyze_line_break_quality_regex",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "_analyze_line_break_quality_regex",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": [
+    "const_assign:score",
+    "const_return"
+   ]
+  },
+  {
+   "id": "backend/video_pipeline/nhk_subtitle_scorer.py::analyze_line_break_quality",
+   "file": "backend/video_pipeline/nhk_subtitle_scorer.py",
+   "symbol": "analyze_line_break_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5「video_pipeline は凍結する（検証用の基準実装として残す）」。本線は backend/agents/pipeline_coordinator.py。backend/main.py と backend/routers/*.py から video_pipeline の import は 0 件（grep 実測）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/video_pipeline/pipeline_coordinator.py::PipelineCoordinator._execute_stage",
    "file": "backend/video_pipeline/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._execute_stage",
@@ -2848,6 +4050,98 @@
    ]
   },
   {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate._calc_subtitle_total",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate._calc_subtitle_total",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": [
+    "const_assign:score"
+   ]
+  },
+  {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate._calculate_total_score",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate._calculate_total_score",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": [
+    "const_return",
+    "const_return"
+   ]
+  },
+  {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate._check_encoding_quality",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate._check_encoding_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate._rank",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate._rank",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate.check_audio_quality",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate.check_audio_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate.check_subtitle_quality",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate.check_subtitle_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": [
+    "const_return",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default"
+   ]
+  },
+  {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate.check_subtitle_quality.<locals>._get_axis_val",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate.check_subtitle_quality.<locals>._get_axis_val",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": [
+    "const_return",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default"
+   ]
+  },
+  {
+   "id": "backend/video_pipeline/quality_gate.py::QualityGate.check_video_quality",
+   "file": "backend/video_pipeline/quality_gate.py",
+   "symbol": "QualityGate.check_video_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "正典 limits #5（video_pipeline は凍結）。backend/main.py と backend/routers/*.py から import 0 件（grep 実測）。本線の品質ゲートは quality_gate_plugins.py + agents/workers/quality_gate_worker.py",
+   "fingerprint": []
+  },
+  {
    "id": "backend/video_pipeline/soul_feedback_engine.py::SoulFeedbackEngine._build_summary",
    "file": "backend/video_pipeline/soul_feedback_engine.py",
    "symbol": "SoulFeedbackEngine._build_summary",
@@ -2872,7 +4166,9 @@
    "category": "チャンネル統計",
    "status": "out_of_scope",
    "reason": "limits#5（video_pipeline 凍結）。欠測時の既定は悲観側に倒れる",
-   "fingerprint": []
+   "fingerprint": [
+    "const_assign:score"
+   ]
   },
   {
    "id": "backend/video_pipeline/soul_feedback_engine.py::SoulFeedbackEngine._compute_retention_and_deviation_trends",
@@ -2950,8 +4246,8 @@
    "file": "backend/video_pipeline/soul_feedback_engine.py",
    "symbol": "SoulFeedbackEngine._rank_top_performing",
    "category": "投稿",
-   "status": "out_of_scope",
-   "reason": "limits#5（video_pipeline 凍結）。欠損時は 0 点で悲観側に倒れる",
+   "status": "marked",
+   "reason": "L855 video_id 既定 ''、L848-850 ctr/retention 既定 0 → score=0.0。欠損動画はランキング最下位に沈む（悲観側）。views も L859 既定 0",
    "fingerprint": [
     "default:video_id"
    ]
@@ -3034,6 +4330,29 @@
    "status": "out_of_scope",
    "reason": "掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと判断された（同ファイルの所見 18 件のいずれもこの関数の範囲に無い）",
    "fingerprint": []
+  },
+  {
+   "id": "backend/video_pipeline/thumbnail_generator.py::ThumbnailGenerator.generate",
+   "file": "backend/video_pipeline/thumbnail_generator.py",
+   "symbol": "ThumbnailGenerator.generate",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "limits #5（video_pipeline 凍結）および本番未到達",
+   "fingerprint": [
+    "except_returns",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/video_pipeline/thumbnail_generator.py::ThumbnailGenerator.generate_candidates",
+   "file": "backend/video_pipeline/thumbnail_generator.py",
+   "symbol": "ThumbnailGenerator.generate_candidates",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "ブリーフ『悲観側に倒れるものは報告しない』+ limits #5",
+   "fingerprint": [
+    "except_returns"
+   ]
   },
   {
    "id": "backend/wagamama_manager.py::WagamamaManager.create_experience_story",

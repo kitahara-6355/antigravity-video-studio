@@ -18,6 +18,8 @@ import pytest
 
 from backend import c4_inventory
 
+NL = chr(10)
+
 
 def _kinds(src: str) -> list[str]:
     """関数1つのソースから危険形の内訳を出す。"""
@@ -349,3 +351,99 @@ def test_ゲートが実態と揃っている():
 def test_cli_が動く(argv, capsys):
     assert c4_inventory.main(argv) == 0
     assert capsys.readouterr().out.strip()
+
+
+# ─────────────────── 21周目の指摘で塞いだ穴 ───────────────────
+#
+# gate-verifier 21周目が「**直したばかりの欠陥を戻してもゲートが素通りする**」ことを
+# 実測で示した。網とラチェットの穴を塞いだので、それぞれに検査を置く。
+
+
+def test_21周目_キーワード引数の数値を拾う():
+    """`quality_score=0.85`（gate-verifier 21周目の指摘）。
+
+    `_risk_kinds` は dict リテラル・`.get` 既定・`or` 既定・`getattr`・定数 return・
+    `except` return しか見ておらず、**キーワード引数の数値リテラルを見ていなかった**。
+    そのため `generation_engine` で直した `quality_score=None` を `0.85` に戻しても
+    fingerprint が動かず、ゲートが緑のまま通っていた。
+    """
+    assert "const_kwarg:quality_score" in _kinds(
+        "def f():" + NL + "    return R(request_id='x', quality_score=0.85)" + NL)
+    # カテゴリ外の鍵は拾わない（過剰検出しない）
+    assert not [k for k in _kinds("def f():" + NL + "    return R(timeout=30)" + NL)
+                if k.startswith("const_kwarg")]
+
+
+def test_21周目_属性への数値代入を拾う():
+    """`result.quality_score = 0.85` / `score = 50.0`。永続化の直前に多い形。"""
+    assert "const_assign:quality_score" in _kinds(
+        "def f(r):" + NL + "    r.quality_score = 0.85" + NL)
+    assert "const_assign:score" in _kinds("def f():" + NL + "    score = 50.0" + NL)
+    assert not [k for k in _kinds("def f():" + NL + "    timeout = 30" + NL)
+                if k.startswith("const_assign")]
+
+
+def test_21周目_expected_ctr_も危険鍵に入っている():
+    """`expected_ctr: 5.0` を戻しても fingerprint が動かなかった。
+
+    `RISK_KEY_RE` は `^…$` の完全一致なので、`expected_ctr` / `ctr_score` が
+    入っていないと `thumbnail_engine/generator.py` の修正を守れない。
+    """
+    assert "const_dict:expected_ctr" in _kinds(
+        "def f():" + NL + "    return {'expected_ctr': 5.0}" + NL)
+    assert "const_dict:ctr_score" in _kinds(
+        "def f():" + NL + "    return {'ctr_score': 5.0}" + NL)
+
+
+def test_21周目_印の検査をコメントで満たせない():
+    """**印を全部消してコメントに `is_real` と書くだけで通っていた。**"""
+    # **クォート付きで書く。** `MARK_RE` はクォートに挟まれた形しか見ないので、
+    # 裸の `is_real` をコメントに置いても元から一致せず、
+    # **コメント除去の有無を区別できない**（最初そう書いて変異が生き残った）
+    コメント行 = '    # ' + chr(39) + 'is_real' + chr(39) + ' を消した'
+    コメントだけ = "def f():" + NL + コメント行 + NL + "    return {'score': 5.0}" + NL
+    assert not c4_inventory._印がある(コメントだけ), "コメントで印の検査を満たしている"
+    本物 = "def f():" + NL + "    return {'score': None, 'is_real': False}" + NL
+    assert c4_inventory._印がある(本物)
+
+
+def test_21周目_辞書の先頭で展開する印を拾う():
+    """`{**DATA_SOURCE, ...}` は文字列リテラルが本文に出てこない。
+
+    これを見ないと `admin_channel_router` の `**DATA_SOURCE` を消しても
+    「印は元から無い」と見なして素通りする（`watch_time_hours: 15200` が無印になる）。
+
+    **接頭辞を必須にすると `**DATA_SOURCE` そのものが外れる**ので、
+    接頭辞の無い名前も通ることを見る（最初その書き方で穴が残った）。
+    """
+    展開 = "def f():" + NL + "    return {**DATA_SOURCE, 'score': 1}" + NL
+    修飾 = "def f():" + NL + "    return {**A.DATA_SOURCE, 'score': 1}" + NL
+    無関係 = "def f():" + NL + "    return {**OTHER, 'score': 1}" + NL
+    assert c4_inventory._印がある(展開)
+    assert c4_inventory._印がある(修飾)
+    assert not c4_inventory._印がある(無関係)
+
+
+def test_21周目_属性代入で立てた印を拾う():
+    """`report.scored = False` のように**属性で印を立てる**形。
+
+    文字列の `scored` は `to_dict()` 側にしか無いことがあり、
+    関数本文の字面だけでは「印なし」に見える
+    （`quality_gate_agent.run_gate` が実際にそうだった）。
+    """
+    印あり = "def f(r):" + NL + "    r.scored = False" + NL + "    return r" + NL
+    印なし = "def f(r):" + NL + "    r.total = 5" + NL + "    return r" + NL
+    assert c4_inventory._印がある(印あり, ast.parse(印あり).body[0])
+    assert not c4_inventory._印がある(印なし, ast.parse(印なし).body[0])
+
+
+def test_21周目_裸の_score_も候補に入る():
+    """**網の内部で定義が食い違っていた。**
+
+    `RISK_KEY_RE` は `score` を危険鍵に数えているのに、カテゴリ語は
+    `quality_score` 等に限られていたため、`{"score": 72}` を返す
+    `admin_channel_router.get_quality_improvement` が候補にすらならなかった。
+    """
+    ids = {c["id"] for c in c4_inventory.scan()}
+    assert "backend/routers/admin_channel_router.py::get_quality_improvement" in ids, \
+        "裸の score を返す本番経路が候補から漏れている"

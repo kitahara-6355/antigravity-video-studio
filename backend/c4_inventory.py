@@ -53,18 +53,26 @@ CATEGORY_PATTERNS = {
     "チャンネル統計": (
         r"watch_time|subscriber|channel_stat|view_count|viewCount|impressions|ctr\b|CTR"
     ),
+    # **裸の `score` と日本語も見る**（gate-verifier 21周目の指摘）。
+    # `RISK_KEY_RE` は `score` を危険鍵に数えているのに、カテゴリ語が
+    # `quality_score` 等に限られていたため、`{"score": 72}` を返す
+    # `admin_channel_router.get_quality_improvement` が候補にすらならなかった。
+    # **網の内部で定義が食い違っていた。**
     "品質スコア": (
-        r"quality_score|qualityScore|quality_gate|overall_score|quality_report|is_acceptable"
+        r"quality_score|qualityScore|quality_gate|overall_score|quality_report"
+        r"|is_acceptable|\bscore\b|品質スコア|品質評価|採点"
     ),
-    "retention": r"retention|維持率|avg_view_duration|average_view",
+    "retention": r"retention|維持率|avg_view_duration|average_view|視聴維持",
 }
 CATEGORY_RE = {k: re.compile(v, re.IGNORECASE) for k, v in CATEGORY_PATTERNS.items()}
 
 # 数値を直書きされたら偽 success になりうる鍵
 RISK_KEY_RE = re.compile(
-    r"^(quality_score|overall_score|score|watch_time_hours|watch_time|subscriber_count|"
-    r"subscribers|view_count|views|impressions|ctr|click_through_rate|retention|"
-    r"retention_rate|avg_view_duration|video_id|url|is_acceptable|predicted_retention)$",
+    r"^(quality_score|overall_score|score|final_score|initial_score|current_score|"
+    r"average_improvement|watch_time_hours|watch_time|subscriber_count|"
+    r"subscribers|view_count|views|impressions|ctr|ctr_score|expected_ctr|predicted_ctr|"
+    r"click_through_rate|retention|retention_rate|avg_retention|predicted_retention|"
+    r"avg_view_duration|video_id|url|is_acceptable|is_ready|passed)$",
     re.IGNORECASE,
 )
 
@@ -79,7 +87,74 @@ SKIP_FILE_RE = re.compile(r"(^|[\\/])(test_[^\\/]*|conftest)\.py$")
 # **`checked: False` + `skip_reason`** を印として使う（「この検査は走っていない」を
 # 集計側が `checked is False` で拾い、本文に「検査されていません」を出す）。
 # ここを `is_real` だけにすると、正しく印を付けた 17 箇所が「印なし」に見える。
-MARK_RE = re.compile(r"""['"](is_real|data_source|skip_reason)['"]""")
+# `scored` / `quality_scored` / `measured` も「測ったか」の印。
+# `quality_gate_agent` や `pipeline_coordinator` はこの形で未計測を表す。
+MARK_RE = re.compile(
+    r"""['"](is_real|data_source|skip_reason|scored|quality_scored|measured)['"]"""
+)
+
+# **辞書の先頭で印を展開する形**（`{**DATA_SOURCE, ...}`）。
+# `admin_channel_router` / `admin_analytics_router` はこの書き方で印を付けており、
+# 文字列リテラルが本文に出てこない。これを見ないと、
+# **`**DATA_SOURCE` を消しても「印は元から無い」と見なして素通りする**
+# （gate-verifier 21周目の指摘。`watch_time_hours: 15200` が無印になる変異が通った）。
+# 先頭の `[A-Za-z_]` を必須にすると **`**DATA_SOURCE` そのもの**が外れる
+# （接頭辞の無い名前に一致できない）。`[\w.]*` は空でよい。
+SPREAD_MARK_RE = re.compile(r"\*\*\s*[\w.]*(DATA_SOURCE|MARK|印)", re.IGNORECASE)
+
+
+def _コメントを落とす(src: str) -> str:
+    """コメントを取り除いた写しを返す。
+
+    **印の検査をコメントで満たせてはいけない**（gate-verifier 21周目の指摘）。
+    印を全部消して「`is_real` を消した」と書いたコメントだけ残す変異が通っていた。
+    """
+    import io as _io
+    import tokenize as _tk
+
+    try:
+        出た = []
+        for tok in _tk.generate_tokens(_io.StringIO(src).readline):
+            if tok.type == _tk.COMMENT:
+                continue
+            出た.append(tok)
+        return _tk.untokenize(出た)
+    except (_tk.TokenError, IndentationError, SyntaxError):
+        # 関数断片は単体で tokenize できないことがある。素朴に落とす
+        落とした = [re.sub(r"(^|\s)#.*$", r"", ln) for ln in src.splitlines()]
+        return chr(10).join(落とした)
+
+
+# 印として使われる名前（属性代入で立てる形を拾うため）
+MARK_NAMES = frozenset(
+    ("is_real", "data_source", "skip_reason", "scored", "quality_scored", "measured", "checked")
+)
+
+
+def _印を属性で立てている(fn: ast.AST) -> bool:
+    """`report.scored = False` のように**属性代入で印を立てる**形を拾う。
+
+    文字列としての `"scored"` は `to_dict()` 側にしか出ないことがあり、
+    関数本文の字面だけ見ると「印なし」に見える
+    （`quality_gate_agent.run_gate` が実際にそうだった）。
+    """
+    for node in ast.walk(fn):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            狙い = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in 狙い:
+                名 = (t.attr if isinstance(t, ast.Attribute)
+                      else t.id if isinstance(t, ast.Name) else None)
+                if 名 in MARK_NAMES:
+                    return True
+    return False
+
+
+def _印がある(本文: str, fn: ast.AST | None = None) -> bool:
+    """出所の印を持つか。**コメントは数えない。**"""
+    素 = _コメントを落とす(本文)
+    if MARK_RE.search(素) or SPREAD_MARK_RE.search(素):
+        return True
+    return bool(fn is not None and _印を属性で立てている(fn))
 
 # `honest` は「4カテゴリだが、実測しているので印が要らない」site。
 # **`marked` にすると印の存在を要求してしまい、正直な計算経路が落ちる。**
@@ -163,6 +238,24 @@ def _risk_kinds(fn: ast.AST) -> list[str]:
         # 6. 数値リテラルをそのまま返す（条件文の「常に 0.0 になる quality_score」）
         if isinstance(node, ast.Return) and node.value is not None and _is_number(node.value):
             出た.append("const_return")
+        # 7. **カテゴリ鍵のキーワード引数に数値リテラル**（`quality_score=0.85`）。
+        #    これが無かったので、直したばかりの `generation_engine` の 0.85 を
+        #    戻してもゲートが素通りした（gate-verifier 21周目の指摘）
+        if isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if kw.arg and RISK_KEY_RE.match(kw.arg) and _is_number(kw.value):
+                    出た.append(f"const_kwarg:{kw.arg.lower()}")
+        # 8. **カテゴリ鍵への数値リテラル代入**（`result.quality_score = 0.85` /
+        #    `score = 50.0`）。永続化の直前でこの形を取ることが多い
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            狙い = node.targets if isinstance(node, ast.Assign) else [node.target]
+            値 = node.value
+            if 値 is not None and _is_number(値):
+                for t in 狙い:
+                    名 = (t.attr if isinstance(t, ast.Attribute)
+                          else t.id if isinstance(t, ast.Name) else None)
+                    if 名 and RISK_KEY_RE.match(名):
+                        出た.append(f"const_assign:{名.lower()}")
     return sorted(出た)
 
 
@@ -220,7 +313,7 @@ def scan() -> list[dict]:
                     "end": 末尾,
                     "categories": cats,
                     "fingerprint": kinds,
-                    "has_mark": bool(MARK_RE.search(本文)),
+                    "has_mark": _印がある(本文, node),
                 }
             )
     return sorted(候補, key=lambda c: c["id"])
