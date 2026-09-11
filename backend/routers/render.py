@@ -674,6 +674,12 @@ async def generate_thumbnail(req: ThumbnailGenerateRequest) -> Dict[str, Any]:
                 video_description=req.video_description,
                 num_variants=1
             )
+            # **生成できた側に印を付ける**（R1.5-C4・案D 掃引）。
+            # 下のフォールバックと同じ形で応答に出るので、印が無いと
+            # 「CTR 予測をした 5.0」と「捏造した 5.0」を受け手が区別できない
+            for _t in raw_thumbnails or []:
+                _t["is_real"] = True
+                _t["data_source"] = "gemini"
         except HTTPException:
             raise
         except Exception as e:
@@ -693,7 +699,11 @@ async def generate_thumbnail(req: ThumbnailGenerateRequest) -> Dict[str, Any]:
                     "description": fallback_res.get("description", "Fallback image due to system errors"),
                     "prompt": "fallback",
                     "image_base64": fallback_res["image_base64"],
-                    "ctr_score": fallback_res.get("ctr_score", 5.0)
+                    # **既定値 5.0 を置かない。** 置くと branding_manager 側を
+                    # 直しても、この行が同じ数字を作り直してしまう
+                    "ctr_score": fallback_res.get("ctr_score"),
+                    "is_real": fallback_res.get("is_real", False),
+                    "data_source": fallback_res.get("data_source", "unavailable"),
                 }]
             except HTTPException:
                 raise
@@ -803,6 +813,14 @@ async def generate_thumbnail(req: ThumbnailGenerateRequest) -> Dict[str, Any]:
                 "prompt": thumb["prompt"],
                 "image_base64": base64.b64encode(processed_data).decode('utf-8'),
                 "ctr_score": thumb["ctr_score"],
+                # **印を応答まで落とさない。** `status: "fallback"` は
+                # ここで捨てられるので、印が無いと出所が消える。
+                # **既定値を置かない** — 上の2経路（生成成功・フォールバック）が
+                # どちらも必ず印を入れるので、ここの既定値は到達しない。
+                # 到達しない既定値は「fail-open に書き換えても誰も気づかない」
+                # 死んだ分岐になるので、鍵で直接引いて落とす
+                "is_real": thumb["is_real"],
+                "data_source": thumb["data_source"],
                 "width": actual_w,
                 "height": actual_h,
                 "aspect_ratio": f"{actual_w}:{actual_h}",
@@ -855,6 +873,10 @@ async def generate_thumbnail(req: ThumbnailGenerateRequest) -> Dict[str, Any]:
                     "prompt": result_data["prompt"],
                     "image_base64": result_data["image_base64"],
                     "ctr_score": result_data["ctr_score"],
+                    # 直前の同一リクエストで書いた行を読み戻しているだけなので、
+                    # 印は必ず入っている。**既定値を置くと到達しない fail-open が残る**
+                    "is_real": result_data["is_real"],
+                    "data_source": result_data["data_source"],
                     "width": result_data["width"],
                     "height": result_data["height"],
                     "aspect_ratio": result_data["aspect_ratio"],

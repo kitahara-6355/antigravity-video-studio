@@ -815,6 +815,11 @@ class BrandingManager:
                     "description": thumb["description"],
                     "image_base64": thumb["image_base64"],
                     "ctr_score": thumb["ctr_score"],
+                    # **フォールバックと同じ形で返るので、成功側にも印を置く**
+                    # （R1.5-C4・案D 掃引）。印が片側にしか無いと、
+                    # 受け手は「印が無い＝成功」と読んでしまう
+                    "is_real": True,
+                    "data_source": "gemini",
                     "validation": val_result
                 }
             except Exception as val_err:
@@ -825,12 +830,20 @@ class BrandingManager:
         fallback_bytes = self._generate_fallback_image_bytes(video_title)
         val_result = self.validate_image_quality(fallback_bytes)
         
+        # **CTR 予測を一度も行っていないので点を名乗らない**（R1.5-C4・案D 掃引）。
+        # ここは生成が失敗したあと Pillow でローカル描画した代替画像を返す経路で、
+        # コンセプト生成もモデル呼び出しも起きていない。以前は `ctr_score: 5.0` を
+        # 印なしで返しており、**正常系（LLM の expected_ctr）と区別が付かなかった**。
+        # 0 も 5.0 も実際に取りうる値なので、数字を入れた時点で印にならない → None。
         return {
             "status": "fallback",
             "concept_name": "Standard Fallback Concept",
             "description": "Fallback image due to system errors",
             "image_base64": base64.b64encode(fallback_bytes).decode('utf-8'),
-            "ctr_score": 5.0,
+            "ctr_score": None,
+            "is_real": False,
+            "data_source": "unavailable",
+            "note": "**CTR 予測は行われていません。**生成に失敗したため代替画像を返しています",
             "validation": val_result
         }
 
@@ -893,6 +906,11 @@ class BrandingManager:
                     "description": thumb["description"],
                     "image_base64": thumb["image_base64"],
                     "ctr_score": thumb["ctr_score"],
+                    # **フォールバックと同じ形で返るので、成功側にも印を置く**
+                    # （R1.5-C4・案D 掃引）。印が片側にしか無いと、
+                    # 受け手は「印が無い＝成功」と読んでしまう
+                    "is_real": True,
+                    "data_source": "gemini",
                     "validation": val_result
                 }
             except Exception as val_err:
@@ -903,12 +921,20 @@ class BrandingManager:
         fallback_bytes = self._generate_fallback_image_bytes(video_title)
         val_result = self.validate_image_quality(fallback_bytes)
         
+        # **CTR 予測を一度も行っていないので点を名乗らない**（R1.5-C4・案D 掃引）。
+        # ここは生成が失敗したあと Pillow でローカル描画した代替画像を返す経路で、
+        # コンセプト生成もモデル呼び出しも起きていない。以前は `ctr_score: 5.0` を
+        # 印なしで返しており、**正常系（LLM の expected_ctr）と区別が付かなかった**。
+        # 0 も 5.0 も実際に取りうる値なので、数字を入れた時点で印にならない → None。
         return {
             "status": "fallback",
             "concept_name": "Standard Fallback Concept",
             "description": "Fallback image due to system errors",
             "image_base64": base64.b64encode(fallback_bytes).decode('utf-8'),
-            "ctr_score": 5.0,
+            "ctr_score": None,
+            "is_real": False,
+            "data_source": "unavailable",
+            "note": "**CTR 予測は行われていません。**生成に失敗したため代替画像を返しています",
             "validation": val_result
         }
 

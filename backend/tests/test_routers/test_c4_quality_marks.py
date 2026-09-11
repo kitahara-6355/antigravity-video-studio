@@ -3322,3 +3322,109 @@ def test_案D_測れているカテゴリは点を出す(tmp_path):
     assert isinstance(結果["category_scores"]["stability"], float),         "測れているカテゴリまで未計測に倒している"
     報告 = {c["category"]: c for c in 結果["category_report"]}
     assert 報告["stability"]["unchecked"] == 0
+
+
+def test_案D_生成に失敗したサムネイルが_CTR_予測を名乗らない():
+    """**捏造した CTR 予測 5.0**（R1.5-C4・案D 掃引で発見）。
+
+    `branding_manager.generate_and_validate_thumbnail()` は、生成が失敗したとき
+    Pillow でローカル描画した代替画像を返す。コンセプト生成もモデル呼び出しも
+    起きていないのに `ctr_score: 5.0` を**印なしで**返していた。
+
+    正常系は `thumbnail_engine/generator.py` が LLM の `expected_ctr` を入れるので、
+    **受け手から見て「予測した 5.0」と「捏造した 5.0」が区別できなかった。**
+
+    `status: "fallback"` は `routers/render.py` が応答を組み立てる際に捨てられるので、
+    API の応答には出所の手がかりが1つも残らない
+    （`main.py:227` → `POST /api/render/thumbnail` → `L686` → `L696` → 応答）。
+
+    **同型が3箇所あった** — 同期版・async twin・`render.py` の
+    `.get("ctr_score", 5.0)`（ルーター側が既定値として 5.0 を作り直していた）。
+    """
+    import importlib
+    import unittest.mock as _m
+
+    from branding_manager import BrandingManager
+
+    # **`import thumbnail_engine.generator as G` と書いてはいけない。**
+    # パッケージ側が同名の属性をインスタンスに束縛しているので、
+    # `G` がモジュールではなく `ThumbnailGenerator` の実体を掴む
+    # （引継ぎ §7 #3 と同型。`importlib.import_module` を使う）
+    G = importlib.import_module("thumbnail_engine.generator")
+
+    m = BrandingManager()
+    # **生成を落としてフォールバック分岐に入れる。**
+    # 鍵が dummy でも生成は success を返しうるので、
+    # 「この分岐に実際に入る」ことを自分で作らないと検査にならない（§3）
+    with _m.patch.object(G, "ThumbnailGenerator", side_effect=RuntimeError("生成失敗")):
+        結果 = m.generate_and_validate_thumbnail(video_title="掃引テスト", video_description="")
+
+    assert 結果["status"] == "fallback", "この検査はフォールバック経路を通す前提"
+    assert 結果["ctr_score"] is None,         f"CTR 予測をしていないのに {結果['ctr_score']} を名乗った"
+    assert 結果["is_real"] is False
+    assert 結果["data_source"] == "unavailable"
+    assert "CTR 予測は行われていません" in 結果["note"]
+
+
+def test_案D_async_版も同じ形で直っている():
+    """**同型を片方だけ直さない。**
+
+    17周目（`SoulPassport.jsx` の owner 側だけ）と同じ失敗を繰り返さないための検査。
+    async twin は現在 本番から到達しないが、到達したときに再発させない。
+    """
+    import inspect
+
+    from branding_manager import BrandingManager
+
+    本文 = inspect.getsource(BrandingManager.generate_and_validate_thumbnail_async)
+    assert '"ctr_score": None' in 本文, "async twin が数字を名乗ったままになっている"
+    assert '"is_real": False' in 本文
+    assert '"data_source": "unavailable"' in 本文
+
+
+def test_案D_成功側にも印があるので印の不在で成功を読み取れない():
+    """**印が片側にしか無いと、受け手は「印が無い＝成功」と読む。**
+
+    フォールバックだけに `is_real: False` を付けると、**印の有無**が成功の
+    代用になってしまい、印を運び忘れた経路が「成功」に化ける。
+    成功側に `is_real: True` を置くことで、**印が無い＝異常**にできる。
+
+    この検査が無いと「成功側の印を外す」変異が生き残る（実際に生き残った）。
+    """
+    import asyncio
+    import base64
+    import importlib
+    import unittest.mock as _m
+    from io import BytesIO
+
+    from PIL import Image
+
+    from branding_manager import BrandingManager
+
+    buf = BytesIO()
+    Image.new("RGB", (1280, 720), color="blue").save(buf, format="JPEG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+
+    class _通る生成器:
+        async def generate(self, *a, **k):
+            return [{
+                "id": "t0", "concept_name": "C", "description": "D",
+                "prompt": "p", "image_base64": b64, "ctr_score": 8.5,
+            }]
+
+    G = importlib.import_module("thumbnail_engine.generator")
+    with _m.patch.object(G, "ThumbnailGenerator", _通る生成器):
+        結果 = BrandingManager().generate_and_validate_thumbnail(
+            video_title="成功側", video_description="")
+
+    assert 結果["status"] == "success", 結果.get("status")
+    assert 結果["is_real"] is True, "成功側に印が無い（印の不在が成功の代用になる）"
+    assert 結果["data_source"] == "gemini"
+    assert 結果["ctr_score"] == 8.5
+    assert asyncio is not None  # ループ生成の副作用を握りつぶさない
+
+
+# `render.py` のルーター側（既定値 5.0 の再捏造）は、
+# このファイルが `routers` をスタブに差し替えていてアプリを起動できないので、
+# **経路を実際に通す検査**は backend/tests/test_render_router.py に置いた
+# （`test_案D_ルーターが既定値で_CTR_を作り直さない`）。

@@ -842,3 +842,109 @@ def test_generate_thumbnail_db_error(mock_generate, tmp_path):
         })
         assert res.status_code == 500
         assert "database fetch failed" in res.json()["detail"].lower()
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_ルーターが既定値で_CTR_を作り直さない(mock_generate):
+    """**`render.py` の `.get("ctr_score", 5.0)` が値を再捏造していた**（R1.5-C4・案D 掃引）。
+
+    `branding_manager` 側のフォールバックを直しても、ルーターが既定値 5.0 を
+    置いていると**同じ数字が復活する**。ここでは manager が `ctr_score` を
+    返さない状態を実際に作り、応答に 5.0 が出ないことを見る
+    （§3: 分岐に入る側のケースを通さないと再発を捕まえられない）。
+
+    あわせて、`status: "fallback"` はルーターが応答を組み立てる際に捨てられるので、
+    **出所の印（`is_real` / `data_source`）が応答まで届くこと**も見る。
+    """
+    import base64 as _b64
+    import branding_manager as _bm
+
+    # 生成を落としてフォールバック分岐に入れる
+    mock_generate.side_effect = RuntimeError("生成失敗")
+
+    dummy_b64 = create_dummy_image_base64(1280, 720)
+    # **`side_effect` を消してから `return_value` を置く。**
+    # 同ファイルの test_generate_thumbnail_fallback_failure が
+    # `side_effect = Exception(...)` を立てたまま戻さないので、
+    # 消さないと単体では緑・全体では赤になる（実際に踏んだ）
+    _bm.branding_manager.generate_and_validate_thumbnail.side_effect = None
+    _bm.branding_manager.generate_and_validate_thumbnail.return_value = {
+        "status": "fallback",
+        "concept_name": "Standard Fallback Concept",
+        "description": "Fallback image due to system errors",
+        "image_base64": dummy_b64,
+        # **`ctr_score` を入れない。** 既定値が復活したらここで 5.0 になる
+        "is_real": False,
+        "data_source": "unavailable",
+        "validation": {},
+    }
+
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "案D 掃引テスト",
+        "video_description": "フォールバック経路を通す",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["ctr_score"] is None,         f"CTR 予測をしていないのに {thumb['ctr_score']} が応答に出た"
+    assert thumb["is_real"] is False
+    assert thumb["data_source"] == "unavailable"
+    assert _b64.b64decode(thumb["image_base64"])
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_成功経路の印が応答まで届く(mock_generate):
+    """**印を応答へ運んでいることを、既定値と違う値で確かめる。**
+
+    フォールバックだけを見ると `is_real: False` が期待値になり、
+    運び忘れたときの既定値 `False` と**区別が付かない**。
+    成功経路（`is_real: True`）を通して初めて「運んでいる」ことが分かる。
+
+    この検査が無いと「ルーターが印を応答へ運ばない」変異が生き残る（実際に生き残った）。
+    """
+    mock_generate.side_effect = None
+    mock_generate.return_value = [{
+        "id": "thumbnail_0", "concept_name": "C", "description": "D",
+        "prompt": "p", "image_base64": create_dummy_image_base64(1280, 720),
+        "ctr_score": 8.5,
+    }]
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "成功経路", "video_description": "d",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["is_real"] is True, "成功経路の印が応答まで届いていない"
+    assert thumb["data_source"] == "gemini"
+    assert thumb["ctr_score"] == 8.5
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_印の無い戻りは成功側に倒さない(mock_generate):
+    """**既定値は悲観側でなければならない。**
+
+    manager が印を返さなかったとき、`thumb.get("is_real", True)` のように
+    成功側へ倒すと、**印を忘れた経路が「実測」を名乗る**。
+
+    この検査が無いと「ルーターの印を fail-open にする」変異が生き残る（実際に生き残った）。
+    """
+    import branding_manager as _bm
+
+    mock_generate.side_effect = RuntimeError("生成失敗")
+    _bm.branding_manager.generate_and_validate_thumbnail.side_effect = None
+    _bm.branding_manager.generate_and_validate_thumbnail.return_value = {
+        "status": "fallback",
+        "concept_name": "C", "description": "D",
+        "image_base64": create_dummy_image_base64(1280, 720),
+        # **印を1つも入れない** — ここで既定値が効く
+    }
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "印なし", "video_description": "d",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["is_real"] is False, "印が無い戻りを成功側に倒している（fail-open）"
+    assert thumb["data_source"] == "unavailable"
+    assert thumb["ctr_score"] is None
