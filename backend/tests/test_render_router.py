@@ -904,10 +904,12 @@ def test_案D_成功経路の印が応答まで届く(mock_generate):
     この検査が無いと「ルーターが印を応答へ運ばない」変異が生き残る（実際に生き残った）。
     """
     mock_generate.side_effect = None
+    # **生成器が自分で印を付けて返す**（thumbnail_engine/generator.py が
+    # コンセプトの出所を知っている唯一の場所）。ルーターはそれを運ぶだけ
     mock_generate.return_value = [{
         "id": "thumbnail_0", "concept_name": "C", "description": "D",
         "prompt": "p", "image_base64": create_dummy_image_base64(1280, 720),
-        "ctr_score": 8.5,
+        "ctr_score": 8.5, "is_real": True, "data_source": "gemini",
     }]
     res = client.post("/api/render/thumbnail", json={
         "video_title": "成功経路", "video_description": "d",
@@ -918,6 +920,34 @@ def test_案D_成功経路の印が応答まで届く(mock_generate):
     assert thumb["is_real"] is True, "成功経路の印が応答まで届いていない"
     assert thumb["data_source"] == "gemini"
     assert thumb["ctr_score"] == 8.5
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_ルーターが生成器の印を捏造しない(mock_generate):
+    """**自分の修正が作った偽**（R1.5-C4・案D 掃引で自己検出）。
+
+    最初この経路を `for _t in raw_thumbnails: _t["is_real"] = True` と書いた。
+    ところが生成器は、コンセプト生成が全滅すると
+    `_get_fallback_concept`（`expected_ctr` を持たない既定構成）に落ちる。
+    **一律に True を貼ると、その回まで「実測」に化ける。**
+
+    ルーターは出所を知らないので、**印の無い戻りは悲観側に倒す**のが正しい。
+    """
+    mock_generate.side_effect = None
+    # 生成器が印を付けずに返した（＝出所が分からない）場合
+    mock_generate.return_value = [{
+        "id": "thumbnail_0", "concept_name": "C", "description": "D",
+        "prompt": "p", "image_base64": create_dummy_image_base64(1280, 720),
+        "ctr_score": 5.0,
+    }]
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "印なし生成器", "video_description": "d",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["is_real"] is False, "ルーターが印を捏造している（一律 True）"
+    assert thumb["data_source"] == "unavailable"
 
 
 @patch("thumbnail_engine.generator.generator.generate")

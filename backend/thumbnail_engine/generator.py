@@ -146,7 +146,11 @@ class ThumbnailGenerator:
                         "description": concept['description'],
                         "prompt": enhanced_prompt,
                         "image_base64": base64.b64encode(image_bytes).decode('utf-8'),
-                        "ctr_score": concept.get('expected_ctr', 5.0)
+                        # **既定値 5.0 を置かない。** コンセプトが落ちた回に
+                        # 数字を作り直してしまう（R1.5-C4・案D 掃引）
+                        "ctr_score": concept.get('expected_ctr'),
+                        "is_real": concept.get('is_real', False),
+                        "data_source": concept.get('data_source', 'unavailable'),
                     })
                 except errors.APIError as api_err:
                     logger.error(f"GenAI API error during image generation for variant {i+1} ({concept['name']}): {api_err}", exc_info=True)
@@ -159,7 +163,9 @@ class ThumbnailGenerator:
                             "description": concept['description'],
                             "prompt": enhanced_prompt,
                             "image_base64": base64.b64encode(fallback_bytes).decode('utf-8'),
-                            "ctr_score": concept.get('expected_ctr', 5.0)
+                            "ctr_score": concept.get('expected_ctr'),
+                            "is_real": concept.get('is_real', False),
+                            "data_source": concept.get('data_source', 'unavailable'),
                         })
                     except Exception as fb_err:
                         logger.error(f"Failed to generate fallback image for variant {i+1}: {fb_err}", exc_info=True)
@@ -258,6 +264,13 @@ class ThumbnailGenerator:
             
             concepts = json.loads(response.text)
             logger.info(f"Generated {len(concepts)} concepts")
+            # **実際にモデルが返したコンセプトであることを印にする**
+            # （R1.5-C4・案D 掃引）。下の _get_fallback_concept と
+            # 区別が付かないと、呼び出し元が「印が無い＝実測」と読む
+            for c in concepts:
+                if isinstance(c, dict):
+                    c.setdefault("is_real", True)
+                    c.setdefault("data_source", "gemini")
             return concepts
             
         except errors.APIError as e:
@@ -272,15 +285,26 @@ class ThumbnailGenerator:
             return self._get_fallback_concept(title)
     
     def _get_fallback_concept(self, title: str) -> List[Dict]:
-        """フォールバックコンセプトを返す"""
+        """フォールバックコンセプトを返す。
+
+        **CTR 予測は名乗らない**（R1.5-C4・案D 掃引）。
+        ここに来るのは API 例外・JSON 破損・想定外例外で
+        **コンセプト生成が一度も成立しなかった**場合で、
+        `expected_ctr` を出す根拠が無い。以前は 5.0 を印なしで返しており、
+        モデルが出した 5.0 と区別が付かなかった。
+        0 も 5.0 も実際に取りうる値なので、数字を入れた時点で印にならない。
+        """
         return [
             {
                 "id": "concept_fallback",
                 "name": "標準スタイル",
                 "description": "視聴者の興味を引く標準的なサムネイル",
                 "visual_prompt": f"YouTube thumbnail for: {title}, eye-catching, high contrast, professional",
-                "expected_ctr": 5.0,
-                "emotion": "curiosity"
+                "expected_ctr": None,
+                "emotion": "curiosity",
+                "is_real": False,
+                "data_source": "unavailable",
+                "note": "**CTR 予測は行われていません。**コンセプト生成に失敗したため既定の構成を使っています",
             }
         ]
 

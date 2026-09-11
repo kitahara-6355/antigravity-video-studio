@@ -3428,3 +3428,140 @@ def test_案D_成功側にも印があるので印の不在で成功を読み取
 # このファイルが `routers` をスタブに差し替えていてアプリを起動できないので、
 # **経路を実際に通す検査**は backend/tests/test_render_router.py に置いた
 # （`test_案D_ルーターが既定値で_CTR_を作り直さない`）。
+
+
+def test_案D_コンセプト生成が全滅した回は_CTR_を名乗らない():
+    """**`_get_fallback_concept` の `expected_ctr: 5.0`**（R1.5-C4・案D 掃引で確定）。
+
+    API 例外・JSON 破損・想定外例外で**コンセプト生成が一度も成立しなかった**とき、
+    `thumbnail_engine/generator.py` は既定の構成を返す。そこに `expected_ctr: 5.0` が
+    印なしで入っており、**モデルが出した 5.0 と区別が付かなかった。**
+
+    `POST /api/preview/thumbnail/generate` は生成器の戻りを**そのまま**応答にするので、
+    ルーター側の手当てでは届かない。生成器自身が出所を名乗る必要がある。
+    """
+    import importlib
+
+    G = importlib.import_module("thumbnail_engine.generator")
+    候補 = G.ThumbnailGenerator()._get_fallback_concept("掃引テスト")
+
+    assert len(候補) == 1
+    c = 候補[0]
+    assert c["expected_ctr"] is None,         f"コンセプト生成が落ちたのに {c['expected_ctr']} を名乗った"
+    assert c["is_real"] is False
+    assert c["data_source"] == "unavailable"
+    assert "CTR 予測は行われていません" in c["note"]
+
+
+def test_案D_生成できたコンセプトには実測の印が付く():
+    """**印が片側だけだと「印が無い＝実測」と読まれる。**
+
+    フォールバックにだけ印を付けると、生成器の戻りを素通しする
+    `preview.py` 経路で両者が区別できない。
+    """
+    import asyncio
+    import importlib
+    import json as _json
+    import unittest.mock as _m
+
+    G = importlib.import_module("thumbnail_engine.generator")
+    g = G.ThumbnailGenerator()
+
+    応答 = _m.MagicMock()
+    応答.text = _json.dumps([{
+        "id": "c0", "name": "N", "description": "D",
+        "visual_prompt": "p", "expected_ctr": 7.5, "emotion": "curiosity",
+    }])
+    偽client = _m.MagicMock()
+    偽client.models.generate_content.return_value = 応答
+
+    with _m.patch.object(g, "client", 偽client, create=True):
+        候補 = asyncio.run(g._generate_concepts("題", "説明", 1))
+
+    assert 候補[0]["expected_ctr"] == 7.5
+    assert 候補[0]["is_real"] is True, "生成できたコンセプトに印が無い"
+    assert 候補[0]["data_source"] == "gemini"
+
+
+def test_案D_generate_の戻りがコンセプトの印を運ぶ():
+    """**`generate()` の組み立てが既定値 5.0 を作り直していた。**
+
+    `_get_fallback_concept` を直しても、結果を組み立てる側が
+    `concept.get('expected_ctr', 5.0)` と書いていると**同じ数字が復活する**。
+    印も `concept.get('is_real', ...)` で運ぶので、既定を成功側に倒すと
+    コンセプトが落ちた回まで「実測」に化ける。
+
+    この検査が無いと、その2つの変異が生き残る（実際に生き残った）。
+    `POST /api/preview/thumbnail/generate` は `generate()` の戻りを
+    そのまま応答にするので、ここが最後の砦になる。
+    """
+    import asyncio
+    import importlib
+    import unittest.mock as _m
+    from io import BytesIO
+
+    from PIL import Image
+
+    G = importlib.import_module("thumbnail_engine.generator")
+    g = G.ThumbnailGenerator()
+
+    buf = BytesIO()
+    Image.new("RGB", (1280, 720), color="red").save(buf, format="JPEG")
+    画像 = buf.getvalue()
+
+    async def _落ちたコンセプト(*a, **k):
+        return g._get_fallback_concept("掃引テスト")
+
+    async def _画像は出る(*a, **k):
+        return 画像
+
+    with _m.patch.object(g, "_generate_concepts", _落ちたコンセプト),          _m.patch.object(g, "_generate_image", _画像は出る):
+        結果 = asyncio.run(g.generate("掃引テスト", "説明", num_variants=1))
+
+    assert 結果, "画像は出ているのに結果が空になっている"
+    t = 結果[0]
+    assert t["ctr_score"] is None,         f"コンセプトが落ちた回に {t['ctr_score']} を名乗った（既定値の作り直し）"
+    assert t["is_real"] is False, "コンセプトが落ちた回を実測に倒している"
+    assert t["data_source"] == "unavailable"
+
+
+def test_案D_モデルが_expected_ctr_を返さなかった回に数字を作らない():
+    """**`concept.get('expected_ctr', 5.0)` の既定値**（R1.5-C4・案D 掃引）。
+
+    コンセプト生成自体は通ったが、モデルの JSON に `expected_ctr` が**無い**回がある。
+    既定 5.0 を置くと、**誰も予測していない 5.0** が実測の 5.0 と同じ顔で出る。
+
+    `_get_fallback_concept` の側は `expected_ctr: None` を**明示的に持つ**ので、
+    `.get(k, 5.0)` の既定値は発火しない。**鍵そのものが無い回**を通さないと、
+    この既定値の有無は区別できない（§3: 分岐に入る側のケースを通す）。
+    """
+    import asyncio
+    import importlib
+    import unittest.mock as _m
+    from io import BytesIO
+
+    from PIL import Image
+
+    G = importlib.import_module("thumbnail_engine.generator")
+    g = G.ThumbnailGenerator()
+
+    buf = BytesIO()
+    Image.new("RGB", (1280, 720), color="green").save(buf, format="JPEG")
+    画像 = buf.getvalue()
+
+    async def _鍵の無いコンセプト(*a, **k):
+        # モデルは返したが `expected_ctr` が欠けている
+        return [{
+            "id": "c0", "name": "N", "description": "D",
+            "visual_prompt": "p", "emotion": "curiosity",
+            "is_real": True, "data_source": "gemini",
+        }]
+
+    async def _画像は出る(*a, **k):
+        return 画像
+
+    with _m.patch.object(g, "_generate_concepts", _鍵の無いコンセプト),          _m.patch.object(g, "_generate_image", _画像は出る):
+        結果 = asyncio.run(g.generate("掃引テスト", "説明", num_variants=1))
+
+    assert 結果
+    assert 結果[0]["ctr_score"] is None,         f"モデルが返していないのに {結果[0]['ctr_score']} を名乗った（既定値 5.0）"

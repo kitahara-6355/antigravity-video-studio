@@ -674,12 +674,15 @@ async def generate_thumbnail(req: ThumbnailGenerateRequest) -> Dict[str, Any]:
                 video_description=req.video_description,
                 num_variants=1
             )
-            # **生成できた側に印を付ける**（R1.5-C4・案D 掃引）。
-            # 下のフォールバックと同じ形で応答に出るので、印が無いと
-            # 「CTR 予測をした 5.0」と「捏造した 5.0」を受け手が区別できない
+            # **生成器が付けた印を尊重する**（R1.5-C4・案D 掃引）。
+            # ここで一律に is_real=True を貼ると、生成器の中で
+            # `_get_fallback_concept`（コンセプト生成が全滅した回）に
+            # 落ちた結果まで「実測」に化ける。**最初この形で書いてしまい、
+            # 掃引が自分の修正の作った偽として検出した。**
+            # 印が無い戻りは悲観側（未計測）に倒す
             for _t in raw_thumbnails or []:
-                _t["is_real"] = True
-                _t["data_source"] = "gemini"
+                _t.setdefault("is_real", False)
+                _t.setdefault("data_source", "unavailable")
         except HTTPException:
             raise
         except Exception as e:
