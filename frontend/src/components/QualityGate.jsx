@@ -6,7 +6,11 @@ import AISuggestionCard from './AISuggestionCard';
 const QualityGate = ({ isOpen, onClose, onConfirm, data }) => {
     if (!isOpen) return null;
 
-    const { is_ready, score, scored, is_real, critical_issues, suggestions, final_verdict } = data || {};
+    // **`note` も受け取る**（R1.5-C4・案D 掃引）。
+    // L46 で `is_real === false && note` を評価しているのに分割代入に無く、
+    // **`is_real: false` の回だけ ReferenceError で描画が落ちていた**。
+    // 「作り物です」と言われたときにこそ警告が出ない、という逆転になっていた。
+    const { is_ready, score, scored, is_real, note, critical_issues, suggestions, final_verdict } = data || {};
 
     // **未計測を「不合格」とも「0点」とも描かない**（R1.5-C4・面(b)の掃引）。
     // 供給元は3つあり、いずれも「測ったか」を渡している:

@@ -58,7 +58,11 @@ class GenerationResult:
     success: bool
     output_path: Optional[str] = None
     optimized_prompt: str = ""
-    quality_score: float = 0.0
+    # **未採点を表せる型にする**（R1.5-C4・案D 掃引）。
+    # 0.0 は「採点して 0 点」と区別が付かないので、既定は None。
+    quality_score: Optional[float] = None
+    # 生成物そのものを採点したか（下流の self_review が付ける）
+    quality_scored: bool = False
     error: Optional[str] = None
     metadata: Dict = field(default_factory=dict)
 
@@ -201,7 +205,11 @@ class ImagenGenerator:
                     success=True,
                     output_path=str(output_path),
                     optimized_prompt=prompt,
-                    quality_score=0.85,
+                    # **生成物は採点していない。** 保存に成功しただけ
+                    # （R1.5-C4・案D 掃引）。採点は下流の
+                    # GenerationEngine.generate が self_review で行う。
+                    # 0.85 を置くと、採点が飛んだ回と区別が付かない
+                    quality_score=None,
                     metadata={"dimensions": dimensions}
                 )
             else:
@@ -270,7 +278,11 @@ class VeoGenerator:
                     success=True,
                     output_path=str(output_path),
                     optimized_prompt=prompt,
-                    quality_score=0.85,
+                    # **生成物は採点していない。** 保存に成功しただけ
+                    # （R1.5-C4・案D 掃引）。採点は下流の
+                    # GenerationEngine.generate が self_review で行う。
+                    # 0.85 を置くと、採点が飛んだ回と区別が付かない
+                    quality_score=None,
                     metadata={"duration": request.duration_sec}
                 )
             else:
@@ -331,6 +343,15 @@ class GenerationEngine:
             result = self.imagen.generate(optimized_prompt, request)
         
         # 3. 品質チェック（Self-Review Engine統合）
+        # **reviewer が居なければ採点していない。** 印を残さないと
+        # 「採点済みで 0.85」と区別が付かない（R1.5-C4・案D 掃引）
+        if result.success and not self.reviewer:
+            result.metadata["review"] = {
+                "scored": False,
+                "is_real": False,
+                "data_source": "unavailable",
+                "note": "**採点していません。**レビュー機構を読み込めませんでした",
+            }
         if result.success and self.reviewer:
             try:
                 review = self.reviewer.review(
@@ -339,12 +360,24 @@ class GenerationEngine:
                     context=request.context
                 )
                 result.quality_score = review.score.overall
+                result.quality_scored = True
                 result.metadata["review"] = {
                     "passed": review.passed,
                     "issues": review.issues
                 }
             except Exception as e:
+                # **採点が飛んだことを残す**（R1.5-C4・案D 掃引）。
+                # 以前はここで握るだけで quality_score が 0.85 のまま返り、
+                # 採点成功と応答上で区別できなかった
                 logger.warning(f"品質チェックスキップ: {e}")
+                result.quality_score = None
+                result.quality_scored = False
+                result.metadata["review"] = {
+                    "scored": False,
+                    "is_real": False,
+                    "data_source": "unavailable",
+                    "note": f"**採点していません。**レビューを実行できませんでした: {type(e).__name__}",
+                }
         
         return result
     

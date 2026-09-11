@@ -3230,6 +3230,36 @@ def test_20周目_M9_経過時間の既定値24が戻らない():
 # 案D 掃引（2026-09-07）: 早期 return が `checked` を落としていた
 # ─────────────────────────────────────────────────────────────
 
+def _別スレッドで(呼ぶ):
+    """**周囲のイベントループを壊さずに**同期的に走らせる（R1.5-C4・案D 掃引）。
+
+    `asyncio.run()` は新しいループを作って**閉じ**、現在のループを None に戻す。
+    `BrandingManager.generate_and_validate_thumbnail` も中で
+    `get_event_loop()` / `run_until_complete()` を使う。
+
+    これを本スレッドでやると、同じプロセスで後から走る
+    `test_render_router.py` の TestClient 経路（ルーター内部が
+    `await asyncio.sleep()` でタスク完了を待つ）が動かなくなり、
+    **単体では緑・並べると赤**になる。実際に踏んだので別スレッドに隔離する。
+    """
+    import threading
+
+    箱 = {}
+
+    def 走る():
+        try:
+            箱["v"] = 呼ぶ()
+        except BaseException as e:  # noqa: BLE001 — 呼び出し側へ運ぶ
+            箱["e"] = e
+
+    t = threading.Thread(target=走る)
+    t.start()
+    t.join()
+    if "e" in 箱:
+        raise 箱["e"]
+    return 箱.get("v")
+
+
 class _何も測れない文脈:
     """プレビューも字幕も無い文脈。**各プラグインの早期 return に入る側。**"""
     preview_path = None
@@ -3357,7 +3387,8 @@ def test_案D_生成に失敗したサムネイルが_CTR_予測を名乗らな�
     # 鍵が dummy でも生成は success を返しうるので、
     # 「この分岐に実際に入る」ことを自分で作らないと検査にならない（§3）
     with _m.patch.object(G, "ThumbnailGenerator", side_effect=RuntimeError("生成失敗")):
-        結果 = m.generate_and_validate_thumbnail(video_title="掃引テスト", video_description="")
+        結果 = _別スレッドで(
+            lambda: m.generate_and_validate_thumbnail(video_title="掃引テスト", video_description=""))
 
     assert 結果["status"] == "fallback", "この検査はフォールバック経路を通す前提"
     assert 結果["ctr_score"] is None,         f"CTR 予測をしていないのに {結果['ctr_score']} を名乗った"
@@ -3414,8 +3445,8 @@ def test_案D_成功側にも印があるので印の不在で成功を読み取
 
     G = importlib.import_module("thumbnail_engine.generator")
     with _m.patch.object(G, "ThumbnailGenerator", _通る生成器):
-        結果 = BrandingManager().generate_and_validate_thumbnail(
-            video_title="成功側", video_description="")
+        結果 = _別スレッドで(lambda: BrandingManager().generate_and_validate_thumbnail(
+            video_title="成功側", video_description=""))
 
     assert 結果["status"] == "success", 結果.get("status")
     assert 結果["is_real"] is True, "成功側に印が無い（印の不在が成功の代用になる）"
@@ -3476,7 +3507,7 @@ def test_案D_生成できたコンセプトには実測の印が付く():
     偽client.models.generate_content.return_value = 応答
 
     with _m.patch.object(g, "client", 偽client, create=True):
-        候補 = asyncio.run(g._generate_concepts("題", "説明", 1))
+        候補 = _別スレッドで(lambda: asyncio.run(g._generate_concepts("題", "説明", 1)))
 
     assert 候補[0]["expected_ctr"] == 7.5
     assert 候補[0]["is_real"] is True, "生成できたコンセプトに印が無い"
@@ -3516,7 +3547,7 @@ def test_案D_generate_の戻りがコンセプトの印を運ぶ():
         return 画像
 
     with _m.patch.object(g, "_generate_concepts", _落ちたコンセプト),          _m.patch.object(g, "_generate_image", _画像は出る):
-        結果 = asyncio.run(g.generate("掃引テスト", "説明", num_variants=1))
+        結果 = _別スレッドで(lambda: asyncio.run(g.generate("掃引テスト", "説明", num_variants=1)))
 
     assert 結果, "画像は出ているのに結果が空になっている"
     t = 結果[0]
@@ -3561,7 +3592,182 @@ def test_案D_モデルが_expected_ctr_を返さなかった回に数字を作�
         return 画像
 
     with _m.patch.object(g, "_generate_concepts", _鍵の無いコンセプト),          _m.patch.object(g, "_generate_image", _画像は出る):
-        結果 = asyncio.run(g.generate("掃引テスト", "説明", num_variants=1))
+        結果 = _別スレッドで(lambda: asyncio.run(g.generate("掃引テスト", "説明", num_variants=1)))
 
     assert 結果
     assert 結果[0]["ctr_score"] is None,         f"モデルが返していないのに {結果[0]['ctr_score']} を名乗った（既定値 5.0）"
+
+
+def test_案D_印を描く式の変数が宣言されている():
+    """**印を受け取っても、描く式が落ちれば同じこと**（R1.5-C4・案D 掃引で発見）。
+
+    `QualityGate.jsx` は `is_real === false && note` で「作り物です」の警告を出すが、
+    `note` が分割代入に無かった。JS では**未宣言の識別子参照は ReferenceError** なので、
+
+        is_real !== false → `&&` が短絡して素通り（気づかない）
+        is_real === false → `note` を評価して**描画ごと落ちる**
+
+    つまり「作り物だと言われたときにこそ警告が出ない」という逆転が起きていた。
+    16周目に入れた印の表示が、一度も動いていなかったことになる。
+
+    **フロントにテストランナーが無い**ので、ここはソースの構造で守る。
+    文言ではなく「`is_real === false && X` の X が宣言されているか」を見る。
+    """
+    import re
+    from pathlib import Path
+
+    根 = Path(__file__).resolve().parents[3] / "frontend" / "src"
+    assert 根.is_dir(), f"フロントのソースが見つからない: {根}"
+
+    # `is_real === false && <識別子>` / `is_real === false && (<識別子>` を拾う
+    使用 = re.compile(r"is_real\s*===\s*false\s*&&\s*\(?\s*([A-Za-z_$][\w$]*)")
+    # 宣言: import / const / let / var / 分割代入の中身 / 関数引数
+    見つけた = 0
+    for f in sorted(根.rglob("*.jsx")):
+        本文 = f.read_text(encoding="utf-8")
+        名前 = set(使用.findall(本文))
+        if not 名前:
+            continue
+        # 宣言されている識別子を雑に集める（分割代入・import・const/let/var）
+        宣言 = set()
+        for m in re.finditer(r"\{([^{}]*)\}\s*=", 本文):          # 分割代入
+            宣言 |= {x.strip().split(":")[-1].split("=")[0].strip()
+                     for x in m.group(1).split(",") if x.strip()}
+        for m in re.finditer(r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)", 本文):
+            宣言.add(m.group(1))
+        for m in re.finditer(r"import\s+(?:\{([^}]*)\}|([A-Za-z_$][\w$]*))", 本文):
+            if m.group(1):
+                宣言 |= {x.strip().split(" as ")[-1].strip() for x in m.group(1).split(",") if x.strip()}
+            elif m.group(2):
+                宣言.add(m.group(2))
+        for n in 名前:
+            見つけた += 1
+            assert n in 宣言, (
+                f"{f.name}: 印を描く式が未宣言の識別子 `{n}` を参照している。"
+                f"is_real === false の回だけ ReferenceError で落ちる"
+            )
+    assert 見つけた > 0, "印を描く式が1つも見つからない（検査が空振りしている）"
+
+
+def test_案D_QualityGate_が_note_を受け取っている():
+    """上の一般規則が `QualityGate.jsx` の実物を捕まえていることを固定する。"""
+    from pathlib import Path
+
+    本文 = (Path(__file__).resolve().parents[3] / "frontend" / "src" /
+            "components" / "QualityGate.jsx").read_text(encoding="utf-8")
+    分割代入 = [x for x in 本文.splitlines() if "} = data || {}" in x]
+    assert 分割代入, "data の分割代入が見つからない"
+    assert "note" in 分割代入[0], f"note を受け取っていない: {分割代入[0].strip()}"
+    assert "is_real === false && note" in 本文, "印を描く式が消えている"
+
+
+def test_案D_生成物を採点していない_0_85_を名乗らない():
+    """**`quality_score=0.85` の直書き**（R1.5-C4・案D 掃引）。
+
+    `ImagenGenerator.generate` / `VeoGenerator.generate` は**保存に成功しただけ**で
+    `quality_score=0.85` を返していた。生成物の採点は一度も行っていない。
+
+    掃引の反証では「下流の `GenerationEngine.generate` が必ず上書きするから
+    応答には出ない」として disputed になったが、**安全性が下流の上書きに
+    依存している**のが問題で、上書きが飛ぶ経路（reviewer が居ない／例外）では
+    0.85 がそのまま残る。**印の無い定数は、上流の事情が変わると黙って偽になる。**
+    """
+    import importlib
+
+    G = importlib.import_module("generation_engine")
+    r = G.GenerationResult(request_id="x", success=True)
+    assert r.quality_score is None, "既定が 0.0 だと「採点して0点」と区別が付かない"
+    assert r.quality_scored is False
+
+    import inspect
+    for 名 in ("ImagenGenerator", "VeoGenerator"):
+        本文 = inspect.getsource(getattr(G, 名).generate)
+        assert "quality_score=0.85" not in 本文, f"{名} が採点していない 0.85 を名乗っている"
+        assert "quality_score=None" in 本文, f"{名} が未採点を None で返していない"
+
+
+def test_案D_採点が飛んだ回に旗と印が残る():
+    """**採点失敗と採点成功が応答上で区別できなかった。**
+
+    `GenerationEngine.generate` は reviewer の例外を warning で握るだけで、
+    `quality_score` を触らずに返していた。reviewer が居ない場合も同じ。
+    ここでは**その分岐に実際に入れて**、旗と印が残ることを見る（§3）。
+    """
+    import importlib
+    import unittest.mock as _m
+
+    G = importlib.import_module("generation_engine")
+
+    class _落ちるレビュー:
+        def review(self, **k):
+            raise RuntimeError("レビュー失敗")
+
+    e = G.GenerationEngine.__new__(G.GenerationEngine)
+    e.prompt_optimizer = _m.MagicMock(optimize=_m.MagicMock(return_value="p"))
+    e.imagen = _m.MagicMock()
+    e.veo = _m.MagicMock()
+    e.reviewer = _落ちるレビュー()
+
+    req = _m.MagicMock()
+    req.id = "x"
+    req.type = G.GenerationType.THUMBNAIL
+    req.context = {}
+    # **生成器が点を持った状態から入る。** None のまま渡すと
+    # 「except が消しているのか、元から None なのか」区別が付かず空振りになる
+    e.imagen.generate.return_value = G.GenerationResult(
+        request_id="x", success=True, quality_score=0.85)
+
+    r = e.generate(req)
+    assert r.quality_score is None, "採点が落ちたのに 0.85 を名乗った"
+    assert r.quality_scored is False
+    印 = r.metadata.get("review") or {}
+    assert 印.get("scored") is False
+    assert 印.get("is_real") is False
+    assert 印.get("data_source") == "unavailable"
+    assert "採点していません" in 印.get("note", "")
+
+    # reviewer が居ない場合も同じ形で残る
+    e2 = G.GenerationEngine.__new__(G.GenerationEngine)
+    e2.prompt_optimizer = _m.MagicMock(optimize=_m.MagicMock(return_value="p"))
+    e2.imagen = _m.MagicMock()
+    e2.veo = _m.MagicMock()
+    e2.reviewer = None
+    e2.imagen.generate.return_value = G.GenerationResult(
+        request_id="y", success=True, quality_score=0.85)
+    r2 = e2.generate(req)
+    assert (r2.metadata.get("review") or {}).get("scored") is False,         "reviewer が居ないのに未採点の印が無い"
+
+
+def test_案D_採点できた回は旗が立つ():
+    """**旗が片側だけだと「旗が無い＝採点済み」と読めない。**
+
+    採点成功で `quality_scored: True` が立つことを見ないと、
+    旗を立てる行を消しても誰も気づかない（実際に変異が生き残った）。
+    """
+    import importlib
+    import unittest.mock as _m
+
+    G = importlib.import_module("generation_engine")
+
+    class _通るレビュー:
+        def review(self, **k):
+            return _m.MagicMock(
+                score=_m.MagicMock(overall=72.5), passed=True, issues=[])
+
+    e = G.GenerationEngine.__new__(G.GenerationEngine)
+    e.prompt_optimizer = _m.MagicMock(optimize=_m.MagicMock(return_value="p"))
+    e.imagen = _m.MagicMock()
+    e.veo = _m.MagicMock()
+    e.reviewer = _通るレビュー()
+
+    req = _m.MagicMock()
+    req.id = "z"
+    req.type = G.GenerationType.THUMBNAIL
+    req.context = {}
+    e.imagen.generate.return_value = G.GenerationResult(
+        request_id="z", success=True, quality_score=None)
+
+    r = e.generate(req)
+    assert r.quality_score == 72.5
+    assert r.quality_scored is True, "採点できたのに旗が立っていない"
+    assert (r.metadata.get("review") or {}).get("passed") is True

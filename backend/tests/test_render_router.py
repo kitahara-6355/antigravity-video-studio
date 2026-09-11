@@ -9,6 +9,26 @@ from unittest.mock import patch, MagicMock
 
 # 他の未インポートな依存モジュールのダミー登録
 sys.modules["branding_manager"] = MagicMock()
+
+
+def _branding_mock():
+    """`branding_manager` のモックを**確実に**得る（R1.5-C4・案D 掃引）。
+
+    上の行は**このモジュールの import 時**に1回だけ効く。ところが同じプロセスで
+    先に走った別のテストファイル（`test_routers/test_c4_quality_marks.py`）が
+    本物の `branding_manager` を import し直すと、`sys.modules` の中身が
+    本物のモジュールに戻る。すると
+    `sys.modules["branding_manager"].branding_manager.generate_and_validate_thumbnail`
+    は**束縛メソッド**になり、`.side_effect = ...` が AttributeError になる。
+
+    `pytest.ini` の testpaths ではこのファイルが先に来るので CI は緑だが、
+    **順序が変わると落ちる**（実際に手元で踏んだ）。収集順に依存させない。
+    """
+    mod = sys.modules.get("branding_manager")
+    if not isinstance(mod, MagicMock):
+        mod = MagicMock()
+        sys.modules["branding_manager"] = mod
+    return mod
 sys.modules["project_archiver"] = MagicMock()
 sys.modules["video_processor"] = MagicMock()
 sys.modules["google.adk"] = MagicMock()
@@ -499,7 +519,14 @@ def test_generate_thumbnail_invalid_requests(mock_generate):
 def test_generate_thumbnail_generator_error(mock_generate):
     # Imagen 4.0 が例外を投げる場合
     mock_generate.side_effect = Exception("API quota limit reached")
-    
+
+    # **フォールバックも落ちることを自分で用意する**（R1.5-C4・案D 掃引）。
+    # 500 になるのは「生成も代替も失敗した」ときで、この検査はこれまで
+    # **前のテストが残した `side_effect` に依存**していた。
+    # モックが作り直されると前提が消えて 200 になる（収集順で結果が変わる）。
+    _branding_mock().branding_manager.generate_and_validate_thumbnail.side_effect = (
+        Exception("No thumbnails generated"))
+
     res = client.post("/api/render/thumbnail", json={
         "video_title": "Test Title",
         "width": 1280,
@@ -515,7 +542,7 @@ def test_generate_thumbnail_empty_result(mock_generate):
     mock_generate.return_value = []
     
     import sys
-    branding_mock = sys.modules["branding_manager"]
+    branding_mock = _branding_mock()
     branding_mock.branding_manager.generate_and_validate_thumbnail.side_effect = Exception("No thumbnails generated")
     
     res = client.post("/api/render/thumbnail", json={
@@ -857,7 +884,7 @@ def test_案D_ルーターが既定値で_CTR_を作り直さない(mock_generat
     **出所の印（`is_real` / `data_source`）が応答まで届くこと**も見る。
     """
     import base64 as _b64
-    import branding_manager as _bm
+    _bm = _branding_mock()
 
     # 生成を落としてフォールバック分岐に入れる
     mock_generate.side_effect = RuntimeError("生成失敗")
@@ -959,7 +986,7 @@ def test_案D_印の無い戻りは成功側に倒さない(mock_generate):
 
     この検査が無いと「ルーターの印を fail-open にする」変異が生き残る（実際に生き残った）。
     """
-    import branding_manager as _bm
+    _bm = _branding_mock()
 
     mock_generate.side_effect = RuntimeError("生成失敗")
     _bm.branding_manager.generate_and_validate_thumbnail.side_effect = None

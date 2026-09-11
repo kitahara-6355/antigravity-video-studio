@@ -287,6 +287,15 @@ jobs:
       - name: 実装不足項目の点検（静的のみ）
         run: PYTHONPATH=./backend python -m backend.feature_gaps --audit --static-only
 
+      # **4カテゴリの「偽の success」を台帳で押さえる**（R1.5-C4・2026-09-07 ユーザー承認）。
+      # 台帳は毎回ソースから候補を作り直して突き合わせるので、
+      # **新しい既定値を持ち込んだコミットがその場で赤くなる。**
+      # gate-verifier を20周使って全部 not_met だったのは欠陥が尽きなかったからではなく、
+      # 母集団 8,642 に対して「反例を1つ挙げよ」が原理的にいつでも成功するため。
+      # 問いを「台帳に漏れはあるか」に変えて有限にした。
+      - name: R1.5-C4 の台帳と実態の突き合わせ
+        run: PYTHONPATH=./backend python -m backend.c4_inventory --gate
+
   outside-testpaths:
     name: testpaths 外の退行検知
     runs-on: ubuntu-latest
