@@ -90,6 +90,32 @@ def _run(args: list[str], cwd: Path | None = None) -> str:
     return r.stdout
 
 
+def harness_args() -> list[str]:
+    """**基準の版と HEAD を同じ土俵で走らせる**ための引数。
+
+    基準の版は別のワークツリーに展開するので、**そちらの `pytest.ini` は
+    基準の版のもの**になる。つまり `pytest.ini` そのものを変えた回は、
+    両側が違う設定で走り、差が全部「退行」に見える。
+
+    2026-09-12 にこれを踏んだ。`timeout = 60` と `pytest-randomly` を入れた
+    コミットで **13件 / 7ファイルが「新しく赤くなった」**と報告されたが、
+    実際には基準側だけ pytest-randomly が有効（基準の `pytest.ini` に
+    `-p no:randomly` が無い）で順序がシャッフルされ、**順序依存のテストの
+    当落が両側で入れ替わっていた**だけだった。中身は誰も壊していない。
+
+    そこで**土俵は HEAD 側の設定に固定して、両側に明示的に渡す。**
+    """
+    args = ["-p", "no:randomly"]  # 入っていてもいなくても順序を固定する
+    ini = (ROOT / "pytest.ini")
+    if ini.is_file():
+        for line in ini.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^\s*timeout\s*=\s*(\d+)\s*$", line)
+            if m:
+                args += ["-o", f"timeout={m.group(1)}"]
+                break
+    return args
+
+
 def testpaths() -> set[str]:
     """`pytest.ini` の testpaths に載っているファイル。"""
     out: set[str] = set()
@@ -229,7 +255,7 @@ def failures(rel: str, cwd: Path) -> tuple[set[str], bool]:
     try:
         r = subprocess.run(
             [sys.executable, "-m", "pytest", rel, "-q", "--no-cov",
-             "-p", "no:cacheprovider"],
+             "-p", "no:cacheprovider", *harness_args()],
             cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
             errors="replace", env=env, timeout=PER_FILE_TIMEOUT, check=False)
     except subprocess.TimeoutExpired:
