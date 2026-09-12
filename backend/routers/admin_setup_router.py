@@ -423,6 +423,14 @@ async def run_diagnostics():
         "total": len(all_checks),
         "passed": sum(1 for c in all_checks if c.get("ok")),
         "timestamp": datetime.now().isoformat(),
+        # **出所を名乗る**（R1.5-C4b・2026-09-13 ユーザー承認）。
+        # `passed` はいま実際に走らせた自己診断の合格数で、ローカルの実測。
+        # 4カテゴリの数字ではないが、`passed` は危険鍵なので名乗っておく
+        # （名乗らない数字を1件も残さないのが条件）。
+        "checked": True,
+        "is_real": True,
+        "data_source": "measured",
+        "note": "この応答時点でローカルの自己診断を実際に走らせた結果です",
     }
 
 

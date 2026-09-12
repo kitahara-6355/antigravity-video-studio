@@ -594,10 +594,16 @@
    "file": "backend/agents/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._write_quality_sidecar",
    "category": "品質スコア",
-   "status": "honest",
-   "reason": "L712 `if not ctx.quality_feedback: return None`。feedback は quality_gate_worker.py:201-202 で quality_scored=True と同時にしか入らない。落ちた検査は quality_gate_plugins.py:1240 が「この項目は検査されていません」を feedback に混ぜるので本文に印が残る。",
+   "status": "marked",
+   "reason": "2026-09-13 に**書き出す数字も出所を名乗るようにした**（R1.5-C4b）。`quality_scored` が False なら `score: None` + `data_source: \"unavailable\"` + 「採点されていません」を書く。採点できたときだけ `measured` を名乗る。消費側（`routers/render.py::_品質の実測`）は score が数値でなければ未計測に倒すので、None を書いても偽の success にならない。",
    "fingerprint": [
+    "getattr_default",
     "getattr_default"
+   ],
+   "marks": [
+    "data_source=?",
+    "is_real=?",
+    "scored=?"
    ]
   },
   {
@@ -938,6 +944,51 @@
    "fingerprint": [
     "or_default"
    ],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::_risk_key_re",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "_risk_key_re",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。危険鍵の定義を `c4_inventory` から読み込むだけで、数字も判定も作らない。",
+   "fingerprint": [],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::サイドカーを書かせる",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "サイドカーを書かせる",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。書き出し口を呼んで中身を読むための足場で、危険形2件は**検査用の固定値**（`quality_score=89` 等）。本番の応答にも成果物にも出ない。",
+   "fingerprint": [
+    "const_kwarg:quality_score",
+    "getattr_default"
+   ],
+   "marks": [
+    "quality_scored=True"
+   ]
+  },
+  {
+   "id": "backend/c4_response_gate.py::出ている鍵",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "出ている鍵",
+   "category": "チャンネル統計",
+   "status": "marked",
+   "reason": "C4b の門そのもの。応答に載っている 4カテゴリの**鍵名**を集めるだけで、値も判定も作らない。",
+   "fingerprint": [],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::名乗らない数字",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "名乗らない数字",
+   "category": "投稿",
+   "status": "marked",
+   "reason": "C4b の門そのもの。応答本文から**印の無い値を列挙する**判定器で、数字を作らない。",
+   "fingerprint": [],
    "marks": []
   },
   {
@@ -1878,6 +1929,19 @@
    "status": "honest",
    "reason": "L221-234: フィードバック0件なら sample_size 0 と「データがまだありません」を返し、平均誤差を作らない。L257 の rate 0 は valid_samples 0 のときで悲観側",
    "fingerprint": []
+  },
+  {
+   "id": "backend/routers/ab_test_tracker.py::get_selection_history",
+   "file": "backend/routers/ab_test_tracker.py",
+   "symbol": "get_selection_history",
+   "category": "チャンネル統計",
+   "status": "marked",
+   "reason": "2026-09-13 に `is_real` / `data_source: \"derived\"` / `note` を足した（R1.5-C4b）。返している行はローカルの選択履歴台帳そのもので、`predicted_ctr` は記録時点の予測値。印があるので C4b の門も通る。",
+   "fingerprint": [],
+   "marks": [
+    "data_source='derived'",
+    "is_real=True"
+   ]
   },
   {
    "id": "backend/routers/ab_test_tracker.py::record_ctr_feedback",

@@ -1,0 +1,318 @@
+{
+ "criterion": "R1.5-C4b",
+ "decided": "2026-09-13 ユーザー承認（案A・判定を静的述語から観測へ）",
+ "note": "`python -m backend.c4_response_gate --gate` の台帳。2種類しか書かない — 母集団から外したもの（out_of_population）と、`measured` を名乗ることを承認したもの（measured_claims）。**どちらも個別の理由が必須**（10文字未満は FAIL）。母集団は「引数なし GET の /api エンドポイント」＋サイドカーの書き出し口。POST とパス引数のあるものは fixture が要るため初回の母集団外で、ここに列挙して隠さない。",
+ "out_of_population": [
+  {
+   "path": "/api/admin/integration/webhooks",
+   "reason": "`url` は**Webhook の送信先設定**で、投稿した動画の URL ではない。危険鍵 `url` が「投稿」カテゴリに入っているのは `youtube_uploader` の `video_url`（動画が存在すると名乗る値）のためで、設定値はその主張をしない。返しているのは利用者が自分で登録した宛先。"
+  },
+  {
+   "path": "/api/director/evolution",
+   "reason": "`agent_performance.*.passed` は**開発プロセスの指標**（各エージェントが処理したタスクの合格数）で、動画の品質スコアでもチャンネルの数字でもない。正典 limits #11 が開発プロセス指標を C4 の対象外としている。"
+  },
+  {
+   "path": "/api/evolution",
+   "reason": "`/api/director/evolution` と同じ実体（開発プロセス指標の `agent_performance.*.passed`）。正典 limits #11 により C4 の対象外。"
+  }
+ ],
+ "measured_claims": [
+  {
+   "path": "/api/v1/themes/stats",
+   "reason": "ローカルのテンプレート選択台帳を**実際に読んで数えた件数**を返す。外部接続は要らない。数え落とした行数を `skipped_entries` で別に出しており、全部数えられたのか一部を捨てたのかが区別できる（満足度は個別に None を印としている）。`themes_router.py` の該当行にも同じ趣旨のコメントがある。"
+  },
+  {
+   "path": "/api/admin/setup/diagnostics",
+   "reason": "`passed` は**この応答の時点でローカルの自己診断を実際に走らせた**合格数。外部接続は要らない。失敗した検査は `all_checks[].error` に残る。"
+  }
+ ],
+ "observed_note": "**鍵のラチェット。** 各ルート／サイドカーが実際に返した 4カテゴリの鍵。包括的な印（応答の先頭の `{**DATA_SOURCE, ...}`）はその下の数字を全部覆うので、印の有無だけでは**新しい数字を足す**形を止められない（gate-verifier 23周目が静的側で突いたのと同じ形を、実測で再現した）。**鍵が増えたら落ちる。** 減るのは前進なので情報のみ。2026-09-13 の実測から起こした（この時点で名乗っていない数字は0件）。",
+ "observed": [
+  {
+   "path": "/api/admin/analytics/ai-suggestion-effect",
+   "keys": [
+    "avg_retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/benchmark",
+   "keys": [
+    "ctr",
+    "retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/chapter-effect",
+   "keys": [
+    "avg_retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/competitor-analysis",
+   "keys": [
+    "avg_retention",
+    "subscribers"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/ctr-trend",
+   "keys": [
+    "ctr"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/dashboard",
+   "keys": [
+    "avg_retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/kpi-achievement",
+   "keys": [
+    "ctr",
+    "retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/owner-dashboard",
+   "keys": [
+    "avg_retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/period-comparison",
+   "keys": [
+    "avg_retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/retention-trend",
+   "keys": [
+    "retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/smartcut-effect",
+   "keys": [
+    "avg_retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/template-effect",
+   "keys": [
+    "avg_retention"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/trend-analysis",
+   "keys": [
+    "score"
+   ]
+  },
+  {
+   "path": "/api/admin/analytics/video-performance",
+   "keys": [
+    "ctr",
+    "retention",
+    "views"
+   ]
+  },
+  {
+   "path": "/api/admin/channel/channel-comparison",
+   "keys": [
+    "ctr",
+    "quality_score",
+    "retention",
+    "subscribers"
+   ]
+  },
+  {
+   "path": "/api/admin/channel/channels",
+   "keys": [
+    "subscribers"
+   ]
+  },
+  {
+   "path": "/api/admin/channel/competitor-benchmark",
+   "keys": [
+    "ctr",
+    "subscribers"
+   ]
+  },
+  {
+   "path": "/api/admin/channel/effect-summary",
+   "keys": [
+    "ctr",
+    "quality_score",
+    "retention"
+   ]
+  },
+  {
+   "path": "/api/admin/channel/quality-improvement",
+   "keys": [
+    "average_improvement",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/admin/incident/quality-degradation",
+   "keys": [
+    "current_score",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/admin/integration/tool/evolution-log",
+   "keys": [
+    "score"
+   ]
+  },
+  {
+   "path": "/api/admin/integration/tool/quality-score",
+   "keys": [
+    "score"
+   ]
+  },
+  {
+   "path": "/api/admin/quality/e2e",
+   "keys": [
+    "passed"
+   ]
+  },
+  {
+   "path": "/api/admin/quality/fitness",
+   "keys": [
+    "passed"
+   ]
+  },
+  {
+   "path": "/api/admin/quality/fv",
+   "keys": [
+    "passed"
+   ]
+  },
+  {
+   "path": "/api/admin/quality/quality-trend",
+   "keys": [
+    "score"
+   ]
+  },
+  {
+   "path": "/api/admin/quality/test-results",
+   "keys": [
+    "passed"
+   ]
+  },
+  {
+   "path": "/api/admin/quality/vision-gap",
+   "keys": [
+    "score"
+   ]
+  },
+  {
+   "path": "/api/admin/setup/diagnostics",
+   "keys": [
+    "passed"
+   ]
+  },
+  {
+   "path": "/api/pipeline/improvement/score-change",
+   "keys": [
+    "current_score",
+    "initial_score",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/pipeline/improvement/status",
+   "keys": [
+    "current_score",
+    "initial_score"
+   ]
+  },
+  {
+   "path": "/api/pipeline/quality-gate/history",
+   "keys": [
+    "current_score",
+    "initial_score",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/pipeline/quality-gate/scores",
+   "keys": [
+    "overall_score",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/pipeline/quality-gate/status",
+   "keys": [
+    "overall_score"
+   ]
+  },
+  {
+   "path": "/api/settings",
+   "keys": [
+    "subscribers",
+    "views"
+   ]
+  },
+  {
+   "path": "/api/status",
+   "keys": [
+    "subscribers",
+    "views"
+   ]
+  },
+  {
+   "path": "/api/thumbnail/history",
+   "keys": [
+    "predicted_ctr",
+    "video_id"
+   ]
+  },
+  {
+   "path": "/api/v1/api/pipeline/improvement/score-change",
+   "keys": [
+    "current_score",
+    "initial_score",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/v1/api/pipeline/improvement/status",
+   "keys": [
+    "current_score",
+    "initial_score"
+   ]
+  },
+  {
+   "path": "/api/v1/api/pipeline/quality-gate/history",
+   "keys": [
+    "current_score",
+    "initial_score",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/v1/api/pipeline/quality-gate/scores",
+   "keys": [
+    "overall_score",
+    "score"
+   ]
+  },
+  {
+   "path": "/api/v1/api/pipeline/quality-gate/status",
+   "keys": [
+    "overall_score"
+   ]
+  },
+  {
+   "path": "*.quality.json",
+   "keys": [
+    "score"
+   ]
+  }
+ ]
+}

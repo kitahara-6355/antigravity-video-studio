@@ -64,6 +64,39 @@ _StageFailed: quality_gate: スコア: 89点 (ランクB)
 
 なお 2 → 89 になった経緯は引継ぎ §2.5 を参照（主因は目標尺のミスマッチ −50点）。
 
+> ### 追記 2026-09-13 — この記録は経路の書き換えより古い（取り直した）
+>
+> gate-verifier 23周目の指摘。上の裏取り先
+> `vault-outputs/final/final_20260828_012707.quality.json` は
+> `category_scores: {template: 100.0, broadcast: 95.8, accessibility: null}` だが、
+> **その後 `9a247db`（2026-09-11）が `backend/quality_gate_plugins.py` を書き換えて
+> いる** — 早期 return する17箇所に `checked: False` + `skip_reason` を付け、
+> 未計測のプラグインを集計の分母から外した。つまり**上の 100.0 / 95.8 は
+> 「測っていないカテゴリを満点で報告していた頃」の数字**で、いまの挙動ではない。
+>
+> **いまの挙動**（2026-09-13 実測・HEAD は案A の実装後・`net_guard` 下なので課金ゼロ）:
+>
+> ```
+> python -m backend.quality_gate_plugins  # 経由: run_all_plugins(プレビュー無しの ctx)
+>
+> all_plugins_ran : False
+> failed_plugins  : 16
+> category_report :
+>   stability      score 33.3  🔴 不合格   unchecked 0
+>   core           score 77.8  🟢 良好     unchecked 2
+>   template       score None  ❓ 未計測   unchecked 7
+>   broadcast      score None  ❓ 未計測   unchecked 4
+>   youtube        score 58.3  🟡 要改善   unchecked 3
+>   accessibility  score None  ⬜ 未実装   unchecked 0
+> ```
+>
+> **記録が古くなった原因が、偽 success を直したことそのもの**である点に注意。
+> 89点という実走の数字（測れた場合）は有効なまま。変わったのは
+> **測れなかったカテゴリの扱い**（満点 → `None` + 「未計測」）。
+>
+> 正典 C4a の条件文に「**実走記録は、その後に経路を書き換えたら取り直す**」を
+> 足したのはこの指摘への対処（2026-09-13 ユーザー承認）。
+
 ## ④ retention 分析 — `agents.pipeline_coordinator._run_retention_analysis()`
 
 ```

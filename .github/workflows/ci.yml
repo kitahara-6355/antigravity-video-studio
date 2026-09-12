@@ -226,6 +226,22 @@ jobs:
           GOOGLE_API_KEY: "dummy_key_for_ci"
         run: python -m backend.ux_verification.ui_api_closure --ratchet
 
+      # **4カテゴリの数字が外に出るとき、必ず出所を名乗る**（R1.5-C4b・2026-09-13 ユーザー承認）。
+      # 判定はソースの形ではなく、**マウントしたアプリの応答本文と書き出したサイドカーの中身**。
+      # 静的解析に置いていた判定を降ろした理由は正典 limits に書いてある —
+      # gate-verifier が21・22・23周目に突いたのは毎回「書き方」で、`watch = 15200` と
+      # 一度置くだけで台帳ゲートは緑になった。**間接参照・タプル・f-string・定数畳み込みは
+      # 応答本文の前では消える**ので、そこで見れば決定可能になる。
+      #
+      # 外部接続は net_guard で遮断するので**課金しない**（憲法第3条）。
+      # ffmpeg とフォントが要るのでこのジョブに置く（lint ジョブには無い）。
+      - name: R1.5-C4b 出ていく数字が出所を名乗るか
+        if: always()
+        env:
+          GOOGLE_API_KEY: "dummy_key_for_ci"
+          PYTHONPATH: ./backend
+        run: python -m backend.c4_response_gate --gate
+
       - name: テスト結果アップロード
         if: always()
         uses: actions/upload-artifact@v4
@@ -287,13 +303,17 @@ jobs:
       - name: 実装不足項目の点検（静的のみ）
         run: PYTHONPATH=./backend python -m backend.feature_gaps --audit --static-only
 
-      # **4カテゴリの「偽の success」を台帳で押さえる**（R1.5-C4・2026-09-07 ユーザー承認）。
-      # 台帳は毎回ソースから候補を作り直して突き合わせるので、
-      # **新しい既定値を持ち込んだコミットがその場で赤くなる。**
-      # gate-verifier を20周使って全部 not_met だったのは欠陥が尽きなかったからではなく、
-      # 母集団 8,642 に対して「反例を1つ挙げよ」が原理的にいつでも成功するため。
-      # 問いを「台帳に漏れはあるか」に変えて有限にした。
-      - name: R1.5-C4 の台帳と実態の突き合わせ
+      # **4カテゴリの site の一覧が維持されていること**（R1.5-C4）。
+      #
+      # **2026-09-13 に降格した。** この台帳は C-2（偽の success を返さない）の
+      # 十分条件ではない。gate-verifier が21・22・23周目に突いたのは毎回「書き方」で、
+      # `watch = 15200` と一度置くだけで緑になった（23周目の実測）。
+      # **判定を静的述語に委ねたので、無限性が site の内側へ移っていた。**
+      # 偽の success の判定は `c4_response_gate`（応答本文とサイドカーの観測）が引き受ける。
+      #
+      # それでもこの門は残す — **4カテゴリの site の一覧が腐っていないこと**は
+      # 静的にしか分からず、母集団を見失わないための地図として要る。
+      - name: R1.5-C4 の台帳（site 一覧）の維持
         run: PYTHONPATH=./backend python -m backend.c4_inventory --gate
 
   outside-testpaths:

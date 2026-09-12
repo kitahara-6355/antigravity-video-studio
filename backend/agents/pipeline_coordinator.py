@@ -711,11 +711,23 @@ class PipelineCoordinator:
         """
         if not ctx.quality_feedback:
             return None
+        # **書き出す数字も出所を名乗る**（R1.5-C4b・2026-09-13 ユーザー承認）。
+        # 以前は `score` だけを書いていた。サイドカーは動画の隣に残り、
+        # `render.py` と人間が後から読む**成果物**なので、応答本文と同じ規則が要る。
+        # 採点できたかは `quality_scored` が持っている（0.0 は実際に取りうる点なので
+        # 値では判断しない — R1.5-C4・9周目の指摘）。
+        採点した = bool(getattr(ctx, "quality_scored", False))
         return self._write_sidecar(ctx, ".quality.json", {
-            "score": ctx.quality_score,
+            "score": ctx.quality_score if 採点した else None,
             "raw_score": (ctx.quality_gate_report or {}).get("raw_score"),
             "feedback": list(ctx.quality_feedback),
             "category_scores": getattr(ctx, "quality_category_scores", {}),
+            "scored": 採点した,
+            "is_real": 採点した,
+            "data_source": "measured" if 採点した else "unavailable",
+            "note": ("ローカルの品質ゲートで採点した点数です"
+                     if 採点した else
+                     "**採点されていません。** この動画に品質ゲートは通っていません"),
         })
 
     def _intermediates(self, ctx: PipelineContext) -> list:
