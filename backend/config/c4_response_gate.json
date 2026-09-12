@@ -24,6 +24,10 @@
   {
    "path": "/api/admin/setup/diagnostics",
    "reason": "`passed` は**この応答の時点でローカルの自己診断を実際に走らせた**合格数。外部接続は要らない。失敗した検査は `all_checks[].error` に残る。"
+  },
+  {
+   "path": "*.quality.json",
+   "reason": "サイドカーが `measured` を名乗るのは `quality_scored` が True のときだけ。品質ゲート（`quality_gate_agent` / `quality_gate_plugins`。**gemini 参照0件のローカル処理**）がその実走で実際に採点したという意味で、外部接続は要らない。採点していなければ `score: None` + `data_source: \"unavailable\"` を書く。"
   }
  ],
  "observed_note": "**鍵のラチェット。** 各ルート／サイドカーが実際に返した 4カテゴリの鍵。包括的な印（応答の先頭の `{**DATA_SOURCE, ...}`）はその下の数字を全部覆うので、印の有無だけでは**新しい数字を足す**形を止められない（gate-verifier 23周目が静的側で突いたのと同じ形を、実測で再現した）。**鍵が増えたら落ちる。** 減るのは前進なので情報のみ。2026-09-13 の実測から起こした（この時点で名乗っていない数字は0件）。",
@@ -314,5 +318,259 @@
     "score"
    ]
   }
- ]
+ ],
+ "side_effect_methods": [
+  "POST",
+  "PUT",
+  "DELETE"
+ ],
+ "side_effect_note": "**門は状態を書き換えない。** だから副作用のあるメソッドは叩かない。これは都合ではなく原則で、突かれても答えがある線。外した先を隠さないため、門は毎回この件数と内訳を印字し、4カテゴリの語に当たるものは `side_effect_blind_spot` で一覧を固定する。",
+ "side_effect_blind_spot": [
+  "DELETE /api/preview/cleanup",
+  "DELETE /api/v1/api/preview/cleanup",
+  "POST /api/admin/analytics/api-connection",
+  "POST /api/admin/analytics/apply-suggestion",
+  "POST /api/admin/analytics/generate-report",
+  "POST /api/admin/analytics/kpi-settings",
+  "POST /api/admin/quality/generate-report",
+  "POST /api/admin/quality/notifications",
+  "POST /api/admin/quality/quality-settings",
+  "POST /api/admin/quality/quick-fix",
+  "POST /api/admin/quality/rollback",
+  "POST /api/admin/quality/run-tests",
+  "POST /api/analytics/simulate",
+  "POST /api/analytics/sync",
+  "POST /api/antigravity/self-review/check",
+  "POST /api/director/quality-score",
+  "POST /api/director/verify-quality",
+  "POST /api/pipeline/quality-gate/check",
+  "POST /api/pipeline/quality-gate/improve",
+  "POST /api/preview/decision",
+  "POST /api/preview/generate",
+  "POST /api/preview/session",
+  "POST /api/preview/step",
+  "POST /api/progressive-preview/snapshot",
+  "POST /api/progressive-preview/start",
+  "POST /api/quality/apply-suggestion",
+  "POST /api/quality/check",
+  "POST /api/quality/cleanup",
+  "POST /api/quality/decision/quick",
+  "POST /api/quality/review/approve",
+  "POST /api/quality/rhythm/split",
+  "POST /api/quality/undo-suggestion",
+  "POST /api/quality/verify",
+  "POST /api/v1/api/pipeline/quality-gate/check",
+  "POST /api/v1/api/pipeline/quality-gate/improve",
+  "POST /api/v1/api/preview/generate",
+  "POST /api/v1/api/progressive-preview/snapshot",
+  "POST /api/v1/api/progressive-preview/start",
+  "POST /api/v1/api/quality/apply-suggestion",
+  "POST /api/v1/api/quality/check",
+  "POST /api/v1/api/quality/cleanup",
+  "POST /api/v1/api/quality/decision/quick",
+  "POST /api/v1/api/quality/review/approve",
+  "POST /api/v1/api/quality/rhythm/split",
+  "POST /api/v1/api/quality/undo-suggestion",
+  "POST /api/v1/api/quality/verify",
+  "POST /api/v1/api/youtube-upload/upload",
+  "POST /api/v1/api/youtube/hook-preview",
+  "POST /api/v1/api/youtube/retention-map",
+  "POST /api/v1/api/youtube/series/session-score",
+  "POST /api/video/realtime-preview",
+  "POST /api/youtube-upload/upload",
+  "POST /api/youtube/hook-preview",
+  "POST /api/youtube/retention-map",
+  "POST /api/youtube/series/session-score"
+ ],
+ "blind_spot_note": "**ここは C4b では測れない。** 副作用があるので門が叩けない。一覧を固定して**増えたら落とす**ことで、盲点が知らないうちに広がるのを止める。正典 limits に「POST 経路の偽 success は C4b では止まらない」と明記してある。",
+ "population_floor": 300,
+ "population_floor_note": "**測れていないのに緑にしないための下限。** 2026-09-13 の実測は 338 ルート。CI ではこの門が 0 ルートで success を返していた（依存の版ずれ）。300 は「壊滅を捕まえるが通常の増減では誤検知しない」水準として置いた。正当にルートが減ったならこの数字を更新する（更新には査読が要る）。",
+ "unreadable": [
+  {
+   "path": "/api/admin/channel/channels/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/admin/incident/incidents/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/admin/incident/rca/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/admin/incident/timeline/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/director/task/c4-gate-probe",
+   "status": 200,
+   "reason": "status 200。JSON として読めない。"
+  },
+  {
+   "path": "/api/director/tasks/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/journal",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/models",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/pipeline/proofreading/export/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/pipeline/quality-gate/drilldown/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/pipeline/report",
+   "status": 200,
+   "reason": "status 200。JSON として読めない。"
+  },
+  {
+   "path": "/api/pipeline/report/thumbnail",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/pipeline/stream/c4-gate-probe",
+   "status": 400,
+   "reason": "必須のクエリ引数が無いので 400。引数を与える形は初回の母集団に入れていない。"
+  },
+  {
+   "path": "/api/preview/report/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/progressive-preview/report/c4-gate-probe",
+   "status": 500,
+   "reason": "**500。壊れている。** 合成の id で叩いたときに例外になる。別タスクで扱う。"
+  },
+  {
+   "path": "/api/resolutions",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/shorts/list",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/smartcut/all-candidates",
+   "status": 400,
+   "reason": "必須のクエリ引数が無いので 400。引数を与える形は初回の母集団に入れていない。"
+  },
+  {
+   "path": "/api/support/faq",
+   "status": 422,
+   "reason": "必須のクエリ引数が無いので 422。引数を与える形は初回の母集団に入れていない。"
+  },
+  {
+   "path": "/api/task/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/usage/switch-history",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/v1/api/journal",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/v1/api/pipeline/proofreading/export/c4-gate-probe",
+   "status": 400,
+   "reason": "必須のクエリ引数が無いので 400。引数を与える形は初回の母集団に入れていない。"
+  },
+  {
+   "path": "/api/v1/api/pipeline/quality-gate/drilldown/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/v1/api/pipeline/stream/c4-gate-probe",
+   "status": 400,
+   "reason": "必須のクエリ引数が無いので 400。引数を与える形は初回の母集団に入れていない。"
+  },
+  {
+   "path": "/api/v1/api/progressive-preview/report/c4-gate-probe",
+   "status": 500,
+   "reason": "**500。壊れている。** 合成の id で叩いたときに例外になる。別タスクで扱う。"
+  },
+  {
+   "path": "/api/v1/api/resolutions",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/v1/api/shorts/list",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/v1/api/smartcut/all-candidates",
+   "status": 400,
+   "reason": "必須のクエリ引数が無いので 400。引数を与える形は初回の母集団に入れていない。"
+  },
+  {
+   "path": "/api/v1/api/usage/switch-history",
+   "status": 500,
+   "reason": "**500。壊れている。** パッケージがサブモジュール名をインスタンスに再束縛する罠（引継ぎ §7 #3 と同じ形）。別タスクで修正予定。**追認ではなく既知の欠陥として記録する。**"
+  },
+  {
+   "path": "/api/v1/api/youtube/assets/search",
+   "status": 422,
+   "reason": "必須のクエリ引数が無いので 422。引数を与える形は初回の母集団に入れていない。"
+  },
+  {
+   "path": "/api/v1/mcp/resources/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/v1/themes/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/v1/themes/templates/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/video",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/video/process/status/c4-gate-probe",
+   "status": 404,
+   "reason": "合成の id（c4-gate-probe）は存在しないので 404。実在の id での本文は C4b では測れない。"
+  },
+  {
+   "path": "/api/youtube/assets/search",
+   "status": 422,
+   "reason": "必須のクエリ引数が無いので 422。引数を与える形は初回の母集団に入れていない。"
+  }
+ ],
+ "unreadable_note": "**「数字を運んでいない」と断定しない。** 本文を解析していないので、分かっているのは「JSON として読めなかった」ことだけ。一覧を固定して**増えたら落とす。**"
 }

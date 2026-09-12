@@ -602,3 +602,84 @@ def test_危険形を持つ対象外で同じ理由を使い回せない():
     assert any("使い回して" in m for m in c4_inventory.check_entries(台帳))
     # 上限以下なら通る（凍結モジュールのように正当に共有できる根拠がある）
     assert not [m for m in c4_inventory.check_entries(台帳[:-1]) if "使い回して" in m]
+
+
+# ─────── 1段の間接参照を透かす（gate-verifier 23周目・2026-09-13） ───────
+#
+# 23周目は「`watch = 15200` と一度置くだけでゲートは緑になる」ことを実測で示した。
+# 述語は「関数の外から来る名前」を危険と見なしていたので、**関数の中で定数を代入した
+# 名前は素通り**だった。実在の site（`admin_analytics_router.get_benchmark` が
+# `industry_avg_ctr = 3.5` を返す）も指紋が空のままだった。
+
+
+def test_一度だけ定数を代入した名前を透かす():
+    src = ("def f():" + NL + "    watch = 15200" + NL
+           + "    return {'watch_time_hours': watch}" + NL)
+    assert "const_dict:watch_time_hours" in _kinds(src)
+
+
+def test_タプル展開の定数も透かす():
+    src = ("def f():" + NL + "    a, b = 3.5, 40.0" + NL
+           + "    return {'ctr': a, 'retention': b}" + NL)
+    assert set(_kinds(src)) == {"const_dict:ctr", "const_dict:retention"}
+
+
+def test_定数畳み込みを透かす():
+    assert "const_dict:watch_time_hours" in _kinds(
+        "def f():" + NL + "    return {'watch_time_hours': 15000 + 200}" + NL)
+
+
+def test_固定値の_f_string_を透かす():
+    assert "const_dict:video_id" in _kinds(
+        "def f():" + NL + "    return {'video_id': f'{1234}_id'}" + NL)
+
+
+def test_引数から来た名前は透かさない():
+    """**偽陽性を作らない。** 入力で変わる値は偽 success ではない。"""
+    src = ("def f(x):" + NL + "    watch = x" + NL
+           + "    return {'watch_time_hours': watch}" + NL)
+    assert not [k for k in _kinds(src) if k.startswith("const_dict")]
+
+
+def test_再代入された名前は透かさない():
+    """一度でも入力から代入されうるなら、その値は呼び出しに依存する。"""
+    src = ("def f(x):" + NL + "    watch = 15200" + NL + "    watch = x" + NL
+           + "    return {'watch_time_hours': watch}" + NL)
+    assert not [k for k in _kinds(src) if k.startswith("const_dict")]
+
+
+def test_ループ変数になる名前は透かさない():
+    """**定数を代入した名前が、後でループ変数にもなる形。**
+
+    最初この検査は `for watch in xs:` だけを書いていたが、それでは
+    `watch` に定数を代入する行が無いので**そもそも定数の候補に入らず、
+    ループ変数を外す処理を殺しても緑のままだった**（空振り）。
+    定数の代入とループ束縛が同じ名前に来る形にして、初めて効く。
+    """
+    src = ("def f(xs):" + NL
+           + "    watch = 15200" + NL
+           + "    for watch in xs:" + NL
+           + "        return {'watch_time_hours': watch}" + NL)
+    assert not [k for k in _kinds(src) if k.startswith("const_dict")],         "ループで上書きされる名前を定数として透かしている"
+
+
+def test_入力を含む演算は透かさない():
+    assert not [k for k in _kinds(
+        "def f(x):" + NL + "    return {'watch_time_hours': x + 200}" + NL)
+        if k.startswith("const_dict")]
+
+
+def test_メソッド呼び出しの既定値を定数と取り違えない():
+    """`d.get('score', 0)` は**引数だけ見ると定数2つ**だが、`d` は入力。
+
+    呼び出し先を見ないと、既定値つきの `.get` を全部「入力に依存しない」と
+    誤判定する（実測で 40 site 以上が偽陽性になった）。
+    """
+    src = "def f(d):" + NL + "    s = d.get('score', 0)" + NL + "    return R(score=s)" + NL
+    assert not [k for k in _kinds(src) if k.startswith("const_")]
+    assert "default:score" in _kinds(src), "`.get` の既定値そのものは今までどおり拾う"
+
+
+def test_定数を包んだ呼び出しは透かす():
+    assert "const_dict:ctr" in _kinds(
+        "def f():" + NL + "    return {'ctr': float(62.5)}" + NL)

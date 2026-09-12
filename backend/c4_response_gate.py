@@ -50,6 +50,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -186,10 +187,20 @@ def 出ている鍵(本文) -> list[str]:
     return sorted(出た)
 
 
+def _実測を名乗っているか(値) -> bool:
+    """`measured` の名乗りか。**大小文字と前後の空白で抜けさせない。**
+
+    2026-09-13 の指摘 — `Measured` / `MEASURED` / `"measured "` はすべて素通りしていた。
+    この比較は `sample` → `measured` の反転を落とすために置いたものなので、
+    表記ゆれで抜けるなら目的を果たしていない。
+    """
+    return isinstance(値, str) and 値.strip().lower() == "measured"
+
+
 def measured_を名乗る箇所(本文, 道: str = "") -> list[str]:
     出た: list[str] = []
     if isinstance(本文, dict):
-        if 本文.get("data_source") == "measured":
+        if _実測を名乗っているか(本文.get("data_source")):
             出た.append(道 or "(応答の先頭)")
         for k, v in 本文.items():
             出た += measured_を名乗る箇所(v, f"{道}.{k}" if 道 else str(k))
@@ -199,31 +210,91 @@ def measured_を名乗る箇所(本文, 道: str = "") -> list[str]:
     return 出た
 
 
-def 母集団(app) -> list[str]:
-    """**引数なし GET の `/api` ルート。**
+探り値 = "c4-gate-probe"   # パス引数に入れる合成の値
 
-    POST とパス引数のあるものは fixture が要るので、初回の母集団から外す
-    （正典 C4b の decision）。**外した先は台帳に書く** — 隠さないことが条件。
+
+def ルート一覧(app) -> list[tuple[str, str]]:
+    """`/api` の (method, path テンプレート) を全部。**版に依存しない拾い方をする。**
+
+    2026-09-13 に CI で母集団が 0 件になり、それを success として通していた
+    （fastapi 0.141.1 / starlette 1.6.0。手元は 0.135.3 / 0.52.1）。
+    原因は依存の版ずれだが、**根本の欠陥は「測れなかったこと」を緑にしたこと**。
+    ここでは `Mount` の下も辿り、`methods` を持たないルート実装でも落とさない。
+    """
+    出た: list[tuple[str, str]] = []
+
+    def 降りる(routes, 接頭: str = ""):
+        for r in routes or ():
+            path = 接頭 + (getattr(r, "path", "") or "")
+            子 = getattr(r, "routes", None)
+            if 子:
+                降りる(子, path)
+                continue
+            methods = getattr(r, "methods", None) or ()
+            for m in methods:
+                if m in ("HEAD", "OPTIONS"):
+                    continue
+                if path.startswith("/api/"):
+                    出た.append((m, path))
+
+    降りる(getattr(app, "routes", None))
+    return sorted(set(出た))
+
+
+def 母集団(app) -> list[str]:
+    """**叩ける `/api` の GET。** パス引数には合成の値を入れて叩く。
+
+    2026-09-13 に広げた（ユーザー承認）。以前は「引数なし GET」だけで、
+    パス引数のある 34 本が母集団の外にあった。gate-verifier は**まさにそこ**
+    （`/api/pipeline/quality-gate/drilldown/{category}`）に印の無い偽 success を
+    置いて、両方の門が緑のままになることを実測で示した。
+
+    **副作用のあるメソッド（POST / PUT / DELETE）は入れない。**
+    理由は都合ではなく原則 — **門が状態を書き換えてはいけない。**
+    そこに残る盲点は台帳の `side_effect_blind_spot` で一覧を固定する。
+
+    **限界**: パス引数には合成の値しか入れないので、`if category == "live"` の
+    ように**特定の値でだけ通る枝**は踏めない。これは正典 limits に明記してある。
     """
     出た = set()
-    for r in app.routes:
-        path = getattr(r, "path", None)
-        methods = getattr(r, "methods", None) or set()
-        if not path or "GET" not in methods:
+    for m, path in ルート一覧(app):
+        if m != "GET":
             continue
-        if "{" in path or not path.startswith("/api/"):
-            continue
-        出た.add(path)
+        出た.add(re.sub(r"\{[^}]*\}", 探り値, path))
     return sorted(出た)
 
 
-def 応答を集める() -> list[tuple[str, int, object]]:
+def 除外の内訳(app) -> dict[str, int]:
+    """母集団に入れなかった (method, path) の内訳。**黙って外さない。**"""
+    出た: dict[str, int] = {}
+    for m, _ in ルート一覧(app):
+        if m == "GET":
+            continue
+        出た[m] = 出た.get(m, 0) + 1
+    return dict(sorted(出た.items()))
+
+
+def 盲点の一覧(app) -> list[str]:
+    """**外したもののうち、4カテゴリの語に当たるもの。** ここが残る盲点。"""
+    語 = re.compile(
+        r"quality|score|retention|ctr|watch.?time|subscriber|view|impression"
+        r"|upload|publish|analytics", re.IGNORECASE)
+    return sorted({f"{m} {p}" for m, p in ルート一覧(app)
+                   if m != "GET" and 語.search(p)})
+
+
+def アプリ():
     os.environ.setdefault("GOOGLE_API_KEY", "dummy_key_for_ci")
     _遮断する()
     sys.path.insert(0, str(REPO_ROOT))
     sys.path.insert(0, str(REPO_ROOT / "backend"))
-    from fastapi.testclient import TestClient
     from main import app
+    return app
+
+
+def 応答を集める(app=None) -> list[tuple[str, int, object]]:
+    from fastapi.testclient import TestClient
+    app = app if app is not None else アプリ()
 
     client = TestClient(app, raise_server_exceptions=False)
     出た = []
@@ -290,10 +361,49 @@ def サイドカーを書かせる() -> list[tuple[str, object]]:
 
 # ─────────────────────────── 判定 ───────────────────────────
 
-def audit(応答, サイドカー, 台帳) -> tuple[list[str], list[str]]:
+def audit(応答, サイドカー, 台帳, 内訳: dict | None = None,
+          盲点: list[str] | None = None) -> tuple[list[str], list[str]]:
     """返り値は (違反, 情報)。"""
     違反: list[str] = []
     情報: list[str] = []
+
+    # ── **測れていないのに緑にしない。** これが最優先の検査 ──────────────
+    #
+    # 2026-09-13、CI でこの門は「✅ 0 ルートとサイドカー 2 件」を出して
+    # exit 0 を返していた（所要 約1秒・HTTP リクエスト 0本）。手元は 304 ルート。
+    # 依存の版ずれで母集団が空になったのに、**空を成功として報告した。**
+    # 契約には「沈黙は緑ではない」と書いておきながら、母集団そのものが
+    # 0 になる経路を塞いでいなかった。
+    下限 = int(台帳.get("population_floor") or 0)
+    if len(応答) < 下限:
+        違反.append(
+            f"**母集団が下限を割りました**: {len(応答)} < {下限}。"
+            f"門が測れていないので、緑にはしません。"
+            f"ルートが正当に減ったのなら台帳の population_floor を更新してください"
+        )
+
+    # ── 外したものを黙って隠さない ────────────────────────────────
+    if 内訳 is not None:
+        宣言 = 台帳.get("side_effect_methods") or []
+        知らない = [m for m in 内訳 if m not in 宣言]
+        if 知らない:
+            違反.append(
+                f"台帳に宣言していない method を母集団から外しています: {知らない}。"
+                f"外すなら side_effect_methods に理由とともに載せてください"
+            )
+    if 盲点 is not None:
+        既知 = set(台帳.get("side_effect_blind_spot") or [])
+        増えた = sorted(set(盲点) - 既知)
+        減った = sorted(既知 - set(盲点))
+        if 増えた:
+            違反.append(
+                f"**測れない盲点が増えました**（4カテゴリの語に当たる副作用ルート）: "
+                f"{増えた[:6]}"
+                + (f" ほか {len(増えた) - 6} 件" if len(増えた) > 6 else "")
+                + "。増やすなら台帳の side_effect_blind_spot に載せて自覚してください"
+            )
+        if 減った:
+            情報.append(f"盲点が減りました（台帳を掃除できます）: {減った[:6]}")
     外した = {e["path"] for e in 台帳.get("out_of_population", [])}
     承認済み = {e["path"] for e in 台帳.get("measured_claims", [])}
     # **鍵のラチェット。** 台帳に載っている鍵の集合を超えたら落ちる
@@ -304,7 +414,21 @@ def audit(応答, サイドカー, 台帳) -> tuple[list[str], list[str]]:
             違反.append(f"呼び出せませんでした: {path} — {body}")
             continue
         if code != 200 or body is None:
-            情報.append(f"{path}: status {code}（4カテゴリの数字を運んでいない）")
+            # **「運んでいない」と断定しない。** 本文を解析していないのだから
+            # 分かっているのは「JSON として読めなかった」ことだけ。
+            # 2026-09-13 の指摘 — ここに 500 が9本入っていたのに、門は
+            # 「4カテゴリの数字を運んでいません」と言い切って情報に落としていた。
+            既知 = {f"{e.get('path')} ({e.get('status')})": e
+                    for e in (台帳.get("unreadable") or [])}
+            印 = f"{path} ({code})"
+            if 印 in 既知:
+                情報.append(f"{印}: {既知[印].get('reason', '')[:60]}")
+            else:
+                違反.append(
+                    f"**読めない応答が増えました**: {印}。"
+                    f"中身を確かめていないので「数字を運んでいない」とは言えません。"
+                    f"台帳の unreadable に**理由つきで**載せるか、読めるように直してください"
+                )
             continue
         if path in 外した:
             情報.append(f"{path}: 台帳で母集団の外に置いています")
@@ -373,6 +497,17 @@ def audit(応答, サイドカー, 台帳) -> tuple[list[str], list[str]]:
                 f"出所を名乗っていないサイドカー: {名} — " + ", ".join(無印[:4])
                 + (f" ほか {len(無印) - 4} 件" if len(無印) > 4 else "")
             )
+        # **サイドカーにも `measured` の承認を要求する。**
+        # 2026-09-13 まで、このループは `measured_を名乗る箇所` を呼んでおらず、
+        # `*.quality.json` が未承認で `measured` を名乗っていた（私が足したもの）。
+        # 条文は母集団を「エンドポイント＋成果物ライタ」と定義しているので、半分だけ
+        # 施行しているのは条文違反。
+        for 箇所 in measured_を名乗る箇所(中身):
+            if 名 not in 承認済み:
+                違反.append(
+                    f"台帳に無い `measured` の名乗り: サイドカー {名} の {箇所}。"
+                    f"何をローカルで測ったかを台帳に書いてください"
+                )
 
     for e in 台帳.get("out_of_population", []):
         if len(str(e.get("reason", ""))) < 10:
@@ -380,6 +515,11 @@ def audit(応答, サイドカー, 台帳) -> tuple[list[str], list[str]]:
     for e in 台帳.get("measured_claims", []):
         if len(str(e.get("reason", ""))) < 10:
             違反.append(f"`measured` を名乗るなら何を測ったか書く: {e.get('path')}")
+    # **読めない応答も理由なしには載せられない。** 一覧に足すだけなら
+    # 「壊れているものを追認する」ことになる（500 が11件ある）
+    for e in 台帳.get("unreadable", []):
+        if len(str(e.get("reason", ""))) < 10:
+            違反.append(f"読めない応答を台帳に載せるなら理由を書く: {e.get('path')}")
 
     return 違反, 情報
 
@@ -393,8 +533,19 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     台帳 = load_ledger()
-    応答 = 応答を集める()
+    app = アプリ()
+    応答 = 応答を集める(app)
     サイドカー = サイドカーを書かせる()
+    内訳 = 除外の内訳(app)
+    盲点 = 盲点の一覧(app)
+
+    # **外した先を必ず見せる。** 隠さないことが母集団を狭める条件（正典 C4b）
+    print(f"母集団: {len(応答)} ルート（`/api` の GET。パス引数には合成値を入れて叩く）"
+          f" / サイドカー {len(サイドカー)} 件")
+    print(f"母集団の外: {sum(内訳.values())} 件 {内訳}"
+          f" — 門は状態を書き換えないので副作用のあるメソッドは叩かない")
+    print(f"  うち 4カテゴリの語に当たる（測れない盲点）: {len(盲点)} 件")
+    print()
 
     if args.baseline:
         外した = {e["path"] for e in 台帳.get("out_of_population", [])}
@@ -430,9 +581,10 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"      measured: {m[:3]}")
         return 0
 
-    違反, 情報 = audit(応答, サイドカー, 台帳)
+    違反, 情報 = audit(応答, サイドカー, 台帳, 内訳, 盲点)
     if 情報:
-        print(f"  ℹ {len(情報)} 件は 4カテゴリの数字を運んでいません（違反ではありません）")
+        print(f"  ℹ {len(情報)} 件は台帳で自覚済みです"
+              f"（読めない応答・母集団の外・鍵が減った、など。違反ではありません）")
     if 違反:
         print(f"🚫 **R1.5-C4b: 出所を名乗っていない数字があります**（{len(違反)} 件）:")
         for m in 違反[:40]:

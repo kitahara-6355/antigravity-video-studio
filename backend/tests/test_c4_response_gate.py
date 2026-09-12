@@ -20,6 +20,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -155,17 +156,43 @@ def test_呼び出せなかったルートは違反になる(門):
 
 
 def test_印の無いサイドカーは違反になる(門):
-    違反, _ = 門.audit([], [("*.quality.json", {"score": 89})], 空台帳)
-    assert any("サイドカー" in v for v in 違反), 違反
+    """**空振りだった**（2026-09-13 の指摘）。
+
+    元は `空台帳` を渡していたので、鍵のラチェット側が
+    「台帳に無いサイドカーが 4カテゴリの数字を書いています」を出し、
+    `any("サイドカー" in v)` がそれで満たされていた。**印の検査を殺しても緑**だった。
+    鍵は台帳に載せたうえで、**印の検査だけ**を見る。
+    """
+    台帳 = {"out_of_population": [], "measured_claims": [],
+            "observed": [{"path": "*.quality.json", "keys": ["score"]}]}
+    違反, _ = 門.audit([], [("*.quality.json", {"score": 89})], 台帳)
+    assert any("出所を名乗っていないサイドカー" in v for v in 違反), 違反
 
 
 def test_印のあるサイドカーは通る(門):
-    台帳 = {"out_of_population": [], "measured_claims": [],
+    """`measured` を名乗るサイドカーは、台帳の承認があってはじめて通る。"""
+    台帳 = {"out_of_population": [],
+            "measured_claims": [{"path": "*.quality.json",
+                                 "reason": "ローカルの品質ゲートで実際に採点した"}],
             "observed": [{"path": "*.quality.json", "keys": ["score"]}]}
     違反, _ = 門.audit(
         [], [("*.quality.json", {"score": 89, "scored": True,
                                  "data_source": "measured"})], 台帳)
     assert 違反 == []
+
+
+def test_サイドカーの未承認_measured_は違反になる(門):
+    """**2026-09-13 まで、サイドカー側は `measured` の承認をまったく見ていなかった。**
+
+    条文は母集団を「エンドポイント＋成果物ライタ」と定義しているのに、
+    施行が半分だけだった。しかも `*.quality.json` は実際に未承認で名乗っていた。
+    """
+    台帳 = {"out_of_population": [], "measured_claims": [],
+            "observed": [{"path": "*.quality.json", "keys": ["score"]}]}
+    違反, _ = 門.audit(
+        [], [("*.quality.json", {"score": 89, "scored": True,
+                                 "data_source": "measured"})], 台帳)
+    assert any("台帳に無い `measured`" in v and "サイドカー" in v for v in 違反), 違反
 
 
 def test_書き出し口を呼べなかったら違反になる(門):
@@ -194,7 +221,8 @@ def test_台帳は読めて必要な鍵がある(門):
     assert set(台帳) >= {"out_of_population", "measured_claims"}
     for 鍵 in ("out_of_population", "measured_claims"):
         for e in 台帳[鍵]:
-            assert e.get("path", "").startswith("/api/"), e
+            # サイドカーは `/api/` ではなく `*.quality.json` のような名前で載る
+            assert e.get("path", "").startswith(("/api/", "*.")), e
             assert len(str(e.get("reason", ""))) >= 10, e
 
 
@@ -281,3 +309,129 @@ def test_台帳の_observed_が実態と揃っている(門):
         assert e["path"] not in 見た, f"observed に重複: {e['path']}"
         見た.add(e["path"])
     assert len(見た) >= 40, f"observed が {len(見た)} 件しかない。実測は43件だった"
+
+
+# ─────────── 測っていないのに緑にしない（2026-09-13） ───────────
+#
+# CI でこの門は「✅ 0 ルートとサイドカー 2 件」を出して exit 0 を返していた
+# （所要 約1秒・HTTP リクエスト 0本）。手元は 304 ルート。依存の版ずれで
+# 母集団が空になったのに、**空を成功として報告した。**
+# 契約に「沈黙は緑ではない」と書いておきながら、母集団そのものが 0 になる
+# 経路を塞いでいなかった。ここが最優先の検査。
+
+
+def test_母集団が下限を割ったら落ちる(門):
+    台帳 = {"out_of_population": [], "measured_claims": [], "observed": [],
+            "population_floor": 300}
+    違反, _ = 門.audit([], [], 台帳)
+    assert any("母集団が下限を割りました" in v for v in 違反), 違反
+
+
+def test_母集団が0でも下限が0なら落ちない(門):
+    """下限を置いていない台帳では従来どおり。**下限は台帳が決める。**"""
+    違反, _ = 門.audit([], [], {"out_of_population": [], "measured_claims": []})
+    assert not [v for v in 違反 if "下限" in v]
+
+
+def test_下限を満たせば落ちない(門):
+    台帳 = {"out_of_population": [], "measured_claims": [], "observed": [],
+            "population_floor": 2}
+    違反, _ = 門.audit([("/api/a", 404, None), ("/api/b", 404, None)], [], 台帳)
+    assert not [v for v in 違反 if "下限" in v]
+
+
+# ─────────── 外した先を隠さない ───────────
+
+def test_宣言していない_method_を外したら落ちる(門):
+    台帳 = {"out_of_population": [], "measured_claims": [],
+            "side_effect_methods": ["POST"]}
+    違反, _ = 門.audit([], [], 台帳, 内訳={"POST": 3, "DELETE": 1})
+    assert any("宣言していない method" in v and "DELETE" in v for v in 違反), 違反
+
+
+def test_盲点が増えたら落ちる(門):
+    """**測れない範囲が知らないうちに広がるのを止める。**"""
+    台帳 = {"out_of_population": [], "measured_claims": [],
+            "side_effect_blind_spot": ["POST /api/a/score"]}
+    違反, _ = 門.audit([], [], 台帳,
+                       盲点=["POST /api/a/score", "POST /api/b/ctr"])
+    assert any("盲点が増えました" in v and "/api/b/ctr" in v for v in 違反), 違反
+
+
+def test_盲点が減っても落とさない(門):
+    台帳 = {"out_of_population": [], "measured_claims": [],
+            "side_effect_blind_spot": ["POST /api/a/score", "POST /api/b/ctr"]}
+    違反, 情報 = 門.audit([], [], 台帳, 盲点=["POST /api/a/score"])
+    assert not [v for v in 違反 if "盲点" in v]
+    assert any("盲点が減りました" in m for m in 情報), 情報
+
+
+# ─────────── 読めない応答を「数字が無い」と断定しない ───────────
+
+def test_読めない応答が増えたら落ちる(門):
+    """**本文を解析していないのだから「運んでいない」とは言えない。**
+
+    ここには 500 が11件入っていたのに、門は「4カテゴリの数字を運んでいません」と
+    言い切って情報に落としていた。
+    """
+    違反, _ = 門.audit([("/api/x", 500, None)], [], 空台帳)
+    assert any("読めない応答が増えました" in v for v in 違反), 違反
+
+
+def test_台帳に理由つきで載っていれば情報に落とす(門):
+    台帳 = {"out_of_population": [], "measured_claims": [],
+            "unreadable": [{"path": "/api/x", "status": 500,
+                            "reason": "500。壊れている。別タスクで扱う"}]}
+    違反, 情報 = 門.audit([("/api/x", 500, None)], [], 台帳)
+    assert not [v for v in 違反 if "読めない応答" in v]
+    assert any("/api/x (500)" in m for m in 情報), 情報
+
+
+def test_読めない応答を理由なしに載せられない(門):
+    """一覧に足すだけなら「壊れているものを追認する」ことになる。"""
+    台帳 = {"out_of_population": [], "measured_claims": [],
+            "unreadable": [{"path": "/api/x", "status": 500, "reason": "500"}]}
+    違反, _ = 門.audit([], [], 台帳)
+    assert any("読めない応答を台帳に載せるなら理由" in v for v in 違反), 違反
+
+
+# ─────────── measured の表記ゆれ ───────────
+
+def test_measured_は大小文字と空白で抜けられない(門):
+    """`sample` → `measured` の反転を落とすのが目的なので、表記ゆれで抜けたら無意味。"""
+    for 値 in ("measured", "Measured", "MEASURED", " measured ", "measured\n"):
+        assert 門._実測を名乗っているか(値), 値
+    for 値 in ("sample", "derived", "gemini", "", None, 3.5):
+        assert not 門._実測を名乗っているか(値), 値
+
+
+# ─────────── ルートの拾い方 ───────────
+
+def test_母集団はパス引数に合成の値を入れる(門):
+    class R:
+        def __init__(s, p, m): s.path, s.methods = p, m
+    app = SimpleNamespace(routes=[
+        R("/api/a/{id}", {"GET"}), R("/api/b", {"GET"}),
+        R("/api/c", {"POST"}), R("/other", {"GET"})])
+    assert 門.母集団(app) == [f"/api/a/{門.探り値}", "/api/b"]
+
+
+def test_除外の内訳は_GET_以外を数える(門):
+    class R:
+        def __init__(s, p, m): s.path, s.methods = p, m
+    app = SimpleNamespace(routes=[
+        R("/api/a", {"GET"}), R("/api/b", {"POST"}),
+        R("/api/c", {"DELETE"}), R("/api/d", {"POST"})])
+    assert 門.除外の内訳(app) == {"DELETE": 1, "POST": 2}
+
+
+def test_ルート一覧は_Mount_の下も辿る(門):
+    """**版が変わって拾えなくなったら母集団が 0 になる。** 入れ子も辿る。"""
+    class R:
+        def __init__(s, p, m): s.path, s.methods = p, m
+    class M:
+        def __init__(s, p, rs): s.path, s.routes = p, rs
+    app = SimpleNamespace(routes=[M("/api", [R("/inner", {"GET"})]),
+                                  R("/api/top", {"GET"})])
+    assert ("GET", "/api/inner") in 門.ルート一覧(app)
+    assert ("GET", "/api/top") in 門.ルート一覧(app)

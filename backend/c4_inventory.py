@@ -329,13 +329,76 @@ def _成功を名乗る値(node: ast.AST, 束縛: frozenset[str]) -> bool:
             根 = 根.value
         return isinstance(根, ast.Name) and 根.id not in 束縛
     if isinstance(node, ast.Call):
-        # `float(62.5)` のような、定数だけを包んだ呼び出し
+        # `float(62.5)` のような、定数だけを包んだ呼び出し。
+        # **呼び出し先も見る。** 引数だけ見ると `d.get("score", 0)` を
+        # 「入力に依存しない」と誤判定する（`d` は入力なのに、引数は定数2つ）。
         return (
             bool(node.args)
             and not node.keywords
+            and _成功を名乗る値(node.func, 束縛)
             and all(_成功を名乗る値(a, 束縛) for a in node.args)
         )
+    if isinstance(node, ast.BinOp):
+        # **定数畳み込み**（`15000 + 200`。gate-verifier 23周目の形の1つ）。
+        # **両辺とも入力に依存しないときだけ**危険 — `x + 1` は入力で変わる
+        return (_成功を名乗る値(node.left, 束縛)
+                and _成功を名乗る値(node.right, 束縛))
+    if isinstance(node, ast.JoinedStr):
+        # f-string。中に差し込む値が全部入力に依存しないなら、結果も固定
+        return all(
+            _成功を名乗る値(v.value, 束縛)
+            for v in node.values if isinstance(v, ast.FormattedValue)
+        )
     return False
+
+
+def _定数に束縛された名前(fn: ast.AST) -> frozenset[str]:
+    """**一度だけ、入力に依存しない値で代入された名前。**
+
+    `watch = 15200` と一度置いてから `{"watch_time_hours": watch}` と書く形
+    （gate-verifier 23周目）。`_成功を名乗る値` は「関数の外から来る名前」を危険と
+    見なすので、**関数の中で定数を代入した名前は素通りしていた。**
+    実測でも `return {"watch_time_hours": 15200}` は検出、
+    `watch = 15200; return {"watch_time_hours": watch}` は `[]` だった。
+
+    **2回以上代入される名前は数えない。** 一度でも入力から代入されうるなら、
+    その値は呼び出しに依存する。`for` のループ変数も同様に外す。
+    タプル展開（`_a, _b = 3.5, 40.0`）も見る — 23周目の指摘の形の1つ。
+    """
+    束縛 = _束縛された名前(fn)
+    回数: dict[str, int] = {}
+    定数: set[str] = set()
+
+    def 記録(target: ast.AST, value: ast.AST) -> None:
+        if not isinstance(target, ast.Name):
+            return
+        回数[target.id] = 回数.get(target.id, 0) + 1
+        if _成功を名乗る値(value, 束縛):
+            定数.add(target.id)
+
+    for n in ast.walk(fn):
+        if isinstance(n, (ast.Assign, ast.AnnAssign)):
+            値 = n.value
+            if 値 is None:
+                continue
+            狙い = n.targets if isinstance(n, ast.Assign) else [n.target]
+            for t in 狙い:
+                if (isinstance(t, (ast.Tuple, ast.List))
+                        and isinstance(値, (ast.Tuple, ast.List))
+                        and len(t.elts) == len(値.elts)):
+                    for tt, vv in zip(t.elts, 値.elts):
+                        記録(tt, vv)
+                else:
+                    記録(t, 値)
+        elif isinstance(n, (ast.AugAssign, ast.NamedExpr)):
+            記録(getattr(n, "target", None), getattr(n, "value", None))
+        elif isinstance(n, (ast.For, ast.AsyncFor, ast.comprehension)):
+            狙い = getattr(n, "target", None)
+            if 狙い is not None:
+                for t in ast.walk(狙い):
+                    if isinstance(t, ast.Name):
+                        回数[t.id] = 回数.get(t.id, 0) + 2   # 入力から来る扱い
+    return frozenset(名 for 名 in 定数 if 回数.get(名, 0) == 1)
 
 
 def _risk_kinds(fn: ast.AST) -> list[str]:
@@ -345,8 +408,13 @@ def _risk_kinds(fn: ast.AST) -> list[str]:
     見たいのは「どういう形が何個あるか」であって、それがどこにあるかではない。
     """
     束縛 = _束縛された名前(fn)
+    定数名 = _定数に束縛された名前(fn)
 
     def 名乗る(node: ast.AST) -> bool:
+        # **1段のローカル束縛を透かす**（gate-verifier 23周目）。
+        # `watch = 15200` と置いてから使う形が素通りしていた
+        if isinstance(node, ast.Name) and node.id in 定数名:
+            return True
         return _成功を名乗る値(node, 束縛)
 
     出た: list[str] = []
