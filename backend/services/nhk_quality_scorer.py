@@ -574,7 +574,7 @@ class NHKQualityScorer:
                 )
                 text = "\n".join(lines[timing_line_idx + 1:]) if timing_line_idx >= 0 else ""
                 entries.append({"start": start_ms, "end": end_ms, "text": text})
-        except (FileNotFoundError, PermissionError) as e:
+        except (FileNotFoundError, PermissionError, IsADirectoryError) as e:
             logger.error("SRT parse failed (file access error): %s", str(e))
         except UnicodeDecodeError as e:
             logger.error("SRT parse failed (encoding error): %s", str(e))
@@ -618,7 +618,7 @@ class NHKQualityScorer:
                     if line:
                         logs.append(json.loads(line))
             return logs[-20:]  # 直近20件
-        except (FileNotFoundError, PermissionError) as e:
+        except (FileNotFoundError, PermissionError, IsADirectoryError) as e:
             logger.warning("Degradation log access failed: %s", str(e))
             return []
         except json.JSONDecodeError as e:

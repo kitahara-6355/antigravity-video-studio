@@ -1268,3 +1268,66 @@ class Test未計測の軸が満点を名乗らない:
                 f"{getattr(s, 'value', '(定数でない)')!r}"
             )
         assert 見た >= 8, f"N/A の分岐が {見た} 件しか見つからない。走査が壊れている"
+
+
+class Testディレクトリを渡しても落ちない:
+    """**Windows と Linux で上がる例外が違う**（2026-09-12）。
+
+    ディレクトリのパスを `open()` に渡すと、Windows は `PermissionError`、
+    **Linux は `IsADirectoryError`** を上げる。本番は
+    `except (FileNotFoundError, PermissionError)` しか捕まえていなかったので、
+    **手元(Windows)では通り、CI(Linux) でだけ落ちる。**
+
+    このファイルは pytest.ini の testpaths に入っていなかったため、
+    CI は一度も走らせておらず、穴が表に出なかった
+    （同じ形の取りこぼしは R1.5 で4度起きている）。
+
+    再現を OS に頼ると、また片方でしか効かない検査になる。
+    **`open` を差し替えて両方の環境で同じ道を通す。**
+    """
+
+    @pytest.mark.parametrize("例外", [IsADirectoryError, PermissionError, FileNotFoundError])
+    def test_srt_の読み取りは握って空リストを返す(self, scorer, 例外, monkeypatch):
+        def 開けない(*a, **kw):
+            raise 例外(21, "Is a directory")
+        monkeypatch.setattr("builtins.open", 開けない)
+        assert scorer._parse_srt_timing("/どこか") == []
+
+    @pytest.mark.parametrize("例外", [IsADirectoryError, PermissionError, FileNotFoundError])
+    def test_劣化ログの読み取りは握って空リストを返す(self, scorer, 例外, monkeypatch):
+        def 開けない(*a, **kw):
+            raise 例外(21, "Is a directory")
+        monkeypatch.setattr("builtins.open", 開けない)
+        monkeypatch.setattr("os.path.exists", lambda p: True)
+        assert scorer._load_degradation_log("/どこか") == []
+
+    def test_open_を守る_except_はどれも_IsADirectoryError_を含む(self):
+        """**枝ごとではなくファイルの作法として押さえる。**
+
+        `open()` を `FileNotFoundError` / `PermissionError` で守っている箇所は、
+        `IsADirectoryError` も並べること。次に `open()` が足されたとき、
+        同じ「Windows では通るが Linux で落ちる」を繰り返さないため。
+        """
+        import ast as _ast
+        src = Path(__file__).resolve().parents[2] / "backend" / "services" / "nhk_quality_scorer.py"
+        木 = _ast.parse(src.read_text(encoding="utf-8"))
+        見た = 0
+        for 節 in _ast.walk(木):
+            if not isinstance(節, _ast.Try):
+                continue
+            if not any(isinstance(n, _ast.Call) and getattr(n.func, "id", None) == "open"
+                       for n in _ast.walk(節)):
+                continue
+            名前 = set()
+            for h in 節.handlers:
+                t = h.type
+                対象 = t.elts if isinstance(t, _ast.Tuple) else ([t] if t is not None else [])
+                名前 |= {getattr(x, "id", "") for x in 対象}
+            if not (名前 & {"FileNotFoundError", "PermissionError"}):
+                continue
+            見た += 1
+            assert "IsADirectoryError" in 名前 or "OSError" in 名前, (
+                f"L{節.lineno}: open() を守る except に IsADirectoryError が無い"
+                f"（Linux でだけ落ちる）。いま: {sorted(名前)}"
+            )
+        assert 見た >= 2, f"open() を守る try が {見た} 件しか見つからない。走査が壊れている"
