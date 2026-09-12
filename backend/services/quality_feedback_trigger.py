@@ -25,6 +25,24 @@ QUALITY_SCORE_HISTORY_PATH = _PROJECT_ROOT / "backend" / "quality_score_history.
 
 
 
+def _数値として読む(val: Any) -> float | None:
+    """読めたら float、**読めなければ None**。
+
+    `_safe_float` は読めないときに既定値へ倒すので、「既定値だった」のか
+    「本当にその値だった」のかが呼び出し元で区別できない。
+    合否を決める場所では**その区別が要る**ので、こちらを使う（R1.5-C4）。
+    """
+    if val is None:
+        return None
+    try:
+        f_val = float(val)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    if math.isnan(f_val) or math.isinf(f_val):
+        return None
+    return f_val
+
+
 def _safe_float(val: Any, default: float) -> float:
     if val is None:
         return default
@@ -81,6 +99,14 @@ class QualityFeedbackTrigger:
                     "details": "axesがリスト形式ではないため処理をスキップしました。"
                 }
             low_axes = []
+            # **測れなかった軸を合格に数えない**（R1.5-C4 / 2026-09-12）。
+            # ここは以前 `_safe_float(axis.get("score"), 100.0)` で、score が
+            # 欠落・非数・NaN のとき**その軸を 100 点扱い**にしていた。必ず閾値以上に
+            # なるので `low_axes` に入らず、「全軸閾値以上。タスク生成なし。」を返す。
+            # **測っていないものを合格と名乗る**形だった。
+            # この関数は axis が dict か・name が文字列かは検査しており入力を
+            # 信用していないのに、score だけ信用していた。
+            未計測: list[str] = []
             for axis in axes:
                 if not isinstance(axis, dict):
                     logger.warning("無効なaxis要素をスキップしました: %r", axis)
@@ -91,18 +117,32 @@ class QualityFeedbackTrigger:
                     continue
                 if axis.get("grade") == "N/A":
                     continue
-                score_val = _safe_float(axis.get("score"), 100.0)
+                読めた = _数値として読む(axis.get("score"))
+                if 読めた is None:
+                    # **不合格にもしない。** 測っていないだけで欠陥ではないので、
+                    # 存在しない指摘を作らず「未計測」として呼び出し元へ返す
+                    未計測.append(name_val)
+                    continue
+                score_val = 読めた
                 thresh_val = _safe_float(axis.get("threshold"), self.threshold)
                 if score_val < thresh_val:
                     low_axes.append(axis)
             
             if not low_axes:
                 self._record_score(score_report, triggered=False)
+                詳細 = "全軸閾値以上。タスク生成なし。"
+                if 未計測:
+                    詳細 = (
+                        f"{len(未計測)}軸が未計測（{'/'.join(未計測)}）。"
+                        "残りは閾値以上。タスク生成なし。"
+                    )
                 return {
                     "triggered": False,
                     "low_axes": [],
                     "tasks_created": 0,
-                    "details": "全軸閾値以上。タスク生成なし。"
+                    "unmeasured_axes": 未計測,
+                    "measured": not 未計測,
+                    "details": 詳細
                 }
             
             # bug_hunterタスクを生成
@@ -136,7 +176,12 @@ class QualityFeedbackTrigger:
                 "triggered": True,
                 "low_axes": [a["name"] for a in low_axes],
                 "tasks_created": injected,
-                "details": f"{len(low_axes)}軸が閾値以下。{injected}件のbug_hunterタスクを生成。"
+                "unmeasured_axes": 未計測,
+                "measured": not 未計測,
+                "details": (
+                    f"{len(low_axes)}軸が閾値以下。{injected}件のbug_hunterタスクを生成。"
+                    + (f" {len(未計測)}軸は未計測（{'/'.join(未計測)}）。" if 未計測 else "")
+                )
             }
         except Exception as e:
             report_meta = {}

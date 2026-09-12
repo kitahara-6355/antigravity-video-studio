@@ -38,6 +38,7 @@ import argparse
 import ast
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -90,7 +91,8 @@ SKIP_FILE_RE = re.compile(r"(^|[\\/])(test_[^\\/]*|conftest)\.py$")
 # `scored` / `quality_scored` / `measured` も「測ったか」の印。
 # `quality_gate_agent` や `pipeline_coordinator` はこの形で未計測を表す。
 MARK_RE = re.compile(
-    r"""['"](is_real|data_source|skip_reason|scored|quality_scored|measured)['"]"""
+    r"""['"](is_real|data_source|skip_reason|scored|quality_scored|measured"""
+    r"""|is_mock|is_sample|is_stub|is_placeholder|is_estimated|estimated)['"]"""
 )
 
 # **辞書の先頭で印を展開する形**（`{**DATA_SOURCE, ...}`）。
@@ -125,10 +127,82 @@ def _コメントを落とす(src: str) -> str:
         return chr(10).join(落とした)
 
 
-# 印として使われる名前（属性代入で立てる形を拾うため）
+# 印として使われる名前（属性代入で立てる形を拾うため）。
+# `is_mock` 系も印。**作り物だと名乗っている**ので、消されたら偽 success になる
+# （gate-verifier 22周目の M11: `post_publish_collector._generate_mock_data` から
+#  `is_mock: True` を落とすと、乱数の CTR・維持率が実績として流れるのに緑だった）。
 MARK_NAMES = frozenset(
-    ("is_real", "data_source", "skip_reason", "scored", "quality_scored", "measured", "checked")
+    ("is_real", "data_source", "skip_reason", "scored", "quality_scored", "measured", "checked",
+     "is_mock", "is_sample", "is_stub", "is_placeholder", "is_estimated", "estimated")
 )
+
+
+def _モジュール定数の印(tree: ast.AST) -> dict[str, list[str]]:
+    """モジュール直下の `NAME = {...}` から、印にあたる項目を取り出す。
+
+    `{**DATA_SOURCE, ...}` のように**印を定数で持って展開する**書き方があり、
+    その定数は関数の外にある。関数の AST だけ見ていると、
+    **`DATA_SOURCE` の中身を `is_real: True` へ反転しても関数側は何も変わらない**
+    （gate-verifier 22周目の M2。固定値のチャンネル統計20経路が実測を名乗るのに緑だった）。
+    """
+    出た: dict[str, list[str]] = {}
+    for node in getattr(tree, "body", []):
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):
+            continue
+        名 = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if not 名:
+            continue
+        中身 = []
+        for k, v in zip(node.value.keys, node.value.values):
+            if isinstance(k, ast.Constant) and k.value in MARK_NAMES:
+                中身.append(f"{k.value}={repr(v.value) if isinstance(v, ast.Constant) else '?'}")
+        if 中身:
+            出た[名[0]] = sorted(中身)
+    return 出た
+
+
+def _印の内訳(fn: ast.AST, モジュール印: dict[str, list[str]] | None = None) -> list[str]:
+    """**印の名前と値**を並べる。`has_mark`（真偽）だけでは足りない。
+
+    gate-verifier 22周目の M2 — `admin_channel_router` の固定値20経路に付いた
+    `is_real: False` / `data_source: "unavailable"` を **`True` / `"measured"` へ
+    反転**すると、作り物が実測を名乗るのに `--gate` は緑のままだった。
+    印の**有無**しか見ていなかったため。値まで指紋に載せれば、反転も削除も落ちる。
+
+    **ここで真偽の判定はしない。** 「どう名乗っているか」を記録するだけで、
+    それが妥当かは台帳の adjudication（`status` と `reason`）が引き受ける。
+    """
+    def 値(node: ast.AST) -> str:
+        if isinstance(node, ast.Constant):
+            return repr(node.value)
+        return "?"
+
+    出た: list[str] = []
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Dict):
+            for k, v in zip(node.keys, node.values):
+                if k is None:
+                    # `{**DATA_SOURCE, ...}` — 名前だけ記録する
+                    名 = getattr(v, "id", None) or getattr(v, "attr", None)
+                    if 名 and re.search(r"DATA_SOURCE|MARK|印", str(名), re.IGNORECASE):
+                        出た.append(f"spread:{名}")
+                        # **展開元の中身まで載せる。** 名前だけだと反転が見えない
+                        for 項 in (モジュール印 or {}).get(str(名), []):
+                            出た.append(f"{名}.{項}")
+                elif isinstance(k, ast.Constant) and k.value in MARK_NAMES:
+                    出た.append(f"{k.value}={値(v)}")
+        elif isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if kw.arg in MARK_NAMES:
+                    出た.append(f"{kw.arg}={値(kw.value)}")
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            狙い = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in 狙い:
+                名 = (t.attr if isinstance(t, ast.Attribute)
+                      else t.id if isinstance(t, ast.Name) else None)
+                if 名 in MARK_NAMES and node.value is not None:
+                    出た.append(f"{名}={値(node.value)}")
+    return sorted(出た)
 
 
 def _印を属性で立てている(fn: ast.AST) -> bool:
@@ -156,6 +230,26 @@ def _印がある(本文: str, fn: ast.AST | None = None) -> bool:
         return True
     return bool(fn is not None and _印を属性で立てている(fn))
 
+# **読まずに一括適用した定型文**を落とす（gate-verifier 22周目の指摘 C-3）。
+#
+# 対象外238件のうち76件が、掃引スクリプトの生成文1種類で除外されていた。
+# 実査するとその文が事実と食い違う site が複数あった（`nhk_quality_scorer._score_cuts`
+# は `AxisScore(score=100.0)` を返す品質スコア関数そのものだった）。
+#
+# **文言では判定しない。** 「数字を作らない」は、表示関数のように本当にそうである
+# site では正しい理由になる。禁じるべきは*言い回し*ではなく
+# **危険形を持つ site に同じ文を配って回ること**なので、次の2つで見る:
+#
+#   1. あの生成文そのもの（「同ファイルの所見」を含む形）
+#   2. 危険形を持つ対象外 site で、**同じ理由が閾値を超えて使い回されている**こと
+#
+# 2 があるので、新しい定型文を作っても同じところで落ちる。
+GENERATED_REASON_RE = re.compile(r"同ファイルの所見|と判断された（同ファイル")
+
+# 危険形を持つ対象外 site が、同じ理由を何件まで共有してよいか。
+# 凍結済みモジュールのように**正当に共有できる根拠**はあるので 0 にはしない。
+SHARED_REASON_LIMIT = 5
+
 # `honest` は「4カテゴリだが、実測しているので印が要らない」site。
 # **`marked` にすると印の存在を要求してしまい、正直な計算経路が落ちる。**
 VALID_STATUS = ("marked", "honest", "out_of_scope", "unresolved")
@@ -174,15 +268,74 @@ def _production_py() -> list[str]:
     return sorted(出た)
 
 
-def _is_number(node: ast.AST) -> bool:
-    """数値リテラル（単項マイナス込み）か。`True` は数値に数えない。"""
+def _束縛された名前(fn: ast.AST) -> frozenset[str]:
+    """その関数の中で**値が決まる**名前（引数・代入・import・内側の定義・except の別名）。
+
+    ここに無い `Name` は関数の外から来る＝**呼び出しの入力に依存しない。**
+    """
+    出た: set[str] = set()
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del)):
+            出た.add(n.id)
+        elif isinstance(n, ast.arg):
+            出た.add(n.arg)
+        elif isinstance(n, (ast.Import, ast.ImportFrom)):
+            for al in n.names:
+                出た.add((al.asname or al.name).split(".")[0])
+        elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if n is not fn:
+                出た.add(n.name)
+        elif isinstance(n, ast.ExceptHandler) and n.name:
+            出た.add(n.name)
+    return frozenset(出た)
+
+
+def _成功を名乗る値(node: ast.AST, 束縛: frozenset[str]) -> bool:
+    """**入力に依存せず、かつ成功を名乗りうる値**か。
+
+    ## なぜ「数値リテラル」ではないのか
+
+    2026-09-12 まで、ここは数値リテラルだけを見ていた（`_is_number`）。
+    危険な形を**列挙する**設計だったので、列挙から漏れた書き方は素通りした。
+    gate-verifier は21周目に「キーワード引数の数値」を、22周目に
+    **文字列・真偽値・モジュール定数・定数への呼び出し**を突いてきた。
+    22周目は条件文の第1例そのもの（`video_id="placeholder_video_id"`）を
+    戻してもゲートが緑のままだった。
+
+    列挙を続けるかぎり次の書き方が必ず残るので、**定義で閉じる**ことにした
+    （2026-09-12 ユーザー承認・案A）。条件文は「偽の success を返さない」
+    なので、危険なのは次の2つを同時に満たす値:
+
+    1. **呼び出しの入力に依存しない** — 何を渡しても同じ値が出る
+    2. **成功を名乗りうる** — `False` / `None` / `""` は「無い・分からない」を
+       言っているので偽の success ではない。**`0` は除かない**
+       （条件文が名指しする「常に 0.0 になる quality_score」がまさにこれ）
+    """
     if isinstance(node, ast.Constant):
-        return isinstance(node.value, (int, float)) and not isinstance(node.value, bool)
-    return (
-        isinstance(node, ast.UnaryOp)
-        and isinstance(node.op, ast.USub)
-        and _is_number(node.operand)
-    )
+        v = node.value
+        if v is None or v is False or v == "":
+            return False
+        return isinstance(v, (int, float, str, bool))
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return _成功を名乗る値(node.operand, 束縛)
+    if isinstance(node, ast.Name):
+        # 外から来る名前＝モジュール定数（`_FALLBACK_SCORE` / `DEFAULT_CTR`）。
+        # **マジックナンバーを定数に括り出すのはレビューが薦める形**なので、
+        # ここを見ないと「直した」はずの既定値が名前に化けて戻ってくる
+        return node.id not in 束縛
+    if isinstance(node, ast.Attribute):
+        根 = node
+        while isinstance(根, ast.Attribute):
+            根 = 根.value
+        return isinstance(根, ast.Name) and 根.id not in 束縛
+    if isinstance(node, ast.Call):
+        # `float(62.5)` のような、定数だけを包んだ呼び出し
+        return (
+            bool(node.args)
+            and not node.keywords
+            and all(_成功を名乗る値(a, 束縛) for a in node.args)
+        )
+    return False
 
 
 def _risk_kinds(fn: ast.AST) -> list[str]:
@@ -191,6 +344,11 @@ def _risk_kinds(fn: ast.AST) -> list[str]:
     **行番号は入れない。** 入れると無関係な編集で台帳が毎回ずれる。
     見たいのは「どういう形が何個あるか」であって、それがどこにあるかではない。
     """
+    束縛 = _束縛された名前(fn)
+
+    def 名乗る(node: ast.AST) -> bool:
+        return _成功を名乗る値(node, 束縛)
+
     出た: list[str] = []
     for node in ast.walk(fn):
         # 1. except が値を返す（19・20周目の主犯）
@@ -206,7 +364,7 @@ def _risk_kinds(fn: ast.AST) -> list[str]:
                     isinstance(key, ast.Constant)
                     and isinstance(key.value, str)
                     and RISK_KEY_RE.match(key.value)
-                    and _is_number(value)
+                    and 名乗る(value)
                 ):
                     出た.append(f"const_dict:{key.value.lower()}")
         # 3. `.get(鍵, 既定値)` / `setdefault`
@@ -231,26 +389,26 @@ def _risk_kinds(fn: ast.AST) -> list[str]:
         # 5. `x or 既定値`
         if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
             for value in node.values[1:]:
-                if _is_number(value) or (
+                if 名乗る(value) or (
                     isinstance(value, ast.Constant) and isinstance(value.value, str)
                 ):
                     出た.append("or_default")
         # 6. 数値リテラルをそのまま返す（条件文の「常に 0.0 になる quality_score」）
-        if isinstance(node, ast.Return) and node.value is not None and _is_number(node.value):
+        if isinstance(node, ast.Return) and node.value is not None and 名乗る(node.value):
             出た.append("const_return")
         # 7. **カテゴリ鍵のキーワード引数に数値リテラル**（`quality_score=0.85`）。
         #    これが無かったので、直したばかりの `generation_engine` の 0.85 を
         #    戻してもゲートが素通りした（gate-verifier 21周目の指摘）
         if isinstance(node, ast.Call):
             for kw in node.keywords:
-                if kw.arg and RISK_KEY_RE.match(kw.arg) and _is_number(kw.value):
+                if kw.arg and RISK_KEY_RE.match(kw.arg) and 名乗る(kw.value):
                     出た.append(f"const_kwarg:{kw.arg.lower()}")
         # 8. **カテゴリ鍵への数値リテラル代入**（`result.quality_score = 0.85` /
         #    `score = 50.0`）。永続化の直前でこの形を取ることが多い
         if isinstance(node, (ast.Assign, ast.AnnAssign)):
             狙い = node.targets if isinstance(node, ast.Assign) else [node.target]
             値 = node.value
-            if 値 is not None and _is_number(値):
+            if 値 is not None and 名乗る(値):
                 for t in 狙い:
                     名 = (t.attr if isinstance(t, ast.Attribute)
                           else t.id if isinstance(t, ast.Name) else None)
@@ -291,6 +449,7 @@ def scan() -> list[dict]:
         except (OSError, UnicodeDecodeError, SyntaxError):
             continue
         lines = src.splitlines()
+        モジュール印 = _モジュール定数の印(tree)
         使った: dict[str, int] = {}
         for node, qualname in _walk_functions(tree):
             末尾 = node.end_lineno or node.lineno
@@ -314,6 +473,7 @@ def scan() -> list[dict]:
                     "categories": cats,
                     "fingerprint": kinds,
                     "has_mark": _印がある(本文, node),
+                    "marks": _印の内訳(node, モジュール印),
                 }
             )
     return sorted(候補, key=lambda c: c["id"])
@@ -345,11 +505,38 @@ def check_entries(sites: list[dict]) -> list[str]:
             出た.append(f"{rid}: status は {' / '.join(VALID_STATUS)} のいずれか（いまは {status}）")
         if status in ("out_of_scope", "honest") and len(str(s.get("reason", ""))) < 10:
             出た.append(f"{rid}: {status} にするなら理由を書く（いまは {s.get('reason')!r}）")
+        # **理由が指紋と矛盾していたら落とす**（gate-verifier 22周目の指摘 C-3）。
+        # 対象外238件のうち76件が「この関数は4カテゴリの数字・判定を作らない」という
+        # 生成文1種類で除外されていた。危険形を持つ関数にこの文が付いていると
+        # **自分で書いた指紋が自分の理由を否定している。**
+        # 実査した例: `nhk_quality_scorer._score_cuts` は `AxisScore(score=100.0)` を
+        # 返す品質スコア関数そのものなのに、この文で対象外になっていた。
+        # 長さしか見ていなかったので CI で落ちなかった。
+        if (status == "out_of_scope" and s.get("fingerprint")
+                and GENERATED_REASON_RE.search(str(s.get("reason", "")))):
+            出た.append(
+                f"{rid}: 危険形 {len(s['fingerprint'])} 件を持つのに、掃引スクリプトの"
+                f"生成文で対象外にしています。実物を読んだ個別の理由を書いてください"
+                f"（指紋: {s['fingerprint']}）"
+            )
         if s.get("category") not in CATEGORIES and status != "out_of_scope":
             出た.append(f"{rid}: category は {' / '.join(CATEGORIES)} のいずれか")
         if rid in 見た:
             出た.append(f"{rid}: id が重複しています")
         見た.add(rid)
+
+    # **危険形を持つ対象外 site で、同じ理由が使い回されていないか。**
+    # 生成文を1種類禁じるだけでは、次の定型文が作られたときに同じ穴が開く。
+    使い回し = Counter(
+        str(s.get("reason", "")) for s in sites
+        if s.get("status") == "out_of_scope" and s.get("fingerprint")
+    )
+    for 理由, 件数 in 使い回し.items():
+        if 件数 > SHARED_REASON_LIMIT:
+            出た.append(
+                f"危険形を持つ対象外 site {件数} 件が同じ理由を使い回しています"
+                f"（上限 {SHARED_REASON_LIMIT}）: {理由[:70]}…"
+            )
     return 出た
 
 
@@ -401,6 +588,16 @@ def audit(sites: list[dict], 実態: list[dict] | None = None) -> tuple[list[str
         # 4. 印が消えた
         if s.get("status") == "marked" and not c["has_mark"]:
             違反.append(f"印（is_real / data_source）が消えています: {sid}")
+
+        # 5. **印の名乗り方が変わった。** 有無だけでは足りない
+        #    （gate-verifier 22周目 M2: `is_real: False` を `True` に反転しても緑だった）
+        台帳印 = sorted(s.get("marks") or [])
+        現物印 = sorted(c.get("marks") or [])
+        if 台帳印 != 現物印:
+            違反.append(
+                f"印の名乗り方が変わったので再確認が要ります: {sid}"
+                f" / 台帳: {台帳印 or '(なし)'} → いま: {現物印 or '(なし)'}"
+            )
 
     # 2. 直っていないと分かっているもの
     for sid, s in 台帳.items():

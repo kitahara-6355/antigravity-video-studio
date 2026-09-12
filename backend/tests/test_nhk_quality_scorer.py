@@ -515,16 +515,22 @@ class TestScoreWithMockedFFmpeg:
     def test_score_audio_and_cuts_no_video_path(
         self, mock_run: MagicMock, scorer: NHKQualityScorer
     ) -> None:
-        """動画ファイルパスが指定されていない場合、音量バランスとカット割りリズムはスキップされスコア100.0およびグレードN/Aを返す"""
+        """動画パス未指定なら、音量バランスとカット割りリズムは grade N/A で**0点**。
+
+        2026-09-12 まで 100.0 だった。grade="N/A" は加重平均（score() L103）から
+        外れるので集計上は無害だが、**grade を見ない消費者が1つ現れた瞬間に
+        「測っていない軸が満点」になる。** 同じ「測れなかった」を表す分岐は
+        このファイルに8つあり、6つは元から 0.0 だった（R1.5-C4）。
+        """
         report = scorer.score("")
         
         # 音量バランスの検証
-        assert report.audio_balance.score == 100.0
+        assert report.audio_balance.score == 0.0
         assert report.audio_balance.grade == "N/A"
         assert report.audio_balance.suggestion == ""
         
         # カット割りリズムの検証
-        assert report.cut_rhythm.score == 100.0
+        assert report.cut_rhythm.score == 0.0
         assert report.cut_rhythm.grade == "N/A"
         assert report.cut_rhythm.suggestion == ""
 
@@ -734,22 +740,22 @@ class TestScoreWithMockedFFmpeg:
     def test_score_audio_and_cuts_empty_or_none_video(
         self, scorer: NHKQualityScorer
     ) -> None:
-        """動画ファイルパスが空文字列またはNoneの場合、音量バランスとカット割りリズムはスコア100.0およびgrade='N/A'を返す"""
+        """動画パスが空文字列や None なら grade N/A で**0点**（2026-09-12 まで 100.0）。"""
         # Noneの場合
         report_none = scorer.score(None)
-        assert report_none.audio_balance.score == 100.0
+        assert report_none.audio_balance.score == 0.0
         assert report_none.audio_balance.grade == "N/A"
         assert report_none.audio_balance.suggestion == ""
-        assert report_none.cut_rhythm.score == 100.0
+        assert report_none.cut_rhythm.score == 0.0
         assert report_none.cut_rhythm.grade == "N/A"
         assert report_none.cut_rhythm.suggestion == ""
 
         # 空文字列の場合
         report_empty = scorer.score("")
-        assert report_empty.audio_balance.score == 100.0
+        assert report_empty.audio_balance.score == 0.0
         assert report_empty.audio_balance.grade == "N/A"
         assert report_empty.audio_balance.suggestion == ""
-        assert report_empty.cut_rhythm.score == 100.0
+        assert report_empty.cut_rhythm.score == 0.0
         assert report_empty.cut_rhythm.grade == "N/A"
         assert report_empty.cut_rhythm.suggestion == ""
 
@@ -1205,3 +1211,60 @@ class TestNHKQualityScorerMoreEdgeCases:
         assert scorer._count_timing_issues([{"start": 1000, "end": 2000}]) == 0
 
 
+class Test未計測の軸が満点を名乗らない:
+    """**測れなかった軸に 100.0 を入れない**（R1.5-C4 / 2026-09-12）。
+
+    `_score_audio` と `_score_cuts` は `video_path` が空のとき
+    `AxisScore(score=100.0, grade="N/A")` を返していた。同じ「測れなかった」を
+    表す分岐が、このファイルには8つある。**6つは 0.0 で、100.0 はこの2つだけ。**
+
+    `grade="N/A"` は加重平均（`score()` L103）と提案（L112）から外れるので
+    集計上は無害で、`quality_feedback_trigger` も N/A 軸を飛ばす。
+    それでも 100.0 を残さないのは、**`grade` を見ない消費者が1つ現れた瞬間に
+    「測っていない軸が満点」になる**ため。0.0 なら同じ見落としが起きても
+    成功を名乗らない（悲観側に倒れる）。
+
+    gate-verifier 22周目の指摘を受けて判定器を閉じ直したとき（案A）に見つかった。
+    """
+
+    def test_video_path_が空でも満点を返さない(self):
+        scorer = NHKQualityScorer()
+        for 軸, 呼ぶ in (("音量バランス", scorer._score_audio),
+                        ("カット割りリズム", scorer._score_cuts)):
+            軸結果 = 呼ぶ("")
+            assert 軸結果.name == 軸
+            assert 軸結果.grade == "N/A", f"{軸}: 未計測の印が無い"
+            assert 軸結果.score == 0.0, f"{軸}: 測っていないのに {軸結果.score} 点を名乗っている"
+
+    def test_未計測の軸は総合スコアを押し上げない(self):
+        """満点だと、`grade` を見ない集計が現れたとき総合が上がってしまう。"""
+        scorer = NHKQualityScorer()
+        軸 = [scorer._score_audio(""), scorer._score_cuts("")]
+        assert all(a.grade == "N/A" for a in 軸)
+        assert sum(a.score for a in 軸) == 0.0
+
+    def test_NA_の分岐はファイル全体で_0点に揃っている(self):
+        """**枝ごとではなくファイルの作法として押さえる。**
+
+        1つずつ書くと、次に足された未計測分岐が同じ穴を開ける。
+        `AxisScore(grade="N/A")` を返す箇所は、`score` も定数 0.0 であること。
+        """
+        import ast as _ast
+        src = Path(__file__).resolve().parents[2] / "backend" / "services" / "nhk_quality_scorer.py"
+        木 = _ast.parse(src.read_text(encoding="utf-8"))
+        見た = 0
+        for 節 in _ast.walk(木):
+            if not (isinstance(節, _ast.Call)
+                    and getattr(節.func, "id", None) == "AxisScore"):
+                continue
+            kw = {k.arg: k.value for k in 節.keywords}
+            g = kw.get("grade")
+            if not (isinstance(g, _ast.Constant) and g.value == "N/A"):
+                continue
+            見た += 1
+            s = kw.get("score")
+            assert isinstance(s, _ast.Constant) and s.value == 0.0, (
+                f"L{節.lineno}: 未計測(N/A)なのに score が "
+                f"{getattr(s, 'value', '(定数でない)')!r}"
+            )
+        assert 見た >= 8, f"N/A の分岐が {見た} 件しか見つからない。走査が壊れている"

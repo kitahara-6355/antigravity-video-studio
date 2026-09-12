@@ -64,10 +64,23 @@ def test_カテゴリ外の鍵への数値直書きは拾わない():
     assert not [k for k in _kinds(src) if k.startswith("const_dict")]
 
 
-def test_真偽値は数値に数えない():
-    """`True` は `isinstance(x, int)` を通るので、明示的に外していないと誤検出する。"""
+def test_真偽値の_True_は成功を名乗るので拾う():
+    """**2026-09-12 に契約を反転した**（案A・gate-verifier 22周目）。
+
+    ここは元々「`True` は `isinstance(x, int)` を通るので明示的に外す」という
+    契約だった。数値リテラルだけを危険と見なす設計だったので筋は通っていたが、
+    **`is_acceptable: True` は「品質チェックに通った」と名乗る値そのもの**で、
+    22周目の M7b はこれを突いた（採点に失敗した経路を合格に戻しても緑だった）。
+
+    述語を「入力に依存せず、かつ成功を名乗りうる値」に置き換えたので、
+    `True` は拾い、`False`（＝通っていない）は拾わない。
+    """
     src = "def f():\n    return {'is_acceptable': True}\n"
-    assert not [k for k in _kinds(src) if k.startswith("const_dict")]
+    assert "const_dict:is_acceptable" in _kinds(src)
+
+    正直 = "def f():\n    return {'is_acceptable': False}\n"
+    assert not [k for k in _kinds(正直) if k.startswith("const_dict")], \
+        "False は「通っていない」を言っているので危険形ではない"
 
 
 def test_get_の既定値を拾う():
@@ -447,3 +460,145 @@ def test_21周目_裸の_score_も候補に入る():
     ids = {c["id"] for c in c4_inventory.scan()}
     assert "backend/routers/admin_channel_router.py::get_quality_improvement" in ids, \
         "裸の score を返す本番経路が候補から漏れている"
+
+
+# ─────────────── 22周目の指摘で「列挙」から「定義」へ変えた分 ───────────────
+#
+# gate-verifier 22周目は、条件文の第1例（`video_id="placeholder_video_id"`）を
+# 戻してもゲートが緑のままであることを実測で示した。原因は `_is_number` が
+# **数値リテラルしか見ていなかった**こと。危険な形を列挙する設計なので、
+# 列挙から漏れた書き方（文字列・真偽値・モジュール定数・定数への呼び出し）が素通りした。
+#
+# 列挙を続けるかぎり次の書き方が必ず残るので、述語を
+# **「入力に依存せず、かつ成功を名乗りうる値」**という定義に置き換えた（案A）。
+
+
+def _名乗る(式: str):
+    木 = ast.parse("def f(a):" + NL + "    return {'score': " + 式 + "}" + NL)
+    fn = 木.body[0]
+    return c4_inventory._成功を名乗る値(
+        fn.body[0].value.values[0], c4_inventory._束縛された名前(fn))
+
+
+def test_文字列も真偽値も成功を名乗る():
+    """`video_id="placeholder_video_id"` / `is_acceptable=True`（22周目の M1・M7b）。"""
+    assert _名乗る("'placeholder_video_id'")
+    assert _名乗る("True")
+    assert _名乗る("0.85")
+
+
+def test_0_は除外しない():
+    """条件文が名指しする「常に 0.0 になる quality_score」がこれ。"""
+    assert _名乗る("0")
+    assert _名乗る("0.0")
+
+
+def test_無い_分からない_は成功を名乗らない():
+    """`False` / `None` / `""` は「測れなかった」を言っているだけ。
+
+    ここを危険に数えると、**正しく付けた印そのものが危険形になり**、
+    台帳が毎回ずれて誰も見なくなる。
+    """
+    assert not _名乗る("None")
+    assert not _名乗る("False")
+    assert not _名乗る("''")
+
+
+def test_モジュール定数は成功を名乗る():
+    """`_FALLBACK_SCORE` / `_DEFAULT_CTR`（22周目の M7・M8）。
+
+    **マジックナンバーを定数に括り出すのはレビューが薦める形**なので、
+    ここを見ないと「直した」はずの既定値が名前に化けて戻ってくる。
+    """
+    assert _名乗る("_FALLBACK_SCORE")
+    assert _名乗る("DEFAULT_CTR")
+    # 引数から来る値は入力に依存するので危険ではない
+    assert not _名乗る("a")
+
+
+def test_定数だけを包んだ呼び出しも成功を名乗る():
+    assert _名乗る("float(62.5)")
+    assert not _名乗る("len(a)")
+
+
+def test_関数の中で代入された名前は入力側に数える():
+    src = ("def f(a):" + NL + "    x = a * 2" + NL + "    return {'score': x}" + NL)
+    fn = ast.parse(src).body[0]
+    束縛 = c4_inventory._束縛された名前(fn)
+    assert "x" in 束縛 and "a" in 束縛
+    assert not c4_inventory._成功を名乗る値(fn.body[1].value.values[0], 束縛)
+
+
+def test_印は値まで記録する():
+    """**有無だけでは足りない**（22周目の M2: `is_real: False` を `True` に反転）。"""
+    偽 = ast.parse("def f():" + NL + "    return {'is_real': False}" + NL).body[0]
+    真 = ast.parse("def f():" + NL + "    return {'is_real': True}" + NL).body[0]
+    assert c4_inventory._印の内訳(偽) == ["is_real=False"]
+    assert c4_inventory._印の内訳(真) == ["is_real=True"]
+    assert c4_inventory._印の内訳(偽) != c4_inventory._印の内訳(真), "反転が指紋に出ていない"
+
+
+def test_展開した定数の中身まで記録する():
+    """`{**DATA_SOURCE, ...}` の `DATA_SOURCE` は**関数の外**にある。
+
+    名前だけ記録すると、定数の中身を `is_real: True` へ反転しても関数側は
+    何も変わらず素通りする（22周目の M2。固定値のチャンネル統計20経路）。
+    """
+    src = ("DATA_SOURCE = {'data_source': 'sample', 'is_real': False}" + NL
+           + "def f():" + NL + "    return {**DATA_SOURCE, 'score': 1}" + NL)
+    木 = ast.parse(src)
+    定数 = c4_inventory._モジュール定数の印(木)
+    内訳 = c4_inventory._印の内訳(木.body[1], 定数)
+    assert "spread:DATA_SOURCE" in 内訳
+    assert "DATA_SOURCE.is_real=False" in 内訳, 内訳
+    assert "DATA_SOURCE.data_source='sample'" in 内訳, 内訳
+
+
+def test_展開元を反転すると内訳が変わる():
+    def 内訳(値):
+        src = ("DATA_SOURCE = {'is_real': " + 値 + "}" + NL
+               + "def f():" + NL + "    return {**DATA_SOURCE, 'score': 1}" + NL)
+        木 = ast.parse(src)
+        return c4_inventory._印の内訳(木.body[1], c4_inventory._モジュール定数の印(木))
+    assert 内訳("False") != 内訳("True"), "定数の反転が指紋に出ていない"
+
+
+def test_印の名乗り方が変わったら再確認を要求する():
+    台帳 = _台帳(fingerprint=["const_dict:score"])
+    台帳[0]["marks"] = ["is_real=False"]
+    実態 = _実態(fingerprint=["const_dict:score"], has_mark=True)
+    実態[0]["marks"] = ["is_real=True"]
+    違反, _ = c4_inventory.audit(台帳, 実態)
+    assert any("印の名乗り方が変わった" in v for v in 違反), 違反
+
+
+def test_危険形を持つのに生成文で対象外にできない():
+    """22周目の指摘 C-3。対象外238件のうち76件が生成文1種類だった。"""
+    台帳 = _台帳(status="out_of_scope", fingerprint=["const_dict:score"],
+                reason="掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと"
+                       "判断された（同ファイルの所見 3 件のいずれもこの関数の範囲に無い）")
+    不備 = c4_inventory.check_entries(台帳)
+    assert any("生成文で対象外" in m for m in 不備), 不備
+
+
+def test_危険形が無ければ生成文でも落とさない():
+    """**言い回しを禁じているのではない。** 数字を作らない site では正しい理由。"""
+    台帳 = _台帳(status="out_of_scope", fingerprint=[],
+                reason="掃引済みファイルだが、この関数は4カテゴリの数字・判定を作らないと"
+                       "判断された（同ファイルの所見 3 件のいずれもこの関数の範囲に無い）")
+    assert not [m for m in c4_inventory.check_entries(台帳) if "生成文で対象外" in m]
+
+
+def test_危険形を持つ対象外で同じ理由を使い回せない():
+    """生成文を1種類禁じるだけでは、次の定型文で同じ穴が開く。"""
+    台帳 = []
+    for i in range(c4_inventory.SHARED_REASON_LIMIT + 1):
+        台帳.append({
+            "id": f"backend/x.py::f{i}", "file": "backend/x.py", "symbol": f"f{i}",
+            "category": "品質スコア", "status": "out_of_scope",
+            "reason": "この経路は見たが問題ないと判断した（十分な長さの定型文）",
+            "fingerprint": ["const_dict:score"],
+        })
+    assert any("使い回して" in m for m in c4_inventory.check_entries(台帳))
+    # 上限以下なら通る（凍結モジュールのように正当に共有できる根拠がある）
+    assert not [m for m in c4_inventory.check_entries(台帳[:-1]) if "使い回して" in m]

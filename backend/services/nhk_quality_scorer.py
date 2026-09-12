@@ -349,7 +349,7 @@ class NHKQualityScorer:
         """軸4: 音量バランス (FFmpeg LUFS計測)"""
         if not video_path:
             return AxisScore(
-                name="音量バランス", score=100.0, max_score=100.0,
+                name="音量バランス", score=0.0, max_score=100.0,
                 grade="N/A", threshold=self.BUG_HUNTER_THRESHOLD,
                 suggestion=""
             )
@@ -454,7 +454,7 @@ class NHKQualityScorer:
         """軸5: カット割りリズム (FFmpeg scdet)"""
         if not video_path:
             return AxisScore(
-                name="カット割りリズム", score=100.0, max_score=100.0,
+                name="カット割りリズム", score=0.0, max_score=100.0,
                 grade="N/A", threshold=self.BUG_HUNTER_THRESHOLD,
                 suggestion=""
             )

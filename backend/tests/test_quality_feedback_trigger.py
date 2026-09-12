@@ -1044,3 +1044,71 @@ class TestQualityFeedbackTriggerBugHunterTask1:
         # 3回目のファイルは replace されたため存在しない
         assert not created_temp_files[2].exists()
 
+
+class Test未計測の軸を合格に数えない:
+    """**測っていない軸を100点扱いにしない**（R1.5-C4 / 2026-09-12）。
+
+    `_safe_float(axis.get("score"), 100.0)` が既定 100.0 だったため、score が
+    欠落・非数・NaN のとき**その軸は必ず閾値以上**になり、`low_axes` に入らず
+    「全軸閾値以上。タスク生成なし。」を返していた。**測っていないものを
+    合格と名乗る**形で、条件文が禁じている偽の success そのもの。
+
+    この関数は `axis` が dict か・`name` が文字列かは検査しており、入力を
+    信用していない。**score だけ信用していた。**
+
+    gate-verifier 22周目の指摘を受けて判定器を「入力に依存せず成功を名乗る値」
+    で閉じ直した（案A）ときに、その網に掛かって見つかった。
+    """
+
+    @pytest.mark.usefixtures("_patch_paths")
+    def test_score_が読めない軸は未計測として出てくる(self, _patch_paths):
+        trigger = QualityFeedbackTrigger(threshold=60.0)
+        report = _make_report([
+            {"name": "字幕タイミング精度", "score": None, "max_score": 100},
+            {"name": "音量バランス", "score": 85.0, "max_score": 100},
+        ])
+        result = trigger.evaluate_and_trigger(report)
+
+        assert result["unmeasured_axes"] == ["字幕タイミング精度"]
+        assert result["measured"] is False
+        assert "未計測" in result["details"], result["details"]
+
+    @pytest.mark.usefixtures("_patch_paths")
+    def test_未計測の軸は低スコア扱いにもしない(self, _patch_paths):
+        """**無いものを不合格にもしない。** 測っていないだけで欠陥ではない。"""
+        trigger = QualityFeedbackTrigger(threshold=60.0)
+        report = _make_report([{"name": "音量バランス", "score": "こわれた", "max_score": 100}])
+        result = trigger.evaluate_and_trigger(report)
+
+        assert result["low_axes"] == []
+        assert result["tasks_created"] == 0
+        assert result["unmeasured_axes"] == ["音量バランス"]
+
+    @pytest.mark.usefixtures("_patch_paths")
+    def test_全部測れていれば従来どおり(self, _patch_paths):
+        """**印を足しただけで、測れている経路の判定は変えない。**"""
+        trigger = QualityFeedbackTrigger(threshold=60.0)
+        report = _make_report([
+            {"name": "字幕タイミング精度", "score": 85.0, "max_score": 100},
+            {"name": "音量バランス", "score": 70.0, "max_score": 100},
+        ])
+        result = trigger.evaluate_and_trigger(report)
+
+        assert result["triggered"] is False
+        assert result["unmeasured_axes"] == []
+        assert result["measured"] is True
+        assert "未計測" not in result["details"]
+
+    @pytest.mark.usefixtures("_patch_paths")
+    def test_grade_が_NA_の軸は未計測に数えない(self, _patch_paths):
+        """`grade: "N/A"` は**その軸を評価しないという既存の宣言**で、
+        score が読めなかったのとは別。ここを混ぜると既存の経路が壊れる。"""
+        trigger = QualityFeedbackTrigger(threshold=60.0)
+        report = _make_report([
+            {"name": "映像", "score": None, "grade": "N/A", "max_score": 100},
+            {"name": "音量バランス", "score": 70.0, "max_score": 100},
+        ])
+        result = trigger.evaluate_and_trigger(report)
+
+        assert result["unmeasured_axes"] == []
+        assert result["measured"] is True
