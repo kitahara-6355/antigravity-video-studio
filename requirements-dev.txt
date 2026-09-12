@@ -25,3 +25,8 @@ chromadb
 
 # CI で ModuleNotFoundError になったため追加（音声認識）
 faster-whisper
+
+# テスト順序依存の計測用（2026-09-12 ユーザー承認）。
+# pytest.ini の addopts で既定は無効（-p no:randomly）にしてある。
+# 汚染を測るときだけ `-p randomly --randomly-seed=N` で明示的に有効化する。
+pytest-randomly

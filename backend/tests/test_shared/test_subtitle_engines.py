@@ -449,10 +449,25 @@ class TestWhisperSubprocess:
         assert result[0]["text"] == "こんにちは"
 
     def test_transcribe_chunk_error(self):
+        """transcribe_chunk: ワーカーが例外 → error を受け取って空リスト。
+
+        **本番が捕まえる型で投げること。** ここに素の `Exception` を置くと
+        `_run` の except を素通りしてワーカースレッドが死に、queue に何も
+        積まれない。すると `queue.Empty` 側（`CHUNK_TIMEOUT` = 600 秒待ち）で
+        `[]` が返るため、**名乗っているエラー経路を一度も通らないまま緑になる**。
+        2026-09-12 に pytest-timeout を入れて発覚した（1件で10分かかっていた）。
+
+        戻り値だけでは2つの経路を区別できない（どちらも `[]`）ので、
+        **所要時間で押さえる。**
+        """
+        import time as _time
         model = MagicMock()
-        model.transcribe.side_effect = Exception("GPU error")
+        model.transcribe.side_effect = RuntimeError("GPU error")
+        始 = _time.monotonic()
         result = transcribe_chunk(model, "/chunk.wav", 0.0, "ja", 0, 1)
+        経過 = _time.monotonic() - 始
         assert result == []
+        assert 経過 < 5.0, f"エラー経路ではなくタイムアウト経路に落ちている（{経過:.1f}秒）"
 
     def test_transcribe_chunk_timeout(self):
         """transcribe_chunk: モデルが永久にブロック → タイムアウト"""
@@ -467,8 +482,12 @@ class TestWhisperSubprocess:
             return (iter([]), None)
         model.transcribe.side_effect = slow_transcribe
 
-        result = transcribe_chunk(model, "/chunk.wav", 0.0, "ja", 0, 1)
-        ws.CHUNK_TIMEOUT = original_timeout
+        # **必ず戻す。** 素通りで抜けると CHUNK_TIMEOUT=1 が後続のテストへ漏れ、
+        # 同じファイル内の他の検査が実行順によって結果を変える。
+        try:
+            result = transcribe_chunk(model, "/chunk.wav", 0.0, "ja", 0, 1)
+        finally:
+            ws.CHUNK_TIMEOUT = original_timeout
         assert result == []
 
     def test_extract_audio_wav_success(self, tmp_path):
