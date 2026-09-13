@@ -435,3 +435,51 @@ def test_ルート一覧は_Mount_の下も辿る(門):
                                   R("/api/top", {"GET"})])
     assert ("GET", "/api/inner") in 門.ルート一覧(app)
     assert ("GET", "/api/top") in 門.ルート一覧(app)
+
+
+def test_ルート一覧は_openapi_からも拾う(門):
+    """**`app.routes` を歩くだけでは新しい FastAPI で0件になる。**
+
+    2026-09-13 に観測した — fastapi 0.141.1 / starlette 1.6.0 の
+    `include_router` はルートを `app.routes` へ平坦化せず、`_IncludedRouter` を
+    1個置くだけになった（`path=None` / `methods=None` / `routes` 属性なし）。
+    CI の母集団が 0 件になった原因はこれ。
+
+    `app.openapi()` は公開 API で、両方の版で同じ形を返すことを実測で確かめた。
+    ここでは **`app.routes` が空でも openapi から拾えること**を見る。
+    """
+    app = SimpleNamespace(
+        routes=[],
+        openapi=lambda: {"paths": {
+            "/api/a": {"get": {}, "post": {}},
+            "/api/b/{x}": {"get": {}},
+            "/other": {"get": {}},
+        }},
+    )
+    一覧 = 門.ルート一覧(app)
+    assert ("GET", "/api/a") in 一覧
+    assert ("POST", "/api/a") in 一覧
+    assert ("GET", "/api/b/{x}") in 一覧
+    assert not [p for _, p in 一覧 if p == "/other"], "`/api` の外は拾わない"
+
+
+def test_ルート一覧は両方の和を取る(門):
+    """`include_in_schema=False` は openapi に出ないので、走査側でも拾う。"""
+    class R:
+        def __init__(s, p, m): s.path, s.methods = p, m
+    app = SimpleNamespace(
+        routes=[R("/api/hidden", {"GET"})],
+        openapi=lambda: {"paths": {"/api/shown": {"get": {}}}},
+    )
+    一覧 = 門.ルート一覧(app)
+    assert ("GET", "/api/hidden") in 一覧, "openapi に出ないルートを落としている"
+    assert ("GET", "/api/shown") in 一覧
+
+
+def test_openapi_が壊れていても走査側で拾う(門):
+    """片方が例外でも、もう片方で測る。**両方失敗したら下限が落とす。**"""
+    def 壊れる(): raise RuntimeError("boom")
+    class R:
+        def __init__(s, p, m): s.path, s.methods = p, m
+    app = SimpleNamespace(routes=[R("/api/a", {"GET"})], openapi=壊れる)
+    assert ("GET", "/api/a") in 門.ルート一覧(app)

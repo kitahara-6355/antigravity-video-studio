@@ -218,11 +218,36 @@ def ルート一覧(app) -> list[tuple[str, str]]:
 
     2026-09-13 に CI で母集団が 0 件になり、それを success として通していた
     （fastapi 0.141.1 / starlette 1.6.0。手元は 0.135.3 / 0.52.1）。
-    原因は依存の版ずれだが、**根本の欠陥は「測れなかったこと」を緑にしたこと**。
-    ここでは `Mount` の下も辿り、`methods` を持たないルート実装でも落とさない。
-    """
-    出た: list[tuple[str, str]] = []
 
+    **原因を観測で特定した。** 新しい FastAPI の `include_router` は
+    ルートを `app.routes` へ平坦化せず、`_IncludedRouter` を1個置くだけになった
+    （`path=None` / `methods=None` / `routes` 属性なし）。
+    `app.routes` を歩く実装では**何も見つからない。**
+
+    そこで **`app.openapi()` を主にする** — 公開 API で、両方の版で同じ形
+    （`paths: {パス: {メソッド: ...}}`）を返すことを実測で確かめた。
+    ただし `include_in_schema=False` のルートは openapi に出ないので、
+    **ルート走査との和**を取る。
+
+    根本の欠陥は版ずれではなく「測れなかったことを緑にしたこと」なので、
+    そちらは `population_floor` で塞いである。
+    """
+    出た: set[tuple[str, str]] = set()
+
+    # 1. openapi（公開 API・版に安定）
+    try:
+        paths = (app.openapi() or {}).get("paths", {}) or {}
+    except Exception:  # noqa: BLE001 — 片方が壊れてももう片方で拾う
+        paths = {}
+    for path, ops in paths.items():
+        if not str(path).startswith("/api/"):
+            continue
+        for m in ops or ():
+            M = str(m).upper()
+            if M not in ("HEAD", "OPTIONS"):
+                出た.add((M, str(path)))
+
+    # 2. ルート走査（`include_in_schema=False` を拾う。旧版ではこちらが主だった）
     def 降りる(routes, 接頭: str = ""):
         for r in routes or ():
             path = 接頭 + (getattr(r, "path", "") or "")
@@ -230,15 +255,12 @@ def ルート一覧(app) -> list[tuple[str, str]]:
             if 子:
                 降りる(子, path)
                 continue
-            methods = getattr(r, "methods", None) or ()
-            for m in methods:
-                if m in ("HEAD", "OPTIONS"):
-                    continue
-                if path.startswith("/api/"):
-                    出た.append((m, path))
+            for m in getattr(r, "methods", None) or ():
+                if m not in ("HEAD", "OPTIONS") and path.startswith("/api/"):
+                    出た.add((m, path))
 
     降りる(getattr(app, "routes", None))
-    return sorted(set(出た))
+    return sorted(出た)
 
 
 def 母集団(app) -> list[str]:
