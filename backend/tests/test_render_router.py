@@ -9,6 +9,26 @@ from unittest.mock import patch, MagicMock
 
 # 他の未インポートな依存モジュールのダミー登録
 sys.modules["branding_manager"] = MagicMock()
+
+
+def _branding_mock():
+    """`branding_manager` のモックを**確実に**得る（R1.5-C4・案D 掃引）。
+
+    上の行は**このモジュールの import 時**に1回だけ効く。ところが同じプロセスで
+    先に走った別のテストファイル（`test_routers/test_c4_quality_marks.py`）が
+    本物の `branding_manager` を import し直すと、`sys.modules` の中身が
+    本物のモジュールに戻る。すると
+    `sys.modules["branding_manager"].branding_manager.generate_and_validate_thumbnail`
+    は**束縛メソッド**になり、`.side_effect = ...` が AttributeError になる。
+
+    `pytest.ini` の testpaths ではこのファイルが先に来るので CI は緑だが、
+    **順序が変わると落ちる**（実際に手元で踏んだ）。収集順に依存させない。
+    """
+    mod = sys.modules.get("branding_manager")
+    if not isinstance(mod, MagicMock):
+        mod = MagicMock()
+        sys.modules["branding_manager"] = mod
+    return mod
 sys.modules["project_archiver"] = MagicMock()
 sys.modules["video_processor"] = MagicMock()
 sys.modules["google.adk"] = MagicMock()
@@ -70,14 +90,14 @@ def test_detect_gpu_fail_or_timeout():
         assert res.json()["gpu_available"] is False
 
 def test_start_render_quality_blocked():
-    with patch("routers.render._get_quality_score", return_value=85):
+    with patch("routers.render._品質の実測", return_value=(85, "/dummy/x.quality.json")):
         res = client.post("/api/render/start", json={"force_render": False})
         assert res.status_code == 200
         assert res.json()["success"] is False
         assert res.json()["error"] == "quality_block"
 
 def test_start_render_nvenc_success():
-    with patch("routers.render._get_quality_score", return_value=95), \
+    with patch("routers.render._品質の実測", return_value=(95, "/dummy/x.quality.json")), \
          patch("routers.render.detect_gpu") as mock_detect:
         
         mock_detect.return_value = {"gpu_available": True, "recommended_encoder": "nvenc"}
@@ -88,7 +108,7 @@ def test_start_render_nvenc_success():
         assert res.json()["gpu_fallback"] is False
 
 def test_start_render_nvenc_fallback():
-    with patch("routers.render._get_quality_score", return_value=95), \
+    with patch("routers.render._品質の実測", return_value=(95, "/dummy/x.quality.json")), \
          patch("routers.render.detect_gpu") as mock_detect:
         
         mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
@@ -264,14 +284,54 @@ def test_list_available_videos(tmp_path):
         assert res.json()["videos"][0]["name"] == "video1.mp4"
 
 
-def test_start_render_default_quality():
-    # _get_quality_score を mock しない場合、デフォルトの95が返るため、ブロックされずに開始するはず。
-    with patch("routers.render.detect_gpu") as mock_detect:
+def test_start_render_未計測なら書き出さない():
+    """**測っていないのに 95 点で通さない**（R1.5-C4・gate-verifier 8周目の指摘）。
+
+    ここは以前「`_get_quality_score` を mock しない場合、デフォルトの 95 が返るため、
+    ブロックされずに開始するはず」と書いてあり、**testpaths 内のこのテストが
+    偽の success を緑で固定していた。**95 は直書きの定数で、
+    そのせいで `if quality_score < 90` の品質ブロック（S17）は永久に偽だった。
+
+    いまは本線が書き出す `*.quality.json` を読む。**無ければ点を名乗らない。**
+    """
+    with patch("routers.render.detect_gpu") as mock_detect,          patch("routers.render._品質の実測", return_value=(None, None)):
         mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
-        res = client.post("/api/render/start", json={"encoder": "libx264"})
-        assert res.status_code == 200
-        assert res.json()["success"] is True
-        assert res.json()["quality_score"] == 95
+        for body in ({"encoder": "libx264"},
+                     {"encoder": "libx264", "force_render": True}):
+            res = client.post("/api/render/start", json=body)
+            assert res.status_code == 200
+            data = res.json()
+            # **未計測は必ず止める。force_render でも越えられない**
+            # （2026-08-29 ユーザー決定）。UI は force_render: !is_ready で
+            # 常に押してくるので、越えられるようにすると門が無いのと同じになる
+            assert data["success"] is False, f"{body}: 未計測なのに書き出しを通した"
+            assert data["error"] == "quality_unmeasured"
+            assert data["force_render_available"] is False
+            assert data["quality_score"] is None
+            assert data["quality_checked"] is False
+            assert data["is_real"] is False
+
+
+def test_start_render_実測が90未満ならブロックする():
+    """**S17 の品質ブロックが実際に効く**（R1.5-C4・8周目の指摘）。
+
+    `_get_quality_score()` が定数 95 だったので、この分岐は**一度も通らなかった**。
+    `force_render` も意味を失っていた。
+    """
+    with patch("routers.render.detect_gpu") as mock_detect,          patch("routers.render._品質の実測",
+               return_value=(89, "/dummy/x.quality.json")):
+        mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
+
+        止まった = client.post("/api/render/start", json={"encoder": "libx264"}).json()
+        assert 止まった["success"] is False
+        assert 止まった["error"] == "quality_block"
+        assert 止まった["quality_score"] == 89
+        assert 止まった["is_real"] is True
+
+        越えた = client.post("/api/render/start",
+                             json={"encoder": "libx264", "force_render": True}).json()
+        assert 越えた["success"] is True, "force_render で越えられない"
+        assert 越えた["quality_score"] == 89
 
 def test_video_processing_progress_callback():
     from video_processor import video_processor
@@ -305,7 +365,7 @@ def test_video_processing_progress_callback():
 
 
 def test_start_render_auto_fallback():
-    with patch("routers.render._get_quality_score", return_value=95), \
+    with patch("routers.render._品質の実測", return_value=(95, "/dummy/x.quality.json")), \
          patch("routers.render.detect_gpu") as mock_detect:
         
         mock_detect.return_value = {"gpu_available": False, "recommended_encoder": "libx264"}
@@ -459,7 +519,14 @@ def test_generate_thumbnail_invalid_requests(mock_generate):
 def test_generate_thumbnail_generator_error(mock_generate):
     # Imagen 4.0 が例外を投げる場合
     mock_generate.side_effect = Exception("API quota limit reached")
-    
+
+    # **フォールバックも落ちることを自分で用意する**（R1.5-C4・案D 掃引）。
+    # 500 になるのは「生成も代替も失敗した」ときで、この検査はこれまで
+    # **前のテストが残した `side_effect` に依存**していた。
+    # モックが作り直されると前提が消えて 200 になる（収集順で結果が変わる）。
+    _branding_mock().branding_manager.generate_and_validate_thumbnail.side_effect = (
+        Exception("No thumbnails generated"))
+
     res = client.post("/api/render/thumbnail", json={
         "video_title": "Test Title",
         "width": 1280,
@@ -475,7 +542,7 @@ def test_generate_thumbnail_empty_result(mock_generate):
     mock_generate.return_value = []
     
     import sys
-    branding_mock = sys.modules["branding_manager"]
+    branding_mock = _branding_mock()
     branding_mock.branding_manager.generate_and_validate_thumbnail.side_effect = Exception("No thumbnails generated")
     
     res = client.post("/api/render/thumbnail", json={
@@ -802,3 +869,139 @@ def test_generate_thumbnail_db_error(mock_generate, tmp_path):
         })
         assert res.status_code == 500
         assert "database fetch failed" in res.json()["detail"].lower()
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_ルーターが既定値で_CTR_を作り直さない(mock_generate):
+    """**`render.py` の `.get("ctr_score", 5.0)` が値を再捏造していた**（R1.5-C4・案D 掃引）。
+
+    `branding_manager` 側のフォールバックを直しても、ルーターが既定値 5.0 を
+    置いていると**同じ数字が復活する**。ここでは manager が `ctr_score` を
+    返さない状態を実際に作り、応答に 5.0 が出ないことを見る
+    （§3: 分岐に入る側のケースを通さないと再発を捕まえられない）。
+
+    あわせて、`status: "fallback"` はルーターが応答を組み立てる際に捨てられるので、
+    **出所の印（`is_real` / `data_source`）が応答まで届くこと**も見る。
+    """
+    import base64 as _b64
+    _bm = _branding_mock()
+
+    # 生成を落としてフォールバック分岐に入れる
+    mock_generate.side_effect = RuntimeError("生成失敗")
+
+    dummy_b64 = create_dummy_image_base64(1280, 720)
+    # **`side_effect` を消してから `return_value` を置く。**
+    # 同ファイルの test_generate_thumbnail_fallback_failure が
+    # `side_effect = Exception(...)` を立てたまま戻さないので、
+    # 消さないと単体では緑・全体では赤になる（実際に踏んだ）
+    _bm.branding_manager.generate_and_validate_thumbnail.side_effect = None
+    _bm.branding_manager.generate_and_validate_thumbnail.return_value = {
+        "status": "fallback",
+        "concept_name": "Standard Fallback Concept",
+        "description": "Fallback image due to system errors",
+        "image_base64": dummy_b64,
+        # **`ctr_score` を入れない。** 既定値が復活したらここで 5.0 になる
+        "is_real": False,
+        "data_source": "unavailable",
+        "validation": {},
+    }
+
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "案D 掃引テスト",
+        "video_description": "フォールバック経路を通す",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["ctr_score"] is None,         f"CTR 予測をしていないのに {thumb['ctr_score']} が応答に出た"
+    assert thumb["is_real"] is False
+    assert thumb["data_source"] == "unavailable"
+    assert _b64.b64decode(thumb["image_base64"])
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_成功経路の印が応答まで届く(mock_generate):
+    """**印を応答へ運んでいることを、既定値と違う値で確かめる。**
+
+    フォールバックだけを見ると `is_real: False` が期待値になり、
+    運び忘れたときの既定値 `False` と**区別が付かない**。
+    成功経路（`is_real: True`）を通して初めて「運んでいる」ことが分かる。
+
+    この検査が無いと「ルーターが印を応答へ運ばない」変異が生き残る（実際に生き残った）。
+    """
+    mock_generate.side_effect = None
+    # **生成器が自分で印を付けて返す**（thumbnail_engine/generator.py が
+    # コンセプトの出所を知っている唯一の場所）。ルーターはそれを運ぶだけ
+    mock_generate.return_value = [{
+        "id": "thumbnail_0", "concept_name": "C", "description": "D",
+        "prompt": "p", "image_base64": create_dummy_image_base64(1280, 720),
+        "ctr_score": 8.5, "is_real": True, "data_source": "gemini",
+    }]
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "成功経路", "video_description": "d",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["is_real"] is True, "成功経路の印が応答まで届いていない"
+    assert thumb["data_source"] == "gemini"
+    assert thumb["ctr_score"] == 8.5
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_ルーターが生成器の印を捏造しない(mock_generate):
+    """**自分の修正が作った偽**（R1.5-C4・案D 掃引で自己検出）。
+
+    最初この経路を `for _t in raw_thumbnails: _t["is_real"] = True` と書いた。
+    ところが生成器は、コンセプト生成が全滅すると
+    `_get_fallback_concept`（`expected_ctr` を持たない既定構成）に落ちる。
+    **一律に True を貼ると、その回まで「実測」に化ける。**
+
+    ルーターは出所を知らないので、**印の無い戻りは悲観側に倒す**のが正しい。
+    """
+    mock_generate.side_effect = None
+    # 生成器が印を付けずに返した（＝出所が分からない）場合
+    mock_generate.return_value = [{
+        "id": "thumbnail_0", "concept_name": "C", "description": "D",
+        "prompt": "p", "image_base64": create_dummy_image_base64(1280, 720),
+        "ctr_score": 5.0,
+    }]
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "印なし生成器", "video_description": "d",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["is_real"] is False, "ルーターが印を捏造している（一律 True）"
+    assert thumb["data_source"] == "unavailable"
+
+
+@patch("thumbnail_engine.generator.generator.generate")
+def test_案D_印の無い戻りは成功側に倒さない(mock_generate):
+    """**既定値は悲観側でなければならない。**
+
+    manager が印を返さなかったとき、`thumb.get("is_real", True)` のように
+    成功側へ倒すと、**印を忘れた経路が「実測」を名乗る**。
+
+    この検査が無いと「ルーターの印を fail-open にする」変異が生き残る（実際に生き残った）。
+    """
+    _bm = _branding_mock()
+
+    mock_generate.side_effect = RuntimeError("生成失敗")
+    _bm.branding_manager.generate_and_validate_thumbnail.side_effect = None
+    _bm.branding_manager.generate_and_validate_thumbnail.return_value = {
+        "status": "fallback",
+        "concept_name": "C", "description": "D",
+        "image_base64": create_dummy_image_base64(1280, 720),
+        # **印を1つも入れない** — ここで既定値が効く
+    }
+    res = client.post("/api/render/thumbnail", json={
+        "video_title": "印なし", "video_description": "d",
+        "width": 1280, "height": 720, "quality": 90,
+    })
+    assert res.status_code == 200, res.text
+    thumb = res.json()["thumbnails"][0]
+    assert thumb["is_real"] is False, "印が無い戻りを成功側に倒している（fail-open）"
+    assert thumb["data_source"] == "unavailable"
+    assert thumb["ctr_score"] is None

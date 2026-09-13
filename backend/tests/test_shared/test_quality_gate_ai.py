@@ -21,13 +21,13 @@ async def test_model_name_resolution_fallback_registry():
 
 @pytest.mark.asyncio
 async def test_model_name_resolution_fallback_default():
-    """ImportError fallback to gemini-2.5-flash when all fail"""
+    """ImportError fallback to gemini-3.6-flash when all fail"""
     with patch.dict(sys.modules, {
         "model_governance": None,
         "model_registry": None
     }):
         checker = AIQualityChecker()
-        assert checker._model_name == "gemini-2.5-flash"
+        assert checker._model_name == "gemini-3.6-flash"
 
 
 @pytest.mark.asyncio

@@ -179,14 +179,39 @@ def test_deprecated差替の食い違いも点検が拾う(monkeypatch, 枠は�
     緑のままだった（2026-08-26・gate-verifier の指摘）。
 
     **C6（2.5系サンセット）でまさに触る所**なので、うっかり型として塞ぐ。
+
+    差し込む行き先は 2026-08-28 まで `gemini-2.5-flash` だったが、
+    R1.5-C6 で**差替表そのものに 2.5 系の逃がし先が入った**ため、
+    その値を差し込むと連鎖が一周して元に戻り、食い違いが生まれなくなった。
+    段の別のモデルに差し替えて、**食い違いを作れることは変えずに**保つ
+    （下の `test_差替表の行き先に2_5系が無い` が新しい性質を押さえる）。
     """
     monkeypatch.setitem(model_governance._deprecation_map,
-                        "gemini-3.6-flash", "gemini-2.5-flash")
+                        "gemini-3.6-flash", "gemini-3.7-flash")
 
     findings, _ = model_policy.audit()
     split = [f for f in findings if f.trigger == "resolver_split"]
 
     assert split, "deprecated 差替で生まれた食い違いを点検が見逃しています"
-    assert any("gemini-2.5-flash" in f.model for f in split)
+    assert any("gemini-3.7-flash" in f.model for f in split)
     # 差替が実際に効いていること（テストが空振りしていないことの確認）
-    assert model_governance._resolve_model("proofreader") == "gemini-2.5-flash"
+    assert model_governance._resolve_model("proofreader") == "gemini-3.7-flash"
+
+
+def test_差替表の行き先に2_5系が無い():
+    """**差替表から 2.5 系が出てこない**（R1.5-C6）。
+
+    `validate_and_correct()` の戻り値はそのまま API に渡る。行き先に
+    2026-10-16 に提供終了するモデルを書くと、差替が差替になっていない。
+    2026-08-28 まで `gemini-2.0-flash-lite → gemini-2.5-flash-lite` と
+    `gemini-2.5-pro → gemini-2.5-flash` がそう書かれていた。
+    """
+    行き先 = set(model_governance._deprecation_map.values())
+
+    assert 行き先, "差替表が空です（設定を読めていない）"
+    assert not [m for m in 行き先 if m.startswith("gemini-2.5")], sorted(行き先)
+
+    # 2.5 系を入力しても 2.5 系は返らない（連鎖の末端まで見る）
+    for 旧 in ("gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"):
+        新 = model_governance.validate_and_correct(旧, caller="test")
+        assert not 新.startswith("gemini-2.5"), (旧, 新)

@@ -46,6 +46,16 @@ class QualityGateWorker(PipelineStageWorker):
         score = 100  # 満点から減点方式
         feedback = []
 
+        # **台帳に載っている「まだ無い機能」を先に知る**（R1.5・2026-08-27）。
+        # 既に入っていれば尊重する（テストが差し替えられるように）。
+        if not hasattr(ctx, "declared_gaps"):
+            try:
+                from feature_gaps import declared_capabilities
+                ctx.declared_gaps = declared_capabilities()
+            except Exception as e:  # noqa: BLE001 — 台帳が読めなくても実行は止めない
+                logger.warning(f"⚠️ 実装不足項目の台帳を読めませんでした: {e}")
+                ctx.declared_gaps = set()
+
         # ━━━ META-01修正: FFprobe実測チェック (QualityGate v2) ━━━
         # プラグインチェックの前に、出力動画の物理的整合性を検証
         ffprobe_passed = True
@@ -177,21 +187,49 @@ class QualityGateWorker(PipelineStageWorker):
             result = {"total_deductions": 100 - score, "feedback": feedback,
                       "category_report": [], "category_scores": {}}
 
+        # **0で床打ちすると「どれくらい悪いか」が消える**（R1.5・2026-08-27）。
+        # 実測では減点合計 -134（素点 -34）でも表示は 0 点で、改善しても数字が
+        # 動かなかった（品質改善ループ3周がまったく動かなかった原因の1つ）。
+        # `ctx.quality_score` の 0〜100 は消費側が多いので変えない。
+        # **素点は捨てずに記録と出力へ回す。**
+        raw_score = score
         score = max(0, min(100, score))
         rank = "S" if score >= 95 else "A" if score >= 90 else "B" if score >= 80 else "C"
         ctx.quality_score = score
+        # **ここでしか立たない**（R1.5-C4）。0.0 は実際に取りうる点なので、
+        # 「測った」を値ではなくこの旗で表す
+        ctx.quality_scored = True
         ctx.quality_feedback = feedback
+        # **落ちた検査を実行記録に残す**（R1.5-C4・19周目）。
+        # `run_all_plugins` の中でプラグインが落ちると、その項目の減点が
+        # 消えて**壊れているほど点が上がる**。`quality_scored` は
+        # 「採点しようとしたか」の旗なので、「**全項目を検査できたか**」は
+        # 別に持つ。ここが無いと「22項目を検査した 95点」と
+        # 「3項目が壊れていて残りだけで出た 95点」が区別できない。
+        落ちた検査 = result.get("failed_plugins", []) or []
+        ctx.quality_gate_report = {
+            "raw_score": raw_score,
+            "clamped": raw_score != score,
+            "deductions": 100 - raw_score,
+            "all_plugins_ran": result.get("all_plugins_ran", True),
+            "failed_plugins": 落ちた検査,
+        }
         # カテゴリ情報を直接ctxに保存（_build_resultで確実に取得するため）
         ctx.quality_category_report = result.get("category_report", [])
         ctx.quality_category_scores = result.get("category_scores", {})
 
         return StageResult(
             stage_name=self.name, success=score >= 90,
-            detail=f"スコア: {score}点 (ランク{rank})",
+            detail=(f"スコア: {score}点（素点 {raw_score}）(ランク{rank})"
+                    if raw_score != score else f"スコア: {score}点 (ランク{rank})"),
             data={
-                "score": score, "rank": rank, "feedback": feedback,
+                "score": score, "raw_score": raw_score,
+                "rank": rank, "feedback": feedback,
                 "category_report": ctx.quality_category_report,
                 "category_scores": ctx.quality_category_scores,
+                # 画面まで届かせる（R1.5-C4・19周目）
+                "all_plugins_ran": result.get("all_plugins_ran", True),
+                "failed_plugins": 落ちた検査,
             },
             duration_seconds=round(time.time() - start, 1),
         )
@@ -323,6 +361,17 @@ class QualityGateWorker(PipelineStageWorker):
         Returns:
             {"failures": [{"message": str, "deduction": int}], "warnings": [str]}
         """
+        # **本線に無い機能を減点しない**（R1.5・2026-08-27 ユーザー決定）。
+        # 本線にサムネイル工程は無いので、減点し続けると品質ゲートは
+        # **原理的に閾値へ到達できない**。台帳に載っている間は「やっていない」
+        # として `skipped_features` に出す。実装したら台帳から消え、
+        # **その瞬間からゲートが本気で見はじめる。**
+        if "thumbnail" in getattr(ctx, "declared_gaps", set()):
+            未実装 = "サムネイル（未実装）"
+            if 未実装 not in ctx.skipped_features:
+                ctx.skipped_features.append(未実装)
+            return {"failures": [], "warnings": [f"⬜ {未実装}。台帳に載っています"]}
+
         try:
             from PIL import Image, UnidentifiedImageError
         except ImportError as ie:

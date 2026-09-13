@@ -21,9 +21,9 @@ except ImportError:
             task (str): タスク名。
 
         Returns:
-            str: 常に 'gemini-2.5-flash' を返す。
+            str: 常に 'gemini-3.6-flash' を返す。
         """
-        return "gemini-2.5-flash"
+        return "gemini-3.6-flash"
 
 router = APIRouter(prefix="/api/usage", tags=["Usage"])
 
@@ -233,7 +233,7 @@ async def get_quality_warning() -> Dict[str, Any]:
         return {
             "warning": True,
             "level": "critical",
-            "message": "⚠️ 高品質モデル(gemini-2.5-flash)の日次枠を使い切りました。品質が低下する可能性があります。",
+            "message": "⚠️ 高品質モデル(gemini-3.6-flash)の日次枠を使い切りました。品質が低下する可能性があります。",
             "suggestion": "やり直しを明日に延期するか、標準モデルでの処理を許容してください。"
         }
     elif premium_ratio > 0.8:
@@ -402,7 +402,7 @@ async def get_current_model_for_task(task: str) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception:
-        preferred = "gemini-2.5-flash"
+        preferred = "gemini-3.6-flash"
     
     result = quota_manager.get_available_model(preferred, task)
     result["task"] = task

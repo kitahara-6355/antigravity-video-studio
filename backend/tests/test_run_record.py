@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -546,3 +547,34 @@ def test_凍結した実装は唯一の入口を名乗らない():
           / "pipeline_coordinator.py").read_text(encoding="utf-8")
 
     assert "唯一の入口" not in 旧
+
+
+# --- 成果物の指紋（R1.5-C3・2026-08-27）---------------------------------------
+
+
+def test_成果物のsha256が記録に残る(tmp_path):
+    """**AI が成果物に届いているかを機械で判定するための指紋。**
+
+    実測（2026-08-27）: AI なしで2回走らせると最終 mp4 の SHA256 は完全一致し、
+    AI ありとは一致しなかった（2,986,662 bytes 対 2,988,566 bytes）。
+    **エンコーダが決定的**なので、差は AI に起因すると言い切れる。
+    指紋が記録に無いと、この判定を後から再現できない。
+    """
+    rec = _recorder(tmp_path)
+    mp4 = tmp_path / "final.mp4"
+    mp4.write_bytes(b"video-bytes")
+    rec.artifact(mp4)
+    rec.finish()
+
+    指紋 = load_run(rec.path)["artifact_digests"]
+
+    assert 指紋[str(mp4)] == hashlib.sha256(b"video-bytes").hexdigest()
+
+
+def test_読めない成果物は指紋を偽らない(tmp_path):
+    """**「確かめられなかった」を「一致した」にしない。**"""
+    rec = _recorder(tmp_path)
+    rec.artifact(tmp_path / "居ない.mp4")
+    rec.finish()
+
+    assert load_run(rec.path)["artifact_digests"][str(tmp_path / "居ない.mp4")] is None

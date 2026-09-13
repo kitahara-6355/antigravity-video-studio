@@ -51,7 +51,7 @@ class AIQualityChecker:
                 from model_registry import get_model
                 self._model_name = get_model("quality_gate")
             except ImportError:
-                self._model_name = "gemini-2.5-flash"
+                self._model_name = "gemini-3.6-flash"
     
     def _build_coherence_prompt(self,
                                 scenes: List[Dict[str, Any]],

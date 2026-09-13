@@ -315,7 +315,10 @@ def test_get_switch_history():
 
 def test_get_available_model_api():
     """POST /get-model のテスト"""
-    mock_result = {"model": "gemini-2.5-flash", "available": True}
+    # **期待値を直書きしない**（R1.5-C6）。段の実体は model_config.json が正典
+    from model_policy import resolve
+    既定 = resolve("quality_gate").model
+    mock_result = {"model": 既定, "available": True}
     mock_qm = MagicMock()
     mock_qm.get_available_model.return_value = mock_result
     with patch("usage_tracker.quota_manager", mock_qm):
@@ -345,7 +348,12 @@ def test_get_current_model_for_task_http_exception():
 
 def test_get_current_model_for_task_exception():
     """GET /current-model/{task} で一般例外が発生した場合、デフォルトモデルになること"""
-    mock_result = {"model": "gemini-2.5-flash", "available": True}
+    # **期待値を直書きしない**（R1.5-C6）。正典は model_config.json。
+    # ここは model_registry.get_model を落としているので、ルータは工程別の
+    # モデルではなく既定モデルに落ちる
+    from model_policy import default_model
+    既定 = default_model()
+    mock_result = {"model": 既定, "available": True}
     mock_qm = MagicMock()
     mock_qm.get_available_model.return_value = mock_result
     with patch("model_registry.get_model", side_effect=Exception("Fail to read model")), \
@@ -353,7 +361,8 @@ def test_get_current_model_for_task_exception():
         response = client.get("/api/usage/current-model/quality_gate")
         assert response.status_code == 200
         data = response.json()
-        assert data["preferred_model"] == "gemini-2.5-flash"
+        assert data["preferred_model"] == 既定
+        assert not data["preferred_model"].startswith("gemini-2.5")
 
 def test_get_two_tier_status_api():
     """GET /two-tier-status のテスト"""
@@ -678,7 +687,11 @@ def test_model_registry_import_error_fallback():
         if usage_router_module:
             importlib.reload(usage_router_module)
             fallback_get_model = getattr(usage_router_module, "get_model")
-            assert fallback_get_model("any_task") == "gemini-2.5-flash"
+            # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+            # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+            from model_policy import resolve
+            assert fallback_get_model("any_task") == resolve("any_task").model
+            assert not fallback_get_model("any_task").startswith("gemini-2.5")
         
     # 元に戻す
     usage_router_module = sys.modules.get("routers.usage_router")

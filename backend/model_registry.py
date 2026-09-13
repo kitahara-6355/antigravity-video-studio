@@ -65,7 +65,7 @@ class ModelRegistry:
         except FileNotFoundError:
             logger.warning("model_config.json not found, using defaults")
             self._config = {
-                "default_model": "gemini-2.5-flash",
+                "default_model": "gemini-3.6-flash",
                 "task_mapping": {},
                 "deprecated": {}
             }
@@ -98,7 +98,7 @@ class ModelRegistry:
         
         # フォールバック: model_governance 未導入時は既存ロジック
         task_mapping = self._config.get("task_mapping", {})
-        model = task_mapping.get(task, self._config.get("default_model", "gemini-2.5-flash"))
+        model = task_mapping.get(task, self._config.get("default_model", "gemini-3.6-flash"))
         
         # 廃止予定モデルのチェック
         deprecated = self._config.get("deprecated", {})
@@ -111,7 +111,7 @@ class ModelRegistry:
     
     def get_default_model(self) -> str:
         """デフォルトモデルを返す"""
-        return self._config.get("default_model", "gemini-2.5-flash")
+        return self._config.get("default_model", "gemini-3.6-flash")
     
     def get_fallback(self, model: str) -> Optional[str]:
         """フォールバックモデルを返す"""

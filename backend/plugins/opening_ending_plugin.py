@@ -30,13 +30,27 @@ def _get_model_from_registry(task: str) -> Optional[str]:
             return None
 
 
+def _fallback_model(task: str) -> str:
+    """**モデル ID を直書きしない**（R1.5-C6）。正典から引き直す。
+
+    直書きの既定値は入替のたびに腐る。ここには 2026-10-16 に提供終了する
+    2.5 系が残っていた。`model_policy` は標準ライブラリだけに依存するので、
+    `model_registry` が落ちる状況でも読める。
+    """
+    try:
+        from model_policy import resolve
+    except ImportError:
+        from backend.model_policy import resolve
+    return resolve(task).model
+
+
 def get_model(task: str) -> str:
     """モジュールレベルでのデフォルトモデル取得"""
     try:
         model = _get_model_from_registry(task)
-        return model if model is not None else "gemini-2.5-flash"
+        return model if model is not None else _fallback_model(task)
     except Exception:
-        return "gemini-2.5-flash"
+        return _fallback_model(task)
 
 
 class OpeningEndingPlugin(Plugin):

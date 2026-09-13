@@ -352,9 +352,12 @@ class TestWebSocketRouter:
             )
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
-            # fallback get_modelは任意のtaskで"gemini-2.5-flash"を返す
-            assert mod.get_model("any_task") == "gemini-2.5-flash"
-            assert mod.get_model("live_api") == "gemini-2.5-flash"
+            # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+            # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+            from model_policy import resolve
+            assert mod.get_model("any_task") == resolve("any_task").model
+            assert mod.get_model("live_api") == resolve("live_api").model
+            assert not mod.get_model("any_task").startswith("gemini-2.5")
         finally:
             if saved_mr is not None:
                 sys.modules["model_registry"] = saved_mr
@@ -459,9 +462,29 @@ class TestWebSocketRouter:
     @pytest.mark.asyncio
     async def test_live_endpoint_gemini_import_error(self):
         mock_ws = AsyncMock()
-        # google.genaiのインポートが失敗するケース
-        with patch.dict("sys.modules", {"google": None, "google.genai": None}):
-            from routers.websocket import websocket_live_endpoint
+        # google.genaiのインポートが失敗するケース。
+        #
+        # **`gemini_client_factory` も落とす**（R1.5-C4・案D 掃引で判明）。
+        # `websocket_live_endpoint` は中で
+        # `from gemini_client_factory import get_gemini_client` を遅延 import する。
+        # このモジュールが**既に sys.modules にある**と import が通ってしまい、
+        # 実行が `client.aio.live.connect(...)` まで進んで**実ネットワーク接続を試みる**。
+        # そうなると close(1011) に到達せず、テストは失敗ではなく**ハングする**
+        # （CI の「testpaths 外の退行検知」でこのファイルだけ 3分38秒かかっていた）。
+        # 直前に走るテストが何を import したかで結果が変わる状態だったので、
+        # **周囲の import 状態に依存しない形に固定する。**
+        # **import は patch の外でやる。** 中でやると
+        # `routers/__init__.py` → `antigravity_api` → `subtitle_normalizer` →
+        # `from google.genai.errors import APIError` の連鎖が落ちて、
+        # 「エンドポイントが 1011 で閉じる」ではなく **import 自体が失敗する**。
+        # このテストが見たいのはエンドポイントの振る舞いであって import の可否ではない。
+        from routers.websocket import websocket_live_endpoint
+
+        with patch.dict("sys.modules", {
+            "google": None,
+            "google.genai": None,
+            "gemini_client_factory": None,
+        }):
             await websocket_live_endpoint(mock_ws)
         # accept呼出後、ImportErrorでclose
         mock_ws.accept.assert_awaited_once()

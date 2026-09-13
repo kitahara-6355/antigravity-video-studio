@@ -61,9 +61,24 @@ def test_fitness(client):
     assert response.json()["passed"] == 26
 
 def test_ratchet(client):
+    """**実体に繋がっていること**を見る（R1.5-C4）。
+
+    ここは以前 `valid is True` を期待していたが、それが通っていたのは
+    ルータが `total_items: 770 / pass_items: 770 / correlation_rate: 100.0`
+    という**作り物**を返していたから。リポジトリにある実測
+    （`snapshots/v8_baseline.json`）は pass 75 / fail 16 / skip 954 で、
+    `valid` は False になる。**健全だと言い張るテストをやめて、
+    出所が実体であることを固定する。**
+    """
     response = client.get("/api/admin/quality/ratchet")
     assert response.status_code == 200
-    assert response.json()["valid"] is True
+    data = response.json()
+    assert data["data_source"] == "derived"
+    assert data["source"] == "backend/ux_verification/snapshots/v8_baseline.json"
+    assert data["total_items"] == (
+        data["pass_items"] + data["fail_items"] + data["skip_items"]
+    )
+    assert data["valid"] is (data["fail_items"] == 0)
 
 def test_fv(client):
     response = client.get("/api/admin/quality/fv")
@@ -224,3 +239,83 @@ def test_dashboard_key_error_handling_specific(client):
     finally:
         _test_results.clear()
         _test_results.update(original_results)
+
+
+# ── R1.5-C4: 数字は出所を名乗る ────────────────────────────────────────
+#
+# 憲法 §7.3.2 の A-4「push時にテスト/リント/セキュリティが自動実行」は
+# **実際に動いている**（GitHub Actions）のに、この画面は全部定数だった。
+# 出所は3段しかない — `measured` / `derived` / `sample`。
+# 実体がリポジトリにあるものは繋ぎ、無いものは作り物だと名乗る。
+
+
+def test_全エンドポイントが出所を名乗る(client):
+    """**この router の応答は1つ残らず出所を名乗る**（R1.5-C4）。
+
+    `admin_analytics_router` / `admin_channel_router` と同じ形の総当たり。
+    **新しい経路を足して出所を書き忘れたらここで落ちる。**
+    5周連続で落ちた原因が「同じクラスの別経路の見落とし」なので、
+    人が25回思い出すのではなく、機械が数える側に置く。
+    """
+    from routers.admin_quality_router import router
+
+    許す出所 = {"measured", "derived", "sample"}
+    印なし = []
+    for route in router.routes:
+        for method in sorted(getattr(route, "methods", set()) - {"HEAD", "OPTIONS"}):
+            body = {"suite": "all", "format": "html", "target_version": "3.5.0",
+                    "coverage_threshold": 70.0, "tests_required": True,
+                    "channels": ["slack"], "enabled": True, "fix_id": 1}
+            resp = (client.get(route.path) if method == "GET"
+                    else client.post(route.path, json=body))
+            if resp.status_code != 200:
+                印なし.append((method, route.path, resp.status_code))
+                continue
+            payload = resp.json()
+            if not isinstance(payload, dict) or payload.get("data_source") not in 許す出所:
+                印なし.append((method, route.path, str(payload)[:120]))
+
+    assert not 印なし, 印なし
+
+
+def test_実体があるものは実データに繋がっている(client):
+    """**繋げるものを作り物のまま置かない**（R1.5-C4）。
+
+    リポジトリの中に実データがあるのに定数を返していた3経路。
+    繋いだ結果、**作り物と実体が食い違っていることが分かった**:
+
+    | 経路 | 作り物 | 実体 |
+    |---|---|---|
+    | `/ratchet` | 770/770・連動率 100.0% | pass 75 / fail 16 / skip 954 |
+    | `/lint` | issues 2件 | 28,842件（W293 が 27,393件）|
+    | `/vision-gap` | score 60.35（独自の定数）| 65.95（正典）|
+
+    `/vision-gap` がとくに悪い。**現在地の正典は
+    `vision_backlog.json`**（憲法第5条）なのに、画面が別の数字を
+    持っていた。台帳が2つあると、どちらが本当か分からなくなる。
+    """
+    for path, source in [
+        ("/api/admin/quality/ratchet",
+         "backend/ux_verification/snapshots/v8_baseline.json"),
+        ("/api/admin/quality/lint", ".github/ruff-baseline.json"),
+        ("/api/admin/quality/vision-gap", "backend/branding/vision_backlog.json"),
+    ]:
+        data = client.get(path).json()
+        assert data["data_source"] == "derived", path
+        assert data["is_real"] is True, path
+        assert data["source"] == source, path
+
+
+def test_正典と画面の実現度が一致する(client):
+    """**現在地は1つ**（憲法第5条・R1.5-C4）。"""
+    import json
+    from pathlib import Path
+
+    正典 = json.loads(
+        (Path(__file__).resolve().parent.parent.parent
+         / "backend/branding/vision_backlog.json").read_text(encoding="utf-8")
+    )
+    画面 = client.get("/api/admin/quality/vision-gap").json()
+
+    assert 画面["score"] == 正典["vision_realization_score"]
+    assert 画面["last_audit_date"] == 正典["last_audit_date"]

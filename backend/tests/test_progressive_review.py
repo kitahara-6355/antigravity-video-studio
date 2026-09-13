@@ -164,6 +164,8 @@ def test_review_final():
     plugin = ProgressiveReviewPlugin()
     
     ctx = ProductionContext()
+    # **「測った」は値ではなく旗で表す**（R1.5-C4・10周目 N-3）
+    ctx.quality_scored = True
     ctx.quality_score = 95.0
     ctx.set_extension("music_layer", "path/to/bgm.mp3")
     
@@ -185,6 +187,7 @@ def test_review_final():
     
     # 3. 品質スコアが低い場合 ＆ BGM未設定
     ctx2 = ProductionContext()
+    ctx2.quality_scored = True
     ctx2.quality_score = 85.0
     
     plugin2 = ProgressiveReviewPlugin()
@@ -198,6 +201,7 @@ def test_review_final():
     ctx3 = ProductionContext()
     ctx3.opening = "op.mp4"
     ctx3.ending = "ed.mp4"
+    ctx3.quality_scored = True
     ctx3.quality_score = 95.0
     ctx3.set_extension("music_layer", "bgm.mp3")
     # 字幕セグメントも正常に設定

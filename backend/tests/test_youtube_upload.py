@@ -1104,9 +1104,13 @@ class TestYouTubeUploaderService:
         dummy_video = tmp_path / "dummy_video.mp4"
         dummy_video.write_bytes(b"dummy data")
         
+        # **未実装として失敗させる**（R1.5-C4・2026-08-26 ユーザー決定）。
+        # 以前は success=True / video_id="placeholder_video_id" を返しており、
+        # **投稿していないのに「できた」と記録されていた**。
         res = await service.upload_video(str(dummy_video), "Title", "Desc", ["tag"])
-        assert res.success is True
-        assert res.video_id == "placeholder_video_id"
+        assert res.success is False
+        assert res.error == "not_implemented"
+        assert not res.video_id
         
         # Exception path
         with patch("services.youtube_uploader.logger.info", side_effect=Exception("Logger failed")):

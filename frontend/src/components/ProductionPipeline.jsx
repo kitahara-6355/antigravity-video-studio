@@ -721,9 +721,45 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                                 ]);
                                 const statusData = statusRes.ok ? await statusRes.json() : {};
                                 const improveData = improveRes.ok ? await improveRes.json() : {};
+                                // **未計測を「0点」と描かない**（R1.5-C4・13周目）。
+                                // 点が無いときに `?? 0` で 0 を置くと、
+                                // 測っていないものが「0点・未達」という
+                                // **測定結果**として出る（9周目に潰した型）。
+                                //
+                                // **さらに: 定数を「採点した」と名乗らない**
+                                // （R1.5-C4・16周目の指摘）。
+                                // 呼び出し口 `getPipelineQualityGateStatus` は UI の
+                                // 足場で、**動画を見ずに定数 85 点**を
+                                // `is_real:false` 付きで返す。13周目の私は
+                                // `?? 0` だけ直して**印を捨てたまま
+                                // `scored: true` を立てていた**ので、
+                                // 画面は 85 点を「QUALITY SCORE」として
+                                // 実測の顔で出していた。
+                                //
+                                // 併せて**取り違えていた鍵名も直す** —
+                                // 本線の実測は `StageResult.data["score"]`
+                                // （`quality_gate_worker.py:217`）であって
+                                // `quality_score` ではない。**実測を持って
+                                // いるのに定数を出していた。**
+                                const 足場の定数 = statusData.is_real === false;
+                                const 点 = 足場の定数
+                                  ? (stage.data?.score ?? null)
+                                  : (statusData.overall_score
+                                     ?? stage.data?.score
+                                     ?? null);
+                                const 採点した = typeof 点 === 'number';
                                 setQualityGateData({
-                                  is_ready: statusData.passed ?? statusData.overall_score >= 90,
-                                  score: statusData.overall_score ?? stage.data?.quality_score ?? 0,
+                                  is_ready: 採点した
+                                    && (足場の定数
+                                        ? 点 >= 90
+                                        : (statusData.passed ?? 点 >= 90)),
+                                  scored: 採点した,
+                                  score: 点,
+                                  // 足場の定数だったことを画面まで運ぶ
+                                  is_real: 採点した ? undefined : false,
+                                  note: (!採点した && 足場の定数)
+                                    ? statusData.note
+                                    : undefined,
                                   critical_issues: (improveData.suggestions || [])
                                     .filter(s => s.severity === 'critical')
                                     .map(s => s.suggestion),
@@ -736,17 +772,22 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                                       priority: s.severity || s.priority || 'medium',
                                       estimated_improvement: s.estimated_improvement || '+3-5点',
                                     })),
-                                  final_verdict: statusData.passed
-                                    ? '品質基準を満たしています。レンダリングに進めます。'
-                                    : '品質基準未達です。AI改善提案を確認してください。',
+                                  final_verdict: !採点した
+                                    ? 'この画面の品質ゲートは**まだ動画を見ていません**（UI の足場が定数を返しています）。本線の品質スコアはパイプラインの結果をご覧ください。'
+                                    : statusData.passed
+                                      ? '品質基準を満たしています。レンダリングに進めます。'
+                                      : '品質基準未達です。AI改善提案を確認してください。',
                                 });
                                 setShowQualityGate(true);
                               } catch (err) {
                                 console.error('Quality gate fetch failed:', err);
+                                // **取得に失敗したのを「0点」と描かない**
+                                // （R1.5-C4・16周目）。取れなかったことと
+                                // 0 点だったことは別
                                 setQualityGateData({
-                                  is_ready: false, score: 0,
+                                  is_ready: false, score: null, scored: false,
                                   critical_issues: [], suggestions: [],
-                                  final_verdict: '品質データの取得に失敗しました',
+                                  final_verdict: '品質データの取得に失敗しました（点は取れていません）',
                                 });
                                 setShowQualityGate(true);
                               }
@@ -801,11 +842,17 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                           : pipelineStatus.result.quality_score >= 80 ? '#eab308' : '#ef4444',
                         lineHeight: 1,
                       }}>
-                        {pipelineStatus.result.quality_score}<span style={{ fontSize: '0.9rem' }}>点</span>
+                        {/* **未計測を「0点」と描かない**（R1.5-C4・9周目の指摘）。
+                            `quality_score` の 0.0 は既定値であって採点結果ではない */}
+                        {pipelineStatus.result.quality_scored === false
+                          ? <span style={{ fontSize: '1rem' }}>未計測</span>
+                          : <>{pipelineStatus.result.quality_score}<span style={{ fontSize: '0.9rem' }}>点</span></>}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                          品質ゲート {pipelineStatus.result.quality_score >= 80 ? '✅ 合格' : '❌ 不合格'}
+                          品質ゲート {pipelineStatus.result.quality_scored === false
+                            ? '⚠️ 未計測（品質ゲートを通していません）'
+                            : pipelineStatus.result.quality_score >= 80 ? '✅ 合格' : '❌ 不合格'}
                         </div>
                         {/* カテゴリ別ミニバー */}
                         <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
@@ -1012,7 +1059,12 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
         onConfirm={() => {
           setShowQualityGate(false);
           // レンダリング開始 or 強制書出
-          apiFetch('postRenderStart', { body: { force_render: !qualityGateData?.is_ready } }).catch(err => console.error('Render start failed:', err));
+          // **どの動画を書き出すのかを渡す**（R1.5-C4・9周目の指摘）。
+          // 渡さないと品質サイドカーを引けず、サーバは未計測として止める
+          apiFetch('postRenderStart', { body: {
+            video_path: pipelineStatus?.result?.final_path || null,
+            force_render: !qualityGateData?.is_ready,
+          } }).catch(err => console.error('Render start failed:', err));
         }}
         data={qualityGateData}
       />

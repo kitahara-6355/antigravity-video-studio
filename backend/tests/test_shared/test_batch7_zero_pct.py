@@ -148,28 +148,37 @@ class TestQualityGateAgent:
         # checks にエラーを起こす関数を追加してもクラッシュしない
         agent.checks.append(lambda c: (_ for _ in ()).throw(ValueError("test")))
         report = agent.run_gate({"full_text": "", "segments": [], "scenes": []})
-        assert report.score == 100  # エラーは無視される
+        # **見るものが無ければ点を名乗らない**（R1.5-C4）。エラーを握って
+        # クラッシュしないことは変わらず見る（このテストの本来の意図）
+        assert report.scored is False
+        assert report.score is None
 
     def test_qg_16_check_func_key_error_handling(self):
         from quality_gate_agent import QualityGateAgent
         agent = QualityGateAgent()
         agent.checks.append(lambda c: (_ for _ in ()).throw(KeyError("test_key")))
         report = agent.run_gate({"full_text": "", "segments": [], "scenes": []})
-        assert report.score == 100
+        # **見るものが無ければ点を名乗らない**（R1.5-C4）
+        assert report.scored is False
+        assert report.score is None
 
     def test_qg_17_check_func_type_error_handling(self):
         from quality_gate_agent import QualityGateAgent
         agent = QualityGateAgent()
         agent.checks.append(lambda c: (_ for _ in ()).throw(TypeError("test_type")))
         report = agent.run_gate({"full_text": "", "segments": [], "scenes": []})
-        assert report.score == 100
+        # **見るものが無ければ点を名乗らない**（R1.5-C4）
+        assert report.scored is False
+        assert report.score is None
 
     def test_qg_18_check_func_unexpected_exception_handling(self):
         from quality_gate_agent import QualityGateAgent
         agent = QualityGateAgent()
         agent.checks.append(lambda c: (_ for _ in ()).throw(RuntimeError("unexpected")))
         report = agent.run_gate({"full_text": "", "segments": [], "scenes": []})
-        assert report.score == 100
+        # **見るものが無ければ点を名乗らない**（R1.5-C4）
+        assert report.scored is False
+        assert report.score is None
 
     def test_qg_19_check_all_score_slabs_and_edge_cases(self):
         from quality_gate_agent import QualityGateAgent, QualityIssue, QualityLevel

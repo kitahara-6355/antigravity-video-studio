@@ -537,12 +537,25 @@ def test_reset_stale_running_tasks(orchestrator):
 
 
 def test_calculate_max_concurrent(orchestrator, tmp_path):
+    """段（tier）からモデルを引き、その枠と残数で同時実行数を決める。
+
+    **2026-08-28 まで設定ファイルを置く場所が違っていて（`backend/` が
+    抜けていた）、この設定は一度も読まれていなかった。** モデル名を
+    直書きしていたので気づけなかった（R1.5-C6）。
+    """
     session = {"recent_errors": []}
     
-    config_file = tmp_path / "model_config.json"
+    (tmp_path / "backend").mkdir()
+    config_file = tmp_path / "backend" / "model_config.json"
     config_file.write_text(json.dumps({
+        "text_generation": {
+            "tiers": {
+                "batch": {"model": "gemini-3.5-flash-lite"},
+                "standard": {"model": "gemini-3.6-flash"},
+            }
+        },
         "free_tier_limits": {
-            "gemini-2.5-flash": {"rpm": 15}
+            "gemini-3.6-flash": {"rpm": 15}
         }
     }), encoding="utf-8")
     
@@ -553,6 +566,27 @@ def test_calculate_max_concurrent(orchestrator, tmp_path):
         with patch("backend.usage_tracker.tracker.usage_tracker", mock_tracker, create=True):
             res = orchestrator._calculate_max_concurrent(phase=6, batch_size=30, session=session)
             assert res == 10
+            # 段から引いた実モデル ID で残数を聞いていること
+            mock_tracker.get_remaining_requests.assert_called_with("gemini-3.6-flash")
+
+
+def test_calculate_max_concurrent_段を引けなければ絞らない(orchestrator, tmp_path):
+    """**設定を読み損ねたことを「残り 0 件」と読み替えない**（R1.5-C6）。
+
+    段からモデルを引けないと `get_remaining_requests("")` が 0 を返し、
+    同時実行数が 2 に落ちる。設定の読み損ねが処理速度の低下として現れ、
+    原因が見えなくなる。
+    """
+    session = {"recent_errors": []}
+    mock_tracker = MagicMock()
+    mock_tracker.get_remaining_requests.return_value = 0
+
+    with patch("agents.orchestration.hub_batch._PROJECT_ROOT", tmp_path):
+        with patch("backend.usage_tracker.tracker.usage_tracker", mock_tracker, create=True):
+            res = orchestrator._calculate_max_concurrent(phase=6, batch_size=30, session=session)
+
+    assert res == 12, res           # min(30, 15, 15*0.8) — 残数では絞らない
+    mock_tracker.get_remaining_requests.assert_not_called()
 
 
 def test_get_next_batch(orchestrator, tmp_path):

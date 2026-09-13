@@ -687,3 +687,32 @@ def test_一部の工程が落ちた実行も1本あたりに数える():
     assert "うち一部失敗 1 本" in text
     assert "150.0 秒" in text and "2.0000 円" in text
     assert "⚠（一部失敗）" in text, "degraded と completed を見た目で区別すること"
+
+
+# --- 台帳の置き場は毎回モジュール変数を見る（2026-08-27）----------------------
+
+
+def test_台帳の置き場を既定引数に焼き込まない(tmp_path, monkeypatch):
+    """**import 時に確定させると、テストの差し替えが効かない。**
+
+    `flush_to_budget` では同じ罠を直してあったが、`__init__` の
+    `ledger_path` に残っていた。実害が出た — CI run 33079706782 で
+    `test_shared/test_model_governance.py` の統治プロキシ系5件が
+    **本番の `.claude/cost_ledger.jsonl` に追記していた**。実費の記録に
+    テストの数字が混ざると「いくら使ったか」が分からなくなる。
+    """
+    退避先 = tmp_path / "cost_ledger.jsonl"
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", 退避先)
+
+    guard = cost_guard.CostGuard(limit_jpy=100.0)
+
+    assert guard.ledger_path == 退避先
+
+
+def test_明示した置き場は尊重する(tmp_path, monkeypatch):
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", tmp_path / "使われない.jsonl")
+    指定 = tmp_path / "こっち.jsonl"
+
+    guard = cost_guard.CostGuard(limit_jpy=100.0, ledger_path=指定)
+
+    assert guard.ledger_path == 指定

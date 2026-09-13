@@ -272,6 +272,35 @@ def test_get_fallback_chain(client):
     assert response.status_code == 200
     assert response.json()["auto_fallback"] is True
 
+
+def test_fallback_chainは正典の段から引く(client):
+    """**定数を返さない**（R1.5-C6）。
+
+    2026-08-28 まで `gemini-2.5-pro` / `gemini-2.0-flash` /
+    `gemini-2.0-flash-lite` を直書きしていた。どれも段の実体と違ううえ、
+    2.5 系は 2026-10-16 に提供終了する。API が返す値なので、画面には
+    「いま動いているモデル」として出ていた。
+    """
+    from model_policy import tiers
+
+    段 = tiers()
+    payload = client.get("/api/admin/setup/fallback-chain").json()
+
+    assert payload["primary"]["model"] == 段["premium"]["model"]
+    assert payload["secondary"]["model"] == 段["standard"]["model"]
+    assert payload["tertiary"]["model"] == 段["batch"]["model"]
+    for 段名 in ("primary", "secondary", "tertiary"):
+        assert not payload[段名]["model"].startswith("gemini-2.5"), payload[段名]
+
+
+def test_fallback_chainは読めなければ定数で埋めない(client):
+    """**読めなかったことを「これが現在の設定です」と言わない**（R1.5-C4）。"""
+    with patch("routers.admin_setup_router._tier_models",
+               side_effect=OSError("読めません")):
+        response = client.get("/api/admin/setup/fallback-chain")
+
+    assert response.status_code == 503, response.text
+
 # S11: Health Check
 def test_run_health_check_healthy(client, monkeypatch):
     class MockFFmpeg:

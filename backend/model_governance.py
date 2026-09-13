@@ -15,7 +15,7 @@ Model Governance — ハーネス統合型モデルガバナンス
   - 新モデル未反映                    → model_config.json 再読込で動的対応
 
 Fallback Chain (model_config.json から自動読込):
-  gemini-3-flash-preview → gemini-2.5-flash → gemini-2.5-flash-lite → None(エラー)
+  gemini-3-flash-preview → gemini-3.6-flash → gemini-3.6-flash-lite → None(エラー)
 """
 
 import json
@@ -118,7 +118,7 @@ class ModelGovernanceEngine:
         self._deprecation_map: Dict[str, str] = {}
         self._fallback_chain: Dict[str, Optional[str]] = {}
         self._task_mapping: Dict[str, str] = {}
-        self._default_model: str = "gemini-2.5-flash"
+        self._default_model: str = "gemini-3.6-flash"
         self._event_log: List[Dict] = []
         self._stats = {
             "deprecation_corrections": 0,
@@ -148,7 +148,7 @@ class ModelGovernanceEngine:
             # タスク→モデル マッピング
             self._task_mapping = config.get("task_mapping", {})
             self._default_model = text_gen.get(
-                "default_model", "gemini-2.5-flash"
+                "default_model", "gemini-3.6-flash"
             )
 
             logger.info(

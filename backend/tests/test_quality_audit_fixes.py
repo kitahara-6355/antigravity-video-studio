@@ -583,11 +583,29 @@ class TestPredictionValidator:
 
         validator = PredictionValidator()
         result = asyncio.run(validator.validate_prediction("W-001", actual_metrics_none, wagamama_manager=mock_mgr))
-        assert result["actual"]["ctr"] == 0.0
+        # **届いていない CTR を 0.0 で埋めない**（R1.5-C4・19周目）。
+        # ここは `== 0.0` を期待していたが、その 0.0 は「metrics が None ＝
+        # 実測が1件も無い」のに実績 CTR として名乗っていた捏造そのもの。
+        # 予測 5.0% に対して「誤差 100%・重大な乖離」という**計測していない判定**
+        # まで出て、それが台帳へ恒久保存されていた。
+        assert result["actual"]["ctr"] is None
+        assert result["actual"]["is_real"] is False
+        assert result["actual"]["data_source"] == "unavailable"
+        assert result["analysis"]["checked"] is False
+        assert result["analysis"]["significant_deviation"] is None
+        assert result["status"] == "skipped"
+        # **台帳に書かない**（作り物のレポートが焼き付かないこと）
+        mock_mgr._save.assert_not_called()
 
         # actual_metrics 自体が None のケース
+        mock_mgr._save.reset_mock()
         result_null = asyncio.run(validator.validate_prediction("W-001", None, wagamama_manager=mock_mgr))
-        assert result_null["actual"]["ctr"] == 0.0
+        # 上と同じ理由（R1.5-C4・19周目）。実測が1件も無いのに 0.0 を実績と呼ばない
+        assert result_null["actual"]["ctr"] is None
+        assert result_null["actual"]["is_real"] is False
+        assert result_null["analysis"]["checked"] is False
+        assert result_null["status"] == "skipped"
+        mock_mgr._save.assert_not_called()
 
     def test_validate_report_keys_match_optimizer(self):
         """生成されるレポートの analysis に predicted と actual キーが含まれていること"""

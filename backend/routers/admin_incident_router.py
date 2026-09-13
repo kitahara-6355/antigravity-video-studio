@@ -172,8 +172,18 @@ async def get_pipeline_failures():
 
 @router.get("/quality-degradation")
 async def get_quality_degradation():
-    """A-5 S4: 品質低下(score<90)の検知状態"""
+    """A-5 S4: 品質低下(score<90)の検知状態
+
+    **何も検知していない**（R1.5-C4）。72 点も3点の推移も定数で、
+    `QualityGateWorker` が劣化したという観測は一度も無い。現在時刻を打つと
+    「いま品質低下を検知した」と読めてしまうので、それもやめる。
+    台帳: `backend/config/feature_gaps.json` の `pipeline_quality_gate_ui`
+    """
     return {
+        "data_source": "sample",
+        "is_real": False,
+        "note": "**検知結果ではありません。**この経路は UI の足場で、"
+                "定数を返しています。品質低下の観測はまだどこにも繋がっていません",
         "current_score": 72,
         "threshold": 90,
         "degraded_workers": ["QualityGateWorker"],
@@ -182,7 +192,7 @@ async def get_quality_degradation():
             {"date": "2026-05-02", "score": 85},
             {"date": "2026-05-02T12:00", "score": 72},
         ],
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": None,
     }
 
 

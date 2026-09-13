@@ -97,7 +97,7 @@ def test_resolve_model_fallback():
     with patch.dict(sys.modules, {"model_governance": None}):
         import plugins.youtube_optimizer_plugin
         importlib.reload(plugins.youtube_optimizer_plugin)
-        assert plugins.youtube_optimizer_plugin._resolve_model("branding") == "gemini-2.5-flash"
+        assert plugins.youtube_optimizer_plugin._resolve_model("branding") == "gemini-3.6-flash"
     
     # 元に戻す
     importlib.reload(plugins.youtube_optimizer_plugin)
@@ -525,7 +525,7 @@ def test_thumbnail_plugin_import_fallback():
     with patch.dict(sys.modules, {"model_registry": None}):
         import plugins.thumbnail_plugin
         importlib.reload(plugins.thumbnail_plugin)
-        assert plugins.thumbnail_plugin.get_model("thumbnail") == "gemini-2.5-flash"
+        assert plugins.thumbnail_plugin.get_model("thumbnail") == "gemini-3.6-flash"
     
     # 元に戻す
     importlib.reload(plugins.thumbnail_plugin)

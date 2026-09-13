@@ -857,8 +857,10 @@ class TestC7CoverageExtension:
             result = await worker.execute(ctx)
             
         assert result.success is True
-        # デフォルトモデル名 gemini-2.5-flash が使われていることを確認
-        assert result.data["model_used"] == "gemini-2.5-flash"
+        # **既定モデル名を直書きしない**（R1.5-C6）。正典は model_config.json
+        from model_policy import resolve
+        assert result.data["model_used"] == resolve("youtube_optimization").model
+        assert not result.data["model_used"].startswith("gemini-2.5")
 
     @pytest.mark.asyncio
     async def test_c7_05_create_fallback_chapters_empty(self):
@@ -906,6 +908,11 @@ class TestC7CoverageExtension:
         ctx = create_mock_ctx(segments=5)
         ctx.segments = _make_segments(5)
         ctx.metadata = None  # dict ではない値
+        # **SNS の実データを渡す**（R1.5-C4）。渡さないと本線は分析しない
+        # （作り物のフォロワー数から投稿先を推奨しないため）
+        ctx.metadata_source = {"sns_data": {"X": {"followers": 320, "posts": [
+            {"text": "#AI", "impressions": 1200, "engagement": 45,
+             "posted_at": "2026-05-20T19:15:00"}]}}}
 
         # CrossMediaService をモックして正常に結果が返るようにする
         mock_service = MagicMock()

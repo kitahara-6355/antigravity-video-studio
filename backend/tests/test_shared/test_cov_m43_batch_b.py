@@ -766,6 +766,11 @@ class TestCovB_ModelGovernance:
         - except Exception as e: logger.debug (L257-258)
         """
         engine = _reset_singleton
+        # **差替表を空にする**（R1.5-C6）。ここで見たいのは枠チェックの
+        # ImportError / 一般例外の経路であって deprecated 差替ではない。
+        # 実設定に gemini-2.5-* の差替行が入ったので、モデル名を素通しの
+        # 目印に使えなくなった
+        engine._deprecation_map = {}
 
         # Part 1: ImportError パス (L255-256) — usage_tracker未インポート
         with patch.dict("sys.modules", {"usage_tracker": None, "usage_tracker.tracker": None}):

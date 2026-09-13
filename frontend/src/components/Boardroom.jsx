@@ -53,14 +53,47 @@ export default function Boardroom({ onClose, initialQuery }) {
 
     if (!dashboardData) return null;
 
-    const { ranks, external_status } = dashboardData;
+    const { external_status } = dashboardData;
 
-    // Radar Data
-    const radarData = [
-        { subject: 'ビジネス力', A: ranks?.biz_rank?.xp || 10, fullMark: 100 },
-        { subject: '技術力', A: ranks?.tech_rank?.xp || 20, fullMark: 100 },
-        { subject: 'ブランド力', A: ranks?.brand_rank?.score || 50, fullMark: 100 },
+    // **鍵を取り違えていた**（R1.5-C4・gate-verifier 17周目の指摘）。
+    // `dashboardData` は `user_model` そのもので、段位は
+    // **`profiles.<役割>.ranks`** の下にある（`branding_manager.update_user_rank()`
+    // はそこにしか書かない）。**トップレベルの `ranks` は存在しない**ので
+    // `ranks?.biz_rank?.xp || 10` は**常に 10** に落ちていた。
+    // つまりレーダーは「クリエイター能力分布」と称して
+    // **10 / 20 / 50 という JSX の定数を常時描いていた。**
+    //
+    // 15周目にこのファイルのライバルカードは直したが、**同じファイルの
+    // 上部にある このカードは無検査のまま残っていた。**
+    const ranks = dashboardData.profiles?.owner?.ranks
+        || dashboardData.profiles?.admin?.ranks
+        || {};
+    const bizRank = dashboardData.profiles?.owner?.ranks?.biz_rank;
+    const techRank = dashboardData.profiles?.admin?.ranks?.tech_rank;
+
+    // **測っていない軸をレーダーに描かない**（R1.5-C4・20周目 CE-1）。
+    //
+    // ここは `?? 0` で3軸を組み立てていた。`?? 50` よりはましだが、
+    // **0 は実際に取りうる値なので印にならない。** とくに `brand_rank` は
+    // **リポジトリ全体でこのファイルにしか存在せず**（他のヒットは自身の
+    // ビルド成果物だけ）、バックエンドに産出元が無い。つまり
+    // 「ブランド力」は**恒久的に 0** を測定値の顔で描いていた。
+    // 隣の「ビジネス力」には作り物の警告帯が出るのに、こちらには何も無い。
+    //
+    // 17周目にこのレーダーの `|| 10/20/50` を直したとき、
+    // **3軸のうち2軸だけを直していた。**
+    const 数値なら = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const 軸の候補 = [
+        { subject: 'ビジネス力', value: 数値なら(bizRank?.xp) },
+        { subject: '技術力', value: 数値なら(techRank?.xp) },
+        { subject: 'ブランド力', value: 数値なら(dashboardData.profiles?.owner?.ranks?.brand_rank?.score) },
     ];
+    const radarData = 軸の候補
+        .filter((x) => x.value !== null)
+        .map((x) => ({ subject: x.subject, A: x.value, fullMark: 100 }));
+    const 未計測の軸 = 軸の候補.filter((x) => x.value === null).map((x) => x.subject);
+    // ビジネス力は作り物のチャンネル統計から出ている（`int(総再生 / 100)`）
+    const biz作り物 = bizRank?.is_real === false;
 
     return (
         <div className="boardroom-page fade-in" style={{
@@ -114,6 +147,21 @@ export default function Boardroom({ onClose, initialQuery }) {
                             </ResponsiveContainer>
                         </div>
 
+                        {/* **測っていない軸があることを隠さない**（R1.5-C4・20周目 CE-1）。
+                            レーダーから外すだけだと、利用者には「その軸が無い」ことも
+                            「まだ測っていない」ことも見えない */}
+                        {未計測の軸.length > 0 && (
+                            <div style={{ marginTop: '10px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(100,116,139,0.08)', border: '1px solid rgba(100,116,139,0.3)', fontSize: '0.75rem', color: '#475569', lineHeight: 1.6 }}>
+                                ❓ <strong>{未計測の軸.join('・')}</strong> は<strong>まだ計測していません</strong>（産出元が無いため、レーダーには描いていません）。
+                            </div>
+                        )}
+
+                        {/* ビジネス力の出どころを名乗る（R1.5-C4・17周目）*/}
+                        {biz作り物 && (
+                            <div style={{ marginTop: '10px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', fontSize: '0.75rem', color: '#b45309', lineHeight: 1.6 }}>
+                                ⚠️ 「ビジネス力」は<strong>作り物のチャンネル統計から計算した値</strong>です（YouTube に接続していません）。
+                            </div>
+                        )}
                         <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(139, 92, 246, 0.1)' }}>
                             <div style={{ marginBottom: '10px' }}>
                                 <strong style={{ fontSize: '1.2rem', color: '#8B5CF6' }}>Level {Math.floor((dashboardData.interaction_history?.total_sessions || 0) / 10) + 1}</strong>
@@ -130,13 +178,19 @@ export default function Boardroom({ onClose, initialQuery }) {
                             <Target size={20} color="#EC4899" /> 次のミッション
                         </h3>
                         <div style={{ marginBottom: '1rem' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>{ranks?.tech_rank?.title || "Identify"}</div>
+                            {/* `title` / `next_milestone` / `ai_notes` はデータに存在せず、
+                                常に既定の文字列が出ていた（R1.5-C4・17周目）。
+                                段位は実在するので `level` を出し、無いものは
+                                **無いと書く**（作り物の励ましを実績の顔で出さない）*/}
+                            <div style={{ fontSize: '0.8rem', color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+                                {techRank?.level || "ランク未設定"}
+                            </div>
                             <h2 style={{ fontSize: '1.5rem', margin: '5px 0', fontFamily: 'var(--font-heading)', color: 'var(--text-primary)' }}>
-                                {ranks?.tech_rank?.next_milestone || "Create your first masterpiece"}
+                                {techRank?.next_milestone || "次のマイルストーンは未設定です"}
                             </h2>
                         </div>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6' }}>
-                            {dashboardData.ai_notes || "ユーザーは高い志を持っています。効率を重視しつつ、深い論理の学習にも意欲的です。"}
+                            {dashboardData.ai_notes || "AI による所見はまだありません。"}
                         </p>
                     </div>
                 </div>
@@ -165,21 +219,65 @@ export default function Boardroom({ onClose, initialQuery }) {
                         <h3 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-heading)', color: 'var(--text-primary)' }}>
                             <RefreshCw size={20} color="#EC4899" /> ライバル出現 (RIVAL DETECTED)
                         </h3>
+                        {/*
+                          **数字を JSX に直書きしない**（R1.5-C4・gate-verifier 15周目の指摘）。
+                          ここは `GadgetReviewer / You: 200 / Target: 250 / 差分: 50 人 /
+                          TechMastery / 目標: 10,000 人` を literal で描いており、
+                          **`external_status` を 56 行目で受け取っているのに一度も使っていなかった**。
+                          `admin_channel_router` の `watch_time_hours: 15200` と同じクラスが、
+                          印の付かないままフロントに残っていた（`docs/dead_code_inventory_20260806.md`
+                          が「画面に出ているのはモックのほう」と記録している）。
+
+                          出所は 呼び出し口 `getSettings` → `branding_manager.get_user_model_for_display()`
+                          で、`backend/user_model_marks.py` が `is_real: false` を付けている。
+                          **印ごと画面に出す。** 数字が無ければ作らずに「未取得」と言う。
+                        */}
+                        {external_status?.rivals?.is_real === false && (
+                            <div style={{ marginBottom: '1rem', padding: '10px 12px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', fontSize: '0.8rem', color: '#b45309', lineHeight: 1.6 }}>
+                                ⚠️ <strong>YouTube に接続していません。</strong>
+                                下の数字は既定のサンプルから選んだもので、実在のチャンネルを調べた結果ではありません。
+                            </div>
+                        )}
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '1rem', borderRadius: '12px', color: 'var(--text-primary)' }}>
                                 <div style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 600 }}>好敵手 (NEMESIS)</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>GadgetReviewer</div>
-                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>You: 200 <span style={{ opacity: 0.6 }}>Target: 250</span></div>
-                                <div style={{ marginTop: '5px', height: '6px', background: 'rgba(0,0,0,0.05)', borderRadius: '3px' }}>
-                                    <div style={{ width: '80%', height: '100%', background: '#ef4444', borderRadius: '3px', boxShadow: '0 0 8px rgba(239,68,68,0.3)' }}></div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>
+                                    {external_status?.rivals?.nemesis?.name || '未取得'}
                                 </div>
-                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#ef4444', fontWeight: 'bold' }}>🔥 差分: 50 人</div>
+                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    You: {external_status?.youtube?.subscribers ?? '—'}
+                                    {' '}<span style={{ opacity: 0.6 }}>Target: {external_status?.rivals?.nemesis?.subs ?? '—'}</span>
+                                </div>
+                                <div style={{ marginTop: '5px', height: '6px', background: 'rgba(0,0,0,0.05)', borderRadius: '3px' }}>
+                                    <div style={{
+                                        width: (typeof external_status?.youtube?.subscribers === 'number'
+                                            && typeof external_status?.rivals?.nemesis?.subs === 'number'
+                                            && external_status.rivals.nemesis.subs > 0)
+                                            ? `${Math.min(100, Math.round(external_status.youtube.subscribers / external_status.rivals.nemesis.subs * 100))}%`
+                                            : '0%',
+                                        height: '100%', background: '#ef4444', borderRadius: '3px', boxShadow: '0 0 8px rgba(239,68,68,0.3)'
+                                    }}></div>
+                                </div>
+                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#ef4444', fontWeight: 'bold' }}>
+                                    {(typeof external_status?.youtube?.subscribers === 'number'
+                                        && typeof external_status?.rivals?.nemesis?.subs === 'number')
+                                        ? `🔥 差分: ${external_status.rivals.nemesis.subs - external_status.youtube.subscribers} 人`
+                                        : '差分: 未取得'}
+                                </div>
                             </div>
                             <div style={{ flex: 1, background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '1rem', borderRadius: '12px', color: 'var(--text-primary)' }}>
                                 <div style={{ fontSize: '0.8rem', color: '#0ea5e9', fontWeight: 600 }}>師匠 (BENCHMARK)</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>TechMastery</div>
-                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>目標: 10,000 人</div>
-                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#0ea5e9', fontWeight: 'bold' }}>スタイルモデル: Tech</div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>
+                                    {external_status?.rivals?.benchmark?.name || '未取得'}
+                                </div>
+                                <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    目標: {typeof external_status?.rivals?.benchmark?.subs === 'number'
+                                        ? `${external_status.rivals.benchmark.subs.toLocaleString()} 人`
+                                        : '未取得'}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', marginTop: '5px', color: '#0ea5e9', fontWeight: 'bold' }}>
+                                    スタイルモデル: {external_status?.rivals?.benchmark?.genre || '未取得'}
+                                </div>
                             </div>
                         </div>
                     </div>

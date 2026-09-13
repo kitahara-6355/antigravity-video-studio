@@ -142,7 +142,16 @@ class TestThemesRouterCoverage:
             os.remove(log_path)
         res = client.get("/themes/stats")
         assert res.status_code == 200
-        assert res.json() == {"stats": {}, "total_selections": 0}
+        # **「集計できなかった」を「集計して 0 件だった」と書かない**（R1.5-C4・19周目）。
+        # ここは応答全体を `== {"stats": {}, "total_selections": 0}` で固定していたが、
+        # 台帳が無い＝集計できていないのに 0 件という実測を名乗っていた。
+        # いまは印（checked / is_real / data_source）が付く。
+        欠測 = res.json()
+        assert 欠測["stats"] == {}
+        assert 欠測["total_selections"] is None, "集計できていないのに 0 件と名乗った"
+        assert 欠測["checked"] is False
+        assert 欠測["is_real"] is False
+        assert 欠測["data_source"] == "unavailable"
 
         # 1) Log exists and has selections
         log_data = {

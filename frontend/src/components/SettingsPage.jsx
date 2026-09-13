@@ -284,7 +284,7 @@ export default function SettingsPage({ onClose }) {
                                     </div>
                                     <div style={{ marginBottom: '1rem' }}>
                                         <div style={{ fontSize: '0.85rem', color: '#718096' }}>現在のランク</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#3182ce' }}>{config?.user_model?.ranks?.tech_rank?.title || "Novice"}</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#3182ce' }}>{config?.user_model?.profiles?.admin?.ranks?.tech_rank?.level || "ランク未設定"}</div>
                                     </div>
                                 </div>
 

@@ -232,7 +232,11 @@ def test_import_error_fallback():
     import services.hook_improver
     importlib.reload(services.hook_improver)
     
-    assert services.hook_improver.get_model("proofreader") == "gemini-2.5-flash"
+    # **直書きの既定値に逃げない**（R1.5-C6）。2026-08-28 まで
+    # gemini-2.5-flash を直書きしており、2026-10-16 に提供終了する
+    from model_policy import resolve
+    assert services.hook_improver.get_model("proofreader") == resolve("proofreader").model
+    assert not services.hook_improver.get_model("proofreader").startswith("gemini-2.5")
     
     # 元に戻す
     if original_model_registry is not None:

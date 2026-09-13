@@ -217,15 +217,34 @@ class SelfReviewEngine:
         )
     
     def _fallback_review(self) -> ReviewResult:
-        """フォールバックレビュー（デフォルト合格）"""
+        """**レビューできなかったときの戻り値**（R1.5-C4）。
+
+        ここは `passed=True / overall=0.75` を返していて、docstring も
+        「デフォルト合格」と書いてあった。**AI レビューが一度も走らなくても
+        「合格・0.75点」**になり、`POST /api/antigravity/self-review/check` が
+        `{"passed": true, "score": 0.75}` を返していた。
+
+        `director_engine.calculate_quality_score()` と
+        `verify_production_quality()` で直したのと同じクラスの3件目。
+        **「問題が見つからなかった」と「見ていない」は別物。**
+
+        `overall` は 0.0 にするが、**それは「0点」という評価ではない**ので
+        `passed=False` と `issues` で「採点していない」ことを明示する
+        （`QualityScore` は float を要求するため `None` を入れられない）。
+        """
         return ReviewResult(
-            passed=True,
+            passed=False,
             score=QualityScore(
-                context_fit=0.75,
-                constitution_fit=0.75,
-                technical_quality=0.75,
-                overall=0.75
-            )
+                context_fit=0.0,
+                constitution_fit=0.0,
+                technical_quality=0.0,
+                overall=0.0,
+                details={"scored": False, "is_real": False,
+                         "data_source": "unavailable",
+                         "note": "**レビューは行われていません。**"
+                                 "点数は評価結果ではありません"},
+            ),
+            issues=["レビューを実行できませんでした（**採点していません**）"],
         )
     
     def review_and_improve(self, 

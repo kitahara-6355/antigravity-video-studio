@@ -42,10 +42,10 @@ except ImportError:
     get_model = None
 
 try:
-    DEFAULT_MODEL = get_model("supervisor") if HAS_MODEL_REGISTRY and get_model is not None else "gemini-2.5-flash"
+    DEFAULT_MODEL = get_model("supervisor") if HAS_MODEL_REGISTRY and get_model is not None else "gemini-3.6-flash"
 except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as e:
-    logger.warning(f"Failed to get supervisor model from registry, falling back to gemini-2.5-flash: {e}")
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    logger.warning(f"Failed to get supervisor model from registry, falling back to gemini-3.6-flash: {e}")
+    DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 def _resolve_model_from_registry(task: str = "supervisor") -> str:

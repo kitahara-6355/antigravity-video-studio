@@ -190,7 +190,14 @@ class CrossMediaService:
         """
         YouTubeのアナリティクスデータとSNSの投稿・インプレッションデータを相関分析する。
         """
-        if sns_data is None:
+        # **作り物から出した結論はそう名乗る**（R1.5-C4）。
+        # `get_default_sns_data()` はフォロワー数もインプレッションも定数で、
+        # そこから決めた `best_platform` は「どこに投稿すべきか」の助言に見える。
+        # 本線（`YouTubeOptWorker._run_cross_media_analysis`）は SNS の実データが
+        # 無ければそもそも呼ばない。ここに来るのはデモと単体テストの経路。
+        # 台帳: `backend/config/feature_gaps.json` の `sns_cross_media`
+        作り物 = sns_data is None
+        if 作り物:
             sns_data = self.get_default_sns_data()
 
         publish_time = self._parse_publish_time(youtube_analytics)
@@ -202,6 +209,11 @@ class CrossMediaService:
         announcement_text = self._generate_announcement(best_platform, suggested_hashtags)
 
         return {
+            "data_source": "sample" if 作り物 else "measured",
+            "is_real": not 作り物,
+            "note": ("**SNS の実データではありません。**既定のサンプル"
+                     "（X 12,500 フォロワー等）から出した相関なので、"
+                     "投稿先の推奨として使わないでください") if 作り物 else None,
             "platform_contribution": {
                 "best_platform": best_platform,
                 "contribution_scores": platform_scores

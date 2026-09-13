@@ -18,9 +18,28 @@ logger = logging.getLogger(__name__)
 try:
     from model_registry import get_model
 except ImportError:
-    def get_model(task): return "gemini-2.5-flash"
+    # **モデル ID を直書きしない**（R1.5-C6）。正典は model_config.json で、
+    # それを読む解決器が model_policy（標準ライブラリだけに依存するので
+    # model_registry より落ちにくい）。直書きの既定値は入替のたびに腐り、
+    # 実際それで 2026-10-16 に提供終了する 2.5 系が本番の実行経路に居座った。
+    def get_model(task):
+        # **import は関数の中で行う。** module 直下に置くと、`backend/` が
+        # sys.path に無いときに import 自体が落ち、従来なら起動できた場面で
+        # モジュールごと死ぬ（R1.5-C6・gate-verifier 2周目の指摘）
+        try:
+            from model_policy import resolve
+        except ImportError:
+            from backend.model_policy import resolve
+        return resolve(task).model
 
-def _get_model_safe(task: str, default: str = "gemini-2.5-flash") -> str:
+def _get_model_safe(task: str, default: Optional[str] = None) -> str:
+    """モデル解決が落ちても**直書きの既定値に逃げない**（R1.5-C6）。
+
+    既定値を直書きすると入替のたびに腐る。実際ここには
+    `gemini-2.5-flash` が残っていて、2026-10-16 に提供終了する。
+    呼び出し側が明示した `default` があればそれを、無ければ正典
+    （`model_config.json`）から引き直す。
+    """
     try:
         return get_model(task)
     except Exception as e:
@@ -35,7 +54,13 @@ def _get_model_safe(task: str, default: str = "gemini-2.5-flash") -> str:
                 f"Failed to get model for task {task} from registry due to unexpected error ({error_type}), using fallback '{default}': {e}",
                 exc_info=True
             )
-        return default
+        if default is not None:
+            return default
+        try:
+            from model_policy import resolve
+        except ImportError:
+            from backend.model_policy import resolve
+        return resolve(task).model
 
 
 class AutoChaptersPlugin(Plugin):

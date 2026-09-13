@@ -184,7 +184,15 @@ async def get_selection_history(limit: int = 20) -> dict[str, Any]:
         return {
             "success": True,
             "total": len(history),
-            "history": history[:limit]
+            "history": history[:limit],
+            # **出所を名乗る**（R1.5-C4b・2026-09-13 ユーザー承認）。
+            # 返している行はローカルの選択履歴台帳そのもので、`predicted_ctr` は
+            # **記録した時点の予測値**。YouTube Analytics の実測ではない。
+            # 印が無いと、画面はこの数字を実績として並べられてしまう。
+            "is_real": True,
+            "data_source": "derived",
+            "note": ("サムネイル選択履歴（ローカル台帳）。`predicted_ctr` は記録時点の"
+                     "**予測値**で、YouTube Analytics の実測ではありません"),
         }
         
     except HTTPException:

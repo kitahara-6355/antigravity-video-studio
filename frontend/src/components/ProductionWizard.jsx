@@ -147,7 +147,11 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
   // ── コンテキストから展開 ──
   const {
     segments = [],
-    quality_score = 0,
+    // **既定値を 0 にしない**（R1.5-C4・9周目の指摘）。`= 0` だと
+    // `typeof quality_score === 'number'` が真になり、下の「未計測」の枝へ
+    // **本番から到達できなかった。**0 は実際に取りうる点なので、値では区別できない
+    quality_score = null,
+    quality_scored = null,
     quality_feedback = [],
     category_report = [],
     metadata = {},
@@ -173,22 +177,35 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
   // ── 品質ゲートデータ統合（D-6解消） ──
   // IMP-003: category_reportが空の場合のフォールバック
   const qualityGateData = useMemo(() => {
-    const effectiveScore = quality_score || 0;
+    // **未計測を「0点」と表示しない**（R1.5-C4）。`|| 0` のせいで、
+    // 品質ゲートを一度も通していないセッションが「品質スコア0点」と出ていた。
+    // バックエンド側（run_gate / _get_quality_score）で `null` を返すようにしたのと同じ扱い。
+    // **旗があれば旗を見る**（R1.5-C4）。バックエンドの `_build_result` が
+    // `quality_scored` を載せる。無い応答（古い形）は値で判断する
+    const 採点した = quality_scored === null
+      ? typeof quality_score === 'number'
+      : quality_scored === true;
+    const effectiveScore = 採点した ? quality_score : null;
     const effectiveFeedback = quality_feedback.length > 0
       ? quality_feedback
       : (category_report.length > 0
           ? category_report.filter(c => c.score !== null && c.score < 70).map(c => `${c.label}: ${c.status} (${c.score}点)`)
           : []);
     return {
-      is_ready: effectiveScore >= 80,
+      is_ready: 採点した && effectiveScore >= 80,
+      scored: 採点した,
       score: effectiveScore,
       critical_issues: effectiveFeedback.filter((_, i) => i < 3),
       suggestions: [],
-      final_verdict: effectiveScore >= 80
-        ? `品質スコア${effectiveScore}点 — 出力準備完了です。`
-        : `品質スコア${effectiveScore}点 — 改善を推奨しますが、強制続行も可能です。`,
+      final_verdict: !採点した
+        ? '品質スコアは**未計測**です。品質ゲートを通してから判断してください。'
+        : effectiveScore >= 80
+          ? `品質スコア${effectiveScore}点 — 出力準備完了です。`
+          : `品質スコア${effectiveScore}点 — 改善を推奨しますが、強制続行も可能です。`,
     };
-  }, [quality_score, quality_feedback, category_report]);
+    // **旗も依存に入れる**（R1.5-C4・13周目）。入れないと、旗だけが
+    // 変わったときに古い判定が残る
+  }, [quality_score, quality_scored, quality_feedback, category_report]);
 
   // ── ステップレビューデータ（D-3解消） ──
   const stepReviewData = useMemo(() => ({
@@ -253,9 +270,23 @@ export default function ProductionWizard({ isOpen, onClose, onRender, context })
             </div>
             <div className="wizard-summary-card">
               <div className="label">品質スコア</div>
-              <div className="value score-counter" style={{ color: quality_score >= 80 ? '#10b981' : '#f59e0b' }}>
-                {quality_score}点
-              </div>
+              {/*
+                **採点の旗を見る**（R1.5-C4・19周目）。
+                このカードだけが `qualityGateData` を通さず生の `quality_score` を
+                描いていた。同じファイルの上（`採点した` / `effectiveScore`）で
+                旗を組み立てているのに、ここがそれを迂回していた。
+                16周目に ProductionPipeline.jsx で直したのと同じ形。
+                未計測を「0点」や「null点」として出さない。
+              */}
+              {qualityGateData.scored ? (
+                <div className="value score-counter" style={{ color: qualityGateData.score >= 80 ? '#10b981' : '#f59e0b' }}>
+                  {qualityGateData.score}点
+                </div>
+              ) : (
+                <div className="value score-counter" style={{ color: '#64748b', fontSize: '1rem' }} title="品質ゲートを通していないため、点はありません">
+                  未計測
+                </div>
+              )}
             </div>
           </div>
           <button className="wizard-btn wizard-btn-render" onClick={onRender}>

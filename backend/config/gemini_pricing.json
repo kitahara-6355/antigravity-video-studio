@@ -87,13 +87,12 @@
   },
   "free_tier": {
     "_comment": "**無料枠は残っている。** R1 の実走が ¥0 で済む可能性がある。ただし Pro 系は 2026-04-01 に無料枠から外れた。",
+    "eligible_models_note": "**2026-08-28 に 2.5 系を落とした**（R1.5-C6）。2026-10-16 に提供終了するモデルを『無料枠で使える』の一覧に残すと、そこへ逃がす実装を呼ぶ",
     "eligible_models": [
       "gemini-3.7-flash",
       "gemini-3.6-flash",
       "gemini-3.5-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite"
+      "gemini-3.5-flash-lite"
     ],
     "limits": "Flash 系はおよそ 5〜15 RPM / 最大 1,000 RPD（2026-08 時点の二次情報）。**P3 では律速が金額ではなくレート制限になる**見込み。実測は R1 で取る",
     "tier_rule": "**一次情報（2026-08-17 確認）: Free tier の条件は『有効なプロジェクトがあること』だけ。Tier 1 は『請求先が紐づいていること』が条件。** つまり請求先を有効にするとそのプロジェクトは Free tier ではなくなる。さらに **『Rate limits are applied per project, not per API key』** — レート制限はキー単位ではなくプロジェクト単位。2人以上に展開してユーザーを分離するならプロジェクトを分ける",

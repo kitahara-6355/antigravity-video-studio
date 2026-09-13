@@ -371,8 +371,12 @@ class TestPipelineReportRouter:
 
     def test_build_feedback_html_empty(self):
         from routers.pipeline_report import _build_feedback_html
-        html = _build_feedback_html({"feedback": []})
+        # **採点したうえで**指摘0件（R1.5-C4・11周目）。旗が無ければ未計測
+        html = _build_feedback_html({"scored": True, "feedback": []})
         assert len(html) > 0
+        assert "全項目クリア" in html
+        未計測 = _build_feedback_html({"feedback": []})
+        assert "未計測" in 未計測, "未計測を全項目クリアと出した"
 
     def test_build_feedback_html_with_items(self):
         from routers.pipeline_report import _build_feedback_html
@@ -589,6 +593,10 @@ class TestPipelineReportRouter:
                 "preview_path": str(dummy_preview),
                 "quality_details": {
                     "score": 95,
+                    # **測ったことは値と別に持つ**（R1.5-C4・9周目）。この作り物は
+                    # 「全機能適用済み」を主張するので、採点済みでなければならない。
+                    # 旗を足す前の形のままだと⑤行が「未計測」になる
+                    "scored": True,
                     "category_report": [
                         {"category": "audio", "label": "audio", "score": 95, "status": "PASS", "deductions": 0, "plugin_count": 2}
                     ],
@@ -710,13 +718,36 @@ class TestReviewRouter:
             assert res.json()["all_approved"] is True
 
     def test_get_review_summary(self):
+        """**採点できたステージが無いので準備完了にならない**（R1.5-C4）。
+
+        `pending_revisions == 0` だけを見ていたので、1つも測っていない
+        セッションでも `ready_for_render: true` になっていた。それは
+        「修正を要求した人が誰もいない」の意味でしかなく、品質の主張ではない。
+
+        なお `routers.review_router.progressive_review` へのパッチは**効かない**
+        （`_get_plugin_components()` が関数の中で import する）。ここが見ている
+        のは実物の挙動で、空の `ProductionContext` では採点できるステージが無い。
+        """
+        client = self._get_client()
+        res = client.get("/api/review/summary")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["summary"]["scored_stages"] == []
+        assert body["summary"]["overall_score"] is None
+        assert body["ready_for_render"] is False
+        assert "品質ゲート" in body["ready_for_render_reason"]
+
+    def test_採点できれば準備完了になりうる(self):
+        """**門が恒真でないことの確認。** 採点できたステージがあれば true。"""
         mock_pr = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.get_extension.return_value = {"pending_revisions": 0}
+        mock_ctx.get_extension.return_value = {
+            "pending_revisions": 0, "scored_stages": ["subtitle"]}
         mock_pr.execute.return_value = mock_ctx
-        with patch("routers.review_router.progressive_review", mock_pr, create=True), \
-             patch("routers.review_router.ProductionContext", MagicMock(return_value=mock_ctx), create=True):
-            client = self._get_client()
-            res = client.get("/api/review/summary")
+        with patch("plugins.progressive_review_plugin.progressive_review",
+                   mock_pr, create=True), \
+             patch("core.ProductionContext", MagicMock(return_value=mock_ctx),
+                   create=True):
+            res = self._get_client().get("/api/review/summary")
             assert res.status_code == 200
             assert res.json()["ready_for_render"] is True

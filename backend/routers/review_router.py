@@ -242,9 +242,20 @@ async def get_review_summary() -> Dict[str, Any]:
         
         summary = context.get_extension("progressive_review_summary", {})
         
+        # **1つも採点していないのに「レンダリング準備完了」と言わない**（R1.5-C4）。
+        # `pending_revisions == 0` だけを見ていたので、**何も測っていない
+        # セッションでも true** になっていた（修正を要求した人が誰もいない、
+        # という意味でしかない）。採点できたステージが1つも無ければ判定不能。
+        採点済み = summary.get("scored_stages") or []
+        修正待ちなし = summary.get("pending_revisions", 1) == 0
         return {
             "summary": summary,
-            "ready_for_render": summary.get("pending_revisions", 1) == 0
+            "ready_for_render": bool(採点済み) and 修正待ちなし,
+            "ready_for_render_reason": (
+                "採点できたステージがありません（品質ゲートが繋がっていません）"
+                if not 採点済み else
+                ("修正待ちのステージがあります" if not 修正待ちなし else "")
+            ),
         }
     except HTTPException:
         raise

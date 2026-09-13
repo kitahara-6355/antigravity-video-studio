@@ -269,6 +269,110 @@ def check_run_status(runs: list[dict]) -> list[Finding]:
     return []
 
 
+def _final_digest(run: dict) -> str | None:
+    """最終成果物の指紋。**プレビューではなく本番の mp4 を見る。**"""
+    digests = run.get("artifact_digests") or {}
+    for path, digest in digests.items():
+        if str(path).endswith(".mp4") and "final" in str(path).replace("\\", "/"):
+            return digest
+    return None
+
+
+def check_ai_effect(runs: list[dict]) -> list[Finding]:
+    """**AI の出力が成果物に届いているか**（R1.5-C3）。
+
+    AI を効かせた実走（`calls > 0`）と効かせない実走（`calls == 0`）で
+    最終成果物の SHA256 が一致したら、**AI は動いたが結果に反映されていない。**
+
+    実測（2026-08-27）で、AI なしの実走を2回繰り返すと SHA256 が完全一致した
+    （エンコーダは決定的）。だから一致／不一致を AI の効果として読んでよい。
+
+    **片方が無い・指紋が読めないときは「確かめていない」と言う** —
+    「一致しなかった」に倒すと、走らせていないだけで緑になる。
+    """
+    def _条件(run: dict) -> tuple:
+        """**比べてよいのは同じ入力どうしだけ。**
+
+        素材や目標尺が違えば成果物が違うのは当たり前で、それを
+        「AI が効いた」と読むと嘘になる（2026-08-27・指摘 N-3）。
+        """
+        inp = run.get("inputs") or {}
+        return (str(inp.get("video_path") or ""), inp.get("target_minutes"))
+
+    ありの実走 = [r for r in runs if (r.get("calls") or 0) > 0]
+    なしの実走 = [r for r in runs if (r.get("calls") or 0) == 0]
+    if ありの実走 and なしの実走:
+        # 同じ入力のペアを新しい順に探す
+        なし別 = {}
+        for r in なしの実走:
+            なし別.setdefault(_条件(r), []).append(r)
+        for r in reversed(ありの実走):
+            相手 = なし別.get(_条件(r))
+            if 相手:
+                ありの実走, なしの実走 = [r], [相手[-1]]
+                break
+        else:
+            return [Finding(
+                "ai_effect_unverified", "inputs",
+                "**同じ入力で AI あり／なしを走らせた組がありません。**"
+                "素材や目標尺が違うと成果物が違うのは当たり前なので、"
+                "それを AI の効果として読むことはできません")]
+    あり = _final_digest(ありの実走[-1]) if ありの実走 else None
+    なし = _final_digest(なしの実走[-1]) if なしの実走 else None
+
+    if not ありの実走 or not なしの実走:
+        欠け = "AI を効かせた実走" if not ありの実走 else "AI を効かせない実走"
+        return [Finding(
+            "ai_effect_unverified", "runs",
+            f"**{欠け}がありません。** AI の出力が成果物に届いているかを"
+            "確かめられません（`GOOGLE_API_KEY=dummy_key_for_ci` を付けて"
+            "1本走らせると AI 無しの実走が作れます。**課金されません**）")]
+    if あり is None or なし is None:
+        return [Finding(
+            "ai_effect_unverified", "artifact_digests",
+            "最終成果物の指紋が記録にありません。**確かめられなかったことを"
+            "「届いている」にはしません**")]
+    if あり == なし:
+        return [Finding(
+            "ai_not_reaching_artifact", f"{ありの実走[-1].get('run_id')} / {なしの実走[-1].get('run_id')}",
+            f"**AI を効かせても成果物が変わっていません**（SHA256 が一致: {あり[:16]}…）。"
+            "API は呼ばれているのに、その出力が成果物に反映されていません")]
+    return []
+
+
+def unused_intermediates(run: dict) -> list[dict]:
+    """**生み出されたのに誰も使っていない中間成果物**（R1.5-C3）。
+
+    作られていないものは数えない（捨てられたわけではない）。
+    """
+    return [i for i in (run.get("intermediates") or [])
+            if i.get("produced") and not i.get("consumed")]
+
+
+def check_intermediates(runs: list[dict]) -> list[Finding]:
+    """**0 でなければ FAIL**（正典 R1.5-C3）。
+
+    AI は金を使って中間成果物を作る。作ったものが下流の誰にも読まれずに
+    消えているなら、その呼び出しは**成果物に何も足していない。**
+    """
+    if not runs:
+        return []
+    run = runs[-1]
+    if "intermediates" not in run:
+        return [Finding(
+            "intermediates_unverified", run.get("run_id", "(不明)"),
+            "中間成果物の使われ方が記録にありません。**確かめられなかったことを"
+            "「全部使われている」にはしません**")]
+    findings = []
+    for i in unused_intermediates(run):
+        findings.append(Finding(
+            "unused_intermediate", f"{run.get('run_id')} / {i.get('name')}",
+            f"**{i.get('name')} は作られたのに使われていません**"
+            f"（消費者: {i.get('consumed_by') or '(宣言なし)'}）。"
+            "AI の呼び出しが成果物に何も足していません"))
+    return findings
+
+
 def history_findings(runs: list[dict]) -> list[Finding]:
     """**過去の実行にあった欠陥。判定材料にはしない。**
 
@@ -340,6 +444,10 @@ def run_gate(video: Path | None = None,
     report.runs = load_runs(runs_dir)
     report.findings += check_runs(report.runs)
     report.findings += check_run_status(report.runs)
+    # **AI が作ったのに誰も使っていない中間成果物を 0 にする**（R1.5-C3）。
+    # 作ったものが下流の誰にも読まれずに消えるなら、その呼び出しは
+    # 成果物に何も足していない。
+    report.findings += check_intermediates(report.runs)
     report.history = history_findings(report.runs)
     report.findings += check_cost(report.runs)
     report.findings += check_models(report.runs)
@@ -411,11 +519,42 @@ def main(argv: list[str] | None = None) -> int:
                         help="成果物が揃っていなければ exit 1")
     parser.add_argument("--resume-check", action="store_true",
                         help="失敗した工程から再開できるかだけを見る")
+    parser.add_argument("--intermediates", action="store_true",
+                        help="使われていない中間成果物を数える（R1.5-C3）")
+    parser.add_argument("--ai-effect", action="store_true",
+                        help="AI の出力が成果物に届いているかだけを見る（R1.5-C3）")
     parser.add_argument("--semantics", action="store_true")
     args = parser.parse_args(argv)
 
     if args.semantics:
         print(_format_semantics())
+        return 0
+
+    if args.intermediates:
+        runs = load_runs()
+        findings = check_intermediates(runs)
+        if runs and "intermediates" in runs[-1]:
+            for i in runs[-1]["intermediates"]:
+                印 = "✅ 使われた" if i.get("consumed") else (
+                    "⬜ 作られていない" if not i.get("produced") else "🚫 捨てられた")
+                print(f"    {印}  {i.get('name'):<20} "
+                      f"{i.get('produced_by')} → {i.get('consumed_by')}")
+            print()
+        if findings:
+            for f in findings:
+                print(f"    {f}")
+            return 1
+        print("✅ 作られた中間成果物はすべて使われています。")
+        return 0
+
+    if args.ai_effect:
+        findings = check_ai_effect(load_runs())
+        if findings:
+            for f in findings:
+                print(f"    {f}")
+            return 1
+        print("✅ AI を効かせた実走と効かせない実走で成果物が違います"
+              "（AI の出力が成果物に届いています）")
         return 0
 
     if args.resume_check:

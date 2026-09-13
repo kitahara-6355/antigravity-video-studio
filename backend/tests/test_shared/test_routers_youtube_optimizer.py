@@ -288,6 +288,10 @@ class TestRetentionAndSeries:
         mock_report.suggestions = []
         mock_report.model_dump.return_value = {}
         mock_plugin = MagicMock()
+        # **501 の門（R1.5-C4）を意図的に開ける。**MagicMock だと
+        # IMPLEMENTED が truthy で偶然通ってしまうので、明示しておく。
+        # 門そのものは test_youtube_optimizer_router.py が押さえている
+        mock_plugin.IMPLEMENTED = True
         mock_plugin.analyze_retention_risks.return_value = mock_report
         mock_gen = MagicMock()
         mock_gen.generate_html_report.return_value = "/tmp/report.html"
@@ -659,6 +663,10 @@ class TestEdgeCases:
     def test_retention_map_http_exception(self):
         """POST /retention-map — HTTPException伝播"""
         mock_plugin = MagicMock()
+        # **501 の門（R1.5-C4）を意図的に開ける。**MagicMock だと
+        # IMPLEMENTED が truthy で偶然通ってしまうので、明示しておく。
+        # 門そのものは test_youtube_optimizer_router.py が押さえている
+        mock_plugin.IMPLEMENTED = True
         mock_plugin.analyze_retention_risks.side_effect = HTTPException(status_code=403, detail="Forbidden Map")
         with patch.dict("sys.modules", {"plugins.retention_map_plugin": MagicMock(retention_map_plugin=mock_plugin)}):
             client = _get_client()
@@ -668,6 +676,10 @@ class TestEdgeCases:
     def test_retention_map_generic_exception(self):
         """POST /retention-map — 一般例外 -> 500"""
         mock_plugin = MagicMock()
+        # **501 の門（R1.5-C4）を意図的に開ける。**MagicMock だと
+        # IMPLEMENTED が truthy で偶然通ってしまうので、明示しておく。
+        # 門そのものは test_youtube_optimizer_router.py が押さえている
+        mock_plugin.IMPLEMENTED = True
         mock_plugin.analyze_retention_risks.side_effect = Exception("Map fail")
         with patch.dict("sys.modules", {"plugins.retention_map_plugin": MagicMock(retention_map_plugin=mock_plugin)}):
             client = _get_client()

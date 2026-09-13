@@ -259,6 +259,10 @@ async def test_action_pipeline_knowledge_success(tmp_path):
     test_data = {
         "video": "test_video.mp4",
         "quality_score": 85,
+        # **「測った」は値ではなく旗で表す**（R1.5-C4・12周目の指摘）。
+        # ここが書くのは VERIFIED_FACTS.md（恒久的に残る「確かめた事実」）なので、
+        # 旗が無ければ採点していないとみなす（fail-closed）
+        "quality_scored": True,
         "total_corrections": 6,
         "retries_used": 1
     }

@@ -303,7 +303,17 @@ async def test_upload_video_file_not_found(temp_creds_path):
 
 
 @pytest.mark.asyncio
-async def test_upload_video_success(temp_creds_path, tmp_path):
+async def test_upload_video_未実装として失敗する(temp_creds_path, tmp_path):
+    """**未実装として失敗させる**（R1.5-C4・2026-08-26 ユーザー決定）。
+
+    以前は `success=True` / `video_id="placeholder_video_id"` を返しており、
+    **投稿していないのに「できた」と記録されていた**。チャンネルの数字と
+    実装の状態が食い違い、収益化の前提が崩れる。
+
+    このファイルは `pytest.ini` の testpaths の外にあるため CI が見ておらず、
+    `backend/tests/test_youtube_upload.py` の重複テストだけを直した結果、
+    **ここが赤いまま残っていた**（gate-verifier 1周目の指摘 N-4）。
+    """
     service = YouTubeUploaderService(credentials_path=str(temp_creds_path))
     service._credentials = YouTubeCredentials(
         client_id="id",
@@ -320,9 +330,11 @@ async def test_upload_video_success(temp_creds_path, tmp_path):
         description="Desc",
         tags=["tag1"]
     )
-    assert result.success is True
-    assert result.video_id == "placeholder_video_id"
-    assert result.status == "processing"
+    assert result.success is False
+    assert result.error == "not_implemented"
+    assert result.status == "failed"
+    assert result.video_id is None
+    assert "手動で投稿" in result.message
 
 
 @pytest.mark.asyncio

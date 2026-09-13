@@ -496,7 +496,20 @@ async def test_analyze_image_gemini_vision_and_fallback(tmp_path):
     
     # 存在しない画像パスでのフォールバック
     res_fallback = analyzer.analyze_image("non_existent_image.png")
-    assert res_fallback["analysis_mode"] == "text_match"
+    # 20周目 CE-3 以降、画像を一度も開けなかった経路は
+    # `analyze({"concept": path.stem})` の戻り値（＝**ファイル名の長さを
+    # 「テキスト可読性」として採点**した総合点 57.5）を返さない。
+    # 印だけ確認して mode 名を書き換えると空振りになるので、
+    # **点を名乗っていないこと**まで見る。
+    assert res_fallback["analysis_mode"] == "image_unanalyzed"
+    assert res_fallback["overall_score"] is None
+    assert res_fallback["verdict"] is None
+    assert res_fallback["is_real"] is False
+    assert res_fallback["data_source"] == "unavailable"
+    assert res_fallback["unavailable_reason"]
+    assert len(res_fallback["unscored_axes"]) == 4
+    assert all(c["score"] is None for c in res_fallback["checks"])
+    assert all(c["is_real"] is False for c in res_fallback["checks"])
     
     # ダミー画像を作成
     dummy_img = tmp_path / "dummy_analysis.png"
@@ -519,12 +532,38 @@ async def test_analyze_image_gemini_vision_and_fallback(tmp_path):
     # Vision API mock (APIが None を返すフォールバックケース)
     with patch("gemini_client_factory.get_gemini_client", return_value=None):
         res = analyzer.analyze_image(str(dummy_img))
-        assert res["analysis_mode"] == "text_match"
+        # 20周目 CE-3 以降、画像を一度も開けなかった経路は
+        # `analyze({"concept": path.stem})` の戻り値（＝**ファイル名の長さを
+        # 「テキスト可読性」として採点**した総合点 57.5）を返さない。
+        # 印だけ確認して mode 名を書き換えると空振りになるので、
+        # **点を名乗っていないこと**まで見る。
+        assert res["analysis_mode"] == "image_unanalyzed"
+        assert res["overall_score"] is None
+        assert res["verdict"] is None
+        assert res["is_real"] is False
+        assert res["data_source"] == "unavailable"
+        assert res["unavailable_reason"]
+        assert len(res["unscored_axes"]) == 4
+        assert all(c["score"] is None for c in res["checks"])
+        assert all(c["is_real"] is False for c in res["checks"])
         
     # Vision API mock (例外発生によるフォールバック)
     with patch("gemini_client_factory.get_gemini_client", side_effect=Exception("API Error")):
         res = analyzer.analyze_image(str(dummy_img))
-        assert res["analysis_mode"] == "text_match"
+        # 20周目 CE-3 以降、画像を一度も開けなかった経路は
+        # `analyze({"concept": path.stem})` の戻り値（＝**ファイル名の長さを
+        # 「テキスト可読性」として採点**した総合点 57.5）を返さない。
+        # 印だけ確認して mode 名を書き換えると空振りになるので、
+        # **点を名乗っていないこと**まで見る。
+        assert res["analysis_mode"] == "image_unanalyzed"
+        assert res["overall_score"] is None
+        assert res["verdict"] is None
+        assert res["is_real"] is False
+        assert res["data_source"] == "unavailable"
+        assert res["unavailable_reason"]
+        assert len(res["unscored_axes"]) == 4
+        assert all(c["score"] is None for c in res["checks"])
+        assert all(c["is_real"] is False for c in res["checks"])
 
 def test_generate_thumbnail_high_res_and_contrast(tmp_path):
     import numpy as np

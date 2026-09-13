@@ -142,8 +142,12 @@ def test_design_system_plugin_import_error_fallback():
         # モジュールをインポート
         import design_system.design_system_plugin as dsp
         
-        # get_model の挙動を確認
-        assert dsp.get_model("branding") == "gemini-2.5-flash"
+        # get_model の挙動を確認。**直書きの既定値に逃げない**（R1.5-C6）。
+        # 2026-08-28 まで gemini-2.5-flash を直書きしており、2026-10-16 に
+        # 提供終了するモデルが本番の実行経路に居座っていた
+        from model_policy import resolve
+        assert dsp.get_model("branding") == resolve("branding").model
+        assert not dsp.get_model("branding").startswith("gemini-2.5")
         
     finally:
         # sys.modulesを元に戻す

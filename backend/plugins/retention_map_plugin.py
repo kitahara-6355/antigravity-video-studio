@@ -33,6 +33,13 @@ class RetentionMapError(Exception):
     pass
 
 class RetentionMapPlugin:
+    # **まだ実装されていない**（R1.5-C4・2026-08-27）。
+    # 下の解析は `random.random()` でセグメントを組み立てるモックで、
+    # 映像・音声の解析は入っていない。**呼び出し側はこの印を見て、
+    # 結果を成果物や記録に混ぜないこと。**
+    # 台帳: `backend/config/feature_gaps.json` の `retention_analysis`
+    IMPLEMENTED = False
+
     """
     [Phase 3: Retention Map Engine]
     動画（または台本）のエンゲージメント低下リスクを算出し、

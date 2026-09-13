@@ -349,7 +349,7 @@ class NHKQualityScorer:
         """軸4: 音量バランス (FFmpeg LUFS計測)"""
         if not video_path:
             return AxisScore(
-                name="音量バランス", score=100.0, max_score=100.0,
+                name="音量バランス", score=0.0, max_score=100.0,
                 grade="N/A", threshold=self.BUG_HUNTER_THRESHOLD,
                 suggestion=""
             )
@@ -454,7 +454,7 @@ class NHKQualityScorer:
         """軸5: カット割りリズム (FFmpeg scdet)"""
         if not video_path:
             return AxisScore(
-                name="カット割りリズム", score=100.0, max_score=100.0,
+                name="カット割りリズム", score=0.0, max_score=100.0,
                 grade="N/A", threshold=self.BUG_HUNTER_THRESHOLD,
                 suggestion=""
             )
@@ -574,7 +574,7 @@ class NHKQualityScorer:
                 )
                 text = "\n".join(lines[timing_line_idx + 1:]) if timing_line_idx >= 0 else ""
                 entries.append({"start": start_ms, "end": end_ms, "text": text})
-        except (FileNotFoundError, PermissionError) as e:
+        except (FileNotFoundError, PermissionError, IsADirectoryError) as e:
             logger.error("SRT parse failed (file access error): %s", str(e))
         except UnicodeDecodeError as e:
             logger.error("SRT parse failed (encoding error): %s", str(e))
@@ -618,7 +618,7 @@ class NHKQualityScorer:
                     if line:
                         logs.append(json.loads(line))
             return logs[-20:]  # 直近20件
-        except (FileNotFoundError, PermissionError) as e:
+        except (FileNotFoundError, PermissionError, IsADirectoryError) as e:
             logger.warning("Degradation log access failed: %s", str(e))
             return []
         except json.JSONDecodeError as e:

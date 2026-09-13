@@ -433,7 +433,13 @@ class TestStrategistMVP:
         assert isinstance(default.applied_philosophies, list)
         assert isinstance(default.recommended_cut_rate, float)
         assert 0.0 <= default.recommended_cut_rate <= 1.0
-        assert isinstance(default.generated_at, str) and len(default.generated_at) > 0
+        # **生成していない時刻を名乗らせない**（R1.5-C4・19周目）。
+        # ここは「str で長さ 1 以上」を要求していたが、default() は Strategist が
+        # 一度も応答していないときに返るものなので、その時刻は datetime.now() の
+        # 捏造だった。他のフィールドが 0.5 や "default" という印付きの値なのに
+        # 時刻だけが本物になり、evolution_log の strategy_detail に
+        # 「その時刻に算出した戦略」の顔で焼き付いていた。いまは None を返す。
+        assert default.generated_at is None
         assert default.model_used == "default"
         assert default.trust_score == 0.0
 
@@ -702,7 +708,19 @@ class TestSmartCutStrategyServiceCoverage:
         from unittest.mock import MagicMock
         service = SmartCutStrategyService(max_sessions=5)
         
-        # 1. brand_alignment_score が欠落している場合（デフォルト 0.5 になること）
+        # **欠けている項目を項目ごとの既定値で埋めない**（R1.5-C4・19周目）。
+        # 以前この節は「キーが欠落していても 0.5 や全1.0の重みで埋まること」を
+        # 期待し、1. には「（デフォルト 0.5 になること）」というコメントまで付けて
+        # 捏造を固定していた。JSON がパースできさえすれば model_used に本物の
+        # モデル名が入った戦略が出来上がり、default() の「Strategist未応答」の印を
+        # 迂回して evolution_log に実測値の顔で焼き付くのが、その 0.5 の正体だった。
+        # いま必須4項目（summary / position_weights / brand_alignment_score /
+        # recommended_cut_rate）が欠けた応答は default() を返すので、期待値は
+        # 「default() の印」（summary・model_used="default"・generated_at is None）へ置き換える。
+        # クランプ（範囲外を 0.0-1.0 に収める）の検証は正当なので残し、必須項目を
+        # 揃えてクランプ経路を実際に通るようにした。
+
+        # 1. brand_alignment_score が欠落している場合、default() の印が付いて返ること
         mock_response_missing_bas = MagicMock()
         mock_response_missing_bas.text = json.dumps({
             "summary": "ブランドアライメント欠落",
@@ -710,39 +728,48 @@ class TestSmartCutStrategyServiceCoverage:
             "recommended_cut_rate": 0.5
         })
         strategy1 = service._parse_response(mock_response_missing_bas, "test-model")
-        assert strategy1.brand_alignment_score == 0.5
-        
+        assert strategy1.summary == "デフォルト戦略（Strategist未応答）"
+        assert strategy1.model_used == "default"
+        assert strategy1.generated_at is None
+
         # 2. brand_alignment_score が範囲外の値（1.5）で、クランプされる場合
         mock_response_invalid_bas_high = MagicMock()
         mock_response_invalid_bas_high.text = json.dumps({
             "summary": "ブランドアライメント高すぎ",
+            "position_weights": {"intro": 1.0},
             "brand_alignment_score": 1.5,
             "recommended_cut_rate": 0.5
         })
         strategy2 = service._parse_response(mock_response_invalid_bas_high, "test-model")
         assert strategy2.brand_alignment_score == 1.0
-        
+        assert strategy2.model_used == "test-model"
+
         # 3. brand_alignment_score が範囲外の値（-0.5）で、クランプされる場合
         mock_response_invalid_bas_low = MagicMock()
         mock_response_invalid_bas_low.text = json.dumps({
             "summary": "ブランドアライメント低すぎ",
+            "position_weights": {"intro": 1.0},
             "brand_alignment_score": -0.5,
             "recommended_cut_rate": 0.5
         })
         strategy3 = service._parse_response(mock_response_invalid_bas_low, "test-model")
         assert strategy3.brand_alignment_score == 0.0
+        assert strategy3.model_used == "test-model"
 
         # 4. brand_alignment_score が文字列の場合でも float 変換される場合
         mock_response_str_bas = MagicMock()
         mock_response_str_bas.text = json.dumps({
             "summary": "ブランドアライメント文字列",
+            "position_weights": {"intro": 1.0},
             "brand_alignment_score": "0.75",
             "recommended_cut_rate": 0.5
         })
         strategy4 = service._parse_response(mock_response_str_bas, "test-model")
         assert strategy4.brand_alignment_score == 0.75
+        assert strategy4.model_used == "test-model"
 
-        # 5. position_weights が欠落している場合、デフォルト weights が適用される場合
+        # 5. position_weights が欠落している場合、default() の印が付いて返ること
+        #    （以前は全1.0の重みで黙って埋めていた。重みは Strategist の判断そのもの）
         mock_response_missing_weights = MagicMock()
         mock_response_missing_weights.text = json.dumps({
             "summary": "重み欠落",
@@ -750,38 +777,50 @@ class TestSmartCutStrategyServiceCoverage:
             "recommended_cut_rate": 0.5
         })
         strategy5 = service._parse_response(mock_response_missing_weights, "test-model")
-        assert strategy5.position_weights == {"intro": 1.0, "body": 1.0, "highlight": 1.0, "outro": 1.0}
+        assert strategy5.summary == "デフォルト戦略（Strategist未応答）"
+        assert strategy5.model_used == "default"
+        assert strategy5.generated_at is None
 
-        # 6. recommended_cut_rate が欠落している場合、デフォルト 0.5 が適用されて正常に CutStrategy が返ること
+        # 6. recommended_cut_rate が欠落している場合、default() の印が付いて返ること
+        #    （以前は summary="カット率欠落" のまま 0.5 を実測値として名乗っていた）
         mock_response_missing_cut_rate = MagicMock()
         mock_response_missing_cut_rate.text = json.dumps({
             "summary": "カット率欠落",
+            "position_weights": {"intro": 1.0},
             "brand_alignment_score": 0.8
         })
         strategy6 = service._parse_response(mock_response_missing_cut_rate, "test-model")
-        assert strategy6.summary == "カット率欠落"
-        assert strategy6.recommended_cut_rate == 0.5
+        assert strategy6.summary == "デフォルト戦略（Strategist未応答）"
+        assert strategy6.model_used == "default"
+        assert strategy6.generated_at is None
 
-        # 7. recommended_cut_rate が不正な値（変換不可）である場合、例外をキャッチして default() になること
+        # 7. recommended_cut_rate が不正な値（変換不可）である場合、default() になること
         mock_response_invalid_cut_rate = MagicMock()
         mock_response_invalid_cut_rate.text = json.dumps({
             "summary": "不正なカット率",
+            "position_weights": {"intro": 1.0},
             "brand_alignment_score": 0.8,
             "recommended_cut_rate": "invalid_rate"
         })
         strategy7 = service._parse_response(mock_response_invalid_cut_rate, "test-model")
         assert strategy7.summary == "デフォルト戦略（Strategist未応答）"
+        assert strategy7.model_used == "default"
+        assert strategy7.generated_at is None
 
-        # 8. brand_alignment_score が不正な値（変換不可）である場合、0.5 が適用されること
+        # 8. brand_alignment_score が不正な値（変換不可）である場合も default() になること
+        #    （以前は 0.5 で埋めたうえで summary="不正なアライメントスコア" を
+        #      本物のモデル名付きで返していた。数値として読めない＝測れていない）
         mock_response_invalid_bas = MagicMock()
         mock_response_invalid_bas.text = json.dumps({
             "summary": "不正なアライメントスコア",
+            "position_weights": {"intro": 1.0},
             "brand_alignment_score": "invalid_score",
             "recommended_cut_rate": 0.5
         })
         strategy8 = service._parse_response(mock_response_invalid_bas, "test-model")
-        assert strategy8.brand_alignment_score == 0.5
-        assert strategy8.summary == "不正なアライメントスコア"
+        assert strategy8.summary == "デフォルト戦略（Strategist未応答）"
+        assert strategy8.model_used == "default"
+        assert strategy8.generated_at is None
 
     @pytest.mark.asyncio
     async def test_resolve_session_thumbnail_task_success(self, tmp_path):

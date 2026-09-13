@@ -103,18 +103,35 @@ export default function SoulPassport({ onClose }) {
                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '4px' }}>ADMIN (TECH)</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ background: 'var(--color-semantic-theme-indigo-bg)', color: 'var(--color-semantic-theme-indigo-dark)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                                    {admin.ranks?.tech_rank?.level || "Apprentice"}
+                                    {admin.ranks?.tech_rank?.level || "ランク未設定"}
                                 </div>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>XP {admin.ranks?.tech_rank?.xp || 0}</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>XP {admin.ranks?.tech_rank?.xp ?? '—'}</span>
                             </div>
                         </div>
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '4px' }}>OWNER (BIZ)</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                                    {owner.ranks?.biz_rank?.level || "Dreamer"}
+                                    {owner.ranks?.biz_rank?.level || "ランク未設定"}
                                 </div>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>XP {owner.ranks?.biz_rank?.xp || 0}</span>
+                                {/*
+                                  **この XP は作り物のチャンネル統計から出ている**
+                                  （R1.5-C4・2026-09-03 ユーザー決定）。
+                                  `calculated_xp = int(総再生 / 100)` で、総再生 4,500
+                                  （YouTube に一度も接続していない値）から XP 45 になる。
+                                  印は `backend/user_model_marks.py` が付ける。
+                                */}
+                                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
+                                    XP {owner.ranks?.biz_rank?.xp ?? '—'}
+                                    {owner.ranks?.biz_rank?.is_real === false && (
+                                        <span
+                                            title={owner.ranks.biz_rank.note || '作り物のチャンネル統計から計算した値です'}
+                                            style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '8px', background: 'rgba(245,158,11,0.15)', color: '#b45309', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'help' }}
+                                        >
+                                            未接続
+                                        </span>
+                                    )}
+                                </span>
                             </div>
                         </div>
                     </div>

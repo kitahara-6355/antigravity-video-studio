@@ -37,7 +37,7 @@ def test_module_load_without_model_registry():
 
     with patch.dict("sys.modules", {"model_registry": None}):
         import agents.adk_agent_template
-        assert agents.adk_agent_template.DEFAULT_MODEL == "gemini-2.5-flash"
+        assert agents.adk_agent_template.DEFAULT_MODEL == "gemini-3.6-flash"
 
 
 def test_resolve_model_from_registry_with_registry():
@@ -59,7 +59,7 @@ def test_resolve_model_from_registry_without_registry():
     with patch.dict("sys.modules", {"model_registry": None}):
         import agents.adk_agent_template
         model = agents.adk_agent_template._resolve_model_from_registry("custom_task")
-        assert model == "gemini-2.5-flash"
+        assert model == "gemini-3.6-flash"
 
 
 def test_create_agent_import_error():
@@ -325,7 +325,7 @@ def test_module_load_with_registry_exception():
     mock_get_model = MagicMock(side_effect=RuntimeError("Registry failed during import"))
     with patch.dict("sys.modules", {"model_registry": MagicMock(get_model=mock_get_model)}):
         import agents.adk_agent_template
-        assert agents.adk_agent_template.DEFAULT_MODEL == "gemini-2.5-flash"
+        assert agents.adk_agent_template.DEFAULT_MODEL == "gemini-3.6-flash"
 
 
 def test_resolve_model_from_registry_with_exception():

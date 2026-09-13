@@ -1348,6 +1348,22 @@ async def toggle_proofreading_skip(req: ProofreadingSkipRequest):
 # O-6: 品質チェックステージ API
 # ============================================================
 
+# **この品質スコアは動画を見て出した点ではない**（R1.5-C4・2026-08-28 ユーザー決定）。
+# `pipeline_default_states.INITIAL_QUALITY_GATE_STATE` の定数（音声88 / 映像82 /
+# 字幕90 / 構成80 → 加重平均 85）を返しているだけで、音声も映像も一切読まない。
+# **本線（`agents.pipeline_coordinator`）の品質ゲートとは別物。**
+# あちらは実走で 89・94 点を出しており、そちらが本物。
+#
+# ここは UI（`frontend/src/components/QualityGate.jsx`）が「QUALITY SCORE」として
+# 表示する経路なので、**印を付けないと画面上は実測値と区別が付かない。**
+# 台帳: `backend/config/feature_gaps.json` の `pipeline_quality_gate_ui`
+QUALITY_GATE_DATA_SOURCE = {
+    "data_source": "sample",
+    "is_real": False,
+    "note": "**動画を見て出した点ではありません。**この経路は UI の足場で、"
+            "定数を返しています。本物の品質ゲートは本線（agents）側にあります",
+}
+
 _quality_gate_state = get_initial_quality_gate_state()
 
 
@@ -1355,6 +1371,7 @@ _quality_gate_state = get_initial_quality_gate_state()
 async def get_quality_gate_status():
     """O6-01: 品質ゲートの状態取得"""
     return {
+        **QUALITY_GATE_DATA_SOURCE,
         "status": _quality_gate_state["status"],
         "overall_score": _quality_gate_state["overall_score"],
         "threshold": _quality_gate_state["threshold"],
@@ -1369,6 +1386,7 @@ async def get_quality_gate_scores():
     """O6-02: カテゴリ別スコア詳細"""
     categories = _quality_gate_state["categories"]
     return {
+        **QUALITY_GATE_DATA_SOURCE,
         "overall_score": _quality_gate_state["overall_score"],
         "threshold": _quality_gate_state["threshold"],
         "passed": _quality_gate_state["overall_score"] >= _quality_gate_state["threshold"],
@@ -1395,6 +1413,7 @@ async def get_quality_gate_drilldown(category: str):
     for c in _quality_gate_state["categories"]:
         if c["id"] == category:
             return {
+                **QUALITY_GATE_DATA_SOURCE,
                 "category": c["id"],
                 "name": c["name"],
                 "score": c["score"],
@@ -1469,6 +1488,7 @@ async def get_quality_improvement(req: QualityImproveRequest):
 
     suggestions.sort(key=lambda s: s["estimated_improvement"], reverse=True)
     return {
+        **QUALITY_GATE_DATA_SOURCE,
         "suggestions": suggestions,
         "count": len(suggestions),
         "estimated_total_improvement": sum(s["estimated_improvement"] for s in suggestions[:3]),
@@ -1479,6 +1499,7 @@ async def get_quality_improvement(req: QualityImproveRequest):
 async def get_quality_gate_history():
     """O6-05: 品質スコア履歴"""
     return {
+        **QUALITY_GATE_DATA_SOURCE,
         "history": _quality_gate_state.get("history", []),
         "count": len(_quality_gate_state.get("history", [])),
         "initial_score": _quality_gate_state["history"][0]["score"] if _quality_gate_state.get("history") else 0,
@@ -1493,7 +1514,9 @@ async def get_quality_gate_history():
 async def run_quality_check():
     """O6-06: 品質チェック実行"""
     _quality_gate_state["status"] = "checking"
-    _quality_gate_state["checked_at"] = datetime.now().isoformat()
+    # **検査していないのに「いま検査した」時刻を打たない**（R1.5-C4）。
+    # 下でやっているのは定数の加重平均を取り直すことだけで、動画は見ていない。
+    # 2周目・4周目で直した `last_sync = datetime.now()` と同型
 
     # 各カテゴリの重み付き平均を計算
     total_weighted = sum(c["score"] * c["weight"] for c in _quality_gate_state["categories"])
@@ -1507,6 +1530,7 @@ async def run_quality_check():
         _quality_gate_state["status"] = "failed"
 
     return {
+        **QUALITY_GATE_DATA_SOURCE,
         "status": _quality_gate_state["status"],
         "overall_score": overall,
         "threshold": _quality_gate_state["threshold"],
@@ -1518,6 +1542,21 @@ async def run_quality_check():
 # O-7: 品質改善ループ API
 # ============================================================
 
+# **このループは動画を直していない**（R1.5-C4）。
+# `apply` がやっているのは `current_score` に定数 +4 を足すことだけで、
+# 音量正規化もビットレート最適化も実際には走らない。初期値の 72 も
+# `pipeline_default_states` の定数であって、何かを測った点ではない。
+#
+# 上の O-6（`QUALITY_GATE_DATA_SOURCE`）と**同じ定数群を出所にしている**のに、
+# 5周目はこちらへ印を付け忘れた。O-6 の 190 行下にある。
+# 台帳: `backend/config/feature_gaps.json` の `pipeline_quality_gate_ui`
+IMPROVEMENT_DATA_SOURCE = {
+    "data_source": "sample",
+    "is_real": False,
+    "note": "**動画を直した結果ではありません。**この改善ループは UI の足場で、"
+            "加点をシミュレートしています。本物の品質ゲートは本線（agents）側にあります",
+}
+
 _improvement_state = get_initial_improvement_state()
 
 
@@ -1525,6 +1564,7 @@ _improvement_state = get_initial_improvement_state()
 async def get_improvement_status():
     """O7-01: 改善ループ進捗"""
     return {
+        **IMPROVEMENT_DATA_SOURCE,
         "status": _improvement_state["status"],
         "iteration": _improvement_state["iteration"],
         "max_iterations": _improvement_state["max_iterations"],
@@ -1540,6 +1580,7 @@ async def get_improvement_status():
 async def get_improvement_actions():
     """O7-02: アクション一覧"""
     return {
+        **IMPROVEMENT_DATA_SOURCE,
         "actions": _improvement_state["actions"],
         "count": len(_improvement_state["actions"]),
         "applied": _improvement_state["applied_actions"],
@@ -1576,6 +1617,7 @@ async def apply_improvement_action(action_id: str):
             })
 
             return {
+                **IMPROVEMENT_DATA_SOURCE,
                 "status": "applied",
                 "action_id": action_id,
                 "action_name": action["name"],
@@ -1592,6 +1634,7 @@ async def apply_improvement_action(action_id: str):
 async def get_improvement_score_change():
     """O7-04: スコア変化推移"""
     return {
+        **IMPROVEMENT_DATA_SOURCE,
         "score_history": _improvement_state["score_history"],
         "initial_score": _improvement_state["initial_score"],
         "current_score": _improvement_state["current_score"],
@@ -1604,7 +1647,8 @@ async def get_improvement_score_change():
 async def abort_improvement_loop():
     """O7-05: 改善ループ中止"""
     if _improvement_state["status"] == "aborted":
-        return {"status": "already_aborted", "message": "改善ループは既に中止されています"}
+        return {**IMPROVEMENT_DATA_SOURCE,
+                "status": "already_aborted", "message": "改善ループは既に中止されています"}
 
     _improvement_state["status"] = "aborted"
     # 未完了アクションをスキップ
@@ -1615,6 +1659,7 @@ async def abort_improvement_loop():
             skipped_count += 1
 
     return {
+        **IMPROVEMENT_DATA_SOURCE,
         "status": "aborted",
         "message": "改善ループを中止しました",
         "skipped_actions": skipped_count,
@@ -1640,4 +1685,5 @@ async def reset_improvement_loop():
         action["score_after"] = None
     _improvement_state["actions"][0]["score_before"] = 72
 
-    return {"status": "reset", "message": "改善ループをリセットしました"}
+    return {**IMPROVEMENT_DATA_SOURCE,
+            "status": "reset", "message": "改善ループをリセットしました"}

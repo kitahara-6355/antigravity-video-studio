@@ -26,10 +26,10 @@ def _get_current_model() -> str:
         from model_governance import model_governance
         return model_governance._resolve_model("proofreader")
     except (ImportError, ModuleNotFoundError):
-        return "gemini-2.5-flash"
+        return "gemini-3.6-flash"
     except Exception as e:
         logger.warning(f"モデルの解決に失敗しました。デフォルトを使用します: {e}")
-        return "gemini-2.5-flash"
+        return "gemini-3.6-flash"
 
 logger = logging.getLogger(__name__)
 

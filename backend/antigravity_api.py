@@ -276,7 +276,12 @@ async def run_self_review(content: Dict):
             generation_type=content.get("type", "unknown"),
             context=content.get("context", {})
         )
+        詳細 = getattr(result.score, "details", None) or {}
         return {
+            # **レビューできなかったことを応答で名乗る**（R1.5-C4）。
+            # 以前は AI が落ちても `passed: true / score: 0.75` が返っていた
+            "scored": 詳細.get("scored", True),
+            "is_real": 詳細.get("is_real", True),
             "passed": result.passed,
             "score": result.score.overall,
             "issues": result.issues

@@ -121,12 +121,59 @@ async def list_themes():
 # UX-5修正: 管理者向けテンプレート選択統計
 # ============================================================
 
+# 集計できなかったときの印（R1.5-C4・19周目）。
+#
+# 以前は台帳（backend/branding/evolution_log.json）が
+# 「無い・空・壊れている・読めない」どの場合でも
+# `{"stats": {}, "total_selections": 0}` を返していた。
+# **「集計できなかった」が「集計して0件だった」に化けていた。**
+#
+# なぜ問題か: この応答は管理者向けのテンプレート選択統計（getTemplateStats）が
+# そのまま画面に描く数字で、「これまでに何回選ばれたか」として読まれる。
+# 台帳を見失っていても「誰も選んでいません」と表示されるので、
+# 記録が飛んでいることに気付けない。0 は**実際に取りうる値**なので印にならない。
+_集計できなかった印 = {
+    "checked": False,
+    "is_real": False,
+    "data_source": "unavailable",
+    "note": "**テンプレート選択の台帳を集計できませんでした。**"
+            "0 件だったのではありません（台帳が無い・空・壊れている・読めない）",
+}
+
+
+def _集計不能(skip_reason: str) -> Dict[str, Any]:
+    """集計できなかったときの応答を組み立てる（R1.5-C4・19周目）。
+
+    数え上げた値は 0 ではなく `None` にする。**0 は「集計して0件だった」
+    という実在しうる結果と同じ形**なので、印の役目を果たさない。
+    どの理由で集計できなかったかは `skip_reason` に残す
+    （`quality_gate_plugins.run_all_plugins` の checked/skip_reason と同じ作法）。
+    """
+    return {
+        "stats": {},
+        "total_selections": None,
+        "by_template": {},
+        "by_theme": {},
+        "avg_satisfaction": {},
+        "rated_counts": {},
+        "unrated_templates": [],
+        "skipped_entries": None,
+        "recent": [],
+        "skip_reason": skip_reason,
+        **_集計できなかった印,
+    }
+
+
 @router.get("/stats")
 async def get_template_stats():
     """
     テンプレート選択統計（管理者向け）。
 
     evolution_log の template_selections を集計。
+
+    **集計できなかったときは数字を名乗らない**（R1.5-C4・19周目）。
+    `checked: False` / `total_selections: None` が「集計できなかった」、
+    `checked: True` / `total_selections: 0` が「集計して0件だった」。
     """
     import json
     from pathlib import Path
@@ -135,34 +182,47 @@ async def get_template_stats():
     try:
         log_path = _writable_path("backend/branding/evolution_log.json")
         if not log_path.exists():
-            return {"stats": {}, "total_selections": 0}
+            # 台帳そのものが無い。選択が1件も無いのか、置き場が変わって
+            # 見失ったのかは**ここでは区別できない**ので 0 とは言わない
+            return _集計不能("ledger_missing")
 
         try:
             content = log_path.read_text(encoding="utf-8")
             if not content.strip():
-                return {"stats": {}, "total_selections": 0}
+                # 0 バイト = 書き込みが途中で切れた跡。空の集計結果ではない
+                return _集計不能("ledger_empty_file")
             data = json.loads(content)
         except (json.JSONDecodeError, OSError) as e:
             logger.error(f"Failed to read or parse evolution_log.json: {e}")
-            return {"stats": {}, "total_selections": 0}
+            return _集計不能(f"ledger_unreadable: {type(e).__name__}")
 
         if not isinstance(data, dict):
-            return {"stats": {}, "total_selections": 0}
+            return _集計不能("ledger_not_object")
 
         selections = data.get("template_selections", [])
-        if not isinstance(selections, list):
+        if selections is None:
+            # 鍵はあるが null。鍵が無い場合（上の既定値 []）と同じく
+            # **台帳は読めていて記録が1件も無い＝本物の 0 件**なので、
+            # 下の通常経路で集計してそう名乗る
             selections = []
+        if not isinstance(selections, list):
+            # 鍵はあるが型が違う。中身を捨てて 0 と言うのは
+            # 「集計して0件だった」の偽装になる
+            return _集計不能("selections_not_list")
 
         # テンプレート別集計
         template_counts = Counter()
         theme_counts = Counter()
         sat_by_template = {}
+        skipped_entries = 0
 
         for s in selections:
             if not isinstance(s, dict):
+                skipped_entries += 1
                 continue
             tid = s.get("template_id", "")
             if not isinstance(tid, str) or not tid:
+                skipped_entries += 1
                 continue
 
             theme_id = s.get("theme_id", "")
@@ -176,29 +236,53 @@ async def get_template_stats():
             sat = s.get("satisfaction")
             if tid not in sat_by_template:
                 sat_by_template[tid] = []
-            if isinstance(sat, (int, float)):
+            # bool は int の一種なので、`satisfaction: true` を 1 点として
+            # 数えないよう除く（評価ではない値を平均に混ぜない）
+            if isinstance(sat, (int, float)) and not isinstance(sat, bool):
                 sat_by_template[tid].append(sat)
 
         avg_satisfaction = {}
+        rated_counts = {}
+        unrated_templates = []
         for tid, sats in sat_by_template.items():
+            rated_counts[tid] = len(sats)
             if sats:
                 avg_satisfaction[tid] = round(sum(sats) / len(sats), 1)
             else:
-                avg_satisfaction[tid] = 3.0
+                # 以前ここは `avg_satisfaction[tid] = 3.0` だった。
+                # **誰も評価していないのに 5 段階の中央値を「平均満足度」として
+                # 返していた。** 管理者向けの統計画面（getTemplateStats）は
+                # これを実際に付いた評価として描くので、
+                # 「まあまあの評価が集まっている」と読めてしまう。
+                # 3.0 は実在しうる平均値なので印にならない。
+                # **評価が1件も無いなら平均を名乗らない**（R1.5-C4・19周目）
+                avg_satisfaction[tid] = None
+                unrated_templates.append(tid)
 
         return {
             "total_selections": sum(template_counts.values()),
             "by_template": dict(template_counts),
             "by_theme": dict(theme_counts),
             "avg_satisfaction": avg_satisfaction,
+            # 各平均が何件の評価に支えられているか。0 件のテンプレートは
+            # 上で None になっている
+            "rated_counts": rated_counts,
+            "unrated_templates": unrated_templates,
+            # 数え落とした行数。全部数えられたのか一部を捨てたのかを区別する
+            "skipped_entries": skipped_entries,
             "recent": [s for s in selections if isinstance(s, dict)][-5:],
+            # ここまで来たときだけ「実際に台帳を読んで数えた」と名乗る。
+            # 満足度は上の None が個別の印なので、この旗は件数についてのもの
+            "checked": True,
+            "is_real": True,
+            "data_source": "measured",
         }
     except HTTPException:
         raise
     except (TypeError, ValueError, KeyError, AttributeError, OSError, RuntimeError) as e:
         logger.error(f"Failed to get template stats: {e}")
         _register_router_technical_debt(
-            line_number=193,
+            line_number=281,
             notes=f"Get template stats exception: {str(e)}",
             pattern="except (TypeError, ValueError, KeyError, AttributeError, OSError, RuntimeError) as e:",
         )
@@ -587,7 +671,15 @@ def _record_template_selection(template_id: str, theme_id: str):
             "template_id": template_id,
             "theme_id": theme_id,
             "timestamp": datetime.now().isoformat(),
-            "satisfaction": 3,  # デフォルト中立。後から更新可能。
+            # 以前ここは `"satisfaction": 3,  # デフォルト中立。後から更新可能。`
+            # だった。**誰も評価していないのに 3 が台帳へ焼き付く**ので、
+            # 統計側で 3.0 を止めても「実測の評価が 3 だった」と読める値が
+            # 残り続ける（管理者向けの統計画面 getTemplateStats が
+            # 「平均満足度」として描く）。作り物を台帳に書かない
+            # （R1.5-C4・19周目）。
+            # 推奨エンジン（template_recommender）は satisfaction が None の行を
+            # 中立として扱う枝を既に持っているので、推奨の挙動は変わらない
+            "satisfaction": None,
         })
 
         # 最新100件のみ保持

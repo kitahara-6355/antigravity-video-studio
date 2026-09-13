@@ -25,3 +25,4 @@ chromadb
 
 # CI で ModuleNotFoundError になったため追加（音声認識）
 faster-whisper
+

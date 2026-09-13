@@ -22,7 +22,7 @@ from typing import Dict, Any, List, Optional
 try:
     from model_registry import get_model
 except ImportError:
-    def get_model(task): return "gemini-2.5-flash"
+    def get_model(task): return "gemini-3.6-flash"
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,24 @@ class ThumbnailAnalyzer:
 
 回答は以下のJSON形式のみ。説明文は不要:
 {"face_score":85,"text_score":70,"contrast_score":90,"composition_score":75,"overall_impression":"...","top_improvement":"..."}"""
+
+    # ━━━ R1.5-C4（19周目）: Vision の採点を「読めたか」で判定するための定義 ━━━
+    # 4軸の採点キー。ここに無いキーで返ってきた応答は「別スキーマ」であって採点ではない
+    _採点キー = ("face_score", "text_score", "contrast_score", "composition_score")
+
+    # 採点を読めなかった軸に入れる文言。**点数を名乗らない**（None のまま）
+    _未計測の提案 = "Vision APIの採点が読めなかったため、この軸の改善提案は出せません"
+    _未計測の説明 = "Vision APIの応答にこの軸の採点が無く、**採点されていません**"
+
+    @staticmethod
+    def _読める採点(値: Any) -> bool:
+        """0〜100 の数値として読めた採点だけを本物とみなす（fail-closed・R1.5-C4）。
+
+        bool は int の派生なので明示的に弾く（`True` を黙って 1 点として扱わないため）。
+        """
+        if isinstance(値, bool) or not isinstance(値, (int, float)):
+            return False
+        return 0 <= 値 <= 100
 
     def analyze(self, thumbnail_concept: Dict[str, Any]) -> Dict[str, Any]:
         """サムネイルコンセプトの品質分析（テキストマッチ版）"""
@@ -86,6 +104,47 @@ class ThumbnailAnalyzer:
             "analysis_mode": "text_match",
         }
 
+    # **画像を一度も開けなかったときの軸名**（R1.5-C4・20周目 CE-3）
+    _軸名 = ("顔クローズアップ", "テキスト可読性", "カラーコントラスト", "構図パターン")
+
+    def _画像を見ていない結果(self, 理由: str) -> Dict[str, Any]:
+        """画像を一度も解析していないことを結果に残す（R1.5-C4・20周目 CE-3）。
+
+        ここは以前 `self.analyze({"concept": path.stem})` の戻り値を素で返していた。
+        `analyze()` は `text_overlay` も `style` も無い辞書を採点するので、
+        **ファイル名の長さを「テキスト可読性」として採点**し、
+        「テキスト12文字 — モバイルでギリギリ読める」のような**画像を見ていない所見**と
+        総合点 57.5 / `verdict: "❌ 要修正"` を 200 で返していた。
+        `is_real` / `data_source` の印は1つも無かった。
+
+        **部分失敗（1軸だけ読めない）では総合点を出さないのに、
+        4軸すべてを一度も見ていないこの経路だけが点を出す**という逆転が起きていた。
+        """
+        return {
+            "overall_score": None,
+            "verdict": None,
+            "checks": [
+                {
+                    "name": 名前,
+                    "score": None,
+                    "status": "❓",
+                    "detail": "画像を解析していません（**採点されていません**）",
+                    "suggestion": "画像を解析できていないため、この軸の改善提案は出せません",
+                    "is_real": False,
+                    "data_source": "unavailable",
+                }
+                for 名前 in self._軸名
+            ],
+            "predicted_ctr_impact": None,
+            "top_improvement": None,
+            "overall_impression": None,
+            "analysis_mode": "image_unanalyzed",
+            "is_real": False,
+            "data_source": "unavailable",
+            "unavailable_reason": 理由,
+            "unscored_axes": list(self._軸名),
+        }
+
     def analyze_image(self, image_path: str) -> Dict[str, Any]:
         """IMP-007: Gemini Vision APIによる実画像分析
 
@@ -98,14 +157,14 @@ class ThumbnailAnalyzer:
         path = Path(image_path)
         if not path.exists():
             logger.warning(f"サムネイル画像が見つかりません: {image_path}")
-            return self.analyze({"concept": path.stem})
+            return self._画像を見ていない結果(f"画像が見つかりません: {image_path}")
 
         try:
             from gemini_client_factory import get_gemini_client
             client = get_gemini_client()
             if client is None:
-                logger.info("Gemini API未設定 — テキスト分析にフォールバック")
-                return self.analyze({"concept": path.stem})
+                logger.info("Gemini API未設定 — 画像は解析できません")
+                return self._画像を見ていない結果("Gemini API が未設定のため画像を解析していません")
 
             # 画像をBase64エンコード
             image_bytes = path.read_bytes()
@@ -132,20 +191,48 @@ class ThumbnailAnalyzer:
             # JSON抽出
             result = self._parse_vision_api_response(response.text)
 
-            face_score = result.get("face_score", 50)
-            text_score = result.get("text_score", 50)
-            contrast_score = result.get("contrast_score", 50)
-            composition_score = result.get("composition_score", 50)
+            # ── R1.5-C4（19周目）: 採点キーが読めなかった軸の点を名乗らない ──
+            # 以前ここは `result.get("face_score", 50)` の4連発だった。
+            # Gemini Vision が **JSON としては通るが採点キーを持たない**応答
+            # （キー欠落・別スキーマ・数値でない値）を返すと、4軸すべてが黙って
+            # 50 点に化け、overall_score 50.0 / verdict「⚠️ 改善推奨」/
+            # detail「Vision API分析: 50点」/ analysis_mode「gemini_vision」を返していた。
+            # つまり**画像を一度も採点できていないのに「Vision API で分析した 50点」**を名乗る。
+            # この戻り値は backend/routers/youtube_optimizer.py の
+            # analyze_thumbnail_image がそのまま応答として返すので、
+            # サムネイル品質の判断材料として画面まで届いていた。
+            # JSONDecodeError のときだけ text_match に落ちて正直だったので、
+            # **「パースは通るが中身が違う」経路にだけ印が無かった**（gate-verifier 19周目）。
+            採点 = {}
+            未計測の軸 = []
+            for キー in self._採点キー:
+                値 = result.get(キー)
+                if self._読める採点(値):
+                    採点[キー] = 値
+                else:
+                    採点[キー] = None
+                    未計測の軸.append(キー)
 
-            min_score = min(face_score, text_score, contrast_score, composition_score)
+            face_score = 採点["face_score"]
+            text_score = 採点["text_score"]
+            contrast_score = 採点["contrast_score"]
+            composition_score = 採点["composition_score"]
+
+            # 最低点は**読めた軸だけ**で決める。全部読めなければ最低点も無い
+            読めた点 = [点 for 点 in 採点.values() if 点 is not None]
+            min_score = min(読めた点) if 読めた点 else None
 
             # 各項目の suggestion 決定ロジック
-            if face_score == min_score:
+            if face_score is None:
+                face_sugg = self._未計測の提案
+            elif face_score == min_score:
                 face_sugg = result.get("top_improvement", "改善提案なし")
             else:
                 face_sugg = "顔が画面の30%以上を占めるようにする" if face_score >= 70 else "驚き顔・リアクション顔を追加するとCTR +1.5%の可能性"
 
-            if text_score == min_score:
+            if text_score is None:
+                text_sugg = self._未計測の提案
+            elif text_score == min_score:
                 text_sugg = result.get("top_improvement", "改善提案なし")
             else:
                 if text_score >= 80:
@@ -155,7 +242,9 @@ class ThumbnailAnalyzer:
                 else:
                     text_sugg = "10文字以内に大胆に削減すること"
 
-            if contrast_score == min_score:
+            if contrast_score is None:
+                contrast_sugg = self._未計測の提案
+            elif contrast_score == min_score:
                 contrast_sugg = result.get("top_improvement", "改善提案なし")
             else:
                 if contrast_score >= 80:
@@ -165,42 +254,62 @@ class ThumbnailAnalyzer:
                 else:
                     contrast_sugg = "暗い背景色 or ビビッドカラーに変更してコントラストを確保"
 
-            if composition_score == min_score:
+            if composition_score is None:
+                composition_sugg = self._未計測の提案
+            elif composition_score == min_score:
                 composition_sugg = result.get("top_improvement", "改善提案なし")
             else:
                 composition_sugg = "視線誘導の矢印やフレームを追加するとさらに効果的" if composition_score >= 70 else "Before/After比較、大きな数字、矢印のいずれかを追加"
 
-            # 統一フォーマットに変換
+            # 統一フォーマットに変換。
+            # **採点を読めた軸だけが「Vision API分析: N点」を名乗る**（R1.5-C4・19周目）。
+            # 読めなかった軸は score を None にする — 0 も 50 も「実際に取りうる点」なので、
+            # 数字を入れた時点で未計測の印にならない。
+            def _軸(名前: str, 点, 提案: str) -> Dict[str, Any]:
+                if 点 is None:
+                    return {
+                        "name": 名前,
+                        "score": None,
+                        "status": "❓",
+                        "detail": self._未計測の説明,
+                        "suggestion": 提案,
+                        "is_real": False,
+                        "data_source": "unavailable",
+                    }
+                return {
+                    "name": 名前,
+                    "score": 点,
+                    "status": self._get_status_icon(点),
+                    "detail": f"Vision API分析: {点}点",
+                    "suggestion": 提案,
+                    "is_real": True,
+                    "data_source": "gemini_vision",
+                }
+
             checks = [
-                {
-                    "name": "顔クローズアップ",
-                    "score": face_score,
-                    "status": self._get_status_icon(face_score),
-                    "detail": f"Vision API分析: {face_score}点",
-                    "suggestion": face_sugg,
-                },
-                {
-                    "name": "テキスト可読性",
-                    "score": text_score,
-                    "status": self._get_status_icon(text_score),
-                    "detail": f"Vision API分析: {text_score}点",
-                    "suggestion": text_sugg,
-                },
-                {
-                    "name": "カラーコントラスト",
-                    "score": contrast_score,
-                    "status": self._get_status_icon(contrast_score),
-                    "detail": f"Vision API分析: {contrast_score}点",
-                    "suggestion": contrast_sugg,
-                },
-                {
-                    "name": "構図パターン",
-                    "score": composition_score,
-                    "status": self._get_status_icon(composition_score),
-                    "detail": f"Vision API分析: {composition_score}点",
-                    "suggestion": composition_sugg,
-                },
+                _軸("顔クローズアップ", face_score, face_sugg),
+                _軸("テキスト可読性", text_score, text_sugg),
+                _軸("カラーコントラスト", contrast_score, contrast_sugg),
+                _軸("構図パターン", composition_score, composition_sugg),
             ]
+
+            if 未計測の軸:
+                # **1軸でも読めていないなら、総合点も判定も CTR 予測も名乗らない**（R1.5-C4・19周目）。
+                # 読めた軸だけの平均は「4軸で採点した総合点」ではないので、
+                # 数字を出した時点で偽の実測になる。analysis_mode も gemini_vision を名乗らない —
+                # 名乗ってよいのは 4軸すべての採点を実際に読めたときだけ。
+                return {
+                    "overall_score": None,
+                    "verdict": None,
+                    "checks": checks,
+                    "predicted_ctr_impact": None,
+                    "top_improvement": result.get("top_improvement"),
+                    "overall_impression": result.get("overall_impression"),
+                    "analysis_mode": "vision_unscored",
+                    "is_real": False,
+                    "data_source": "unavailable",
+                    "unscored_axes": 未計測の軸,
+                }
 
             scores = [c["score"] for c in checks]
             avg_score = round(sum(scores) / len(scores), 1)
@@ -213,17 +322,21 @@ class ThumbnailAnalyzer:
                 "top_improvement": result.get("top_improvement", "改善提案なし"),
                 "overall_impression": result.get("overall_impression", ""),
                 "analysis_mode": "gemini_vision",
+                # 4軸すべての採点を実際に読めた実測。印を付けて、上の未計測の戻り値と区別できるようにする
+                "is_real": True,
+                "data_source": "gemini_vision",
+                "unscored_axes": [],
             }
 
         except json.JSONDecodeError as jde:
-            logger.error(f"Gemini Vision分析応答パースエラー — テキスト分析にフォールバック: {jde}")
+            logger.error(f"Gemini Vision分析応答パースエラー — 画像は解析できません: {jde}")
             logger.debug(f"Failed to parse text: {response.text if 'response' in locals() else 'None'}", exc_info=True)
-            return self.analyze({"concept": path.stem})
+            return self._画像を見ていない結果(f"Vision の応答を解釈できませんでした: {type(jde).__name__}")
         except Exception as e:
-            logger.error(f"Gemini Vision分析エラー — テキスト分析にフォールバック: {e}")
+            logger.error(f"Gemini Vision分析エラー — 画像は解析できません: {e}")
             # TDRへの登録等がない場合でも、例外トレースが確実にログに出るようにする
             logger.debug("Gemini Vision API fallback stack trace:", exc_info=True)
-            return self.analyze({"concept": path.stem})
+            return self._画像を見ていない結果(f"Vision の呼び出しに失敗しました: {type(e).__name__}")
 
     def _check_face_closeup(self, concept: Dict) -> Dict:
         """顔のクローズアップ比率（CTRに最も影響する要因）"""

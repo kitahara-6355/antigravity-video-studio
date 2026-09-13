@@ -449,11 +449,21 @@ class TickLoop:
                     from agents.memory.verified_facts import verified_facts_store
 
                     video = knowledge.get("video", "unknown")
-                    score = knowledge.get("quality_score", 0)
+                    score = knowledge.get("quality_score")
                     corrections = knowledge.get("total_corrections", 0)
                     retries = knowledge.get("retries_used", 0)
 
-                    if score > 0:
+                    # **番兵値で「測ったか」を判断しない**（R1.5-C4・12周目の指摘）。
+                    # `score > 0` は、未計測の 0 を「測って 0 点」と同じ枠で扱う
+                    # 読み方で、9周目に本線で根治したのと同じ型。しかもここが書くのは
+                    # `VERIFIED_FACTS.md`（**恒久的に残る「確かめた事実」**）なので、
+                    # 取り違えると作り物が事実として焼き付く。
+                    # 旧い記録には旗が無いので、**旗が無ければ採点していないとみなす**
+                    # （fail-closed）。
+                    採点した = bool(knowledge.get("quality_scored")) and isinstance(
+                        score, (int, float))
+
+                    if 採点した:
                         verified_facts_store.add_fact(
                             category="lesson",
                             content=f"制作実績: {video} → 品質スコア{score}点",

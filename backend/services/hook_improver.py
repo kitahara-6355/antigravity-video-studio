@@ -15,7 +15,19 @@ import os
 try:
     from model_registry import get_model
 except ImportError:
-    def get_model(task): return "gemini-2.5-flash"
+    # **モデル ID を直書きしない**（R1.5-C6）。正典は model_config.json で、
+    # それを読む解決器が model_policy（標準ライブラリだけに依存するので
+    # model_registry より落ちにくい）。直書きの既定値は入替のたびに腐り、
+    # 実際それで 2026-10-16 に提供終了する 2.5 系が本番の実行経路に居座った。
+    def get_model(task):
+        # **import は関数の中で行う。** module 直下に置くと、`backend/` が
+        # sys.path に無いときに import 自体が落ち、従来なら起動できた場面で
+        # モジュールごと死ぬ（R1.5-C6・gate-verifier 2周目の指摘）
+        try:
+            from model_policy import resolve
+        except ImportError:
+            from backend.model_policy import resolve
+        return resolve(task).model
 
 logger = logging.getLogger(__name__)
 

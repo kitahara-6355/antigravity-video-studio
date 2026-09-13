@@ -68,11 +68,28 @@ class APIConnectionRequest(BaseModel):
 
 # ── 状態管理 (インメモリ) ──
 
+# **これは実在のチャンネルの数字ではない**（R1.5-C4）。
+# `_video_data` も `_template_data` も、下の `/retention-trend` が式で組み立てる
+# 30日分の維持率も、すべて作り物。**YouTube Analytics には一度も接続していない。**
+# 収益化の到達度をこの数字で判断すると嘘になるので、返すときは `DATA_SOURCE` を
+# 必ず添える。`admin_channel_router` と同じ扱い（2026-08-28 に揃えた。
+# それまでこのファイルだけ無印で、`connected: true` と現在時刻の `last_sync` を
+# 返していた — **いま同期したように見える**のが特に悪い）。
+# 台帳: `backend/config/feature_gaps.json` の `channel_stats`
+DATA_SOURCE = {
+    "data_source": "sample",
+    "is_real": False,
+    "note": "**実在のチャンネルの数字ではありません。**YouTube Analytics には"
+            "接続していません（未実装）。収益化の判断には使えません",
+}
+
 _kpi_settings = {"target_ctr": 5.0, "target_retention": 50.0}
 _api_connection = {
-    "connected": True,
+    # **接続していないので False。** 2026-08-28 まで True を返していた
+    "connected": False,
     "update_interval_minutes": 60,
-    "last_sync": datetime.now().isoformat(),
+    # **現在時刻を入れない。** 一度も同期していない
+    "last_sync": None,
     "enabled": True,
 }
 _applied_suggestions: List[int] = []
@@ -115,6 +132,7 @@ async def get_analytics_dashboard():
     try:
         avg_ctr, avg_retention = _calculate_average_metrics(_video_data)
         return {
+            **DATA_SOURCE,
             "title": "YouTube Analytics連携",
             "status": "connected" if _api_connection["connected"] else "disconnected",
             "kpi_summary": {
@@ -157,7 +175,7 @@ async def get_ctr_trend():
             "date": date.strftime("%Y-%m-%d"),
             "ctr": round(min(base_ctr, 8.0), 2),
         })
-    return {"history": history, "period_days": 30}
+    return {**DATA_SOURCE, "history": history, "period_days": 30}
 
 
 # ── S3: 維持率推移 ──
@@ -174,7 +192,7 @@ async def get_retention_trend():
             "date": date.strftime("%Y-%m-%d"),
             "retention": round(min(base_retention, 65.0), 1),
         })
-    return {"history": history, "period_days": 30}
+    return {**DATA_SOURCE, "history": history, "period_days": 30}
 
 
 # ── S4: 動画別実績 ──
@@ -182,7 +200,7 @@ async def get_retention_trend():
 @router.get("/video-performance")
 async def get_video_performance():
     """A-3 S4: 動画別のCTR/維持率/再生数の比較"""
-    return {"videos": _video_data, "total": len(_video_data)}
+    return {**DATA_SOURCE, "videos": _video_data, "total": len(_video_data)}
 
 
 # ── S5: ベンチマーク ──
@@ -195,6 +213,7 @@ async def get_benchmark():
         industry_avg_ctr = 3.5
         industry_avg_retention = 40.0
         return {
+            **DATA_SOURCE,
             "industry_avg": {
                 "ctr": industry_avg_ctr,
                 "retention": industry_avg_retention,
@@ -221,7 +240,7 @@ async def get_benchmark():
 @router.get("/template-effect")
 async def get_template_effect():
     """A-3 S6: テンプレート別の効果分析"""
-    return {"templates": _template_data, "total": len(_template_data)}
+    return {**DATA_SOURCE, "templates": _template_data, "total": len(_template_data)}
 
 
 # ── S7: SmartCut効果 ──
@@ -229,7 +248,7 @@ async def get_template_effect():
 @router.get("/smartcut-effect")
 async def get_smartcut_effect():
     """A-3 S7: SmartCut設定別の維持率効果分析"""
-    return {"settings": _smartcut_settings, "total": len(_smartcut_settings)}
+    return {**DATA_SOURCE, "settings": _smartcut_settings, "total": len(_smartcut_settings)}
 
 
 # ── S8: AI提案効果 ──
@@ -238,6 +257,7 @@ async def get_smartcut_effect():
 async def get_ai_suggestion_effect():
     """A-3 S8: AI提案採用/却下別のパフォーマンス比較"""
     return {
+        **DATA_SOURCE,
         "adopted": {
             "count": 15,
             "avg_ctr": 5.4,
@@ -261,6 +281,7 @@ async def get_ai_suggestion_effect():
 async def get_chapter_effect():
     """A-3 S9: チャプター有無による視聴行動の差分"""
     return {
+        **DATA_SOURCE,
         "with_chapters": {
             "avg_retention": 53.2,
             "avg_watch_time_min": 8.5,
@@ -284,6 +305,7 @@ async def get_chapter_effect():
 async def get_thumbnail_effect():
     """A-3 S10: サムネイル選択とCTR of 相関"""
     return {
+        **DATA_SOURCE,
         "thumbnails": [
             {"type": "text_overlay", "avg_ctr": 5.8, "count": 10},
             {"type": "face_close_up", "avg_ctr": 6.2, "count": 7},
@@ -300,7 +322,8 @@ async def get_thumbnail_effect():
 @router.get("/improvement-suggestions")
 async def get_improvement_suggestions():
     """A-3 S11: データ駆動の改善提案一覧"""
-    return {"suggestions": _improvement_suggestions, "total": len(_improvement_suggestions)}
+    return {**DATA_SOURCE, "suggestions": _improvement_suggestions,
+            "total": len(_improvement_suggestions)}
 
 
 # ── S12: 提案適用 ──
@@ -314,7 +337,8 @@ async def apply_suggestion(req: ApplySuggestionRequest):
             raise HTTPException(status_code=404, detail=f"Suggestion ID {req.suggestion_id} not found")
         suggestion["applied"] = True
         _applied_suggestions.append(req.suggestion_id)
-        return {"status": "applied", "suggestion_id": req.suggestion_id, "applied_at": datetime.now().isoformat()}
+        return {**DATA_SOURCE, "status": "applied", "suggestion_id": req.suggestion_id,
+                "applied_at": datetime.now().isoformat()}
     except HTTPException:
         raise
     except (KeyError, TypeError, ValueError) as e:
@@ -326,7 +350,7 @@ async def apply_suggestion(req: ApplySuggestionRequest):
 @router.get("/kpi-settings")
 async def get_kpi_settings():
     """KPI設定の現在値を取得"""
-    return _kpi_settings
+    return {**DATA_SOURCE, **_kpi_settings}
 
 
 @router.post("/kpi-settings")
@@ -343,7 +367,7 @@ async def update_kpi_settings(req: KPISettingRequest):
             raise HTTPException(status_code=400, detail=f"Invalid target_retention: {req.target_retention}. Must be 100.0 or less")
         _kpi_settings["target_ctr"] = req.target_ctr
         _kpi_settings["target_retention"] = req.target_retention
-        return {"status": "updated", **_kpi_settings}
+        return {**DATA_SOURCE, "status": "updated", **_kpi_settings}
     except HTTPException:
         raise
     except (KeyError, TypeError, ValueError) as e:
@@ -360,6 +384,7 @@ async def get_kpi_achievement():
         ctr_rate = min(100.0, (avg_ctr / max(_kpi_settings["target_ctr"], 0.01)) * 100)
         retention_rate = min(100.0, (avg_retention / max(_kpi_settings["target_retention"], 0.01)) * 100)
         return {
+            **DATA_SOURCE,
             "target": _kpi_settings.copy(),
             "actual": {
                 "ctr": round(avg_ctr, 1),
@@ -383,6 +408,7 @@ async def get_kpi_achievement():
 async def get_trend_analysis():
     """A-3 S15: 視聴者の興味トレンド分析"""
     return {
+        **DATA_SOURCE,
         "trends": [
             {"topic": "AI動画編集", "score": 92, "direction": "rising"},
             {"topic": "YouTubeショート", "score": 85, "direction": "rising"},
@@ -400,6 +426,7 @@ async def get_trend_analysis():
 async def get_competitor_analysis():
     """A-3 S16: 類似チャンネルとのパフォーマンス比較"""
     return {
+        **DATA_SOURCE,
         "competitors": [
             {"name": "チャンネルA", "subscribers": 25000, "avg_ctr": 4.2, "avg_retention": 45.5},
             {"name": "チャンネルB", "subscribers": 18000, "avg_ctr": 5.1, "avg_retention": 48.2},
@@ -420,6 +447,7 @@ async def generate_report(req: ReportGenerateRequest):
         if req.period not in valid_periods:
             raise HTTPException(status_code=400, detail=f"Invalid period: {req.period}. Must be one of {valid_periods}")
         return {
+            **DATA_SOURCE,
             "status": "generated",
             "period": req.period,
             "download_url": f"/api/admin/analytics/download/report_{req.period}.pdf",
@@ -436,7 +464,7 @@ async def generate_report(req: ReportGenerateRequest):
 @router.get("/api-connection")
 async def get_api_connection():
     """A-3 S18: YouTube Analytics API接続状態/更新頻度"""
-    return _api_connection
+    return {**DATA_SOURCE, **_api_connection}
 
 
 @router.post("/api-connection")
@@ -444,8 +472,11 @@ async def update_api_connection(req: APIConnectionRequest):
     """A-3 S18: API接続設定の更新"""
     _api_connection["update_interval_minutes"] = req.update_interval_minutes
     _api_connection["enabled"] = req.enabled
-    _api_connection["last_sync"] = datetime.now().isoformat()
-    return {"status": "updated", **_api_connection}
+    # **設定を書き換えただけで「同期した」と言わない**（R1.5-C4）。
+    # ここで現在時刻を入れていたので、設定画面を開くだけで
+    # `last_sync` と `last_successful_sync` が「いま」になっていた。
+    # 実際には YouTube Analytics に一度も繋いでいない
+    return {**DATA_SOURCE, "status": "updated", **_api_connection}
 
 
 # ── S19: キャッシュ/フォールバック ──
@@ -454,6 +485,7 @@ async def update_api_connection(req: APIConnectionRequest):
 async def get_cache_fallback():
     """A-3 S19: API未接続時のキャッシュ/フォールバック状態"""
     return {
+        **DATA_SOURCE,
         "cache_available": True,
         "cache_age_hours": 2.5,
         "fallback_active": not _api_connection["connected"],
@@ -470,6 +502,7 @@ async def get_owner_dashboard():
     avg_ctr, avg_retention = _calculate_average_metrics(_video_data)
     total_views = sum(v["views"] for v in _video_data)
     return {
+        **DATA_SOURCE,
         "summary": {
             "total_videos": len(_video_data),
             "total_views": total_views,
@@ -494,6 +527,7 @@ async def get_period_comparison(period1: str = "2026-03", period2: str = "2026-0
         validate_period_format(period1)
         validate_period_format(period2)
         return {
+            **DATA_SOURCE,
             "period1": {
                 "label": period1,
                 "avg_ctr": 4.1,
@@ -527,6 +561,7 @@ async def get_period_comparison(period1: str = "2026-03", period2: str = "2026-0
 async def get_growth_forecast():
     """A-3 S22: チャンネル成長予測(登録者/再生数)"""
     return {
+        **DATA_SOURCE,
         "forecast_subscribers": {
             "current": 15000,
             "30_days": 17200,

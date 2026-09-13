@@ -30,6 +30,20 @@ if _backend_dir not in sys.path:
 # 1. WagamamaManager (11テスト)
 # ============================================================
 
+def _表示用の読み口(mock):
+    """実物と同じ経路にする — `user_model` を読み、印の集約点へ通す。
+
+    `GET /api/status` と `get_all_settings()` は `user_model` を直に読むのを
+    やめ、`branding_manager.get_user_model_for_display()` を通すようになった
+    （R1.5-C4・gate-verifier 10周目 N-1）。素通しの `return_value` にすると
+    **集約点を迂回しても気づけない**ので、実物と同じ形にする。
+    """
+    def 読む():
+        from user_model_marks import 実績を持つ値に印を付ける
+        return 実績を持つ値に印を付ける(mock.user_model)
+    return 読む
+
+
 class TestWagamamaManager:
     """wagamama_manager.py の主要分岐テスト"""
 
@@ -204,6 +218,7 @@ class TestSettingsManager:
             "video_source_name": "",
         }
         mock_bm.user_model = {"name": "test_user"}
+        mock_bm.get_user_model_for_display.side_effect = _表示用の読み口(mock_bm)
         mock_bm._save_json = MagicMock()
 
         mock_const_path = Path("/fake/constitution.json")

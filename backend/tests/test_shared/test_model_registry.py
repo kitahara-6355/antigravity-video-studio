@@ -204,7 +204,7 @@ class TestModelRegistry:
         
         with patch("builtins.open", side_effect=FileNotFoundError):
             registry = ModelRegistry()
-            assert registry._config["default_model"] == "gemini-2.5-flash"
+            assert registry._config["default_model"] == "gemini-3.6-flash"
             assert registry._config["task_mapping"] == {}
             
         ModelRegistry._instance = None

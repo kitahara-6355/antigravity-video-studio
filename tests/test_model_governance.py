@@ -162,6 +162,10 @@ def test_resolve_model():
         "gemini-2.5-flash-lite": None
     }
     engine._default_model = "gemini-2.5-flash"
+    # **差替表を空にする**（R1.5-C6）。ここで見たいのは枠枯渇による降格で
+    # あって deprecated 差替ではない。実設定に gemini-2.5-* の差替行が
+    # 入ったので、モデル名を素通しの目印に使えなくなった
+    engine._deprecation_map = {}
 
     # usage_tracker モックモジュールの定義
     mock_tracker = MagicMock()
@@ -416,10 +420,14 @@ async def test_harness_hooks():
     mock_hook_output = MagicMock()
     with patch.dict("sys.modules", {"harness.hooks": MagicMock(HookOutput=mock_hook_output)}):
         await _model_governance_hook(mock_input)
-        mock_hook_output.assert_called_once_with(updated_input={"model": "gemini-3-flash-preview"})
+        # **行き先は現行の段**（R1.5-C6）。2026-08-28 まで
+        # gemini-2.0-flash -> gemini-3-flash-preview と書かれていたが、
+        # 3-flash-preview は preview のまま取り残されていた
+        mock_hook_output.assert_called_once_with(updated_input={"model": "gemini-3.6-flash"})
         
-    # 置換不要時
-    mock_input.tool_input = {"model": "gemini-2.5-flash"}
+    # 置換不要時（**差替表に載っていないモデルを使う**。gemini-2.5-flash は
+    # 2026-08-28 に差替対象へ入ったので、もう「置換不要」の目印にならない）
+    mock_input.tool_input = {"model": "gemini-3.6-flash"}
     res = await _model_governance_hook(mock_input)
     assert res is None
 
