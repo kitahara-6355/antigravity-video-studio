@@ -49,6 +49,9 @@ router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
 _pipeline_state = get_initial_pipeline_state()
 
+# 工程の見出しに写す出所の印（`_update_stage`）。リセットでは消す（`_reset_state`）
+_出所の印 = ("scored", "is_real", "data_source")
+
 
 def _reset_state():
     """パイプライン状態をリセット"""
@@ -69,6 +72,11 @@ def _reset_state():
     for stage in _pipeline_state["stages"]:
         stage["status"] = "pending"
         stage["detail"] = ""
+        # **前の実走の点数と印を、新しい実走の工程に残さない**（R1.5-C4b・27周目の前）。
+        # 以前は status と detail しか戻さず、「待機中」の工程に前回の data（点数）と
+        # 写した印が残っていた。初期の工程は name / icon / status / detail だけを持つ
+        for 鍵 in ("progress", "data", *_出所の印):
+            stage.pop(鍵, None)
 
 
 def _update_stage(index: int, status: str, detail: str = "", progress: int = -1, data: dict = None):
@@ -80,6 +88,12 @@ def _update_stage(index: int, status: str, detail: str = "", progress: int = -1,
             _pipeline_state["stages"][index]["progress"] = progress
         if data is not None:
             _pipeline_state["stages"][index]["data"] = data
+            # **見出し（detail）にも点数が載るので、印を工程そのものにも写す**
+            # （R1.5-C4b・26周目）。品質ゲートの detail は「スコア: 96点」で、
+            # 印は data の中にしか無かった
+            for 鍵 in _出所の印:
+                if 鍵 in data:
+                    _pipeline_state["stages"][index][鍵] = data[鍵]
         _pipeline_state["current_stage"] = index
 
 

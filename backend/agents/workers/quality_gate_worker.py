@@ -223,6 +223,10 @@ class QualityGateWorker(PipelineStageWorker):
             detail=(f"スコア: {score}点（素点 {raw_score}）(ランク{rank})"
                     if raw_score != score else f"スコア: {score}点 (ランク{rank})"),
             data={
+                # **出所を名乗る**（R1.5-C4b・26周目）。この data は進捗通知を経て
+                # `GET /api/pipeline/status` の `stages[].data` にそのまま出る。
+                # ここまで来たら実際に採点している（`ctx.quality_scored` と同じ意味）
+                "scored": True,
                 "score": score, "raw_score": raw_score,
                 "rank": rank, "feedback": feedback,
                 "category_report": ctx.quality_category_report,

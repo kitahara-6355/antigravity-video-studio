@@ -86,19 +86,20 @@ _StageFailed: quality_gate: スコア: 89点 (ランクB)
 > r = Q.run_all_plugins(Ctx(), None)
 > print('all_plugins_ran :', r.get('all_plugins_ran'))
 > print('failed_plugins  :', len(r.get('failed_plugins', [])))
+> print('category_report :')
 > for c in r['category_report']:
->     print(f\"  {c['category']:<14} score {c['score']}  unchecked {c.get('unchecked')}\")
+>     print(f\"  {c['category']:<14} score {c['score']}  {c['status']}  unchecked {c.get('unchecked')}\")
 > "
 >
 > all_plugins_ran : False
 > failed_plugins  : 16
 > category_report :
->   stability      score 33.3  🔴 不合格   unchecked 0
->   core           score 77.8  🟢 良好     unchecked 2
->   template       score None  ❓ 未計測   unchecked 7
->   broadcast      score None  ❓ 未計測   unchecked 4
->   youtube        score 58.3  🟡 要改善   unchecked 3
->   accessibility  score None  ⬜ 未実装   unchecked 0
+>   stability      score 33.3  🔴 不合格  unchecked 0
+>   core           score 77.8  🟢 良好  unchecked 2
+>   template       score None  ❓ 未計測  unchecked 7
+>   broadcast      score None  ❓ 未計測  unchecked 4
+>   youtube        score 58.3  🟡 要改善  unchecked 3
+>   accessibility  score None  ⬜ 未実装  unchecked 0
 > ```
 >
 > **記録が古くなった原因が、偽 success を直したことそのもの**である点に注意。
@@ -115,6 +116,12 @@ _StageFailed: quality_gate: スコア: 89点 (ランクB)
 > 2026-09-17 に同じ数字が一字一致で出ることを確かめた。
 > `ANTIGRAVITY_WRITABLE_ROOT` を一時ディレクトリへ向けているのは、
 > 向けないと `backend/usage_tracker/usage_data.json`（Git 追跡下）が書き換わるため。
+>
+> **出力欄の訂正（2026-09-17・gate-verifier 26周目）。** 25周目の訂正のあとも、
+> 出力欄には手順が印字しない行（`category_report :` の見出しと状態の列）が
+> 手で整えた空白つきで残っていた。手順に見出しと `status` の印字を足し、
+> 出力欄を**その手順の標準出力そのもの**に差し替えた（2026-09-17 実測・exit 0・
+> 標準エラー 0 バイト）。数字は訂正前と同じ。
 
 ## ④ retention 分析 — `agents.pipeline_coordinator._run_retention_analysis()`
 

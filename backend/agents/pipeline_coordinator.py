@@ -334,6 +334,20 @@ class PipelineCoordinator:
                 msg["data"] = data
             await self._ws_broadcast(msg)
 
+    async def _notify_result(self, worker: PipelineStageWorker, result: StageResult):
+        """工程の結果を通知する（直列・並列の両方がここを通る）。
+
+        **失敗でも data を渡す**（R1.5-C4b・26周目）。品質ゲートは 90 点未満だと
+        失敗として返るが、`detail` には「スコア: 85点」が載る。以前は失敗のときだけ
+        data を落としていたので、`GET /api/pipeline/status` の工程には点数だけが
+        出所の印（data の `scored`）なしで残っていた。data を持たない失敗は従来どおり。
+        C4b の門もこの関数を呼んで工程の進み方を再現する。
+        """
+        if result.success:
+            await self._notify(worker, "completed", result.detail, 100, result.data)
+        else:
+            await self._notify(worker, "error", result.detail, -1, result.data or None)
+
     # ============================================================
     # Harness ヘルパー（グレースフル初期化）
     # ============================================================
@@ -885,13 +899,10 @@ class PipelineCoordinator:
             ctx.stage_results.append(result)
             await self._fire_post_hook(harness, worker, result, ctx)
 
-            if result.success:
-                await self._notify(worker, "completed", result.detail, 100, result.data)
-            else:
-                await self._notify(worker, "error", result.detail)
-                if type(worker).__name__ in FATAL_WORKERS:
-                    logger.error(f"❌ 致命的エラー: {worker.name} — 中断")
-                    return result.detail
+            await self._notify_result(worker, result)
+            if not result.success and type(worker).__name__ in FATAL_WORKERS:
+                logger.error(f"❌ 致命的エラー: {worker.name} — 中断")
+                return result.detail
         return None
 
     async def _execute_parallel_stages(self, ctx: PipelineContext, harness: Optional[Dict],
@@ -943,12 +954,9 @@ class PipelineCoordinator:
             ctx.stage_results.append(result)
             await self._fire_post_hook(harness, worker, result, ctx)
 
-            if result.success:
-                await self._notify(worker, "completed", result.detail, 100, result.data)
-            else:
-                await self._notify(worker, "error", result.detail)
-                if isinstance(worker, PreviewWorker):
-                    logger.error(f"❌ 致命的エラー: {worker.name} (並列)")
+            await self._notify_result(worker, result)
+            if not result.success and isinstance(worker, PreviewWorker):
+                logger.error(f"❌ 致命的エラー: {worker.name} (並列)")
             return result
 
         if parallel_workers:

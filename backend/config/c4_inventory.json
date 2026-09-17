@@ -663,12 +663,13 @@
    "symbol": "QualityGateWorker.execute",
    "category": "品質スコア",
    "status": "marked",
-   "reason": "L195-216: raw_score/clamped/deductions を保持し、ctx.quality_scored=True と quality_gate_report{all_plugins_ran, failed_plugins} で「全項目を検査できたか」を別に持つ。印あり。",
+   "reason": "L195-235: raw_score/clamped/deductions を保持し、ctx.quality_scored=True と quality_gate_report{all_plugins_ran, failed_plugins} で「全項目を検査できたか」を別に持つ。印あり。2026-09-17 から工程の結果（`StageResult.data`）にも `scored: True` を載せ、router の `_update_stage` が工程の見出しへ写す（C4b 26周目: 進捗通知を経て `GET /api/pipeline/status` の `stages[]` に出る点数に印が無かった）。",
    "fingerprint": [
     "const_assign:score"
    ],
    "marks": [
-    "quality_scored=True"
+    "quality_scored=True",
+    "scored=True"
    ]
   },
   {
@@ -953,26 +954,47 @@
    "marks": []
   },
   {
+   "id": "backend/c4_response_gate.py::_一回書かせる",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "_一回書かせる",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。サイドカーの書き出し口を1回呼んで中身を読む足場（2026-09-17 に `サイドカーを書かせる` から切り出した）。`getattr(coord, メソッド名, None)` の既定値と、例外で返す `{\"kind\": \"error\"}` は、改名や例外を**門の違反「呼び出せませんでした」に変える**ためのもの（`audit` は error の面を必ず違反にする）で、数字ではない。点数は呼び出し側の `点数の変種` から来る検査用の値で、門の一時ツリーの外に出ない。",
+   "fingerprint": [
+    "except_returns",
+    "getattr_default"
+   ],
+   "marks": []
+  },
+  {
    "id": "backend/c4_response_gate.py::_文脈",
    "file": "backend/c4_response_gate.py",
    "symbol": "_文脈",
    "category": "品質スコア",
    "status": "out_of_scope",
-   "reason": "C4b の門そのもの。入力条件に使う**合成の実走文脈**を作る足場で、`quality_score` の 89.5 と番兵 73.21、`category_report` の点数は、門が本番の書き出し口と `_build_result` に渡す検査用の値。利用者に届く数字ではない。",
-   "fingerprint": [
-    "const_dict:score"
-   ],
+   "reason": "C4b の門そのもの。入力条件に使う本番の `PipelineContext` を作る足場。2026-09-17 から採点済みの文脈は `品質ゲートを走らせる` が本番の Worker に作らせるので、ここで点を入れるのは**未採点**（`quality_scored=False`）とサイドカーの入力だけ。点は呼び出し側の `点数の変種` から来る検査用の値で、定数の点は持たなくなった（指紋の `const_dict:score` が消えたのはこのため）。",
+   "fingerprint": [],
    "marks": [
     "quality_scored=?"
    ]
   },
   {
-   "id": "backend/c4_response_gate.py::_番兵か",
+   "id": "backend/c4_response_gate.py::_本物の採点",
    "file": "backend/c4_response_gate.py",
-   "symbol": "_番兵か",
+   "symbol": "_本物の採点",
    "category": "品質スコア",
    "status": "out_of_scope",
-   "reason": "C4b の門そのもの。値が未採点の番兵（73.21）かを判定するだけの述語で、数字を作らない。",
+   "reason": "C4b の門そのもの。本番の `run_all_plugins` を合成の文脈で1度だけ走らせ、**採点結果の形**を借りる（26周目: 形を手で作っていたので本番とずれていた）。`template_config` が読めないときに `None` で進むのは本番の Worker と同じ扱い（本番は ImportError / SyntaxError を受けて `None`）。数字は作らない。",
+   "fingerprint": [],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::_点に合わせる",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "_点に合わせる",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。借りた採点結果の `total_deductions` とカテゴリの点を、入力条件の点数（`点数の変種`）に合わせて**値だけ**動かす。形は本番の `run_all_plugins` のまま。出てくる数字は門の一時ツリーの中で本番の Worker に渡す検査用の値で、利用者には届かない。",
    "fingerprint": [],
    "marks": []
   },
@@ -1006,10 +1028,18 @@
    "symbol": "サイドカーを書かせる",
    "category": "品質スコア",
    "status": "out_of_scope",
-   "reason": "C4b の門そのもの。書き出し口を**分岐ごとに**呼んで中身を読む足場。`getattr(coord, メソッド名, None)` は改名で門が黙るのを止めるための既定値で、数字ではない。検査用の点数は `_文脈` が作る（2026-09-17 に分けた）。",
-   "fingerprint": [
-    "getattr_default"
-   ],
+   "reason": "C4b の門そのもの。書き出し口を**分岐ごとに、点数を2通り（と同じ点をもう一度）で**呼び、点数に連れて動く所を比べる足場。`getattr` の既定値と例外の扱いは 2026-09-17 に `_一回書かせる` へ移した（指紋の `getattr_default` はそちらに出る）。数字は作らない。",
+   "fingerprint": [],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::品質ゲートを走らせる",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "品質ゲートを走らせる",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。**本番の `QualityGateWorker.execute` に採点させる**足場（26周目: 工程の進み方を再現していなかった）。FFprobe とサムネイルの物理検査を「失敗なし」に差し替えるのは合成の文脈に動画ファイルが無いからで、差し替えはその Worker インスタンスだけ。`run_all_plugins` の差し替えは `try/finally` で戻す。本番の経路は変えない。",
+   "fingerprint": [],
    "marks": []
   },
   {
@@ -1019,16 +1049,6 @@
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "C4b の門そのもの。`_pipeline_state` に差す実走結果を**本番の `_build_result` に作らせる**足場。`duration_seconds` の固定は揺れを消すためで、利用者に届かない。",
-   "fingerprint": [],
-   "marks": []
-  },
-  {
-   "id": "backend/c4_response_gate.py::番兵の漏れ",
-   "file": "backend/c4_response_gate.py",
-   "symbol": "番兵の漏れ",
-   "category": "品質スコア",
-   "status": "out_of_scope",
-   "reason": "C4b の門そのもの。未採点の点数が印の無いところへ出たかを列挙する判定器で、数字を作らない。",
    "fingerprint": [],
    "marks": []
   },
@@ -1973,16 +1993,27 @@
    "fingerprint": []
   },
   {
+   "id": "backend/routers/ab_test_tracker.py::get_prediction_accuracy",
+   "file": "backend/routers/ab_test_tracker.py",
+   "symbol": "get_prediction_accuracy",
+   "category": "チャンネル統計",
+   "status": "marked",
+   "reason": "L209-229: 予測誤差（|actual_ctr − predicted_ctr|）はローカルの選択履歴台帳の行から `_analyze_prediction_accuracy` が計算する（フィードバック0件なら「データがまだありません」）。C4b の鍵名の分類で `average_error` などを4カテゴリに入れたところ印が無かったので、2026-09-17 に `data_source: \"derived\"` と `note`（台帳の行が実際の選択かは確かめていない）を付けた。`is_real` は名乗らない。",
+   "fingerprint": [],
+   "marks": [
+    "data_source='derived'"
+   ]
+  },
+  {
    "id": "backend/routers/ab_test_tracker.py::get_selection_history",
    "file": "backend/routers/ab_test_tracker.py",
    "symbol": "get_selection_history",
    "category": "チャンネル統計",
    "status": "marked",
-   "reason": "2026-09-13 に `is_real` / `data_source: \"derived\"` / `note` を足した（R1.5-C4b）。返している行はローカルの選択履歴台帳そのもので、`predicted_ctr` は記録時点の予測値。印があるので C4b の門も通る。",
+   "reason": "2026-09-13 に `data_source: \"derived\"` / `note` を足した（R1.5-C4b）。返している行はローカルの選択履歴台帳そのもので、`predicted_ctr` は記録時点の予測値（`note` がそう名乗る）。当初は `is_real: True` も名乗っていたが、台帳の中身を確かめると全件がテストの書いた行（`test_video_001`）で**実物だという主張に裏付けが無かった**ので、2026-09-17 に外した。",
    "fingerprint": [],
    "marks": [
-    "data_source='derived'",
-    "is_real=True"
+    "data_source='derived'"
    ]
   },
   {
@@ -2998,6 +3029,19 @@
     "_集計できなかった印.is_real=False",
     "skip_reason=?",
     "spread:_集計できなかった印"
+   ]
+  },
+  {
+   "id": "backend/routers/themes_router.py::get_template",
+   "file": "backend/routers/themes_router.py",
+   "symbol": "get_template",
+   "category": "チャンネル統計",
+   "status": "marked",
+   "reason": "L89-104: `PRODUCTION_TEMPLATES` の定数（`quality_benchmarks` の CTR・維持率の**目標値**を含む）をそのまま返す。チャンネルの実測ではないのに印が無かったので、2026-09-17 に `is_real: False` / `data_source: \"template\"` を付けた（C4b の鍵名の分類で `ctr_target_percent` などを4カテゴリに入れて見つけた）。",
+   "fingerprint": [],
+   "marks": [
+    "data_source='template'",
+    "is_real=False"
    ]
   },
   {

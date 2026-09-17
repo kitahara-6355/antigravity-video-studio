@@ -18,6 +18,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import shutil
@@ -218,6 +219,8 @@ def test_HTML_は見える文字の行にする(門):
     r = 門.本文を読む(_応答(html.encode("utf-8"), "text/html; charset=utf-8"))
     assert r["kind"] == "text"
     assert r["lines"] == ["総合スコア: 未計測", "① 文字起こし", "生成日時: <日時> / x"], r["lines"]
+    # 見えない所（属性・スクリプト）も比べられるよう、生の本文を日時だけ伏せて持つ
+    assert r["raw"] == html.replace("2026-09-17T12:00:00.123", "<日時>")
 
 
 def test_空の本文はリダイレクト先を行にする(門):
@@ -225,21 +228,82 @@ def test_空の本文はリダイレクト先を行にする(門):
     assert r == {"kind": "none", "lines": ["Location: /?error=no_code"]}
 
 
-# ─────────────────── 未採点の番兵 ───────────────────
+# ─────────────────── 点数に連れて動く所（26周目: 番兵の完全一致をやめた） ───────────────────
 
-def test_番兵は文字に出たら漏れ(門):
-    o = 面("r", kind="text", lines=["総合スコア: 73.21点"])
-    assert 門.番兵の漏れ(o) == ["総合スコア: 73.21点"]
-
-
-def test_番兵は印の無い_JSON_に出たら漏れ(門):
-    assert 門.番兵の漏れ(面("r", {"video_path": "73.21"})) == ["$.video_path = '73.21'"]
-    assert 門.番兵の漏れ(面("r", {"n": 73.21})) == ["$.n = 73.21"]
+def test_違う所は値と形と配列の位置で見る(門):
+    assert 門.違う所({"a": 1, "b": [1, 2]}, {"a": 2, "b": [1, 3]}) == [("a",), ("b", 1)]
+    assert 門.違う所({"a": 1}, {"a": 1, "c": 5}) == [("c",)]
+    assert 門.違う所({"b": [1]}, {"b": [1, 2]}) == [("b", 1)]
+    assert 門.違う所({"s": {"x": 1}}, {"s": 15200}) == [("s",)]
 
 
-def test_番兵は印と並んでいれば漏れではない(門):
-    """`quality_scored: false` と並んでいれば、読み手が未採点と区別できる。"""
-    assert 門.番兵の漏れ(面("r", {"quality_score": 73.21, "quality_scored": False})) == []
+def test_違う所は日時と数の型の違いを無視する(門):
+    assert 門.違う所({"t": "at 2026-09-17T12:00:00.1"}, {"t": "at 2026-09-18T01:02:03"}) == []
+    assert 門.違う所({"n": 0}, {"n": 0.0}) == []
+    assert 門.違う所({"n": True}, {"n": 1}) == [("n",)], "真偽値は数と分ける"
+
+
+def test_道を書くは形の道と同じ書き方(門):
+    assert 門.道を書く(("stages", 5, "data", "gemini-3.1-pro")) == '$.stages[5].data["gemini-3.1-pro"]'
+
+
+def test_印で覆われているかは祖先と自分を見る(門):
+    本文 = {"result": {"quality_scored": False, "score": 1}, "free": {"x": 1},
+            "stages": [{"scored": True, "detail": "92点"}]}
+    assert 門.印で覆われているか(本文, ("result", "score"))
+    assert 門.印で覆われているか(本文, ("stages", 0, "detail"))
+    assert not 門.印で覆われているか(本文, ("free", "x"))
+    assert 門.印で覆われているか({"new": {"is_real": False, "v": 1}}, ("new",)), "足された器が自分で名乗る"
+    assert not 門.印で覆われているか(本文, ("gone", "x")), "無い道は覆われていない"
+
+
+def test_点数に連れて動く_JSON_は印が無ければ漏れ(門):
+    """**書式を変えても抜けられない**（26周目 M6: `:.1f` で番兵の完全一致をすり抜けた）。"""
+    甲 = 面("f", {"video_path": "73.2", "result": {"quality_scored": False, "quality_score": 73.21}})
+    乙 = 面("f", {"video_path": "0.0", "result": {"quality_scored": False, "quality_score": 0}})
+    r = 門.点数に連れて動く所(甲, 乙, 甲)
+    assert r["漏れ"] == ["$.video_path"] and r["覆われた"] == 1, r
+
+
+def test_片方の変種でしか名乗っていなければ漏れ(門):
+    """点数によって印が消える形（高い点のときだけ `is_real` を付ける等）を通さない。"""
+    甲 = 面("f", {"is_real": False, "n": 1})
+    乙 = 面("f", {"n": 2})
+    assert "$.n" in 門.点数に連れて動く所(甲, 乙, 甲)["漏れ"]
+
+
+def test_点数と関係なく揺れる所は除く(門):
+    甲 = 面("f", {"uptime": 1.2, "n": 1})
+    甲2 = 面("f", {"uptime": 3.4, "n": 1})
+    乙 = 面("f", {"uptime": 5.6, "n": 2})
+    assert 門.点数に連れて動く所(甲, 乙, 甲2)["漏れ"] == ["$.n"]
+    assert 門.点数に連れて動く所(甲, 乙, None)["漏れ"] == ["$.n", "$.uptime"]
+
+
+def test_点数に連れて動く文字は行で拾う(門):
+    甲 = 面("r", kind="text", lines=["総合スコア: 未計測", "x"])
+    乙 = 面("r", kind="text", lines=["総合スコア: 73.2点", "x"])
+    甲["raw"], 乙["raw"] = "<p>未計測</p>", "<p>73.2点</p>"
+    r = 門.点数に連れて動く所(甲, 乙, dict(甲))
+    assert r["文字"] == ["総合スコア: 73.2点", "総合スコア: 未計測"] and not r["見えない所"]
+
+
+def test_見えない所の点数も拾う(門):
+    """**26周目 M10**: `<meter value="73.21">` は見える文字が「未計測」のままだった。"""
+    甲 = 面("r", kind="text", lines=["総合スコア: 未計測"])
+    乙 = dict(甲)
+    甲["raw"], 乙["raw"] = '<meter value="0"></meter>未計測', '<meter value="73.21"></meter>未計測'
+    r = 門.点数に連れて動く所(甲, 乙, dict(甲))
+    assert r["文字"] == [] and r["見えない所"] is True
+    # 同じ点数でも生の本文が揺れるなら、見えない所の違いは言えない
+    揺れた = dict(甲)
+    揺れた["raw"] = '<meter value="0"></meter>未計測<!-- 別の回 -->'
+    assert 門.点数に連れて動く所(甲, 乙, 揺れた)["見えない所"] is False
+
+
+def test_点数で出口が変わったら報告する(門):
+    r = 門.点数に連れて動く所(面("f", {}), 面("f", {}, status=500), None)
+    assert r["出口"] is True
 
 
 # ─────────────────── audit: 印と承認 ───────────────────
@@ -336,18 +400,41 @@ def test_measured_を名乗るなら何を測ったか要る(門):
     assert any("何を測ったか" in v for v in 違反), 違反
 
 
-def test_未採点の番兵が漏れたら違反になる(門):
-    観測 = [面("GET /api/r［実走後・未採点］", kind="text", lines=["総合スコア: 73.21点"],
-               route="GET /api/r", condition="実走後・未採点", unscored=True)]
-    違反, _ = 判定(門, 観測, 台帳())
-    assert any("未採点の点数が印の無いところへ" in v for v in 違反), 違反
+def _動いた面(unscored: bool, **動き):
+    o = 面("GET /api/r［実走後・x］", kind="text", lines=["総合スコア: 73.2点"],
+           route="GET /api/r", condition="実走後・x", unscored=unscored)
+    o["動いた"] = {"漏れ": [], "覆われた": 0, "文字": [], "見えない所": False, "出口": False, **動き}
+    return o
 
 
-def test_未採点でない面の番兵は見ない(門):
-    """採点済みの面に同じ数字が出ても、それは番兵ではない。"""
-    観測 = [面("GET /api/r", kind="text", lines=["総合スコア: 73.21点"])]
-    違反, _ = 判定(門, 観測, 台帳())
-    assert not [v for v in 違反 if "未採点" in v], 違反
+def test_未採点で画面の文字が動いたら違反になる(門):
+    """**台帳で見せてよい面にしていても落とす**（未採点の点を見せる理由は無い）。"""
+    台帳_ = 台帳(score_displays={"GET /api/r": "採点した点を見せるレポート。未採点では未計測"})
+    for 動き in ({"文字": ["総合スコア: 73.2点"]}, {"見えない所": True}):
+        違反, _ = 判定(門, [_動いた面(True, **動き)], 台帳_)
+        assert any("未採点の点数が画面に出ています" in v for v in 違反), (動き, 違反)
+
+
+def test_採点済みで文字が動くのは台帳で許した面だけ(門):
+    違反, _ = 判定(門, [_動いた面(False, 文字=["総合スコア: 92点"])], 台帳())
+    assert any("点数を文字で見せる面が台帳にありません" in v for v in 違反), 違反
+    台帳_ = 台帳(score_displays={"GET /api/r": "採点した点を見せるレポート。未採点では未計測"})
+    違反, 情報 = 判定(門, [_動いた面(False, 文字=["総合スコア: 92点"])], 台帳_)
+    assert 違反 == [], 違反
+    assert not [m for m in 情報 if "点数を見せなかった" in m], 情報
+
+
+def test_点数に連れて動く無印の値と出口の変化は違反になる(門):
+    違反, _ = 判定(門, [_動いた面(False, 漏れ=["$.video_path"])], 台帳())
+    assert any("出所を名乗っていない値" in v and "$.video_path" in v for v in 違反), 違反
+    違反, _ = 判定(門, [_動いた面(False, 出口=True)], 台帳())
+    assert any("点数によって出口" in v for v in 違反), 違反
+
+
+def test_点数を見せてよい面は理由が要り使われなければ知らせる(門):
+    違反, 情報 = 判定(門, [], 台帳(score_displays={"GET /api/r": "見せる"}))
+    assert any("見せてよい理由を書く" in v for v in 違反), 違反
+    assert any("点数を見せなかった面の宣言" in m for m in 情報), 情報
 
 
 # ─────────────────── audit: 面のラチェット ───────────────────
@@ -394,6 +481,24 @@ def test_鍵が減っても落とさない(門):
                       台帳(non_category_names=["a", "b"]), 面台帳)
     assert 違反 == [], 違反
     assert any("出なくなった鍵" in m for m in 情報), 情報
+
+
+def test_出所の印が消えたら落ちる(門):
+    """**印の鍵が面から消えるのは退行。** 文字に埋まった点数（障害の見出しの「85→72」）は
+    鍵名では見えないので、印が消えたこと自体を止める（26周目の見落としへの対処）。"""
+    面台帳 = 門.面台帳を作る([面("GET /api/x", {"is_real": False, "data_source": "sample",
+                                                "title": "品質スコア低下(85→72)"})])
+    違反, _ = 判定(門, [面("GET /api/x", {"title": "品質スコア低下(85→72)"})],
+                   台帳(non_category_names=["title"]), 面台帳)
+    assert any("出所の印が消えました" in v and "$.data_source" in v for v in 違反), 違反
+    # 印でない鍵が減るのは従来どおり情報
+    面台帳 = 門.面台帳を作る([面("GET /api/x", {"a": 1, "b": 2})])
+    違反, _ = 判定(門, [面("GET /api/x", {"a": 1})], 台帳(non_category_names=["a", "b"]), 面台帳)
+    assert 違反 == [], 違反
+    # 文字の面の行は道ではない（道に見える行が消えても印の消失ではない）
+    面台帳 = 門.面台帳を作る([面("GET /r", kind="text", lines=["注意.data_source: 見本", "x"])])
+    違反, _ = 判定(門, [面("GET /r", kind="text", lines=["x"])], 台帳(), 面台帳)
+    assert 違反 == [], 違反
 
 
 def test_出口が変わったら落ちる(門):
@@ -543,6 +648,45 @@ def test_盲点が減っても落とさない(門):
     assert any("盲点が減りました" in m for m in 情報), 情報
 
 
+def test_WebSocket_は通り道として宣言が要る(門):
+    """26周目: `/api` 配下の WebSocket が母集団の外の内訳に出ていなかった。"""
+    内訳 = {"POST": 1, "WEBSOCKET": 2}
+    違反, _ = 判定(門, [], 台帳(side_effect_methods=["POST"]), 付帯={"内訳": 内訳})
+    assert any("宣言していない method" in v and "WEBSOCKET" in v for v in 違反), 違反
+    台帳_ = 台帳(side_effect_methods=["POST"],
+                excluded_transports={"WEBSOCKET": "接続して待つ通り道。1回叩いて本文を得られない"})
+    違反, _ = 判定(門, [], 台帳_, 付帯={"内訳": 内訳})
+    assert 違反 == [], 違反
+    違反, _ = 判定(門, [], 台帳(excluded_transports={"WEBSOCKET": "待つ"}))
+    assert any("通り道には理由を書く" in v for v in 違反), 違反
+
+
+def test_パス引数の値の出どころが無ければ落ちる(門):
+    """**26周目 M11/M12。** 合成の値だけでは、一覧が返す ID でしか開かない面が見えない。"""
+    付帯 = {"パス引数": {"未宣言": ["GET /api/c/{id}"], "値が取れない": ["GET /api/d/{id} ← GET /api/d $.x[].id"],
+                     "使われていない宣言": ["GET /api/gone/{id}"]}}
+    違反, 情報 = 判定(門, [], 台帳(), 付帯=付帯)
+    assert any("パス引数の値の出どころが台帳にありません" in v and "/api/c/{id}" in v for v in 違反), 違反
+    assert any("一覧 API から値が取れません" in v and "/api/d/{id}" in v for v in 違反), 違反
+    assert any("使われていないパス引数の宣言" in m for m in 情報), 情報
+
+
+def test_パス引数の宣言は形と理由が要る(門):
+    宣言 = {
+        "GET /api/a/{id}": {"from": "GET /api/a", "take": "channels[].id"},
+        "GET /api/b/{id}": {"values": ["x"], "reason": "短い"},
+        "GET /api/c/{id}": {"none": "無い"},
+        "GET /api/d/{id}": {"limit": 3},
+        "GET /api/e/{id}": {"from": "GET /api/e", "take": "$.items[].id", "limit": 2},
+    }
+    違反, _ = 判定(門, [], 台帳(path_values=宣言))
+    assert any("取る値の道（take）を書く" in v and "/api/a/" in v for v in 違反), 違反
+    assert any("決まった値を使うなら理由" in v and "/api/b/" in v for v in 違反), 違反
+    assert any("出どころが無いなら理由" in v and "/api/c/" in v for v in 違反), 違反
+    assert any("宣言の形が読めません" in v and "/api/d/" in v for v in 違反), 違反
+    assert not [v for v in 違反 if "/api/e/" in v], 違反
+
+
 def test_門がリポジトリを書き換えたら落ちる(門):
     """**25周目 D-5。** 門は状態を書き換えてはいけない。"""
     違反, _ = 判定(門, [], 台帳(), 付帯={"書き換わったもの": ["変更 assets/asset_index.json"]})
@@ -641,25 +785,43 @@ def test_門は外部のアプリを起こさない(門, monkeypatch):
 
 
 def test_起こす前に外部接続と外のアプリを封じる(門, tmp_path, monkeypatch):
-    """封じる関数があっても、**アプリを読む前に呼ばなければ意味が無い。**"""
+    """封じる関数があっても、**アプリを読む前に呼ばなければ意味が無い。**
+
+    26周目 G7/G7b — 以前の契約は main を先に sys.modules へ置いていたので、
+    封じる呼び出しを `import main` の後ろへ移しても通った。**main を本当に読ませ、
+    読まれた瞬間に封じてあったかを main 自身に記録させる。**
+    """
     複製 = tmp_path / "repo"
     (複製 / "backend" / "tests").mkdir(parents=True)
     (複製 / "backend" / "tests" / "net_guard.py").write_text(
         "呼ばれた = []\n\ndef install():\n    呼ばれた.append('install')\n", encoding="utf-8")
-    順番: list[str] = []
+    (複製 / "backend" / "main.py").write_text(
+        "import os, sys\n"
+        "ng = sys.modules.get('net_guard')\n"
+        "読んだときに網があった = bool(ng and getattr(ng, '呼ばれた', None))\n"
+        "読んだときに窓を封じていた = sys.modules['_c4t_順番'].順番 == ['外のアプリ']\n"
+        "app = object()\n", encoding="utf-8")
+    記録 = types.ModuleType("_c4t_順番")
+    記録.順番 = []
+    monkeypatch.setitem(sys.modules, "_c4t_順番", 記録)
     monkeypatch.setitem(sys.modules, "net_guard", sys.modules.get("net_guard"))
-    monkeypatch.setattr(門, "_外のアプリを起こさない", lambda: 順番.append("外のアプリ"))
-    偽の_main = types.ModuleType("main")
-    偽の_main.__file__ = str(複製 / "backend" / "main.py")
-    偽の_main.app = object()
-    monkeypatch.setitem(sys.modules, "main", 偽の_main)
+    # 後で元に戻す（無かったなら消す）ために記録させてから外す — 偽の main を他のテストに残さない
+    monkeypatch.setitem(sys.modules, "main", None)
+    del sys.modules["main"]
+    monkeypatch.syspath_prepend(str(複製 / "backend"))
+    monkeypatch.setattr(門, "_外のアプリを起こさない", lambda: 記録.順番.append("外のアプリ"))
 
-    assert 門.起こす(複製) is 偽の_main.app
-    assert sys.modules["net_guard"].呼ばれた == ["install"]
-    assert 順番 == ["外のアプリ"]
+    app = 門.起こす(複製)
+    main = sys.modules["main"]
+    assert app is main.app
+    assert main.読んだときに網があった, "net_guard を main より先に入れていない"
+    assert main.読んだときに窓を封じていた, "外のアプリを main より先に封じていない"
 
     # 複製の外の main を読んだら止める（隔離の漏れ）
+    偽の_main = types.ModuleType("main")
     偽の_main.__file__ = str(tmp_path / "elsewhere" / "main.py")
+    偽の_main.app = object()
+    monkeypatch.setitem(sys.modules, "main", 偽の_main)
     with pytest.raises(RuntimeError):
         門.起こす(複製)
 
@@ -760,17 +922,6 @@ def test_サイドカーは分岐ごとに書かせる(門, tmp_path):
     assert 未["unscored"] is True
     assert 未["body"]["score"] is None and 未["body"]["data_source"] == "unavailable"
     assert 出た["*.quality.json［採点済み］"]["body"]["data_source"] == "measured"
-
-
-def test_実走後の状態は本番の_build_result_が作る(門):
-    未 = 門.実走後の状態(False)
-    済 = 門.実走後の状態(True)
-    assert 未["status"] == 済["status"] == "completed"
-    assert 未["result"]["quality_scored"] is False
-    assert 未["result"]["quality_score"] == 門.未採点の番兵
-    assert 未["result"]["quality_details"]["scored"] is False
-    assert 済["result"]["quality_details"]["scored"] is True
-    assert isinstance(済["result"]["stage_results"], list) and 済["result"]["stage_results"]
 
 
 def test_状態を差したら必ず戻す(門, monkeypatch):
@@ -877,6 +1028,38 @@ def test_例外と承認は面台帳にある面を指す(本物の台帳, 本�
         assert e["face"] in faces, e
 
 
+def test_パス引数の宣言は面台帳のテンプレートと一対一(門, 本物の台帳, 本物の面台帳):
+    """**テンプレート付きの GET は全部、値の出どころが台帳にある**（26周目 M11/M12）。
+
+    面台帳には合成の値で叩いた面が1本ずつあるので、それと宣言を突き合わせる。
+    """
+    探りの面 = {k for k in 本物の面台帳["faces"] if 門.探り値 in k and "［" not in k}
+    宣言 = 本物の台帳["path_values"]
+    宣言の面 = {門._埋める(k, 門.探り値) for k in 宣言}
+    assert 探りの面 == 宣言の面
+    一覧から = [k for k, v in 宣言.items() if "from" in v]
+    assert len(一覧から) >= 10, "一覧 API から値を取る宣言が少なすぎる"
+    for k, v in 宣言.items():
+        if "from" in v:
+            assert v["from"] in 本物の面台帳["faces"], (k, v)
+
+
+def test_面台帳に一覧の_ID_で開いた面がある(本物の面台帳):
+    """C4a の名指し例（ch-001）と、7周目の迂回箇所（MCP の進化ログ）が門の視野に入っている。"""
+    faces = 本物の面台帳["faces"]
+    for 名 in ("GET /api/admin/channel/channels/ch-001", "GET /api/v1/mcp/resources/evolution_log"):
+        assert 名 in faces and faces[名]["status"] == 200, 名
+
+
+def test_点数を見せる面と通り道の宣言は実在する(本物の台帳, 本物の面台帳):
+    faces = 本物の面台帳["faces"]
+    for 経路 in 本物の台帳["score_displays"]:
+        assert 経路 in faces and faces[経路]["kind"] == "text", 経路
+    assert "WEBSOCKET" in 本物の台帳["excluded_transports"]
+    ws = [x for x in 本物の台帳["side_effect_blind_spot"] if x.startswith("WEBSOCKET ")]
+    assert len(ws) >= 2, ws
+
+
 def test_台帳は_JSON_として妥当(門):
     json.loads(門.LEDGER_PATH.read_text(encoding="utf-8"))
     json.loads(門.FACES_PATH.read_text(encoding="utf-8"))
@@ -949,3 +1132,203 @@ def test_openapi_が壊れていても走査側で拾う(門):
         def __init__(s, p, m): s.path, s.methods = p, m
     app = SimpleNamespace(routes=[R("/api/a", {"GET"})], openapi=壊れる)
     assert ("GET", "/api/a") in 門.ルート一覧(app)
+
+
+class _R:
+    def __init__(s, p, m):
+        s.path, s.methods = p, m
+
+
+class APIWebSocketRoute:   # 型の名前で見分けるので、名前だけ本物に合わせる
+    def __init__(s, p):
+        s.path = p
+
+
+def test_ルート一覧は新しい_FastAPI_の包みの中も辿る(門):
+    """**fastapi 0.141 の `_IncludedRouter`**（中身は `original_router`、接頭辞は `include_context`）。
+
+    ここを辿らないと、openapi に出ないルート（WebSocket・include_in_schema=False）が
+    CI の版では1本も見えなかった（2026-09-17 に実物の構造を確かめた）。
+    """
+    内 = SimpleNamespace(routes=[APIWebSocketRoute("/api/pipeline/ws/pipeline"),
+                                _R("/api/hidden", {"GET"})])
+    包み = SimpleNamespace(original_router=内, include_context=SimpleNamespace(prefix="/api/v1"))
+    外 = SimpleNamespace(original_router=SimpleNamespace(routes=[包み]),
+                         include_context=SimpleNamespace(prefix=""))
+    app = SimpleNamespace(routes=[外], openapi=lambda: {"paths": {}})
+    一覧 = 門.ルート一覧(app)
+    assert ("WEBSOCKET", "/api/v1/api/pipeline/ws/pipeline") in 一覧
+    assert ("GET", "/api/v1/api/hidden") in 一覧
+
+
+def test_WebSocket_は母集団に入れず盲点に全部載る(門):
+    app = SimpleNamespace(routes=[APIWebSocketRoute("/api/x/ws"), APIWebSocketRoute("/ws/outside"),
+                                  _R("/api/a", {"GET"})])
+    assert 門.母集団(app) == ["/api/a"]
+    assert 門.除外の内訳(app) == {"WEBSOCKET": 1}
+    assert 門.盲点の一覧(app) == ["WEBSOCKET /api/x/ws"], "語に当たらなくても WebSocket は盲点"
+
+
+def test_母集団は台帳で対応づけた値でも叩く(門):
+    app = SimpleNamespace(routes=[_R("/api/ch/{channel_id}", {"GET"}), _R("/api/ch", {"GET"})])
+    値 = {"GET /api/ch/{channel_id}": ["ch-001", "a b/c"]}
+    assert 門.母集団(app, 値) == ["/api/ch", "/api/ch/a%20b%2Fc", f"/api/ch/{門.探り値}", "/api/ch/ch-001"]
+    assert 門.GETのテンプレート(app) == ["/api/ch/{channel_id}"]
+
+
+def test_取り出すは道の式で一覧の値を拾う(門):
+    本文 = {"channels": [{"id": "ch-001"}, {"id": 2}, {"id": True}, {"id": ""}, {"name": "x"}],
+            "names": ["a", "b"]}
+    assert 門._取り出す(本文, "$.channels[].id") == ["ch-001", "2"], "真偽値と空は値にしない"
+    assert 門._取り出す(本文, "$.names[]") == ["a", "b"]
+    assert 門._取り出す(本文, "$.missing[].id") == []
+    for 悪い in ("channels[].id", "$.channels[0].id", "$..id"):
+        with pytest.raises(ValueError):
+            門._取り出す(本文, 悪い)
+
+
+def test_パス引数の値は台帳の宣言どおりに決まる(門):
+    既定 = [面("GET /api/ch", {"channels": [{"id": "ch-001"}, {"id": "ch-002"}, {"id": "ch-003"}]}),
+            面("GET /api/empty", {"items": []})]
+    宣言 = {
+        "GET /api/ch/{id}": {"from": "GET /api/ch", "take": "$.channels[].id", "limit": 2},
+        "GET /api/fmt/{f}": {"values": ["srt", "txt"], "reason": "コードで決まっている書き出し形式"},
+        "GET /api/job/{id}": {"none": "ジョブは POST でしか生まれず一覧が無い"},
+        "GET /api/empty/{id}": {"from": "GET /api/empty", "take": "$.items[].id"},
+        "GET /api/gone/{id}": {"none": "もう無いルートへの宣言（掃除候補）"},
+    }
+    テンプレート = ["/api/ch/{id}", "/api/empty/{id}", "/api/fmt/{f}", "/api/job/{id}", "/api/new/{id}"]
+    値, 問題 = 門.パス引数の値(テンプレート, 既定, 台帳(path_values=宣言))
+    assert 値["GET /api/ch/{id}"] == ["ch-001", "ch-002"]
+    assert 値["GET /api/fmt/{f}"] == ["srt", "txt"]
+    assert "GET /api/job/{id}" not in 値
+    assert 問題["未宣言"] == ["GET /api/new/{id}"]
+    assert 問題["値が取れない"] == ["GET /api/empty/{id} ← GET /api/empty $.items[].id"]
+    assert 問題["使われていない宣言"] == ["GET /api/gone/{id}"]
+
+
+def test_観測の本体は条件ごとに点数を変えて比べる(門, tmp_path, monkeypatch, 小さなアプリ):
+    """**26周目 G18**: `unscored` の旗を消しても契約が全部通った。子プロセスの中身を通しで回す。
+
+    アプリは点数を無印で返す小さなもの。条件つきの面には「動いた」が付き、
+    未採点の条件にだけ `unscored` が立ち、台帳で対応づけた値でも叩く。
+    """
+    from fastapi import FastAPI
+
+    現在 = {"点": None}
+    app = FastAPI()
+
+    @app.get("/api/score")
+    def score():
+        return {"value": 現在["点"]}
+
+    @app.get("/api/ch")
+    def chs():
+        return {"channels": [{"id": "ch-001"}]}
+
+    @app.get("/api/ch/{cid}")
+    def ch(cid: str):
+        return {"id": cid}
+
+    @contextlib.contextmanager
+    def 差す(状態):
+        現在["点"] = 状態["点"]
+        try:
+            yield
+        finally:
+            現在["点"] = None
+
+    進めた: list = []
+    (tmp_path / "repo").mkdir()
+    monkeypatch.setattr(門, "起こす", lambda _複製: app)
+    monkeypatch.setattr(門, "load_ledger", lambda _p=None: 台帳(path_values={
+        "GET /api/ch/{cid}": {"from": "GET /api/ch", "take": "$.channels[].id"}}))
+    monkeypatch.setattr(門, "実走後の状態", lambda 条件, 点: ({"点": 点}, ("工程", 条件, 点)))
+    # 工程の進み方は、状態を差した**あと**に差した状態へ当てる
+    monkeypatch.setattr(門, "_工程を進める", lambda 通知: 進めた.append((通知, 現在["点"])))
+    monkeypatch.setattr(門, "状態を差す", 差す)
+    monkeypatch.setattr(門, "サイドカーを書かせる", lambda _w: [])
+    monkeypatch.setattr(門, "漏れたモジュール", lambda _c, _r: [])
+
+    assert 門._観測の本体(tmp_path, tmp_path / "real") == 0
+    出た = json.loads((tmp_path / "observed.json").read_text(encoding="utf-8"))
+    観測 = {o["face"]: o for o in 出た["観測"]}
+    assert "GET /api/ch/ch-001" in 観測, "台帳で対応づけた値で叩いていない"
+    for 条件 in (門.合格, 門.不合格, 門.未採点):
+        o = 観測[f"GET /api/score［{条件}］"]
+        assert o["unscored"] is (条件 == 門.未採点), 条件
+        assert o["動いた"]["漏れ"] == ["$.value"], (条件, o["動いた"])
+        assert "GET /api/ch/ch-001［" + 条件 + "］" in 観測
+    assert "動いた" not in 観測["GET /api/score"], "既定の条件は比べない"
+    assert 出た["付帯"]["パス引数"]["未宣言"] == []
+    assert len(進めた) == 9, 進めた   # 3条件 × 3回
+    assert all(通知[2] == 差した点 for 通知, 差した点 in 進めた), "工程を差した状態の中で進めていない"
+
+
+# ─────────────────── 本番側の配線（26周目の実在の漏れ） ───────────────────
+
+def test_品質ゲートの工程は採点した印を持つ(門):
+    """本番の QualityGateWorker に採点させ、その data が名乗っていることを見る。"""
+    _worker, 工程, ctx = 門.品質ゲートを走らせる(92)
+    assert 工程.success is True and 工程.data["scored"] is True
+    assert ctx.quality_scored is True and ctx.quality_score == 92
+    _, 落ちた, _ = 門.品質ゲートを走らせる(85)
+    assert 落ちた.success is False and 落ちた.data["scored"] is True
+
+
+def test_失敗した工程にも_data_を渡す(monkeypatch):
+    """**90点未満の品質ゲートは失敗として返るが、見出しには点数が載る。** data を落とさない。"""
+    import asyncio
+
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from agents.pipeline_types import StageResult
+    coord = PipelineCoordinator.__new__(PipelineCoordinator)
+    届いた = []
+    coord._progress_callback = lambda *a: 届いた.append(a)
+    coord._ws_broadcast = None
+    w = SimpleNamespace(index=5, name="品質チェック", icon="✅")
+    asyncio.run(coord._notify_result(w, StageResult("品質チェック", False, "スコア: 85点", {"scored": True})))
+    asyncio.run(coord._notify_result(w, StageResult("品質チェック", False, "落ちた")))
+    asyncio.run(coord._notify_result(w, StageResult("品質チェック", True, "スコア: 92点", {"scored": True})))
+    assert 届いた == [
+        (5, "error", "スコア: 85点", -1, {"scored": True}),
+        (5, "error", "落ちた", -1, None),
+        (5, "completed", "スコア: 92点", 100, {"scored": True}),
+    ]
+
+
+def test_工程の見出しにも印を写す(monkeypatch):
+    pr = importlib.import_module("routers.pipeline_router")
+    monkeypatch.setattr(pr, "_pipeline_state", {"stages": [{"status": "pending", "detail": ""}],
+                                                "current_stage": 0})
+    pr._update_stage(0, "completed", "スコア: 92点", 100, {"scored": True, "score": 92})
+    assert pr._pipeline_state["stages"][0]["scored"] is True
+    pr._update_stage(0, "running", "やり直し")
+    assert pr._pipeline_state["stages"][0]["scored"] is True, "data の無い更新で印を消さない"
+
+
+def test_新しい実走は前の実走の点数と印を工程に残さない(monkeypatch):
+    """**リセットは工程を初期の形に戻す**（27周目の前に自分で発見）。
+
+    `_reset_state` は status と detail しか戻さず、前の実走の data（点数）と、
+    `_update_stage` が写した印が、新しい実走の「待機中」の工程に残っていた。
+    """
+    from routers.pipeline_default_states import get_initial_pipeline_state
+    pr = importlib.import_module("routers.pipeline_router")
+    monkeypatch.setattr(pr, "_pipeline_state", get_initial_pipeline_state())
+    pr._update_stage(5, "completed", "スコア: 96点", 100, {"scored": True, "score": 96})
+    assert pr._pipeline_state["stages"][5]["scored"] is True
+    pr._reset_state()
+    assert pr._pipeline_state["stages"] == get_initial_pipeline_state()["stages"]
+
+
+def test_実走後の状態は条件ごとに本番が作る(門):
+    合, 合の通知 = 門.実走後の状態(門.合格, 97)
+    assert 合["result"]["quality_scored"] is True and 合["result"]["quality_score"] == 97
+    assert 合の通知[1].success is True and 合の通知[1].data["scored"] is True
+    否, 否の通知 = 門.実走後の状態(門.不合格, 81)
+    assert 否["result"]["quality_gate_report"]["status"] == "blocked"
+    assert 否の通知[1].success is False
+    未, 未の通知 = 門.実走後の状態(門.未採点, 73.21)
+    assert 未["result"]["quality_scored"] is False and 未["result"]["quality_score"] == 73.21
+    assert 未の通知[1].success is False and not 未の通知[1].data, "点を出せなかった工程は data を持たない"

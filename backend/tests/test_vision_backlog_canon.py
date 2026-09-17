@@ -55,6 +55,25 @@ def test_現フェーズの終了条件が2箇所で一致する(canon):
     )
 
 
+def test_現フェーズの写しは両方にある鍵がすべて一致する(canon):
+    """**exit_criteria だけを揃えても、ほかの写しが腐る。**
+
+    gate-verifier 26周目（2026-09-17）の指摘: `current_phase.limits` が
+    `roadmap.phases.R1.5.limits` の先頭9件のままで、#10〜#21 が無かった。
+    `current_phase.note` は「同じ内容を指す」と書いているので、
+    両方にある鍵（limits・budget・condition_notes など）はすべて一致させる。
+    """
+    phase_id = canon["current_phase"]["id"]
+    here = canon["current_phase"]
+    there = canon["roadmap"]["phases"][phase_id]
+    共有 = sorted(set(here) & set(there))
+    assert "limits" in 共有, 共有
+    違う = [k for k in 共有 if here[k] != there[k]]
+    assert not 違う, (
+        f"current_phase と roadmap.phases.{phase_id} で食い違っている鍵: {違う}。"
+        f"片方だけ更新していませんか")
+
+
 def test_終了条件のidが重複しない(canon):
     for phase_id, phase in canon["roadmap"]["phases"].items():
         ids = [c["id"] for c in phase.get("exit_criteria") or []]

@@ -189,7 +189,10 @@ async def get_selection_history(limit: int = 20) -> dict[str, Any]:
             # 返している行はローカルの選択履歴台帳そのもので、`predicted_ctr` は
             # **記録した時点の予測値**。YouTube Analytics の実測ではない。
             # 印が無いと、画面はこの数字を実績として並べられてしまう。
-            "is_real": True,
+            #
+            # **`is_real` は名乗らない**（2026-09-17 に外した）。台帳の行が実際の
+            # 選択かどうかはこの経路には分からない — このリポジトリの台帳は
+            # 全件がテストの書いた行（`test_video_001`）で、`is_real: true` は嘘だった
             "data_source": "derived",
             "note": ("サムネイル選択履歴（ローカル台帳）。`predicted_ctr` は記録時点の"
                      "**予測値**で、YouTube Analytics の実測ではありません"),
@@ -211,7 +214,13 @@ async def get_prediction_accuracy() -> dict[str, Any]:
         
         return {
             "success": True,
-            "accuracy": accuracy
+            "accuracy": accuracy,
+            # **出所を名乗る**（R1.5-C4b・26周目）。誤差は |actual_ctr − predicted_ctr| で、
+            # ローカルの選択履歴台帳の行から計算した値。同じ量の `ctr_difference` は
+            # 4カテゴリとして扱っているのに、ここだけ印が無かった
+            "data_source": "derived",
+            "note": ("ローカルの選択履歴台帳から計算した予測誤差です。台帳の行が実際の"
+                     "選択かどうかはこの経路では確かめていません"),
         }
         
     except HTTPException:

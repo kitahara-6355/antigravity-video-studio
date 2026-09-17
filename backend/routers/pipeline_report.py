@@ -239,7 +239,8 @@ async def pipeline_report():
     # 判定: スコア90点以上（憲法§8.2準拠）
     quality_ok = 採点した and quality_score >= 90
     点表示 = f"{quality_score}点" if 採点した else "未計測"
-    cat_display = ', '.join(categories_found) if categories_found else 点表示
+    # 並びは固定する（集合のままだと起動のたびに順番が変わり、同じ実走のレポートが揺れる）
+    cat_display = ', '.join(sorted(categories_found)) if categories_found else 点表示
     checks.append({
         "id": "⑤", "name": "品質ゲート",
         "ok": quality_ok,

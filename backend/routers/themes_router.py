@@ -93,6 +93,10 @@ async def get_template(template_id: str):
 
     tmpl = PRODUCTION_TEMPLATES[template_id]
     return {
+        # **出所を名乗る**（R1.5-C4b・26周目）。`quality_benchmarks` の CTR・維持率は
+        # テンプレートの設計目標（定数）で、このチャンネルの実測ではない
+        "is_real": False,
+        "data_source": "template",
         "template": tmpl,
         "recommended_themes": RECOMMENDED_COMBOS.get(template_id, []),
         "available_themes": list(MOOD_THEMES.keys()),

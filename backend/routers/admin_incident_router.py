@@ -51,6 +51,15 @@ class EscalationRequest(BaseModel):
 
 # ── 状態管理 (インメモリ) ──
 
+# **架空のデータ**（R1.5-C4b・26周目）。障害の見出しに品質スコア（85→72）が
+# 文字で入っているのに印が無く、同じ架空データを `/quality-degradation` だけが
+# `sample` と名乗っていた。この見本を返す応答は、応答ごとに出所を名乗る
+_見本 = {
+    "data_source": "sample",
+    "is_real": False,
+    "note": "**実際の障害記録ではありません。**UI の足場として固定の見本を返しています",
+}
+
 _alerts = [
     {"id": 1, "type": "quota_warning", "level": "WARNING", "message": "Gemini API使用量が80%超過", "threshold": 80, "created_at": "2026-05-02T10:00:00", "acknowledged": False},
     {"id": 2, "type": "pipeline_failure", "level": "CRITICAL", "message": "TranscribeWorker タイムアウト", "threshold": None, "created_at": "2026-05-02T11:30:00", "acknowledged": False},
@@ -247,6 +256,7 @@ async def get_alerts():
     """A-5 S7: アクティブアラート一覧"""
     active = [a for a in _alerts if not a["acknowledged"]]
     return {
+        **_見本,
         "alerts": _alerts,
         "active_count": len(active),
         "total": len(_alerts),
@@ -269,6 +279,7 @@ async def acknowledge_alert(req: AlertAckRequest):
 async def get_incident_history():
     """A-5 S8: インシデント履歴の一覧"""
     return {
+        **_見本,
         "incidents": _incidents,
         "total": len(_incidents),
     }
@@ -280,7 +291,7 @@ async def get_incident_detail(incident_id: str):
     incident = next((i for i in _incidents if i["id"] == incident_id), None)
     if incident is None:
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-    return incident
+    return {**_見本, **incident}
 
 
 # ── S9: 根本原因分析 ──
@@ -490,6 +501,7 @@ async def get_downtime():
 async def get_status_page():
     """A-5 S21: 公開ステータスページの現在状態"""
     return {
+        **_見本,
         "overall_status": "operational",
         "components": [
             {"name": "Pipeline Engine", "status": "operational"},

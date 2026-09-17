@@ -4,6 +4,167 @@
  "note": "`python -m backend.c4_response_gate --gate` の台帳（**人の判断**）。観測した面の形は `c4_response_faces.json`（`--write-faces` で書き直して差分を査読する）。ここに書くのは — 鍵名の分類（category_names / non_category_names_reviewed / non_category_names）、面ごとの例外（exemptions）、`measured` の承認（measured_claims）、副作用メソッドと盲点、下限。**理由は個別に書く**（10文字未満は FAIL）。25周目 D-1 の反省から、**面を丸ごと外す仕組みは持たない**（外すのは面ごと・鍵ごと）。",
  "population_floor": 330,
  "population_floor_note": "**本文を検査した** GET の面の数（既定の条件）。2026-09-17 の実測は 338（うち 200 以外 36・HTML 1 も本文を読む）。25周目 D-7 — 以前は列挙したルート数を数えており、実際に本文を見ていたのは 298 で下限の 300 を割っていた。面の増減そのものは面の台帳が止めるので、これは母集団の崩壊（依存の版ずれで0件など）を捕まえる網",
+ "path_values_note": "**パス引数に入れる値の出どころ**（26周目・2026-09-17 ユーザー承認）。合成の値 `c4-gate-probe` だけでは、`ch-001` のように**API 自身が一覧で返す ID でしか開かない面**が 404 の形しか見えなかった（C4a の名指し例と、7周目に実際に起きた迂回がそこにあった）。テンプレート付きの GET は**全部**ここに書く — 一覧 API（from / take / limit。値は既定の条件で実際に返った先頭から）、決まった値（values + reason）、出どころが無い理由（none）。**書いていないテンプレートと、値が取れなくなった一覧は門が落とす**",
+ "path_values": {
+  "GET /api/admin/channel/channels/{channel_id}": {
+   "from": "GET /api/admin/channel/channels",
+   "take": "$.channels[].id",
+   "limit": 3
+  },
+  "GET /api/admin/incident/incidents/{incident_id}": {
+   "from": "GET /api/admin/incident/incidents",
+   "take": "$.incidents[].id",
+   "limit": 3
+  },
+  "GET /api/admin/incident/rca/{incident_id}": {
+   "from": "GET /api/admin/incident/incidents",
+   "take": "$.incidents[].id",
+   "limit": 3
+  },
+  "GET /api/admin/incident/timeline/{incident_id}": {
+   "from": "GET /api/admin/incident/incidents",
+   "take": "$.incidents[].id",
+   "limit": 3
+  },
+  "GET /api/director/task/{task_id}": {
+   "none": "Director の非同期タスクは POST でしか生まれず、一覧を返す GET が無い。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/director/tasks/{task_id}": {
+   "none": "Director の非同期タスク（旧経路）は POST でしか生まれず、一覧を返す GET が無い。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/logs/files/{filename}": {
+   "from": "GET /api/logs/files",
+   "take": "$.files[].name",
+   "limit": 2
+  },
+  "GET /api/pipeline/proofreading/export/{export_format}": {
+   "values": [
+    "srt",
+    "txt"
+   ],
+   "reason": "書き出し形式はコードで srt / txt に決まっている（pipeline_router.export_proofreading）。校閲結果の状態は入力条件に入れていないので、どちらも「校閲結果がありません」の形になる"
+  },
+  "GET /api/pipeline/quality-gate/drilldown/{category}": {
+   "from": "GET /api/pipeline/quality-gate/scores",
+   "take": "$.categories[].id",
+   "limit": 6
+  },
+  "GET /api/pipeline/stream/{video_type}": {
+   "values": [
+    "preview",
+    "final"
+   ],
+   "reason": "video_type はコードで preview / final に決まっている（pipeline_router.stream_video）"
+  },
+  "GET /api/preview/report/{session_id}": {
+   "none": "プレビューのセッション（legacy_production_router の `_preview_sessions`）は POST でしか生まれない。一覧の `GET /api/preview/sessions` はあるが、先に登録された `GET /api/preview/{preview_id}` に当たって届かない（`preview_id=\"sessions\"` として「Preview not found」を返す。既知の欠陥）。届いたとしても門の実行では常に空で、値が取れない（合成の値だけで叩く）"
+  },
+  "GET /api/preview/{preview_id}": {
+   "none": "プレビュー（`backend/previews/<id>.mp4`）は POST の生成でしか生まれず、ID の一覧を返す GET が無い（`GET /api/preview/sessions` はセッションの一覧で、しかもこの経路に当たってしまう）。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/progressive-preview/report/{session_id}": {
+   "none": "段階プレビューのセッションは POST でしか生まれず、一覧を返す GET が無い。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）。合成の値で 500 になる既知の欠陥（別タスク）"
+  },
+  "GET /api/render/download/{job_id}": {
+   "none": "レンダリングのジョブは POST でしか生まれず、一覧を返す GET が無い。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/render/status/{job_id}": {
+   "none": "レンダリングのジョブは POST でしか生まれず、一覧を返す GET が無い。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/task/{task_id}": {
+   "none": "タスク（`task_store`）は POST でしか生まれない。一覧の `GET /api/tasks` はあるが、門は POST を叩かないので門の実行では常に空で、値が取れない（合成の値だけで叩く）"
+  },
+  "GET /api/usage/current-model/{task}": {
+   "values": [
+    "quality_gate",
+    "thumbnail"
+   ],
+   "reason": "工程名は backend/model_config.json の task_mapping のキー（品質ゲートとサムネイルを選んだ）"
+  },
+  "GET /api/usage/remaining/{model_name}": {
+   "from": "GET /api/usage/dashboard",
+   "take": "$.models[].name",
+   "limit": 3
+  },
+  "GET /api/v1/api/pipeline/proofreading/export/{export_format}": {
+   "values": [
+    "srt",
+    "txt"
+   ],
+   "reason": "v1 の別名。書き出し形式はコードで srt / txt に決まっている"
+  },
+  "GET /api/v1/api/pipeline/quality-gate/drilldown/{category}": {
+   "from": "GET /api/v1/api/pipeline/quality-gate/scores",
+   "take": "$.categories[].id",
+   "limit": 6
+  },
+  "GET /api/v1/api/pipeline/stream/{video_type}": {
+   "values": [
+    "preview",
+    "final"
+   ],
+   "reason": "v1 の別名。video_type はコードで preview / final に決まっている"
+  },
+  "GET /api/v1/api/preview/{preview_id}": {
+   "none": "v1 の別名。プレビュー（`backend/previews/<id>.mp4`）は POST の生成でしか生まれず、ID の一覧を返す GET が無い。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/v1/api/progressive-preview/report/{session_id}": {
+   "none": "v1 の別名。段階プレビューのセッションは POST でしか生まれず、一覧を返す GET が無い。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/v1/api/usage/current-model/{task}": {
+   "values": [
+    "quality_gate",
+    "thumbnail"
+   ],
+   "reason": "v1 の別名。工程名は backend/model_config.json の task_mapping のキー"
+  },
+  "GET /api/v1/api/usage/remaining/{model_name}": {
+   "from": "GET /api/v1/api/usage/dashboard",
+   "take": "$.models[].name",
+   "limit": 3
+  },
+  "GET /api/v1/api/youtube/series/{series_id}/playlist": {
+   "none": "v1 の別名。シリーズの一覧を返す GET が無い（series_planner は ID を受けて計画を作る。合成の値でも「見つからない」分岐の本体が動く）"
+  },
+  "GET /api/v1/mcp/resources/{resource_name}": {
+   "from": "GET /api/v1/mcp/resources",
+   "take": "$.resources[].name",
+   "limit": 2
+  },
+  "GET /api/v1/themes/templates/{template_id}": {
+   "from": "GET /api/v1/themes/templates",
+   "take": "$.templates[].id",
+   "limit": 2
+  },
+  "GET /api/v1/themes/{theme_id}": {
+   "from": "GET /api/v1/themes",
+   "take": "$.themes[].id",
+   "limit": 2
+  },
+  "GET /api/video/download/{task_id}": {
+   "none": "動画処理のタスク（render の `_video_tasks`）は POST でしか生まれず、一覧を返す GET が無い（`GET /api/debug/video-tasks` が見るのは legacy_production_router の別の辞書）。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/video/preview/{task_id}": {
+   "none": "動画処理のタスク（render の `_video_tasks`）は POST でしか生まれず、一覧を返す GET が無い（`GET /api/debug/video-tasks` が見るのは legacy_production_router の別の辞書）。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/video/process/status/{task_id}": {
+   "none": "動画処理のタスク（legacy_production_router の `_video_tasks`）は POST でしか生まれない。一覧の `GET /api/debug/video-tasks` はあるが、門は POST を叩かないので門の実行では常に空で、値が取れない（合成の値だけで叩く）"
+  },
+  "GET /api/video/status/{task_id}": {
+   "none": "動画処理のタスク（render の `_video_tasks`）は POST でしか生まれず、一覧を返す GET が無い（`GET /api/debug/video-tasks` が見るのは legacy_production_router の別の辞書）。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
+  },
+  "GET /api/youtube/series/{series_id}/playlist": {
+   "none": "シリーズの一覧を返す GET が無い（series_planner は ID を受けて計画を作る。合成の値でも「見つからない」分岐の本体が動く）"
+  }
+ },
+ "score_displays_note": "**採点した点を文字で見せてよい面。** 点数を2通りにした実走で、HTML の文字が点数に連れて動くのはここに載せた面だけ許す（HTML には出所の印を付けられないため）。未採点の実走で文字が動いたら、ここに載っていても落とす",
+ "score_displays": {
+  "GET /api/pipeline/report": "パイプライン完了レポート（HTML）。採点済みの実走でだけ総合スコア・工程の見出し・カテゴリ別の点を表示し、未採点では「未計測」と出す（pipeline_report._品質の表示）"
+ },
+ "excluded_transports_note": "**母集団の外に置く、メソッド以外の通り道。** 門は内訳にこれも数えて毎回表示し、`side_effect_blind_spot` に一覧を固定する（増えたら落ちる）",
+ "excluded_transports": {
+  "WEBSOCKET": "接続して待つ通り道で、GET のように1回叩いて本文を得られない。/api 配下の2本はパイプラインの進捗（工程の data）を配信するが、同じ data は GET /api/pipeline/status の stages[] として実走後の条件で見ている（WebSocket の電文そのものは見ていない — limits #20）"
+ },
  "category_names_note": "**4カテゴリの数字を運ぶ鍵名**（投稿・チャンネル統計・品質スコア・retention）。ここに載せた鍵名と `c4_inventory.RISK_KEY_RE` の鍵名は、値が数字か空でない文字列なら**同じ場所か祖先に出所の印が要る**。器（dict）の鍵名を載せると、その下の値すべてに印が要る。2026-09-17 に紛らわしい語（STRONG_VOCAB_RE）に当たる 79 個を出現箇所つきで1つずつ確かめて分けた",
  "category_names": {
   "actual_ctr": "投稿後に実際に出た CTR（チャンネル統計）",
@@ -12,11 +173,15 @@
   "additional_revenue_usd": "施策で増えた収益の見積もり（チャンネル統計・収益）",
   "all_predicted_ctrs": "サムネイル候補ごとの予測 CTR の一覧（チャンネル統計の予測値）",
   "audio_quality": "品質改善の前後比較（音声品質の点数）を入れる器。下の値は品質スコア",
+  "average_error": "サムネイルの CTR 予測誤差の平均（|actual_ctr − predicted_ctr|）。同じ量の ctr_difference と同じ扱い",
   "avg_ctr": "平均 CTR（チャンネル統計）",
+  "avg_view_duration_seconds": "平均視聴時間（秒）（retention）。チャンネル詳細の KPI",
   "avg_views": "平均再生数（チャンネル統計）",
+  "avg_views_per_video": "動画あたりの平均再生数（チャンネル統計）。25周目 D-4 で名指しされた鍵",
   "avg_watch_time_increase_pct": "総再生時間の平均増加率（チャンネル統計）",
   "avg_watch_time_min": "平均視聴時間（分）（retention）",
   "category_scores": "品質ゲートのカテゴリ別点数を入れる器。下の `core` などの鍵名だけでは点数と分からない",
+  "correct_prediction_rate": "予測 CTR が最も高い案を選べた割合（CTR の予測精度）",
   "correlation_score": "サムネイルの変更と CTR の相関（チャンネル統計の分析値）",
   "ctr_average_percent": "業界の平均 CTR（参考値。実測と取り違えやすいので印を要求する）",
   "ctr_change": "期間比較の CTR 差（チャンネル統計）",
@@ -25,14 +190,21 @@
   "ctr_difference": "予測と実績の CTR 差（チャンネル統計）",
   "ctr_pct": "CTR（％表記・チャンネル統計）",
   "ctr_status": "CTR をベンチマークと比べた判定（above/below）。統計から導いた値",
+  "ctr_target_percent": "テンプレートの CTR 目標（設計値）。実測と取り違えやすいので4カテゴリとして印を要求する",
   "ctr_top_tier_percent": "上位チャンネルの CTR（参考値。実測と取り違えやすいので印を要求する）",
   "drop_off_points": "視聴者が離脱した時刻の一覧（retention 分析）",
+  "engagement_rate": "エンゲージメント率（チャンネル統計）。25周目 D-4 で名指しされた鍵",
   "forecast_subscribers": "登録者数の予測を入れる器。下の `30_days` などは登録者数",
   "forecast_views": "再生数の予測を入れる器。下の `next_month` などは再生数",
+  "kpi": "チャンネルの KPI（総再生時間・平均視聴時間など）を入れる器",
+  "max_error": "サムネイルの CTR 予測誤差の最大（|actual_ctr − predicted_ctr|）",
   "metadata_quality": "品質改善の前後比較（メタデータ品質の点数）を入れる器",
+  "min_error": "サムネイルの CTR 予測誤差の最小（|actual_ctr − predicted_ctr|）",
+  "performance": "チャンネルの実績（平均再生数・投稿本数など）を入れる器",
   "post_publish_feedbacks": "投稿後の実績（CTR・維持率・再生数）を入れる器",
   "published": "動画の公開日。**動画が公開されたと名乗る値**（投稿）",
   "quality": "品質の改善率（`improvement_pct.quality`）。品質スコア由来の値",
+  "quality_benchmarks": "テンプレートの品質基準（CTR・維持率の目標、音量）を入れる器",
   "quality_details": "パイプラインの品質ゲート結果を入れる器（点数・カテゴリ別点数）",
   "quality_gate_impact": "品質ゲートが維持率に与えた効果の見積もり（retention）",
   "quality_gate_report": "品質ゲート不合格レポートを入れる器（点数・しきい値・差）",
@@ -43,6 +215,7 @@
   "retention_diff": "施策の有無による視聴維持率の差（retention）",
   "retention_pct": "視聴維持率（％表記・retention）",
   "retention_status": "維持率をベンチマークと比べた判定（above/below）。統計から導いた値",
+  "retention_target_percent": "テンプレートの維持率目標（設計値）。実測と取り違えやすいので4カテゴリとして印を要求する",
   "retention_top_tier_percent": "上位チャンネルの視聴維持率（参考値。実測と取り違えやすいので印を要求する）",
   "score_after": "改善施策の後の品質スコア",
   "score_before": "改善施策の前の品質スコア",
@@ -54,9 +227,11 @@
   "target_ctr": "利用者が置いた CTR の目標値。実測と取り違えやすいので4カテゴリとして印を要求する",
   "target_retention": "利用者が置いた維持率の目標値。実測と取り違えやすいので4カテゴリとして印を要求する",
   "technical_quality": "自己レビューの技術品質（0〜1）。品質スコアの次元名（しきい値として出る場所は exemptions）",
+  "top_video_views": "最も再生された動画の再生数（チャンネル統計）",
   "total_comments_analyzed": "分析したコメントの件数（チャンネル統計）",
   "total_subscribers": "登録者数の合計（チャンネル統計）",
   "total_views": "総再生数（チャンネル統計）。25周目 D-4 で列挙の外にあると指摘された鍵",
+  "videos_published": "公開した動画の本数（投稿）",
   "views_change": "期間比較の再生数の差（チャンネル統計）",
   "views_change_pct": "期間比較の再生数の変化率（チャンネル統計）",
   "views_monthly_3m": "3か月後の月間再生数の予測（チャンネル統計）",
@@ -70,6 +245,7 @@
   "comment": "承認履歴に人が書いたコメント本文（`approval/history`）。YouTube のコメント数ではない",
   "degraded_workers": "品質劣化を検知したワーカーの名前の一覧（運用指標）。`grade` に当たるだけ",
   "documentation_url": "SDK の説明文書へのリンク（設定値）。投稿した動画の URL ではない",
+  "engagement_rules": "テンプレートの編集ルール（間の最大秒数・語り口・テンポ）を入れる器。エンゲージメントの実測ではない",
   "fatigue_score": "オーナーの疲労度の推定（対話の調子から数える内部状態・0〜100。`manager_monitoring`）。動画やチャンネルの数字ではない",
   "gemini-3-flash-preview": "モデル ID（フォールバック対応表の鍵）。`preview` の `view` に当たるだけ",
   "gemini-3.1-pro-preview": "モデル ID（フォールバック対応表の鍵）。`preview` の `view` に当たるだけ",
@@ -80,6 +256,7 @@
   "preview_path": "ローカルに書いたプレビュー動画のパス。投稿や統計を名乗る値ではない",
   "preview_url": "プレビュー動画のローカル配信 URL。YouTube へ投稿した動画の URL ではない",
   "quality_gate": "`workers.quality_gate` はワーカー別の API クォータ消費（運用指標）。品質スコアではない",
+  "quality_gate_enabled": "品質ゲートを使うかの設定（真偽）。品質スコアではない",
   "reengagement_mark_seconds": "再エンゲージを仕掛ける時刻の目安（編集の設計値・テンプレートの定数）。視聴維持率の実測ではない",
   "retention_days": "ファイルの保管日数（ストレージ設定）。視聴維持率ではない",
   "review": "制作工程『レビュー』の所要時間の内訳（制作効率）。品質スコアではない",
@@ -98,6 +275,7 @@
   "SmartCut構成": "一括",
   "YouTube最適化": "一括",
   "accent": "一括",
+  "accessibility": "一括",
   "accuracy": "一括",
   "achievement_pct": "一括",
   "achievement_rate": "一括",
@@ -111,6 +289,7 @@
   "active_count": "一括",
   "active_mode": "一括",
   "active_tools": "一括",
+  "actor": "一括",
   "actual": "一括",
   "admin": "一括",
   "adopted": "一括",
@@ -125,11 +304,13 @@
   "all_concepts": "一括",
   "all_features_active": "一括",
   "all_passed": "一括",
+  "all_plugins_ran": "一括",
   "allow_credentials": "一括",
   "allow_headers": "一括",
   "allow_methods": "一括",
   "allowed_origins": "一括",
   "analysis_date": "一括",
+  "analyzed_at": "一括",
   "api_calls_today": "一括",
   "api_connected": "一括",
   "api_key": "一括",
@@ -151,17 +332,19 @@
   "assets": "一括",
   "attempt": "一括",
   "audioConfig": "一括",
+  "audio_loudness_lufs": "一括",
   "auth_tokens": "一括",
   "author": "一括",
   "authorize_endpoint": "一括",
   "auto_fallback": "一括",
   "auto_learn": "一括",
+  "auto_optimize": "一括",
   "auto_pilot_ratio": "一括",
   "auto_schedule": "一括",
   "available": "一括",
   "available_assets": "一括",
   "available_for_use": "一括",
-  "average_error": "一括",
+  "available_themes": "一括",
   "avg_duration_ms": "一括",
   "avg_satisfaction": "一括",
   "avoided": "一括",
@@ -186,6 +369,7 @@
   "brand_keywords": "一括",
   "brand_personality": "一括",
   "breakdown": "一括",
+  "broadcast": "一括",
   "budget_seconds": "一括",
   "bug_hunter": "一括",
   "built_at": "一括",
@@ -211,6 +395,7 @@
   "channel_owner": "一括",
   "channels": "一括",
   "chapters": "一括",
+  "chars_per_second": "一括",
   "checked_at": "一括",
   "checklist": "一括",
   "checkpoint": "一括",
@@ -256,7 +441,6 @@
   "cool": "一括",
   "core": "一括",
   "correct": "一括",
-  "correct_prediction_rate": "一括",
   "corrected": "一括",
   "correlation_rate": "一括",
   "cost": "一括",
@@ -291,6 +475,7 @@
   "date": "一括",
   "day": "一括",
   "days_elapsed": "一括",
+  "dead_air_max_seconds": "一括",
   "decision_count": "一括",
   "decision_insights": "一括",
   "deductions": "一括",
@@ -352,6 +537,7 @@
   "estimated_impact": "一括",
   "estimated_retries": "一括",
   "estimated_time_minutes": "一括",
+  "event": "一括",
   "event_type": "一括",
   "events": "一括",
   "evolution_entries": "一括",
@@ -369,6 +555,7 @@
   "fail_count": "一括",
   "fail_items": "一括",
   "failed": "一括",
+  "failed_plugins": "一括",
   "failure_count": "一括",
   "failures": "一括",
   "fallback_activations": "一括",
@@ -393,6 +580,7 @@
   "fixes": "一括",
   "flaky": "一括",
   "font_family": "一括",
+  "font_size_min_px": "一括",
   "force_render_available": "一括",
   "force_render_endpoint": "一括",
   "forecast_cost": "一括",
@@ -488,6 +676,7 @@
   "key_configured": "一括",
   "keys": "一括",
   "keywords": "一括",
+  "kinetic_typography": "一括",
   "kpi_summary": "一括",
   "label": "一括",
   "labels": "一括",
@@ -508,6 +697,7 @@
   "last_updated": "一括",
   "latest": "一括",
   "layer_distribution": "一括",
+  "lead_frames": "一括",
   "learned_by_ai": "一括",
   "lessons_learned": "一括",
   "level": "一括",
@@ -528,10 +718,11 @@
   "lufs_target": "一括",
   "machine": "一括",
   "main": "一括",
+  "max_chars_per_line": "一括",
   "max_count": "一括",
   "max_delta": "一括",
-  "max_error": "一括",
   "max_iterations": "一括",
+  "max_lines": "一括",
   "max_retries": "一括",
   "mcp_enabled": "一括",
   "mcp_native": "一括",
@@ -549,7 +740,7 @@
   "metrics": "一括",
   "migration_guide": "一括",
   "mime_type": "一括",
-  "min_error": "一括",
+  "min_display_seconds": "一括",
   "missing": "一括",
   "model": "一括",
   "models": "一括",
@@ -569,6 +760,7 @@
   "mtbf_hours": "一括",
   "mttr_minutes": "一括",
   "name": "一括",
+  "narration_style": "一括",
   "negative": "一括",
   "nemesis": "一括",
   "network_io_mbps": "一括",
@@ -594,12 +786,14 @@
   "original": "一括",
   "os": "一括",
   "our_rank": "一括",
+  "outline_required": "一括",
   "output_dir": "一括",
   "over_budget": "一括",
   "overall": "一括",
   "overall_status": "一括",
   "override_active": "一括",
   "owner": "一括",
+  "pacing": "一括",
   "parameters": "一括",
   "pass_count": "一括",
   "pass_items": "一括",
@@ -729,10 +923,12 @@
   "roi_ratio": "一括",
   "role": "一括",
   "roles": "一括",
+  "root_cause": "一括",
   "ruff": "一括",
   "rule": "一括",
   "rule_id": "一括",
   "rules": "一括",
+  "safe_area_margin_percent": "一括",
   "sample_count": "一括",
   "sample_size": "一括",
   "satisfaction": "一括",
@@ -781,6 +977,7 @@
   "sla_met": "一括",
   "slack_webhook": "一括",
   "smartcut": "一括",
+  "smartcut_enabled": "一括",
   "smartcut_impact": "一括",
   "smartcut_strategies": "一括",
   "source": "一括",
@@ -788,6 +985,7 @@
   "sources": "一括",
   "speaker_id": "一括",
   "speed": "一括",
+  "stability": "一括",
   "stack_trace": "一括",
   "stage_results": "一括",
   "stages": "一括",
@@ -810,6 +1008,7 @@
   "subtitle_font": "一括",
   "subtitle_lead_frames": "一括",
   "subtitle_max_per_line": "一括",
+  "subtitle_rules": "一括",
   "subtitle_size": "一括",
   "subtitle_trail_frames": "一括",
   "success": "一括",
@@ -866,9 +1065,11 @@
   "time": "一括",
   "time_saved_hours": "一括",
   "time_value_usd": "一括",
+  "timeline": "一括",
   "timestamp": "一括",
   "timezone": "一括",
   "title": "一括",
+  "title_first": "一括",
   "titles": "一括",
   "to_tier": "一括",
   "token_endpoint": "一括",
@@ -891,6 +1092,7 @@
   "total_downtime_minutes": "一括",
   "total_endpoints": "一括",
   "total_entries": "一括",
+  "total_events": "一括",
   "total_failures": "一括",
   "total_gb": "一括",
   "total_improvement": "一括",
@@ -908,6 +1110,7 @@
   "total_size_mb": "一括",
   "total_videos": "一括",
   "total_workers": "一括",
+  "trail_frames": "一括",
   "transcribe": "一括",
   "transcription": "一括",
   "transcription_accuracy": "一括",
@@ -925,6 +1128,7 @@
   "tv_standards": "一括",
   "type": "一括",
   "typography": "一括",
+  "unchecked": "一括",
   "unrated_templates": "一括",
   "unresolved": "一括",
   "update_interval_minutes": "一括",
@@ -1087,6 +1291,46 @@
    "face": "GET /api/evolution",
    "key": "$.agent_performance.thumbnail.passed",
    "reason": "開発エージェント `thumbnail` が処理したタスクの合格数（開発プロセス指標）。動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.bug_hunter.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `bug_hunter` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.coverage.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `coverage` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.design_stock.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `design_stock` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.doc_gen.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `doc_gen` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.refactor.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `refactor` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.tdr_cleanup.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `tdr_cleanup` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.test_weaver.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `test_weaver` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
+  },
+  {
+   "face": "GET /api/v1/mcp/resources/evolution_log",
+   "key": "$.agent_performance.thumbnail.passed",
+   "reason": "MCP の資源として返す進化ログ（`/api/evolution` と同じ実体）。開発エージェント `thumbnail` のタスク合格数で、動画の品質でもチャンネルの数字でもない（正典 limits #11）"
   }
  ],
  "measured_claims": [
@@ -1164,7 +1408,9 @@
   "POST /api/youtube-upload/upload",
   "POST /api/youtube/hook-preview",
   "POST /api/youtube/retention-map",
-  "POST /api/youtube/series/session-score"
+  "POST /api/youtube/series/session-score",
+  "WEBSOCKET /api/pipeline/ws/pipeline",
+  "WEBSOCKET /api/v1/api/pipeline/ws/pipeline"
  ],
- "blind_spot_note": "**ここは C4b では測れない。** 副作用があるので門が叩けない。一覧を固定して**増えたら落とす**ことで、盲点が知らないうちに広がるのを止める。正典 limits に「POST 経路の偽 success は C4b では止まらない」と明記してある。"
+ "blind_spot_note": "**ここは C4b では測れない。** 副作用があるので門が叩けない。一覧を固定して**増えたら落とす**ことで、盲点が知らないうちに広がるのを止める。正典 limits に「POST 経路の偽 success は C4b では止まらない」と明記してある。 2026-09-17 から **WebSocket は語によらず全部**載せる（26周目: 内訳にも出ていなかった）。"
 }
