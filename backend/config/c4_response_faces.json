@@ -3498,32 +3498,32 @@
     "$:dict"
    ]
   },
+  "GET /api/logs/files/_cov_batch_a_result.txt": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.filename:str",
+    "$.lines:list",
+    "$.lines[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/logs/files/backend_log.txt": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.filename:str",
+    "$.lines:list",
+    "$.lines[]:str",
+    "$:dict"
+   ]
+  },
   "GET /api/logs/files/c4-gate-probe": {
    "status": 200,
    "kind": "json",
    "shape": [
     "$.filename:str",
     "$.lines:list",
-    "$:dict"
-   ]
-  },
-  "GET /api/logs/files/coverage_branch_report.txt": {
-   "status": 200,
-   "kind": "json",
-   "shape": [
-    "$.filename:str",
-    "$.lines:list",
-    "$.lines[]:str",
-    "$:dict"
-   ]
-  },
-  "GET /api/logs/files/requirements.txt": {
-   "status": 200,
-   "kind": "json",
-   "shape": [
-    "$.filename:str",
-    "$.lines:list",
-    "$.lines[]:str",
     "$:dict"
    ]
   },

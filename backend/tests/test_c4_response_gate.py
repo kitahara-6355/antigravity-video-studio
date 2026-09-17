@@ -677,7 +677,8 @@ def test_パス引数の宣言は形と理由が要る(門):
         "GET /api/b/{id}": {"values": ["x"], "reason": "短い"},
         "GET /api/c/{id}": {"none": "無い"},
         "GET /api/d/{id}": {"limit": 3},
-        "GET /api/e/{id}": {"from": "GET /api/e", "take": "$.items[].id", "limit": 2},
+        "GET /api/e/{id}": {"from": "GET /api/e", "take": "$.items[].id", "limit": 2, "order": "name"},
+        "GET /api/f/{id}": {"from": "GET /api/f", "take": "$.items[].id", "order": "mtime"},
     }
     違反, _ = 判定(門, [], 台帳(path_values=宣言))
     assert any("取る値の道（take）を書く" in v and "/api/a/" in v for v in 違反), 違反
@@ -685,6 +686,7 @@ def test_パス引数の宣言は形と理由が要る(門):
     assert any("出どころが無いなら理由" in v and "/api/c/" in v for v in 違反), 違反
     assert any("宣言の形が読めません" in v and "/api/d/" in v for v in 違反), 違反
     assert not [v for v in 違反 if "/api/e/" in v], 違反
+    assert any("並べ方（order）は name だけ" in v and "/api/f/" in v for v in 違反), 違反
 
 
 def test_門がリポジトリを書き換えたら落ちる(門):
@@ -1188,18 +1190,29 @@ def test_取り出すは道の式で一覧の値を拾う(門):
 
 
 def test_パス引数の値は台帳の宣言どおりに決まる(門):
-    既定 = [面("GET /api/ch", {"channels": [{"id": "ch-001"}, {"id": "ch-002"}, {"id": "ch-003"}]}),
-            面("GET /api/empty", {"items": []})]
+    # 同じ ID が2回返っても、上限は別々の値で数える
+    既定 = [面("GET /api/ch", {"channels": [{"id": "ch-001"}, {"id": "ch-001"}, {"id": "ch-002"},
+                                            {"id": "ch-003"}]}),
+            面("GET /api/empty", {"items": []}),
+            # 更新時刻の新しい順に返す一覧（並びは環境で変わる）
+            面("GET /api/logs", {"files": [{"name": "c.txt"}, {"name": "a.txt"}, {"name": "b.txt"}]})]
     宣言 = {
         "GET /api/ch/{id}": {"from": "GET /api/ch", "take": "$.channels[].id", "limit": 2},
         "GET /api/fmt/{f}": {"values": ["srt", "txt"], "reason": "コードで決まっている書き出し形式"},
         "GET /api/job/{id}": {"none": "ジョブは POST でしか生まれず一覧が無い"},
         "GET /api/empty/{id}": {"from": "GET /api/empty", "take": "$.items[].id"},
         "GET /api/gone/{id}": {"none": "もう無いルートへの宣言（掃除候補）"},
+        "GET /api/logs/{name}": {"from": "GET /api/logs", "take": "$.files[].name", "limit": 2,
+                                 "order": "name"},
+        "GET /api/raw/{name}": {"from": "GET /api/logs", "take": "$.files[].name", "limit": 2},
     }
-    テンプレート = ["/api/ch/{id}", "/api/empty/{id}", "/api/fmt/{f}", "/api/job/{id}", "/api/new/{id}"]
+    テンプレート = ["/api/ch/{id}", "/api/empty/{id}", "/api/fmt/{f}", "/api/job/{id}", "/api/new/{id}",
+                  "/api/logs/{name}", "/api/raw/{name}"]
     値, 問題 = 門.パス引数の値(テンプレート, 既定, 台帳(path_values=宣言))
     assert 値["GET /api/ch/{id}"] == ["ch-001", "ch-002"]
+    # **並びが環境で変わる一覧は名前順に並べてから上限で切る**（CI の checkout は更新時刻がほぼ同じ）
+    assert 値["GET /api/logs/{name}"] == ["a.txt", "b.txt"]
+    assert 値["GET /api/raw/{name}"] == ["c.txt", "a.txt"], "order が無ければ一覧の並びのまま"
     assert 値["GET /api/fmt/{f}"] == ["srt", "txt"]
     assert "GET /api/job/{id}" not in 値
     assert 問題["未宣言"] == ["GET /api/new/{id}"]

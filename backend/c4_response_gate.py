@@ -602,6 +602,8 @@ def パス引数の値(テンプレート: list[str], 既定の観測: list[dict
 
     台帳 `path_values` の書き方（キーは `GET <テンプレート>`）:
     - `{"from": "<一覧の面>", "take": "$.channels[].id", "limit": 3}` — 一覧 API が実際に返す値
+      （一覧の並びのまま先頭から。**並びが環境で変わる一覧**（更新時刻順など）は
+      `"order": "name"` を足すと、名前順に並べてから上限で切る）
     - `{"values": [...], "reason": "..."}` — コードで決まっている値
     - `{"none": "..."}` — 値の出どころが無い理由（合成の値だけで叩く）
     """
@@ -621,7 +623,10 @@ def パス引数の値(テンプレート: list[str], 既定の観測: list[dict
                 vs = _取り出す(o.get("body"), str(spec.get("take", ""))) if o.get("kind") == "json" else []
             except ValueError:
                 vs = []
-            vs = list(dict.fromkeys(vs))[: int(spec.get("limit", 2))]
+            vs = list(dict.fromkeys(vs))
+            if spec.get("order") == "name":
+                vs = sorted(vs)
+            vs = vs[: int(spec.get("limit", 2))]
             if not vs:
                 問題["値が取れない"].append(f"{経路} ← {spec['from']} {spec.get('take')}")
             値[経路] = vs
@@ -1179,6 +1184,8 @@ def audit(観測: list[dict], 台帳: dict, 面台帳: dict,
             continue
         if "from" in spec and not str(spec.get("take", "")).startswith("$"):
             違反.append(f"一覧 API から取る値の道（take）を書く: {経路}")
+        if "order" in spec and spec["order"] != "name":
+            違反.append(f"一覧の並べ方（order）は name だけ: {経路}")
         if "values" in spec and len(str(spec.get("reason", ""))) < 10:
             違反.append(f"決まった値を使うなら理由を書く: {経路}")
         if "none" in spec and len(str(spec.get("none", ""))) < 10:

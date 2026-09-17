@@ -4,7 +4,7 @@
  "note": "`python -m backend.c4_response_gate --gate` の台帳（**人の判断**）。観測した面の形は `c4_response_faces.json`（`--write-faces` で書き直して差分を査読する）。ここに書くのは — 鍵名の分類（category_names / non_category_names_reviewed / non_category_names）、面ごとの例外（exemptions）、`measured` の承認（measured_claims）、副作用メソッドと盲点、下限。**理由は個別に書く**（10文字未満は FAIL）。25周目 D-1 の反省から、**面を丸ごと外す仕組みは持たない**（外すのは面ごと・鍵ごと）。",
  "population_floor": 330,
  "population_floor_note": "**本文を検査した** GET の面の数（既定の条件）。2026-09-17 の実測は 338（うち 200 以外 36・HTML 1 も本文を読む）。25周目 D-7 — 以前は列挙したルート数を数えており、実際に本文を見ていたのは 298 で下限の 300 を割っていた。面の増減そのものは面の台帳が止めるので、これは母集団の崩壊（依存の版ずれで0件など）を捕まえる網",
- "path_values_note": "**パス引数に入れる値の出どころ**（26周目・2026-09-17 ユーザー承認）。合成の値 `c4-gate-probe` だけでは、`ch-001` のように**API 自身が一覧で返す ID でしか開かない面**が 404 の形しか見えなかった（C4a の名指し例と、7周目に実際に起きた迂回がそこにあった）。テンプレート付きの GET は**全部**ここに書く — 一覧 API（from / take / limit。値は既定の条件で実際に返った先頭から）、決まった値（values + reason）、出どころが無い理由（none）。**書いていないテンプレートと、値が取れなくなった一覧は門が落とす**",
+ "path_values_note": "**パス引数に入れる値の出どころ**（26周目・2026-09-17 ユーザー承認）。合成の値 `c4-gate-probe` だけでは、`ch-001` のように**API 自身が一覧で返す ID でしか開かない面**が 404 の形しか見えなかった（C4a の名指し例と、7周目に実際に起きた迂回がそこにあった）。テンプレート付きの GET は**全部**ここに書く — 一覧 API（from / take / limit。値は既定の条件で実際に返った先頭から）、決まった値（values + reason）、出どころが無い理由（none）。**書いていないテンプレートと、値が取れなくなった一覧は門が落とす** 並びが環境で変わる一覧（更新時刻順など）は `order: \"name\"` で名前順に並べてから上限で切る。",
  "path_values": {
   "GET /api/admin/channel/channels/{channel_id}": {
    "from": "GET /api/admin/channel/channels",
@@ -35,7 +35,9 @@
   "GET /api/logs/files/{filename}": {
    "from": "GET /api/logs/files",
    "take": "$.files[].name",
-   "limit": 2
+   "limit": 2,
+   "order": "name",
+   "note": "一覧は backend/ 直下の .log / .txt を**更新時刻の新しい順**に返す（log_manager.list_log_files）。門の複製は更新時刻を保つので、並びは手元の作業ツリーと CI の checkout で変わる（CI ではほぼ同じ時刻になる）。名前順に並べてから上限で切り、どの環境でも同じファイルを開く"
   },
   "GET /api/pipeline/proofreading/export/{export_format}": {
    "values": [
