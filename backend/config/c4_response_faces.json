@@ -1,6 +1,6 @@
 {
  "criterion": "R1.5-C4b",
- "note": "**観測した面の形**（`python -m backend.c4_response_gate --write-faces` が書く）。面 = 出力口（GET の応答・サイドカー）＋入力条件。各面の `shape` は応答の鍵の道と値の種類の集合（HTML は見える文字の行）。**新しい鍵・新しい面・消えた面・出口（status と種類）の変化は門が落とす。**書き直したら git diff を査読し、新しい鍵が4カテゴリなら印があるか、鍵名の分類が要るかを確かめること。条件つきの面（［実走後・…］）は、既定の面の形に収まらないものだけ載せる",
+ "note": "**観測した面の形**（`python -m backend.c4_response_gate --write-faces` が書く）。面 = 出力口（GET の応答・サイドカー）＋入力条件。各面の `shape` は応答の鍵の道と値の種類の集合（HTML は見える文字の行）。**新しい鍵・新しい面・消えた面・出口（status と種類）の変化は門が落とす。**書き直したら git diff を査読し、新しい鍵が4カテゴリなら印があるか、鍵名の分類が要るかを確かめること。条件つきの面（［実走後・…］）は、既定の面の形に収まらないものだけ載せる**OS や機材で形が変わる面は、両方の形の和を載せる**（CI の成果物 `c4b-observed-faces.json` から持ち帰る）。2026-09-17 時点では `GET /api/render/gpu-detect` の `gpu_name` だけ — GPU の無い CI では null、手元では文字列。片方の環境では「出なくなった鍵」が情報として出るが違反ではない。",
  "faces": {
   "*.quality.json［採点済み］": {
    "status": null,
@@ -3423,6 +3423,7 @@
    "status": 200,
    "kind": "json",
    "shape": [
+    "$.error:str",
     "$.path:str",
     "$.status:str",
     "$:dict"
@@ -4056,6 +4057,7 @@
    "shape": [
     "$.fallback_encoder:str",
     "$.gpu_available:bool",
+    "$.gpu_name:null",
     "$.gpu_name:str",
     "$.recommended_encoder:str",
     "$:dict"
@@ -5049,6 +5051,7 @@
    "status": 200,
    "kind": "json",
    "shape": [
+    "$.error:str",
     "$.path:str",
     "$.status:str",
     "$:dict"

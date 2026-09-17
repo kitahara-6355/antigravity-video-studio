@@ -619,6 +619,51 @@ def test_隔離の環境は実キーと網の抜け道を消す(門, tmp_path):
     assert env["PATH"] == "p"
 
 
+def test_門は外部のアプリを起こさない(門, monkeypatch):
+    """**GET でも利用者のデスクトップに窓を開くものがある**（2026-09-17 に発見）。
+
+    `GET /api/pipeline/open-folder` は `os.startfile()` を呼ぶので、Windows で門を
+    走らせるたびにエクスプローラーが開いていた（1回で最大6枚）。Linux には
+    `os.startfile` が無く、応答の形まで OS で変わっていた。**どの OS でも拒む。**
+    """
+    import os
+    import webbrowser
+    # 元に戻せるように monkeypatch に先に記録させる（門の関数が上書きしても戻る）
+    monkeypatch.setattr(os, "startfile", lambda *a, **k: None, raising=False)
+    for 名 in ("open", "open_new", "open_new_tab"):
+        monkeypatch.setattr(webbrowser, 名, lambda *a, **k: True)
+    門._外のアプリを起こさない()
+    with pytest.raises(OSError):
+        os.startfile("C:/")
+    for 名 in ("open", "open_new", "open_new_tab"):
+        with pytest.raises(OSError):
+            getattr(webbrowser, 名)("https://example.invalid/")
+
+
+def test_起こす前に外部接続と外のアプリを封じる(門, tmp_path, monkeypatch):
+    """封じる関数があっても、**アプリを読む前に呼ばなければ意味が無い。**"""
+    複製 = tmp_path / "repo"
+    (複製 / "backend" / "tests").mkdir(parents=True)
+    (複製 / "backend" / "tests" / "net_guard.py").write_text(
+        "呼ばれた = []\n\ndef install():\n    呼ばれた.append('install')\n", encoding="utf-8")
+    順番: list[str] = []
+    monkeypatch.setitem(sys.modules, "net_guard", sys.modules.get("net_guard"))
+    monkeypatch.setattr(門, "_外のアプリを起こさない", lambda: 順番.append("外のアプリ"))
+    偽の_main = types.ModuleType("main")
+    偽の_main.__file__ = str(複製 / "backend" / "main.py")
+    偽の_main.app = object()
+    monkeypatch.setitem(sys.modules, "main", 偽の_main)
+
+    assert 門.起こす(複製) is 偽の_main.app
+    assert sys.modules["net_guard"].呼ばれた == ["install"]
+    assert 順番 == ["外のアプリ"]
+
+    # 複製の外の main を読んだら止める（隔離の漏れ）
+    偽の_main.__file__ = str(tmp_path / "elsewhere" / "main.py")
+    with pytest.raises(RuntimeError):
+        門.起こす(複製)
+
+
 @pytest.mark.skipif(shutil.which("git") is None, reason="git が要る")
 def test_複製は無視したファイルを入れない(門, tmp_path):
     """**`.env` や手元のデータを複製に持ち込まない。** CI のチェックアウトと同じものだけで測る。"""

@@ -35,9 +35,15 @@ D-3 200 以外と HTML / D-4 列挙外の鍵名）。
 `usage_data.json` / `logs/backend.log` / chroma の DB が書き換わった。
 
 そこで門は**追跡ファイルの複製**（`git ls-files` の作業ツリー版。無視したファイルは
-入れない）の上でアプリを起こす。副産物として、**手元と CI で同じものを測る**
-（手元にしかないデータ・キャッシュ・`~/.gemini` を読まない）。
+入れない）の上でアプリを起こす。副産物として、**手元と CI で同じデータを測る**
+（手元にしかないデータ・キャッシュ・`~/.gemini` を読まない）。**OS と機材の差は残る** —
+2026-09-17 の CI（Linux）で2面に出た（`gpu-detect` の `gpu_name` は GPU の有無で変わるので
+台帳に両方の形の和を載せた。`open-folder` は下の理由で揃えた）。
 それでも本物のリポジトリが変わったら落とす（最後の一枚）。
+
+**利用者のデスクトップにも触らない。** `GET /api/pipeline/open-folder` は `os.startfile()` で
+エクスプローラーを開くので、Windows で門を走らせるたびに窓が開いていた。子プロセスでは
+`os.startfile` と `webbrowser` を拒む関数に差し替える（どの OS でも同じ形の応答になる）。
 
 ## 入力条件
 
@@ -570,6 +576,24 @@ def 隔離の環境変数(作業場: Path, 複製: Path, 元: dict | None = None
     return env
 
 
+def _外のアプリを起こさない() -> None:
+    """**門は利用者のデスクトップに窓を開かない。**
+
+    GET でも外のアプリを起こすものがある — `GET /api/pipeline/open-folder` は
+    `os.startfile()` を呼ぶので、Windows で門を走らせるたびにエクスプローラーが
+    開いていた（1回で最大6枚。2026-09-17 に CI との形の差から見つけた）。
+    Linux には `os.startfile` が無いので、応答の形まで OS で変わっていた。
+    **どの OS でも同じように拒む**（無い OS にも拒む関数を置く）。
+    """
+    def 拒む(*_a, **_k):
+        raise OSError("C4b の門は外部のアプリを起こさない（os.startfile / webbrowser）")
+
+    os.startfile = 拒む
+    import webbrowser
+    for 名 in ("open", "open_new", "open_new_tab"):
+        setattr(webbrowser, 名, 拒む)
+
+
 def 起こす(複製: Path):
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -578,6 +602,7 @@ def 起こす(複製: Path):
     sys.modules["net_guard"] = net_guard
     spec.loader.exec_module(net_guard)
     net_guard.install()   # 外部接続を例外にする。**この門は課金してはいけない**
+    _外のアプリを起こさない()
     import main
     if not _下にある(Path(main.__file__).resolve(), 複製.resolve()):
         raise RuntimeError(f"複製ではなく {main.__file__} を読みました（隔離できていません）")
@@ -886,7 +911,8 @@ def audit(観測: list[dict], 台帳: dict, 面台帳: dict,
                     f"**新しい鍵が出ています**: {名} — {_並べる(増えた)}。"
                     f"**包括的な印はこれを覆ってしまう**ので、4カテゴリかどうかを査読して台帳に載せてください")
             if 減った:
-                情報.append(f"{名}: 出なくなった鍵があります（台帳を掃除できます）: {_並べる(減った, 3)}")
+                情報.append(f"{名}: 出なくなった鍵があります（別の OS・機材でだけ出る鍵かもしれないので、"
+                            f"CI の成果物と突き合わせてから掃除する）: {_並べる(減った, 3)}")
 
         # ── 未採点の値が漏れていないか ──
         if o.get("unscored"):
