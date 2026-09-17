@@ -953,13 +953,51 @@
    "marks": []
   },
   {
-   "id": "backend/c4_response_gate.py::_risk_key_re",
+   "id": "backend/c4_response_gate.py::_文脈",
    "file": "backend/c4_response_gate.py",
-   "symbol": "_risk_key_re",
+   "symbol": "_文脈",
    "category": "品質スコア",
    "status": "out_of_scope",
-   "reason": "C4b の門そのもの。危険鍵の定義を `c4_inventory` から読み込むだけで、数字も判定も作らない。",
+   "reason": "C4b の門そのもの。入力条件に使う**合成の実走文脈**を作る足場で、`quality_score` の 89.5 と番兵 73.21、`category_report` の点数は、門が本番の書き出し口と `_build_result` に渡す検査用の値。利用者に届く数字ではない。",
+   "fingerprint": [
+    "const_dict:score"
+   ],
+   "marks": [
+    "quality_scored=?"
+   ]
+  },
+  {
+   "id": "backend/c4_response_gate.py::_番兵か",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "_番兵か",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。値が未採点の番兵（73.21）かを判定するだけの述語で、数字を作らない。",
    "fingerprint": [],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::_観測の本体",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "_観測の本体",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門の子プロセスの本体。`return 0` は終了コードで、観測した面を一時ツリーのファイルへ書き出すだけ。4カテゴリの数字は作らない。",
+   "fingerprint": [
+    "const_return"
+   ],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::audit",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "audit",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の判定本体。`台帳.get(\"population_floor\") or 0` などの既定値は台帳の読み出しで、違反と情報の文字列を返すだけ。数字を外へ出さない。",
+   "fingerprint": [
+    "or_default"
+   ],
    "marks": []
   },
   {
@@ -968,32 +1006,29 @@
    "symbol": "サイドカーを書かせる",
    "category": "品質スコア",
    "status": "out_of_scope",
-   "reason": "C4b の門そのもの。書き出し口を呼んで中身を読むための足場で、危険形2件は**検査用の固定値**（`quality_score=89` 等）。本番の応答にも成果物にも出ない。",
+   "reason": "C4b の門そのもの。書き出し口を**分岐ごとに**呼んで中身を読む足場。`getattr(coord, メソッド名, None)` は改名で門が黙るのを止めるための既定値で、数字ではない。検査用の点数は `_文脈` が作る（2026-09-17 に分けた）。",
    "fingerprint": [
-    "const_kwarg:quality_score",
     "getattr_default"
    ],
-   "marks": [
-    "quality_scored=True"
-   ]
+   "marks": []
   },
   {
-   "id": "backend/c4_response_gate.py::出ている鍵",
+   "id": "backend/c4_response_gate.py::実走後の状態",
    "file": "backend/c4_response_gate.py",
-   "symbol": "出ている鍵",
-   "category": "チャンネル統計",
-   "status": "marked",
-   "reason": "C4b の門そのもの。応答に載っている 4カテゴリの**鍵名**を集めるだけで、値も判定も作らない。",
+   "symbol": "実走後の状態",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。`_pipeline_state` に差す実走結果を**本番の `_build_result` に作らせる**足場。`duration_seconds` の固定は揺れを消すためで、利用者に届かない。",
    "fingerprint": [],
    "marks": []
   },
   {
-   "id": "backend/c4_response_gate.py::名乗らない数字",
+   "id": "backend/c4_response_gate.py::番兵の漏れ",
    "file": "backend/c4_response_gate.py",
-   "symbol": "名乗らない数字",
-   "category": "投稿",
-   "status": "marked",
-   "reason": "C4b の門そのもの。応答本文から**印の無い値を列挙する**判定器で、数字を作らない。",
+   "symbol": "番兵の漏れ",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。未採点の点数が印の無いところへ出たかを列挙する判定器で、数字を作らない。",
    "fingerprint": [],
    "marks": []
   },
@@ -2941,9 +2976,13 @@
    "file": "backend/routers/soul_router.py",
    "symbol": "get_soul_dashboard",
    "category": "チャンネル統計",
-   "status": "honest",
-   "reason": "L198-243: XP・セッション数・承認率はすべて evolution_log.json の実エントリから算出。読めなければ 0 件になり数字を作らない。ADK 失敗は L185 で 500",
-   "fingerprint": []
+   "status": "marked",
+   "reason": "L198-243: XP・セッション数・承認率は evolution_log.json の実エントリから算出（読めなければ 0 件で数字を作らない。ADK 失敗は L185 で 500）。業界ベンチマーク（`top_youtuber_benchmarks` の CTR・維持率）は公開情報の参考値で、**印が無く自分の数字と区別がつかなかった**ので 2026-09-17 に `is_real: False` / `data_source: \"reference\"` を付けた（C4b の鍵名の分類で見つけた）。",
+   "fingerprint": [],
+   "marks": [
+    "data_source='reference'",
+    "is_real=False"
+   ]
   },
   {
    "id": "backend/routers/themes_router.py::_集計不能",

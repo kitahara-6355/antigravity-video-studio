@@ -256,6 +256,11 @@ async def get_soul_dashboard():
                 "reference": "NHK字幕規格 + 民放連ガイドライン",
             },
             "top_youtuber_benchmarks": {
+                # **このチャンネルの実測ではない**（R1.5-C4b・25周目 D-4）。
+                # 公開情報から引いた参考値なので、CTR や維持率と並べるなら出所を名乗る。
+                # 以前は印が無く、応答だけ見ると自分の数字と区別がつかなかった
+                "is_real": False,
+                "data_source": "reference",
                 "ctr_average_percent": 3.5,
                 "ctr_top_tier_percent": 6.0,
                 "retention_average_percent": 40,

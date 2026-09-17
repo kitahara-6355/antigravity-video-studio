@@ -1,69 +1,88 @@
-"""R1.5-C4b の判定（2026-09-13 ユーザー承認・案A）。
+"""R1.5-C4b の判定 — **面と鍵をまるごとラチェットする**（2026-09-17 ユーザー承認）。
 
 **4カテゴリの数字が外に出るとき、必ず出所を名乗る。**
 
-## なぜソースを見るのをやめたのか
+## なぜこの形なのか
 
-`c4_inventory`（limits #17）は母集団を 8,642 site から有限にしたが、
-**各 site の中身が安全かの判定を静的述語に委ねた**ので、無限性が site の内側へ移った。
-`gate-verifier` の指摘は3周続けて「書き方」の話だった:
+| 周 | 無限性の在処 | 有界化 |
+|---|---|---|
+| 〜20 | どの site か | 台帳（limits #17） |
+| 21〜23 | どの**書き方**か | 定義で閉じる（#18）→ 応答の観測へ（#19） |
+| 24〜25 | どの**鍵名**・どの**出力面**か | **この形** |
 
-    21周目  キーワード引数・属性代入の数値
-    22周目  文字列・真偽値・モジュール定数・定数への呼び出し
-    23周目  1段のローカル束縛・タプル返し・f-string・定数畳み込み
+25周目の診断: 判定を静的述語から観測へ移しても、**母集団の定義が「意味」で
+書かれている限り無限性は残る**。「4カテゴリの数字か？」という述語が残る限り、
+そこが破られる（D-1 台帳で外したパス全体 / D-2 サイドカーの未採点分岐 /
+D-3 200 以外と HTML / D-4 列挙外の鍵名）。
 
-`watch = 15200` と一度置くだけでゲートは緑になる（23周目の実測）。
-**「4カテゴリのどこにも偽の success が無い」を静的に示すことは、母集団が本番ソース
-全体である限り有界化できない。**
+そこで**述語を無くす**。検出は機械的にし、意味の判断は査読（台帳への記入）にだけ残す。
 
-そこで判定を「**出ていく数字が出所を名乗るか**」に置き換える。
-間接参照・タプル・f-string・定数畳み込みは**応答本文の前では消える**ので決定可能になる。
+1. **面を列挙する。** 面 = 出力口（GET の応答・サイドカー）＋入力条件。
+   台帳 `c4_response_faces.json` に全部載せる。**増えても消えても落ちる**
+2. **面ごとに鍵の集合をまるごとラチェットする。** 鍵の道と値の種類
+   （`$.stats.views:num`）。HTML は見える文字の行。
+   **新しい鍵が出たら、人が査読して台帳に入れるまで落ちる**
+3. **鍵名をすべて分類する。** 4カテゴリ（印が要る）か、それ以外か。
+   **分類されていない鍵名が出たら落ちる。** 4カテゴリの鍵の下にある値も4カテゴリ
+   （`category_scores: {"core": 77.8}` の `core` は鍵名だけでは分からない）
 
-## 何を見るか
+その代わり、API の形が変わるたびに台帳の更新が要る（churn）。それが有界性の対価。
 
-1. **マウントしたアプリの応答本文** — 引数なし GET の `/api` を実際に叩く
-2. **書き出されたサイドカー** — 書き出し口を実際に呼んで中身を見る
+## 門は状態を書き換えない（25周目 D-5）
 
-外部接続は `net_guard` で遮断する（**課金しない**。憲法第3条）。
+286 本の副作用ルートを叩かない理由は「門は状態を書き換えない」という原則だった。
+**それを門自身が破っていた** — 1回走らせるだけで `assets/asset_index.json` /
+`usage_data.json` / `logs/backend.log` / chroma の DB が書き換わった。
 
-## 印の語彙
+そこで門は**追跡ファイルの複製**（`git ls-files` の作業ツリー版。無視したファイルは
+入れない）の上でアプリを起こす。副産物として、**手元と CI で同じものを測る**
+（手元にしかないデータ・キャッシュ・`~/.gemini` を読まない）。
+それでも本物のリポジトリが変わったら落とす（最後の一枚）。
 
-門が見るのは2点だけ。**名乗っているか**と、**`measured` が台帳で承認済みか**。
+## 入力条件
 
-`measured` は台帳で個別に承認したものだけが名乗れる。この門は外部接続を遮断した
-環境で走るので、実測を名乗るなら「何をローカルで測ったか」が言えなければならない。
-台帳に無い `measured` は FAIL
-（`sample` → `measured` の反転を落とす。gate-verifier 22周目 M2 の形）。
+- **既定** — アプリを起こしたまま。パス引数には合成値 `c4-gate-probe` を入れる
+- **実走後・採点済み / 実走後・未採点** — `_pipeline_state` に実走の結果を差す。
+  結果は**本番の `_build_result` に作らせる**（手書きの形で測らない）。
+  未採点では `quality_score` に番兵 73.21 を入れ、**印の無いところへ漏れたら落とす**
+- サイドカーは書き出し口を**分岐ごとに**呼ぶ（D-2: 採点済みの1形しか叩いていなかった）
 
-**値の語彙は閉じていない。** 実測（2026-09-13）で使われているのは
-`sample`（103）/ `derived`（7）/ `measured`（1）で、ソースには `unavailable` /
-`gemini` / `gemini_vision` もある。閉じた語彙を強制すると、
-**正直に `gemini` と名乗っている4箇所が落ちる。**
+外部接続は `net_guard` で遮断する（**課金しない**。憲法第3条）。キーは常に
+`dummy_key_for_ci` にする（手元の実キーを使わせない）。
 
-    python -m backend.c4_response_gate --show     # 母集団と印の一覧
-    python -m backend.c4_response_gate --gate     # 判定（違反があれば exit 1）
+    python -m backend.c4_response_gate --gate           # 判定（違反があれば exit 1）
+    python -m backend.c4_response_gate --show           # 面と印の一覧
+    python -m backend.c4_response_gate --write-faces    # 面の台帳を書き直す（差分を査読する）
+    python -m backend.c4_response_gate --unclassified   # 分類されていない鍵名と出現箇所
 
-台帳: `backend/config/c4_response_gate.json`
+台帳: `backend/config/c4_response_gate.json`（人の判断）/
+`backend/config/c4_response_faces.json`（観測した面の形）
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
+import copy
+import html.parser
+import importlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
-from types import SimpleNamespace
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LEDGER_PATH = REPO_ROOT / "backend" / "config" / "c4_response_gate.json"
+FACES_PATH = REPO_ROOT / "backend" / "config" / "c4_response_faces.json"
 
 # 出所の印に使われる鍵。**`measured` だけは台帳の承認が要る**（正典 C4b）。
 # 値の語彙は閉じていない — 実測（2026-09-13）で `sample` / `derived` /
 # `unavailable` / `gemini` / `gemini_vision` / `measured` が使われている。
 # **閉じた語彙を強制すると、正直に `gemini` と名乗っている4箇所が落ちる。**
-# 門が見るのは「名乗っているか」と「`measured` が承認済みか」の2点。
 MARK_KEYS = frozenset((
     "is_real", "data_source", "skip_reason", "scored", "quality_scored", "measured",
     "checked", "is_mock", "is_sample", "is_stub", "is_placeholder", "is_estimated",
@@ -74,11 +93,10 @@ MARK_KEYS = frozenset((
 def _risk_key_re():
     """**危険鍵の定義は `c4_inventory` と同じものを使う。**
 
-    21周目の指摘は「網の内部で定義が食い違っていた」ことだった
-    （`RISK_KEY_RE` は `score` を数えるのにカテゴリ語は数えていなかった）。
-    2つのゲートで別々に定義すると同じ失敗を繰り返すので、正典を1つにする。
+    21周目の指摘は「網の内部で定義が食い違っていた」ことだった。
+    ここでは「必ず4カテゴリとして扱う鍵名」の核に使う（台帳の分類で増やせるが、
+    減らせない — 対象外にするなら面ごとの `exemptions` に理由を書く）。
     """
-    sys.path.insert(0, str(REPO_ROOT / "backend"))
     import importlib.util
     spec = importlib.util.spec_from_file_location(
         "_c4_inventory_for_keys", REPO_ROOT / "backend" / "c4_inventory.py")
@@ -89,22 +107,105 @@ def _risk_key_re():
 
 RISK_KEY_RE = _risk_key_re()
 
+# **査読の深さを決めるだけの語。検出には使わない。**
+# これに当たる鍵名を「対象外」にするなら、一括ではなく個別に理由を書く。
+# 当たらない鍵名は一括で「対象外」にしてよい（新しい鍵名は面のラチェットで必ず止まる）。
+STRONG_VOCAB_RE = re.compile(
+    r"view|subscri|watch|retention|retain|ctr|click|impression|engagement|score|quality"
+    r"|like|comment|share|revenue|rpm|cpm|grade|rating|upload|publish|video_?id|url"
+    r"|audience|drop.?off",
+    re.IGNORECASE,
+)
 
-def _遮断する() -> None:
-    """外部接続を例外にする。**この門は課金してはいけない**（憲法第3条）。"""
-    sys.path.insert(0, str(REPO_ROOT / "backend" / "tests"))
-    from net_guard import install
-    install()
+探り値 = "c4-gate-probe"   # パス引数に入れる合成の値
+未採点の番兵 = 73.21       # 未採点の実走で quality_score に入れる。印の無いところへ出たら落とす
+_番兵の字 = "73.21"
+
+既定 = "既定"
+採点済み = "実走後・採点済み"
+未採点 = "実走後・未採点"
+条件の一覧 = (既定, 採点済み, 未採点)
 
 
 def load_ledger(path: Path | None = None) -> dict:
     p = Path(path or LEDGER_PATH)
     if not p.is_file():
-        return {"out_of_population": [], "measured_claims": []}
+        return {}
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-# ─────────────────────────── 応答本文 ───────────────────────────
+def load_faces(path: Path | None = None) -> dict:
+    p = Path(path or FACES_PATH)
+    if not p.is_file():
+        return {"faces": {}}
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+# ─────────────────────────── 形（鍵の集合） ───────────────────────────
+
+_素の鍵 = re.compile(r"^[^.\[\]\"':\s]+$")
+
+
+def _鍵を書く(鍵: str) -> str:
+    """道の1段。記号を含む鍵は JSON で括る（モデル ID の `.` で道が割れないように）。"""
+    return "." + 鍵 if _素の鍵.match(鍵) else "[" + json.dumps(鍵, ensure_ascii=False) + "]"
+
+
+def _種類(v) -> str:
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "bool"
+    if isinstance(v, (int, float)):
+        return "num"
+    if isinstance(v, str):
+        return "str"
+    if isinstance(v, dict):
+        return "dict"
+    if isinstance(v, list):
+        return "list"
+    return type(v).__name__
+
+
+def 形(本文) -> list[str]:
+    """**応答の鍵の集合をまるごと。** 道と値の種類（`$.a[].b:num`）。
+
+    種類まで持つのは、既存の鍵の中身を差し替える形を止めるため
+    （`stats: {...}` を `stats: 15200` にしても道は変わらない）。
+    """
+    出た: set[str] = set()
+
+    def 降りる(o, 道):
+        出た.add(f"{道}:{_種類(o)}")
+        if isinstance(o, dict):
+            for k, v in o.items():
+                降りる(v, 道 + _鍵を書く(str(k)))
+        elif isinstance(o, list):
+            for v in o:
+                降りる(v, 道 + "[]")
+
+    降りる(本文, "$")
+    return sorted(出た)
+
+
+def 鍵名(本文) -> set[str]:
+    """本文に出てくる鍵名をすべて（値の種類によらない）。"""
+    出た: set[str] = set()
+
+    def 降りる(o):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                出た.add(str(k))
+                降りる(v)
+        elif isinstance(o, list):
+            for v in o:
+                降りる(v)
+
+    降りる(本文)
+    return 出た
+
+
+# ─────────────────────────── 印 ───────────────────────────
 
 def 印を持つか(obj: dict) -> bool:
     """出所の印を持つか。
@@ -125,116 +226,190 @@ def 印を持つか(obj: dict) -> bool:
     return False
 
 
-def 名乗らない数字(本文, 祖先に印: bool = False, 道: str = "") -> list[str]:
-    """**出所を名乗っていない 4カテゴリの値**を列挙する。
+def 値がある(v) -> bool:
+    """数字か空でない文字列。**真偽値は数字として数えない**（`passed: True`）。"""
+    return (isinstance(v, (int, float)) and not isinstance(v, bool)) or (
+        isinstance(v, str) and v != "")
 
-    印は祖先で立てても良い（`{**DATA_SOURCE, ...}` は応答の先頭に置かれる）。
-    数字だけでなく**空でない文字列も見る** — 条件文の第1例
-    `video_id="placeholder_video_id"` が文字列だから。
+
+def 葉を歩く(本文):
+    """値ごとに (道, 名, 名の道, 値, 印で覆われているか, 祖先) を出す。
+
+    - 名は値にいちばん近い鍵名。**配列の中の値も出す**（`views: [100, 200]`）
+    - 名の道は鍵そのものの道（配列の `[]` を含まない）。面ごとの例外はこれで引く
+    - 祖先は (鍵名, 鍵の道) の列。4カテゴリの鍵の下にある値を見分けるのに使う
+    - 印は祖先で立てても良い（`{**DATA_SOURCE, ...}` は応答の先頭に置かれる）
     """
-    出た: list[str] = []
-    if isinstance(本文, dict):
-        ここに印 = 祖先に印 or 印を持つか(本文)
-        for k, v in 本文.items():
-            子の道 = f"{道}.{k}" if 道 else str(k)
-            if isinstance(k, str) and RISK_KEY_RE.match(k) and not ここに印:
-                危険 = (
-                    (isinstance(v, (int, float)) and not isinstance(v, bool))
-                    or (isinstance(v, str) and v != "")
-                )
-                if 危険:
-                    出た.append(f"{子の道} = {v!r}")
-            出た += 名乗らない数字(v, ここに印, 子の道)
-    elif isinstance(本文, list):
-        for i, v in enumerate(本文):
-            出た += 名乗らない数字(v, 祖先に印, f"{道}[{i}]")
-    return 出た
-
-
-def 出ている鍵(本文) -> list[str]:
-    """応答に**実際に載っている 4カテゴリの鍵**を並べる（印の有無に関係なく）。
-
-    ## なぜ印の有無だけでは足りないか
-
-    包括的な印（応答の先頭の `{**DATA_SOURCE, ...}`）は、その下の数字を全部覆う。
-    だから**印を持つエンドポイントに新しい数字を足すと、名乗らせないまま通る。**
-    実測で確かめた: `admin/setup/diagnostics`（`data_source: "measured"`）に
-    `偽 = 7.7` を経由して `predicted_ctr` を足すと、門は緑のままだった。
-    これは gate-verifier 23周目が静的側で突いたのと**同じ形**（1段のローカル束縛）。
-
-    そこで**鍵の集合をラチェットにする。** 新しい 4カテゴリの鍵が出てきたら、
-    実測かどうかを確かめて台帳に載せるまで落ちる。
-    **鍵は応答から観測する**ので、間接参照・タプル・f-string・定数畳み込みでは隠れられない。
-    """
-    出た: set[str] = set()
-
-    def 降りる(o):
+    def 降りる(o, 道, 名, 名の道, 印, 祖先):
         if isinstance(o, dict):
+            ここ = 印 or 印を持つか(o)
+            次 = (*祖先, (名, 名の道)) if 名 is not None else 祖先
             for k, v in o.items():
-                if isinstance(k, str) and RISK_KEY_RE.match(k):
-                    危険 = (
-                        (isinstance(v, (int, float)) and not isinstance(v, bool))
-                        or (isinstance(v, str) and v != "")
-                    )
-                    if 危険:
-                        出た.add(k)
-                降りる(v)
+                子 = 道 + _鍵を書く(str(k))
+                yield from 降りる(v, 子, str(k), 子, ここ, 次)
         elif isinstance(o, list):
             for v in o:
-                降りる(v)
+                yield from 降りる(v, 道 + "[]", 名, 名の道, 印, 祖先)
+        elif 名 is not None:
+            yield 道, 名, 名の道, o, 印, 祖先
 
-    降りる(本文)
-    return sorted(出た)
+    yield from 降りる(本文, "$", None, None, False, ())
+
+
+def _危険鍵か(名: str) -> bool:
+    return bool(RISK_KEY_RE.match(名))
+
+
+def 名乗らない数字(本文, カテゴリか=None, 外す道=frozenset()) -> list[str]:
+    """**出所を名乗っていない 4カテゴリの値**を列挙する。
+
+    4カテゴリかどうかは、値の鍵名か、**祖先の鍵名**で決まる。
+    `外す道` は面ごとの例外（台帳 `exemptions`）。**その鍵だけ**を外す —
+    25周目 D-1 は、鍵1つの理由でパス全体を素通しにしていた。
+    """
+    カテゴリか = カテゴリか or _危険鍵か
+    出た: list[str] = []
+    for 道, 名, 名の道, 値, 覆われ, 祖先 in 葉を歩く(本文):
+        if 覆われ or not 値がある(値) or 名の道 in 外す道:
+            continue
+        if カテゴリか(名) or any(カテゴリか(a) and ad not in 外す道 for a, ad in 祖先):
+            出た.append(f"{道} = {値!r}")
+    return 出た
 
 
 def _実測を名乗っているか(値) -> bool:
     """`measured` の名乗りか。**大小文字と前後の空白で抜けさせない。**
 
     2026-09-13 の指摘 — `Measured` / `MEASURED` / `"measured "` はすべて素通りしていた。
-    この比較は `sample` → `measured` の反転を落とすために置いたものなので、
-    表記ゆれで抜けるなら目的を果たしていない。
     """
     return isinstance(値, str) and 値.strip().lower() == "measured"
 
 
-def measured_を名乗る箇所(本文, 道: str = "") -> list[str]:
+def measured_を名乗る箇所(本文, 道: str = "$") -> list[str]:
     出た: list[str] = []
     if isinstance(本文, dict):
         if _実測を名乗っているか(本文.get("data_source")):
-            出た.append(道 or "(応答の先頭)")
+            出た.append(道)
         for k, v in 本文.items():
-            出た += measured_を名乗る箇所(v, f"{道}.{k}" if 道 else str(k))
+            出た += measured_を名乗る箇所(v, 道 + _鍵を書く(str(k)))
     elif isinstance(本文, list):
-        for i, v in enumerate(本文):
-            出た += measured_を名乗る箇所(v, f"{道}[{i}]")
+        for v in 本文:
+            出た += measured_を名乗る箇所(v, 道 + "[]")
     return 出た
 
 
-探り値 = "c4-gate-probe"   # パス引数に入れる合成の値
+def _番兵か(v) -> bool:
+    if isinstance(v, bool):
+        return False
+    if isinstance(v, (int, float)):
+        return abs(v - 未採点の番兵) < 1e-9
+    return isinstance(v, str) and _番兵の字 in v
 
+
+def 番兵の漏れ(観測: dict) -> list[str]:
+    """**未採点の点数が、印の無いところへ出ていないか。**
+
+    HTML には印を付けられないので、文字に番兵が出たらそれだけで落とす
+    （25周目 M-4b: 未採点のレポートに「92.0点（合格）」が出ても門は緑だった）。
+    JSON は `quality_scored: false` のような印が同じ場所にあれば、読み手が区別できる。
+    """
+    if 観測.get("kind") == "json":
+        return [f"{道} = {値!r}" for 道, _, _, 値, 覆われ, _ in 葉を歩く(観測.get("body"))
+                if not 覆われ and _番兵か(値)]
+    return [行 for 行 in 観測.get("lines") or () if _番兵の字 in 行]
+
+
+# ─────────────────────────── 本文の読み方 ───────────────────────────
+
+_区切りタグ = frozenset((
+    "p", "div", "tr", "li", "ul", "ol", "table", "br", "section", "header", "footer",
+    "h1", "h2", "h3", "h4", "h5", "h6", "title", "body", "html", "head",
+))
+_日時 = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?")
+
+
+class _見える文字(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.行: list[str] = []
+        self._今: list[str] = []
+        self._飛ばす = 0
+
+    def _切る(self):
+        s = " ".join("".join(self._今).split())
+        if s:
+            self.行.append(s)
+        self._今 = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("style", "script"):
+            self._飛ばす += 1
+        if tag in _区切りタグ:
+            self._切る()
+        elif tag in ("td", "th"):
+            self._今.append(" ")   # 表のセルは同じ行に空白で並べる
+
+    def handle_endtag(self, tag):
+        if tag in ("style", "script"):
+            self._飛ばす = max(0, self._飛ばす - 1)
+        if tag in _区切りタグ:
+            self._切る()
+
+    def handle_data(self, data):
+        if not self._飛ばす:
+            self._今.append(data)
+
+
+def 文字の行(本文: str, html_か: bool) -> list[str]:
+    """利用者に見える文字を行に分ける。**生成日時だけは伏せる**（毎回変わるため）。"""
+    if html_か:
+        p = _見える文字()
+        p.feed(本文)
+        p.close()
+        p._切る()
+        行 = p.行
+    else:
+        行 = [" ".join(s.split()) for s in 本文.splitlines()]
+    return [_日時.sub("<日時>", s) for s in 行 if s]
+
+
+def 本文を読む(res) -> dict:
+    """**200 以外も読む**（25周目 D-3: 404 の本文に数字を載せても門は見ていなかった）。"""
+    種類 = (res.headers.get("content-type") or "").split(";")[0].strip().lower()
+    生 = res.content or b""
+    if 種類 == "application/json" or 種類.endswith("+json"):
+        try:
+            return {"kind": "json", "body": res.json()}
+        except ValueError:
+            return {"kind": "text", "lines": ["（JSON と名乗っているが読めない）",
+                                               *文字の行(res.text, False)]}
+    if not 生:
+        行 = []
+        if res.headers.get("location"):
+            行.append(f"Location: {res.headers['location']}")
+        return {"kind": "none", "lines": 行}
+    if 種類.startswith("text/"):
+        return {"kind": "text", "lines": 文字の行(res.text, 種類 == "text/html")}
+    return {"kind": "binary", "lines": [種類 or "（content-type なし）"]}
+
+
+def 形を取る(観測: dict) -> list[str]:
+    if 観測.get("kind") == "json":
+        return 形(観測.get("body"))
+    return sorted(set(観測.get("lines") or ()))
+
+
+# ─────────────────────────── ルート ───────────────────────────
 
 def ルート一覧(app) -> list[tuple[str, str]]:
     """`/api` の (method, path テンプレート) を全部。**版に依存しない拾い方をする。**
 
-    2026-09-13 に CI で母集団が 0 件になり、それを success として通していた
-    （fastapi 0.141.1 / starlette 1.6.0。手元は 0.135.3 / 0.52.1）。
-
-    **原因を観測で特定した。** 新しい FastAPI の `include_router` は
-    ルートを `app.routes` へ平坦化せず、`_IncludedRouter` を1個置くだけになった
-    （`path=None` / `methods=None` / `routes` 属性なし）。
-    `app.routes` を歩く実装では**何も見つからない。**
-
-    そこで **`app.openapi()` を主にする** — 公開 API で、両方の版で同じ形
-    （`paths: {パス: {メソッド: ...}}`）を返すことを実測で確かめた。
-    ただし `include_in_schema=False` のルートは openapi に出ないので、
-    **ルート走査との和**を取る。
-
-    根本の欠陥は版ずれではなく「測れなかったことを緑にしたこと」なので、
-    そちらは `population_floor` で塞いである。
+    fastapi 0.141.1 / starlette 1.6.0 の `include_router` はルートを
+    `app.routes` へ平坦化せず `_IncludedRouter` を1個置くだけになった
+    （2026-09-13 に CI で母集団が 0 件になった原因）。そこで `app.openapi()` を主にし、
+    `include_in_schema=False` を拾うためにルート走査との和を取る。
     """
     出た: set[tuple[str, str]] = set()
-
-    # 1. openapi（公開 API・版に安定）
     try:
         paths = (app.openapi() or {}).get("paths", {}) or {}
     except Exception:  # noqa: BLE001 — 片方が壊れてももう片方で拾う
@@ -247,7 +422,6 @@ def ルート一覧(app) -> list[tuple[str, str]]:
             if M not in ("HEAD", "OPTIONS"):
                 出た.add((M, str(path)))
 
-    # 2. ルート走査（`include_in_schema=False` を拾う。旧版ではこちらが主だった）
     def 降りる(routes, 接頭: str = ""):
         for r in routes or ():
             path = 接頭 + (getattr(r, "path", "") or "")
@@ -266,33 +440,20 @@ def ルート一覧(app) -> list[tuple[str, str]]:
 def 母集団(app) -> list[str]:
     """**叩ける `/api` の GET。** パス引数には合成の値を入れて叩く。
 
-    2026-09-13 に広げた（ユーザー承認）。以前は「引数なし GET」だけで、
-    パス引数のある 34 本が母集団の外にあった。gate-verifier は**まさにそこ**
-    （`/api/pipeline/quality-gate/drilldown/{category}`）に印の無い偽 success を
-    置いて、両方の門が緑のままになることを実測で示した。
-
     **副作用のあるメソッド（POST / PUT / DELETE）は入れない。**
     理由は都合ではなく原則 — **門が状態を書き換えてはいけない。**
     そこに残る盲点は台帳の `side_effect_blind_spot` で一覧を固定する。
-
-    **限界**: パス引数には合成の値しか入れないので、`if category == "live"` の
-    ように**特定の値でだけ通る枝**は踏めない。これは正典 limits に明記してある。
     """
-    出た = set()
-    for m, path in ルート一覧(app):
-        if m != "GET":
-            continue
-        出た.add(re.sub(r"\{[^}]*\}", 探り値, path))
-    return sorted(出た)
+    return sorted({re.sub(r"\{[^}]*\}", 探り値, path)
+                   for m, path in ルート一覧(app) if m == "GET"})
 
 
 def 除外の内訳(app) -> dict[str, int]:
     """母集団に入れなかった (method, path) の内訳。**黙って外さない。**"""
     出た: dict[str, int] = {}
     for m, _ in ルート一覧(app):
-        if m == "GET":
-            continue
-        出た[m] = 出た.get(m, 0) + 1
+        if m != "GET":
+            出た[m] = 出た.get(m, 0) + 1
     return dict(sorted(出た.items()))
 
 
@@ -305,321 +466,636 @@ def 盲点の一覧(app) -> list[str]:
                    if m != "GET" and 語.search(p)})
 
 
-def アプリ():
-    os.environ.setdefault("GOOGLE_API_KEY", "dummy_key_for_ci")
-    _遮断する()
-    sys.path.insert(0, str(REPO_ROOT))
-    sys.path.insert(0, str(REPO_ROOT / "backend"))
-    from main import app
-    return app
+def 面の名前(経路: str, 条件: str) -> str:
+    return 経路 if 条件 == 既定 else f"{経路}［{条件}］"
 
 
-def 応答を集める(app=None) -> list[tuple[str, int, object]]:
+# ─────────────────────────── 隔離 ───────────────────────────
+
+_走査で飛ばす = frozenset((
+    ".git", "__pycache__", "node_modules", ".pytest_cache", ".ruff_cache", ".mypy_cache",
+))
+
+
+def 状態の指紋(root: Path) -> dict[str, tuple[int, int]]:
+    """リポジトリのファイル（無視したものも含む）の大きさと更新時刻。"""
+    出た: dict[str, tuple[int, int]] = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _走査で飛ばす]
+        for fn in filenames:
+            p = os.path.join(dirpath, fn)
+            try:
+                st = os.stat(p)
+            except OSError:
+                continue
+            出た[os.path.relpath(p, root).replace(os.sep, "/")] = (st.st_size, st.st_mtime_ns)
+    return 出た
+
+
+def 書き換わったもの(前: dict, 後: dict) -> list[str]:
+    return sorted(
+        [f"変更 {p}" for p in 後 if p in 前 and 後[p] != 前[p]]
+        + [f"作成 {p}" for p in 後 if p not in 前]
+        + [f"削除 {p}" for p in 前 if p not in 後]
+    )
+
+
+def 追跡ファイル(root: Path) -> list[str]:
+    """`git ls-files` の追跡ファイル＋未追跡だが無視していないもの。
+
+    **無視したもの（`.env`・手元のデータ・ログ）は入れない。** CI のチェックアウトと
+    同じものだけで測る。作業ツリーの変更（未コミット）は入る。
+    """
+    r = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
+         "--exclude-standard"],
+        capture_output=True, check=True)
+    return sorted({p for p in r.stdout.decode("utf-8").split("\0") if p})
+
+
+def 複製する(root: Path, 先: Path) -> int:
+    n = 0
+    for rel in 追跡ファイル(root):
+        src = root / rel
+        if not src.is_file():   # 作業ツリーで消したもの
+            continue
+        dst = 先 / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        n += 1
+    return n
+
+
+def _下にある(p: Path, 親: Path) -> bool:
+    try:
+        p.relative_to(親)
+        return True
+    except ValueError:
+        return False
+
+
+_資格情報らしい = re.compile(r"API_KEY|TOKEN|SECRET|CREDENTIAL|PASSWORD", re.IGNORECASE)
+
+
+def 隔離の環境変数(作業場: Path, 複製: Path, 元: dict | None = None) -> dict[str, str]:
+    """子プロセスの環境。書き込み先と読み込み元を複製と作業場に向ける。"""
+    env = dict(os.environ if 元 is None else 元)
+    # **鍵・トークン・資格情報らしい変数は名前で全部消す**（名指しの列挙では漏れる）。
+    # `ANTIGRAVITY_ALLOW_NETWORK` は net_guard を丸ごと外すので必ず消す
+    for k in list(env):
+        if _資格情報らしい.search(k) or k in (
+                "ANTIGRAVITY_ALLOW_NETWORK", "VIDEO_AUTOMATION_BASE_DIR",
+                "ANTIGRAVITY_APP_DATA", "PYTHONHOME"):
+            env.pop(k)
+    家 = 作業場 / "home"
+    env.update({
+        # 課金しない（憲法第3条）。手元の実キーを使わせない
+        "GOOGLE_API_KEY": "dummy_key_for_ci",
+        "ANTIGRAVITY_DISABLE_AUTO_COMMIT": "1",
+        "ANTIGRAVITY_BASE_DIR": str(複製),
+        "ANTIGRAVITY_WRITABLE_ROOT": str(複製),
+        "ANTIGRAVITY_VAULT_OUTPUTS": str(複製 / "vault-outputs"),
+        "ANTIGRAVITY_VAULT_ASSETS": str(作業場 / "vault-assets"),
+        "ANTIGRAVITY_VAULT_ENVIRONMENTS": str(作業場 / "vault-environments"),
+        "ANTIGRAVITY_APP_DATA_DIR": str(作業場 / "app-data"),
+        # 手元のキャッシュや `~/.gemini` を読まない（CI と同じ条件にする）
+        "HOME": str(家),
+        "USERPROFILE": str(家),
+        # 順序は CI と同じ（`backend` が先）。`backend/tests` は道に入れない —
+        # テスト用の小さなモジュールが本番の名前を覆うことがある
+        "PYTHONPATH": os.pathsep.join((str(複製 / "backend"), str(複製))),
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8",
+    })
+    return env
+
+
+def 起こす(複製: Path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "net_guard", 複製 / "backend" / "tests" / "net_guard.py")
+    net_guard = importlib.util.module_from_spec(spec)
+    sys.modules["net_guard"] = net_guard
+    spec.loader.exec_module(net_guard)
+    net_guard.install()   # 外部接続を例外にする。**この門は課金してはいけない**
+    import main
+    if not _下にある(Path(main.__file__).resolve(), 複製.resolve()):
+        raise RuntimeError(f"複製ではなく {main.__file__} を読みました（隔離できていません）")
+    return main.app
+
+
+def 漏れたモジュール(複製: Path, 本物: Path,
+                    除外: tuple[Path, ...] | None = None) -> list[str]:
+    """**複製の外（本物のリポジトリ）から読んだモジュール。** 隔離の漏れ。
+
+    インタプリタ自身の置き場（`sys.prefix`）は除く — リポジトリの中に `.venv` を
+    置いた開発機で、依存ライブラリ全部を漏れと呼ばないため。
+    """
+    本物 = 本物.resolve()
+    写し = 複製.resolve()
+    if 除外 is None:
+        除外 = (Path(sys.prefix), Path(sys.base_prefix))
+    除外 = tuple(Path(x).resolve() for x in 除外)
+    出た = []
+    for 名, m in list(sys.modules.items()):
+        f = getattr(m, "__file__", None)
+        if not f:
+            continue
+        try:
+            p = Path(f).resolve()
+        except OSError:
+            continue
+        if any(_下にある(p, x) for x in 除外):
+            continue
+        if _下にある(p, 本物) and not _下にある(p, 写し):
+            出た.append(f"{名} ({p.relative_to(本物).as_posix()})")
+    return sorted(出た)
+
+
+# ─────────────────────────── 入力条件 ───────────────────────────
+
+def _文脈(最終パス: str, 採点: bool | None):
+    """本番の `PipelineContext` を作る。`採点=None` は講評もメタデータも無い実走。"""
+    from agents.pipeline_types import PipelineContext, StageResult
+    ctx = PipelineContext(video_path="c4-gate-probe.mp4", session_id="c4gateprobe-0001",
+                          final_path=最終パス, preview_path="c4-gate-probe/preview.mp4")
+    if 採点 is None:
+        return ctx
+    ctx.quality_scored = 採点
+    ctx.quality_score = 89.5 if 採点 else 未採点の番兵
+    ctx.quality_feedback = ["字幕の行長が長い箇所があります"]
+    ctx.quality_category_scores = {"core": 77.8, "template": 100.0}
+    ctx.quality_category_report = (
+        [{"category": "core", "label": "コア", "score": 77.8, "status": "warn",
+          "deductions": 2, "plugin_count": 5}] if 採点 else [])
+    ctx.quality_gate_report = {"raw_score": 89.5} if 採点 else None
+    ctx.metadata = {"titles": ["タイトル案"], "tags": ["a", "b", "c", "d", "e"],
+                    "description": "説明", "chapters": [{"time": "00:00", "title": "導入"}]}
+    ctx.stage_results = [StageResult(stage_name="品質チェック", success=bool(採点),
+                                     detail="c4-gate-probe", duration_seconds=1.5)]
+    return ctx
+
+
+def 実走後の状態(採点: bool) -> dict:
+    """`_pipeline_state` に差す実走の結果。**形は本番の `_build_result` に作らせる。**"""
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from routers.pipeline_default_states import get_initial_pipeline_state
+    coord = PipelineCoordinator.__new__(PipelineCoordinator)
+    結果 = coord._build_result(_文脈("c4-gate-probe/final.mp4", 採点), "completed", time.time())
+    結果["duration_seconds"] = 12.3   # 実時間で揺れるので固定する（値であって形ではない）
+    状態 = get_initial_pipeline_state(session_id="c4gateprobe-0001",
+                                    video_path="c4-gate-probe.mp4")
+    状態.update(status="completed", started_at="c4-gate-probe", completed_at="c4-gate-probe",
+              result=結果)
+    return 状態
+
+
+@contextlib.contextmanager
+def 状態を差す(新しい状態: dict):
+    # `routers` パッケージはサブモジュール名を router 実体に再束縛するので、
+    # 属性ではなく sys.modules から引く（引継ぎ §7 #3 の罠）
+    pr = importlib.import_module("routers.pipeline_router")
+    元 = copy.deepcopy(pr._pipeline_state)
+    pr._pipeline_state.clear()
+    pr._pipeline_state.update(copy.deepcopy(新しい状態))
+    try:
+        yield
+    finally:
+        pr._pipeline_state.clear()
+        pr._pipeline_state.update(元)
+
+
+def 応答を集める(app, 条件: str = 既定) -> list[dict]:
     from fastapi.testclient import TestClient
-    app = app if app is not None else アプリ()
-
-    client = TestClient(app, raise_server_exceptions=False)
+    # リダイレクトは追わない — 追うと `/api` の外の面を測ることになる
+    client = TestClient(app, raise_server_exceptions=False, follow_redirects=False)
     出た = []
     for path in 母集団(app):
+        経路 = f"GET {path}"
+        記録 = {"face": 面の名前(経路, 条件), "route": 経路, "condition": 条件}
         try:
             res = client.get(path)
         except Exception as e:  # noqa: BLE001 — 1本の失敗で門を止めない
-            出た.append((path, -1, {"_呼び出し例外": f"{type(e).__name__}: {e}"}))
+            出た.append({**記録, "status": -1, "kind": "error",
+                        "error": f"{type(e).__name__}: {e}"})
+            continue
+        出た.append({**記録, "status": res.status_code, **本文を読む(res)})
+    return 出た
+
+
+def サイドカーを書かせる(作業場: Path) -> list[dict]:
+    """**書き出し口を分岐ごとに実際に呼んで中身を見る。**
+
+    25周目 D-2 — 以前は採点済みの1形でしか呼んでいなかったので、
+    未採点の分岐が無印の `score` を書いても門は緑だった。
+    """
+    from agents.pipeline_coordinator import PipelineCoordinator
+    coord = PipelineCoordinator.__new__(PipelineCoordinator)
+    出た: list[dict] = []
+    分岐 = (
+        ("*.quality.json", "_write_quality_sidecar", "採点済み", True),
+        ("*.quality.json", "_write_quality_sidecar", "未採点", False),
+        ("*.quality.json", "_write_quality_sidecar", "講評なし", None),
+        ("*.youtube.json", "_write_metadata_sidecar", "メタデータあり", True),
+        ("*.youtube.json", "_write_metadata_sidecar", "メタデータなし", None),
+    )
+    for i, (経路, メソッド名, 条件, 採点) in enumerate(分岐):
+        記録 = {"face": f"{経路}［{条件}］", "route": 経路, "condition": 条件,
+                "status": None, "unscored": 採点 is False}
+        置き場 = 作業場 / "sidecars" / str(i)
+        置き場.mkdir(parents=True, exist_ok=True)
+        final = 置き場 / "final_test.mp4"
+        final.write_bytes(b"fake")
+        # **メソッド名は getattr で解決する。** 改名で門が黙るのを止める
+        呼ぶ = getattr(coord, メソッド名, None)
+        if 呼ぶ is None:
+            出た.append({**記録, "kind": "error", "error": f"{メソッド名} がありません（改名？）"})
             continue
         try:
-            body = res.json()
-        except Exception:  # noqa: BLE001 — JSON でない応答は 4カテゴリの数字を運べない
-            body = None
-        出た.append((path, res.status_code, body))
+            p = 呼ぶ(_文脈(str(final), 採点))
+        except Exception as e:  # noqa: BLE001
+            出た.append({**記録, "kind": "error", "error": f"{type(e).__name__}: {e}"})
+            continue
+        if not p:
+            出た.append({**記録, "kind": "none", "lines": []})
+            continue
+        出た.append({**記録, "kind": "json",
+                    "body": json.loads(Path(p).read_text(encoding="utf-8"))})
     return 出た
 
 
-# ─────────────────────────── サイドカー ───────────────────────────
+def _観測の本体(作業場: Path, 本物: Path) -> int:
+    """**子プロセスの中身。** 複製の上でアプリを起こし、全条件の面を集めて書き出す。
 
-def サイドカーを書かせる() -> list[tuple[str, object]]:
-    """**書き出し口を実際に呼んで中身を見る。**
-
-    過去に書かれたファイルを読んでも、いまの書き出し口が何を書くかは分からない
-    （凍結した成果物は後から印を足せない）。呼んで、書かれたものを読む。
+    子に分けるのは、ログのファイルハンドルや chroma の DB が掴んだままでも
+    **プロセスが終われば必ず放される**から（同じプロセスだと一時ツリーが消せずに残った）。
+    `sys.modules` も親と混ざらない。
     """
-    sys.path.insert(0, str(REPO_ROOT))
-    sys.path.insert(0, str(REPO_ROOT / "backend"))
-    from agents.pipeline_coordinator import PipelineCoordinator
+    複製 = 作業場 / "repo"
+    (作業場 / "home").mkdir(parents=True, exist_ok=True)
+    app = 起こす(複製)
+    観測: list[dict] = []
+    for 条件 in 条件の一覧:
+        if 条件 == 既定:
+            観測 += 応答を集める(app, 条件)
+            continue
+        with 状態を差す(実走後の状態(条件 == 採点済み)):
+            for o in 応答を集める(app, 条件):
+                o["unscored"] = 条件 == 未採点
+                観測.append(o)
+    観測 += サイドカーを書かせる(作業場)
+    付帯 = {"内訳": 除外の内訳(app), "盲点": 盲点の一覧(app),
+            "漏れたモジュール": 漏れたモジュール(複製, 本物)}
+    (作業場 / "observed.json").write_text(
+        json.dumps({"観測": 観測, "付帯": 付帯}, ensure_ascii=False), encoding="utf-8")
+    return 0
 
-    # `__init__` は重い（モデル解決・エンジン初期化）。書き出し口だけ使う
-    coord = PipelineCoordinator.__new__(PipelineCoordinator)
-    出た: list[tuple[str, object]] = []
-    with tempfile.TemporaryDirectory() as d:
-        final = Path(d) / "final_test.mp4"
-        final.write_bytes(b"fake")
-        ctx = SimpleNamespace(
-            final_path=str(final),
-            quality_score=89,
-            quality_feedback=["講評"],
-            quality_gate_report={"raw_score": 89},
-            quality_category_scores={"template": 100.0},
-            quality_scored=True,
-            metadata={"title": "t", "tags": ["a"]},
-        )
-        # **メソッド名は getattr で解決する。** 直接書くと、改名で門そのものが
-        # 落ちて「違反なし」にも「違反あり」にもならない（沈黙は緑ではない）
-        for 名, メソッド名 in (("*.quality.json", "_write_quality_sidecar"),
-                              ("*.youtube.json", "_write_metadata_sidecar")):
-            呼ぶ = getattr(coord, メソッド名, None)
-            if 呼ぶ is None:
-                出た.append((名, {"_呼び出し例外": f"{メソッド名} がありません（改名？）"}))
-                continue
-            try:
-                p = 呼ぶ(ctx)
-            except Exception as e:  # noqa: BLE001
-                出た.append((名, {"_呼び出し例外": f"{type(e).__name__}: {e}"}))
-                continue
-            if not p:
-                出た.append((名, None))
-                continue
-            出た.append((名, json.loads(Path(p).read_text(encoding="utf-8"))))
-    return 出た
+
+def 観測する() -> tuple[list[dict], dict]:
+    """追跡ファイルの複製を作り、子プロセスでアプリを起こして全条件の面を集める。"""
+    前 = 状態の指紋(REPO_ROOT)
+    作業場 = Path(tempfile.mkdtemp(prefix="c4gate-"))
+    try:
+        複製 = 作業場 / "repo"
+        件数 = 複製する(REPO_ROOT, 複製)
+        記録 = 作業場 / "child.log"
+        with open(記録, "wb") as log:
+            r = subprocess.run(
+                [sys.executable, "-P", str(複製 / "backend" / "c4_response_gate.py"),
+                 "--_observe", str(作業場), "--_real-root", str(REPO_ROOT)],
+                cwd=複製, env=隔離の環境変数(作業場, 複製),
+                stdout=log, stderr=subprocess.STDOUT, timeout=1800, check=False)
+        出力 = 作業場 / "observed.json"
+        if r.returncode != 0 or not 出力.is_file():
+            末尾 = 記録.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+            raise RuntimeError(
+                f"観測の子プロセスが失敗しました（exit {r.returncode}）:\n" + "\n".join(末尾))
+        中身 = json.loads(出力.read_text(encoding="utf-8"))
+    finally:
+        shutil.rmtree(作業場, ignore_errors=True)
+    付帯 = 中身["付帯"]
+    付帯["複製したファイル"] = 件数
+    付帯["一時ツリーが残った"] = 作業場.exists()
+    付帯["書き換わったもの"] = 書き換わったもの(前, 状態の指紋(REPO_ROOT))
+    return 中身["観測"], 付帯
 
 
 # ─────────────────────────── 判定 ───────────────────────────
 
-def audit(応答, サイドカー, 台帳, 内訳: dict | None = None,
-          盲点: list[str] | None = None) -> tuple[list[str], list[str]]:
-    """返り値は (違反, 情報)。"""
+def _条件つきのGETか(観測: dict) -> bool:
+    return 観測.get("condition") != 既定 and str(観測.get("route", "")).startswith("GET ")
+
+
+def _既定と同じ形か(観測: dict, 既定の面: dict | None) -> bool:
+    """条件つきの面が、既定の面の台帳に収まるか（収まるなら台帳に別に載せない）。"""
+    if 既定の面 is None:
+        return False
+    return ((既定の面.get("status"), 既定の面.get("kind")) == (観測["status"], 観測["kind"])
+            and set(形を取る(観測)) <= set(既定の面.get("shape") or ()))
+
+
+def _並べる(xs, n: int = 6) -> str:
+    xs = list(xs)
+    return f"{xs[:n]}" + (f" ほか {len(xs) - n} 件" if len(xs) > n else "")
+
+
+def audit(観測: list[dict], 台帳: dict, 面台帳: dict,
+          付帯: dict | None = None) -> tuple[list[str], list[str]]:
+    """返り値は (違反, 情報)。`観測` は `観測する()` の形。"""
+    付帯 = 付帯 or {}
     違反: list[str] = []
     情報: list[str] = []
 
-    # ── **測れていないのに緑にしない。** これが最優先の検査 ──────────────
-    #
-    # 2026-09-13、CI でこの門は「✅ 0 ルートとサイドカー 2 件」を出して
-    # exit 0 を返していた（所要 約1秒・HTTP リクエスト 0本）。手元は 304 ルート。
-    # 依存の版ずれで母集団が空になったのに、**空を成功として報告した。**
-    # 契約には「沈黙は緑ではない」と書いておきながら、母集団そのものが
-    # 0 になる経路を塞いでいなかった。
+    # ── 門が状態を書き換えていないか・隔離できているか（25周目 D-5） ──
+    for p in 付帯.get("書き換わったもの") or ():
+        違反.append(f"**門がリポジトリを書き換えました**: {p}。門は状態を書き換えてはいけない"
+                    f"（門の実行中に手で編集したファイルもここに出ます。その場合は走らせ直す）")
+    for m in 付帯.get("漏れたモジュール") or ():
+        違反.append(f"**複製の外のコードを読んでいます**（隔離の漏れ）: {m}")
+    if 付帯.get("一時ツリーが残った"):
+        情報.append("一時ツリーを消しきれませんでした（%TEMP% / $TMPDIR の c4gate-*）")
+
+    # ── 測れていないのに緑にしない。**数えるのは本文を検査した面**（D-7） ──
     下限 = int(台帳.get("population_floor") or 0)
-    if len(応答) < 下限:
+    検査した = [o for o in 観測
+                if o.get("condition") == 既定 and str(o.get("route", "")).startswith("GET ")
+                and o.get("kind") in ("json", "text")]
+    if len(検査した) < 下限:
         違反.append(
-            f"**母集団が下限を割りました**: {len(応答)} < {下限}。"
+            f"**本文を検査した面が下限を割りました**: {len(検査した)} < {下限}。"
             f"門が測れていないので、緑にはしません。"
-            f"ルートが正当に減ったのなら台帳の population_floor を更新してください"
-        )
+            f"ルートが正当に減ったのなら台帳の population_floor を更新してください")
 
-    # ── 外したものを黙って隠さない ────────────────────────────────
-    if 内訳 is not None:
+    # ── 外したものを黙って隠さない ──
+    if 付帯.get("内訳") is not None:
         宣言 = 台帳.get("side_effect_methods") or []
-        知らない = [m for m in 内訳 if m not in 宣言]
+        知らない = [m for m in 付帯["内訳"] if m not in 宣言]
         if 知らない:
-            違反.append(
-                f"台帳に宣言していない method を母集団から外しています: {知らない}。"
-                f"外すなら side_effect_methods に理由とともに載せてください"
-            )
-    if 盲点 is not None:
+            違反.append(f"台帳に宣言していない method を母集団から外しています: {知らない}。"
+                        f"外すなら side_effect_methods に理由とともに載せてください")
+    if 付帯.get("盲点") is not None:
         既知 = set(台帳.get("side_effect_blind_spot") or [])
-        増えた = sorted(set(盲点) - 既知)
-        減った = sorted(既知 - set(盲点))
+        増えた = sorted(set(付帯["盲点"]) - 既知)
+        減った = sorted(既知 - set(付帯["盲点"]))
         if 増えた:
-            違反.append(
-                f"**測れない盲点が増えました**（4カテゴリの語に当たる副作用ルート）: "
-                f"{増えた[:6]}"
-                + (f" ほか {len(増えた) - 6} 件" if len(増えた) > 6 else "")
-                + "。増やすなら台帳の side_effect_blind_spot に載せて自覚してください"
-            )
+            違反.append(f"**測れない盲点が増えました**（4カテゴリの語に当たる副作用ルート）: "
+                        f"{_並べる(増えた)}。増やすなら台帳の side_effect_blind_spot に載せて自覚してください")
         if 減った:
-            情報.append(f"盲点が減りました（台帳を掃除できます）: {減った[:6]}")
-    外した = {e["path"] for e in 台帳.get("out_of_population", [])}
-    承認済み = {e["path"] for e in 台帳.get("measured_claims", [])}
-    # **鍵のラチェット。** 台帳に載っている鍵の集合を超えたら落ちる
-    既知の鍵 = {e["path"]: set(e.get("keys") or []) for e in 台帳.get("observed", [])}
+            情報.append(f"盲点が減りました（台帳を掃除できます）: {_並べる(減った)}")
 
-    for path, code, body in 応答:
-        if code == -1:
-            違反.append(f"呼び出せませんでした: {path} — {body}")
+    面 = (面台帳 or {}).get("faces") or {}
+    カテゴリ名 = dict(台帳.get("category_names") or {})
+    個別 = dict(台帳.get("non_category_names_reviewed") or {})
+    一括 = set(台帳.get("non_category_names") or ())
+    例外: dict[str, set[str]] = {}
+    for e in 台帳.get("exemptions") or ():
+        例外.setdefault(str(e.get("face")), set()).add(str(e.get("key")))
+    承認済み = {str(e.get("face")) for e in 台帳.get("measured_claims") or ()}
+
+    def カテゴリか(名: str) -> bool:
+        return _危険鍵か(名) or 名 in カテゴリ名
+
+    見た面: set[str] = set()
+    出た名: set[str] = set()
+    使った例外: set[tuple[str, str]] = set()
+
+    for o in 観測:
+        名 = o["face"]
+        見た面.add(名)
+        if o.get("kind") == "error":
+            違反.append(f"呼び出せませんでした: {名} — {o.get('error')}")
             continue
-        if code != 200 or body is None:
-            # **「運んでいない」と断定しない。** 本文を解析していないのだから
-            # 分かっているのは「JSON として読めなかった」ことだけ。
-            # 2026-09-13 の指摘 — ここに 500 が9本入っていたのに、門は
-            # 「4カテゴリの数字を運んでいません」と言い切って情報に落としていた。
-            既知 = {f"{e.get('path')} ({e.get('status')})": e
-                    for e in (台帳.get("unreadable") or [])}
-            印 = f"{path} ({code})"
-            if 印 in 既知:
-                情報.append(f"{印}: {既知[印].get('reason', '')[:60]}")
-            else:
+
+        # ── 面のラチェット ──
+        いまの形 = 形を取る(o)
+        基準 = 面.get(名)
+        if 基準 is None:
+            if not (_条件つきのGETか(o) and _既定と同じ形か(o, 面.get(o["route"]))):
                 違反.append(
-                    f"**読めない応答が増えました**: {印}。"
-                    f"中身を確かめていないので「数字を運んでいない」とは言えません。"
-                    f"台帳の unreadable に**理由つきで**載せるか、読めるように直してください"
-                )
+                    f"**台帳に無い面です**: {名}（{o.get('status')} {o['kind']}・"
+                    f"鍵 {len(いまの形)} 個）。中身を査読して `--write-faces` で台帳に載せてください")
+        else:
+            if (基準.get("status"), 基準.get("kind")) != (o.get("status"), o["kind"]):
+                違反.append(
+                    f"**面の出口が変わりました**: {名} — 台帳 {基準.get('status')} {基準.get('kind')}"
+                    f" → いま {o.get('status')} {o['kind']}。中身を査読して台帳を更新してください")
+            増えた = sorted(set(いまの形) - set(基準.get("shape") or ()))
+            減った = sorted(set(基準.get("shape") or ()) - set(いまの形))
+            if 増えた:
+                違反.append(
+                    f"**新しい鍵が出ています**: {名} — {_並べる(増えた)}。"
+                    f"**包括的な印はこれを覆ってしまう**ので、4カテゴリかどうかを査読して台帳に載せてください")
+            if 減った:
+                情報.append(f"{名}: 出なくなった鍵があります（台帳を掃除できます）: {_並べる(減った, 3)}")
+
+        # ── 未採点の値が漏れていないか ──
+        if o.get("unscored"):
+            漏れ = 番兵の漏れ(o)
+            if 漏れ:
+                違反.append(f"**未採点の点数が印の無いところへ出ています**: {名} — {_並べる(漏れ, 4)}")
+
+        if o["kind"] != "json":
             continue
-        if path in 外した:
-            情報.append(f"{path}: 台帳で母集団の外に置いています")
-            continue
-        無印 = 名乗らない数字(body)
+        本文 = o.get("body")
+        出た名 |= 鍵名(本文)
+
+        # ── 印の検査（例外は面ごと・鍵ごと） ──
+        外す道 = frozenset(例外.get(名, set()) | (
+            例外.get(o["route"], set()) if _条件つきのGETか(o) else set()))
+        for k in 外す道:
+            使った例外.add((名, k))
+        無印 = 名乗らない数字(本文, カテゴリか, 外す道)
         if 無印:
-            違反.append(
-                f"出所を名乗っていない 4カテゴリの値: {path} — "
-                + ", ".join(無印[:4]) + (f" ほか {len(無印) - 4} 件" if len(無印) > 4 else "")
-            )
-        # **鍵のラチェット** — 印で覆われていても、新しい数字は adjudication が要る
-        いまの鍵 = set(出ている鍵(body))
-        if いまの鍵:
-            if path not in 既知の鍵:
-                違反.append(
-                    f"台帳に無いルートが 4カテゴリの数字を返しています: {path} — "
-                    f"{sorted(いまの鍵)}。実測かどうか確かめて台帳の observed に載せてください"
-                )
-            else:
-                増えた = sorted(いまの鍵 - 既知の鍵[path])
-                減った = sorted(既知の鍵[path] - いまの鍵)
-                if 増えた:
-                    違反.append(
-                        f"新しい 4カテゴリの数字が出ています: {path} — 増えた: {増えた}。"
-                        f"**包括的な印はこれを覆ってしまう**ので、実測かどうかを確かめて"
-                        f"台帳の observed を更新してください"
-                    )
-                if 減った:
-                    # 減るのは前進（出す数字が減った）。**台帳の掃除を促すだけ**
-                    情報.append(f"{path}: 出なくなった鍵があります（台帳を掃除できます）: {減った}")
+            違反.append(f"**出所を名乗っていない 4カテゴリの値**: {名} — {_並べる(無印, 4)}")
 
-        for 箇所 in measured_を名乗る箇所(body):
-            if path not in 承認済み:
+        # ── `measured` は台帳の承認が要る ──
+        承認 = 名 in 承認済み or (_条件つきのGETか(o) and o["route"] in 承認済み)
+        for 箇所 in measured_を名乗る箇所(本文):
+            if not 承認:
                 違反.append(
-                    f"台帳に無い `measured` の名乗り: {path} の {箇所}。"
-                    f"外部接続を遮断した環境で実測を名乗るなら、"
-                    f"**何をローカルで測ったか**を台帳に書いてください"
-                )
+                    f"台帳に無い `measured` の名乗り: {名} の {箇所}。"
+                    f"外部接続を遮断した環境で実測を名乗るなら、**何をローカルで測ったか**を台帳に書いてください")
 
-    for 名, 中身 in サイドカー:
-        # サイドカーにも同じラチェットを掛ける（包括的な印で覆う穴は同じ形で開く）
-        if isinstance(中身, dict) and "_呼び出し例外" not in 中身:
-            いまの鍵 = set(出ている鍵(中身))
-            if いまの鍵:
-                if 名 not in 既知の鍵:
-                    違反.append(
-                        f"台帳に無いサイドカーが 4カテゴリの数字を書いています: {名} — "
-                        f"{sorted(いまの鍵)}"
-                    )
-                else:
-                    増えた = sorted(いまの鍵 - 既知の鍵[名])
-                    if 増えた:
-                        違反.append(
-                            f"サイドカーに新しい 4カテゴリの数字が出ています: {名} — "
-                            f"増えた: {増えた}"
-                        )
-        if 中身 is None:
-            情報.append(f"{名}: 書き出されませんでした（空なら作らない仕様）")
-            continue
-        if isinstance(中身, dict) and "_呼び出し例外" in 中身:
-            違反.append(f"サイドカーの書き出し口を呼べませんでした: {名} — {中身}")
-            continue
-        無印 = 名乗らない数字(中身)
-        if 無印:
-            違反.append(
-                f"出所を名乗っていないサイドカー: {名} — " + ", ".join(無印[:4])
-                + (f" ほか {len(無印) - 4} 件" if len(無印) > 4 else "")
-            )
-        # **サイドカーにも `measured` の承認を要求する。**
-        # 2026-09-13 まで、このループは `measured_を名乗る箇所` を呼んでおらず、
-        # `*.quality.json` が未承認で `measured` を名乗っていた（私が足したもの）。
-        # 条文は母集団を「エンドポイント＋成果物ライタ」と定義しているので、半分だけ
-        # 施行しているのは条文違反。
-        for 箇所 in measured_を名乗る箇所(中身):
-            if 名 not in 承認済み:
-                違反.append(
-                    f"台帳に無い `measured` の名乗り: サイドカー {名} の {箇所}。"
-                    f"何をローカルで測ったかを台帳に書いてください"
-                )
+    # ── 消えた面（ルートが消えた・書き出し口が消えた） ──
+    for 名 in sorted(set(面) - 見た面):
+        違反.append(f"**面が消えました**: {名}。意図した削除なら `--write-faces` で台帳から外してください")
+    for 名 in sorted(set(面) & 見た面):
+        o = next((x for x in 観測 if x["face"] == 名), None)
+        if o is not None and _条件つきのGETか(o) and _既定と同じ形か(o, 面.get(o["route"])):
+            情報.append(f"{名}: 既定と同じ形になりました（台帳から外せます）")
 
-    for e in 台帳.get("out_of_population", []):
+    # ── 鍵名の分類 ──
+    # 印の鍵そのもの（`is_real` / `data_source` …）は分類済みとして扱う
+    未分類 = sorted(n for n in 出た名 if not カテゴリか(n) and n not in MARK_KEYS
+                 and n not in 個別 and n not in 一括)
+    if 未分類:
+        違反.append(
+            f"**分類されていない鍵名があります**（{len(未分類)} 個）: {_並べる(未分類, 10)}。"
+            f"4カテゴリなら category_names、違うなら non_category_names に載せてください"
+            f"（`--unclassified` で出現箇所が見られます）")
+    for n in sorted((set(個別) | 一括) & set(カテゴリ名)):
+        違反.append(f"4カテゴリの鍵名を対象外にも分類しています: {n}。"
+                    f"場所によって違うなら、面ごとの exemptions に理由を書いてください")
+    for n in sorted(一括):
+        if _危険鍵か(n):
+            違反.append(f"危険鍵は一括で対象外にできません: {n}（面ごとの exemptions を使う）")
+        elif STRONG_VOCAB_RE.search(n):
+            違反.append(f"紛らわしい鍵名を一括で対象外にしています: {n}。"
+                        f"non_category_names_reviewed に個別の理由を書いてください")
+    for n, r in sorted(個別.items()):
+        if _危険鍵か(n):
+            違反.append(f"危険鍵は対象外にできません: {n}（面ごとの exemptions を使う）")
+        if len(str(r)) < 10:
+            違反.append(f"対象外にする理由を書く: {n}")
+    for n, r in sorted(カテゴリ名.items()):
+        if len(str(r)) < 10:
+            違反.append(f"4カテゴリに入れる理由を書く: {n}")
+
+    # ── 例外と承認は理由つき。使われていないものは掃除を促す ──
+    for e in 台帳.get("exemptions") or ():
         if len(str(e.get("reason", ""))) < 10:
-            違反.append(f"母集団の外に置くなら理由を書く: {e.get('path')}")
-    for e in 台帳.get("measured_claims", []):
+            違反.append(f"例外にするなら理由を書く: {e.get('face')} {e.get('key')}")
+        if (str(e.get("face")), str(e.get("key"))) not in 使った例外:
+            情報.append(f"使われていない例外があります（台帳を掃除できます）: {e.get('face')} {e.get('key')}")
+    for e in 台帳.get("measured_claims") or ():
         if len(str(e.get("reason", ""))) < 10:
-            違反.append(f"`measured` を名乗るなら何を測ったか書く: {e.get('path')}")
-    # **読めない応答も理由なしには載せられない。** 一覧に足すだけなら
-    # 「壊れているものを追認する」ことになる（500 が11件ある）
-    for e in 台帳.get("unreadable", []):
-        if len(str(e.get("reason", ""))) < 10:
-            違反.append(f"読めない応答を台帳に載せるなら理由を書く: {e.get('path')}")
+            違反.append(f"`measured` を名乗るなら何を測ったか書く: {e.get('face')}")
+        if str(e.get("face")) not in 見た面:
+            情報.append(f"観測されていない面の承認があります: {e.get('face')}")
 
     return 違反, 情報
 
 
+# ─────────────────────────── 台帳の書き出し ───────────────────────────
+
+def 面台帳を作る(観測: list[dict], 既存: dict | None = None, 足すだけ: bool = False) -> dict:
+    """観測から面の台帳を作る。**条件つきの面は既定と違うときだけ載せる。**
+
+    `足すだけ` は既存の形に和を取る（別の環境で出た鍵を足すとき）。
+    """
+    既存 = 既存 or {}
+    面: dict[str, dict] = {}
+    既定の面 = {o["route"]: {"status": o.get("status"), "kind": o["kind"], "shape": 形を取る(o)}
+               for o in 観測 if o.get("condition") == 既定 and o.get("kind") != "error"}
+    for o in 観測:
+        if o.get("kind") == "error":
+            continue
+        if _条件つきのGETか(o) and _既定と同じ形か(o, 既定の面.get(o["route"])):
+            continue
+        面[o["face"]] = {"status": o.get("status"), "kind": o["kind"], "shape": 形を取る(o)}
+    if 足すだけ:
+        for 名, 旧 in (既存.get("faces") or {}).items():
+            if 名 in 面 and (旧.get("status"), 旧.get("kind")) == (面[名]["status"], 面[名]["kind"]):
+                面[名]["shape"] = sorted(set(面[名]["shape"]) | set(旧.get("shape") or ()))
+    出す = {k: v for k, v in 既存.items() if k != "faces"}
+    出す["faces"] = dict(sorted(面.items()))
+    return 出す
+
+
+def 未分類の出現(観測: list[dict], 台帳: dict) -> dict[str, list[str]]:
+    カテゴリ名 = set(台帳.get("category_names") or {})
+    分類済み = カテゴリ名 | MARK_KEYS | set(台帳.get("non_category_names_reviewed") or {}) | set(
+        台帳.get("non_category_names") or ())
+    出た: dict[str, list[str]] = {}
+    for o in 観測:
+        if o.get("kind") != "json":
+            continue
+        for 道, 名, _, 値, 覆われ, _ in 葉を歩く(o.get("body")):
+            if 名 in 分類済み or _危険鍵か(名):
+                continue
+            出た.setdefault(名, [])
+            if len(出た[名]) < 3:
+                出た[名].append(f"{o['face']} {道} = {値!r:.60}{'（印あり）' if 覆われ else ''}")
+        for n in 鍵名(o.get("body")):
+            if n not in 分類済み and not _危険鍵か(n):
+                出た.setdefault(n, [])
+    return dict(sorted(出た.items()))
+
+
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="R1.5-C4b: 出ていく数字が出所を名乗るか")
+    ap = argparse.ArgumentParser(description="R1.5-C4b: 出ていく数字が出所を名乗るか（面と鍵のラチェット）")
     ap.add_argument("--gate", action="store_true", help="違反があれば exit 1")
-    ap.add_argument("--show", action="store_true", help="母集団と印の一覧を出す")
-    ap.add_argument("--baseline", action="store_true",
-                    help="いま出ている鍵を台帳の observed の形で出す（人が中身を確かめて貼る）")
+    ap.add_argument("--show", action="store_true", help="面と印の一覧を出す")
+    ap.add_argument("--write-faces", action="store_true",
+                    help="面の台帳を観測で書き直す（差分を人が査読する）")
+    ap.add_argument("--merge", action="store_true",
+                    help="--write-faces で既存の形との和を取る（別の環境で出た鍵を足すとき）")
+    ap.add_argument("--unclassified", action="store_true", help="分類されていない鍵名と出現箇所")
+    ap.add_argument("--faces-out", help="観測した面を台帳と同じ形でこのパスへ書く（CI の成果物用）")
+    ap.add_argument("--_observe", help=argparse.SUPPRESS)      # 子プロセス用
+    ap.add_argument("--_real-root", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
 
-    台帳 = load_ledger()
-    app = アプリ()
-    応答 = 応答を集める(app)
-    サイドカー = サイドカーを書かせる()
-    内訳 = 除外の内訳(app)
-    盲点 = 盲点の一覧(app)
+    if args._observe:
+        return _観測の本体(Path(args._observe), Path(args._real_root))
 
-    # **外した先を必ず見せる。** 隠さないことが母集団を狭める条件（正典 C4b）
-    print(f"母集団: {len(応答)} ルート（`/api` の GET。パス引数には合成値を入れて叩く）"
-          f" / サイドカー {len(サイドカー)} 件")
+    台帳 = load_ledger()
+    面台帳 = load_faces()
+    始め = time.time()
+    観測, 付帯 = 観測する()
+    所要 = time.time() - 始め
+
+    既定の面 = [o for o in 観測 if o.get("condition") == 既定 and o["route"].startswith("GET ")]
+    内訳 = 付帯.get("内訳") or {}
+    print(f"母集団: GET {len(既定の面)} ルート × 入力条件 {len(条件の一覧)}"
+          f"（{' / '.join(条件の一覧)}）＋ サイドカーの分岐 "
+          f"{sum(1 for o in 観測 if not o['route'].startswith('GET '))} 件"
+          f" — 複製 {付帯.get('複製したファイル')} ファイルの上で {所要:.1f} 秒")
     print(f"母集団の外: {sum(内訳.values())} 件 {内訳}"
           f" — 門は状態を書き換えないので副作用のあるメソッドは叩かない")
-    print(f"  うち 4カテゴリの語に当たる（測れない盲点）: {len(盲点)} 件")
+    print(f"  うち 4カテゴリの語に当たる（測れない盲点）: {len(付帯.get('盲点') or [])} 件")
     print()
 
-    if args.baseline:
-        外した = {e["path"] for e in 台帳.get("out_of_population", [])}
-        出た = []
-        for path, code, body in 応答:
-            if code != 200 or body is None or path in 外した:
-                continue
-            鍵 = 出ている鍵(body)
-            if 鍵:
-                出た.append({"path": path, "keys": 鍵})
-        for 名, 中身 in サイドカー:
-            if isinstance(中身, dict) and "_呼び出し例外" not in 中身:
-                鍵 = 出ている鍵(中身)
-                if 鍵:
-                    出た.append({"path": 名, "keys": 鍵})
-        print(json.dumps(出た, ensure_ascii=False, indent=1))
+    if args.faces_out:
+        # 台帳は書き換えない。別の環境（CI の Linux）で出た形を持ち帰るためのもの
+        Path(args.faces_out).write_text(
+            json.dumps(面台帳を作る(観測), ensure_ascii=False, indent=1) + "\n",
+            encoding="utf-8", newline="\n")
+
+    if args.write_faces:
+        出す = 面台帳を作る(観測, 面台帳, 足すだけ=args.merge)
+        # 改行は OS によらず LF（Windows で CRLF になると全行差分に見える）
+        FACES_PATH.write_text(json.dumps(出す, ensure_ascii=False, indent=1) + "\n",
+                              encoding="utf-8", newline="\n")
+        print(f"面の台帳を書きました: {FACES_PATH.relative_to(REPO_ROOT).as_posix()}"
+              f"（{len(出す['faces'])} 面）。**git diff を査読してください**")
+        return 0
+
+    if args.unclassified:
+        for 名, 例 in 未分類の出現(観測, 台帳).items():
+            print(f"{名}{'  ← 紛らわしい語' if STRONG_VOCAB_RE.search(名) else ''}")
+            for x in 例:
+                print(f"    {x}")
         return 0
 
     if args.show:
-        print(f"母集団（引数なし GET の /api）: {len(応答)} ルート")
-        print(f"サイドカーの書き出し口: {len(サイドカー)} 件")
-        print()
-        for p, c, b in 応答:
-            if c != 200 or b is None:
+        for o in 観測:
+            if o.get("kind") != "json":
+                print(f"  {o['face']}: {o.get('status')} {o['kind']}（{len(o.get('lines') or [])} 行）")
                 continue
-            無印 = 名乗らない数字(b)
-            m = measured_を名乗る箇所(b)
-            if 無印 or m:
-                print(f"  {p}")
-                if 無印:
-                    print(f"      名乗っていない: {無印[:3]}")
-                if m:
-                    print(f"      measured: {m[:3]}")
+            m = measured_を名乗る箇所(o.get("body"))
+            if m:
+                print(f"  {o['face']}: measured {m[:3]}")
         return 0
 
-    違反, 情報 = audit(応答, サイドカー, 台帳, 内訳, 盲点)
+    違反, 情報 = audit(観測, 台帳, 面台帳, 付帯)
     if 情報:
-        print(f"  ℹ {len(情報)} 件は台帳で自覚済みです"
-              f"（読めない応答・母集団の外・鍵が減った、など。違反ではありません）")
+        print(f"  ℹ {len(情報)} 件の情報（台帳の掃除候補など。違反ではありません）")
+        for m in 情報[:10]:
+            print(f"    · {m}")
     if 違反:
-        print(f"🚫 **R1.5-C4b: 出所を名乗っていない数字があります**（{len(違反)} 件）:")
-        for m in 違反[:40]:
+        print(f"🚫 **R1.5-C4b: 違反があります**（{len(違反)} 件）:")
+        for m in 違反[:60]:
             print(f"    - {m}")
-        if len(違反) > 40:
-            print(f"    … ほか {len(違反) - 40} 件")
+        if len(違反) > 60:
+            print(f"    … ほか {len(違反) - 60} 件")
         print()
         print("  数字を出すなら `data_source`（measured / derived / sample / unavailable）と")
-        print("  `is_real` を同じ応答に載せてください。母集団から外すなら台帳に理由を書きます。")
+        print("  `is_real` を同じ応答に載せてください。形が変わったなら査読して台帳を更新します。")
         return 1 if args.gate else 0
 
-    print(f"✅ {len(応答)} ルートとサイドカー {len(サイドカー)} 件で、"
-          f"4カテゴリの数字はすべて出所を名乗っています。")
+    print(f"✅ {len(観測)} 面（GET {len(既定の面)} ルート × {len(条件の一覧)} 条件＋サイドカー）で、"
+          f"形は台帳どおり、4カテゴリの数字はすべて出所を名乗っています。")
     return 0
 
 

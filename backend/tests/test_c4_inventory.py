@@ -242,6 +242,26 @@ def test_危険形が減っても再確認で落ちる():
     assert any("危険形が変わった" in m for m in 違反)
 
 
+def test_同じ危険形が増えても再確認で落ちる():
+    """**指紋は集合ではなく個数つきで比べる**（gate-verifier 25周目 D-6）。
+
+    同じ関数に2つ目の `const_dict:score` を足しても、集合で比べると変化が無い。
+    実装はもともと個数つきで比べていたが、それを固定する契約が無く、
+    list→set に落とす変異で 68 件が全部通った（空振り）。
+    """
+    違反, _ = c4_inventory.audit(
+        _台帳(fingerprint=["const_dict:score"]),
+        _実態(fingerprint=["const_dict:score", "const_dict:score"], has_mark=True),
+    )
+    assert any("危険形が変わった" in m and "const_dict:score" in m for m in 違反), 違反
+    # 減る側も同じ（2つあったものが1つになった）
+    違反, _ = c4_inventory.audit(
+        _台帳(fingerprint=["const_dict:score", "const_dict:score"]),
+        _実態(fingerprint=["const_dict:score"], has_mark=True),
+    )
+    assert any("危険形が変わった" in m and "減った" in m for m in 違反), 違反
+
+
 def test_印が消えたら落ちる():
     違反, _ = c4_inventory.audit(_台帳(fingerprint=["const_return"]),
                                  _実態(fingerprint=["const_return"], has_mark=False))

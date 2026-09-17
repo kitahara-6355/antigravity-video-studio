@@ -1,0 +1,6562 @@
+{
+ "criterion": "R1.5-C4b",
+ "note": "**観測した面の形**（`python -m backend.c4_response_gate --write-faces` が書く）。面 = 出力口（GET の応答・サイドカー）＋入力条件。各面の `shape` は応答の鍵の道と値の種類の集合（HTML は見える文字の行）。**新しい鍵・新しい面・消えた面・出口（status と種類）の変化は門が落とす。**書き直したら git diff を査読し、新しい鍵が4カテゴリなら印があるか、鍵名の分類が要るかを確かめること。条件つきの面（［実走後・…］）は、既定の面の形に収まらないものだけ載せる",
+ "faces": {
+  "*.quality.json［採点済み］": {
+   "status": null,
+   "kind": "json",
+   "shape": [
+    "$.category_scores.core:num",
+    "$.category_scores.template:num",
+    "$.category_scores:dict",
+    "$.data_source:str",
+    "$.feedback:list",
+    "$.feedback[]:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.raw_score:num",
+    "$.score:num",
+    "$.scored:bool",
+    "$:dict"
+   ]
+  },
+  "*.quality.json［未採点］": {
+   "status": null,
+   "kind": "json",
+   "shape": [
+    "$.category_scores.core:num",
+    "$.category_scores.template:num",
+    "$.category_scores:dict",
+    "$.data_source:str",
+    "$.feedback:list",
+    "$.feedback[]:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.raw_score:null",
+    "$.score:null",
+    "$.scored:bool",
+    "$:dict"
+   ]
+  },
+  "*.quality.json［講評なし］": {
+   "status": null,
+   "kind": "none",
+   "shape": []
+  },
+  "*.youtube.json［メタデータあり］": {
+   "status": null,
+   "kind": "json",
+   "shape": [
+    "$.chapters:list",
+    "$.chapters[].time:str",
+    "$.chapters[].title:str",
+    "$.chapters[]:dict",
+    "$.description:str",
+    "$.tags:list",
+    "$.tags[]:str",
+    "$.titles:list",
+    "$.titles[]:str",
+    "$:dict"
+   ]
+  },
+  "*.youtube.json［メタデータなし］": {
+   "status": null,
+   "kind": "none",
+   "shape": []
+  },
+  "GET /api/admin/analytics/ai-suggestion-effect": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.adopted.avg_ctr:num",
+    "$.adopted.avg_retention:num",
+    "$.adopted.count:num",
+    "$.adopted:dict",
+    "$.data_source:str",
+    "$.impact_diff.ctr_diff:num",
+    "$.impact_diff.retention_diff:num",
+    "$.impact_diff:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.rejected.avg_ctr:num",
+    "$.rejected.avg_retention:num",
+    "$.rejected.count:num",
+    "$.rejected:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/api-connection": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.connected:bool",
+    "$.data_source:str",
+    "$.enabled:bool",
+    "$.is_real:bool",
+    "$.last_sync:null",
+    "$.note:str",
+    "$.update_interval_minutes:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/benchmark": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.channel_avg.ctr:num",
+    "$.channel_avg.retention:num",
+    "$.channel_avg:dict",
+    "$.comparison.ctr_diff:num",
+    "$.comparison.ctr_status:str",
+    "$.comparison.retention_diff:num",
+    "$.comparison.retention_status:str",
+    "$.comparison:dict",
+    "$.data_source:str",
+    "$.industry_avg.ctr:num",
+    "$.industry_avg.retention:num",
+    "$.industry_avg:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/cache-fallback": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.cache_age_hours:num",
+    "$.cache_available:bool",
+    "$.data_freshness:str",
+    "$.data_source:str",
+    "$.fallback_active:bool",
+    "$.is_real:bool",
+    "$.last_successful_sync:null",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/chapter-effect": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.improvement.retention_diff:num",
+    "$.improvement.watch_time_diff:num",
+    "$.improvement:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.with_chapters.avg_retention:num",
+    "$.with_chapters.avg_watch_time_min:num",
+    "$.with_chapters.video_count:num",
+    "$.with_chapters:dict",
+    "$.without_chapters.avg_retention:num",
+    "$.without_chapters.avg_watch_time_min:num",
+    "$.without_chapters.video_count:num",
+    "$.without_chapters:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/competitor-analysis": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.competitors:list",
+    "$.competitors[].avg_ctr:num",
+    "$.competitors[].avg_retention:num",
+    "$.competitors[].name:str",
+    "$.competitors[].subscribers:num",
+    "$.competitors[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.our_rank:num",
+    "$.total_compared:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/ctr-trend": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.history:list",
+    "$.history[].ctr:num",
+    "$.history[].date:str",
+    "$.history[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.period_days:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.api_connected:bool",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.kpi_summary.avg_ctr:num",
+    "$.kpi_summary.avg_retention:num",
+    "$.kpi_summary.total_videos:num",
+    "$.kpi_summary.total_views:num",
+    "$.kpi_summary:dict",
+    "$.note:str",
+    "$.sections:list",
+    "$.sections[]:str",
+    "$.status:str",
+    "$.timestamp:str",
+    "$.title:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/growth-forecast": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.confidence:num",
+    "$.data_source:str",
+    "$.forecast_subscribers.30_days:num",
+    "$.forecast_subscribers.90_days:num",
+    "$.forecast_subscribers.current:num",
+    "$.forecast_subscribers.method:str",
+    "$.forecast_subscribers:dict",
+    "$.forecast_views.3_months:num",
+    "$.forecast_views.current_monthly:num",
+    "$.forecast_views.method:str",
+    "$.forecast_views.next_month:num",
+    "$.forecast_views:dict",
+    "$.generated_at:str",
+    "$.growth_rate.subscribers_monthly_pct:num",
+    "$.growth_rate.views_monthly_pct:num",
+    "$.growth_rate:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/improvement-suggestions": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.suggestions:list",
+    "$.suggestions[].applied:bool",
+    "$.suggestions[].category:str",
+    "$.suggestions[].description:str",
+    "$.suggestions[].id:num",
+    "$.suggestions[].impact:str",
+    "$.suggestions[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/kpi-achievement": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.achievement_rate.ctr:num",
+    "$.achievement_rate.overall:num",
+    "$.achievement_rate.retention:num",
+    "$.achievement_rate:dict",
+    "$.actual.ctr:num",
+    "$.actual.retention:num",
+    "$.actual:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.target.target_ctr:num",
+    "$.target.target_retention:num",
+    "$.target:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/kpi-settings": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.target_ctr:num",
+    "$.target_retention:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/owner-dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.highlights:list",
+    "$.highlights[]:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.summary.avg_ctr:num",
+    "$.summary.avg_retention:num",
+    "$.summary.total_videos:num",
+    "$.summary.total_views:num",
+    "$.summary:dict",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/period-comparison": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.diff.ctr_change:num",
+    "$.diff.ctr_change_pct:num",
+    "$.diff.retention_change:num",
+    "$.diff.retention_change_pct:num",
+    "$.diff.views_change:num",
+    "$.diff.views_change_pct:num",
+    "$.diff:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.period1.avg_ctr:num",
+    "$.period1.avg_retention:num",
+    "$.period1.label:str",
+    "$.period1.total_views:num",
+    "$.period1:dict",
+    "$.period2.avg_ctr:num",
+    "$.period2.avg_retention:num",
+    "$.period2.label:str",
+    "$.period2.total_views:num",
+    "$.period2:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/retention-trend": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.history:list",
+    "$.history[].date:str",
+    "$.history[].retention:num",
+    "$.history[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.period_days:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/smartcut-effect": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.settings:list",
+    "$.settings[].avg_retention:num",
+    "$.settings[].description:str",
+    "$.settings[].setting:str",
+    "$.settings[].video_count:num",
+    "$.settings[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/template-effect": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.templates:list",
+    "$.templates[].avg_ctr:num",
+    "$.templates[].avg_retention:num",
+    "$.templates[].name:str",
+    "$.templates[].video_count:num",
+    "$.templates[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/thumbnail-effect": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.best_performing:str",
+    "$.correlation_score:num",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.thumbnails:list",
+    "$.thumbnails[].avg_ctr:num",
+    "$.thumbnails[].count:num",
+    "$.thumbnails[].type:str",
+    "$.thumbnails[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/trend-analysis": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.analysis_date:str",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.total:num",
+    "$.trends:list",
+    "$.trends[].direction:str",
+    "$.trends[].score:num",
+    "$.trends[].topic:str",
+    "$.trends[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/analytics/video-performance": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.total:num",
+    "$.videos:list",
+    "$.videos[].ctr:num",
+    "$.videos[].id:num",
+    "$.videos[].published:str",
+    "$.videos[].retention:num",
+    "$.videos[].title:str",
+    "$.videos[].views:num",
+    "$.videos[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/alert-settings": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.alerts:list",
+    "$.alerts[].channel_id:str",
+    "$.alerts[].condition:str",
+    "$.alerts[].metric:str",
+    "$.alerts[].threshold:num",
+    "$.alerts[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/channel-comparison": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.best_performer:str",
+    "$.comparisons:list",
+    "$.comparisons[].channel_id:str",
+    "$.comparisons[].ctr:num",
+    "$.comparisons[].name:str",
+    "$.comparisons[].quality_score:num",
+    "$.comparisons[].retention:num",
+    "$.comparisons[].subscribers:num",
+    "$.comparisons[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.metrics:list",
+    "$.metrics[]:str",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/channels": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.channels:list",
+    "$.channels[].connected:bool",
+    "$.channels[].genre:str",
+    "$.channels[].id:str",
+    "$.channels[].name:str",
+    "$.channels[].status:str",
+    "$.channels[].subscribers:num",
+    "$.channels[].total_views:num",
+    "$.channels[].youtube_channel_id:str",
+    "$.channels[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/channels/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/comment-analysis": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.requests:list",
+    "$.requests[].count:num",
+    "$.requests[].topic:str",
+    "$.requests[]:dict",
+    "$.sentiment.negative:num",
+    "$.sentiment.neutral:num",
+    "$.sentiment.positive:num",
+    "$.sentiment:dict",
+    "$.top_topics:list",
+    "$.top_topics[]:str",
+    "$.total_comments_analyzed:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/competitor-benchmark": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.benchmarks:list",
+    "$.benchmarks[].avg_views:num",
+    "$.benchmarks[].ctr:num",
+    "$.benchmarks[].name:str",
+    "$.benchmarks[].subscribers:num",
+    "$.benchmarks[]:dict",
+    "$.channel_id:str",
+    "$.data_source:str",
+    "$.genre:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.ranking.avg_views:num",
+    "$.ranking.ctr:num",
+    "$.ranking.subscribers:num",
+    "$.ranking:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/ctr-improvement": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.after:num",
+    "$.before:num",
+    "$.data_source:str",
+    "$.factors:list",
+    "$.factors[].contribution_pct:num",
+    "$.factors[].name:str",
+    "$.factors[]:dict",
+    "$.improvement_pct:num",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.sections:list",
+    "$.sections[]:str",
+    "$.status:str",
+    "$.summary.active_channels:num",
+    "$.summary.total_channels:num",
+    "$.summary.total_subscribers:num",
+    "$.summary.total_views:num",
+    "$.summary:dict",
+    "$.timestamp:str",
+    "$.title:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/effect-summary": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.after.ctr_pct:num",
+    "$.after.production_time_hours:num",
+    "$.after.quality_score:num",
+    "$.after.retention_pct:num",
+    "$.after:dict",
+    "$.before.ctr_pct:num",
+    "$.before.production_time_hours:num",
+    "$.before.quality_score:num",
+    "$.before.retention_pct:num",
+    "$.before:dict",
+    "$.data_source:str",
+    "$.improvement_pct.ctr:num",
+    "$.improvement_pct.production_time:num",
+    "$.improvement_pct.quality:num",
+    "$.improvement_pct.retention:num",
+    "$.improvement_pct:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/growth-prediction": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.channel_id:str",
+    "$.confidence:null",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.method:str",
+    "$.model:null",
+    "$.note:str",
+    "$.predictions.subscribers_12m:num",
+    "$.predictions.subscribers_3m:num",
+    "$.predictions.subscribers_6m:num",
+    "$.predictions.views_monthly_3m:num",
+    "$.predictions.views_monthly_6m:num",
+    "$.predictions:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/optimization-recommendations": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.prioritized_count:num",
+    "$.recommendations:list",
+    "$.recommendations[].channel_id:str",
+    "$.recommendations[].expected_impact:str",
+    "$.recommendations[].id:num",
+    "$.recommendations[].priority:str",
+    "$.recommendations[].title:str",
+    "$.recommendations[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/owner-view": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.customizable:bool",
+    "$.data_source:str",
+    "$.enabled:bool",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.theme:str",
+    "$.visible_sections:list",
+    "$.visible_sections[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/permissions": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.roles:list",
+    "$.roles[].name:str",
+    "$.roles[].permissions:list",
+    "$.roles[].permissions[]:str",
+    "$.roles[]:dict",
+    "$.users:list",
+    "$.users[].channel_id:str",
+    "$.users[].role:str",
+    "$.users[].user_id:str",
+    "$.users[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/post-schedule": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.next_post.channel_id:str",
+    "$.next_post.scheduled_at:str",
+    "$.next_post.type:str",
+    "$.next_post:dict",
+    "$.note:str",
+    "$.schedule:list",
+    "$.schedule[].channel_id:str",
+    "$.schedule[].day:str",
+    "$.schedule[].time:str",
+    "$.schedule[].type:str",
+    "$.schedule[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/posting-pace": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.achievement_pct:num",
+    "$.actual.posts_per_week:num",
+    "$.actual.posts_this_month:num",
+    "$.actual:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.streak_days:num",
+    "$.target.posts_per_week:num",
+    "$.target:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/production-efficiency": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.after_hours:num",
+    "$.before_hours:num",
+    "$.breakdown.editing.after:num",
+    "$.breakdown.editing.before:num",
+    "$.breakdown.editing.reduction_pct:num",
+    "$.breakdown.editing:dict",
+    "$.breakdown.optimization.after:num",
+    "$.breakdown.optimization.before:num",
+    "$.breakdown.optimization.reduction_pct:num",
+    "$.breakdown.optimization:dict",
+    "$.breakdown.review.after:num",
+    "$.breakdown.review.before:num",
+    "$.breakdown.review.reduction_pct:num",
+    "$.breakdown.review:dict",
+    "$.breakdown.transcription.after:num",
+    "$.breakdown.transcription.before:num",
+    "$.breakdown.transcription.reduction_pct:num",
+    "$.breakdown.transcription:dict",
+    "$.breakdown:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.reduction_pct:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/quality-improvement": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.average_improvement:num",
+    "$.data_source:str",
+    "$.details.audio_quality.after:num",
+    "$.details.audio_quality.before:num",
+    "$.details.audio_quality:dict",
+    "$.details.metadata_quality.after:num",
+    "$.details.metadata_quality.before:num",
+    "$.details.metadata_quality:dict",
+    "$.details.transcription_accuracy.after:num",
+    "$.details.transcription_accuracy.before:num",
+    "$.details.transcription_accuracy:dict",
+    "$.details:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.trend:list",
+    "$.trend[].month:str",
+    "$.trend[].score:num",
+    "$.trend[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/retention-improvement": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.after:num",
+    "$.avg_watch_time_increase_pct:num",
+    "$.before:num",
+    "$.data_source:str",
+    "$.improvement_pct:num",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.quality_gate_impact:num",
+    "$.smartcut_impact:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/roi": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.benefit.additional_revenue_usd:num",
+    "$.benefit.time_saved_hours:num",
+    "$.benefit.time_value_usd:num",
+    "$.benefit:dict",
+    "$.cost.api_monthly_usd:num",
+    "$.cost.compute_monthly_usd:num",
+    "$.cost.total_monthly_usd:num",
+    "$.cost:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.payback_period_months:num",
+    "$.roi_ratio:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/template-recommendations": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.genre_match:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.templates:list",
+    "$.templates[].genre_match:num",
+    "$.templates[].id:str",
+    "$.templates[].name:str",
+    "$.templates[].usage_count:num",
+    "$.templates[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/channel/youtube-connection": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.api_key:null",
+    "$.channel_id:null",
+    "$.connected:bool",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.last_sync:null",
+    "$.note:str",
+    "$.quota_limit:num",
+    "$.quota_used_today:num",
+    "$.scopes:list",
+    "$.scopes[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/alerts": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.active_count:num",
+    "$.alerts:list",
+    "$.alerts[].acknowledged:bool",
+    "$.alerts[].created_at:str",
+    "$.alerts[].id:num",
+    "$.alerts[].level:str",
+    "$.alerts[].message:str",
+    "$.alerts[].threshold:null",
+    "$.alerts[].threshold:num",
+    "$.alerts[].type:str",
+    "$.alerts[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/auto-retry": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.history:list",
+    "$.history[].attempt:num",
+    "$.history[].result:str",
+    "$.history[].timestamp:str",
+    "$.history[].worker:str",
+    "$.history[]:dict",
+    "$.last_retry:str",
+    "$.max_retries:num",
+    "$.retry_count:num",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.sections:list",
+    "$.sections[]:str",
+    "$.status:str",
+    "$.summary.active_alerts:num",
+    "$.summary.open_incidents:num",
+    "$.summary.self_healing_events:num",
+    "$.summary.total_incidents:num",
+    "$.summary.uptime_pct:num",
+    "$.summary.workers_healthy:num",
+    "$.summary.workers_total:num",
+    "$.summary:dict",
+    "$.timestamp:str",
+    "$.title:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/downtime": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.incidents:num",
+    "$.monthly_breakdown:list",
+    "$.monthly_breakdown[].downtime_minutes:num",
+    "$.monthly_breakdown[].incidents:num",
+    "$.monthly_breakdown[].month:str",
+    "$.monthly_breakdown[]:dict",
+    "$.mttr_minutes:num",
+    "$.timestamp:str",
+    "$.total_minutes:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/incidents": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.incidents:list",
+    "$.incidents[].error:str",
+    "$.incidents[].id:str",
+    "$.incidents[].resolution:null",
+    "$.incidents[].resolution:str",
+    "$.incidents[].resolved_at:null",
+    "$.incidents[].resolved_at:str",
+    "$.incidents[].severity:str",
+    "$.incidents[].started_at:str",
+    "$.incidents[].status:str",
+    "$.incidents[].title:str",
+    "$.incidents[].type:str",
+    "$.incidents[].worker:str",
+    "$.incidents[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/incidents/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/patterns": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.last_updated:str",
+    "$.patterns:list",
+    "$.patterns[].category:str",
+    "$.patterns[].frequency:num",
+    "$.patterns[].id:str",
+    "$.patterns[].last_seen:str",
+    "$.patterns[].pattern:str",
+    "$.patterns[].recommended_action:str",
+    "$.patterns[]:dict",
+    "$.total_learned:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/performance": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.cpu_pct:num",
+    "$.disk_pct:num",
+    "$.gpu_memory_pct:num",
+    "$.gpu_temperature_c:num",
+    "$.memory_pct:num",
+    "$.network_io_mbps:num",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/pipeline-failures": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.failures:list",
+    "$.failures[].error:str",
+    "$.failures[].recovered:bool",
+    "$.failures[].session_id:str",
+    "$.failures[].timestamp:str",
+    "$.failures[].worker:str",
+    "$.failures[]:dict",
+    "$.last_check:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/preventive": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.generated_at:str",
+    "$.prioritized_count:num",
+    "$.suggestions:list",
+    "$.suggestions[].category:str",
+    "$.suggestions[].estimated_impact:str",
+    "$.suggestions[].id:num",
+    "$.suggestions[].priority:str",
+    "$.suggestions[].title:str",
+    "$.suggestions[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/quality-degradation": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_score:num",
+    "$.data_source:str",
+    "$.degradation_trend:list",
+    "$.degradation_trend[].date:str",
+    "$.degradation_trend[].score:num",
+    "$.degradation_trend[]:dict",
+    "$.degraded_workers:list",
+    "$.degraded_workers[]:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.threshold:num",
+    "$.timestamp:null",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/quota-breach": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_usage_pct:num",
+    "$.daily_limit:num",
+    "$.daily_used:num",
+    "$.level:str",
+    "$.message:str",
+    "$.threshold:num",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/rca/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/recovery-check": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.all_passed:bool",
+    "$.checked_at:str",
+    "$.checklist:list",
+    "$.checklist[].item:str",
+    "$.checklist[].passed:bool",
+    "$.checklist[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/recovery-guide": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.estimated_time_minutes:num",
+    "$.incident_type:str",
+    "$.steps:list",
+    "$.steps[].action:str",
+    "$.steps[].command:str",
+    "$.steps[].order:num",
+    "$.steps[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/self-healing": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.events:list",
+    "$.events[].action:str",
+    "$.events[].id:str",
+    "$.events[].incident_id:str",
+    "$.events[].result:str",
+    "$.events[].timestamp:str",
+    "$.events[].trigger:str",
+    "$.events[]:dict",
+    "$.success_rate:num",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/sla": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_month.incidents_count:num",
+    "$.current_month.sla_met:bool",
+    "$.current_month.total_downtime_minutes:num",
+    "$.current_month:dict",
+    "$.mtbf_hours:num",
+    "$.mttr_minutes:num",
+    "$.target_pct:num",
+    "$.timestamp:str",
+    "$.uptime_pct:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/status-page": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.components:list",
+    "$.components[].name:str",
+    "$.components[].status:str",
+    "$.components[]:dict",
+    "$.last_incident:str",
+    "$.overall_status:str",
+    "$.updated_at:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/timeline/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/incident/worker-isolation": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.healthy_count:num",
+    "$.isolated_count:num",
+    "$.total_workers:num",
+    "$.workers:list",
+    "$.workers[].failure_count:num",
+    "$.workers[].isolated:bool",
+    "$.workers[].last_failure:null",
+    "$.workers[].last_failure:str",
+    "$.workers[].name:str",
+    "$.workers[].status:str",
+    "$.workers[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/api-docs": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.endpoints:list",
+    "$.endpoints[].description:str",
+    "$.endpoints[].method:str",
+    "$.endpoints[].path:str",
+    "$.endpoints[]:dict",
+    "$.openapi_url:str",
+    "$.swagger_url:str",
+    "$.total_endpoints:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/api-logs": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.logs:list",
+    "$.logs[].duration_ms:num",
+    "$.logs[].method:str",
+    "$.logs[].path:str",
+    "$.logs[].status:num",
+    "$.logs[].timestamp:str",
+    "$.logs[]:dict",
+    "$.period:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/api-stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.endpoints:list",
+    "$.endpoints[].avg_duration_ms:num",
+    "$.endpoints[].calls_today:num",
+    "$.endpoints[].method:str",
+    "$.endpoints[].path:str",
+    "$.endpoints[]:dict",
+    "$.period:str",
+    "$.timestamp:str",
+    "$.total_requests:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/api-version": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.available:list",
+    "$.available[]:str",
+    "$.current:str",
+    "$.deprecated:list",
+    "$.migration_guide:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/auth-tokens": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.active_count:num",
+    "$.tokens:list",
+    "$.tokens[].active:bool",
+    "$.tokens[].created_at:str",
+    "$.tokens[].expires_at:str",
+    "$.tokens[].id:str",
+    "$.tokens[].name:str",
+    "$.tokens[].token_prefix:str",
+    "$.tokens[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/claude-desktop": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.capabilities:list",
+    "$.capabilities[]:str",
+    "$.connected:bool",
+    "$.last_heartbeat:str",
+    "$.transport:str",
+    "$.version:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/cors": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.allow_credentials:bool",
+    "$.allow_headers:list",
+    "$.allow_headers[]:str",
+    "$.allow_methods:list",
+    "$.allow_methods[]:str",
+    "$.allowed_origins:list",
+    "$.allowed_origins[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.sections:list",
+    "$.sections[]:str",
+    "$.status:str",
+    "$.summary.active_tools:num",
+    "$.summary.api_calls_today:num",
+    "$.summary.auth_tokens:num",
+    "$.summary.external_apps:num",
+    "$.summary.mcp_tools:num",
+    "$.summary.webhooks:num",
+    "$.summary:dict",
+    "$.timestamp:str",
+    "$.title:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/dual-mode": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.active_mode:str",
+    "$.http_base_url:str",
+    "$.http_enabled:bool",
+    "$.mcp_enabled:bool",
+    "$.mcp_transport:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/external-apps": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.apps:list",
+    "$.apps[].created_at:str",
+    "$.apps[].id:str",
+    "$.apps[].name:str",
+    "$.apps[].redirect_uri:str",
+    "$.apps[].scopes:list",
+    "$.apps[].scopes[]:str",
+    "$.apps[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/notifications": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.channels:list",
+    "$.channels[]:str",
+    "$.discord_webhook:str",
+    "$.enabled:bool",
+    "$.slack_webhook:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/oauth": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.authorize_endpoint:str",
+    "$.enabled:bool",
+    "$.grant_types:list",
+    "$.grant_types[]:str",
+    "$.registered_apps:num",
+    "$.token_endpoint:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/rate-limits": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.burst:num",
+    "$.rpm:num",
+    "$.window_seconds:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/sdk": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.documentation_url:str",
+    "$.download_links.npm:str",
+    "$.download_links.python:str",
+    "$.download_links:dict",
+    "$.versions:list",
+    "$.versions[].language:str",
+    "$.versions[].status:str",
+    "$.versions[].version:str",
+    "$.versions[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/tool/evolution-log": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.entries:list",
+    "$.entries[].philosophy:str",
+    "$.entries[].score:num",
+    "$.entries[].session_id:str",
+    "$.entries[].timestamp:str",
+    "$.entries[]:dict",
+    "$.is_real:bool",
+    "$.last_updated:null",
+    "$.note:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/tool/pipeline-status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.last_run:str",
+    "$.session_id:str",
+    "$.stages:list",
+    "$.stages[].duration_s:num",
+    "$.stages[].name:str",
+    "$.stages[].status:str",
+    "$.stages[]:dict",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/tool/quality-score": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories.metadata:num",
+    "$.categories.proofreading:num",
+    "$.categories.rendering:num",
+    "$.categories.smartcut:num",
+    "$.categories.transcription:num",
+    "$.categories:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.rank:str",
+    "$.score:num",
+    "$.timestamp:null",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/tools": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.tools:list",
+    "$.tools[].calls_today:num",
+    "$.tools[].description:str",
+    "$.tools[].id:str",
+    "$.tools[].name:str",
+    "$.tools[].permissions:list",
+    "$.tools[].permissions[]:str",
+    "$.tools[].status:str",
+    "$.tools[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/webhooks": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.total:num",
+    "$.webhooks:list",
+    "$.webhooks[].active:bool",
+    "$.webhooks[].events:list",
+    "$.webhooks[].events[]:str",
+    "$.webhooks[].id:str",
+    "$.webhooks[].url:str",
+    "$.webhooks[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/integration/websocket-monitor": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.active_connections:num",
+    "$.connections:list",
+    "$.connections[].client_id:str",
+    "$.connections[].connected_since:str",
+    "$.connections[].messages_sent:num",
+    "$.connections[]:dict",
+    "$.messages_per_minute:num",
+    "$.timestamp:str",
+    "$.total_messages_today:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/performance/budget": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.degradation_rules:list",
+    "$.degradation_rules[].action:str",
+    "$.degradation_rules[].savings_percent:num",
+    "$.degradation_rules[].worker:str",
+    "$.degradation_rules[]:dict",
+    "$.threshold_ratio:num",
+    "$.total_budget_seconds:num",
+    "$.worker_budgets.AI校閲.budget_seconds:num",
+    "$.worker_budgets.AI校閲.priority:str",
+    "$.worker_budgets.AI校閲:dict",
+    "$.worker_budgets.SmartCut構成.budget_seconds:num",
+    "$.worker_budgets.SmartCut構成.priority:str",
+    "$.worker_budgets.SmartCut構成:dict",
+    "$.worker_budgets.YouTube最適化.budget_seconds:num",
+    "$.worker_budgets.YouTube最適化.priority:str",
+    "$.worker_budgets.YouTube最適化:dict",
+    "$.worker_budgets.プレビュー生成.budget_seconds:num",
+    "$.worker_budgets.プレビュー生成.priority:str",
+    "$.worker_budgets.プレビュー生成:dict",
+    "$.worker_budgets.品質チェック.budget_seconds:num",
+    "$.worker_budgets.品質チェック.priority:str",
+    "$.worker_budgets.品質チェック:dict",
+    "$.worker_budgets.文字起こし.budget_seconds:num",
+    "$.worker_budgets.文字起こし.priority:str",
+    "$.worker_budgets.文字起こし:dict",
+    "$.worker_budgets.最終レンダリング.budget_seconds:num",
+    "$.worker_budgets.最終レンダリング.priority:str",
+    "$.worker_budgets.最終レンダリング:dict",
+    "$.worker_budgets:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/performance/current": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.consumption_ratio:num",
+    "$.cumulative_seconds:num",
+    "$.over_budget:bool",
+    "$.remaining_seconds:num",
+    "$.total_budget_seconds:num",
+    "$.type:str",
+    "$.workers_completed:num",
+    "$.workers_total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/performance/history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$:list"
+   ]
+  },
+  "GET /api/admin/quality/changelog": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.commits:list",
+    "$.commits[].author:str",
+    "$.commits[].date:str",
+    "$.commits[].hash:str",
+    "$.commits[].message:str",
+    "$.commits[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/coverage": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.branch_pct:num",
+    "$.data_source:str",
+    "$.files_covered:num",
+    "$.files_total:num",
+    "$.is_real:bool",
+    "$.line_pct:num",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/coverage-trend": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.history:list",
+    "$.history[].branch_pct:num",
+    "$.history[].date:str",
+    "$.history[].line_pct:num",
+    "$.history[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.period_days:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.sections:list",
+    "$.sections[]:str",
+    "$.status:str",
+    "$.summary.coverage_pct:num",
+    "$.summary.fitness_passed:num",
+    "$.summary.fitness_total:num",
+    "$.summary.ratchet_items:num",
+    "$.summary.ratchet_valid:bool",
+    "$.summary.tests_passed:num",
+    "$.summary.tests_total:num",
+    "$.summary:dict",
+    "$.timestamp:str",
+    "$.title:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/deploy": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.commit_hash:str",
+    "$.data_source:str",
+    "$.deployed_at:str",
+    "$.environment:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.status:str",
+    "$.version:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/e2e": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.failed:num",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.passed:num",
+    "$.suites:list",
+    "$.suites[].name:str",
+    "$.suites[].passed:num",
+    "$.suites[].total:num",
+    "$.suites[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/failure-analysis": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories.flaky:num",
+    "$.categories.new:num",
+    "$.categories.regression:num",
+    "$.categories:dict",
+    "$.data_source:str",
+    "$.failures:list",
+    "$.failures[].category:str",
+    "$.failures[].count:num",
+    "$.failures[].last_seen:str",
+    "$.failures[].test:str",
+    "$.failures[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.total_failures:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/fitness": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.all_passed:bool",
+    "$.data_source:str",
+    "$.functions:list",
+    "$.functions[].description:str",
+    "$.functions[].name:str",
+    "$.functions[].passed:bool",
+    "$.functions[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.passed:num",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/fv": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories:list",
+    "$.categories[].name:str",
+    "$.categories[].passed:num",
+    "$.categories[].skipped:num",
+    "$.categories[].total:num",
+    "$.categories[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.passed:num",
+    "$.skipped:num",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/lint": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.issues:list",
+    "$.issues[].count:num",
+    "$.issues[].rule:str",
+    "$.issues[].severity:str",
+    "$.issues[]:dict",
+    "$.note:str",
+    "$.source:str",
+    "$.tools.ruff.issues:num",
+    "$.tools.ruff:dict",
+    "$.tools:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/notifications": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.channels:list",
+    "$.channels[]:str",
+    "$.data_source:str",
+    "$.enabled:bool",
+    "$.is_real:bool",
+    "$.last_updated:str",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/quality-gates": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.gate_a.conditions:list",
+    "$.gate_a.conditions[]:str",
+    "$.gate_a.status:str",
+    "$.gate_a:dict",
+    "$.gate_b.conditions:list",
+    "$.gate_b.conditions[]:str",
+    "$.gate_b.status:str",
+    "$.gate_b:dict",
+    "$.gate_c.conditions:list",
+    "$.gate_c.conditions[]:str",
+    "$.gate_c.status:str",
+    "$.gate_c:dict",
+    "$.gate_d.conditions:list",
+    "$.gate_d.conditions[]:str",
+    "$.gate_d.status:str",
+    "$.gate_d:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/quality-settings": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.coverage_threshold:num",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.tests_required:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/quality-trend": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.history:list",
+    "$.history[].coverage:num",
+    "$.history[].date:str",
+    "$.history[].score:num",
+    "$.history[].tests_passed:num",
+    "$.history[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.period_days:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/quick-fixes": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.fixes:list",
+    "$.fixes[].applicable:bool",
+    "$.fixes[].description:str",
+    "$.fixes[].id:num",
+    "$.fixes[].name:str",
+    "$.fixes[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/ratchet": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.correlation_rate:num",
+    "$.data_source:str",
+    "$.fail_items:num",
+    "$.is_real:bool",
+    "$.layer_distribution:null",
+    "$.measured_at:str",
+    "$.note:str",
+    "$.pass_items:num",
+    "$.skip_items:num",
+    "$.source:str",
+    "$.total_items:num",
+    "$.valid:bool",
+    "$.version:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/security": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.issues:list",
+    "$.note:str",
+    "$.scanned_at:str",
+    "$.scanner:str",
+    "$.scanner_version:str",
+    "$.severity_summary.high:num",
+    "$.severity_summary.low:num",
+    "$.severity_summary.medium:num",
+    "$.severity_summary:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/test-results": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.duration_seconds:num",
+    "$.failed:num",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.passed:num",
+    "$.skipped:num",
+    "$.timestamp:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quality/vision-gap": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.axes:list",
+    "$.axes[].confidence:str",
+    "$.axes[].measured_at:str",
+    "$.axes[].name:str",
+    "$.axes[].score:num",
+    "$.axes[].weight:num",
+    "$.axes[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.last_audit_date:str",
+    "$.note:null",
+    "$.score:num",
+    "$.source:str",
+    "$.weighted:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/alerts": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.alerts:list",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/auto-block": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.blocked:bool",
+    "$.override_active:bool",
+    "$.reason:null",
+    "$.threshold:num",
+    "$.triggered_at:null",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/budget": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_cost_jpy:num",
+    "$.exceeded:bool",
+    "$.monthly_limit_jpy:num",
+    "$.remaining_jpy:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/cost-estimate": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.actual:num",
+    "$.breakdown.batch:num",
+    "$.breakdown.premium:num",
+    "$.breakdown.standard:num",
+    "$.breakdown:dict",
+    "$.currency:str",
+    "$.estimated:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.blocked:bool",
+    "$.saving_mode:bool",
+    "$.sections:list",
+    "$.sections[]:str",
+    "$.status:str",
+    "$.timestamp:str",
+    "$.title:str",
+    "$.usage_summary.monthly_limit:num",
+    "$.usage_summary.monthly_used:num",
+    "$.usage_summary.usage_percent:num",
+    "$.usage_summary:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/downgrade-log": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.logs:list",
+    "$.logs[].from_tier:str",
+    "$.logs[].reason:str",
+    "$.logs[].timestamp:str",
+    "$.logs[].to_tier:str",
+    "$.logs[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/forecast": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.currency:str",
+    "$.daily_average:num",
+    "$.days_elapsed:num",
+    "$.forecast_cost:num",
+    "$.forecast_requests:num",
+    "$.method:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/free-tier-status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.action:str",
+    "$.daily_used:num",
+    "$.exceeded:bool",
+    "$.free_limit:num",
+    "$.remaining_free:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/key-rotation": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.keys:list",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/model-breakdown": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.batch:num",
+    "$.premium:num",
+    "$.standard:num",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/optimization": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.suggestions:list",
+    "$.suggestions[].category:str",
+    "$.suggestions[].description:str",
+    "$.suggestions[].impact:str",
+    "$.suggestions[]:dict",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/quota-reset": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.next_reset:str",
+    "$.reset_time:str",
+    "$.timezone:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/realtime-status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.connected_clients:num",
+    "$.last_update:str",
+    "$.update_interval_ms:num",
+    "$.websocket_enabled:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/remaining": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.percentage:num",
+    "$.period:str",
+    "$.remaining:num",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/saving-mode": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.enabled:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.color:str",
+    "$.description:str",
+    "$.status:str",
+    "$.thresholds.critical:num",
+    "$.thresholds.info:num",
+    "$.thresholds.warning:num",
+    "$.thresholds:dict",
+    "$.usage_percent:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/thresholds": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.critical:num",
+    "$.info:num",
+    "$.warning:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/usage-gauge": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.daily.limit:num",
+    "$.daily.percent:num",
+    "$.daily.used:num",
+    "$.daily:dict",
+    "$.monthly.limit:num",
+    "$.monthly.percent:num",
+    "$.monthly.used:num",
+    "$.monthly:dict",
+    "$.weekly.limit:num",
+    "$.weekly.percent:num",
+    "$.weekly.used:num",
+    "$.weekly:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/usage-history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.history:list",
+    "$.history[].date:str",
+    "$.history[].requests:num",
+    "$.history[]:dict",
+    "$.period_days:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/quota/worker-breakdown": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.total:num",
+    "$.worker_count:num",
+    "$.workers.preview:num",
+    "$.workers.proofread:num",
+    "$.workers.quality_gate:num",
+    "$.workers.render:num",
+    "$.workers.smartcut:num",
+    "$.workers.transcribe:num",
+    "$.workers.youtube_opt:num",
+    "$.workers:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/api-keys": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.gemini.configured:bool",
+    "$.gemini.prefix:str",
+    "$.gemini:dict",
+    "$.youtube.configured:bool",
+    "$.youtube.prefix:null",
+    "$.youtube:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/config/export": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.config.log_level:str",
+    "$.config.notification_settings.email:null",
+    "$.config.notification_settings.slack_webhook:null",
+    "$.config.notification_settings:dict",
+    "$.config.storage_threshold_gb:num",
+    "$.config:dict",
+    "$.exported_at:str",
+    "$.format:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.sections:list",
+    "$.sections[]:str",
+    "$.status:str",
+    "$.timestamp:str",
+    "$.title:str",
+    "$.uptime_seconds:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/di-container": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.initialized:bool",
+    "$.service_count:num",
+    "$.services:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/diagnostics": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.all_checks:list",
+    "$.all_checks[].name:str",
+    "$.all_checks[].ok:bool",
+    "$.all_checks[].version:str",
+    "$.all_checks[]:dict",
+    "$.checked:bool",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.passed:num",
+    "$.timestamp:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/environment": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.backend.port:num",
+    "$.backend.status:str",
+    "$.backend:dict",
+    "$.database.status:str",
+    "$.database.type:str",
+    "$.database:dict",
+    "$.frontend.port:num",
+    "$.frontend.status:str",
+    "$.frontend:dict",
+    "$.gpu.status:str",
+    "$.gpu:dict",
+    "$.os:str",
+    "$.python_version:str",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/error-logs": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.level_filter:str",
+    "$.logs:list",
+    "$.timestamp:str",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/fallback-chain": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.auto_fallback:bool",
+    "$.primary.model:str",
+    "$.primary.tier:str",
+    "$.primary:dict",
+    "$.secondary.model:str",
+    "$.secondary.tier:str",
+    "$.secondary:dict",
+    "$.source:str",
+    "$.tertiary.model:str",
+    "$.tertiary.tier:str",
+    "$.tertiary:dict",
+    "$.trigger_conditions:list",
+    "$.trigger_conditions[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/gpu": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.available:bool",
+    "$.driver:str",
+    "$.model:str",
+    "$.vram_mb:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/harness": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.components.governance.initialized:bool",
+    "$.components.governance.status:str",
+    "$.components.governance:dict",
+    "$.components.hooks.initialized:bool",
+    "$.components.hooks.status:str",
+    "$.components.hooks:dict",
+    "$.components.session.initialized:bool",
+    "$.components.session.status:str",
+    "$.components.session:dict",
+    "$.components.tool_registry.initialized:bool",
+    "$.components.tool_registry.status:str",
+    "$.components.tool_registry:dict",
+    "$.components:dict",
+    "$.initialized_count:num",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/health-check": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.checks.disk.free_gb:num",
+    "$.checks.disk.total_gb:num",
+    "$.checks.disk.usage_percent:num",
+    "$.checks.disk.warning:bool",
+    "$.checks.disk:dict",
+    "$.checks.ffmpeg.available:bool",
+    "$.checks.ffmpeg:dict",
+    "$.checks.gemini.key_configured:bool",
+    "$.checks.gemini:dict",
+    "$.checks.whisper.available:bool",
+    "$.checks.whisper:dict",
+    "$.checks:dict",
+    "$.status:str",
+    "$.timestamp:str",
+    "$.uptime_seconds:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/log-level": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.level:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/model-config": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.config_path:str",
+    "$.loaded:bool",
+    "$.task_model_mapping:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/notifications": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.email:null",
+    "$.slack_webhook:null",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/storage": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.free_gb:num",
+    "$.threshold_gb:num",
+    "$.total_gb:num",
+    "$.usage_percent:num",
+    "$.warning:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/storage/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories.drafts.count:num",
+    "$.categories.drafts.max_count:num",
+    "$.categories.drafts.newest_file:null",
+    "$.categories.drafts.oldest_file:null",
+    "$.categories.drafts.protected:bool",
+    "$.categories.drafts.retention_days:num",
+    "$.categories.drafts.size_mb:num",
+    "$.categories.drafts:dict",
+    "$.categories.final.count:num",
+    "$.categories.final.max_count:null",
+    "$.categories.final.newest_file:null",
+    "$.categories.final.oldest_file:null",
+    "$.categories.final.protected:bool",
+    "$.categories.final.retention_days:null",
+    "$.categories.final.size_mb:num",
+    "$.categories.final:dict",
+    "$.categories.prefinal.count:num",
+    "$.categories.prefinal.max_count:num",
+    "$.categories.prefinal.newest_file:null",
+    "$.categories.prefinal.oldest_file:null",
+    "$.categories.prefinal.protected:bool",
+    "$.categories.prefinal.retention_days:num",
+    "$.categories.prefinal.size_mb:num",
+    "$.categories.prefinal:dict",
+    "$.categories.raw.count:num",
+    "$.categories.raw.max_count:null",
+    "$.categories.raw.newest_file:null",
+    "$.categories.raw.oldest_file:null",
+    "$.categories.raw.protected:bool",
+    "$.categories.raw.retention_days:null",
+    "$.categories.raw.size_mb:num",
+    "$.categories.raw:dict",
+    "$.categories.screenshots.count:num",
+    "$.categories.screenshots.max_count:num",
+    "$.categories.screenshots.newest_file:null",
+    "$.categories.screenshots.oldest_file:null",
+    "$.categories.screenshots.protected:bool",
+    "$.categories.screenshots.retention_days:num",
+    "$.categories.screenshots.size_mb:num",
+    "$.categories.screenshots:dict",
+    "$.categories.video_output.count:num",
+    "$.categories.video_output.max_count:num",
+    "$.categories.video_output.newest_file:null",
+    "$.categories.video_output.oldest_file:null",
+    "$.categories.video_output.protected:bool",
+    "$.categories.video_output.retention_days:num",
+    "$.categories.video_output.size_mb:num",
+    "$.categories.video_output:dict",
+    "$.categories:dict",
+    "$.deletable_size_mb:num",
+    "$.protected_size_mb:num",
+    "$.total_size_mb:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/admin/setup/versions": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.fastapi:str",
+    "$.pydantic:str",
+    "$.python:str",
+    "$.system.machine:str",
+    "$.system.os:str",
+    "$.system.release:str",
+    "$.system:dict",
+    "$.uvicorn:str",
+    "$.whisper:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/assets": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.assets:list",
+    "$.assets[].category:str",
+    "$.assets[].id:str",
+    "$.assets[].labels:list",
+    "$.assets[].path:str",
+    "$.assets[].style_tags:list",
+    "$.assets[]:dict",
+    "$.count:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/assets/sufficiency": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories.channel_owner.by_type:dict",
+    "$.categories.channel_owner.total:num",
+    "$.categories.channel_owner:dict",
+    "$.categories.guest.by_type:dict",
+    "$.categories.guest.total:num",
+    "$.categories.guest:dict",
+    "$.categories.template.by_type:dict",
+    "$.categories.template.total:num",
+    "$.categories.template:dict",
+    "$.categories:dict",
+    "$.recommendations:list",
+    "$.recommendations[].category:str",
+    "$.recommendations[].missing:list",
+    "$.recommendations[].missing[]:str",
+    "$.recommendations[].suggestion:str",
+    "$.recommendations[]:dict",
+    "$.total_assets:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/editor/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.ffmpeg_available:bool",
+    "$.output_dir:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/learning/pending": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.proposals:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/learning/preferences": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.test.avoided:list",
+    "$.test.category:str",
+    "$.test.confidence:num",
+    "$.test.preferred:list",
+    "$.test.preferred[]:str",
+    "$.test.sample_count:num",
+    "$.test:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/proper-nouns": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.entries:list",
+    "$.entries[].confirmed:bool",
+    "$.entries[].context_hint:str",
+    "$.entries[].correct:str",
+    "$.entries[].id:str",
+    "$.entries[].incorrect:str",
+    "$.entries[].type:str",
+    "$.entries[].usage_count:num",
+    "$.entries[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/self-review/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.enabled:bool",
+    "$.thresholds.constitution_fit:num",
+    "$.thresholds.context_fit:num",
+    "$.thresholds.overall:num",
+    "$.thresholds.technical_quality:num",
+    "$.thresholds:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.available_assets:num",
+    "$.ffmpeg_available:bool",
+    "$.pending_confirmations:num",
+    "$.pending_proposals:num",
+    "$.proper_noun_entries:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/antigravity/telop-proposals": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.proposals:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/approval/history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.history:list",
+    "$.history[].data.action:str",
+    "$.history[].data.approved:bool",
+    "$.history[].data.comment:str",
+    "$.history[].data.feedback:str",
+    "$.history[].data.role:str",
+    "$.history[].data.session_id:str",
+    "$.history[].data.suggestion_id:str",
+    "$.history[].data.timestamp:str",
+    "$.history[].data.type:str",
+    "$.history[].data:dict",
+    "$.history[].iso_time:str",
+    "$.history[].timestamp:num",
+    "$.history[].type:str",
+    "$.history[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/archives/snapshots": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$:list"
+   ]
+  },
+  "GET /api/available-videos": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.videos:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/cleanup/preview": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.deleted:list",
+    "$.dry_run:bool",
+    "$.freed_bytes:num",
+    "$.protected:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/collaboration/journal": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.notes:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/color/presets": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.default:str",
+    "$.presets:list",
+    "$.presets[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/council/resolutions": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.resolutions:list",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/dashboard/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.module:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/dashboard/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_step:str",
+    "$.phase:str",
+    "$.preview_url:null",
+    "$.progress:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/debug/video-tasks": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.task_count:num",
+    "$.task_ids:list",
+    "$.tasks:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/decision/context": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$:str"
+   ]
+  },
+  "GET /api/decision/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.approval_rate:num",
+    "$.approvals:num",
+    "$.learned_by_ai:num",
+    "$.modifications:num",
+    "$.rejection_patterns:dict",
+    "$.rejections:num",
+    "$.total_decisions:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/director-profile": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.AI提案へのアドバイス:str",
+    "$.こだわり（却下傾向）:dict",
+    "$.好み（承認傾向）:dict",
+    "$.承認率:num",
+    "$.総判断数:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/director/evolution": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.agent_performance.bug_hunter.failed:num",
+    "$.agent_performance.bug_hunter.passed:num",
+    "$.agent_performance.bug_hunter.success_rate:num",
+    "$.agent_performance.bug_hunter.total:num",
+    "$.agent_performance.bug_hunter:dict",
+    "$.agent_performance.coverage.failed:num",
+    "$.agent_performance.coverage.passed:num",
+    "$.agent_performance.coverage.success_rate:num",
+    "$.agent_performance.coverage.total:num",
+    "$.agent_performance.coverage:dict",
+    "$.agent_performance.design_stock.failed:num",
+    "$.agent_performance.design_stock.passed:num",
+    "$.agent_performance.design_stock.success_rate:num",
+    "$.agent_performance.design_stock.total:num",
+    "$.agent_performance.design_stock:dict",
+    "$.agent_performance.doc_gen.failed:num",
+    "$.agent_performance.doc_gen.passed:num",
+    "$.agent_performance.doc_gen.success_rate:num",
+    "$.agent_performance.doc_gen.total:num",
+    "$.agent_performance.doc_gen:dict",
+    "$.agent_performance.refactor.failed:num",
+    "$.agent_performance.refactor.passed:num",
+    "$.agent_performance.refactor.success_rate:num",
+    "$.agent_performance.refactor.total:num",
+    "$.agent_performance.refactor:dict",
+    "$.agent_performance.tdr_cleanup.failed:num",
+    "$.agent_performance.tdr_cleanup.passed:num",
+    "$.agent_performance.tdr_cleanup.success_rate:num",
+    "$.agent_performance.tdr_cleanup.total:num",
+    "$.agent_performance.tdr_cleanup:dict",
+    "$.agent_performance.test_weaver.failed:num",
+    "$.agent_performance.test_weaver.passed:num",
+    "$.agent_performance.test_weaver.success_rate:num",
+    "$.agent_performance.test_weaver.total:num",
+    "$.agent_performance.test_weaver:dict",
+    "$.agent_performance.thumbnail.failed:num",
+    "$.agent_performance.thumbnail.passed:num",
+    "$.agent_performance.thumbnail.success_rate:num",
+    "$.agent_performance.thumbnail.total:num",
+    "$.agent_performance.thumbnail:dict",
+    "$.agent_performance:dict",
+    "$.approval_count:num",
+    "$.decision_insights:list",
+    "$.director_profile.approval_rate:num",
+    "$.director_profile.approval_tendencies:dict",
+    "$.director_profile.rejection_tendencies:dict",
+    "$.director_profile.total_decisions:num",
+    "$.director_profile.updated_at:str",
+    "$.director_profile:dict",
+    "$.entries:list",
+    "$.last_sync:str",
+    "$.last_updated:str",
+    "$.locked_segments:list",
+    "$.locked_segments[].end_time:num",
+    "$.locked_segments[].event_type:str",
+    "$.locked_segments[].reason:str",
+    "$.locked_segments[].segment_id:str",
+    "$.locked_segments[].start_time:num",
+    "$.locked_segments[].timestamp:str",
+    "$.locked_segments[].title:str",
+    "$.locked_segments[]:dict",
+    "$.notifications:list",
+    "$.notifications[].created_at:str",
+    "$.notifications[].detail.integration_status:str",
+    "$.notifications[].detail.integration_triggered:bool",
+    "$.notifications[].detail.philosophy_count:num",
+    "$.notifications[].detail:dict",
+    "$.notifications[].id:str",
+    "$.notifications[].message:str",
+    "$.notifications[].read:bool",
+    "$.notifications[].rule_id:str",
+    "$.notifications[].type:str",
+    "$.notifications[]:dict",
+    "$.pending_proposals:list",
+    "$.pending_proposals[].content:str",
+    "$.pending_proposals[].generated_at:str",
+    "$.pending_proposals[].proposal_id:str",
+    "$.pending_proposals[].proposal_type:str",
+    "$.pending_proposals[].source_summary:str",
+    "$.pending_proposals[].status:str",
+    "$.pending_proposals[].user_edit:null",
+    "$.pending_proposals[]:dict",
+    "$.philosophies:list",
+    "$.philosophies[].content:str",
+    "$.philosophies[].extracted_at:str",
+    "$.philosophies[].philosophy:str",
+    "$.philosophies[].session_summary:str",
+    "$.philosophies[].source:str",
+    "$.philosophies[].tags:list",
+    "$.philosophies[].tags[]:str",
+    "$.philosophies[].timestamp:str",
+    "$.philosophies[]:dict",
+    "$.post_publish_feedbacks:list",
+    "$.post_publish_feedbacks[].actual_ctr:num",
+    "$.post_publish_feedbacks[].actual_retention:num",
+    "$.post_publish_feedbacks[].actual_views:num",
+    "$.post_publish_feedbacks[].ctr_difference:num",
+    "$.post_publish_feedbacks[].data_source:str",
+    "$.post_publish_feedbacks[].drop_off_points:list",
+    "$.post_publish_feedbacks[].drop_off_points[]:str",
+    "$.post_publish_feedbacks[].is_real:bool",
+    "$.post_publish_feedbacks[].lessons_learned:list",
+    "$.post_publish_feedbacks[].lessons_learned[]:str",
+    "$.post_publish_feedbacks[].note:str",
+    "$.post_publish_feedbacks[].predicted_ctr:num",
+    "$.post_publish_feedbacks[].significant_deviation:bool",
+    "$.post_publish_feedbacks[].timestamp:str",
+    "$.post_publish_feedbacks[].video_id:str",
+    "$.post_publish_feedbacks[].wagamama_id:str",
+    "$.post_publish_feedbacks[]:dict",
+    "$.quarantined_entries:list",
+    "$.quarantined_entries[].deleted_count:num",
+    "$.quarantined_entries[].detail.mood:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.accent:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.background:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.main:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.sub:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.text:str",
+    "$.quarantined_entries[].detail.old_values.color_palette:dict",
+    "$.quarantined_entries[].detail.old_values.motion.duration:str",
+    "$.quarantined_entries[].detail.old_values.motion.transition:str",
+    "$.quarantined_entries[].detail.old_values.motion:dict",
+    "$.quarantined_entries[].detail.old_values.typography.body_size:str",
+    "$.quarantined_entries[].detail.old_values.typography.font_family:str",
+    "$.quarantined_entries[].detail.old_values.typography.heading_weight:str",
+    "$.quarantined_entries[].detail.old_values.typography:dict",
+    "$.quarantined_entries[].detail.old_values:dict",
+    "$.quarantined_entries[].detail.updates.color_palette.accent:str",
+    "$.quarantined_entries[].detail.updates.color_palette.background:str",
+    "$.quarantined_entries[].detail.updates.color_palette.main:str",
+    "$.quarantined_entries[].detail.updates.color_palette.sub:str",
+    "$.quarantined_entries[].detail.updates.color_palette.text:str",
+    "$.quarantined_entries[].detail.updates.color_palette:dict",
+    "$.quarantined_entries[].detail.updates.motion.duration:str",
+    "$.quarantined_entries[].detail.updates.motion.transition:str",
+    "$.quarantined_entries[].detail.updates.motion:dict",
+    "$.quarantined_entries[].detail.updates.typography.body_size:str",
+    "$.quarantined_entries[].detail.updates.typography.font_family:str",
+    "$.quarantined_entries[].detail.updates.typography.heading_weight:str",
+    "$.quarantined_entries[].detail.updates.typography:dict",
+    "$.quarantined_entries[].detail.updates:dict",
+    "$.quarantined_entries[].detail:dict",
+    "$.quarantined_entries[].dry_run:bool",
+    "$.quarantined_entries[].freed_mb:num",
+    "$.quarantined_entries[].insight:str",
+    "$.quarantined_entries[].iso_time:str",
+    "$.quarantined_entries[].protected_count:num",
+    "$.quarantined_entries[].quarantined_reason:str",
+    "$.quarantined_entries[].source:str",
+    "$.quarantined_entries[].stat_changes:list",
+    "$.quarantined_entries[].stat_changes[]:str",
+    "$.quarantined_entries[].summary:str",
+    "$.quarantined_entries[].task_id:str",
+    "$.quarantined_entries[].timestamp:num",
+    "$.quarantined_entries[].timestamp:str",
+    "$.quarantined_entries[].type:str",
+    "$.quarantined_entries[]:dict",
+    "$.rejection_count:num",
+    "$.rejection_history:list",
+    "$.session_count:num",
+    "$.template_selections:list",
+    "$.template_selections[].satisfaction:num",
+    "$.template_selections[].template_id:str",
+    "$.template_selections[].theme_id:str",
+    "$.template_selections[].timestamp:str",
+    "$.template_selections[]:dict",
+    "$.trigger_history:list",
+    "$.trigger_history[].detail.integration_status:str",
+    "$.trigger_history[].detail.integration_triggered:bool",
+    "$.trigger_history[].detail.philosophy_count:num",
+    "$.trigger_history[].detail:dict",
+    "$.trigger_history[].fired_at:num",
+    "$.trigger_history[].iso_time:str",
+    "$.trigger_history[].rule_id:str",
+    "$.trigger_history[]:dict",
+    "$.trust_history:list",
+    "$.trust_score:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/director/profile": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.AI提案へのアドバイス:str",
+    "$.こだわり（却下傾向）:dict",
+    "$.好み（承認傾向）:dict",
+    "$.承認率:num",
+    "$.総判断数:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/director/state": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.audioConfig.name:str",
+    "$.audioConfig.style:str",
+    "$.audioConfig:dict",
+    "$.scenes:list",
+    "$.scenes[].description:str",
+    "$.scenes[].name:str",
+    "$.scenes[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/director/task/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$:null"
+   ]
+  },
+  "GET /api/director/tasks/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/draft/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.draft_count:num",
+    "$.total_size_mb:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/evolution": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.agent_performance.bug_hunter.failed:num",
+    "$.agent_performance.bug_hunter.passed:num",
+    "$.agent_performance.bug_hunter.success_rate:num",
+    "$.agent_performance.bug_hunter.total:num",
+    "$.agent_performance.bug_hunter:dict",
+    "$.agent_performance.coverage.failed:num",
+    "$.agent_performance.coverage.passed:num",
+    "$.agent_performance.coverage.success_rate:num",
+    "$.agent_performance.coverage.total:num",
+    "$.agent_performance.coverage:dict",
+    "$.agent_performance.design_stock.failed:num",
+    "$.agent_performance.design_stock.passed:num",
+    "$.agent_performance.design_stock.success_rate:num",
+    "$.agent_performance.design_stock.total:num",
+    "$.agent_performance.design_stock:dict",
+    "$.agent_performance.doc_gen.failed:num",
+    "$.agent_performance.doc_gen.passed:num",
+    "$.agent_performance.doc_gen.success_rate:num",
+    "$.agent_performance.doc_gen.total:num",
+    "$.agent_performance.doc_gen:dict",
+    "$.agent_performance.refactor.failed:num",
+    "$.agent_performance.refactor.passed:num",
+    "$.agent_performance.refactor.success_rate:num",
+    "$.agent_performance.refactor.total:num",
+    "$.agent_performance.refactor:dict",
+    "$.agent_performance.tdr_cleanup.failed:num",
+    "$.agent_performance.tdr_cleanup.passed:num",
+    "$.agent_performance.tdr_cleanup.success_rate:num",
+    "$.agent_performance.tdr_cleanup.total:num",
+    "$.agent_performance.tdr_cleanup:dict",
+    "$.agent_performance.test_weaver.failed:num",
+    "$.agent_performance.test_weaver.passed:num",
+    "$.agent_performance.test_weaver.success_rate:num",
+    "$.agent_performance.test_weaver.total:num",
+    "$.agent_performance.test_weaver:dict",
+    "$.agent_performance.thumbnail.failed:num",
+    "$.agent_performance.thumbnail.passed:num",
+    "$.agent_performance.thumbnail.success_rate:num",
+    "$.agent_performance.thumbnail.total:num",
+    "$.agent_performance.thumbnail:dict",
+    "$.agent_performance:dict",
+    "$.approval_count:num",
+    "$.decision_insights:list",
+    "$.director_profile.approval_rate:num",
+    "$.director_profile.approval_tendencies:dict",
+    "$.director_profile.rejection_tendencies:dict",
+    "$.director_profile.total_decisions:num",
+    "$.director_profile.updated_at:str",
+    "$.director_profile:dict",
+    "$.entries:list",
+    "$.last_sync:str",
+    "$.last_updated:str",
+    "$.locked_segments:list",
+    "$.locked_segments[].end_time:num",
+    "$.locked_segments[].event_type:str",
+    "$.locked_segments[].reason:str",
+    "$.locked_segments[].segment_id:str",
+    "$.locked_segments[].start_time:num",
+    "$.locked_segments[].timestamp:str",
+    "$.locked_segments[].title:str",
+    "$.locked_segments[]:dict",
+    "$.notifications:list",
+    "$.notifications[].created_at:str",
+    "$.notifications[].detail.integration_status:str",
+    "$.notifications[].detail.integration_triggered:bool",
+    "$.notifications[].detail.philosophy_count:num",
+    "$.notifications[].detail:dict",
+    "$.notifications[].id:str",
+    "$.notifications[].message:str",
+    "$.notifications[].read:bool",
+    "$.notifications[].rule_id:str",
+    "$.notifications[].type:str",
+    "$.notifications[]:dict",
+    "$.pending_proposals:list",
+    "$.pending_proposals[].content:str",
+    "$.pending_proposals[].generated_at:str",
+    "$.pending_proposals[].proposal_id:str",
+    "$.pending_proposals[].proposal_type:str",
+    "$.pending_proposals[].source_summary:str",
+    "$.pending_proposals[].status:str",
+    "$.pending_proposals[].user_edit:null",
+    "$.pending_proposals[]:dict",
+    "$.philosophies:list",
+    "$.philosophies[].content:str",
+    "$.philosophies[].extracted_at:str",
+    "$.philosophies[].philosophy:str",
+    "$.philosophies[].session_summary:str",
+    "$.philosophies[].source:str",
+    "$.philosophies[].tags:list",
+    "$.philosophies[].tags[]:str",
+    "$.philosophies[].timestamp:str",
+    "$.philosophies[]:dict",
+    "$.post_publish_feedbacks:list",
+    "$.post_publish_feedbacks[].actual_ctr:num",
+    "$.post_publish_feedbacks[].actual_retention:num",
+    "$.post_publish_feedbacks[].actual_views:num",
+    "$.post_publish_feedbacks[].ctr_difference:num",
+    "$.post_publish_feedbacks[].data_source:str",
+    "$.post_publish_feedbacks[].drop_off_points:list",
+    "$.post_publish_feedbacks[].drop_off_points[]:str",
+    "$.post_publish_feedbacks[].is_real:bool",
+    "$.post_publish_feedbacks[].lessons_learned:list",
+    "$.post_publish_feedbacks[].lessons_learned[]:str",
+    "$.post_publish_feedbacks[].note:str",
+    "$.post_publish_feedbacks[].predicted_ctr:num",
+    "$.post_publish_feedbacks[].significant_deviation:bool",
+    "$.post_publish_feedbacks[].timestamp:str",
+    "$.post_publish_feedbacks[].video_id:str",
+    "$.post_publish_feedbacks[].wagamama_id:str",
+    "$.post_publish_feedbacks[]:dict",
+    "$.quarantined_entries:list",
+    "$.quarantined_entries[].deleted_count:num",
+    "$.quarantined_entries[].detail.mood:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.accent:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.background:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.main:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.sub:str",
+    "$.quarantined_entries[].detail.old_values.color_palette.text:str",
+    "$.quarantined_entries[].detail.old_values.color_palette:dict",
+    "$.quarantined_entries[].detail.old_values.motion.duration:str",
+    "$.quarantined_entries[].detail.old_values.motion.transition:str",
+    "$.quarantined_entries[].detail.old_values.motion:dict",
+    "$.quarantined_entries[].detail.old_values.typography.body_size:str",
+    "$.quarantined_entries[].detail.old_values.typography.font_family:str",
+    "$.quarantined_entries[].detail.old_values.typography.heading_weight:str",
+    "$.quarantined_entries[].detail.old_values.typography:dict",
+    "$.quarantined_entries[].detail.old_values:dict",
+    "$.quarantined_entries[].detail.updates.color_palette.accent:str",
+    "$.quarantined_entries[].detail.updates.color_palette.background:str",
+    "$.quarantined_entries[].detail.updates.color_palette.main:str",
+    "$.quarantined_entries[].detail.updates.color_palette.sub:str",
+    "$.quarantined_entries[].detail.updates.color_palette.text:str",
+    "$.quarantined_entries[].detail.updates.color_palette:dict",
+    "$.quarantined_entries[].detail.updates.motion.duration:str",
+    "$.quarantined_entries[].detail.updates.motion.transition:str",
+    "$.quarantined_entries[].detail.updates.motion:dict",
+    "$.quarantined_entries[].detail.updates.typography.body_size:str",
+    "$.quarantined_entries[].detail.updates.typography.font_family:str",
+    "$.quarantined_entries[].detail.updates.typography.heading_weight:str",
+    "$.quarantined_entries[].detail.updates.typography:dict",
+    "$.quarantined_entries[].detail.updates:dict",
+    "$.quarantined_entries[].detail:dict",
+    "$.quarantined_entries[].dry_run:bool",
+    "$.quarantined_entries[].freed_mb:num",
+    "$.quarantined_entries[].insight:str",
+    "$.quarantined_entries[].iso_time:str",
+    "$.quarantined_entries[].protected_count:num",
+    "$.quarantined_entries[].quarantined_reason:str",
+    "$.quarantined_entries[].source:str",
+    "$.quarantined_entries[].stat_changes:list",
+    "$.quarantined_entries[].stat_changes[]:str",
+    "$.quarantined_entries[].summary:str",
+    "$.quarantined_entries[].task_id:str",
+    "$.quarantined_entries[].timestamp:num",
+    "$.quarantined_entries[].timestamp:str",
+    "$.quarantined_entries[].type:str",
+    "$.quarantined_entries[]:dict",
+    "$.rejection_count:num",
+    "$.rejection_history:list",
+    "$.session_count:num",
+    "$.template_selections:list",
+    "$.template_selections[].satisfaction:num",
+    "$.template_selections[].template_id:str",
+    "$.template_selections[].theme_id:str",
+    "$.template_selections[].timestamp:str",
+    "$.template_selections[]:dict",
+    "$.trigger_history:list",
+    "$.trigger_history[].detail.integration_status:str",
+    "$.trigger_history[].detail.integration_triggered:bool",
+    "$.trigger_history[].detail.philosophy_count:num",
+    "$.trigger_history[].detail:dict",
+    "$.trigger_history[].fired_at:num",
+    "$.trigger_history[].iso_time:str",
+    "$.trigger_history[].rule_id:str",
+    "$.trigger_history[]:dict",
+    "$.trust_history:list",
+    "$.trust_score:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/evolution/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.director_profile.approval_rate:num",
+    "$.director_profile.approval_tendencies:dict",
+    "$.director_profile.rejection_tendencies:dict",
+    "$.director_profile.total_decisions:num",
+    "$.director_profile.updated_at:str",
+    "$.director_profile:dict",
+    "$.entries:list",
+    "$.evolution_entries:num",
+    "$.evolution_entries_count:num",
+    "$.notifications:list",
+    "$.notifications[].created_at:str",
+    "$.notifications[].detail.integration_status:str",
+    "$.notifications[].detail.integration_triggered:bool",
+    "$.notifications[].detail.philosophy_count:num",
+    "$.notifications[].detail:dict",
+    "$.notifications[].id:str",
+    "$.notifications[].message:str",
+    "$.notifications[].read:bool",
+    "$.notifications[].rule_id:str",
+    "$.notifications[].type:str",
+    "$.notifications[]:dict",
+    "$.pending_proposals:list",
+    "$.pending_proposals[].content:str",
+    "$.pending_proposals[].generated_at:str",
+    "$.pending_proposals[].proposal_id:str",
+    "$.pending_proposals[].source_summary:str",
+    "$.pending_proposals[].status:str",
+    "$.pending_proposals[].user_edit:null",
+    "$.pending_proposals[]:dict",
+    "$.philosophies:list",
+    "$.philosophies[].content:str",
+    "$.philosophies[].extracted_at:str",
+    "$.philosophies[].philosophy:str",
+    "$.philosophies[].session_summary:str",
+    "$.philosophies[].source:str",
+    "$.philosophies[].tags:list",
+    "$.philosophies[].tags[]:str",
+    "$.philosophies[].timestamp:str",
+    "$.philosophies[]:dict",
+    "$.philosophies_count:num",
+    "$.philosophy_timeline:list",
+    "$.philosophy_timeline[].content:str",
+    "$.philosophy_timeline[].extracted_at:str",
+    "$.philosophy_timeline[].philosophy:str",
+    "$.philosophy_timeline[].session_summary:str",
+    "$.philosophy_timeline[].source:str",
+    "$.philosophy_timeline[].tags:list",
+    "$.philosophy_timeline[].tags[]:str",
+    "$.philosophy_timeline[].timestamp:str",
+    "$.philosophy_timeline[]:dict",
+    "$.trigger_history:list",
+    "$.trigger_history[].detail.integration_status:str",
+    "$.trigger_history[].detail.integration_triggered:bool",
+    "$.trigger_history[].detail.philosophy_count:num",
+    "$.trigger_history[].detail:dict",
+    "$.trigger_history[].fired_at:num",
+    "$.trigger_history[].iso_time:str",
+    "$.trigger_history[].rule_id:str",
+    "$.trigger_history[]:dict",
+    "$.trigger_status.rules:list",
+    "$.trigger_status.rules[].action:str",
+    "$.trigger_status.rules[].current_value:num",
+    "$.trigger_status.rules[].in_cooldown:bool",
+    "$.trigger_status.rules[].max_delta:num",
+    "$.trigger_status.rules[].progress_pct:num",
+    "$.trigger_status.rules[].rule_id:str",
+    "$.trigger_status.rules[].threshold:num",
+    "$.trigger_status.rules[].trigger_type:str",
+    "$.trigger_status.rules[]:dict",
+    "$.trigger_status:dict",
+    "$.trust_history:list",
+    "$.trust_score:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/evolution/proposals": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$:list",
+    "$[].content:str",
+    "$[].generated_at:str",
+    "$[].proposal_id:str",
+    "$[].source_summary:str",
+    "$[].status:str",
+    "$[].user_edit:null",
+    "$[]:dict"
+   ]
+  },
+  "GET /api/evolution/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.decision_count:num",
+    "$.evolution_entries:num",
+    "$.last_sync:str",
+    "$.philosophies:num",
+    "$.smartcut_strategies:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/evolution/triggers": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.rules:list",
+    "$.rules[].action:str",
+    "$.rules[].current_value:num",
+    "$.rules[].in_cooldown:bool",
+    "$.rules[].max_delta:num",
+    "$.rules[].progress_pct:num",
+    "$.rules[].rule_id:str",
+    "$.rules[].threshold:num",
+    "$.rules[].trigger_type:str",
+    "$.rules[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/journal": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/logs/files": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.files:list",
+    "$.files[].modified:str",
+    "$.files[].name:str",
+    "$.files[].size:num",
+    "$.files[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/logs/files/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.filename:str",
+    "$.lines:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/logs/memory": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.logs:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/manager/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.alert_message:null",
+    "$.fatigue_score:num",
+    "$.interaction_count:num",
+    "$.last_interaction_tone:str",
+    "$.last_login:null",
+    "$.session_count:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/models": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/philosophies": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.philosophies:list",
+    "$.philosophies[].content:str",
+    "$.philosophies[].extracted_at:str",
+    "$.philosophies[].philosophy:str",
+    "$.philosophies[].session_summary:str",
+    "$.philosophies[].source:str",
+    "$.philosophies[].tags:list",
+    "$.philosophies[].tags[]:str",
+    "$.philosophies[].timestamp:str",
+    "$.philosophies[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/philosophy/list": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.philosophies:list",
+    "$.philosophies[].content:str",
+    "$.philosophies[].extractedAt:str",
+    "$.philosophies[].id:str",
+    "$.philosophies[].session:num",
+    "$.philosophies[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/philosophy/summary": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.latest.content:str",
+    "$.latest.extracted_at:str",
+    "$.latest.source:str",
+    "$.latest:dict",
+    "$.summary:str",
+    "$.total_count:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/api-usage": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.can_run_pipeline:bool",
+    "$.date:str",
+    "$.escalation_level:str",
+    "$.limit:num",
+    "$.remaining:num",
+    "$.sources:dict",
+    "$.usage_pct:num",
+    "$.used:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/dictionary": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.auto_learn:bool",
+    "$.count:num",
+    "$.entries:list",
+    "$.entries[].confirmed:bool",
+    "$.entries[].context_hint:str",
+    "$.entries[].correct:str",
+    "$.entries[].created_at:str",
+    "$.entries[].id:str",
+    "$.entries[].incorrect:str",
+    "$.entries[].type:str",
+    "$.entries[].usage_count:num",
+    "$.entries[]:dict",
+    "$.pending:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/improvement/actions": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.actions:list",
+    "$.actions[].category:str",
+    "$.actions[].description:str",
+    "$.actions[].id:str",
+    "$.actions[].name:str",
+    "$.actions[].score_after:null",
+    "$.actions[].score_after:num",
+    "$.actions[].score_before:null",
+    "$.actions[].score_before:num",
+    "$.actions[].status:str",
+    "$.actions[]:dict",
+    "$.applied:list",
+    "$.applied[]:str",
+    "$.count:num",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/improvement/score-change": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_score:num",
+    "$.data_source:str",
+    "$.initial_score:num",
+    "$.is_real:bool",
+    "$.iterations:num",
+    "$.note:str",
+    "$.score_history:list",
+    "$.score_history[].action:str",
+    "$.score_history[].iteration:num",
+    "$.score_history[].score:num",
+    "$.score_history[]:dict",
+    "$.total_improvement:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/improvement/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.completed_actions:num",
+    "$.current_score:num",
+    "$.data_source:str",
+    "$.initial_score:num",
+    "$.is_real:bool",
+    "$.iteration:num",
+    "$.max_iterations:num",
+    "$.note:str",
+    "$.pending_actions:num",
+    "$.status:str",
+    "$.total_actions:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/open-folder": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.path:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/proofreading/export/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/proofreading/export/c4-gate-probe［実走後・採点済み］": {
+   "status": 400,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/proofreading/export/c4-gate-probe［実走後・未採点］": {
+   "status": 400,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/proofreading/result": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.approved_count:num",
+    "$.count:num",
+    "$.pending_count:num",
+    "$.rejected_count:num",
+    "$.segments:list",
+    "$.segments[].changes:list",
+    "$.segments[].changes[].corrected:str",
+    "$.segments[].changes[].original:str",
+    "$.segments[].changes[].position:num",
+    "$.segments[].changes[].type:str",
+    "$.segments[].changes[]:dict",
+    "$.segments[].corrected:str",
+    "$.segments[].end:num",
+    "$.segments[].id:num",
+    "$.segments[].original:str",
+    "$.segments[].start:num",
+    "$.segments[].status:str",
+    "$.segments[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/proofreading/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.approved_segments:num",
+    "$.progress:num",
+    "$.skip:bool",
+    "$.status:str",
+    "$.total_segments:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/quality-gate/drilldown/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/quality-gate/history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.current_score:num",
+    "$.data_source:str",
+    "$.history:list",
+    "$.history[].iteration:num",
+    "$.history[].score:num",
+    "$.history[].timestamp:str",
+    "$.history[]:dict",
+    "$.improvement:num",
+    "$.initial_score:num",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/quality-gate/scores": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories:list",
+    "$.categories[].detail_count:num",
+    "$.categories[].fail_count:num",
+    "$.categories[].id:str",
+    "$.categories[].name:str",
+    "$.categories[].pass_count:num",
+    "$.categories[].score:num",
+    "$.categories[].warning_count:num",
+    "$.categories[].weight:num",
+    "$.categories[].weighted_score:num",
+    "$.categories[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.overall_score:num",
+    "$.passed:bool",
+    "$.threshold:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/quality-gate/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.category_count:num",
+    "$.checked_at:null",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.overall_score:num",
+    "$.passed:bool",
+    "$.status:str",
+    "$.threshold:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/report": {
+   "status": 200,
+   "kind": "text",
+   "shape": [
+    "# 判定 機能 結果 ステージ詳細 実行時間",
+    "Antigravity パイプライン完了レポート",
+    "① ❌ 文字起こし セグメントなし —",
+    "② ❌ AI校閲 未実行 —",
+    "③ ❌ SmartCut構成 未実行 —",
+    "④ ❌ プレビュー生成 ファイルなし —",
+    "⑤ ❌ 品質ゲート スコア: 未計測 / カテゴリ: 未計測 —",
+    "⑥ ❌ 最終レンダリング ファイルなし —",
+    "⑦ ❌ YouTube最適化 タイトル0案 / タグ0個 / チャプター0個 —",
+    "⑧ ❌ サムネイル生成 ファイルなし —",
+    "⚠️ 改善余地あり（0/8合格）",
+    "カテゴリ別スコア: データなし",
+    "ステータス: idle 動画: 実行時間: N/A秒 セッション: N/A",
+    "フィードバック: 未計測（品質ゲートを通していないので指摘の有無を言えません）",
+    "憲法§8.2（品質ゲート）・§11.2（本番品質レンダリング）・§23（YouTube最適化）準拠",
+    "生成日時: <日時> / Antigravity Video Studio",
+    "結果 ステージ 詳細 実行時間 リトライ",
+    "総合スコア: 未計測（品質ゲートを通していません）",
+    "🎯 品質ゲート詳細",
+    "📊 ステージ実行ログ",
+    "📋 8項目判定基準",
+    "🚀 Antigravity パイプライン完了レポート"
+   ]
+  },
+  "GET /api/pipeline/report/thumbnail": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/report［実走後・採点済み］": {
+   "status": 200,
+   "kind": "text",
+   "shape": [
+    "# 判定 機能 結果 ステージ詳細 実行時間",
+    "Antigravity パイプライン完了レポート",
+    "① ❌ 文字起こし セグメントなし —",
+    "② ❌ AI校閲 未実行 —",
+    "③ ❌ SmartCut構成 未実行 —",
+    "④ ❌ プレビュー生成 ファイルなし —",
+    "⑤ ❌ 品質ゲート スコア: 89.5点 / カテゴリ: core c4-gate-probe 1.5s",
+    "⑥ ❌ 最終レンダリング ファイルなし —",
+    "⑦ ✅ YouTube最適化 タイトル1案 / タグ5個 / チャプター1個 —",
+    "⑧ ❌ サムネイル生成 ファイルなし —",
+    "⚠ フィードバック (1件):",
+    "⚠️ 改善余地あり（1/8合格）",
+    "✅ 品質チェック c4-gate-probe 1.5s リトライ: 0",
+    "カテゴリ スコア 判定 減点 プラグイン数",
+    "コア 77.8 warn 2点 5個",
+    "ステータス: completed 動画: c4-gate-probe.mp4 実行時間: 12.3秒 セッション: c4gatepr",
+    "字幕の行長が長い箇所があります",
+    "憲法§8.2（品質ゲート）・§11.2（本番品質レンダリング）・§23（YouTube最適化）準拠",
+    "生成日時: <日時> / Antigravity Video Studio",
+    "結果 ステージ 詳細 実行時間 リトライ",
+    "総合スコア: 89.5点",
+    "🎯 品質ゲート詳細",
+    "📊 ステージ実行ログ",
+    "📋 8項目判定基準",
+    "🚀 Antigravity パイプライン完了レポート"
+   ]
+  },
+  "GET /api/pipeline/report［実走後・未採点］": {
+   "status": 200,
+   "kind": "text",
+   "shape": [
+    "# 判定 機能 結果 ステージ詳細 実行時間",
+    "Antigravity パイプライン完了レポート",
+    "① ❌ 文字起こし セグメントなし —",
+    "② ❌ AI校閲 未実行 —",
+    "③ ❌ SmartCut構成 未実行 —",
+    "④ ❌ プレビュー生成 ファイルなし —",
+    "⑤ ❌ 品質ゲート スコア: 未計測 / カテゴリ: 未計測 c4-gate-probe 1.5s",
+    "⑥ ❌ 最終レンダリング ファイルなし —",
+    "⑦ ✅ YouTube最適化 タイトル1案 / タグ5個 / チャプター1個 —",
+    "⑧ ❌ サムネイル生成 ファイルなし —",
+    "⚠ フィードバック (1件):",
+    "⚠️ 改善余地あり（1/8合格）",
+    "❌ 品質チェック c4-gate-probe 1.5s リトライ: 0",
+    "カテゴリ別スコア: データなし",
+    "ステータス: completed 動画: c4-gate-probe.mp4 実行時間: 12.3秒 セッション: c4gatepr",
+    "字幕の行長が長い箇所があります",
+    "憲法§8.2（品質ゲート）・§11.2（本番品質レンダリング）・§23（YouTube最適化）準拠",
+    "生成日時: <日時> / Antigravity Video Studio",
+    "結果 ステージ 詳細 実行時間 リトライ",
+    "総合スコア: 未計測（品質ゲートを通していません）",
+    "🎯 品質ゲート詳細",
+    "📊 ステージ実行ログ",
+    "📋 8項目判定基準",
+    "🚀 Antigravity パイプライン完了レポート"
+   ]
+  },
+  "GET /api/pipeline/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.checkpoint:null",
+    "$.completed_at:null",
+    "$.current_stage:num",
+    "$.error:null",
+    "$.result:null",
+    "$.session_id:null",
+    "$.stages:list",
+    "$.stages[].detail:str",
+    "$.stages[].icon:str",
+    "$.stages[].name:str",
+    "$.stages[].status:str",
+    "$.stages[]:dict",
+    "$.started_at:null",
+    "$.status:str",
+    "$.target_minutes:num",
+    "$.video_count:num",
+    "$.video_path:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/status［実走後・採点済み］": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.checkpoint:null",
+    "$.completed_at:str",
+    "$.current_stage:num",
+    "$.error:null",
+    "$.result.duration_seconds:num",
+    "$.result.error:str",
+    "$.result.final_path:str",
+    "$.result.health.all_features_active:bool",
+    "$.result.health.skipped_features:list",
+    "$.result.health.warnings:list",
+    "$.result.health:dict",
+    "$.result.metadata.chapters:list",
+    "$.result.metadata.chapters[].time:str",
+    "$.result.metadata.chapters[].title:str",
+    "$.result.metadata.chapters[]:dict",
+    "$.result.metadata.description:str",
+    "$.result.metadata.tags:list",
+    "$.result.metadata.tags[]:str",
+    "$.result.metadata.titles:list",
+    "$.result.metadata.titles[]:str",
+    "$.result.metadata:dict",
+    "$.result.preview_path:str",
+    "$.result.quality_details.category_report:list",
+    "$.result.quality_details.category_report[].category:str",
+    "$.result.quality_details.category_report[].deductions:num",
+    "$.result.quality_details.category_report[].label:str",
+    "$.result.quality_details.category_report[].plugin_count:num",
+    "$.result.quality_details.category_report[].score:num",
+    "$.result.quality_details.category_report[].status:str",
+    "$.result.quality_details.category_report[]:dict",
+    "$.result.quality_details.category_scores.core:num",
+    "$.result.quality_details.category_scores.template:num",
+    "$.result.quality_details.category_scores:dict",
+    "$.result.quality_details.feedback:list",
+    "$.result.quality_details.feedback[]:str",
+    "$.result.quality_details.score:num",
+    "$.result.quality_details.scored:bool",
+    "$.result.quality_details:dict",
+    "$.result.quality_gate_report.category_scores.core:num",
+    "$.result.quality_gate_report.category_scores.template:num",
+    "$.result.quality_gate_report.category_scores:dict",
+    "$.result.quality_gate_report.feedback:list",
+    "$.result.quality_gate_report.feedback[]:str",
+    "$.result.quality_gate_report.force_render_available:bool",
+    "$.result.quality_gate_report.force_render_endpoint:str",
+    "$.result.quality_gate_report.gap:num",
+    "$.result.quality_gate_report.improvement_suggestions:list",
+    "$.result.quality_gate_report.improvement_suggestions[].action:str",
+    "$.result.quality_gate_report.improvement_suggestions[].description:str",
+    "$.result.quality_gate_report.improvement_suggestions[]:dict",
+    "$.result.quality_gate_report.score:num",
+    "$.result.quality_gate_report.status:str",
+    "$.result.quality_gate_report.threshold:num",
+    "$.result.quality_gate_report:dict",
+    "$.result.quality_score:num",
+    "$.result.quality_scored:bool",
+    "$.result.segments_count:num",
+    "$.result.session_id:str",
+    "$.result.stage_results:list",
+    "$.result.stage_results[].detail:str",
+    "$.result.stage_results[].duration:num",
+    "$.result.stage_results[].name:str",
+    "$.result.stage_results[].retries:num",
+    "$.result.stage_results[].success:bool",
+    "$.result.stage_results[]:dict",
+    "$.result.status:str",
+    "$.result:dict",
+    "$.session_id:str",
+    "$.stages:list",
+    "$.stages[].detail:str",
+    "$.stages[].icon:str",
+    "$.stages[].name:str",
+    "$.stages[].status:str",
+    "$.stages[]:dict",
+    "$.started_at:str",
+    "$.status:str",
+    "$.target_minutes:num",
+    "$.video_count:num",
+    "$.video_path:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/status［実走後・未採点］": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.checkpoint:null",
+    "$.completed_at:str",
+    "$.current_stage:num",
+    "$.error:null",
+    "$.result.duration_seconds:num",
+    "$.result.error:str",
+    "$.result.final_path:str",
+    "$.result.health.all_features_active:bool",
+    "$.result.health.skipped_features:list",
+    "$.result.health.warnings:list",
+    "$.result.health:dict",
+    "$.result.metadata.chapters:list",
+    "$.result.metadata.chapters[].time:str",
+    "$.result.metadata.chapters[].title:str",
+    "$.result.metadata.chapters[]:dict",
+    "$.result.metadata.description:str",
+    "$.result.metadata.tags:list",
+    "$.result.metadata.tags[]:str",
+    "$.result.metadata.titles:list",
+    "$.result.metadata.titles[]:str",
+    "$.result.metadata:dict",
+    "$.result.preview_path:str",
+    "$.result.quality_details.category_report:list",
+    "$.result.quality_details.category_scores.core:num",
+    "$.result.quality_details.category_scores.template:num",
+    "$.result.quality_details.category_scores:dict",
+    "$.result.quality_details.feedback:list",
+    "$.result.quality_details.feedback[]:str",
+    "$.result.quality_details.score:num",
+    "$.result.quality_details.scored:bool",
+    "$.result.quality_details:dict",
+    "$.result.quality_gate_report:null",
+    "$.result.quality_score:num",
+    "$.result.quality_scored:bool",
+    "$.result.segments_count:num",
+    "$.result.session_id:str",
+    "$.result.stage_results:list",
+    "$.result.stage_results[].detail:str",
+    "$.result.stage_results[].duration:num",
+    "$.result.stage_results[].name:str",
+    "$.result.stage_results[].retries:num",
+    "$.result.stage_results[].success:bool",
+    "$.result.stage_results[]:dict",
+    "$.result.status:str",
+    "$.result:dict",
+    "$.session_id:str",
+    "$.stages:list",
+    "$.stages[].detail:str",
+    "$.stages[].icon:str",
+    "$.stages[].name:str",
+    "$.stages[].status:str",
+    "$.stages[]:dict",
+    "$.started_at:str",
+    "$.status:str",
+    "$.target_minutes:num",
+    "$.video_count:num",
+    "$.video_path:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/stream/c4-gate-probe": {
+   "status": 400,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/transcription/models": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current:str",
+    "$.models:list",
+    "$.models[].accuracy:str",
+    "$.models[].id:str",
+    "$.models[].name:str",
+    "$.models[].speed:str",
+    "$.models[].vram_gb:num",
+    "$.models[]:dict",
+    "$.recommended:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/transcription/segments": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.model:str",
+    "$.segments:list",
+    "$.segments[].end:num",
+    "$.segments[].id:num",
+    "$.segments[].speaker_id:str",
+    "$.segments[].start:num",
+    "$.segments[].text:str",
+    "$.segments[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/transcription/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.elapsed_seconds:num",
+    "$.error_message:null",
+    "$.model:str",
+    "$.progress:num",
+    "$.segment_count:num",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/pipeline/videos": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$.videos:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/preview/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/preview/report/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/preview/sessions": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/progressive-preview/report/c4-gate-probe": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/quality/cleanup/preview": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.deleted:list",
+    "$.dry_run:bool",
+    "$.freed_bytes:num",
+    "$.protected:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/quality/storage/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories.drafts.count:num",
+    "$.categories.drafts.max_count:num",
+    "$.categories.drafts.newest_file:null",
+    "$.categories.drafts.oldest_file:null",
+    "$.categories.drafts.protected:bool",
+    "$.categories.drafts.retention_days:num",
+    "$.categories.drafts.size_mb:num",
+    "$.categories.drafts:dict",
+    "$.categories.final.count:num",
+    "$.categories.final.max_count:null",
+    "$.categories.final.newest_file:null",
+    "$.categories.final.oldest_file:null",
+    "$.categories.final.protected:bool",
+    "$.categories.final.retention_days:null",
+    "$.categories.final.size_mb:num",
+    "$.categories.final:dict",
+    "$.categories.prefinal.count:num",
+    "$.categories.prefinal.max_count:num",
+    "$.categories.prefinal.newest_file:null",
+    "$.categories.prefinal.oldest_file:null",
+    "$.categories.prefinal.protected:bool",
+    "$.categories.prefinal.retention_days:num",
+    "$.categories.prefinal.size_mb:num",
+    "$.categories.prefinal:dict",
+    "$.categories.raw.count:num",
+    "$.categories.raw.max_count:null",
+    "$.categories.raw.newest_file:null",
+    "$.categories.raw.oldest_file:null",
+    "$.categories.raw.protected:bool",
+    "$.categories.raw.retention_days:null",
+    "$.categories.raw.size_mb:num",
+    "$.categories.raw:dict",
+    "$.categories.screenshots.count:num",
+    "$.categories.screenshots.max_count:num",
+    "$.categories.screenshots.newest_file:null",
+    "$.categories.screenshots.oldest_file:null",
+    "$.categories.screenshots.protected:bool",
+    "$.categories.screenshots.retention_days:num",
+    "$.categories.screenshots.size_mb:num",
+    "$.categories.screenshots:dict",
+    "$.categories.video_output.count:num",
+    "$.categories.video_output.max_count:num",
+    "$.categories.video_output.newest_file:null",
+    "$.categories.video_output.oldest_file:null",
+    "$.categories.video_output.protected:bool",
+    "$.categories.video_output.retention_days:num",
+    "$.categories.video_output.size_mb:num",
+    "$.categories.video_output:dict",
+    "$.categories:dict",
+    "$.deletable_size_mb:num",
+    "$.protected_size_mb:num",
+    "$.total_size_mb:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/quality/threshold": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.block_threshold:num",
+    "$.pass_threshold:num",
+    "$.warning_threshold:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/render/download/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$.job_id:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/render/gpu-detect": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.fallback_encoder:str",
+    "$.gpu_available:bool",
+    "$.gpu_name:str",
+    "$.recommended_encoder:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/render/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/render/settings": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.settings.bgm_ducking:bool",
+    "$.settings.bgm_volume:num",
+    "$.settings.encoder:str",
+    "$.settings.logo_enabled:bool",
+    "$.settings.logo_height:num",
+    "$.settings.logo_opacity:num",
+    "$.settings.logo_position:str",
+    "$.settings.lufs_target:num",
+    "$.settings.subtitle_enabled:bool",
+    "$.settings.subtitle_font:str",
+    "$.settings.subtitle_size:num",
+    "$.settings:dict",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/render/status/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$.job_id:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/resolutions": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/segments": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$:list"
+   ]
+  },
+  "GET /api/settings": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.constitution.brand_personality.keywords:list",
+    "$.constitution.brand_personality.keywords[]:str",
+    "$.constitution.brand_personality:dict",
+    "$.constitution.design_tokens.cool.color_palette.accent:str",
+    "$.constitution.design_tokens.cool.color_palette.background:str",
+    "$.constitution.design_tokens.cool.color_palette.main:str",
+    "$.constitution.design_tokens.cool.color_palette.sub:str",
+    "$.constitution.design_tokens.cool.color_palette.text:str",
+    "$.constitution.design_tokens.cool.color_palette:dict",
+    "$.constitution.design_tokens.cool.motion.duration:str",
+    "$.constitution.design_tokens.cool.motion.transition:str",
+    "$.constitution.design_tokens.cool.motion:dict",
+    "$.constitution.design_tokens.cool.typography.body_size:str",
+    "$.constitution.design_tokens.cool.typography.font_family:str",
+    "$.constitution.design_tokens.cool.typography.heading_weight:str",
+    "$.constitution.design_tokens.cool.typography:dict",
+    "$.constitution.design_tokens.cool:dict",
+    "$.constitution.design_tokens.elegant.color_palette.accent:str",
+    "$.constitution.design_tokens.elegant.color_palette.background:str",
+    "$.constitution.design_tokens.elegant.color_palette.main:str",
+    "$.constitution.design_tokens.elegant.color_palette.sub:str",
+    "$.constitution.design_tokens.elegant.color_palette.text:str",
+    "$.constitution.design_tokens.elegant.color_palette:dict",
+    "$.constitution.design_tokens.elegant.motion.duration:str",
+    "$.constitution.design_tokens.elegant.motion.transition:str",
+    "$.constitution.design_tokens.elegant.motion:dict",
+    "$.constitution.design_tokens.elegant.typography.body_size:str",
+    "$.constitution.design_tokens.elegant.typography.font_family:str",
+    "$.constitution.design_tokens.elegant.typography.heading_weight:str",
+    "$.constitution.design_tokens.elegant.typography:dict",
+    "$.constitution.design_tokens.elegant:dict",
+    "$.constitution.design_tokens.energetic.color_palette.accent:str",
+    "$.constitution.design_tokens.energetic.color_palette.background:str",
+    "$.constitution.design_tokens.energetic.color_palette.main:str",
+    "$.constitution.design_tokens.energetic.color_palette.sub:str",
+    "$.constitution.design_tokens.energetic.color_palette.text:str",
+    "$.constitution.design_tokens.energetic.color_palette:dict",
+    "$.constitution.design_tokens.energetic.motion.duration:str",
+    "$.constitution.design_tokens.energetic.motion.transition:str",
+    "$.constitution.design_tokens.energetic.motion:dict",
+    "$.constitution.design_tokens.energetic.typography.body_size:str",
+    "$.constitution.design_tokens.energetic.typography.font_family:str",
+    "$.constitution.design_tokens.energetic.typography.heading_weight:str",
+    "$.constitution.design_tokens.energetic.typography:dict",
+    "$.constitution.design_tokens.energetic:dict",
+    "$.constitution.design_tokens.warm.color_palette.accent:str",
+    "$.constitution.design_tokens.warm.color_palette.background:str",
+    "$.constitution.design_tokens.warm.color_palette.main:str",
+    "$.constitution.design_tokens.warm.color_palette.sub:str",
+    "$.constitution.design_tokens.warm.color_palette.text:str",
+    "$.constitution.design_tokens.warm.color_palette:dict",
+    "$.constitution.design_tokens.warm.motion.duration:str",
+    "$.constitution.design_tokens.warm.motion.transition:str",
+    "$.constitution.design_tokens.warm.motion:dict",
+    "$.constitution.design_tokens.warm.typography.body_size:str",
+    "$.constitution.design_tokens.warm.typography.font_family:str",
+    "$.constitution.design_tokens.warm.typography.heading_weight:str",
+    "$.constitution.design_tokens.warm.typography:dict",
+    "$.constitution.design_tokens.warm:dict",
+    "$.constitution.design_tokens:dict",
+    "$.constitution.evolution_vision:str",
+    "$.constitution.video_source_name:str",
+    "$.constitution:dict",
+    "$.user_model.collaborative_settings.auto_pilot_ratio:num",
+    "$.user_model.collaborative_settings:dict",
+    "$.user_model.external_status.quests:list",
+    "$.user_model.external_status.quests[].current_val:num",
+    "$.user_model.external_status.quests[].data_source:str",
+    "$.user_model.external_status.quests[].gap:num",
+    "$.user_model.external_status.quests[].is_real:bool",
+    "$.user_model.external_status.quests[].note:str",
+    "$.user_model.external_status.quests[].reward_xp:num",
+    "$.user_model.external_status.quests[].target_name:str",
+    "$.user_model.external_status.quests[].target_val:num",
+    "$.user_model.external_status.quests[].type:str",
+    "$.user_model.external_status.quests[]:dict",
+    "$.user_model.external_status.rivals.benchmark.data_source:str",
+    "$.user_model.external_status.rivals.benchmark.genre:str",
+    "$.user_model.external_status.rivals.benchmark.is_real:bool",
+    "$.user_model.external_status.rivals.benchmark.name:str",
+    "$.user_model.external_status.rivals.benchmark.note:str",
+    "$.user_model.external_status.rivals.benchmark.subs:num",
+    "$.user_model.external_status.rivals.benchmark.views:num",
+    "$.user_model.external_status.rivals.benchmark:dict",
+    "$.user_model.external_status.rivals.data_source:str",
+    "$.user_model.external_status.rivals.is_real:bool",
+    "$.user_model.external_status.rivals.nemesis.data_source:str",
+    "$.user_model.external_status.rivals.nemesis.genre:str",
+    "$.user_model.external_status.rivals.nemesis.is_real:bool",
+    "$.user_model.external_status.rivals.nemesis.name:str",
+    "$.user_model.external_status.rivals.nemesis.note:str",
+    "$.user_model.external_status.rivals.nemesis.subs:num",
+    "$.user_model.external_status.rivals.nemesis.views:num",
+    "$.user_model.external_status.rivals.nemesis:dict",
+    "$.user_model.external_status.rivals.note:str",
+    "$.user_model.external_status.rivals:dict",
+    "$.user_model.external_status.youtube.data_source:str",
+    "$.user_model.external_status.youtube.is_real:bool",
+    "$.user_model.external_status.youtube.last_updated:null",
+    "$.user_model.external_status.youtube.note:str",
+    "$.user_model.external_status.youtube.subscribers:num",
+    "$.user_model.external_status.youtube.total_views:num",
+    "$.user_model.external_status.youtube.videos:num",
+    "$.user_model.external_status.youtube:dict",
+    "$.user_model.external_status:dict",
+    "$.user_model.interaction_history.collaborative_notes:str",
+    "$.user_model.interaction_history:dict",
+    "$.user_model.profiles.admin.ranks.tech_rank.level:str",
+    "$.user_model.profiles.admin.ranks.tech_rank.xp:num",
+    "$.user_model.profiles.admin.ranks.tech_rank:dict",
+    "$.user_model.profiles.admin.ranks:dict",
+    "$.user_model.profiles.admin:dict",
+    "$.user_model.profiles.owner.ranks.biz_rank.data_source:str",
+    "$.user_model.profiles.owner.ranks.biz_rank.is_real:bool",
+    "$.user_model.profiles.owner.ranks.biz_rank.note:str",
+    "$.user_model.profiles.owner.ranks.biz_rank.xp:num",
+    "$.user_model.profiles.owner.ranks.biz_rank:dict",
+    "$.user_model.profiles.owner.ranks:dict",
+    "$.user_model.profiles.owner:dict",
+    "$.user_model.profiles:dict",
+    "$.user_model:dict",
+    "$.video_exists:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/shorts/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/shorts/list": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/smartcut/all-candidates": {
+   "status": 400,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/smartcut/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.collaborative_settings.auto_pilot_ratio:num",
+    "$.collaborative_settings:dict",
+    "$.external_status.quests:list",
+    "$.external_status.quests[].current_val:num",
+    "$.external_status.quests[].data_source:str",
+    "$.external_status.quests[].gap:num",
+    "$.external_status.quests[].is_real:bool",
+    "$.external_status.quests[].note:str",
+    "$.external_status.quests[].reward_xp:num",
+    "$.external_status.quests[].target_name:str",
+    "$.external_status.quests[].target_val:num",
+    "$.external_status.quests[].type:str",
+    "$.external_status.quests[]:dict",
+    "$.external_status.rivals.benchmark.data_source:str",
+    "$.external_status.rivals.benchmark.genre:str",
+    "$.external_status.rivals.benchmark.is_real:bool",
+    "$.external_status.rivals.benchmark.name:str",
+    "$.external_status.rivals.benchmark.note:str",
+    "$.external_status.rivals.benchmark.subs:num",
+    "$.external_status.rivals.benchmark.views:num",
+    "$.external_status.rivals.benchmark:dict",
+    "$.external_status.rivals.data_source:str",
+    "$.external_status.rivals.is_real:bool",
+    "$.external_status.rivals.nemesis.data_source:str",
+    "$.external_status.rivals.nemesis.genre:str",
+    "$.external_status.rivals.nemesis.is_real:bool",
+    "$.external_status.rivals.nemesis.name:str",
+    "$.external_status.rivals.nemesis.note:str",
+    "$.external_status.rivals.nemesis.subs:num",
+    "$.external_status.rivals.nemesis.views:num",
+    "$.external_status.rivals.nemesis:dict",
+    "$.external_status.rivals.note:str",
+    "$.external_status.rivals:dict",
+    "$.external_status.youtube.data_source:str",
+    "$.external_status.youtube.is_real:bool",
+    "$.external_status.youtube.last_updated:null",
+    "$.external_status.youtube.note:str",
+    "$.external_status.youtube.subscribers:num",
+    "$.external_status.youtube.total_views:num",
+    "$.external_status.youtube.videos:num",
+    "$.external_status.youtube:dict",
+    "$.external_status:dict",
+    "$.interaction_history.collaborative_notes:str",
+    "$.interaction_history:dict",
+    "$.profiles.admin.ranks.tech_rank.level:str",
+    "$.profiles.admin.ranks.tech_rank.xp:num",
+    "$.profiles.admin.ranks.tech_rank:dict",
+    "$.profiles.admin.ranks:dict",
+    "$.profiles.admin:dict",
+    "$.profiles.owner.ranks.biz_rank.data_source:str",
+    "$.profiles.owner.ranks.biz_rank.is_real:bool",
+    "$.profiles.owner.ranks.biz_rank.note:str",
+    "$.profiles.owner.ranks.biz_rank.xp:num",
+    "$.profiles.owner.ranks.biz_rank:dict",
+    "$.profiles.owner.ranks:dict",
+    "$.profiles.owner:dict",
+    "$.profiles:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/storage/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories.drafts.count:num",
+    "$.categories.drafts.max_count:num",
+    "$.categories.drafts.newest_file:null",
+    "$.categories.drafts.oldest_file:null",
+    "$.categories.drafts.protected:bool",
+    "$.categories.drafts.retention_days:num",
+    "$.categories.drafts.size_mb:num",
+    "$.categories.drafts:dict",
+    "$.categories.final.count:num",
+    "$.categories.final.max_count:null",
+    "$.categories.final.newest_file:null",
+    "$.categories.final.oldest_file:null",
+    "$.categories.final.protected:bool",
+    "$.categories.final.retention_days:null",
+    "$.categories.final.size_mb:num",
+    "$.categories.final:dict",
+    "$.categories.prefinal.count:num",
+    "$.categories.prefinal.max_count:num",
+    "$.categories.prefinal.newest_file:null",
+    "$.categories.prefinal.oldest_file:null",
+    "$.categories.prefinal.protected:bool",
+    "$.categories.prefinal.retention_days:num",
+    "$.categories.prefinal.size_mb:num",
+    "$.categories.prefinal:dict",
+    "$.categories.raw.count:num",
+    "$.categories.raw.max_count:null",
+    "$.categories.raw.newest_file:null",
+    "$.categories.raw.oldest_file:null",
+    "$.categories.raw.protected:bool",
+    "$.categories.raw.retention_days:null",
+    "$.categories.raw.size_mb:num",
+    "$.categories.raw:dict",
+    "$.categories.screenshots.count:num",
+    "$.categories.screenshots.max_count:num",
+    "$.categories.screenshots.newest_file:null",
+    "$.categories.screenshots.oldest_file:null",
+    "$.categories.screenshots.protected:bool",
+    "$.categories.screenshots.retention_days:num",
+    "$.categories.screenshots.size_mb:num",
+    "$.categories.screenshots:dict",
+    "$.categories.video_output.count:num",
+    "$.categories.video_output.max_count:num",
+    "$.categories.video_output.newest_file:null",
+    "$.categories.video_output.oldest_file:null",
+    "$.categories.video_output.protected:bool",
+    "$.categories.video_output.retention_days:num",
+    "$.categories.video_output.size_mb:num",
+    "$.categories.video_output:dict",
+    "$.categories:dict",
+    "$.deletable_size_mb:num",
+    "$.protected_size_mb:num",
+    "$.total_size_mb:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/support/faq": {
+   "status": 422,
+   "kind": "json",
+   "shape": [
+    "$.detail:list",
+    "$.detail[].input:null",
+    "$.detail[].loc:list",
+    "$.detail[].loc[]:str",
+    "$.detail[].msg:str",
+    "$.detail[].type:str",
+    "$.detail[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/support/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.by_type.ConnectionError:num",
+    "$.by_type:dict",
+    "$.resolved:num",
+    "$.total:num",
+    "$.unresolved:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/support/unresolved": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.errors:list",
+    "$.errors[].context:dict",
+    "$.errors[].error_type:str",
+    "$.errors[].id:str",
+    "$.errors[].message:str",
+    "$.errors[].resolution:str",
+    "$.errors[].resolved:bool",
+    "$.errors[].stack_trace:str",
+    "$.errors[].timestamp:str",
+    "$.errors[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/task/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/tasks": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.tasks:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/thumbnail/accuracy": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.accuracy.average_error:num",
+    "$.accuracy.correct_prediction_rate:num",
+    "$.accuracy.max_error:num",
+    "$.accuracy.min_error:num",
+    "$.accuracy.sample_size:num",
+    "$.accuracy:dict",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/thumbnail/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/thumbnail/history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.data_source:str",
+    "$.history:list",
+    "$.history[].actual_ctr:null",
+    "$.history[].all_concepts:list",
+    "$.history[].all_concepts[]:str",
+    "$.history[].all_predicted_ctrs:list",
+    "$.history[].all_predicted_ctrs[]:num",
+    "$.history[].feedback_at:null",
+    "$.history[].predicted_ctr:num",
+    "$.history[].reason:str",
+    "$.history[].selected_at:str",
+    "$.history[].selected_concept:str",
+    "$.history[].selected_index:num",
+    "$.history[].video_id:str",
+    "$.history[]:dict",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.success:bool",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/transcribe/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.message:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/current-model/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.available:bool",
+    "$.model:str",
+    "$.original:str",
+    "$.preferred_model:str",
+    "$.switched:bool",
+    "$.task:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.alerts:list",
+    "$.date:str",
+    "$.models:list",
+    "$.models[].alert_level:str",
+    "$.models[].can_use:bool",
+    "$.models[].limit:num",
+    "$.models[].name:str",
+    "$.models[].remaining:num",
+    "$.models[].tier:str",
+    "$.models[].usage_percent:num",
+    "$.models[].used:num",
+    "$.models[]:dict",
+    "$.recommendations:list",
+    "$.recommendations[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/governance": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.counters.deprecation_corrections:num",
+    "$.counters.fallback_activations:num",
+    "$.counters.total_api_errors:num",
+    "$.counters:dict",
+    "$.deprecation_map:dict",
+    "$.deprecation_map[\"gemini-2.0-flash\"]:str",
+    "$.deprecation_map[\"gemini-2.0-flash-lite\"]:str",
+    "$.deprecation_map[\"gemini-2.5-flash\"]:str",
+    "$.deprecation_map[\"gemini-2.5-flash-lite\"]:str",
+    "$.deprecation_map[\"gemini-2.5-pro\"]:str",
+    "$.deprecation_map[\"imagen-3.0-generate-001\"]:str",
+    "$.fallback_chain.gemini-3-flash-preview:str",
+    "$.fallback_chain:dict",
+    "$.fallback_chain[\"gemini-2.5-flash\"]:str",
+    "$.fallback_chain[\"gemini-2.5-flash-lite\"]:str",
+    "$.fallback_chain[\"gemini-2.5-pro\"]:str",
+    "$.fallback_chain[\"gemini-3.1-pro-preview\"]:str",
+    "$.fallback_chain[\"gemini-3.5-flash-lite\"]:null",
+    "$.fallback_chain[\"gemini-3.6-flash\"]:str",
+    "$.fallback_chain[\"gemini-3.7-flash\"]:str",
+    "$.grade_policy.batch:str",
+    "$.grade_policy.escalation:str",
+    "$.grade_policy.premium:str",
+    "$.grade_policy.principle:str",
+    "$.grade_policy.standard:str",
+    "$.grade_policy:dict",
+    "$.recent_events:list",
+    "$.tiers.batch.description:str",
+    "$.tiers.batch.label:str",
+    "$.tiers.batch.model:str",
+    "$.tiers.batch:dict",
+    "$.tiers.premium.description:str",
+    "$.tiers.premium.label:str",
+    "$.tiers.premium.model:str",
+    "$.tiers.premium:dict",
+    "$.tiers.pro.description:str",
+    "$.tiers.pro.label:str",
+    "$.tiers.pro.model:str",
+    "$.tiers.pro:dict",
+    "$.tiers.standard.description:str",
+    "$.tiers.standard.label:str",
+    "$.tiers.standard.model:str",
+    "$.tiers.standard:dict",
+    "$.tiers:dict",
+    "$.usage.date:str",
+    "$.usage.models.gemini-3-flash-preview.alert_level:str",
+    "$.usage.models.gemini-3-flash-preview.limit:num",
+    "$.usage.models.gemini-3-flash-preview.remaining:num",
+    "$.usage.models.gemini-3-flash-preview.tier:str",
+    "$.usage.models.gemini-3-flash-preview.usage_ratio:num",
+    "$.usage.models.gemini-3-flash-preview.used:num",
+    "$.usage.models.gemini-3-flash-preview:dict",
+    "$.usage.models:dict",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].alert_level:str",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].limit:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].remaining:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].tier:str",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].usage_ratio:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].used:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"]:dict",
+    "$.usage.models[\"gemini-3.6-flash\"].alert_level:str",
+    "$.usage.models[\"gemini-3.6-flash\"].limit:num",
+    "$.usage.models[\"gemini-3.6-flash\"].remaining:num",
+    "$.usage.models[\"gemini-3.6-flash\"].tier:str",
+    "$.usage.models[\"gemini-3.6-flash\"].usage_ratio:num",
+    "$.usage.models[\"gemini-3.6-flash\"].used:num",
+    "$.usage.models[\"gemini-3.6-flash\"]:dict",
+    "$.usage.models[\"gemini-3.7-flash\"].alert_level:str",
+    "$.usage.models[\"gemini-3.7-flash\"].limit:num",
+    "$.usage.models[\"gemini-3.7-flash\"].remaining:num",
+    "$.usage.models[\"gemini-3.7-flash\"].tier:str",
+    "$.usage.models[\"gemini-3.7-flash\"].usage_ratio:num",
+    "$.usage.models[\"gemini-3.7-flash\"].used:num",
+    "$.usage.models[\"gemini-3.7-flash\"]:dict",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].alert_level:str",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].limit:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].remaining:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].tier:str",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].usage_ratio:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].used:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"]:dict",
+    "$.usage.models[\"imagen-4.0-generate-001\"].alert_level:str",
+    "$.usage.models[\"imagen-4.0-generate-001\"].limit:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"].remaining:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"].tier:str",
+    "$.usage.models[\"imagen-4.0-generate-001\"].usage_ratio:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"].used:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"]:dict",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].alert_level:str",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].limit:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].remaining:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].tier:str",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].usage_ratio:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].used:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"]:dict",
+    "$.usage.models[\"veo-3.0\"].alert_level:str",
+    "$.usage.models[\"veo-3.0\"].limit:num",
+    "$.usage.models[\"veo-3.0\"].remaining:num",
+    "$.usage.models[\"veo-3.0\"].tier:str",
+    "$.usage.models[\"veo-3.0\"].usage_ratio:num",
+    "$.usage.models[\"veo-3.0\"].used:num",
+    "$.usage.models[\"veo-3.0\"]:dict",
+    "$.usage.models[\"veo-3.1\"].alert_level:str",
+    "$.usage.models[\"veo-3.1\"].limit:num",
+    "$.usage.models[\"veo-3.1\"].remaining:num",
+    "$.usage.models[\"veo-3.1\"].tier:str",
+    "$.usage.models[\"veo-3.1\"].usage_ratio:num",
+    "$.usage.models[\"veo-3.1\"].used:num",
+    "$.usage.models[\"veo-3.1\"]:dict",
+    "$.usage.models[\"veo-3.1-fast\"].alert_level:str",
+    "$.usage.models[\"veo-3.1-fast\"].limit:num",
+    "$.usage.models[\"veo-3.1-fast\"].remaining:num",
+    "$.usage.models[\"veo-3.1-fast\"].tier:str",
+    "$.usage.models[\"veo-3.1-fast\"].usage_ratio:num",
+    "$.usage.models[\"veo-3.1-fast\"].used:num",
+    "$.usage.models[\"veo-3.1-fast\"]:dict",
+    "$.usage:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/model-status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.reset_info.can_wait:bool",
+    "$.reset_info.remaining_display:str",
+    "$.reset_info.remaining_hours:num",
+    "$.reset_info.remaining_minutes:num",
+    "$.reset_info.reset_time_jst:str",
+    "$.reset_info.reset_time_utc:str",
+    "$.reset_info:dict",
+    "$.tiers.batch.available_for_use:num",
+    "$.tiers.batch.description:str",
+    "$.tiers.batch.label:str",
+    "$.tiers.batch.model:str",
+    "$.tiers.batch.preserved:num",
+    "$.tiers.batch.remaining:num",
+    "$.tiers.batch.status:str",
+    "$.tiers.batch.usage_percent:num",
+    "$.tiers.batch:dict",
+    "$.tiers.premium.available_for_use:num",
+    "$.tiers.premium.description:str",
+    "$.tiers.premium.label:str",
+    "$.tiers.premium.model:str",
+    "$.tiers.premium.preserved:num",
+    "$.tiers.premium.remaining:num",
+    "$.tiers.premium.status:str",
+    "$.tiers.premium.usage_percent:num",
+    "$.tiers.premium:dict",
+    "$.tiers.pro.available_for_use:num",
+    "$.tiers.pro.description:str",
+    "$.tiers.pro.label:str",
+    "$.tiers.pro.model:str",
+    "$.tiers.pro.preserved:num",
+    "$.tiers.pro.remaining:num",
+    "$.tiers.pro.status:str",
+    "$.tiers.pro.usage_percent:num",
+    "$.tiers.pro:dict",
+    "$.tiers.standard.available_for_use:num",
+    "$.tiers.standard.description:str",
+    "$.tiers.standard.label:str",
+    "$.tiers.standard.model:str",
+    "$.tiers.standard.preserved:num",
+    "$.tiers.standard.remaining:num",
+    "$.tiers.standard.status:str",
+    "$.tiers.standard.usage_percent:num",
+    "$.tiers.standard:dict",
+    "$.tiers:dict",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/quality-warning": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.level:str",
+    "$.message:str",
+    "$.warning:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/remaining/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.can_use:bool",
+    "$.model:str",
+    "$.remaining:num",
+    "$.usage_percent:num",
+    "$.warning:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/retry-budget": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.advice:str",
+    "$.premium.estimated_retries:num",
+    "$.premium.model:str",
+    "$.premium.remaining_requests:num",
+    "$.premium.usage_percent:num",
+    "$.premium.warning:bool",
+    "$.premium:dict",
+    "$.standard.estimated_retries:num",
+    "$.standard.model:str",
+    "$.standard.remaining_requests:num",
+    "$.standard.usage_percent:num",
+    "$.standard.warning:bool",
+    "$.standard:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/switch-history": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/two-tier-status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.reset_info.can_wait:bool",
+    "$.reset_info.remaining_display:str",
+    "$.reset_info.remaining_hours:num",
+    "$.reset_info.remaining_minutes:num",
+    "$.reset_info.reset_time_jst:str",
+    "$.reset_info.reset_time_utc:str",
+    "$.reset_info:dict",
+    "$.tiers.batch.available_for_use:num",
+    "$.tiers.batch.description:str",
+    "$.tiers.batch.label:str",
+    "$.tiers.batch.model:str",
+    "$.tiers.batch.preserved:num",
+    "$.tiers.batch.remaining:num",
+    "$.tiers.batch.status:str",
+    "$.tiers.batch.usage_percent:num",
+    "$.tiers.batch:dict",
+    "$.tiers.premium.available_for_use:num",
+    "$.tiers.premium.description:str",
+    "$.tiers.premium.label:str",
+    "$.tiers.premium.model:str",
+    "$.tiers.premium.preserved:num",
+    "$.tiers.premium.remaining:num",
+    "$.tiers.premium.status:str",
+    "$.tiers.premium.usage_percent:num",
+    "$.tiers.premium:dict",
+    "$.tiers.pro.available_for_use:num",
+    "$.tiers.pro.description:str",
+    "$.tiers.pro.label:str",
+    "$.tiers.pro.model:str",
+    "$.tiers.pro.preserved:num",
+    "$.tiers.pro.remaining:num",
+    "$.tiers.pro.status:str",
+    "$.tiers.pro.usage_percent:num",
+    "$.tiers.pro:dict",
+    "$.tiers.standard.available_for_use:num",
+    "$.tiers.standard.description:str",
+    "$.tiers.standard.label:str",
+    "$.tiers.standard.model:str",
+    "$.tiers.standard.preserved:num",
+    "$.tiers.standard.remaining:num",
+    "$.tiers.standard.status:str",
+    "$.tiers.standard.usage_percent:num",
+    "$.tiers.standard:dict",
+    "$.tiers:dict",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/usage/wait-options": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_status.available:bool",
+    "$.current_status.model:str",
+    "$.current_status.remaining:num",
+    "$.current_status.tier:str",
+    "$.current_status.usage_percent:num",
+    "$.current_status:dict",
+    "$.recommendations:list",
+    "$.reset_info.can_wait:bool",
+    "$.reset_info.remaining_display:str",
+    "$.reset_info.remaining_hours:num",
+    "$.reset_info.remaining_minutes:num",
+    "$.reset_info.reset_time_jst:str",
+    "$.reset_info.reset_time_utc:str",
+    "$.reset_info:dict",
+    "$.tier:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/color/presets": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.default:str",
+    "$.presets:list",
+    "$.presets[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/decision/context": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$:str"
+   ]
+  },
+  "GET /api/v1/api/decision/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.approval_rate:num",
+    "$.approvals:num",
+    "$.learned_by_ai:num",
+    "$.modifications:num",
+    "$.rejection_patterns:dict",
+    "$.rejections:num",
+    "$.total_decisions:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/director-profile": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.AI提案へのアドバイス:str",
+    "$.こだわり（却下傾向）:dict",
+    "$.好み（承認傾向）:dict",
+    "$.承認率:num",
+    "$.総判断数:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/journal": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/philosophies": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.philosophies:list",
+    "$.philosophies[].content:str",
+    "$.philosophies[].extracted_at:str",
+    "$.philosophies[].philosophy:str",
+    "$.philosophies[].session_summary:str",
+    "$.philosophies[].source:str",
+    "$.philosophies[].tags:list",
+    "$.philosophies[].tags[]:str",
+    "$.philosophies[].timestamp:str",
+    "$.philosophies[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/api-usage": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.can_run_pipeline:bool",
+    "$.date:str",
+    "$.escalation_level:str",
+    "$.limit:num",
+    "$.remaining:num",
+    "$.sources:dict",
+    "$.usage_pct:num",
+    "$.used:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/dictionary": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.auto_learn:bool",
+    "$.count:num",
+    "$.entries:list",
+    "$.entries[].confirmed:bool",
+    "$.entries[].context_hint:str",
+    "$.entries[].correct:str",
+    "$.entries[].created_at:str",
+    "$.entries[].id:str",
+    "$.entries[].incorrect:str",
+    "$.entries[].type:str",
+    "$.entries[].usage_count:num",
+    "$.entries[]:dict",
+    "$.pending:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/improvement/actions": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.actions:list",
+    "$.actions[].category:str",
+    "$.actions[].description:str",
+    "$.actions[].id:str",
+    "$.actions[].name:str",
+    "$.actions[].score_after:null",
+    "$.actions[].score_after:num",
+    "$.actions[].score_before:null",
+    "$.actions[].score_before:num",
+    "$.actions[].status:str",
+    "$.actions[]:dict",
+    "$.applied:list",
+    "$.applied[]:str",
+    "$.count:num",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/improvement/score-change": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_score:num",
+    "$.data_source:str",
+    "$.initial_score:num",
+    "$.is_real:bool",
+    "$.iterations:num",
+    "$.note:str",
+    "$.score_history:list",
+    "$.score_history[].action:str",
+    "$.score_history[].iteration:num",
+    "$.score_history[].score:num",
+    "$.score_history[]:dict",
+    "$.total_improvement:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/improvement/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.completed_actions:num",
+    "$.current_score:num",
+    "$.data_source:str",
+    "$.initial_score:num",
+    "$.is_real:bool",
+    "$.iteration:num",
+    "$.max_iterations:num",
+    "$.note:str",
+    "$.pending_actions:num",
+    "$.status:str",
+    "$.total_actions:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/open-folder": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.path:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/proofreading/export/c4-gate-probe": {
+   "status": 400,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/proofreading/result": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.approved_count:num",
+    "$.count:num",
+    "$.pending_count:num",
+    "$.rejected_count:num",
+    "$.segments:list",
+    "$.segments[].changes:list",
+    "$.segments[].changes[].corrected:str",
+    "$.segments[].changes[].original:str",
+    "$.segments[].changes[].position:num",
+    "$.segments[].changes[].type:str",
+    "$.segments[].changes[]:dict",
+    "$.segments[].corrected:str",
+    "$.segments[].end:num",
+    "$.segments[].id:num",
+    "$.segments[].original:str",
+    "$.segments[].start:num",
+    "$.segments[].status:str",
+    "$.segments[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/proofreading/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.approved_segments:num",
+    "$.progress:num",
+    "$.skip:bool",
+    "$.status:str",
+    "$.total_segments:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/quality-gate/drilldown/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/quality-gate/history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.current_score:num",
+    "$.data_source:str",
+    "$.history:list",
+    "$.history[].iteration:num",
+    "$.history[].score:num",
+    "$.history[].timestamp:str",
+    "$.history[]:dict",
+    "$.improvement:num",
+    "$.initial_score:num",
+    "$.is_real:bool",
+    "$.note:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/quality-gate/scores": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories:list",
+    "$.categories[].detail_count:num",
+    "$.categories[].fail_count:num",
+    "$.categories[].id:str",
+    "$.categories[].name:str",
+    "$.categories[].pass_count:num",
+    "$.categories[].score:num",
+    "$.categories[].warning_count:num",
+    "$.categories[].weight:num",
+    "$.categories[].weighted_score:num",
+    "$.categories[]:dict",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.overall_score:num",
+    "$.passed:bool",
+    "$.threshold:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/quality-gate/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.category_count:num",
+    "$.checked_at:null",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.note:str",
+    "$.overall_score:num",
+    "$.passed:bool",
+    "$.status:str",
+    "$.threshold:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.checkpoint:null",
+    "$.completed_at:null",
+    "$.current_stage:num",
+    "$.error:null",
+    "$.result:null",
+    "$.session_id:null",
+    "$.stages:list",
+    "$.stages[].detail:str",
+    "$.stages[].icon:str",
+    "$.stages[].name:str",
+    "$.stages[].status:str",
+    "$.stages[]:dict",
+    "$.started_at:null",
+    "$.status:str",
+    "$.target_minutes:num",
+    "$.video_count:num",
+    "$.video_path:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/status［実走後・採点済み］": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.checkpoint:null",
+    "$.completed_at:str",
+    "$.current_stage:num",
+    "$.error:null",
+    "$.result.duration_seconds:num",
+    "$.result.error:str",
+    "$.result.final_path:str",
+    "$.result.health.all_features_active:bool",
+    "$.result.health.skipped_features:list",
+    "$.result.health.warnings:list",
+    "$.result.health:dict",
+    "$.result.metadata.chapters:list",
+    "$.result.metadata.chapters[].time:str",
+    "$.result.metadata.chapters[].title:str",
+    "$.result.metadata.chapters[]:dict",
+    "$.result.metadata.description:str",
+    "$.result.metadata.tags:list",
+    "$.result.metadata.tags[]:str",
+    "$.result.metadata.titles:list",
+    "$.result.metadata.titles[]:str",
+    "$.result.metadata:dict",
+    "$.result.preview_path:str",
+    "$.result.quality_details.category_report:list",
+    "$.result.quality_details.category_report[].category:str",
+    "$.result.quality_details.category_report[].deductions:num",
+    "$.result.quality_details.category_report[].label:str",
+    "$.result.quality_details.category_report[].plugin_count:num",
+    "$.result.quality_details.category_report[].score:num",
+    "$.result.quality_details.category_report[].status:str",
+    "$.result.quality_details.category_report[]:dict",
+    "$.result.quality_details.category_scores.core:num",
+    "$.result.quality_details.category_scores.template:num",
+    "$.result.quality_details.category_scores:dict",
+    "$.result.quality_details.feedback:list",
+    "$.result.quality_details.feedback[]:str",
+    "$.result.quality_details.score:num",
+    "$.result.quality_details.scored:bool",
+    "$.result.quality_details:dict",
+    "$.result.quality_gate_report.category_scores.core:num",
+    "$.result.quality_gate_report.category_scores.template:num",
+    "$.result.quality_gate_report.category_scores:dict",
+    "$.result.quality_gate_report.feedback:list",
+    "$.result.quality_gate_report.feedback[]:str",
+    "$.result.quality_gate_report.force_render_available:bool",
+    "$.result.quality_gate_report.force_render_endpoint:str",
+    "$.result.quality_gate_report.gap:num",
+    "$.result.quality_gate_report.improvement_suggestions:list",
+    "$.result.quality_gate_report.improvement_suggestions[].action:str",
+    "$.result.quality_gate_report.improvement_suggestions[].description:str",
+    "$.result.quality_gate_report.improvement_suggestions[]:dict",
+    "$.result.quality_gate_report.score:num",
+    "$.result.quality_gate_report.status:str",
+    "$.result.quality_gate_report.threshold:num",
+    "$.result.quality_gate_report:dict",
+    "$.result.quality_score:num",
+    "$.result.quality_scored:bool",
+    "$.result.segments_count:num",
+    "$.result.session_id:str",
+    "$.result.stage_results:list",
+    "$.result.stage_results[].detail:str",
+    "$.result.stage_results[].duration:num",
+    "$.result.stage_results[].name:str",
+    "$.result.stage_results[].retries:num",
+    "$.result.stage_results[].success:bool",
+    "$.result.stage_results[]:dict",
+    "$.result.status:str",
+    "$.result:dict",
+    "$.session_id:str",
+    "$.stages:list",
+    "$.stages[].detail:str",
+    "$.stages[].icon:str",
+    "$.stages[].name:str",
+    "$.stages[].status:str",
+    "$.stages[]:dict",
+    "$.started_at:str",
+    "$.status:str",
+    "$.target_minutes:num",
+    "$.video_count:num",
+    "$.video_path:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/status［実走後・未採点］": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.checkpoint:null",
+    "$.completed_at:str",
+    "$.current_stage:num",
+    "$.error:null",
+    "$.result.duration_seconds:num",
+    "$.result.error:str",
+    "$.result.final_path:str",
+    "$.result.health.all_features_active:bool",
+    "$.result.health.skipped_features:list",
+    "$.result.health.warnings:list",
+    "$.result.health:dict",
+    "$.result.metadata.chapters:list",
+    "$.result.metadata.chapters[].time:str",
+    "$.result.metadata.chapters[].title:str",
+    "$.result.metadata.chapters[]:dict",
+    "$.result.metadata.description:str",
+    "$.result.metadata.tags:list",
+    "$.result.metadata.tags[]:str",
+    "$.result.metadata.titles:list",
+    "$.result.metadata.titles[]:str",
+    "$.result.metadata:dict",
+    "$.result.preview_path:str",
+    "$.result.quality_details.category_report:list",
+    "$.result.quality_details.category_scores.core:num",
+    "$.result.quality_details.category_scores.template:num",
+    "$.result.quality_details.category_scores:dict",
+    "$.result.quality_details.feedback:list",
+    "$.result.quality_details.feedback[]:str",
+    "$.result.quality_details.score:num",
+    "$.result.quality_details.scored:bool",
+    "$.result.quality_details:dict",
+    "$.result.quality_gate_report:null",
+    "$.result.quality_score:num",
+    "$.result.quality_scored:bool",
+    "$.result.segments_count:num",
+    "$.result.session_id:str",
+    "$.result.stage_results:list",
+    "$.result.stage_results[].detail:str",
+    "$.result.stage_results[].duration:num",
+    "$.result.stage_results[].name:str",
+    "$.result.stage_results[].retries:num",
+    "$.result.stage_results[].success:bool",
+    "$.result.stage_results[]:dict",
+    "$.result.status:str",
+    "$.result:dict",
+    "$.session_id:str",
+    "$.stages:list",
+    "$.stages[].detail:str",
+    "$.stages[].icon:str",
+    "$.stages[].name:str",
+    "$.stages[].status:str",
+    "$.stages[]:dict",
+    "$.started_at:str",
+    "$.status:str",
+    "$.target_minutes:num",
+    "$.video_count:num",
+    "$.video_path:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/stream/c4-gate-probe": {
+   "status": 400,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/transcription/models": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current:str",
+    "$.models:list",
+    "$.models[].accuracy:str",
+    "$.models[].id:str",
+    "$.models[].name:str",
+    "$.models[].speed:str",
+    "$.models[].vram_gb:num",
+    "$.models[]:dict",
+    "$.recommended:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/transcription/segments": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.model:str",
+    "$.segments:list",
+    "$.segments[].end:num",
+    "$.segments[].id:num",
+    "$.segments[].speaker_id:str",
+    "$.segments[].start:num",
+    "$.segments[].text:str",
+    "$.segments[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/transcription/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.elapsed_seconds:num",
+    "$.error_message:null",
+    "$.model:str",
+    "$.progress:num",
+    "$.segment_count:num",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/pipeline/videos": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$.videos:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/preview/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/progressive-preview/report/c4-gate-probe": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/quality/cleanup/preview": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.deleted:list",
+    "$.dry_run:bool",
+    "$.freed_bytes:num",
+    "$.protected:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/quality/storage/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.categories.drafts.count:num",
+    "$.categories.drafts.max_count:num",
+    "$.categories.drafts.newest_file:null",
+    "$.categories.drafts.oldest_file:null",
+    "$.categories.drafts.protected:bool",
+    "$.categories.drafts.retention_days:num",
+    "$.categories.drafts.size_mb:num",
+    "$.categories.drafts:dict",
+    "$.categories.final.count:num",
+    "$.categories.final.max_count:null",
+    "$.categories.final.newest_file:null",
+    "$.categories.final.oldest_file:null",
+    "$.categories.final.protected:bool",
+    "$.categories.final.retention_days:null",
+    "$.categories.final.size_mb:num",
+    "$.categories.final:dict",
+    "$.categories.prefinal.count:num",
+    "$.categories.prefinal.max_count:num",
+    "$.categories.prefinal.newest_file:null",
+    "$.categories.prefinal.oldest_file:null",
+    "$.categories.prefinal.protected:bool",
+    "$.categories.prefinal.retention_days:num",
+    "$.categories.prefinal.size_mb:num",
+    "$.categories.prefinal:dict",
+    "$.categories.raw.count:num",
+    "$.categories.raw.max_count:null",
+    "$.categories.raw.newest_file:null",
+    "$.categories.raw.oldest_file:null",
+    "$.categories.raw.protected:bool",
+    "$.categories.raw.retention_days:null",
+    "$.categories.raw.size_mb:num",
+    "$.categories.raw:dict",
+    "$.categories.screenshots.count:num",
+    "$.categories.screenshots.max_count:num",
+    "$.categories.screenshots.newest_file:null",
+    "$.categories.screenshots.oldest_file:null",
+    "$.categories.screenshots.protected:bool",
+    "$.categories.screenshots.retention_days:num",
+    "$.categories.screenshots.size_mb:num",
+    "$.categories.screenshots:dict",
+    "$.categories.video_output.count:num",
+    "$.categories.video_output.max_count:num",
+    "$.categories.video_output.newest_file:null",
+    "$.categories.video_output.oldest_file:null",
+    "$.categories.video_output.protected:bool",
+    "$.categories.video_output.retention_days:num",
+    "$.categories.video_output.size_mb:num",
+    "$.categories.video_output:dict",
+    "$.categories:dict",
+    "$.deletable_size_mb:num",
+    "$.protected_size_mb:num",
+    "$.total_size_mb:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/quality/threshold": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.block_threshold:num",
+    "$.pass_threshold:num",
+    "$.warning_threshold:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/resolutions": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/shorts/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/shorts/list": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/smartcut/all-candidates": {
+   "status": 400,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/smartcut/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/current-model/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.available:bool",
+    "$.model:str",
+    "$.original:str",
+    "$.preferred_model:str",
+    "$.switched:bool",
+    "$.task:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.alerts:list",
+    "$.date:str",
+    "$.models:list",
+    "$.models[].alert_level:str",
+    "$.models[].can_use:bool",
+    "$.models[].limit:num",
+    "$.models[].name:str",
+    "$.models[].remaining:num",
+    "$.models[].tier:str",
+    "$.models[].usage_percent:num",
+    "$.models[].used:num",
+    "$.models[]:dict",
+    "$.recommendations:list",
+    "$.recommendations[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/governance": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.counters.deprecation_corrections:num",
+    "$.counters.fallback_activations:num",
+    "$.counters.total_api_errors:num",
+    "$.counters:dict",
+    "$.deprecation_map:dict",
+    "$.deprecation_map[\"gemini-2.0-flash\"]:str",
+    "$.deprecation_map[\"gemini-2.0-flash-lite\"]:str",
+    "$.deprecation_map[\"gemini-2.5-flash\"]:str",
+    "$.deprecation_map[\"gemini-2.5-flash-lite\"]:str",
+    "$.deprecation_map[\"gemini-2.5-pro\"]:str",
+    "$.deprecation_map[\"imagen-3.0-generate-001\"]:str",
+    "$.fallback_chain.gemini-3-flash-preview:str",
+    "$.fallback_chain:dict",
+    "$.fallback_chain[\"gemini-2.5-flash\"]:str",
+    "$.fallback_chain[\"gemini-2.5-flash-lite\"]:str",
+    "$.fallback_chain[\"gemini-2.5-pro\"]:str",
+    "$.fallback_chain[\"gemini-3.1-pro-preview\"]:str",
+    "$.fallback_chain[\"gemini-3.5-flash-lite\"]:null",
+    "$.fallback_chain[\"gemini-3.6-flash\"]:str",
+    "$.fallback_chain[\"gemini-3.7-flash\"]:str",
+    "$.grade_policy.batch:str",
+    "$.grade_policy.escalation:str",
+    "$.grade_policy.premium:str",
+    "$.grade_policy.principle:str",
+    "$.grade_policy.standard:str",
+    "$.grade_policy:dict",
+    "$.recent_events:list",
+    "$.tiers.batch.description:str",
+    "$.tiers.batch.label:str",
+    "$.tiers.batch.model:str",
+    "$.tiers.batch:dict",
+    "$.tiers.premium.description:str",
+    "$.tiers.premium.label:str",
+    "$.tiers.premium.model:str",
+    "$.tiers.premium:dict",
+    "$.tiers.pro.description:str",
+    "$.tiers.pro.label:str",
+    "$.tiers.pro.model:str",
+    "$.tiers.pro:dict",
+    "$.tiers.standard.description:str",
+    "$.tiers.standard.label:str",
+    "$.tiers.standard.model:str",
+    "$.tiers.standard:dict",
+    "$.tiers:dict",
+    "$.usage.date:str",
+    "$.usage.models.gemini-3-flash-preview.alert_level:str",
+    "$.usage.models.gemini-3-flash-preview.limit:num",
+    "$.usage.models.gemini-3-flash-preview.remaining:num",
+    "$.usage.models.gemini-3-flash-preview.tier:str",
+    "$.usage.models.gemini-3-flash-preview.usage_ratio:num",
+    "$.usage.models.gemini-3-flash-preview.used:num",
+    "$.usage.models.gemini-3-flash-preview:dict",
+    "$.usage.models:dict",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].alert_level:str",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].limit:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].remaining:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].tier:str",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].usage_ratio:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"].used:num",
+    "$.usage.models[\"gemini-3.5-flash-lite\"]:dict",
+    "$.usage.models[\"gemini-3.6-flash\"].alert_level:str",
+    "$.usage.models[\"gemini-3.6-flash\"].limit:num",
+    "$.usage.models[\"gemini-3.6-flash\"].remaining:num",
+    "$.usage.models[\"gemini-3.6-flash\"].tier:str",
+    "$.usage.models[\"gemini-3.6-flash\"].usage_ratio:num",
+    "$.usage.models[\"gemini-3.6-flash\"].used:num",
+    "$.usage.models[\"gemini-3.6-flash\"]:dict",
+    "$.usage.models[\"gemini-3.7-flash\"].alert_level:str",
+    "$.usage.models[\"gemini-3.7-flash\"].limit:num",
+    "$.usage.models[\"gemini-3.7-flash\"].remaining:num",
+    "$.usage.models[\"gemini-3.7-flash\"].tier:str",
+    "$.usage.models[\"gemini-3.7-flash\"].usage_ratio:num",
+    "$.usage.models[\"gemini-3.7-flash\"].used:num",
+    "$.usage.models[\"gemini-3.7-flash\"]:dict",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].alert_level:str",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].limit:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].remaining:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].tier:str",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].usage_ratio:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"].used:num",
+    "$.usage.models[\"imagen-4.0-fast-generate-001\"]:dict",
+    "$.usage.models[\"imagen-4.0-generate-001\"].alert_level:str",
+    "$.usage.models[\"imagen-4.0-generate-001\"].limit:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"].remaining:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"].tier:str",
+    "$.usage.models[\"imagen-4.0-generate-001\"].usage_ratio:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"].used:num",
+    "$.usage.models[\"imagen-4.0-generate-001\"]:dict",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].alert_level:str",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].limit:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].remaining:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].tier:str",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].usage_ratio:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"].used:num",
+    "$.usage.models[\"imagen-4.0-ultra-generate-001\"]:dict",
+    "$.usage.models[\"veo-3.0\"].alert_level:str",
+    "$.usage.models[\"veo-3.0\"].limit:num",
+    "$.usage.models[\"veo-3.0\"].remaining:num",
+    "$.usage.models[\"veo-3.0\"].tier:str",
+    "$.usage.models[\"veo-3.0\"].usage_ratio:num",
+    "$.usage.models[\"veo-3.0\"].used:num",
+    "$.usage.models[\"veo-3.0\"]:dict",
+    "$.usage.models[\"veo-3.1\"].alert_level:str",
+    "$.usage.models[\"veo-3.1\"].limit:num",
+    "$.usage.models[\"veo-3.1\"].remaining:num",
+    "$.usage.models[\"veo-3.1\"].tier:str",
+    "$.usage.models[\"veo-3.1\"].usage_ratio:num",
+    "$.usage.models[\"veo-3.1\"].used:num",
+    "$.usage.models[\"veo-3.1\"]:dict",
+    "$.usage.models[\"veo-3.1-fast\"].alert_level:str",
+    "$.usage.models[\"veo-3.1-fast\"].limit:num",
+    "$.usage.models[\"veo-3.1-fast\"].remaining:num",
+    "$.usage.models[\"veo-3.1-fast\"].tier:str",
+    "$.usage.models[\"veo-3.1-fast\"].usage_ratio:num",
+    "$.usage.models[\"veo-3.1-fast\"].used:num",
+    "$.usage.models[\"veo-3.1-fast\"]:dict",
+    "$.usage:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/model-status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.reset_info.can_wait:bool",
+    "$.reset_info.remaining_display:str",
+    "$.reset_info.remaining_hours:num",
+    "$.reset_info.remaining_minutes:num",
+    "$.reset_info.reset_time_jst:str",
+    "$.reset_info.reset_time_utc:str",
+    "$.reset_info:dict",
+    "$.tiers.batch.available_for_use:num",
+    "$.tiers.batch.description:str",
+    "$.tiers.batch.label:str",
+    "$.tiers.batch.model:str",
+    "$.tiers.batch.preserved:num",
+    "$.tiers.batch.remaining:num",
+    "$.tiers.batch.status:str",
+    "$.tiers.batch.usage_percent:num",
+    "$.tiers.batch:dict",
+    "$.tiers.premium.available_for_use:num",
+    "$.tiers.premium.description:str",
+    "$.tiers.premium.label:str",
+    "$.tiers.premium.model:str",
+    "$.tiers.premium.preserved:num",
+    "$.tiers.premium.remaining:num",
+    "$.tiers.premium.status:str",
+    "$.tiers.premium.usage_percent:num",
+    "$.tiers.premium:dict",
+    "$.tiers.pro.available_for_use:num",
+    "$.tiers.pro.description:str",
+    "$.tiers.pro.label:str",
+    "$.tiers.pro.model:str",
+    "$.tiers.pro.preserved:num",
+    "$.tiers.pro.remaining:num",
+    "$.tiers.pro.status:str",
+    "$.tiers.pro.usage_percent:num",
+    "$.tiers.pro:dict",
+    "$.tiers.standard.available_for_use:num",
+    "$.tiers.standard.description:str",
+    "$.tiers.standard.label:str",
+    "$.tiers.standard.model:str",
+    "$.tiers.standard.preserved:num",
+    "$.tiers.standard.remaining:num",
+    "$.tiers.standard.status:str",
+    "$.tiers.standard.usage_percent:num",
+    "$.tiers.standard:dict",
+    "$.tiers:dict",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/quality-warning": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.level:str",
+    "$.message:str",
+    "$.warning:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/remaining/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.can_use:bool",
+    "$.model:str",
+    "$.remaining:num",
+    "$.usage_percent:num",
+    "$.warning:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/retry-budget": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.advice:str",
+    "$.premium.estimated_retries:num",
+    "$.premium.model:str",
+    "$.premium.remaining_requests:num",
+    "$.premium.usage_percent:num",
+    "$.premium.warning:bool",
+    "$.premium:dict",
+    "$.standard.estimated_retries:num",
+    "$.standard.model:str",
+    "$.standard.remaining_requests:num",
+    "$.standard.usage_percent:num",
+    "$.standard.warning:bool",
+    "$.standard:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/switch-history": {
+   "status": 500,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/two-tier-status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.reset_info.can_wait:bool",
+    "$.reset_info.remaining_display:str",
+    "$.reset_info.remaining_hours:num",
+    "$.reset_info.remaining_minutes:num",
+    "$.reset_info.reset_time_jst:str",
+    "$.reset_info.reset_time_utc:str",
+    "$.reset_info:dict",
+    "$.tiers.batch.available_for_use:num",
+    "$.tiers.batch.description:str",
+    "$.tiers.batch.label:str",
+    "$.tiers.batch.model:str",
+    "$.tiers.batch.preserved:num",
+    "$.tiers.batch.remaining:num",
+    "$.tiers.batch.status:str",
+    "$.tiers.batch.usage_percent:num",
+    "$.tiers.batch:dict",
+    "$.tiers.premium.available_for_use:num",
+    "$.tiers.premium.description:str",
+    "$.tiers.premium.label:str",
+    "$.tiers.premium.model:str",
+    "$.tiers.premium.preserved:num",
+    "$.tiers.premium.remaining:num",
+    "$.tiers.premium.status:str",
+    "$.tiers.premium.usage_percent:num",
+    "$.tiers.premium:dict",
+    "$.tiers.pro.available_for_use:num",
+    "$.tiers.pro.description:str",
+    "$.tiers.pro.label:str",
+    "$.tiers.pro.model:str",
+    "$.tiers.pro.preserved:num",
+    "$.tiers.pro.remaining:num",
+    "$.tiers.pro.status:str",
+    "$.tiers.pro.usage_percent:num",
+    "$.tiers.pro:dict",
+    "$.tiers.standard.available_for_use:num",
+    "$.tiers.standard.description:str",
+    "$.tiers.standard.label:str",
+    "$.tiers.standard.model:str",
+    "$.tiers.standard.preserved:num",
+    "$.tiers.standard.remaining:num",
+    "$.tiers.standard.status:str",
+    "$.tiers.standard.usage_percent:num",
+    "$.tiers.standard:dict",
+    "$.tiers:dict",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/usage/wait-options": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.current_status.available:bool",
+    "$.current_status.model:str",
+    "$.current_status.remaining:num",
+    "$.current_status.tier:str",
+    "$.current_status.usage_percent:num",
+    "$.current_status:dict",
+    "$.recommendations:list",
+    "$.reset_info.can_wait:bool",
+    "$.reset_info.remaining_display:str",
+    "$.reset_info.remaining_hours:num",
+    "$.reset_info.remaining_minutes:num",
+    "$.reset_info.reset_time_jst:str",
+    "$.reset_info.reset_time_utc:str",
+    "$.reset_info:dict",
+    "$.tier:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube-upload/auth": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.message:str",
+    "$.setup_required:bool",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube-upload/callback": {
+   "status": 307,
+   "kind": "none",
+   "shape": [
+    "Location: /?error=no_code"
+   ]
+  },
+  "GET /api/v1/api/youtube-upload/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube-upload/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.has_refresh_token:bool",
+    "$.is_authenticated:bool",
+    "$.is_configured:bool",
+    "$.message:str",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/assets/index-stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.backend:str",
+    "$.built_at:null",
+    "$.embedding_dim:num",
+    "$.file_size_kb:num",
+    "$.index_dir:str",
+    "$.index_exists:bool",
+    "$.success:bool",
+    "$.total_entries:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/assets/search": {
+   "status": 422,
+   "kind": "json",
+   "shape": [
+    "$.detail:list",
+    "$.detail[].input:null",
+    "$.detail[].loc:list",
+    "$.detail[].loc[]:str",
+    "$.detail[].msg:str",
+    "$.detail[].type:str",
+    "$.detail[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/comments/request-trends": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.message:str",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/hook-history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.history:list",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/schedule": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.schedule:list",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/schedule/next-deadline": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.has_deadline:bool",
+    "$.message:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/schedule/pace-analysis": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.enough_data:bool",
+    "$.message:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/schedule/settings": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.settings.auto_schedule:bool",
+    "$.settings.preferred_days:list",
+    "$.settings.preferred_days[]:str",
+    "$.settings.reminder_hours_before:num",
+    "$.settings.target_per_week:num",
+    "$.settings:dict",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/api/youtube/series/c4-gate-probe/playlist": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.message:str",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/mcp/info": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.description:str",
+    "$.mcp_native:bool",
+    "$.name:str",
+    "$.resources:num",
+    "$.tools:num",
+    "$.version:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/mcp/resources": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.resources:list",
+    "$.resources[].description:str",
+    "$.resources[].mime_type:str",
+    "$.resources[].name:str",
+    "$.resources[].uri:str",
+    "$.resources[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/mcp/resources/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/mcp/tools": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.tools:list",
+    "$.tools[].description:str",
+    "$.tools[].name:str",
+    "$.tools[].parameters:dict",
+    "$.tools[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/soul/chronicle": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.chronicle:list",
+    "$.total:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/soul/dashboard": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.brand_keywords:list",
+    "$.brand_keywords[]:str",
+    "$.chronicle:list",
+    "$.industry_benchmarks.color_grading.reference:str",
+    "$.industry_benchmarks.color_grading.tech_benchmark:str",
+    "$.industry_benchmarks.color_grading.trend:str",
+    "$.industry_benchmarks.color_grading:dict",
+    "$.industry_benchmarks.source:str",
+    "$.industry_benchmarks.top_youtuber_benchmarks.ctr_average_percent:num",
+    "$.industry_benchmarks.top_youtuber_benchmarks.ctr_top_tier_percent:num",
+    "$.industry_benchmarks.top_youtuber_benchmarks.data_source:str",
+    "$.industry_benchmarks.top_youtuber_benchmarks.dopamine_interval_seconds:num",
+    "$.industry_benchmarks.top_youtuber_benchmarks.hook_window_seconds:num",
+    "$.industry_benchmarks.top_youtuber_benchmarks.is_real:bool",
+    "$.industry_benchmarks.top_youtuber_benchmarks.reengagement_mark_seconds:num",
+    "$.industry_benchmarks.top_youtuber_benchmarks.reference:str",
+    "$.industry_benchmarks.top_youtuber_benchmarks.retention_average_percent:num",
+    "$.industry_benchmarks.top_youtuber_benchmarks.retention_top_tier_percent:num",
+    "$.industry_benchmarks.top_youtuber_benchmarks:dict",
+    "$.industry_benchmarks.tv_standards.reference:str",
+    "$.industry_benchmarks.tv_standards.subtitle_chars_per_second:num",
+    "$.industry_benchmarks.tv_standards.subtitle_lead_frames:num",
+    "$.industry_benchmarks.tv_standards.subtitle_max_per_line:num",
+    "$.industry_benchmarks.tv_standards.subtitle_trail_frames:num",
+    "$.industry_benchmarks.tv_standards:dict",
+    "$.industry_benchmarks.typography.reference:str",
+    "$.industry_benchmarks.typography.silent_first:str",
+    "$.industry_benchmarks.typography.trend:str",
+    "$.industry_benchmarks.typography:dict",
+    "$.industry_benchmarks:dict",
+    "$.last_updated:str",
+    "$.philosophy.current:str",
+    "$.philosophy.history:list",
+    "$.philosophy.history[].content:str",
+    "$.philosophy.history[].extracted_at:str",
+    "$.philosophy.history[].source:str",
+    "$.philosophy.history[]:dict",
+    "$.philosophy.total_philosophies:num",
+    "$.philosophy:dict",
+    "$.rank.description:str",
+    "$.rank.icon:str",
+    "$.rank.level:str",
+    "$.rank.next_rank.name:str",
+    "$.rank.next_rank.remaining:num",
+    "$.rank.next_rank.threshold:num",
+    "$.rank.next_rank:dict",
+    "$.rank.xp:num",
+    "$.rank:dict",
+    "$.statistics.approval_rate:num",
+    "$.statistics.approvals:num",
+    "$.statistics.rejections:num",
+    "$.statistics.total_decisions:num",
+    "$.statistics.total_sessions:num",
+    "$.statistics:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/soul/philosophy": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.latest.content:str",
+    "$.latest.extracted_at:str",
+    "$.latest.source:str",
+    "$.latest:dict",
+    "$.philosophies:list",
+    "$.philosophies[].content:str",
+    "$.philosophies[].extracted_at:str",
+    "$.philosophies[].philosophy:str",
+    "$.philosophies[].session_summary:str",
+    "$.philosophies[].source:str",
+    "$.philosophies[].tags:list",
+    "$.philosophies[].tags[]:str",
+    "$.philosophies[].timestamp:str",
+    "$.philosophies[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/themes": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.themes:list",
+    "$.themes[].color_palette.accent:str",
+    "$.themes[].color_palette.background:str",
+    "$.themes[].color_palette.main:str",
+    "$.themes[].color_palette.sub:str",
+    "$.themes[].color_palette.text:str",
+    "$.themes[].color_palette:dict",
+    "$.themes[].description:str",
+    "$.themes[].id:str",
+    "$.themes[].label:str",
+    "$.themes[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/themes/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/themes/current/active": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.applied_at:str",
+    "$.template:null",
+    "$.theme.id:str",
+    "$.theme.label:str",
+    "$.theme:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/themes/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$.templates_count:num",
+    "$.themes_count:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/themes/stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.avg_satisfaction.asmr_relaxation:num",
+    "$.avg_satisfaction.hikakin_vlog:num",
+    "$.avg_satisfaction.mrbeast_entertainment:num",
+    "$.avg_satisfaction.nhk_documentary:num",
+    "$.avg_satisfaction:dict",
+    "$.by_template.asmr_relaxation:num",
+    "$.by_template.hikakin_vlog:num",
+    "$.by_template.mrbeast_entertainment:num",
+    "$.by_template.nhk_documentary:num",
+    "$.by_template:dict",
+    "$.by_theme.calm:num",
+    "$.by_theme.cool:num",
+    "$.by_theme.energetic:num",
+    "$.by_theme.warm:num",
+    "$.by_theme:dict",
+    "$.checked:bool",
+    "$.data_source:str",
+    "$.is_real:bool",
+    "$.rated_counts.asmr_relaxation:num",
+    "$.rated_counts.hikakin_vlog:num",
+    "$.rated_counts.mrbeast_entertainment:num",
+    "$.rated_counts.nhk_documentary:num",
+    "$.rated_counts:dict",
+    "$.recent:list",
+    "$.recent[].satisfaction:num",
+    "$.recent[].template_id:str",
+    "$.recent[].theme_id:str",
+    "$.recent[].timestamp:str",
+    "$.recent[]:dict",
+    "$.skipped_entries:num",
+    "$.total_selections:num",
+    "$.unrated_templates:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/themes/templates": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.templates:list",
+    "$.templates[].description:str",
+    "$.templates[].id:str",
+    "$.templates[].label:str",
+    "$.templates[].name:str",
+    "$.templates[].recommended_themes:list",
+    "$.templates[].recommended_themes[]:str",
+    "$.templates[].reference:str",
+    "$.templates[].target_genre:list",
+    "$.templates[].target_genre[]:str",
+    "$.templates[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/themes/templates/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/v1/version": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.api_version:str",
+    "$.app_version:str",
+    "$.codename:str",
+    "$.deprecations:list",
+    "$.supported_versions:list",
+    "$.supported_versions[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/video": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/video/color-presets": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.default:str",
+    "$.presets:list",
+    "$.presets[]:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/video/download/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/video/list": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.videos:list",
+    "$:dict"
+   ]
+  },
+  "GET /api/video/preview/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/video/process/status/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/video/status/c4-gate-probe": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.error:str",
+    "$.task_id:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube-upload/auth": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.message:str",
+    "$.setup_required:bool",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube-upload/callback": {
+   "status": 307,
+   "kind": "none",
+   "shape": [
+    "Location: /?error=no_code"
+   ]
+  },
+  "GET /api/youtube-upload/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube-upload/status": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.has_refresh_token:bool",
+    "$.is_authenticated:bool",
+    "$.is_configured:bool",
+    "$.message:str",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/assets/index-stats": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.backend:str",
+    "$.built_at:null",
+    "$.embedding_dim:num",
+    "$.file_size_kb:num",
+    "$.index_dir:str",
+    "$.index_exists:bool",
+    "$.success:bool",
+    "$.total_entries:num",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/assets/search": {
+   "status": 422,
+   "kind": "json",
+   "shape": [
+    "$.detail:list",
+    "$.detail[].input:null",
+    "$.detail[].loc:list",
+    "$.detail[].loc[]:str",
+    "$.detail[].msg:str",
+    "$.detail[].type:str",
+    "$.detail[]:dict",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/comments/request-trends": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.message:str",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/health": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.service:str",
+    "$.status:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/hook-history": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.history:list",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/schedule": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.count:num",
+    "$.schedule:list",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/schedule/next-deadline": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.has_deadline:bool",
+    "$.message:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/schedule/pace-analysis": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.enough_data:bool",
+    "$.message:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/schedule/settings": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.settings.auto_schedule:bool",
+    "$.settings.preferred_days:list",
+    "$.settings.preferred_days[]:str",
+    "$.settings.reminder_hours_before:num",
+    "$.settings.target_per_week:num",
+    "$.settings:dict",
+    "$.success:bool",
+    "$:dict"
+   ]
+  },
+  "GET /api/youtube/series/c4-gate-probe/playlist": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.message:str",
+    "$.success:bool",
+    "$:dict"
+   ]
+  }
+ }
+}

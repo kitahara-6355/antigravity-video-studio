@@ -77,7 +77,18 @@ _StageFailed: quality_gate: スコア: 89点 (ランクB)
 > **いまの挙動**（2026-09-13 実測・HEAD は案A の実装後・`net_guard` 下なので課金ゼロ）:
 >
 > ```
-> python -m backend.quality_gate_plugins  # 経由: run_all_plugins(プレビュー無しの ctx)
+> ANTIGRAVITY_WRITABLE_ROOT="$(mktemp -d)" GOOGLE_API_KEY=dummy_key_for_ci PYTHONPATH=./backend python -c "
+> import quality_gate_plugins as Q
+> class Ctx:  # プレビューも字幕も無い文脈（各プラグインの早期 return に入る側）
+>     preview_path = None; segments = []; selected_segments = []; final_path = None
+>     metadata = {}; target_minutes = 10; template = None; thumbnail_path = None
+>     def __getattr__(self, n): return None
+> r = Q.run_all_plugins(Ctx(), None)
+> print('all_plugins_ran :', r.get('all_plugins_ran'))
+> print('failed_plugins  :', len(r.get('failed_plugins', [])))
+> for c in r['category_report']:
+>     print(f\"  {c['category']:<14} score {c['score']}  unchecked {c.get('unchecked')}\")
+> "
 >
 > all_plugins_ran : False
 > failed_plugins  : 16
@@ -96,6 +107,14 @@ _StageFailed: quality_gate: スコア: 89点 (ランクB)
 >
 > 正典 C4a の条件文に「**実走記録は、その後に経路を書き換えたら取り直す**」を
 > 足したのはこの指摘への対処（2026-09-13 ユーザー承認）。
+>
+> **再現手順の訂正（2026-09-17・gate-verifier 25周目）。** 当初ここには
+> `python -m backend.quality_gate_plugins` と書いていたが、このモジュールは
+> `__main__` を持たないので**何も出力しない**（実測: exit 0・0 バイト）。数字は
+> `run_all_plugins` を直接呼べば再現するので、内容ではなく手順の誤り。上の形に直し、
+> 2026-09-17 に同じ数字が一字一致で出ることを確かめた。
+> `ANTIGRAVITY_WRITABLE_ROOT` を一時ディレクトリへ向けているのは、
+> 向けないと `backend/usage_tracker/usage_data.json`（Git 追跡下）が書き換わるため。
 
 ## ④ retention 分析 — `agents.pipeline_coordinator._run_retention_analysis()`
 

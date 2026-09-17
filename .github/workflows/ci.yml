@@ -240,7 +240,8 @@ jobs:
         env:
           GOOGLE_API_KEY: "dummy_key_for_ci"
           PYTHONPATH: ./backend
-        run: python -m backend.c4_response_gate --gate
+        # 観測した面は成果物に残す — 手元（Windows）と形が違ったときに持ち帰って査読する
+        run: python -m backend.c4_response_gate --gate --faces-out c4b-observed-faces.json
 
       - name: テスト結果アップロード
         if: always()
@@ -252,6 +253,7 @@ jobs:
             coverage.json
             fs-guard-records.jsonl
             fs-guard-report.txt
+            c4b-observed-faces.json
           retention-days: 30
 
       # main へのマージ可否は「マージするとき」に判定する。

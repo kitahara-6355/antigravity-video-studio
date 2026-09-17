@@ -140,3 +140,6 @@ Human01_Official Artifact/
 # fs_guard の検出結果（実行のたびに変わる作業ファイル）
 fs-guard-report.txt
 fs-guard-records.jsonl
+
+# R1.5-C4b の門が CI で観測した面（成果物として持ち帰るもの。台帳ではない）
+c4b-observed-faces.json
