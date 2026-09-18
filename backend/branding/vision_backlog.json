@@ -314,6 +314,17 @@
         "detail": "python -m backend.cost_guard --status が2つ警告する: .claude/budget.json の auto_reload が off と宣言されていない／spend_cap_usd と spend_cap_project が空。CLAUDE.md の方針は Spend Cap（月額・約10分遅れ）→ Tier 上限 → cost_guard の三重で、cost_guard は推定でしか止められない",
         "found_by": "R1.5 ゲート報告の証拠集め（2026-09-19）",
         "note": "AI Studio の設定はユーザーの操作。設定済みなら台帳の記入漏れ。実走が増える R3 の前に埋める"
+      },
+      {
+        "id": "D-35",
+        "title": "C4b の門の観測が、実行時に書き換わる追跡ファイルに日付で左右される",
+        "status": "open",
+        "priority": "P2",
+        "axis": "ux_guarantee_owner",
+        "created": "2026-09-19",
+        "detail": "GET /api/pipeline/api-usage は当日の呼び出し元の内訳（sources）を返し、中身は追跡ファイル backend/usage_tracker/daily_usage.json から来る。2026-09-19 の実走で当日の項目（ai_proofreader: 1）が増え、同じ日に門を回すと新しい鍵 $.sources.ai_proofreader と条件つきの面10個が出て FAIL した（翌日には鍵が消えて『出なくなった鍵』の情報になる）。実走の使用量をコミットせずに戻して回避した（費用の正式な記録は .claude/cost_ledger.jsonl と budget.json）",
+        "found_by": "R1.5 ゲート報告の証拠集め（2026-09-19）",
+        "note": "直し方の案: 実行時データ（usage_tracker の2ファイルなど）を追跡から外して初期値を置く／門が複製するときにこれらを HEAD の版で置く／sources を動的な鍵の写像として扱う。D-29 と同じく『実行時の状態が追跡ファイルに混ざる』問題"
       }
     ],
     "structural": [
