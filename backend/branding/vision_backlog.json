@@ -325,6 +325,91 @@
         "detail": "GET /api/pipeline/api-usage は当日の呼び出し元の内訳（sources）を返し、中身は追跡ファイル backend/usage_tracker/daily_usage.json から来る。2026-09-19 の実走で当日の項目（ai_proofreader: 1）が増え、同じ日に門を回すと新しい鍵 $.sources.ai_proofreader と条件つきの面10個が出て FAIL した（翌日には鍵が消えて『出なくなった鍵』の情報になる）。実走の使用量をコミットせずに戻して回避した（費用の正式な記録は .claude/cost_ledger.jsonl と budget.json）",
         "found_by": "R1.5 ゲート報告の証拠集め（2026-09-19）",
         "note": "直し方の案: 実行時データ（usage_tracker の2ファイルなど）を追跡から外して初期値を置く／門が複製するときにこれらを HEAD の版で置く／sources を動的な鍵の写像として扱う。D-29 と同じく『実行時の状態が追跡ファイルに混ざる』問題"
+      },
+      {
+        "id": "D-36",
+        "title": "ディスク空き不足で早期終了すると、失敗の原因が実行記録に残らない",
+        "status": "open",
+        "priority": "P2",
+        "axis": "pipeline_e2e",
+        "created": "2026-09-19",
+        "detail": "_check_disk_space を 0.5GB にすると、記録は status: failed / stages: [] / failed_stages: [] / all_features_active: true になり、--resume は『失敗した工程はありません（status=failed）』と出して exit 0 を返す。原因は API の戻り値にしか渡らない（pipeline_coordinator.py 612-617 行・863-878 行）。成果物ゲートは status=failed で落とすので C1c は無事。HANDOVER_20260827 §5 の積み残しで、正典にも limits にも入っていなかった",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
+        "note": "うっかり型（verification_policy の分類）"
+      },
+      {
+        "id": "D-37",
+        "title": "最終レンダリングだけ事前フック（ガバナンス）を通らない",
+        "status": "open",
+        "priority": "P2",
+        "axis": "pipeline_e2e",
+        "created": "2026-09-19",
+        "detail": "render_final を禁じるガバナンスが無視される（pipeline_coordinator.py 1011-1042 行）。工程は実際に走るので C1b の『成功に数えない』には反しない。中間ゲートからの積み残し",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
+        "note": "うっかり型"
+      },
+      {
+        "id": "D-38",
+        "title": "成果物ゲート（--gate）が、model 欄に入った段の名前を検出しない",
+        "status": "open",
+        "priority": "P3",
+        "axis": "pipeline_e2e",
+        "created": "2026-09-19",
+        "detail": "最新の記録の写しで proofread の model を 'standard' に書き換えても findings は 0。いま記録に実モデル ID が残るのは、記録器が model_policy.resolve() を通るから（C2 のテストが間接的に守っている）",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
+        "note": "うっかり型"
+      },
+      {
+        "id": "D-39",
+        "title": "モデルの降格（フォールバック）の理由が実行記録に残らない",
+        "status": "open",
+        "priority": "P2",
+        "axis": "pipeline_e2e",
+        "created": "2026-09-19",
+        "detail": "2026-09-19 の AI あり実走（20260918T162232479754-0000）で、standard 段（gemini-3.6-flash）が2回とも再試行のあと batch 段（gemini-3.5-flash-lite）に降格した。run.json には model_mismatch: true と実際のモデルが残るが、理由はコンソールのログと揮発するイベントにしか出ない（model_governance.py 723-733 行・343-356 行）。今回は保存していたコンソール出力で 503（サーバー混雑）と確かめた — 429 ではないので C5 の前提（standard 段 RPD 1,000 → 166本/日）は崩れていない。429 が続くと前提が崩れるので、記録から判別できるようにする",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
+        "note": "モデル管理の方針『どの結果がどのモデルで出たかが常に分かる』の延長（なぜそのモデルになったか）"
+      },
+      {
+        "id": "D-40",
+        "title": "Evaluator-Optimizer が毎回 TypeError で落ち、ログを出さずに握りつぶされている",
+        "status": "open",
+        "priority": "P2",
+        "axis": "quality_auto_improve",
+        "created": "2026-09-19",
+        "detail": "accessibility の点数が None（quality_gate_plugins.py 1370 行）のため、evaluator_optimizer.py 228 行の score < 70 が TypeError になり、pipeline_coordinator.py 1075 行が握りつぶす。output/runs の4件すべての traceback に出ている。初回コミットからで、退行ではない",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外"
+      },
+      {
+        "id": "D-41",
+        "title": "品質改善ループが最終レンダリングの後に回る（合格しても最終 mp4 は safe モードのまま）",
+        "status": "open",
+        "priority": "P1",
+        "axis": "quality_auto_improve",
+        "created": "2026-09-19",
+        "detail": "pipeline_coordinator.py 634-637 行。ループで合格すると状態は completed になるが、最終 mp4 は不合格だったときの safe モードで作られたまま（verifier が scratch で実測）",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外",
+        "note": "R2 の承認工程（承認した動画だけを書き出す・R2-C1）と一緒に直すのが自然"
+      },
+      {
+        "id": "D-42",
+        "title": "品質サイドカーの『全ステージ正常完走』が実態と合わない",
+        "status": "open",
+        "priority": "P2",
+        "axis": "quality_auto_improve",
+        "created": "2026-09-19",
+        "detail": "判定の材料は segments・selected・metadata の有無だけ（quality_gate_plugins.py 1139-1156 行）。AI なしの実走でも『全ステージ正常完走』と出て、stability が 100.0 になっていた",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外"
+      },
+      {
+        "id": "D-43",
+        "title": "品質改善ループが不合格で終わると、画面の工程表示（stages[5]）が running のまま残る",
+        "status": "open",
+        "priority": "P2",
+        "axis": "ui_api_connection",
+        "created": "2026-09-19",
+        "detail": "ループの最後の通知が running /『品質再チェック...』で、不合格で終わったときに閉じる通知が無い（pipeline_coordinator.py 1142-1166 行）。C4b の変更前（1fe506c）から同じで、私の修正の退行ではないことを確かめた",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外"
       }
     ],
     "structural": [
@@ -612,7 +697,8 @@
       }
     ],
     "condition_notes": [
-      "**R1.5-C1 は 2026-08-27 に4つへ分割した**（ユーザー決定）。旧 C1 は「一本化／記録／握り潰さない／成果物ゲートが PASS する」を1条件に束ねており、gate-verifier の2周をここで使い切った。**最後の節が形として間違っていた** — 「ゲートが PASS すること」を条件にすると**ゲートを弱くするのが最短の達成手段**になり、実際そうなっていた（`--gate` が `status: failed` を一度も見ておらず、動画も全 run から集めていた）。C1c で「赤を FAIL にできること」に書き換えたので基準は下がっていない。旧 C1 の判定は not_met のまま歴史に残す"
+      "**R1.5-C1 は 2026-08-27 に4つへ分割した**（ユーザー決定）。旧 C1 は「一本化／記録／握り潰さない／成果物ゲートが PASS する」を1条件に束ねており、gate-verifier の2周をここで使い切った。**最後の節が形として間違っていた** — 「ゲートが PASS すること」を条件にすると**ゲートを弱くするのが最短の達成手段**になり、実際そうなっていた（`--gate` が `status: failed` を一度も見ておらず、動画も全 run から集めていた）。C1c で「赤を FAIL にできること」に書き換えたので基準は下がっていない。旧 C1 の判定は not_met のまま歴史に残す",
+      "**2026-09-19 29周目（ユーザー決定の再検証）**: 中間ゲート（8/27）と 8/28 に met だった C1a〜C1d・C2・C3・C5 を、その後の変更（C5 の met 以降だけで関係6ファイルに +460/−89 行）を踏まえて HEAD `803bed2` に当て直した。gate-verifier は7条件すべて met・overall ready（判定を覆す反例なし）。変異で確かめた範囲: C1b は偽 worker で例外・リトライ全滅・記録の書き出し失敗を注入、C1c は最新の記録を failed / running / 状態なし / 動画なしに書き換え、C2 は25工程で解決器を突き合わせて3種の変異、C3 は SHA を揃える・consumed=false・intermediates 欠落。残った指摘はうっかり型3件と範囲外5件で、D-36〜D-43 としてバックログに登録した。コストは約47万トークン・約33分"
     ]
   },
   "phase_history": [
@@ -1276,7 +1362,8 @@
         },
         "budget_id": "R1.5-mainline",
         "condition_notes": [
-          "**R1.5-C1 は 2026-08-27 に4つへ分割した**（ユーザー決定）。旧 C1 は「一本化／記録／握り潰さない／成果物ゲートが PASS する」を1条件に束ねており、gate-verifier の2周をここで使い切った。**最後の節が形として間違っていた** — 「ゲートが PASS すること」を条件にすると**ゲートを弱くするのが最短の達成手段**になり、実際そうなっていた（`--gate` が `status: failed` を一度も見ておらず、動画も全 run から集めていた）。C1c で「赤を FAIL にできること」に書き換えたので基準は下がっていない。旧 C1 の判定は not_met のまま歴史に残す"
+          "**R1.5-C1 は 2026-08-27 に4つへ分割した**（ユーザー決定）。旧 C1 は「一本化／記録／握り潰さない／成果物ゲートが PASS する」を1条件に束ねており、gate-verifier の2周をここで使い切った。**最後の節が形として間違っていた** — 「ゲートが PASS すること」を条件にすると**ゲートを弱くするのが最短の達成手段**になり、実際そうなっていた（`--gate` が `status: failed` を一度も見ておらず、動画も全 run から集めていた）。C1c で「赤を FAIL にできること」に書き換えたので基準は下がっていない。旧 C1 の判定は not_met のまま歴史に残す",
+          "**2026-09-19 29周目（ユーザー決定の再検証）**: 中間ゲート（8/27）と 8/28 に met だった C1a〜C1d・C2・C3・C5 を、その後の変更（C5 の met 以降だけで関係6ファイルに +460/−89 行）を踏まえて HEAD `803bed2` に当て直した。gate-verifier は7条件すべて met・overall ready（判定を覆す反例なし）。変異で確かめた範囲: C1b は偽 worker で例外・リトライ全滅・記録の書き出し失敗を注入、C1c は最新の記録を failed / running / 状態なし / 動画なしに書き換え、C2 は25工程で解決器を突き合わせて3種の変異、C3 は SHA を揃える・consumed=false・intermediates 欠落。残った指摘はうっかり型3件と範囲外5件で、D-36〜D-43 としてバックログに登録した。コストは約47万トークン・約33分"
         ]
       },
       "R2": {
