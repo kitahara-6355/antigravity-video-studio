@@ -334,6 +334,37 @@ class PipelineCoordinator:
                 msg["data"] = data
             await self._ws_broadcast(msg)
 
+    async def _notify_retry(self, worker: PipelineStageWorker, qi: int, ctx) -> None:
+        """品質改善ループの「やり直し」を知らせる（R1.5-C4b・27周目）。
+
+        **見出しに前回の点数が載るので、data で出所を名乗る。** 未採点の実走では
+        `quality_score` は既定値の 0 のまま（測った 0点ではない）なので、
+        `scored` が無いと「0点だった」と読めてしまう。C4b の門もここを呼ぶ。
+        """
+        await self._notify(
+            worker, "retrying",
+            f"品質改善 {qi}/{self.MAX_QUALITY_RETRIES} (前回:{ctx.quality_score}点)", -1,
+            {"scored": bool(getattr(ctx, "quality_scored", False)), "score": ctx.quality_score})
+
+    async def _notify_quality_blocked(self, ctx) -> None:
+        """品質不合格を WebSocket で知らせる（T-033）。
+
+        **出所を名乗る**（R1.5-C4b・27周目）。この経路は GET には出ないので
+        C4b の門は測れない（台帳の `excluded_transports` に理由を書いてある）。
+        未採点の実走でも `quality_score` の 0 がそのまま流れるため、`scored` を添える。
+        """
+        if not self._ws_broadcast:
+            return
+        await self._ws_broadcast({
+            "type": "quality_gate_blocked",
+            "scored": bool(getattr(ctx, "quality_scored", False)),
+            "score": ctx.quality_score,
+            "threshold": 90,
+            "feedback": ctx.quality_feedback[:5],
+            "render_mode": "safe",
+            "force_render_available": True,
+        })
+
     async def _notify_result(self, worker: PipelineStageWorker, result: StageResult):
         """工程の結果を通知する（直列・並列の両方がここを通る）。
 
@@ -992,15 +1023,7 @@ class PipelineCoordinator:
                     f"⚠️ [T-031] 品質スコア{ctx.quality_score}点 < 90 — safe_modeレンダリング"
                 )
                 # T-033: WebSocket で品質不合格通知
-                if self._ws_broadcast:
-                    await self._ws_broadcast({
-                        "type": "quality_gate_blocked",
-                        "score": ctx.quality_score,
-                        "threshold": 90,
-                        "feedback": ctx.quality_feedback[:5],
-                        "render_mode": "safe",
-                        "force_render_available": True,
-                    })
+                await self._notify_quality_blocked(ctx)
             else:
                 ctx.render_mode = "production"
 
@@ -1099,10 +1122,7 @@ class PipelineCoordinator:
                 f"前回スコア={ctx.quality_score}点, "
                 f"フィードバック={len(ctx.quality_feedback)}件"
             )
-            await self._notify(
-                quality_worker, "retrying",
-                f"品質改善 {qi}/{self.MAX_QUALITY_RETRIES} (前回:{ctx.quality_score}点)"
-            )
+            await self._notify_retry(quality_worker, qi, ctx)
 
             # Preview 再生成 (BUG-02修正: 計測フック追加)
             await self._notify(preview_worker, "running", "品質改善のため再生成中...")

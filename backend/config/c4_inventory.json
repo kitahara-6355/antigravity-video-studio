@@ -533,6 +533,34 @@
    "fingerprint": []
   },
   {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._notify_quality_blocked",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator._notify_quality_blocked",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L349-366: 品質不合格を WebSocket で配る（T-033）。`threshold: 90` は本番の合格ラインそのもので、測った値ではない。`scored` と `score` で出所を名乗る（`getattr` の既定は悲観側）。**この経路は GET に出ないので C4b の門では測れない** — 台帳 `c4_response_gate.json` の`excluded_transports` に理由を書いてある。2026-09-18 に足した（gate-verifier 27周目 E2:未採点の実走でも `quality_score` の 0 が無印で流れていた）。",
+   "fingerprint": [
+    "getattr_default"
+   ],
+   "marks": [
+    "scored=?"
+   ]
+  },
+  {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._notify_retry",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator._notify_retry",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L337-348: 品質改善ループの「やり直し」を知らせる。**見出しに前回の点数が載る**ので（`品質改善 1/3 (前回:85点)`）、data で `scored` と `score` を名乗り、router の `_update_stage` が工程の見出しへ写す。`getattr(ctx, \"quality_scored\", False)` の既定は**悲観側**（旗が無ければ「採点していない」と名乗る）。2026-09-18 に足した（gate-verifier 27周目 E1: この見出しの点数が無印で `GET /api/pipeline/status` に出ていた）。",
+   "fingerprint": [
+    "getattr_default"
+   ],
+   "marks": [
+    "scored=?"
+   ]
+  },
+  {
    "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._quality_improvement_loop",
    "file": "backend/agents/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._quality_improvement_loop",
@@ -964,6 +992,16 @@
     "except_returns",
     "getattr_default"
    ],
+   "marks": []
+  },
+  {
+   "id": "backend/c4_response_gate.py::_工程を進める",
+   "file": "backend/c4_response_gate.py",
+   "symbol": "_工程を進める",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "C4b の門そのもの。**本番の配線で工程の状態を進める**足場（coordinator の `_notify_result` と、点が出なかった実走では `_notify_retry`）。数字は入力条件の `点数の変種` から来る検査用の値で、門の一時ツリーの外に出ない。",
+   "fingerprint": [],
    "marks": []
   },
   {
@@ -2782,13 +2820,17 @@
    "symbol": "force_render",
    "category": "品質スコア",
    "status": "honest",
-   "reason": "L838 `quality_score=quality_report.get(\"score\", 0)`。quality_report は L796 で存在必須（無ければ400）。生成元 pipeline_coordinator.py:1155 は `quality_scored` が真のときだけ dict を作り必ず `score` を入れる。既定0は到達しない。",
+   "reason": "L838 `quality_score=quality_report.get(\"score\", 0)`。quality_report は存在必須（無ければ400）。生成元 pipeline_coordinator の `_build_result` は `quality_scored` が真で90点未満のときだけ dict を作り、必ず `score` を入れる。既定0は到達しない。2026-09-18 に**応答と WebSocket の電文に `scored: True` を足した**（gate-verifier 27周目 E2。採点済みの実走でしか作られない値なので真）。",
    "fingerprint": [
     "default:score",
     "default:score",
     "default:score",
     "default:score",
     "or_default"
+   ],
+   "marks": [
+    "scored=True",
+    "scored=True"
    ]
   },
   {

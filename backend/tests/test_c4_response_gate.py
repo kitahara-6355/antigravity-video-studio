@@ -280,6 +280,26 @@ def test_点数と関係なく揺れる所は除く(門):
     assert 門.点数に連れて動く所(甲, 乙, None)["漏れ"] == ["$.n", "$.uptime"]
 
 
+def test_揺れる文字列でも点数の動きは拾う(門):
+    """**27周目 M08。** 時刻と点数が同じ文字列に入ると、葉ごと捨てて点数の動きまで見逃していた。
+
+    揺れた**部分だけ**を伏せた型に、もう片方の点数の回が当てはまるかで見る。
+    """
+    甲 = 面("f", {"detail": "02:24:37 完了 品質0点"})
+    乙 = 面("f", {"detail": "02:24:39 完了 品質73.21点"})
+    甲2 = 面("f", {"detail": "02:24:41 完了 品質0点"})
+    assert 門.点数に連れて動く所(甲, 乙, 甲2)["漏れ"] == ["$.detail"]
+
+
+def test_揺れるだけの文字列は漏れにしない(門):
+    """揺れた所だけを伏せた型に当てはまるなら、点数とは関係ない（空振りを作らない）。"""
+    甲 = 面("f", {"detail": "02:24:37 完了"})
+    乙 = 面("f", {"detail": "02:24:39 完了"})
+    甲2 = 面("f", {"detail": "02:24:41 完了"})
+    r = 門.点数に連れて動く所(甲, 乙, 甲2)
+    assert r["漏れ"] == [] and r["覆われた"] == 0, r
+
+
 def test_点数に連れて動く文字は行で拾う(門):
     甲 = 面("r", kind="text", lines=["総合スコア: 未計測", "x"])
     乙 = 面("r", kind="text", lines=["総合スコア: 73.2点", "x"])
@@ -295,10 +315,61 @@ def test_見えない所の点数も拾う(門):
     甲["raw"], 乙["raw"] = '<meter value="0"></meter>未計測', '<meter value="73.21"></meter>未計測'
     r = 門.点数に連れて動く所(甲, 乙, dict(甲))
     assert r["文字"] == [] and r["見えない所"] is True
-    # 同じ点数でも生の本文が揺れるなら、見えない所の違いは言えない
+    # **27周目 M09**: 生の本文が毎回揺れても（キャッシュ避けなど）、揺れた所だけを伏せて見る
     揺れた = dict(甲)
-    揺れた["raw"] = '<meter value="0"></meter>未計測<!-- 別の回 -->'
-    assert 門.点数に連れて動く所(甲, 乙, 揺れた)["見えない所"] is False
+    甲["raw"] = '<meter value="0"></meter>未計測<link href="/favicon.ico?v=111">'
+    乙["raw"] = '<meter value="73.21"></meter>未計測<link href="/favicon.ico?v=222">'
+    揺れた["raw"] = '<meter value="0"></meter>未計測<link href="/favicon.ico?v=333">'
+    assert 門.点数に連れて動く所(甲, 乙, 揺れた)["見えない所"] is True
+    # 揺れているだけなら見えない所は動いていない
+    乙だけ揺れ = dict(乙)
+    乙だけ揺れ["raw"] = '<meter value="0"></meter>未計測<link href="/favicon.ico?v=444">'
+    assert 門.点数に連れて動く所(甲, 乙だけ揺れ, 揺れた)["見えない所"] is False
+
+
+def test_点数の変種は表示の閾値をまたぐ(門):
+    """**27周目 M07。** 同じ帯の中で点数を動かすと、閾値から作った文字だけが動く形を見逃す。
+
+    合格・不合格は品質ゲートの90点の同じ側に置いたまま、表示のランク（95 / 90 / 80）はまたぐ。
+    """
+    def 帯(点):
+        return "S" if 点 >= 95 else "A" if 点 >= 90 else "B" if 点 >= 80 else "C"
+
+    for 条件, (甲, 乙) in 門.点数の変種.items():
+        assert 帯(甲) != 帯(乙), f"{条件} の {甲} と {乙} が同じ帯"
+        if 条件 not in 門._未採点の条件:
+            assert (甲 >= 90) == (乙 >= 90), f"{条件} の2点が品質ゲートの合否をまたいでいる"
+    assert 門.点数の変種[門.合格][0] >= 90 and 門.点数の変種[門.不合格][0] < 90
+
+
+def test_改善ループの条件ではやり直しも本番の配線で進める(門, monkeypatch):
+    """**27周目 E1。** 品質ゲートが不合格なら、本番はこのあと改善ループの「やり直し」を知らせる。
+
+    **結果の通知だけの状態とは別の面**として見るので、条件で分ける（同じ面に畳むと、
+    やり直しが上書きしてしまい、結果の通知の印が消えても気づけない）。
+    """
+    from agents.pipeline_types import StageResult
+    pc = importlib.import_module("agents.pipeline_coordinator")
+    呼ばれた = []
+
+    async def 結果を(worker, 工程):
+        呼ばれた.append(("結果", 工程.success))
+
+    async def やり直しを(worker, qi, ctx):
+        呼ばれた.append(("やり直し", qi))
+
+    monkeypatch.setattr(pc.pipeline_coordinator, "_notify_result", 結果を)
+    monkeypatch.setattr(pc.pipeline_coordinator, "_notify_retry", やり直しを)
+    ctx = SimpleNamespace(quality_scored=False, quality_score=0)
+    工程 = StageResult("品質チェック", False, "スコア: 85点")
+    門._工程を進める((SimpleNamespace(index=5), 工程, ctx, True))
+    門._工程を進める((SimpleNamespace(index=5), 工程, ctx, False))
+    assert 呼ばれた == [("結果", False), ("やり直し", 1), ("結果", False)], 呼ばれた
+    # 条件の一覧と点数の変種が揃っていること（改善ループは不合格と同じ帯）
+    assert 門.改善ループ in 門.条件の一覧 and 門.点数の変種[門.改善ループ] == 門.点数の変種[門.不合格]
+    # 点が出なかった実走もループに入る（本番は `verify` が偽なら入る）
+    assert 門.改善ループ未採点 in 門.条件の一覧
+    assert 門.点数の変種[門.改善ループ未採点] == 門.点数の変種[門.未採点]
 
 
 def test_点数で出口が変わったら報告する(門):
@@ -664,11 +735,26 @@ def test_WebSocket_は通り道として宣言が要る(門):
 def test_パス引数の値の出どころが無ければ落ちる(門):
     """**26周目 M11/M12。** 合成の値だけでは、一覧が返す ID でしか開かない面が見えない。"""
     付帯 = {"パス引数": {"未宣言": ["GET /api/c/{id}"], "値が取れない": ["GET /api/d/{id} ← GET /api/d $.x[].id"],
-                     "使われていない宣言": ["GET /api/gone/{id}"]}}
+                     "使われていない宣言": ["GET /api/gone/{id}"],
+                     "上限より多い": ["GET /api/e/{id} ← GET /api/e $.x[].id（4 件 > 上限 2）"]}}
     違反, 情報 = 判定(門, [], 台帳(), 付帯=付帯)
     assert any("パス引数の値の出どころが台帳にありません" in v and "/api/c/{id}" in v for v in 違反), 違反
     assert any("一覧 API から値が取れません" in v and "/api/d/{id}" in v for v in 違反), 違反
+    assert any("一覧が返す値を全部は叩けていません" in v and "/api/e/{id}" in v for v in 違反), 違反
     assert any("使われていないパス引数の宣言" in m for m in 情報), 情報
+
+
+def test_一覧が上限より多くの値を返したら落ちる(門):
+    """**27周目 M11。** 上限で黙って打ち切ると、一覧の3件目以降に足した数字が見えない。"""
+    既定 = [面("GET /api/th", {"themes": [{"id": "warm"}, {"id": "cool"},
+                                          {"id": "energetic"}, {"id": "calm"}]})]
+    宣言 = {"GET /api/th/{id}": {"from": "GET /api/th", "take": "$.themes[].id", "limit": 2}}
+    値, 問題 = 門.パス引数の値(["/api/th/{id}"], 既定, 台帳(path_values=宣言))
+    assert 問題["上限より多い"] == ["GET /api/th/{id} ← GET /api/th $.themes[].id（4 件 > 上限 2）"], 問題
+    assert 値["GET /api/th/{id}"] == ["warm", "cool"], "上限までは叩く"
+    宣言["GET /api/th/{id}"]["limit"] = 4
+    値, 問題 = 門.パス引数の値(["/api/th/{id}"], 既定, 台帳(path_values=宣言))
+    assert 問題["上限より多い"] == [] and 値["GET /api/th/{id}"] == ["warm", "cool", "energetic", "calm"]
 
 
 def test_パス引数の宣言は形と理由が要る(門):
@@ -1267,14 +1353,14 @@ def test_観測の本体は条件ごとに点数を変えて比べる(門, tmp_p
     出た = json.loads((tmp_path / "observed.json").read_text(encoding="utf-8"))
     観測 = {o["face"]: o for o in 出た["観測"]}
     assert "GET /api/ch/ch-001" in 観測, "台帳で対応づけた値で叩いていない"
-    for 条件 in (門.合格, 門.不合格, 門.未採点):
+    for 条件 in (門.合格, 門.不合格, 門.未採点, 門.改善ループ, 門.改善ループ未採点):
         o = 観測[f"GET /api/score［{条件}］"]
-        assert o["unscored"] is (条件 == 門.未採点), 条件
+        assert o["unscored"] is (条件 in 門._未採点の条件), 条件
         assert o["動いた"]["漏れ"] == ["$.value"], (条件, o["動いた"])
         assert "GET /api/ch/ch-001［" + 条件 + "］" in 観測
     assert "動いた" not in 観測["GET /api/score"], "既定の条件は比べない"
     assert 出た["付帯"]["パス引数"]["未宣言"] == []
-    assert len(進めた) == 9, 進めた   # 3条件 × 3回
+    assert len(進めた) == 15, 進めた   # 5条件 × 3回
     assert all(通知[2] == 差した点 for 通知, 差した点 in 進めた), "工程を差した状態の中で進めていない"
 
 
@@ -1308,6 +1394,52 @@ def test_失敗した工程にも_data_を渡す(monkeypatch):
         (5, "error", "落ちた", -1, None),
         (5, "completed", "スコア: 92点", 100, {"scored": True}),
     ]
+
+
+def test_品質改善のやり直しにも印を載せる():
+    """**27周目 E1。** 改善ループの「やり直し」の見出しに点数が載るのに data が無く、
+
+    `GET /api/pipeline/status` の `stages[5].detail = "品質改善 1/3 (前回:0点)"` が無印で出ていた。
+    """
+    import asyncio
+
+    from agents.pipeline_coordinator import PipelineCoordinator
+    coord = PipelineCoordinator.__new__(PipelineCoordinator)
+    届いた = []
+    coord._progress_callback = lambda *a: 届いた.append(a)
+    coord._ws_broadcast = None
+    w = SimpleNamespace(index=5, name="品質チェック", icon="✅")
+    採点済み = SimpleNamespace(quality_scored=True, quality_score=85)
+    未採点 = SimpleNamespace(quality_scored=False, quality_score=0)
+    asyncio.run(coord._notify_retry(w, 1, 採点済み))
+    asyncio.run(coord._notify_retry(w, 2, 未採点))
+    assert [(a[0], a[1], a[4]) for a in 届いた] == [
+        (5, "retrying", {"scored": True, "score": 85}),
+        (5, "retrying", {"scored": False, "score": 0}),
+    ], 届いた
+    assert "前回:85点" in 届いた[0][2] and "前回:0点" in 届いた[1][2]
+
+
+def test_WebSocket_の品質不合格も出所を名乗る():
+    """**27周目 E2。** WS は `stages[]` に無い数字を配る（未採点の実走では 0 が流れる）。"""
+    import asyncio
+
+    from agents.pipeline_coordinator import PipelineCoordinator
+    coord = PipelineCoordinator.__new__(PipelineCoordinator)
+    配った = []
+
+    async def 記録(msg):
+        配った.append(msg)
+
+    coord._ws_broadcast = 記録
+    asyncio.run(coord._notify_quality_blocked(
+        SimpleNamespace(quality_scored=False, quality_score=0, quality_feedback=[])))
+    assert 配った[0]["type"] == "quality_gate_blocked"
+    assert 配った[0]["scored"] is False and 配った[0]["score"] == 0
+    coord._ws_broadcast = None
+    asyncio.run(coord._notify_quality_blocked(SimpleNamespace(quality_scored=True, quality_score=85,
+                                                              quality_feedback=[])))
+    assert len(配った) == 1, "配り先が無ければ何もしない"
 
 
 def test_工程の見出しにも印を写す(monkeypatch):

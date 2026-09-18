@@ -4,7 +4,7 @@
  "note": "`python -m backend.c4_response_gate --gate` の台帳（**人の判断**）。観測した面の形は `c4_response_faces.json`（`--write-faces` で書き直して差分を査読する）。ここに書くのは — 鍵名の分類（category_names / non_category_names_reviewed / non_category_names）、面ごとの例外（exemptions）、`measured` の承認（measured_claims）、副作用メソッドと盲点、下限。**理由は個別に書く**（10文字未満は FAIL）。25周目 D-1 の反省から、**面を丸ごと外す仕組みは持たない**（外すのは面ごと・鍵ごと）。",
  "population_floor": 330,
  "population_floor_note": "**本文を検査した** GET の面の数（既定の条件）。2026-09-17 の実測は 338（うち 200 以外 36・HTML 1 も本文を読む）。25周目 D-7 — 以前は列挙したルート数を数えており、実際に本文を見ていたのは 298 で下限の 300 を割っていた。面の増減そのものは面の台帳が止めるので、これは母集団の崩壊（依存の版ずれで0件など）を捕まえる網",
- "path_values_note": "**パス引数に入れる値の出どころ**（26周目・2026-09-17 ユーザー承認）。合成の値 `c4-gate-probe` だけでは、`ch-001` のように**API 自身が一覧で返す ID でしか開かない面**が 404 の形しか見えなかった（C4a の名指し例と、7周目に実際に起きた迂回がそこにあった）。テンプレート付きの GET は**全部**ここに書く — 一覧 API（from / take / limit。値は既定の条件で実際に返った先頭から）、決まった値（values + reason）、出どころが無い理由（none）。**書いていないテンプレートと、値が取れなくなった一覧は門が落とす** 並びが環境で変わる一覧（更新時刻順など）は `order: \"name\"` で名前順に並べてから上限で切る。",
+ "path_values_note": "**パス引数に入れる値の出どころ**（26周目・2026-09-17 ユーザー承認）。合成の値 `c4-gate-probe` だけでは、`ch-001` のように**API 自身が一覧で返す ID でしか開かない面**が 404 の形しか見えなかった（C4a の名指し例と、7周目に実際に起きた迂回がそこにあった）。テンプレート付きの GET は**全部**ここに書く — 一覧 API（from / take / limit。値は既定の条件で実際に返った先頭から）、決まった値（values + reason）、出どころが無い理由（none）。**書いていないテンプレートと、値が取れなくなった一覧は門が落とす** 並びが環境で変わる一覧（更新時刻順など）は `order: \"name\"` で名前順に並べてから上限で切る。 **一覧が返す値は全部叩く**（27周目 M11: 上限で黙って打ち切ると、3件目以降に足した数字が見えなかった）。`limit` は歯止めで、一覧がそれより多く返したら門が落ちる — 増えた面を査読して上限を上げる。",
  "path_values": {
   "GET /api/admin/channel/channels/{channel_id}": {
    "from": "GET /api/admin/channel/channels",
@@ -35,7 +35,7 @@
   "GET /api/logs/files/{filename}": {
    "from": "GET /api/logs/files",
    "take": "$.files[].name",
-   "limit": 2,
+   "limit": 4,
    "order": "name",
    "note": "一覧は backend/ 直下の .log / .txt を**更新時刻の新しい順**に返す（log_manager.list_log_files）。門の複製は更新時刻を保つので、並びは手元の作業ツリーと CI の checkout で変わる（CI ではほぼ同じ時刻になる）。名前順に並べてから上限で切り、どの環境でも同じファイルを開く"
   },
@@ -86,7 +86,7 @@
   "GET /api/usage/remaining/{model_name}": {
    "from": "GET /api/usage/dashboard",
    "take": "$.models[].name",
-   "limit": 3
+   "limit": 10
   },
   "GET /api/v1/api/pipeline/proofreading/export/{export_format}": {
    "values": [
@@ -123,7 +123,7 @@
   "GET /api/v1/api/usage/remaining/{model_name}": {
    "from": "GET /api/v1/api/usage/dashboard",
    "take": "$.models[].name",
-   "limit": 3
+   "limit": 10
   },
   "GET /api/v1/api/youtube/series/{series_id}/playlist": {
    "none": "v1 の別名。シリーズの一覧を返す GET が無い（series_planner は ID を受けて計画を作る。合成の値でも「見つからない」分岐の本体が動く）"
@@ -136,12 +136,12 @@
   "GET /api/v1/themes/templates/{template_id}": {
    "from": "GET /api/v1/themes/templates",
    "take": "$.templates[].id",
-   "limit": 2
+   "limit": 4
   },
   "GET /api/v1/themes/{theme_id}": {
    "from": "GET /api/v1/themes",
    "take": "$.themes[].id",
-   "limit": 2
+   "limit": 4
   },
   "GET /api/video/download/{task_id}": {
    "none": "動画処理のタスク（render の `_video_tasks`）は POST でしか生まれず、一覧を返す GET が無い（`GET /api/debug/video-tasks` が見るのは legacy_production_router の別の辞書）。門は POST を叩かないので実在の ID を作れない（合成の値だけで叩く）"
@@ -165,7 +165,7 @@
  },
  "excluded_transports_note": "**母集団の外に置く、メソッド以外の通り道。** 門は内訳にこれも数えて毎回表示し、`side_effect_blind_spot` に一覧を固定する（増えたら落ちる）",
  "excluded_transports": {
-  "WEBSOCKET": "接続して待つ通り道で、GET のように1回叩いて本文を得られない。/api 配下の2本はパイプラインの進捗（工程の data）を配信するが、同じ data は GET /api/pipeline/status の stages[] として実走後の条件で見ている（WebSocket の電文そのものは見ていない — limits #20）"
+  "WEBSOCKET": "接続して待つ通り道で、GET のように1回叩いて本文を得られない。**門は電文を見ていない**（limits #20(1)）。/api 配下の2本が配るのは、(1) 工程の進捗（`pipeline_progress`。点数は `detail` に、印は `data` に入り、同じものを `GET /api/pipeline/status` の `stages[]` で見ている）、(2) `quality_gate_blocked`（coordinator の `_notify_quality_blocked`）、(3) `force_render_complete`（pipeline_router の強制レンダリング）。**(2)(3) は GET に出ない**ので門では測れない — 27周目の指摘でどちらにも `scored` を足し、電文だけを見ても採点済みかどうかが分かるようにした"
  },
  "category_names_note": "**4カテゴリの数字を運ぶ鍵名**（投稿・チャンネル統計・品質スコア・retention）。ここに載せた鍵名と `c4_inventory.RISK_KEY_RE` の鍵名は、値が数字か空でない文字列なら**同じ場所か祖先に出所の印が要る**。器（dict）の鍵名を載せると、その下の値すべてに印が要る。2026-09-17 に紛らわしい語（STRONG_VOCAB_RE）に当たる 79 個を出現箇所つきで1つずつ確かめて分けた",
  "category_names": {
@@ -521,6 +521,7 @@
   "elegant": "一括",
   "email": "一括",
   "embedding_dim": "一括",
+  "emphasis_highlight": "一括",
   "enabled": "一括",
   "encoder": "一括",
   "end": "一括",
@@ -743,6 +744,7 @@
   "migration_guide": "一括",
   "mime_type": "一括",
   "min_display_seconds": "一括",
+  "minimal_telop": "一括",
   "missing": "一括",
   "model": "一括",
   "models": "一括",

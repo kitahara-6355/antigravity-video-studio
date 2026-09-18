@@ -99,30 +99,30 @@
   },
   "declarations": {
     "src/components/ImageDirector.jsx|?|img": "",
-    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:961 GET /api/pipeline/stream/{video_type}",
-    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1288 GET /api/pipeline/proofreading/export/{export_format}",
+    "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:965 GET /api/pipeline/stream/{video_type}",
+    "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1292 GET /api/pipeline/proofreading/export/{export_format}",
     "src/components/QuickDecisionBar.jsx|?|currentItem.preview": "",
     "src/components/SceneTimeline.jsx|?|scene.image": "",
     "src/components/YouTubeOptimizerPanel.jsx|?|thumb.path": "",
     "src/pages/EditorPage.jsx|GET|/api/video": "static_route_scan: routers/legacy_management_router.py:92 GET /api/video",
     "src/gateway/client.js|?|apiUrl(name, { params, query })": "",
-    "src/gateway/endpoints.js|DELETE|/api/pipeline/dictionary/{entry_id}": "static_route_scan: routers/pipeline_router.py:1274 DELETE /api/pipeline/dictionary/{entry_id}",
+    "src/gateway/endpoints.js|DELETE|/api/pipeline/dictionary/{entry_id}": "static_route_scan: routers/pipeline_router.py:1278 DELETE /api/pipeline/dictionary/{entry_id}",
     "src/gateway/endpoints.js|GET|/api/collaboration/journal": "static_route_scan: routers/legacy_management_router.py:157 GET /api/collaboration/journal",
     "src/gateway/endpoints.js|GET|/api/dashboard/health": "static_route_scan: routers/dashboard_router.py:108 GET /api/dashboard/health",
     "src/gateway/endpoints.js|GET|/api/director/evolution": "static_route_scan: routers/legacy_director_router.py:110 GET /api/director/evolution",
     "src/gateway/endpoints.js|GET|/api/director/state": "static_route_scan: routers/legacy_director_router.py:66 GET /api/director/state",
     "src/gateway/endpoints.js|GET|/api/director/tasks/{task_id}": "static_route_scan: routers/legacy_director_router.py:55 GET /api/director/tasks/{task_id}",
-    "src/gateway/endpoints.js|GET|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1205 GET /api/pipeline/dictionary",
-    "src/gateway/endpoints.js|GET|/api/pipeline/open-folder": "static_route_scan: routers/pipeline_router.py:927 GET /api/pipeline/open-folder",
-    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1288 GET /api/pipeline/proofreading/export/{export_format}",
-    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/result": "static_route_scan: routers/pipeline_router.py:1139 GET /api/pipeline/proofreading/result",
-    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/status": "static_route_scan: routers/pipeline_router.py:1335 GET /api/pipeline/proofreading/status",
-    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1384 GET /api/pipeline/quality-gate/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1209 GET /api/pipeline/dictionary",
+    "src/gateway/endpoints.js|GET|/api/pipeline/open-folder": "static_route_scan: routers/pipeline_router.py:931 GET /api/pipeline/open-folder",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/export/{export_format}": "static_route_scan: routers/pipeline_router.py:1292 GET /api/pipeline/proofreading/export/{export_format}",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/result": "static_route_scan: routers/pipeline_router.py:1143 GET /api/pipeline/proofreading/result",
+    "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/status": "static_route_scan: routers/pipeline_router.py:1339 GET /api/pipeline/proofreading/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status": "static_route_scan: routers/pipeline_router.py:1388 GET /api/pipeline/quality-gate/status",
     "src/gateway/endpoints.js|GET|/api/pipeline/status": "static_route_scan: routers/pipeline_router.py:736 GET /api/pipeline/status",
-    "src/gateway/endpoints.js|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:961 GET /api/pipeline/stream/{video_type}",
-    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/models": "static_route_scan: routers/pipeline_router.py:1034 GET /api/pipeline/transcription/models",
-    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/segments": "static_route_scan: routers/pipeline_router.py:1073 GET /api/pipeline/transcription/segments",
-    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/status": "static_route_scan: routers/pipeline_router.py:1104 GET /api/pipeline/transcription/status",
+    "src/gateway/endpoints.js|GET|/api/pipeline/stream/{video_type}": "static_route_scan: routers/pipeline_router.py:965 GET /api/pipeline/stream/{video_type}",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/models": "static_route_scan: routers/pipeline_router.py:1038 GET /api/pipeline/transcription/models",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/segments": "static_route_scan: routers/pipeline_router.py:1077 GET /api/pipeline/transcription/segments",
+    "src/gateway/endpoints.js|GET|/api/pipeline/transcription/status": "static_route_scan: routers/pipeline_router.py:1108 GET /api/pipeline/transcription/status",
     "src/gateway/endpoints.js|GET|/api/pipeline/videos": "static_route_scan: routers/pipeline_router.py:443 GET /api/pipeline/videos",
     "src/gateway/endpoints.js|GET|/api/segments": "static_route_scan: routers/segments.py:33 GET /api/segments",
     "src/gateway/endpoints.js|GET|/api/settings": "static_route_scan: routers/legacy_management_router.py:191 GET /api/settings",
@@ -150,15 +150,15 @@
     "src/gateway/endpoints.js|POST|/api/director/quality-score": "static_route_scan: routers/director.py:158 POST /api/director/quality-score",
     "src/gateway/endpoints.js|POST|/api/director/state": "static_route_scan: routers/legacy_director_router.py:79 POST /api/director/state",
     "src/gateway/endpoints.js|POST|/api/director/verify-quality": "static_route_scan: routers/legacy_director_router.py:96 POST /api/director/verify-quality",
-    "src/gateway/endpoints.js|POST|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1229 POST /api/pipeline/dictionary",
-    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve": "static_route_scan: routers/pipeline_router.py:1159 POST /api/pipeline/proofreading/approve",
-    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve-all": "static_route_scan: routers/pipeline_router.py:1181 POST /api/pipeline/proofreading/approve-all",
-    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject": "static_route_scan: routers/pipeline_router.py:1170 POST /api/pipeline/proofreading/reject",
-    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject-all": "static_route_scan: routers/pipeline_router.py:1193 POST /api/pipeline/proofreading/reject-all",
-    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/skip": "static_route_scan: routers/pipeline_router.py:1354 POST /api/pipeline/proofreading/skip",
-    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1445 POST /api/pipeline/quality-gate/improve",
+    "src/gateway/endpoints.js|POST|/api/pipeline/dictionary": "static_route_scan: routers/pipeline_router.py:1233 POST /api/pipeline/dictionary",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve": "static_route_scan: routers/pipeline_router.py:1163 POST /api/pipeline/proofreading/approve",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve-all": "static_route_scan: routers/pipeline_router.py:1185 POST /api/pipeline/proofreading/approve-all",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject": "static_route_scan: routers/pipeline_router.py:1174 POST /api/pipeline/proofreading/reject",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject-all": "static_route_scan: routers/pipeline_router.py:1197 POST /api/pipeline/proofreading/reject-all",
+    "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/skip": "static_route_scan: routers/pipeline_router.py:1358 POST /api/pipeline/proofreading/skip",
+    "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve": "static_route_scan: routers/pipeline_router.py:1449 POST /api/pipeline/quality-gate/improve",
     "src/gateway/endpoints.js|POST|/api/pipeline/start": "static_route_scan: routers/pipeline_router.py:669 POST /api/pipeline/start",
-    "src/gateway/endpoints.js|POST|/api/pipeline/transcription/model": "static_route_scan: routers/pipeline_router.py:1121 POST /api/pipeline/transcription/model",
+    "src/gateway/endpoints.js|POST|/api/pipeline/transcription/model": "static_route_scan: routers/pipeline_router.py:1125 POST /api/pipeline/transcription/model",
     "src/gateway/endpoints.js|POST|/api/pipeline/videos/metadata": "static_route_scan: routers/pipeline_router.py:481 POST /api/pipeline/videos/metadata",
     "src/gateway/endpoints.js|POST|/api/pipeline/videos/validate": "static_route_scan: routers/pipeline_router.py:588 POST /api/pipeline/videos/validate",
     "src/gateway/endpoints.js|POST|/api/quality/apply-suggestion": "static_route_scan: routers/quality.py:157 POST /api/quality/apply-suggestion",
@@ -188,8 +188,8 @@
     "src/gateway/endpoints.js|POST|/api/youtube/improve-hook": "static_route_scan: routers/youtube_optimizer.py:771 POST /api/youtube/improve-hook",
     "src/gateway/endpoints.js|POST|/api/youtube/optimize": "static_route_scan: routers/youtube_optimizer.py:597 POST /api/youtube/optimize",
     "src/gateway/endpoints.js|POST|/api/youtube/pre-plan": "static_route_scan: routers/youtube_optimizer.py:230 POST /api/youtube/pre-plan",
-    "src/gateway/endpoints.js|PUT|/api/pipeline/transcription/segments/{segment_id}": "static_route_scan: routers/pipeline_router.py:1092 PUT /api/pipeline/transcription/segments/{segment_id}",
-    "src/gateway/endpoints.js|WEBSOCKET|/api/pipeline/ws/pipeline": "static_route_scan: routers/pipeline_router.py:947 WEBSOCKET /api/pipeline/ws/pipeline",
+    "src/gateway/endpoints.js|PUT|/api/pipeline/transcription/segments/{segment_id}": "static_route_scan: routers/pipeline_router.py:1096 PUT /api/pipeline/transcription/segments/{segment_id}",
+    "src/gateway/endpoints.js|WEBSOCKET|/api/pipeline/ws/pipeline": "static_route_scan: routers/pipeline_router.py:951 WEBSOCKET /api/pipeline/ws/pipeline",
     "index.html|GET|https://fonts.googleapis.com": "",
     "index.html|GET|https://fonts.gstatic.com": "",
     "index.html|GET|https://fonts.googleapis.com/css2": ""
@@ -740,6 +740,144 @@
       "before": "static_route_scan: routers/pipeline_router.py:942 WEBSOCKET /api/pipeline/ws/pipeline",
       "after": "static_route_scan: routers/pipeline_router.py:947 WEBSOCKET /api/pipeline/ws/pipeline",
       "reason": "R1.5-C4b 27周目の前: pipeline_router.py の _reset_state が工程を初期の形に戻すようにし（前の実走の点数と印を残さない）、出所の印の定義をその上へ移したため、同ファイルの経路の行番号がずれた（+5 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/components/ProductionPipeline.jsx|GET|/api/pipeline/stream/{video_type}",
+      "before": "static_route_scan: routers/pipeline_router.py:961 GET /api/pipeline/stream/{video_type}",
+      "after": "static_route_scan: routers/pipeline_router.py:965 GET /api/pipeline/stream/{video_type}",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/components/ProofreadingStagePanel.jsx|GET|/api/pipeline/proofreading/export/{export_format}",
+      "before": "static_route_scan: routers/pipeline_router.py:1288 GET /api/pipeline/proofreading/export/{export_format}",
+      "after": "static_route_scan: routers/pipeline_router.py:1292 GET /api/pipeline/proofreading/export/{export_format}",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|DELETE|/api/pipeline/dictionary/{entry_id}",
+      "before": "static_route_scan: routers/pipeline_router.py:1274 DELETE /api/pipeline/dictionary/{entry_id}",
+      "after": "static_route_scan: routers/pipeline_router.py:1278 DELETE /api/pipeline/dictionary/{entry_id}",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/dictionary",
+      "before": "static_route_scan: routers/pipeline_router.py:1205 GET /api/pipeline/dictionary",
+      "after": "static_route_scan: routers/pipeline_router.py:1209 GET /api/pipeline/dictionary",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/open-folder",
+      "before": "static_route_scan: routers/pipeline_router.py:927 GET /api/pipeline/open-folder",
+      "after": "static_route_scan: routers/pipeline_router.py:931 GET /api/pipeline/open-folder",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/export/{export_format}",
+      "before": "static_route_scan: routers/pipeline_router.py:1288 GET /api/pipeline/proofreading/export/{export_format}",
+      "after": "static_route_scan: routers/pipeline_router.py:1292 GET /api/pipeline/proofreading/export/{export_format}",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/result",
+      "before": "static_route_scan: routers/pipeline_router.py:1139 GET /api/pipeline/proofreading/result",
+      "after": "static_route_scan: routers/pipeline_router.py:1143 GET /api/pipeline/proofreading/result",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/proofreading/status",
+      "before": "static_route_scan: routers/pipeline_router.py:1335 GET /api/pipeline/proofreading/status",
+      "after": "static_route_scan: routers/pipeline_router.py:1339 GET /api/pipeline/proofreading/status",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/quality-gate/status",
+      "before": "static_route_scan: routers/pipeline_router.py:1384 GET /api/pipeline/quality-gate/status",
+      "after": "static_route_scan: routers/pipeline_router.py:1388 GET /api/pipeline/quality-gate/status",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/stream/{video_type}",
+      "before": "static_route_scan: routers/pipeline_router.py:961 GET /api/pipeline/stream/{video_type}",
+      "after": "static_route_scan: routers/pipeline_router.py:965 GET /api/pipeline/stream/{video_type}",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/transcription/models",
+      "before": "static_route_scan: routers/pipeline_router.py:1034 GET /api/pipeline/transcription/models",
+      "after": "static_route_scan: routers/pipeline_router.py:1038 GET /api/pipeline/transcription/models",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/transcription/segments",
+      "before": "static_route_scan: routers/pipeline_router.py:1073 GET /api/pipeline/transcription/segments",
+      "after": "static_route_scan: routers/pipeline_router.py:1077 GET /api/pipeline/transcription/segments",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|GET|/api/pipeline/transcription/status",
+      "before": "static_route_scan: routers/pipeline_router.py:1104 GET /api/pipeline/transcription/status",
+      "after": "static_route_scan: routers/pipeline_router.py:1108 GET /api/pipeline/transcription/status",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/dictionary",
+      "before": "static_route_scan: routers/pipeline_router.py:1229 POST /api/pipeline/dictionary",
+      "after": "static_route_scan: routers/pipeline_router.py:1233 POST /api/pipeline/dictionary",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve",
+      "before": "static_route_scan: routers/pipeline_router.py:1159 POST /api/pipeline/proofreading/approve",
+      "after": "static_route_scan: routers/pipeline_router.py:1163 POST /api/pipeline/proofreading/approve",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/approve-all",
+      "before": "static_route_scan: routers/pipeline_router.py:1181 POST /api/pipeline/proofreading/approve-all",
+      "after": "static_route_scan: routers/pipeline_router.py:1185 POST /api/pipeline/proofreading/approve-all",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject",
+      "before": "static_route_scan: routers/pipeline_router.py:1170 POST /api/pipeline/proofreading/reject",
+      "after": "static_route_scan: routers/pipeline_router.py:1174 POST /api/pipeline/proofreading/reject",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/reject-all",
+      "before": "static_route_scan: routers/pipeline_router.py:1193 POST /api/pipeline/proofreading/reject-all",
+      "after": "static_route_scan: routers/pipeline_router.py:1197 POST /api/pipeline/proofreading/reject-all",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/proofreading/skip",
+      "before": "static_route_scan: routers/pipeline_router.py:1354 POST /api/pipeline/proofreading/skip",
+      "after": "static_route_scan: routers/pipeline_router.py:1358 POST /api/pipeline/proofreading/skip",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/quality-gate/improve",
+      "before": "static_route_scan: routers/pipeline_router.py:1445 POST /api/pipeline/quality-gate/improve",
+      "after": "static_route_scan: routers/pipeline_router.py:1449 POST /api/pipeline/quality-gate/improve",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/pipeline/transcription/model",
+      "before": "static_route_scan: routers/pipeline_router.py:1121 POST /api/pipeline/transcription/model",
+      "after": "static_route_scan: routers/pipeline_router.py:1125 POST /api/pipeline/transcription/model",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|PUT|/api/pipeline/transcription/segments/{segment_id}",
+      "before": "static_route_scan: routers/pipeline_router.py:1092 PUT /api/pipeline/transcription/segments/{segment_id}",
+      "after": "static_route_scan: routers/pipeline_router.py:1096 PUT /api/pipeline/transcription/segments/{segment_id}",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
+    },
+    {
+      "key": "src/gateway/endpoints.js|WEBSOCKET|/api/pipeline/ws/pipeline",
+      "before": "static_route_scan: routers/pipeline_router.py:947 WEBSOCKET /api/pipeline/ws/pipeline",
+      "after": "static_route_scan: routers/pipeline_router.py:951 WEBSOCKET /api/pipeline/ws/pipeline",
+      "reason": "R1.5-C4b 27周目の対処: pipeline_router.py の force-render の応答と WebSocket 電文に出所の印（scored）を足したため、同ファイルの経路の行番号がずれた（+4 行）。経路・メソッド・当たり先のファイルはいずれも変わっていない"
     }
   ],
   "migrations": [

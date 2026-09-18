@@ -859,6 +859,9 @@ async def force_render(req: ForceRenderRequest):
         # WebSocket 通知
         await pipeline_ws.broadcast({
             "type": "force_render_complete",
+            # **出所を名乗る**（R1.5-C4b・27周目）。`quality_gate_report` は
+            # 採点済みで90点未満の実走でしか作られない（coordinator の `_build_result`）
+            "scored": True,
             "final_path": final_path,
             "size_mb": round(size_mb, 1),
             "quality_score": quality_report.get("score", 0),
@@ -872,6 +875,7 @@ async def force_render(req: ForceRenderRequest):
 
         return {
             "status": "force_rendered",
+            "scored": True,   # 同上（R1.5-C4b・27周目）
             "final_path": final_path,
             "size_mb": round(size_mb, 1),
             "reason": req.reason,

@@ -76,6 +76,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import copy
+import difflib
 import html.parser
 import importlib
 import json
@@ -137,13 +138,22 @@ STRONG_VOCAB_RE = re.compile(
 合格 = "実走後・採点済み（合格）"
 不合格 = "実走後・採点済み（不合格）"
 未採点 = "実走後・未採点"
-条件の一覧 = (既定, 合格, 不合格, 未採点)
+改善ループ = "実走後・品質改善ループ（不合格）"
+改善ループ未採点 = "実走後・品質改善ループ（未採点）"
+条件の一覧 = (既定, 合格, 不合格, 未採点, 改善ループ, 改善ループ未採点)
+_未採点の条件 = (未採点, 改善ループ未採点)
+_やり直す条件 = (改善ループ, 改善ループ未採点)
 
 # **同じ条件の中で点数だけを変えた2つの変種。** 出力のどこが点数に連れて動くかを比べる。
-# 合格・不合格は品質ゲートの閾値（90点）の同じ側に置き、分岐を変えずに値だけを動かす。
-# 未採点の 0 は本番の既定値（`PipelineContext.quality_score`）
+# 合格・不合格は品質ゲートの閾値（90点）の同じ側に置き、**工程の分岐は変えずに**値だけを動かす。
+# ただし**表示の閾値はまたぐ**ように選ぶ（27周目 M07: 同じ帯の中で動かすと、
+# 「90点以上か」のような閾値から作った文字だけが動く形を見逃した）——
+# 合格は 92/97 でランク A と S、不合格は 85/79 でランク B と C、未採点は 0 と 97.3。
+# 未採点の 0 は本番の既定値（`PipelineContext.quality_score`）で、97.3 は
+# 「採点していないのに高得点の表示になる」形を見つけるための値
 点数の変種: dict[str, tuple[float, float]] = {
-    合格: (92, 97), 不合格: (85, 81), 未採点: (0, 73.21),
+    合格: (92, 97), 不合格: (85, 79), 未採点: (0, 97.3),
+    改善ループ: (85, 79), 改善ループ未採点: (0, 97.3),
 }
 
 
@@ -375,12 +385,48 @@ def 印で覆われているか(本文, 道: tuple) -> bool:
     return False
 
 
+def _値を取る(本文, 道: tuple):
+    """道の先の値（辿れなければ None）。"""
+    o = 本文
+    for s in 道:
+        if (isinstance(o, dict) and s in o) or (
+                isinstance(o, list) and isinstance(s, int) and 0 <= s < len(o)):
+            o = o[s]
+        else:
+            return None
+    return o
+
+
+def 揺れを伏せて当てはまるか(甲: str, 乙: str, 甲2: str | None) -> bool:
+    """**甲と甲2で揺れた所だけを伏せた型**に、乙が当てはまるか（27周目 M08/M09）。
+
+    揺れる所ごと葉を捨てると、同じ文字列に入った点数の動きまで見えなくなる
+    （`"02:24:37 完了 品質85点"` のような見出しや、キャッシュ避けの付いた HTML）。
+    **揺れた部分だけ**を `.*?` に置き換えた型を作り、もう片方の点数の回を当てる。
+    """
+    if 甲2 is None:
+        return 甲 == 乙
+    型: list[str] = []
+    位置 = 0
+    for a, _b, n in difflib.SequenceMatcher(None, 甲, 甲2, autojunk=False).get_matching_blocks():
+        if a > 位置:
+            型.append(".*?")   # 甲と甲2で揺れた所
+        if n:
+            型.append(re.escape(甲[a:a + n]))
+        位置 = a + n
+    if 位置 < len(甲):
+        型.append(".*?")
+    return re.fullmatch("".join(型), 乙, re.DOTALL) is not None
+
+
 def 点数に連れて動く所(甲: dict, 乙: dict, 甲2: dict | None = None) -> dict:
     """同じ条件で**点数だけを変えた2回（甲・乙）**と、**甲をもう一度（甲2）**を比べる。
 
-    - 甲と甲2で違う所は、点数と関係なく揺れる所（経過秒など）なので除く
+    - 甲と甲2で違う所は、点数と関係なく揺れる所（経過秒など）なので除く。
+      ただし**文字は葉ごと捨てない** — 揺れた部分だけを伏せて、残りが動いたかを見る（27周目 M08）
     - JSON: 残った違いのうち、**印で覆われていない所が「漏れ」**
-    - 文字（HTML）: 見える行の違いと、見えない所（属性など）の違い
+    - 文字（HTML）: 見える行の違いと、見えない所（属性など）の違い。
+      生の本文が毎回揺れても、揺れた所だけを伏せて比べる（27周目 M09）
     - 出口（status と種類）が変わったら、それ自体を報告する（点数で分岐している）
     """
     結果: dict = {"漏れ": [], "覆われた": 0, "文字": [], "見えない所": False, "出口": False}
@@ -388,10 +434,10 @@ def 点数に連れて動く所(甲: dict, 乙: dict, 甲2: dict | None = None) 
         結果["出口"] = True
         return 結果
     if 甲.get("kind") == "json":
-        揺れ = (set(違う所(甲.get("body"), 甲2.get("body")))
-                if 甲2 and 甲2.get("kind") == "json" else set())
+        甲2の本文 = 甲2.get("body") if 甲2 and 甲2.get("kind") == "json" else None
+        揺れ = set(違う所(甲.get("body"), 甲2の本文)) if 甲2の本文 is not None else set()
         for 道 in 違う所(甲.get("body"), 乙.get("body")):
-            if 道 in 揺れ:
+            if 道 in 揺れ and not _文字が点数で動いたか(甲.get("body"), 乙.get("body"), 甲2の本文, 道):
                 continue
             if 印で覆われているか(甲.get("body"), 道) and 印で覆われているか(乙.get("body"), 道):
                 結果["覆われた"] += 1
@@ -401,10 +447,19 @@ def 点数に連れて動く所(甲: dict, 乙: dict, 甲2: dict | None = None) 
     行甲 = set(甲.get("lines") or ())
     揺れる行 = (行甲 ^ set(甲2.get("lines") or ())) if 甲2 else set()
     結果["文字"] = sorted((行甲 ^ set(乙.get("lines") or ())) - 揺れる行)
-    生が揺れる = bool(甲2) and 甲.get("raw") != 甲2.get("raw")
-    結果["見えない所"] = (not 結果["文字"] and not 生が揺れる
-                         and 甲.get("raw") != 乙.get("raw"))
+    結果["見えない所"] = (not 結果["文字"]
+                         and not 揺れを伏せて当てはまるか(甲.get("raw") or "", 乙.get("raw") or "",
+                                                          甲2.get("raw") if 甲2 else None))
     return 結果
+
+
+def _文字が点数で動いたか(甲の本文, 乙の本文, 甲2の本文, 道: tuple) -> bool:
+    """揺れる葉でも、**文字なら揺れた部分だけを伏せて**点数で動いたかを見る。"""
+    甲値, 乙値 = _値を取る(甲の本文, 道), _値を取る(乙の本文, 道)
+    if not (isinstance(甲値, str) and isinstance(乙値, str)):
+        return False   # 数や真偽値は揺れと点数を分けられない（limits #21 に宣言）
+    甲2値 = _値を取る(甲2の本文, 道) if 甲2の本文 is not None else None
+    return not 揺れを伏せて当てはまるか(甲値, 乙値, 甲2値 if isinstance(甲2値, str) else None)
 
 
 # ─────────────────────────── 本文の読み方 ───────────────────────────
@@ -610,7 +665,8 @@ def パス引数の値(テンプレート: list[str], 既定の観測: list[dict
     宣言 = 台帳.get("path_values") or {}
     本文 = {o["face"]: o for o in 既定の観測}
     値: dict[str, list[str]] = {}
-    問題: dict[str, list[str]] = {"未宣言": [], "値が取れない": [], "使われていない宣言": []}
+    問題: dict[str, list[str]] = {"未宣言": [], "値が取れない": [], "使われていない宣言": [],
+                                 "上限より多い": []}
     for t in テンプレート:
         経路 = f"GET {t}"
         spec = 宣言.get(経路)
@@ -626,7 +682,13 @@ def パス引数の値(テンプレート: list[str], 既定の観測: list[dict
             vs = list(dict.fromkeys(vs))
             if spec.get("order") == "name":
                 vs = sorted(vs)
-            vs = vs[: int(spec.get("limit", 2))]
+            # **一覧が返す値は全部叩く**（27周目 M11: 上限の外に足した数字が見えなかった）。
+            # 上限は歯止めで、超えたら黙って切らずに落とす
+            上限 = int(spec.get("limit", 2))
+            if len(vs) > 上限:
+                問題["上限より多い"].append(
+                    f"{経路} ← {spec['from']} {spec.get('take')}（{len(vs)} 件 > 上限 {上限}）")
+            vs = vs[:上限]
             if not vs:
                 問題["値が取れない"].append(f"{経路} ← {spec['from']} {spec.get('take')}")
             値[経路] = vs
@@ -919,14 +981,19 @@ def 実走後の状態(条件: str, 点: float) -> tuple[dict, tuple | None]:
     from agents.workers.quality_gate_worker import QualityGateWorker
     from routers.pipeline_default_states import get_initial_pipeline_state
     coord = PipelineCoordinator.__new__(PipelineCoordinator)
-    if 条件 == 未採点:
+    # 改善ループの条件だけ、結果の通知のあとに**やり直しの通知**まで進める
+    # （27周目 E1。本番は品質ゲートが不合格でも点が出なくてもここへ入る。
+    #  結果の通知だけの状態も別の面として見るので、条件を分けている）
+    やり直す = 条件 in _やり直す条件
+    if 条件 in _未採点の条件:
         ctx = _文脈("c4-gate-probe/final.mp4", False, 点)
         worker = QualityGateWorker()
-        通知 = (worker, pipeline_coordinator._normalized(worker, None))   # 結果を返さなかった工程
+        # 結果を返さなかった工程
+        通知 = (worker, pipeline_coordinator._normalized(worker, None), ctx, やり直す)
     else:
         worker, 工程, ctx = 品質ゲートを走らせる(点)
         ctx.stage_results = [工程]
-        通知 = (worker, 工程)
+        通知 = (worker, 工程, ctx, やり直す)
     結果 = coord._build_result(ctx, "completed", time.time())
     結果["duration_seconds"] = 12.3   # 実時間で揺れるので固定する（値であって形ではない）
     状態 = get_initial_pipeline_state(session_id="c4gateprobe-0001",
@@ -937,12 +1004,19 @@ def 実走後の状態(条件: str, 点: float) -> tuple[dict, tuple | None]:
 
 
 def _工程を進める(通知: tuple) -> None:
-    """**本番の配線で工程の状態を進める**（coordinator の `_notify_result` → router の `_update_stage`）。"""
+    """**本番の配線で工程の状態を進める**（coordinator の `_notify_result` → router の `_update_stage`）。
+
+    点が出なかった（90点未満・未採点）実走では、本番はこのあと品質改善ループに入って
+    「やり直し」を知らせる。その見出しにも点数が載るので、**同じ配線で進める**
+    （27周目 E1: 門は結果の通知しか再現しておらず、やり直しの見出しを見ていなかった）。
+    """
     import asyncio
 
     from agents.pipeline_coordinator import pipeline_coordinator
-    worker, 工程 = 通知
+    worker, 工程, ctx, やり直す = 通知
     asyncio.run(pipeline_coordinator._notify_result(worker, 工程))
+    if やり直す:
+        asyncio.run(pipeline_coordinator._notify_retry(worker, 1, ctx))
 
 
 @contextlib.contextmanager
@@ -1057,7 +1131,7 @@ def _観測の本体(作業場: Path, 本物: Path) -> int:
                     _工程を進める(通知)
                 回[印] = {o["face"]: o for o in 応答を集める(app, 条件, 値)}
         for 名, o in 回["甲"].items():
-            o["unscored"] = 条件 == 未採点
+            o["unscored"] = 条件 in _未採点の条件
             o["動いた"] = 点数に連れて動く所(o, 回["乙"].get(名) or {}, 回["甲2"].get(名))
             観測.append(o)
 
@@ -1176,6 +1250,9 @@ def audit(観測: list[dict], 台帳: dict, 面台帳: dict,
     for x in 引数.get("値が取れない") or ():
         違反.append(f"**台帳で対応づけた一覧 API から値が取れません**: {x}。"
                     f"一覧の形が変わったか、空になった")
+    for x in 引数.get("上限より多い") or ():
+        違反.append(f"**一覧が返す値を全部は叩けていません**: {x}。"
+                    f"上限（limit）を一覧の件数まで上げて、増えた面を査読して台帳に載せてください")
     for 経路 in 引数.get("使われていない宣言") or ():
         情報.append(f"使われていないパス引数の宣言があります（台帳を掃除できます）: {経路}")
     for 経路, spec in sorted((台帳.get("path_values") or {}).items()):
