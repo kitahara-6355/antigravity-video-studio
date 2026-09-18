@@ -3,7 +3,7 @@
  "decided": "2026-09-17 ユーザー承認（面と鍵をまるごとラチェット）。2026-09-13 の案A（判定を静的述語から観測へ）を引き継ぐ",
  "note": "`python -m backend.c4_response_gate --gate` の台帳（**人の判断**）。観測した面の形は `c4_response_faces.json`（`--write-faces` で書き直して差分を査読する）。ここに書くのは — 鍵名の分類（category_names / non_category_names_reviewed / non_category_names）、面ごとの例外（exemptions）、`measured` の承認（measured_claims）、副作用メソッドと盲点、下限。**理由は個別に書く**（10文字未満は FAIL）。25周目 D-1 の反省から、**面を丸ごと外す仕組みは持たない**（外すのは面ごと・鍵ごと）。",
  "population_floor": 330,
- "population_floor_note": "**本文を検査した** GET の面の数（既定の条件）。2026-09-17 の実測は 338（うち 200 以外 36・HTML 1 も本文を読む）。25周目 D-7 — 以前は列挙したルート数を数えており、実際に本文を見ていたのは 298 で下限の 300 を割っていた。面の増減そのものは面の台帳が止めるので、これは母集団の崩壊（依存の版ずれで0件など）を捕まえる網",
+ "population_floor_note": "**本文を検査した** GET の面の数（既定の条件）。2026-09-18 の実測は 402（既定の GET 404 面のうち json 397・text 5。200 以外も HTML も本文を読む。一覧 API が返す値でも叩くようになって増えた）。25周目 D-7 — 以前は列挙したルート数を数えており、実際に本文を見ていたのは 298 で下限の 300 を割っていた。面の増減そのものは面の台帳が止めるので、これは母集団の崩壊（依存の版ずれで0件など）を捕まえる網",
  "path_values_note": "**パス引数に入れる値の出どころ**（26周目・2026-09-17 ユーザー承認）。合成の値 `c4-gate-probe` だけでは、`ch-001` のように**API 自身が一覧で返す ID でしか開かない面**が 404 の形しか見えなかった（C4a の名指し例と、7周目に実際に起きた迂回がそこにあった）。テンプレート付きの GET は**全部**ここに書く — 一覧 API（from / take / limit。値は既定の条件で実際に返った先頭から）、決まった値（values + reason）、出どころが無い理由（none）。**書いていないテンプレートと、値が取れなくなった一覧は門が落とす** 並びが環境で変わる一覧（更新時刻順など）は `order: \"name\"` で名前順に並べてから上限で切る。 **一覧が返す値は全部叩く**（27周目 M11: 上限で黙って打ち切ると、3件目以降に足した数字が見えなかった）。`limit` は歯止めで、一覧がそれより多く返したら門が落ちる — 増えた面を査読して上限を上げる。",
  "path_values": {
   "GET /api/admin/channel/channels/{channel_id}": {
@@ -165,7 +165,7 @@
  },
  "excluded_transports_note": "**母集団の外に置く、メソッド以外の通り道。** 門は内訳にこれも数えて毎回表示し、`side_effect_blind_spot` に一覧を固定する（増えたら落ちる）",
  "excluded_transports": {
-  "WEBSOCKET": "接続して待つ通り道で、GET のように1回叩いて本文を得られない。**門は電文を見ていない**（limits #20(1)）。/api 配下の2本が配るのは、(1) 工程の進捗（`pipeline_progress`。点数は `detail` に、印は `data` に入り、同じものを `GET /api/pipeline/status` の `stages[]` で見ている）、(2) `quality_gate_blocked`（coordinator の `_notify_quality_blocked`）、(3) `force_render_complete`（pipeline_router の強制レンダリング）。**(2)(3) は GET に出ない**ので門では測れない — 27周目の指摘でどちらにも `scored` を足し、電文だけを見ても採点済みかどうかが分かるようにした"
+  "WEBSOCKET": "接続して待つ通り道で、GET のように1回叩いて本文を得られない。**門は電文を見ていない**（limits #20(1)）。/api 配下の2本が配るのは、(1) 工程の進捗（`pipeline_progress`。点数は `detail` に、印は `data` に入り、同じものを `GET /api/pipeline/status` の `stages[]` で見ている）、(2) `quality_gate_blocked`（coordinator の `_notify_quality_blocked`）、(3) `force_render_complete`（pipeline_router の強制レンダリング）、(4) `pipeline_start` と `pipeline_complete`（pipeline_router。`pipeline_complete` の `result` は `GET /api/pipeline/status` が返すものと同じオブジェクト）。**(2)(3) は GET に出ない**（(4) は GET で見ている）ので門では測れない — 27周目の指摘でどちらにも `scored` を足し、電文だけを見ても採点済みかどうかが分かるようにした"
  },
  "category_names_note": "**4カテゴリの数字を運ぶ鍵名**（投稿・チャンネル統計・品質スコア・retention）。ここに載せた鍵名と `c4_inventory.RISK_KEY_RE` の鍵名は、値が数字か空でない文字列なら**同じ場所か祖先に出所の印が要る**。器（dict）の鍵名を載せると、その下の値すべてに印が要る。2026-09-17 に紛らわしい語（STRONG_VOCAB_RE）に当たる 79 個を出現箇所つきで1つずつ確かめて分けた",
  "category_names": {
