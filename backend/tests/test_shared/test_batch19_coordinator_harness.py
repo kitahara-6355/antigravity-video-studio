@@ -159,26 +159,36 @@ class TestDiskManager:
         from disk_manager import ensure_disk_space
         assert callable(ensure_disk_space)
 
-    def test_dm_02_enough_space(self):
+    # **置き場は必ず tmp_path を渡す。** 省くと既定の本物の vault-outputs/ に向き、
+    # 容量不足の分岐が preview/ と merged/ の mp4 を全部消す（keep_latest=0）。
+    # 2026-09-12 と 09-18 にこれで実走の preview が消え、成果物ゲートが
+    # 最新の実走を確かめられなくなった。
+
+    def test_dm_02_enough_space(self, tmp_path):
         from disk_manager import ensure_disk_space
         # With no paths or small paths, should not raise
         try:
-            ensure_disk_space([], min_free_gb=0.001)
+            ensure_disk_space([], min_free_gb=0.001, outputs_dir=tmp_path)
         except (AttributeError, ValueError, KeyError, TypeError, FileNotFoundError, OSError, RuntimeError):
             pass  # Specific exceptions only
 
-    def test_dm_03_check_space(self):
+    def test_dm_03_check_space(self, tmp_path):
         from disk_manager import ensure_disk_space
         try:
-            ensure_disk_space(["test.mp4"], min_free_gb=0.001)
+            ensure_disk_space(["test.mp4"], min_free_gb=0.001, outputs_dir=tmp_path)
         except (AttributeError, ValueError, KeyError, TypeError, FileNotFoundError, OSError, RuntimeError):
             pass  # Specific exceptions only
 
-    def test_dm_04_large_threshold(self):
+    def test_dm_04_large_threshold(self, tmp_path):
         from disk_manager import ensure_disk_space
+        中間 = tmp_path / "preview" / "old.mp4"
+        中間.parent.mkdir()
+        中間.write_bytes(b"x")
         # ensure_disk_space returns False when insufficient (does not raise)
-        result = ensure_disk_space([], min_free_gb=999999)
+        result = ensure_disk_space([], min_free_gb=999999, outputs_dir=tmp_path)
         assert result is False
+        # 掃除が渡した置き場に向いたこと（本物の vault-outputs/ ではなく）
+        assert not 中間.exists()
 
     def test_dm_05_module_functions(self):
         import disk_manager

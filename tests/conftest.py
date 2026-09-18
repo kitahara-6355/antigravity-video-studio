@@ -140,6 +140,18 @@ def _block_external_network(request):
         uninstall()
 
 
+# ── テストの実行記録を本番の output/runs/ から隔離する（2026-09-19） ──
+# backend/tests/conftest.py の同名の fixture と同じもの。こちらに無かったので、
+# tests/test_pipeline_coordinator.py の4件が走るたびに本番の output/runs/ へ
+# 記録を書き、68件積もった（実走の記録は2件）。成果物ゲートは最新の1本で
+# 判定するので、テストの記録で赤くなっていた。契約は tests/test_run_record_isolation.py。
+@pytest.fixture(scope="session", autouse=True)
+def テストの実行記録を本番から隔離する(tmp_path_factory):
+    os.environ["AVS_RUNS_DIR"] = str(tmp_path_factory.mktemp("runs"))
+    yield
+    os.environ.pop("AVS_RUNS_DIR", None)
+
+
 # ---------------- 本番ファイル書き込みの検出 ----------------
 # フック本体は backend/tests/fs_guard.py にある。rootdir がバッチ構成で変わるため、
 # 複数の conftest から同じものを取り込む。install も報告も冪等。
