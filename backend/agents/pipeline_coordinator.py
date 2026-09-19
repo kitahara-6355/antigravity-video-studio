@@ -66,7 +66,16 @@ from agents.workers import (  # noqa: F401 — re-export
     YouTubeOptWorker,
 )
 
-from backend.revenue.run_record import RunRecorder
+from backend.revenue.approval_gate import (
+    APPROVAL,
+    EXPORT,
+    PROPOSAL,
+    STATUS_AWAITING_APPROVAL,
+    export_allowed,
+    write_export,
+    write_proposal,
+)
+from backend.revenue.run_record import RUNS_DIR, RunRecorder
 
 
 # ============================================================
@@ -119,6 +128,22 @@ STATUS_COMPLETED = "completed"
 STATUS_DEGRADED = "degraded"
 
 
+def _merge_intermediates(before: list, after: list) -> list:
+    """提案まで（`before`）と書き出し（`after`）の中間成果物の使われ方を合わせる。
+
+    書き出しは提案から組み立て直した文脈で動くので、そこで数え直すと、提案までに
+    プレビューが使った字幕が「使われていない」に化ける（R1.5-C3 の門が落ちる）。
+    **作られたかは提案までの値、使われたかは「どちらかで使われた」。**
+    """
+    after_by = {r.get("name"): r for r in after}
+    merged = [{**row, "consumed": bool(row.get("consumed")
+                                       or after_by.get(row.get("name"), {}).get("consumed"))}
+              for row in before]
+    names = {r.get("name") for r in before}
+    merged += [r for r in after if r.get("name") not in names]
+    return merged
+
+
 # ============================================================
 # Coordinator（司令塔）
 # ============================================================
@@ -160,6 +185,8 @@ class PipelineCoordinator:
         self._quality_sidecar_path: Optional[str] = None
         # 工程名 → 最後の試行が通ったか。**リトライで通ったものは失敗にしない**
         self._outcomes: Dict[str, bool] = {}
+        # 書き出し（承認の後）で記録を閉じ直すとき、提案までの中間成果物の使われ方
+        self._intermediates_before: Optional[list] = None
 
     # --- 実行記録 -----------------------------------------------------------
 
@@ -630,15 +657,15 @@ class PipelineCoordinator:
         # 並列ステージ (S4 || S5 || S6)
         await self._execute_parallel_stages(ctx, harness, perf_manager)
 
-        # 最終ステージ (品質ゲート連動 T-031)
-        await self._execute_final_rendering_stage(ctx, harness, perf_manager)
-
         # 品質ゲート: Evaluator-Optimizer (並列実行結果から取得)
+        # **書き出しの前に回す**（D-41・R2-C1）。以前は書き出しの後に回っていて、
+        # ループで合格しても書き出しは不合格のときの safe モードのまま残っていた。
+        # 承認の対象は、ループを終えた後の動画。
         await self._optimize_quality(ctx, harness, perf_manager)
 
         # ━━━ 4.5 失敗を握り潰さない（R1.5-C1）━━━
         # **落ちた工程があるのに "completed" を返さない。** 直列で中断するのは
-        # 文字起こしだけで、校閲・スマートカット・メタデータ・品質・レンダリングの
+        # 文字起こしだけで、校閲・スマートカット・メタデータ・品質の
         # 失敗はここまで素通りしていた。宣言済みの例外（プレビュー）は除く。
         致命, 劣化 = self._settle_outcomes(ctx)
         if 致命:
@@ -648,16 +675,19 @@ class PipelineCoordinator:
                 ctx, "error", total_start,
                 f"工程が失敗しました: {'、'.join(致命)}")
 
-        # 落ちた工程はあるが動画は作れた場合。**完走とは呼ばない。**
-        final_status = STATUS_DEGRADED if 劣化 else STATUS_COMPLETED
-
-        # ━━━ 5. パイプライン後処理 ━━━
-        retention_report = await self._run_retention_analysis(ctx)
-        if retention_report:
-            ctx.stage_results.append(retention_report)
-
-        # DreamEngine 学習フック
-        await self._trigger_dream_learning(ctx)
+        # ━━━ 5. 書き出さずに提案で止まる（R2-C1）━━━
+        # **承認していない動画は書き出せない。** 人がプレビューを見て承認し、
+        # `python -m backend.revenue.approval_gate --export <run_id>` で書き出す。
+        # 書き出し・retention 分析・学習は承認の後（書き出す側・`export`）で行う。
+        proposal_path = self._write_proposal(ctx, 劣化)
+        if proposal_path is None:
+            # 残せなかった提案は承認も書き出しもできない。**承認待ちのまま
+            # 放置される実走を作らない。**
+            self._finalize_harness(harness, ctx, "error")
+            self._close_recorder(ctx, "failed")
+            return self._build_result(
+                ctx, "error", total_start,
+                "提案を残せませんでした（承認も書き出しもできません）")
 
         # ━━━ 6. Harness 完了処理 ━━━
         self._finalize_harness(harness, ctx, "ok")
@@ -665,12 +695,128 @@ class PipelineCoordinator:
         # ━━━ 7. パフォーマンスバジェットレポート保存 (PB-01) ━━━
         perf_report_data = self._save_performance_report(ctx, perf_manager)
 
-        self._close_recorder(ctx, final_status)
+        run_id = self._recorder.run_id if self._recorder else None
+        self._close_recorder(ctx, STATUS_AWAITING_APPROVAL)
 
-        result = self._build_result(ctx, final_status, total_start)
+        result = self._build_result(ctx, STATUS_AWAITING_APPROVAL, total_start)
+        result["run_id"] = run_id
+        result["proposal_path"] = proposal_path
         if perf_report_data:
             result["performance_budget"] = perf_report_data
         return result
+
+    def _write_proposal(self, ctx: PipelineContext, degraded=()) -> Optional[str]:
+        """提案を実行記録の隣に残す（R2-C1）。残せなかったら `None`（呼び出し側が失敗にする）。"""
+        recorder = self._recorder
+        if recorder is None:
+            return None
+        try:
+            write_proposal(
+                recorder.dir, ctx, run_id=recorder.run_id,
+                models_used=recorder.models_so_far(),
+                degraded_stages=list(degraded),
+                quality_detail={
+                    "feedback": list(getattr(ctx, "quality_feedback", None) or []),
+                    "category_scores": getattr(ctx, "quality_category_scores", None) or {},
+                    "raw_score": (ctx.quality_gate_report or {}).get("raw_score"),
+                })
+            return str(recorder.dir / PROPOSAL)
+        except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
+            logger.warning(f"⚠️ 提案を残せませんでした: {e}")
+            return None
+
+    # --- 書き出し（承認の後・R2-C1） ----------------------------------------------
+
+    async def export(self, run_id: str) -> Dict:
+        """**承認された提案を書き出す**（R2-C1）。承認が無ければ書き出さない。
+
+        本線（`execute`）は提案で止まる。人がプレビューを見て承認した後にこれを呼ぶ
+        （`python -m backend.revenue.approval_gate --export <run_id>`）。同じ実行の記録に
+        書き出しの工程を足し、completed / degraded で閉じ直す。
+        **断ったときは記録に触らない** — 実走は承認待ちのまま残る。
+        """
+        total_start = time.time()
+        runs_dir = Path(self.runs_dir or os.getenv("AVS_RUNS_DIR") or RUNS_DIR)
+        run_dir = runs_dir / run_id
+
+        def _断る(why: str) -> Dict:
+            logger.warning(f"🚫 書き出しません: {why}")
+            return {"status": "error", "error": why, "run_id": run_id, "final_path": None}
+
+        if (run_dir / EXPORT).exists():
+            return _断る(f"書き出し済みです: {run_dir / EXPORT}")
+        ok, why = export_allowed(run_dir)
+        if not ok:
+            return _断る(why)
+
+        proposal = json.loads((run_dir / PROPOSAL).read_text(encoding="utf-8"))
+        approval = json.loads((run_dir / APPROVAL).read_text(encoding="utf-8"))
+        ctx = self._context_from_proposal(proposal, approval, run_dir)
+
+        self._outcomes = {}
+        self._sidecar_path = None
+        self._quality_sidecar_path = None
+        try:
+            kwargs: Dict[str, Any] = {"runs_dir": runs_dir}
+            if self.ledger_path is not None:
+                kwargs["ledger_path"] = Path(self.ledger_path)
+            self._recorder = RunRecorder.reopen(run_id, **kwargs)
+        except Exception as e:  # noqa: BLE001 — 開き直せない記録には書き出さない
+            return _断る(f"実行記録を開き直せませんでした: {e}")
+        self._intermediates_before = list(self._recorder.record.get("intermediates") or [])
+
+        try:
+            # 最終ステージ (品質ゲート連動 T-031)。モードは提案の品質（ループの後）で決まる
+            await self._execute_final_rendering_stage(ctx, None, None)
+            致命, 劣化 = self._settle_outcomes(ctx)
+            if 致命:
+                self._close_recorder(ctx, "failed")
+                return self._build_result(
+                    ctx, "error", total_start, f"工程が失敗しました: {'、'.join(致命)}")
+
+            retention_report = await self._run_retention_analysis(ctx)
+            if retention_report:
+                ctx.stage_results.append(retention_report)
+            await self._trigger_dream_learning(ctx)
+
+            # 前半で落ちた工程があれば、書き出しても完走とは呼ばない（R1.5-C1b）
+            final_status = (STATUS_DEGRADED if (劣化 or proposal.get("degraded_stages"))
+                            else STATUS_COMPLETED)
+            self._close_recorder(ctx, final_status)
+            write_export(run_dir, final_path=ctx.final_path,
+                         metadata_sidecar=self._sidecar_path,
+                         quality_sidecar=self._quality_sidecar_path,
+                         render_mode=ctx.render_mode)
+        finally:
+            self._intermediates_before = None
+
+        result = self._build_result(ctx, final_status, total_start)
+        result["run_id"] = run_id
+        return result
+
+    def _context_from_proposal(self, proposal: dict, approval: dict,
+                               run_dir: Path) -> PipelineContext:
+        """提案から書き出しの文脈を組み立てる。**メタデータは人が承認した現物**を使う。"""
+        ctx = PipelineContext(video_path=proposal["video_path"],
+                              session_id=proposal.get("session_id") or "")
+        ctx.preview_path = (proposal.get("preview") or {}).get("path")
+        quality = proposal.get("quality") or {}
+        ctx.quality_score = quality.get("score", 0)
+        ctx.quality_scored = bool(quality.get("scored"))
+        detail = proposal.get("quality_detail") or {}
+        ctx.quality_feedback = list(detail.get("feedback") or [])
+        ctx.quality_category_scores = dict(detail.get("category_scores") or {})
+        if detail.get("raw_score") is not None:
+            ctx.quality_gate_report = {"raw_score": detail["raw_score"]}
+        ctx.skipped_features = list(proposal.get("skipped_features") or [])
+        metadata: Dict[str, Any] = {}
+        for out in proposal.get("ai_outputs") or []:
+            if out.get("name") == "youtube_metadata":
+                metadata = json.loads((run_dir / out["working"]).read_text(encoding="utf-8"))
+        # 開示（R2-C3）: 承認のときに人が決めた判断を、手動投稿用のメタデータに入れる
+        metadata["ai_disclosure"] = approval["ai_disclosure"]
+        ctx.metadata = metadata
+        return ctx
 
     # --- 実行記録の開閉 -----------------------------------------------------
 
@@ -834,7 +980,12 @@ class PipelineCoordinator:
             # 通らないので空のまま閉じていた。`_outcomes` なら着手した工程が
             # 全部入っている。
             落ちた = [n for n, ok in self._outcomes.items() if not ok]
-            recorder.intermediates(self._intermediates(ctx))
+            rows = self._intermediates(ctx)
+            if self._intermediates_before is not None:
+                # 書き出し（承認の後）: 作られたかは提案までの値、使われたかは
+                # 「提案までか書き出しのどちらかで使われた」（R1.5-C3 を割らない）
+                rows = _merge_intermediates(self._intermediates_before, rows)
+            recorder.intermediates(rows)
             recorder.finish(status, health={
                 "skipped_features": list(ctx.skipped_features),
                 "failed_stages": 落ちた,
@@ -1015,6 +1166,20 @@ class PipelineCoordinator:
         if render_worker:
             # **着手した工程は、結果を返すまで「落ちた」扱い**（R1.5-C1b）
             self._record_outcome(render_worker, False)
+            # **承認していない動画は書き出せない**（R2-C1）。`export` の入口でも確かめるが、
+            # 書き出しの工程の直前でもう一度確かめる — 入口を通らない経路（画面の強制
+            # 書き出しなど）もここを通る。承認は実行記録の置き場にあるので、記録が無ければ通さない。
+            run_dir = self._recorder.dir if self._recorder else None
+            allowed, why = (export_allowed(run_dir) if run_dir is not None
+                            else (False, "実行記録が無いので承認を確かめられません"))
+            if not allowed:
+                reason = f"承認の門: {why}"
+                logger.warning(f"🚫 {reason}")
+                self._record_dead_stage(render_worker, ctx, reason)
+                ctx.stage_results.append(StageResult(
+                    stage_name=render_worker.name, success=False, detail=reason))
+                await self._notify(render_worker, "error", reason)
+                return
             # T-031: 品質ゲート結果に基づくレンダリングモード判定
             quality_passed = ctx.quality_score >= 90
             if not quality_passed:
@@ -1557,7 +1722,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"  ⚠ {w}")
     if result.get("error"):
         print(f"  🚫 {result['error']}")
-    return 0 if result["status"] in (STATUS_COMPLETED, STATUS_DEGRADED) else 1
+    if result["status"] == STATUS_AWAITING_APPROVAL:
+        # **承認していない動画は書き出せない**（R2-C1）。次の手順を出す
+        run_id = result.get("run_id")
+        print()
+        print(f"  ⏸ 承認待ち: 提案 {result.get('proposal_path')}")
+        print("    プレビューを見て、直すなら working/youtube_metadata.json を直してから:")
+        print(f"    python -m backend.revenue.approval_gate --approve {run_id} --synthetic no|yes")
+        print(f"    python -m backend.revenue.approval_gate --export {run_id}")
+    return 0 if result["status"] in (
+        STATUS_COMPLETED, STATUS_DEGRADED, STATUS_AWAITING_APPROVAL) else 1
 
 
 if __name__ == "__main__":
