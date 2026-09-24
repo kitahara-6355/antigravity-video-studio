@@ -185,8 +185,10 @@ class PipelineCoordinator:
         self._quality_sidecar_path: Optional[str] = None
         # 工程名 → 最後の試行が通ったか。**リトライで通ったものは失敗にしない**
         self._outcomes: Dict[str, bool] = {}
-        # 書き出し（承認の後）で記録を閉じ直すとき、提案までの中間成果物の使われ方
+        # 書き出し（承認の後）で記録を閉じ直すとき、提案までの中間成果物の使われ方と
+        # 提案までに落ちた工程。閉じ直しで消さない（R1.5-C1b・C3 を割らない）
         self._intermediates_before: Optional[list] = None
+        self._failed_before: Optional[list] = None
 
     # --- 実行記録 -----------------------------------------------------------
 
@@ -675,10 +677,17 @@ class PipelineCoordinator:
                 ctx, "error", total_start,
                 f"工程が失敗しました: {'、'.join(致命)}")
 
-        # ━━━ 5. 書き出さずに提案で止まる（R2-C1）━━━
+        # ━━━ 5. 視聴維持のリスクは**承認の前**に出す ━━━
+        # 人が見て決める材料なので提案に載せる。書き出しの文脈は提案から組み立て直す
+        # ので、ここで回さないと区間（segments）を持たないまま分析することになる。
+        retention_report = await self._run_retention_analysis(ctx)
+        if retention_report:
+            ctx.stage_results.append(retention_report)
+
+        # ━━━ 6. 書き出さずに提案で止まる（R2-C1）━━━
         # **承認していない動画は書き出せない。** 人がプレビューを見て承認し、
         # `python -m backend.revenue.approval_gate --export <run_id>` で書き出す。
-        # 書き出し・retention 分析・学習は承認の後（書き出す側・`export`）で行う。
+        # 書き出しと学習（完成した動画から学ぶ）は承認の後（`export`）で行う。
         proposal_path = self._write_proposal(ctx, 劣化)
         if proposal_path is None:
             # 残せなかった提案は承認も書き出しもできない。**承認待ちのまま
@@ -689,10 +698,10 @@ class PipelineCoordinator:
                 ctx, "error", total_start,
                 "提案を残せませんでした（承認も書き出しもできません）")
 
-        # ━━━ 6. Harness 完了処理 ━━━
+        # ━━━ 7. Harness 完了処理 ━━━
         self._finalize_harness(harness, ctx, "ok")
 
-        # ━━━ 7. パフォーマンスバジェットレポート保存 (PB-01) ━━━
+        # ━━━ 8. パフォーマンスバジェットレポート保存 (PB-01) ━━━
         perf_report_data = self._save_performance_report(ctx, perf_manager)
 
         run_id = self._recorder.run_id if self._recorder else None
@@ -763,7 +772,9 @@ class PipelineCoordinator:
             self._recorder = RunRecorder.reopen(run_id, **kwargs)
         except Exception as e:  # noqa: BLE001 — 開き直せない記録には書き出さない
             return _断る(f"実行記録を開き直せませんでした: {e}")
-        self._intermediates_before = list(self._recorder.record.get("intermediates") or [])
+        before = self._recorder.record
+        self._intermediates_before = list(before.get("intermediates") or [])
+        self._failed_before = list((before.get("health") or {}).get("failed_stages") or [])
 
         try:
             # 最終ステージ (品質ゲート連動 T-031)。モードは提案の品質（ループの後）で決まる
@@ -774,9 +785,7 @@ class PipelineCoordinator:
                 return self._build_result(
                     ctx, "error", total_start, f"工程が失敗しました: {'、'.join(致命)}")
 
-            retention_report = await self._run_retention_analysis(ctx)
-            if retention_report:
-                ctx.stage_results.append(retention_report)
+            # 学習は**完成した動画から**学ぶので書き出しの後（retention 分析は提案の段）
             await self._trigger_dream_learning(ctx)
 
             # 前半で落ちた工程があれば、書き出しても完走とは呼ばない（R1.5-C1b）
@@ -789,6 +798,7 @@ class PipelineCoordinator:
                          render_mode=ctx.render_mode)
         finally:
             self._intermediates_before = None
+            self._failed_before = None
 
         result = self._build_result(ctx, final_status, total_start)
         result["run_id"] = run_id
@@ -809,6 +819,7 @@ class PipelineCoordinator:
         if detail.get("raw_score") is not None:
             ctx.quality_gate_report = {"raw_score": detail["raw_score"]}
         ctx.skipped_features = list(proposal.get("skipped_features") or [])
+        ctx.warnings = list(proposal.get("warnings") or [])
         metadata: Dict[str, Any] = {}
         for out in proposal.get("ai_outputs") or []:
             if out.get("name") == "youtube_metadata":
@@ -980,6 +991,10 @@ class PipelineCoordinator:
             # 通らないので空のまま閉じていた。`_outcomes` なら着手した工程が
             # 全部入っている。
             落ちた = [n for n, ok in self._outcomes.items() if not ok]
+            if self._failed_before:
+                # 書き出し（承認の後）: 提案までに落ちた工程を先に並べて残す
+                落ちた = list(self._failed_before) + [
+                    n for n in 落ちた if n not in self._failed_before]
             rows = self._intermediates(ctx)
             if self._intermediates_before is not None:
                 # 書き出し（承認の後）: 作られたかは提案までの値、使われたかは

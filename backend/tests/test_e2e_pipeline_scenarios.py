@@ -60,8 +60,14 @@ async def test_scenario_01_normal_full_pipeline(safe_popen_mock, tmp_path):
         mock_disk.return_value = MagicMock(free=10 * (1024 ** 3))
         
         result = await coordinator.execute(ctx)
-        
-        assert result["status"] == "completed"
+        # R2-C1: 本線は提案で止まる。承認して書き出して初めて完走する
+        assert result["status"] == "awaiting_approval", result.get("error")
+        from pathlib import Path
+        from backend.revenue import approval_gate as ag
+        ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
+        result = await coordinator.export(result["run_id"])
+
+        assert result["status"] == "completed", result.get("error")
         assert result["quality_score"] == 95
         assert len(result["stage_results"]) > 0
         for stage in result["stage_results"]:

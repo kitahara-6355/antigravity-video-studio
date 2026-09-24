@@ -107,6 +107,32 @@ def _create_coordinator_with_mocks(quality_score: int = 95) -> PipelineCoordinat
     return coord
 
 
+def _提案で落ちた工程(result: dict) -> list:
+    """提案に残った「前半で落ちた工程」。書き出したらこれで degraded になる（R1.5-C1b）。
+
+    本線は提案で止まるので、完走か劣化かは書き出しの時点で決まる。提案の段では
+    状態は awaiting_approval で、劣化の事実はここに残る。
+    """
+    return json.loads(Path(result["proposal_path"]).read_text(encoding="utf-8"))["degraded_stages"]
+
+
+async def _書き出すまで(coord: PipelineCoordinator, ctx: PipelineContext) -> dict:
+    """**提案 → 承認 → 書き出し**（R2-C1）。
+
+    本線（`execute`）は書き出さずに提案で止まる（`awaiting_approval`）。書き出し・
+    retention 分析・学習・品質不合格の通知を見るテストは、承認して書き出すまで通す。
+    提案の段で終わった実走（error）はそこで返す。書き出しは提案から組み立てた
+    別の文脈で走るので、書き出しの様子は戻り値か worker のモックの呼び出しで見る。
+    """
+    from backend.revenue import approval_gate as ag
+
+    result = await coord.execute(ctx)
+    if result["status"] != "awaiting_approval":
+        return result
+    ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
+    return await coord.export(result["run_id"])
+
+
 # ============================================================
 # C1: Worker登録・順序 (8)
 # ============================================================
@@ -250,12 +276,14 @@ class TestC2ExecutionControl:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
-        # Render が最後に実行: stage_results に Render が含まれること
+        # Render は承認の後（書き出し）に実行: 書き出しの結果に Render が含まれること
         render_worker = coord._find_worker(RenderWorker)
-        render_results = [r for r in ctx.stage_results if r.stage_name == render_worker.name]
+        render_results = [r for r in result["stage_results"] if r["name"] == render_worker.name]
         assert len(render_results) >= 1
+        # 提案の段（QualityGate を含む）では Render は走らない（R2-C1）
+        assert not [r for r in ctx.stage_results if r.stage_name == render_worker.name]
 
     @pytest.mark.asyncio
     async def test_C2_04_quality_gate_production_mode(self):
@@ -279,9 +307,11 @@ class TestC2ExecutionControl:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
-        assert ctx.render_mode == "safe"
+        render_worker = coord._find_worker(RenderWorker)
+        書き出しの文脈 = render_worker.execute.call_args.args[0]
+        assert 書き出しの文脈.render_mode == "safe"
 
     @pytest.mark.asyncio
     async def test_C2_06_max_retries_applied(self):
@@ -400,7 +430,7 @@ class TestC3ResultAggregation:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         assert result["status"] == "completed"
 
@@ -513,7 +543,7 @@ class TestC4ErrorControl:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         # 止めない。ただし完走ではない
         assert result["status"] == "degraded"
@@ -533,7 +563,7 @@ class TestC4ErrorControl:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         assert result["status"] == "degraded"   # 止めない（T-020b）が完走でもない
         assert any("プレビュー" in w for w in ctx.warnings)
@@ -550,7 +580,7 @@ class TestC4ErrorControl:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         # 例外で他のステージは巻き込まない。ただし落ちた事実は残す
         assert result["status"] == "degraded"
@@ -753,7 +783,7 @@ class TestC5WebSocketHook:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         blocked_msgs = [m for m in ws_msgs if m.get("type") == "quality_gate_blocked"]
         assert len(blocked_msgs) >= 1
@@ -770,7 +800,7 @@ class TestC5WebSocketHook:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         assert result["status"] == "completed"
 
@@ -788,7 +818,7 @@ class TestC5WebSocketHook:
 
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         assert dream_called
 
@@ -807,7 +837,7 @@ class TestC5WebSocketHook:
 
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         assert retention_called
 
@@ -894,7 +924,7 @@ class TestC6Performance:
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock), \
              patch('shutil.disk_usage', return_value=mock_disk):
-            result = await coord.execute(ctx)
+            result = await _書き出すまで(coord, ctx)
 
         assert result["status"] == "completed"
         assert any("ディスク" in w for w in ctx.warnings)
@@ -917,7 +947,7 @@ class TestC6Performance:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result1 = await coord.execute(ctx1)
+            result1 = await _書き出すまで(coord, ctx1)
 
         # Worker を再モック（state reset）
         _patch_all_workers(coord)
@@ -925,7 +955,7 @@ class TestC6Performance:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result2 = await coord.execute(ctx2)
+            result2 = await _書き出すまで(coord, ctx2)
 
         assert result1["status"] == "completed"
         assert result2["status"] == "completed"
@@ -984,7 +1014,7 @@ class TestC7HarnessIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         mock_session.session_manager.resume_session.assert_called_once_with("test-session-123")
         mock_gov.governance_engine.start_span.assert_called_once()
         mock_gov.governance_engine.end_span.assert_called_once_with(mock_span, status="ok")
@@ -1016,7 +1046,7 @@ class TestC7HarnessIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         assert ctx.session_id == "new-session-456"
         mock_session.session_manager.create_session.assert_called_once_with(video_path="/tmp/test.mp4")
 
@@ -1040,7 +1070,7 @@ class TestC7HarnessIntegration:
             result = await coord.execute(ctx)
 
         # 例外がスルーされ、Harnessなしで正常終了すること
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_C7_04_pre_hook_governance_permission_deny(self):
@@ -1142,6 +1172,8 @@ class TestC7HarnessIntegration:
 
         mock_hooks = MagicMock()
         mock_session = MagicMock()
+        # 本物は文字列の ID を返す（MagicMock のままだと提案の JSON を書けない）
+        mock_session.session_manager.create_session.return_value.session_id = "c7-session"
         mock_gov = MagicMock()
 
         mock_gov.governance_engine.check_permission.return_value = True
@@ -1161,7 +1193,8 @@ class TestC7HarnessIntegration:
             result = await coord.execute(ctx)
 
         # 校閲は非致命的なので**中断はしない**。ただし完走とは呼ばない（R1.5-C1）
-        assert result["status"] == "degraded"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
+        assert "proofread" in _提案で落ちた工程(result)  # 書き出したら degraded（完走とは呼ばない）
 
         # POST_TOOL_USE (成功した文字起こしなど) と POST_TOOL_USE_FAILURE (失敗したAI校閲) が両方呼ばれていること
         fired_events = [args[0] for args, kwargs in mock_hooks.hook_system.fire.call_args_list]
@@ -1233,7 +1266,7 @@ class TestC7HarnessIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         assert ctx.session_id == "non-existent-session-id"
         mock_session.session_manager.resume_session.assert_called_once_with("non-existent-session-id")
         mock_session.session_manager.create_session.assert_called_once_with(
@@ -1252,7 +1285,7 @@ class TestC7HarnessIntegration:
         with patch.dict(sys.modules, {'harness.hooks': None, 'harness.session_manager': None, 'harness.governance': None}),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         assert not ctx.session_id
 
     @pytest.mark.asyncio
@@ -1265,6 +1298,8 @@ class TestC7HarnessIntegration:
         mock_hooks.hook_system.fire = AsyncMock(return_value=MagicMock(permission_decision="allow"))
 
         mock_session = MagicMock()
+        # 本物は文字列の ID を返す（MagicMock のままだと提案の JSON を書けない）
+        mock_session.session_manager.create_session.return_value.session_id = "c7-session"
         mock_gov = MagicMock()
         mock_gov.governance_engine.check_permission.return_value = True
         mock_gov.governance_engine.check_rate_limit.return_value = True
@@ -1281,7 +1316,7 @@ class TestC7HarnessIntegration:
             result = await coord.execute(ctx)
 
         # 例外は catch され、パイプライン自体は completed になること
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_C7_12_pre_hook_denied_non_fatal_worker(self):
@@ -1304,6 +1339,8 @@ class TestC7HarnessIntegration:
         mock_hooks.hook_system.fire = mock_fire
 
         mock_session = MagicMock()
+        # 本物は文字列の ID を返す（MagicMock のままだと提案の JSON を書けない）
+        mock_session.session_manager.create_session.return_value.session_id = "c7-session"
         mock_gov = MagicMock()
         mock_gov.governance_engine.check_permission.return_value = True
         mock_gov.governance_engine.check_rate_limit.return_value = True
@@ -1319,7 +1356,8 @@ class TestC7HarnessIntegration:
 
         # AI校閲が拒否されたが致命的ではないので**止めない**。
         # ただし断られた工程は動いていないので completed とも呼ばない（R1.5-C1）
-        assert result["status"] == "degraded"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
+        assert "proofread" in _提案で落ちた工程(result)  # 書き出したら degraded（完走とは呼ばない）
         # AI校閲の StageResult が失敗 (Hook denied) として記録されていること
         proofread_res = next(r for r in result["stage_results"] if r["name"] == "AI校閲")
         assert proofread_res["success"] is False
@@ -1346,6 +1384,8 @@ class TestC7HarnessIntegration:
         mock_hooks.hook_system.fire = mock_fire
 
         mock_session = MagicMock()
+        # 本物は文字列の ID を返す（MagicMock のままだと提案の JSON を書けない）
+        mock_session.session_manager.create_session.return_value.session_id = "c7-session"
         mock_gov = MagicMock()
         mock_gov.governance_engine.check_permission.return_value = True
         mock_gov.governance_engine.check_rate_limit.return_value = True
@@ -1360,7 +1400,8 @@ class TestC7HarnessIntegration:
             result = await coord.execute(ctx)
 
         # 断られた工程は動いていない。止めないが完走とも呼ばない（R1.5-C1）
-        assert result["status"] == "degraded"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
+        assert "youtube_opt" in _提案で落ちた工程(result)  # 書き出したら degraded（完走とは呼ばない）
         yt_res = next(r for r in result["stage_results"] if r["name"] == "YouTube最適化")
         assert yt_res["success"] is False
         assert "Hook denied" in yt_res["detail"]
@@ -1400,7 +1441,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         mock_tmpl_config_inst.set_active_template.assert_called_once_with(
             "tmpl_warm_v1", {"theme": "warm", "font": "Inter"}, theme_id="warm"
         )
@@ -1422,7 +1463,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed" # 例外で中断せず完了すること
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後） # 例外で中断せず完了すること
 
     @pytest.mark.asyncio
     async def test_C8_03_performance_budget_manager_exception(self):
@@ -1440,7 +1481,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed" # パフォーマンスバジェットの例外でも続行
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後） # パフォーマンスバジェットの例外でも続行
 
     @pytest.mark.asyncio
     async def test_C8_04_performance_budget_save_exception(self):
@@ -1458,7 +1499,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_C8_05_disk_check_exception(self):
@@ -1469,7 +1510,7 @@ class TestC8ExternalIntegration:
         with patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock),              patch('shutil.disk_usage', side_effect=OSError("ディスク情報取得不能")):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed" # ディスクチェックがコケてもパイプラインは完了
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後） # ディスクチェックがコケてもパイプラインは完了
 
     @pytest.mark.asyncio
     async def test_C8_06_evaluator_optimizer_success_and_failure(self):
@@ -1490,6 +1531,8 @@ class TestC8ExternalIntegration:
 
         # セッション記録用の harness
         mock_session = MagicMock()
+        # 本物は文字列の ID を返す（MagicMock のままだと提案の JSON を書けない）
+        mock_session.session_manager.create_session.return_value.session_id = "c8-session"
         mock_hooks = MagicMock()
         mock_hooks.hook_system.fire = AsyncMock(return_value=MagicMock(permission_decision="allow"))
         
@@ -1507,7 +1550,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         mock_opt.evaluator_optimizer.run.assert_called_once_with(ctx, max_iterations=3)
         mock_session.session_manager.record_tool_call.assert_any_call(
             ctx.session_id, "evaluator_optimizer", {"iterations": 2}, {"improvements": ["audio_lufs_adjust", "re_proofread"]}, 4.5
@@ -1524,7 +1567,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord2, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord2, '_trigger_dream_learning', new_callable=AsyncMock):
             result2 = await coord2.execute(ctx2)
 
-        assert result2["status"] == "completed" # 改善しきれなくてもパイプラインは完了
+        assert result2["status"] == "awaiting_approval"  # 改善しきれなくても提案までは進む
 
     @pytest.mark.asyncio
     async def test_C8_07_retention_analysis_success_and_exception(self):
@@ -1550,7 +1593,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         # metadata に分析結果が含まれること
         analysis = ctx.metadata.get("retention_analysis")
         assert analysis is not None
@@ -1566,7 +1609,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord2, '_init_harness', return_value=None),              patch.object(coord2, '_trigger_dream_learning', new_callable=AsyncMock):
             result2 = await coord2.execute(ctx2)
 
-        assert result2["status"] == "completed" # 例外発生しても無視して完了する
+        assert result2["status"] == "awaiting_approval"  # 例外発生しても無視して提案まで進む
 
     @pytest.mark.asyncio
     async def test_C8_08_dream_learning_success_and_exception(self, monkeypatch):
@@ -1575,6 +1618,10 @@ class TestC8ExternalIntegration:
         **このテストだけは学習フックを動かす。** conftest がセッション全体で
         `AVS_SKIP_LEARNING_SIDE_EFFECTS=1` を立てている（実走のたびに
         VERIFIED_FACTS が書き換わるのを防ぐため）ので、ここでは外す。
+
+        R2-C1 で学習フックは**書き出し（承認の後）**に移った。パイプラインを通すと
+        `Path.write_text` のモックが提案や記録の書き出しまで止めてしまうので、
+        ここではフックを直接呼んで中身を見る（フックが回ること自体は C5-06 が見ている）。
         """
         monkeypatch.delenv("AVS_SKIP_LEARNING_SIDE_EFFECTS", raising=False)
         # 1. 正常系
@@ -1583,11 +1630,11 @@ class TestC8ExternalIntegration:
         ctx.segments = [{"start": 0, "end": 10}]
         ctx.selected_segments = [{"start": 0, "end": 10}]
         ctx.quality_score = 95
-        
+
         # ログフォルダ書き出しのモック
         mock_mkdir = MagicMock()
         mock_write = MagicMock()
-        
+
         mock_dream = MagicMock()
         mock_dream.dream_engine.should_dream = AsyncMock(return_value=True)
         mock_dream.dream_engine.run_dream_cycle = AsyncMock()
@@ -1597,24 +1644,23 @@ class TestC8ExternalIntegration:
         }
 
         # Path.write_text と Path.mkdir をモック化してローカル書き出しを抑止
-        with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch('pathlib.Path.mkdir', mock_mkdir),              patch('pathlib.Path.write_text', mock_write):
-            result = await coord.execute(ctx)
+        with patch.dict(sys.modules, modules_patch), \
+             patch('pathlib.Path.mkdir', mock_mkdir), \
+             patch('pathlib.Path.write_text', mock_write):
+            await coord._trigger_dream_learning(ctx)
 
-        assert result["status"] == "completed"
         mock_dream.dream_engine.increment_session_count.assert_called_once()
         mock_dream.dream_engine.should_dream.assert_called_once()
         mock_dream.dream_engine.run_dream_cycle.assert_called_once()
         mock_write.assert_called_once() # run_*.json が書き込まれていること
 
-        # 2. 例外系
-        coord2 = _create_coordinator_with_mocks()
-        ctx2 = PipelineContext(video_path="/tmp/test.mp4")
+        # 2. 例外系: 学習フックの例外は外に出さない（書き出しを落とさない）
         mock_dream.dream_engine.should_dream.side_effect = RuntimeError("DreamEngine障害")
 
-        with patch.dict(sys.modules, modules_patch),              patch.object(coord2, '_init_harness', return_value=None),              patch.object(coord2, '_run_retention_analysis', new_callable=AsyncMock, return_value=None):
-            result2 = await coord2.execute(ctx2)
-
-        assert result2["status"] == "completed" # 例外があっても正常にスルー
+        with patch.dict(sys.modules, modules_patch), \
+             patch('pathlib.Path.mkdir', MagicMock()), \
+             patch('pathlib.Path.write_text', MagicMock()):
+            await coord._trigger_dream_learning(ctx)  # 例外が外に出ないこと
 
     @pytest.mark.asyncio
     async def test_C8_09_retention_analysis_duration_fallback(self):
@@ -1643,7 +1689,7 @@ class TestC8ExternalIntegration:
         with patch.dict(sys.modules, modules_patch),              patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
             result = await coord.execute(ctx)
 
-        assert result["status"] == "completed"
+        assert result["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
         # 呼び出し時の duration_sec パラメータが 180 になっていることを確認
         mock_plugin.retention_map_plugin.analyze_retention_risks.assert_called_once_with(
             video_id="test",
@@ -1674,7 +1720,7 @@ class TestC9EdgeCases:
         coord._notify = _track_notify
 
         with patch.object(coord, '_init_harness', return_value=None),              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None),              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await coord.execute(ctx := PipelineContext(video_path="/tmp/test.mp4"))
+            result = await _書き出すまで(coord, ctx := PipelineContext(video_path="/tmp/test.mp4"))
 
         assert "error" in notify_calls
         # **動画が無いのに完了と言わない**（R1.5-C1）。

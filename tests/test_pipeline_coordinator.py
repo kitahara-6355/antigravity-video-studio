@@ -22,6 +22,25 @@ from agents.pipeline_coordinator import (
     resolve_pipeline_coordinator_thumbnail_task,
 )
 
+def _承認済みにする(coordinator, tmp_path):
+    """書き出しの工程を直接呼ぶテスト用に、承認済みの実走を1本用意して記録を開く。
+
+    R2-C1: 書き出しの工程の直前に承認の門がある。ここで見たいのは T-031 の
+    モード判定なので、**門は本物のまま通す**（承認を用意する）。
+    """
+    from types import SimpleNamespace
+    from backend.revenue import approval_gate as ag
+    from backend.revenue.run_record import RunRecorder
+
+    runs = tmp_path / "runs"
+    rec = RunRecorder(runs_dir=runs)
+    rec.finish("awaiting_approval")
+    ag.write_proposal(rec.dir, SimpleNamespace(video_path=str(tmp_path / "dummy.mp4")),
+                      run_id=rec.run_id, models_used=[])
+    ag.approve(rec.dir, synthetic=False, by="test")
+    coordinator._recorder = RunRecorder.reopen(rec.run_id, runs_dir=runs)
+
+
 # ===========================================================================
 # 1. サムネイル生成・検証関連のテスト (A分類)
 # ===========================================================================
@@ -624,8 +643,9 @@ async def test_execute_parallel_stages_with_exception():
     assert any(r.stage_name == quality_worker.name and r.success for r in ctx.stage_results)
 
 @pytest.mark.asyncio
-async def test_execute_final_rendering_stage_quality_passed():
+async def test_execute_final_rendering_stage_quality_passed(tmp_path):
     coordinator = PipelineCoordinator()
+    _承認済みにする(coordinator, tmp_path)
     ctx = PipelineContext(video_path="/dummy.mp4")
     ctx.quality_score = 92 # 90以上 -> production mode
     
@@ -638,8 +658,9 @@ async def test_execute_final_rendering_stage_quality_passed():
     assert any(r.stage_name == render_worker.name and r.success for r in ctx.stage_results)
 
 @pytest.mark.asyncio
-async def test_execute_final_rendering_stage_quality_failed():
+async def test_execute_final_rendering_stage_quality_failed(tmp_path):
     coordinator = PipelineCoordinator()
+    _承認済みにする(coordinator, tmp_path)
     ctx = PipelineContext(video_path="/dummy.mp4")
     ctx.quality_score = 80 # 90点未満 -> safe mode & WebSocket通知
     
@@ -879,9 +900,13 @@ async def test_execute_main_success(tmp_path):
     
     with patch("shutil.disk_usage", return_value=mock_usage):
         res = await coordinator.execute(ctx)
-        assert res["status"] == "completed"
+        # R2-C1: 本線は書き出さずに提案で止まる。書き出し・retention・学習は承認の後
+        assert res["status"] == "awaiting_approval"
         assert res["performance_budget"] == {"total_duration": 10.0}
         coordinator._finalize_harness.assert_called_once()
+        coordinator._execute_final_rendering_stage.assert_not_awaited()
+        # 学習は書き出しの後（retention 分析は承認の前に回す — 人が見て決める材料）
+        coordinator._trigger_dream_learning.assert_not_awaited()
 
 
 # ===========================================================================
@@ -966,10 +991,12 @@ async def test_execute_main_with_retention_report(tmp_path):
     coordinator._trigger_dream_learning = AsyncMock()
     coordinator._finalize_harness = MagicMock()
     coordinator._save_performance_report = MagicMock(return_value=None)
-    
+
+    # R2-C1: 本線は提案で止まる。retention 分析は**承認の前**に回す（人が見て決める材料）
     with patch("shutil.disk_usage", return_value=mock_usage):
         res = await coordinator.execute(ctx)
-        assert res["status"] == "completed"
+        assert res["status"] == "awaiting_approval"
+        coordinator._run_retention_analysis.assert_awaited_once()
         assert any(r.stage_name == "Retention分析" for r in ctx.stage_results)
 
 def test_init_performance_budget_manager_exception():
@@ -1069,18 +1096,21 @@ async def test_execute_stages_with_perf_manager():
         await coordinator._optimize_quality(ctx, None, mock_perf)
 
 @pytest.mark.asyncio
-async def test_execute_final_rendering_stage_failure():
+async def test_execute_final_rendering_stage_failure(tmp_path):
     coordinator = PipelineCoordinator()
+    _承認済みにする(coordinator, tmp_path)
     ctx = PipelineContext(video_path="/dummy.mp4")
     ctx.quality_score = 95
-    
+
     from agents.workers import RenderWorker
     render_worker = coordinator._find_worker(RenderWorker)
     render_worker.execute = AsyncMock(return_value=StageResult(stage_name=render_worker.name, success=False, detail="render crash"))
-    
+
     await coordinator._execute_final_rendering_stage(ctx, None, None)
     res = next(r for r in ctx.stage_results if r.stage_name == render_worker.name)
     assert res.success is False
+    # 承認の門で断られたのではなく、書き出しの工程そのものが落ちたこと
+    assert res.detail == "render crash"
 
 @pytest.mark.asyncio
 async def test_optimize_quality_evaluator_optimizer_still_failed():

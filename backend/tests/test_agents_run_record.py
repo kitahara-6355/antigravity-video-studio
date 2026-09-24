@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -66,6 +67,23 @@ def _run(coordinator, tmp_path):
         return asyncio.run(coordinator.execute(ctx))
 
 
+def _run_and_export(coordinator, tmp_path):
+    """**提案 → 承認 → 書き出し**まで走らせる（R2-C1 の後の本線の1本ぶん）。
+
+    本線は提案で止まる（`awaiting_approval`）ので、書き出し・サイドカー・完走か劣化かの
+    判定は承認の後にしか起きない。提案の段で致命的に落ちた実走は、そこで返す。
+    """
+    from backend.revenue import approval_gate as ag
+
+    result = _run(coordinator, tmp_path)
+    if result["status"] != "awaiting_approval":
+        return result
+    ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
+    with patch.object(coordinator, "_run_retention_analysis",
+                      new=AsyncMock(return_value=None)):
+        return asyncio.run(coordinator.export(result["run_id"]))
+
+
 def _run_json(tmp_path):
     runs = sorted((tmp_path / "runs").glob("*/run.json"))
     assert runs, "実行記録が1件も書かれていません"
@@ -83,7 +101,7 @@ def 学習の副作用を止める(monkeypatch):
 
 
 def test_工程ごとに実行記録が残る(tmp_path):
-    _run(_coordinator(tmp_path), tmp_path)
+    _run_and_export(_coordinator(tmp_path), tmp_path)
     run = _run_json(tmp_path)
 
     名前 = [s["name"] for s in run["stages"]]
@@ -118,7 +136,7 @@ def test_失敗した工程の原因と入力が残る(tmp_path):
 
 def test_必須工程が落ちたら完走扱いにしない(tmp_path):
     """**「何もしていないのに success」を止める。** R1 で video_pipeline に入れた保証。"""
-    result = _run(_coordinator(tmp_path, 落ちる={"RenderWorker"}), tmp_path)
+    result = _run_and_export(_coordinator(tmp_path, 落ちる={"RenderWorker"}), tmp_path)
 
     assert result["status"] != "completed", (
         f"最終レンダリングが落ちたのに status={result['status']}")
@@ -127,15 +145,15 @@ def test_必須工程が落ちたら完走扱いにしない(tmp_path):
 
 def test_校閲の失敗も握り潰さない(tmp_path):
     """直列で中断するのが文字起こしだけだったので、校閲の失敗が消えていた。"""
-    result = _run(_coordinator(tmp_path, 落ちる={"ProofreadWorker"}), tmp_path)
+    result = _run_and_export(_coordinator(tmp_path, 落ちる={"ProofreadWorker"}), tmp_path)
 
     assert result["status"] != "completed"
 
 
 def test_プレビューの失敗は止めないが完走とも呼ばない(tmp_path):
     """T-020b。**止めないが、成功にもしない。**"""
-    result = _run(_coordinator(tmp_path, 落ちる={"PreviewWorker"},
-                               final_path=CLIP), tmp_path)
+    result = _run_and_export(_coordinator(tmp_path, 落ちる={"PreviewWorker"},
+                                          final_path=tmp_path / "final.mp4"), tmp_path)
     run = _run_json(tmp_path)
 
     assert result["status"] == "degraded", "止めないが、完走とも呼ばない"
@@ -159,7 +177,10 @@ def test_成果物ゲートが本線の記録の形を認める(tmp_path):
     """
     from backend.revenue.artifact_gate import check_runs, load_runs
 
-    _run(_coordinator(tmp_path, final_path=CLIP), tmp_path)
+    # 本物のクリップの隣にサイドカーを書かないよう、写しを最終の動画にする（D-29）
+    final = tmp_path / "final.mp4"
+    shutil.copy(CLIP, final)
+    _run_and_export(_coordinator(tmp_path, final_path=final), tmp_path)
     findings = check_runs(load_runs(tmp_path / "runs"))
 
     それ以外 = [f for f in findings if f.kind != "model_unverified"]
@@ -235,7 +256,7 @@ def test_落ちた工程が実行記録にも残る(tmp_path):
     """
     c = _coordinator(tmp_path, 落ちる={"YouTubeOptWorker"})
 
-    result = _run(c, tmp_path)
+    result = _run_and_export(c, tmp_path)
 
     assert result["status"] == "degraded", result["status"]
     rec = _run_json(tmp_path)
@@ -358,7 +379,7 @@ def test_直列で結果を返さなくても実行は落ちない(tmp_path):
         if type(w).__name__ == "ProofreadWorker":
             w.execute = _何も返さない
 
-    result = _run(c, tmp_path)
+    result = _run_and_export(c, tmp_path)
 
     assert result["status"] != "completed", result["status"]
     rec = _run_json(tmp_path)
@@ -475,7 +496,7 @@ def test_AIのメタデータがサイドカーとして残る(tmp_path):
                 return StageResult(stage_name=_w.name, success=True, detail="やった")
             w.execute = _メタデータを作る
 
-    _run(c, tmp_path)
+    _run_and_export(c, tmp_path)
 
     横 = final.with_suffix(".youtube.json")
     assert 横.is_file(), list(tmp_path.iterdir())
@@ -538,7 +559,7 @@ def test_品質の講評もサイドカーに残る(tmp_path):
                 return StageResult(stage_name=_w.name, success=True, detail="やった")
             w.execute = _講評を出す
 
-    _run(c, tmp_path)
+    _run_and_export(c, tmp_path)
 
     横 = final.with_suffix(".quality.json")
     assert 横.is_file(), list(tmp_path.iterdir())

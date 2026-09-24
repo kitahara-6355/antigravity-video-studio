@@ -307,3 +307,24 @@ def test_二度は書き出さない(tmp_path):
     again = _export(c, res["run_id"])
     assert again["status"] == "error" and "書き出し済み" in again["error"]
     assert c.rendered == ["production"], "二度書き出しています"
+
+
+def test_前半で落ちた工程と警告は書き出した後の記録にも残る(tmp_path):
+    """書き出しで記録を閉じ直しても、提案までに落ちた工程を消さない（R1.5-C1b を割らない）。"""
+    from backend.revenue import approval_gate as ag
+
+    c = _coordinator(tmp_path)
+    c.落とす = {"ProofreadWorker"}
+
+    async def _警告つきで合格(ctx, harness, perf_manager):
+        await _合格(ctx, harness, perf_manager)
+        ctx.warnings.append("前半の警告")
+
+    res = _run(c, tmp_path, optimize=_警告つきで合格)
+    ag.approve(_run_dir(tmp_path), synthetic=False, by="北原")
+    out = _export(c, res["run_id"])
+
+    rec = json.loads((_run_dir(tmp_path) / "run.json").read_text(encoding="utf-8"))
+    assert "proofread" in rec["health"]["failed_stages"], rec["health"]
+    assert "前半の警告" in rec["health"]["warnings"]
+    assert "前半の警告" in out["health"]["warnings"]
