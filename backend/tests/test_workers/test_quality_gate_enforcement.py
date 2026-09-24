@@ -91,7 +91,8 @@ class TestT032QualityFailureReport:
         assert report["score"] == 75
         assert report["threshold"] == 90
         assert report["gap"] == 15
-        assert report["force_render_available"] is True
+        # **強制書き出しは廃止した**（R2-C1）。承認すれば出せる
+        assert report["force_render_available"] is False
         assert report["force_render_endpoint"] == "/api/pipeline/force-render"
         assert len(report["feedback"]) == 2
 
@@ -139,27 +140,20 @@ class TestT033WebSocketNotification:
 
         ctx = create_mock_ctx(segments=10)
         ctx.quality_score = 81
+        ctx.quality_scored = True
 
-        # Phase C のロジックをシミュレート
-        quality_passed = ctx.quality_score >= 90
-        if not quality_passed:
-            ctx.render_mode = "safe"
-            if coordinator._ws_broadcast:
-                await coordinator._ws_broadcast({
-                    "type": "quality_gate_blocked",
-                    "score": ctx.quality_score,
-                    "threshold": 90,
-                    "feedback": ctx.quality_feedback[:5],
-                    "render_mode": "safe",
-                    "force_render_available": True,
-                })
+        # **本番の通知そのものを呼ぶ。** ここは電文をテスト側で組み立てていたので、
+        # 本番の中身が変わっても気づけなかった（2026-09-24 に直した）
+        await coordinator._notify_quality_blocked(ctx)
 
         assert len(ws_messages) == 1
         msg = ws_messages[0]
         assert msg["type"] == "quality_gate_blocked"
         assert msg["score"] == 81
         assert msg["threshold"] == 90
-        assert msg["force_render_available"] is True
+        assert msg["scored"] is True
+        # **強制書き出しは廃止した**（R2-C1）。承認すれば出せる
+        assert msg["force_render_available"] is False
 
 
 class TestT034ForceRenderAPI:
@@ -191,7 +185,11 @@ class TestT034ForceRenderAPI:
 
     @pytest.mark.asyncio
     async def test_force_render_rejects_without_quality_report(self):
-        """品質不合格レポートなしでforce-renderが400エラーを返す"""
+        """**承認していない動画は書き出せない**（R2-C1）。
+
+        かつては「品質ゲート不合格レポートが無い」ときだけ 400 で断っていた。
+        R2 では**レポートが在っても書き出さない**（承認を通す）ので 409 になる。
+        """
         from routers.pipeline_router import force_render, ForceRenderRequest, _pipeline_state
 
         original_status = _pipeline_state["status"]
@@ -204,7 +202,8 @@ class TestT034ForceRenderAPI:
             from fastapi import HTTPException
             with pytest.raises(HTTPException) as exc_info:
                 await force_render(req)
-            assert exc_info.value.status_code == 400
+            assert exc_info.value.status_code == 409
+            assert "承認" in exc_info.value.detail
         finally:
             _pipeline_state["status"] = original_status
             _pipeline_state["result"] = original_result
@@ -513,7 +512,8 @@ class TestT045ForceRenderFlow:
         # force-render 情報の確認
         report = result["quality_gate_report"]
         assert report is not None
-        assert report["force_render_available"] is True
+        # **強制書き出しは廃止した**（R2-C1）。承認すれば出せる
+        assert report["force_render_available"] is False
         assert report["force_render_endpoint"] == "/api/pipeline/force-render"
         assert report["gap"] == 9  # 90 - 81
         assert len(report["feedback"]) == 1

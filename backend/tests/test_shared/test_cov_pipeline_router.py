@@ -374,6 +374,7 @@ class TestForceRender:
         assert resp.status_code == 400
 
     def test_no_quality_report(self, pipeline_client):
+        """R2-C1: 断り方は品質レポートの有無で変わらない（承認を通せ・409）。"""
         from routers.pipeline_router import _pipeline_state
         _pipeline_state["status"] = "completed"
         _pipeline_state["result"] = {}
@@ -381,7 +382,7 @@ class TestForceRender:
             "/api/pipeline/force-render",
             json={"reason": "test"}
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 409
 
     def test_preview_not_found(self, pipeline_client):
         from routers.pipeline_router import _pipeline_state
@@ -394,7 +395,8 @@ class TestForceRender:
             "/api/pipeline/force-render",
             json={"reason": "test"}
         )
-        assert resp.status_code == 404
+        # R2-C1: プレビューが在っても書き出さない（承認を通す）
+        assert resp.status_code == 409
 
 
 # ============================================================

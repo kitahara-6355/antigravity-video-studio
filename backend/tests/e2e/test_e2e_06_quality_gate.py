@@ -232,7 +232,11 @@ class TestO6L5EndToEnd:
                 assert s["estimated_improvement"] > 0
 
     def test_o6_l5_05(self, app_page):
-        """O6-L5-05 [S10]: 不合格→提案→履歴→強制レンダリング導線の完走"""
+        """O6-L5-05 [S10]: 不合格→提案→履歴→**承認への案内**の完走
+
+        強制レンダリングは R2-C1 で閉じた（承認していない動画は書き出せない）。
+        導線の終点は「書き出し」ではなく「承認を通せ」という案内（409）。
+        """
         assert app_page.request.get(f"{BASE}/quality-gate/status").ok
         assert app_page.request.post(f"{BASE}/quality-gate/improve",
             data=json.dumps({"category": ""}),
@@ -242,7 +246,8 @@ class TestO6L5EndToEnd:
         fr = app_page.request.post(f"{BASE}/force-render",
             data=json.dumps({"reason": "test"}),
             headers={"Content-Type": "application/json"})
-        assert fr.status in [200, 400, 404]
+        # 409 = 承認を通していない（R2-C1）。200（書き出した）はもう返らない
+        assert fr.status in [400, 409]
 
     def test_o6_l3_07(self, app_page):
         """O6-L3-07 [S5]: subtitleドリルダウン"""

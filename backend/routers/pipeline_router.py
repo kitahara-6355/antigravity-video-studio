@@ -788,7 +788,7 @@ async def approve_checkpoint():
 
 
 # ============================================================
-# T-034/T-035: 強制レンダリング API（品質ゲート実効化）
+# T-034/T-035: 強制レンダリング API → R2-C1 で閉じた（承認を通す）
 # ============================================================
 
 class ForceRenderRequest(BaseModel):
@@ -798,97 +798,33 @@ class ForceRenderRequest(BaseModel):
 
 @router.post("/force-render")
 async def force_render(req: ForceRenderRequest):
-    """品質不合格時の強制レンダリング (憲法§8.2 バイパス権限)
+    """**承認していない動画は書き出せない**（R2-C1・2026-09-19）。
 
-    品質スコア<90のパイプライン完了後に、ユーザー判断で本番品質レンダリングを実行。
-    理由は evolution_log.json に記録される。
+    ここは憲法§8.2 のバイパスとして、承認を経ずにプレビューを本番品質で書き出していた
+    （T-034/T-035）。R2 で本線を「提案 → 承認 → 書き出し」にしたので、**この経路は
+    書き出さない。** CLI だけ塞いでも画面から抜けられるなら門が無いのと同じ。
+
+    **品質が低いまま出すという判断は、バイパスではなく承認そのもの。** 承認すれば出せる
+    （誰が・いつ・何を承認し、合成メディアを開示したかが `approval.json` に残る）。
+    議長のバイパスは作らない（`vision_backlog.json` の R2 limits）。
+    画面からの「承認して書き出す」は R2-C5 で作る。
     """
-    if _pipeline_state["status"] != "completed":
+    # 実走していないときの言い方は変えない（従来の 400 のまま）
+    if _pipeline_state["status"] not in ("completed", "awaiting_approval", "degraded"):
         raise HTTPException(400, "パイプラインが完了していません")
 
-    result = _pipeline_state.get("result", {})
-    quality_report = result.get("quality_gate_report")
-    if not quality_report:
-        raise HTTPException(400, "品質ゲート不合格レポートが存在しません（品質合格済みの可能性）")
-
-    preview_path = result.get("preview_path", "")
-    if not preview_path or not Path(preview_path).exists():
-        raise HTTPException(404, "プレビューファイルが見つかりません")
-
-    # --- 本番品質レンダリング実行 ---
-    try:
-        from safe_io import VAULT_OUTPUTS_DIR
-        final_dir = VAULT_OUTPUTS_DIR / "final"
-    except ImportError:
-        final_dir = Path("output/final")
-    final_dir.mkdir(parents=True, exist_ok=True)
-
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    final_path = str(final_dir / f"force_render_{ts}.mp4")
-
-    try:
-        import shutil
-        # 本番品質エンコード
-        try:
-            from video_editor_engine import video_editor
-            ffmpeg = video_editor.ffmpeg
-            if ffmpeg.is_available():
-                encode_args = ffmpeg._get_encode_args("balanced")
-                cmd = ["-y", "-i", preview_path] + encode_args + [final_path]
-                success, output = ffmpeg.run_command(cmd, timeout=1800)
-                if not success:
-                    logger.warning(f"Force render encode failed, copying: {output[:200]}")
-                    shutil.copy(preview_path, final_path)
-            else:
-                shutil.copy(preview_path, final_path)
-        except ImportError:
-            shutil.copy(preview_path, final_path)
-
-        size_mb = Path(final_path).stat().st_size / 1024 / 1024
-
-        # T-035: evolution_log に強制レンダリング理由を記録
-        await _record_force_render(
-            reason=req.reason or "理由未記入",
-            quality_score=quality_report.get("score", 0),
-        )
-
-        # パイプライン結果を更新
-        _pipeline_state["result"]["final_path"] = final_path
-        _pipeline_state["result"]["force_rendered"] = True
-
-        # WebSocket 通知
-        await pipeline_ws.broadcast({
-            "type": "force_render_complete",
-            # **出所を名乗る**（R1.5-C4b・27周目）。`quality_gate_report` は
-            # 採点済みで90点未満の実走でしか作られない（coordinator の `_build_result`）
-            "scored": True,
-            "final_path": final_path,
-            "size_mb": round(size_mb, 1),
-            "quality_score": quality_report.get("score", 0),
-            "reason": req.reason,
-        })
-
-        logger.info(
-            f"✅ [T-034] 強制レンダリング完了: {final_path} "
-            f"({size_mb:.1f}MB, score={quality_report.get('score', 0)})"
-        )
-
-        return {
-            "status": "force_rendered",
-            "scored": True,   # 同上（R1.5-C4b・27周目）
-            "final_path": final_path,
-            "size_mb": round(size_mb, 1),
-            "reason": req.reason,
-            "quality_score": quality_report.get("score", 0),
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ 強制レンダリング失敗: {e}", exc_info=True)
-        raise HTTPException(500, f"強制レンダリング失敗: {e}")
+    run_id = (_pipeline_state.get("result") or {}).get("run_id") or "<run_id>"
+    raise HTTPException(
+        409,
+        "強制書き出しは廃止しました（R2-C1: 承認していない動画は書き出せない）。"
+        "品質が低いまま出す判断は承認そのものなので、承認を通してください: "
+        f"python -m backend.revenue.approval_gate --approve {run_id} --synthetic yes|no\n"
+        f"python -m backend.revenue.approval_gate --export {run_id}",
+    )
 
 
+# **いまは誰も呼んでいない。** 経路を閉じたので（上の 409）、残しているのは
+# R2-C5 の承認画面で「低品質と分かったうえで承認した理由」を残すため。
 async def _record_force_render(reason: str, quality_score: int):
     """T-035: evolution_log に強制レンダリング理由を記録"""
     try:

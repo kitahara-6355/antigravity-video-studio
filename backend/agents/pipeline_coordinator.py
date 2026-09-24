@@ -391,7 +391,8 @@ class PipelineCoordinator:
             "threshold": 90,
             "feedback": ctx.quality_feedback[:5],
             "render_mode": "safe",
-            "force_render_available": True,
+            # **強制書き出しは廃止した**（R2-C1）。出すなら承認を通す
+            "force_render_available": False,
         })
 
     async def _notify_result(self, worker: PipelineStageWorker, result: StageResult):
@@ -1380,7 +1381,8 @@ class PipelineCoordinator:
                 "feedback": getattr(ctx, 'quality_feedback', []),
                 "category_scores": getattr(ctx, 'quality_category_scores', {}),
                 "improvement_suggestions": self._generate_improvement_suggestions(ctx),
-                "force_render_available": True,
+                # **強制書き出しは廃止した**（R2-C1）。出すなら承認を通す
+                "force_render_available": False,
                 "force_render_endpoint": "/api/pipeline/force-render",
             }
         ctx.quality_gate_report = quality_gate_report

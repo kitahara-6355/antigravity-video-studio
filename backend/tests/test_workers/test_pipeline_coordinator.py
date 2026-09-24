@@ -484,7 +484,8 @@ class TestC3ResultAggregation:
         assert qgr["score"] == 75
         assert qgr["threshold"] == 90
         assert qgr["gap"] == 15
-        assert qgr["force_render_available"] is True
+        # **強制書き出しは廃止した**（R2-C1）。承認すれば出せる
+        assert qgr["force_render_available"] is False
 
     @pytest.mark.asyncio
     async def test_C3_07_quality_gate_report_none_when_high_score(self):

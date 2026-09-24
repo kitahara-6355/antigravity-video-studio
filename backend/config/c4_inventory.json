@@ -650,6 +650,47 @@
    ]
   },
   {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._context_from_proposal",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator._context_from_proposal",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L815 `quality.get(\"score\", 0)` は既定 0 を持つが、**L816 で `scored`（旗）も提案から復元する**ので、未採点を「測った 0 点」に化けさせない（R1.5-C4 の型）。提案は `write_proposal` が必ず両方を書く。`or_default` は講評・カテゴリ別・印字リストの空退避。",
+   "fingerprint": [
+    "default:score",
+    "or_default"
+   ],
+   "marks": [
+    "quality_scored=?"
+   ]
+  },
+  {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._write_proposal",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator._write_proposal",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "提案を残すだけで点数を作らない（点数は `write_proposal` 側）。2件の `getattr_default` は講評（list）とカテゴリ別（dict）の**空の器**。`except_returns` は記録の失敗で実行を落とさないための None 返しで、呼び出し側（execute）は None を受けたら実走を error にする（提案が無ければ承認も書き出しもできない = R2-C1）。",
+   "fingerprint": [
+    "except_returns",
+    "getattr_default",
+    "getattr_default"
+   ]
+  },
+  {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator.export",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator.export",
+   "category": "retention",
+   "status": "out_of_scope",
+   "reason": "retention の数字をここでは作らない。retention 分析は**提案の段**（`execute`。承認の材料なので書き出しの前）で走り、site としては`_analyze_retention` 側に登録済み。この関数の `or_default` 2件は開き直した記録の `intermediates` と `failed_stages` の**空リスト退避**、`except_returns` は記録を開き直せないときに書き出しを断る（`_断る` は status=error を返し、記録に触らない）。数字を1つも作らない。",
+   "fingerprint": [
+    "except_returns",
+    "or_default",
+    "or_default"
+   ]
+  },
+  {
    "id": "backend/agents/task_contract.py::TaskContractManager.get_pipeline_contracts",
    "file": "backend/agents/task_contract.py",
    "symbol": "TaskContractManager.get_pipeline_contracts",
@@ -2812,25 +2853,6 @@
     "IMPROVEMENT_DATA_SOURCE.data_source='sample'",
     "IMPROVEMENT_DATA_SOURCE.is_real=False",
     "spread:IMPROVEMENT_DATA_SOURCE"
-   ]
-  },
-  {
-   "id": "backend/routers/pipeline_router.py::force_render",
-   "file": "backend/routers/pipeline_router.py",
-   "symbol": "force_render",
-   "category": "品質スコア",
-   "status": "honest",
-   "reason": "L838 `quality_score=quality_report.get(\"score\", 0)`。quality_report は存在必須（無ければ400）。生成元 pipeline_coordinator の `_build_result` は `quality_scored` が真で90点未満のときだけ dict を作り、必ず `score` を入れる。既定0は到達しない。2026-09-18 に**応答と WebSocket の電文に `scored: True` を足した**（gate-verifier 27周目 E2。採点済みの実走でしか作られない値なので真）。",
-   "fingerprint": [
-    "default:score",
-    "default:score",
-    "default:score",
-    "default:score",
-    "or_default"
-   ],
-   "marks": [
-    "scored=True",
-    "scored=True"
    ]
   },
   {
@@ -5121,6 +5143,38 @@
    "status": "out_of_scope",
    "reason": "文字起こしであり4カテゴリの数字ではない（limits 2）",
    "fingerprint": []
+  },
+  {
+   "id": "backend/revenue/approval_gate.py::trace",
+   "file": "backend/revenue/approval_gate.py",
+   "symbol": "trace",
+   "category": "品質スコア",
+   "status": "honest",
+   "reason": "証跡の表示だけ（R2-C2）。点数は提案の `quality.score` をそのまま出し、既定値を足さない（無ければ None と出る）。L310 の `or_default` はモデル一覧が空のときに **`(記録なし)` と明示する**ための退避で、モデル名を捏造しない。もう1件の `or_default` は開示辞書の空退避。",
+   "fingerprint": [
+    "or_default",
+    "or_default"
+   ]
+  },
+  {
+   "id": "backend/revenue/approval_gate.py::write_proposal",
+   "file": "backend/revenue/approval_gate.py",
+   "symbol": "write_proposal",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "L91 `score = getattr(ctx, \"quality_score\", 0)` は既定 0 を持つが、**同じ辞書に L102 `scored`（旗）を並べて出所を名乗る**（R1.5-C4 の型）。未採点の 0 を「測った 0 点」と読めない。L92 `passed = score >= 90` も未採点では False 側に倒れ、L104 の書き出しモードは safe になる（安全側）。他の getattr 既定（metadata/session_id/skipped_features/warnings/preview_path/quality_scored）はいずれも空の器か文字列で、数字を作らない。",
+   "fingerprint": [
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default"
+   ],
+   "marks": [
+    "scored=?"
+   ]
   }
  ]
 }

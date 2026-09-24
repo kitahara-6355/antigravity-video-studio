@@ -138,7 +138,8 @@ class TestPipelineRouterExecution:
         }
         r = self.client.post("/api/pipeline/force-render",
                              json={"session_id": "test", "reason": "quality override"})
-        assert r.status_code in (200, 400, 500)
+        # R2-C1: 承認を通さない書き出しは断る（かつては 200 で書き出していた）
+        assert r.status_code == 409
         _reset_state()
 
     def test_pex_11_validate_mixed_files(self, tmp_path):
