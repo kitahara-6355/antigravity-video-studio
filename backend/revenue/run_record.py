@@ -437,7 +437,9 @@ def _format_list(runs_dir: Path) -> str:
         return f"実行記録がありません（{runs_dir}）"
     lines = [f"実行記録 {len(runs)} 件", ""]
     for run in runs:
-        mark = {"completed": "✅", "failed": "🚫"}.get(run.get("status"), "…")
+        mark = {"completed": "✅", "failed": "🚫",
+                # 承認待ち（R2-C1）は走っている途中（…）とは違う
+                "awaiting_approval": "⏸"}.get(run.get("status"), "…")
         lines.append(
             f"  {mark} {run.get('run_id')}  "
             f"{len(run.get('stages') or [])} 工程 / "
@@ -476,6 +478,19 @@ def _format_resume(runs_dir: Path, run_id: str) -> tuple[str, int]:
     except (OSError, ValueError) as e:
         return f"🚫 実行記録を読めません: {path}（{e}）", 1
     stage = failed_stage(run)
+    if stage is None and run.get("status") == "awaiting_approval":
+        # **承認待ちは「やることが無い」ではない**（R2-C1）。工程はどれも落ちていないので
+        # 失敗の案内は出せないが、止まっている理由と次の手を出す
+        return ("\n".join([
+            f"⏸ {run_id} は**承認待ち**です（提案までで止まっています。工程の失敗はありません）",
+            "",
+            "  プレビューと提案を見る:",
+            f"    python -m backend.revenue.approval_gate --trace {run_id}",
+            "",
+            "  承認してから書き出す:",
+            f"    python -m backend.revenue.approval_gate --approve {run_id} --synthetic yes|no",
+            f"    python -m backend.revenue.approval_gate --export {run_id}",
+        ]), 1)
     if stage is None:
         return f"✅ {run_id} に失敗した工程はありません（status={run.get('status')}）", 0
     done = [s["name"] for s in run["stages"] if s.get("status") == "success"]

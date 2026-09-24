@@ -222,6 +222,19 @@ def test_gate_承認なしで書き出していたらFAIL(tmp_path, capsys):
     assert rc == 1 and "承認" in out
 
 
+def test_gate_書き出しの記録が無ければFAIL(tmp_path, capsys):
+    """**完走を名乗っているのに書き出しの記録が無い** = 門を通らずに書き出している。
+
+    承認の門は `write_export` を通ったときだけ記録を残す。記録が無いまま completed に
+    なっている実走は、古い経路（force-render や自前のレンダリング）で出したということ。
+    """
+    run_dir = _書き出した実走(tmp_path)
+    (run_dir / "export.json").unlink()
+    rc, out = _gate(tmp_path, capsys)
+    assert rc == 1
+    assert "書き出しの記録" in out and "承認の門" in out
+
+
 def test_gate_書き出したものが承認のときと違えばFAIL(tmp_path, capsys):
     _書き出した実走(tmp_path)
     (tmp_path / "final.mp4").write_bytes(b"swapped")

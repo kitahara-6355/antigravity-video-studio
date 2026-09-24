@@ -343,6 +343,23 @@ def test_終わっていない実走も緑にしない(tmp_path):
     assert "run_failed" in _kinds(check_run_status(load_runs(tmp_path)))
 
 
+def test_承認待ちは落とすが言い方を変える(tmp_path):
+    """**承認待ちは「動かなかった」ではない**（R2-C1）。緑にはしないが、言い方を変える。
+
+    R2 で本線は書き出さずに提案で止まる（`awaiting_approval`）。成果物はまだ無いので
+    緑にはしない。ただし「最新の実走が失敗で終わっています」と言われると、
+    **人の承認を待っているだけなのに実装を疑いに行くことになる。**
+    """
+    _gate_run(tmp_path, "20260919T100000000000-0000", status="awaiting_approval")
+
+    findings = check_run_status(load_runs(tmp_path))
+    assert "run_awaiting_approval" in _kinds(findings), "承認待ち専用の言い方が無い"
+    assert "run_failed" not in _kinds(findings)
+    本文 = str(findings[0])
+    assert "承認" in 本文
+    assert "--approve" in 本文 and "--export" in 本文, "次にやることが書かれていない"
+
+
 def test_状態が記録されていなければ判定できない(tmp_path):
     """**「確かめられなかった」を「問題なし」にしない**（fail-closed）。"""
     d = tmp_path / "20260827T100000000000-0000"

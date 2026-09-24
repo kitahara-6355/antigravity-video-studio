@@ -524,6 +524,27 @@ def test_本線に再開が無いことを隠さない(tmp_path):
     assert "--resume" not in out.split("ここから")[-1], out
 
 
+def test_承認待ちの記録は承認と書き出しを案内する(tmp_path):
+    """**「失敗した工程はありません」で終わらせない**（R2-C1）。
+
+    R2 で本線は提案までで止まる。工程はどれも落ちていないので、従来の案内は
+    `✅ 失敗した工程はありません` だけだった。**次にやることが人の承認である**
+    ことが分からないと、止まっている理由が分からない。
+    """
+    from backend.revenue.run_record import _format_resume
+
+    rec = _recorder(tmp_path, inputs={"mainline": "agents", "video_path": "x.mp4"})
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        pass
+    rec.finish(status="awaiting_approval")
+
+    out, code = _format_resume(tmp_path / "runs", rec.run_id)
+
+    assert code == 1, "承認待ちは「やることが無い」ではない"
+    assert "承認待ち" in out
+    assert "--approve" in out and "--export" in out, out
+
+
 def test_旧実装の記録は旧実装の入口を案内する(tmp_path):
     """凍結した基準実装の記録は、そちらの再開を案内してよい。"""
     from backend.revenue.run_record import _format_resume
