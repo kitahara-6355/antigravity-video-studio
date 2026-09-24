@@ -762,6 +762,8 @@ class PipelineCoordinator:
         proposal = json.loads((run_dir / PROPOSAL).read_text(encoding="utf-8"))
         approval = json.loads((run_dir / APPROVAL).read_text(encoding="utf-8"))
         ctx = self._context_from_proposal(proposal, approval, run_dir)
+        # **worker も自分で門を引く**（R2-C1）。どの実行の承認を見ればよいかを渡す
+        ctx.run_dir = str(run_dir)
 
         self._outcomes = {}
         self._sidecar_path = None

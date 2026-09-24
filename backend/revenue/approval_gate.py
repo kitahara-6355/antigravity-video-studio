@@ -201,6 +201,28 @@ def approve(run_dir: str | Path, *, synthetic: bool | None, by: str,
     return approval
 
 
+# 開示の中身（設計 docs/specs/2026-09-19-r2-approval-design.md §5）。
+# **bool 1個は開示ではない** — 誰が・いつ決めたか、AI をどの工程に使ったかまで揃って開示。
+DISCLOSURE_FIELDS = ("contains_synthetic_media", "decided_by", "decided_at", "ai_used_for")
+
+
+def disclosure_problem(disclosure: dict | None) -> str | None:
+    """開示として成り立っていなければ理由を返す。成り立っていれば None。
+
+    **`ai_used_for` は空でよい**（AI を1工程も使わなかった実走がある）。無いのと空は違う。
+    """
+    d = disclosure or {}
+    if not isinstance(d.get("contains_synthetic_media"), bool):
+        return "開示の判断がありません（合成メディアを含むかを承認のときに決めてください）"
+    欠け = [f for f in ("decided_by", "decided_at")
+            if not isinstance(d.get(f), str) or not d[f].strip()]
+    if not isinstance(d.get("ai_used_for"), list):
+        欠け.append("ai_used_for")
+    if 欠け:
+        return f"開示の中身が欠けています（{'、'.join(欠け)}）"
+    return None
+
+
 def export_allowed(run_dir: str | Path) -> tuple[bool, str]:
     """**書き出してよいか**（R2-C1 の門）。通さない理由を必ず言う。
 
@@ -227,9 +249,9 @@ def export_allowed(run_dir: str | Path) -> tuple[bool, str]:
         path = run_dir / working.get(edit["name"], "")
         if _sha256_file(path) != edit.get("working_sha256"):
             return False, f"承認の後に直しています（{edit['name']}）。承認し直してください"
-    disclosure = approval.get("ai_disclosure") or {}
-    if not isinstance(disclosure.get("contains_synthetic_media"), bool):
-        return False, "開示の判断がありません（合成メディアを含むかを承認のときに決めてください）"
+    問題 = disclosure_problem(approval.get("ai_disclosure"))
+    if 問題:
+        return False, 問題
     return True, ""
 
 
@@ -288,8 +310,9 @@ def gate(runs_dir: str | Path) -> tuple[bool, list[str]]:
     sidecar = export.get("metadata_sidecar")
     disclosure = (_read_json(Path(sidecar)).get("ai_disclosure")
                   if sidecar and Path(sidecar).is_file() else None)
-    if not isinstance((disclosure or {}).get("contains_synthetic_media"), bool):
-        problems.append("手動投稿用のメタデータに AI 生成の開示（ai_disclosure）がありません")
+    問題 = disclosure_problem(disclosure)
+    if 問題:
+        problems.append(f"手動投稿用のメタデータの AI 生成の開示が不十分です — {問題}")
     return (not problems), [f"{run_dir.name}: {p}" for p in problems]
 
 

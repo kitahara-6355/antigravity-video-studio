@@ -141,6 +141,9 @@ class PipelineContext:
     # T-031: 品質ゲート実効化 — レンダリングモード制御
     render_mode: str = "production"  # production / safe / force
     quality_gate_report: Optional[Dict] = None
+    # R2-C1: この実行の記録の置き場（承認はここにある）。**書き出す worker が門を引くのに使う。**
+    # 指せないときは承認を確かめられないので書き出さない（fail-closed）
+    run_dir: Optional[str] = None
 
 
 # ============================================================

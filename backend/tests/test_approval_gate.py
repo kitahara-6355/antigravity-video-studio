@@ -222,6 +222,42 @@ def test_gate_承認なしで書き出していたらFAIL(tmp_path, capsys):
     assert rc == 1 and "承認" in out
 
 
+def test_開示は中身が欠けても書き出せない(tmp_path):
+    """**bool 1個だけでは開示ではない**（2026-09-24 の gate-verifier の指摘）。
+
+    設計（docs/specs/2026-09-19-r2-approval-design.md §5）は開示の中身として
+    「合成メディアを含むか・誰が決めたか・いつ決めたか・AI をどの工程に使ったか」を
+    宣言している。機械が bool だけを見ていると、残り3つを削っても書き出せてしまう。
+    """
+    for 欠け in ("decided_by", "decided_at", "ai_used_for"):
+        run_dir = _提案のある実走(tmp_path / 欠け)
+        _承認(run_dir)
+        path = run_dir / "approval.json"
+        a = json.loads(path.read_text(encoding="utf-8"))
+        del a["ai_disclosure"][欠け]
+        path.write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")
+
+        ok, why = ag.export_allowed(run_dir)
+
+        assert ok is False, f"{欠け} が無くても書き出せます"
+        assert 欠け in why or "開示" in why
+
+
+def test_gate_出力の開示は中身が欠けていたらFAIL(tmp_path, capsys):
+    """成果物側（サイドカー）も同じ。**bool だけ残して中身を削った開示は開示ではない。**"""
+    run_dir = _書き出した実走(tmp_path)
+    e = json.loads((run_dir / "export.json").read_text(encoding="utf-8"))
+    sidecar = Path(e["metadata_sidecar"])
+    m = json.loads(sidecar.read_text(encoding="utf-8"))
+    m["ai_disclosure"] = {"contains_synthetic_media": False}
+    sidecar.write_text(json.dumps(m, ensure_ascii=False), encoding="utf-8")
+
+    rc, out = _gate(tmp_path, capsys)
+
+    assert rc == 1, out
+    assert "開示" in out
+
+
 def test_gate_書き出しの記録が無ければFAIL(tmp_path, capsys):
     """**完走を名乗っているのに書き出しの記録が無い** = 門を通らずに書き出している。
 

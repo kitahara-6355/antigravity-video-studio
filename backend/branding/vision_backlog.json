@@ -448,6 +448,28 @@
         "detail": "`test_ai_proofreader.py` / `test_context_compressor.py` / `test_admin_channel_router.py` などが**モジュールの import 時に** `sys.modules['google']` などを MagicMock へ差し替えて戻さない。その後 `backend/tests/test_routers_health.py` が `import faster_whisper` を実行すると `pkg_resources.declare_namespace` が壊れたモックを辿って `TypeError: ('Not a package:', 'google')` になり、**収集の段で全体が止まる**（`Interrupted: 1 error during collection`）。CLAUDE.md は作業の締めに素の `pytest` を指示しているが、手元ではこれが通らない。`--continue-on-collection-errors` で回避できる。**CI は緑**（run 35409157620 の「Python テストスイート」）なので環境差（faster_whisper の有無）。D-29（テストの分離）の系列",
         "found_by": "2026-09-24 の R2-C1〜C3 の締めの全体実行",
         "note": "origin/main でも同じ（2fa8087 で再現）。R2 の変更が原因ではない"
+      },
+      {
+        "id": "D-47",
+        "title": "`render_mode` がラベルだけ（safe と production で同じエンコード設定）",
+        "status": "open",
+        "priority": "P2",
+        "axis": "quality_assurance",
+        "created": "2026-09-25",
+        "detail": "提案と書き出しの記録には `render_mode: production | safe` が載り、90点以上なら production になる（D-41 の条件はここを見ている）。**ただし `RenderWorker` は `ctx.render_mode` をどこからも読んでいない** — `_encode_video_production_quality` は常に `_get_encode_args(\"balanced\")` を使うので、safe と production の書き出しは同一設定。**モードは記録上の区別でしかない。**直すには production 用のエンコード設定（CRF・プリセット）を決める必要があり、画質と書き出し時間のトレードオフはユーザー判断なので R3 の品質の話として切り出す",
+        "found_by": "2026-09-24 の gate-verifier（R2-C1〜C3 の中間ゲート）",
+        "note": "2026-09-25 ユーザー決定: いまは直さず登録して先へ進む"
+      },
+      {
+        "id": "D-48",
+        "title": "Shorts の書き出しを承認の流れに載せ直す（いまは 409 で止めている）",
+        "status": "open",
+        "priority": "P1",
+        "axis": "ux_guarantee_owner",
+        "created": "2026-09-25",
+        "detail": "`POST /api/shorts/render` は承認を1件も見ずに 1080x1920 の完成動画を `vault-outputs/shorts/` へ書いていた（2026-09-24 の gate-verifier が実生成）。R2-C1 と正面から衝突するので **2026-09-25 に 409 で閉じた**。**Shorts は収益化の主軸（登録者1,000人を集める側）なので、消したのではなく止めただけ。**本線の提案 → 承認 → 書き出しに Shorts を載せる（切り出し1本ごとに実行記録と提案を作る）工事が要る。画面側（`ShortsGenerator.jsx`）は `SettingsPage.jsx` に props 無しで置かれていて `videoPath` が空なので、**閉じた時点で画面からは動いていなかった**",
+        "found_by": "2026-09-24 の gate-verifier（R2-C1〜C3 の中間ゲート）",
+        "note": "2026-09-25 ユーザー決定: 閉じる（承認の流れに載せるのは R3 以降）"
       }
     ],
     "structural": [
@@ -644,9 +666,12 @@
       "**YouTube の判定そのものは再現できない。** ここで測るのは『こちらの作り方が量産型に見えないこと』であって、審査の合否ではない",
       "開示ラベルの要否はコンテンツによる。**判定は人間が行う**（機械はメタデータの有無だけを見る）",
       "**議長のバイパス（憲法 §9.3 の緊急時のスキップ）は作らない。** C1「承認していない動画は書き出せない」を字義どおりに保つため（2026-09-19 の設計判断）",
-      "**門は本線（agents）と画面の書き出し経路だけを覆う。** 凍結した基準実装（`backend/video_pipeline/`）は承認を通らずに `compose` で動画を作れる。検証用に CLI を残しているだけで投稿には使わないが、**塞いでいないことを言っておく**（2026-09-24 の実装で確認）",
+      "**門は「動画を書き出す主体」に置いてある** — 本線（agents）・画面の書き出し経路・`RenderWorker` の3層。2026-09-24 の gate-verifier が `POST /api/shorts/render` で**承認ゼロの 1080x1920 mp4 を実生成**して反証したので、`/api/shorts/render`・`/api/video/process`・worker 直呼び（harness の `render_final`）を塞いだ（2026-09-25）。**塞いでいないのは凍結した基準実装（`backend/video_pipeline/`）だけ** — 検証用に CLI を残しているだけで投稿には使わない",
       "**承認は CLI だけ。** 画面から承認して書き出す導線は R2-C5 で作る。`POST /api/pipeline/force-render` は 409 で承認の手順を案内するだけになった",
-      "**`export.json` が無い実走は「門を通らなかった」と判定する。** R2 より前の実走はすべてこの形なので、`--gate` は最新の1本しか見ない（成果物ゲートと同じ考え方）"
+      "**`export.json` が無い実走は「門を通らなかった」と判定する。** R2 より前の実走はすべてこの形なので、`--gate` は最新の1本しか見ない（成果物ゲートと同じ考え方）",
+      "**承認の後に生成物を手で書き換えられたら分からない。** 手動投稿用サイドカー（`*.youtube.json`）は `export.json` がパスしか持たないので、bool の開示が入った別物に差し替えれば `--gate` は通る（2026-09-24 の gate-verifier）。**意図的な回避なので塞がない**（`verification_policy` の規則2）",
+      "**人が直せるのは手動投稿用のメタデータだけ**（`working/youtube_metadata.json`）。字幕・構成・カット位置に人が手を入れた差分は承認の証跡に出ない（R2-C2 の範囲）",
+      "**開示は AI を使った工程の「宣言」から作る。** 実際には失敗した AI 呼び出しも「AI を使った工程」に載る（過大申告側なので安全方向）"
     ],
     "exit_criteria": [
       {
@@ -1390,9 +1415,12 @@
           "**YouTube の判定そのものは再現できない。** ここで測るのは『こちらの作り方が量産型に見えないこと』であって、審査の合否ではない",
           "開示ラベルの要否はコンテンツによる。**判定は人間が行う**（機械はメタデータの有無だけを見る）",
           "**議長のバイパス（憲法 §9.3 の緊急時のスキップ）は作らない。** C1「承認していない動画は書き出せない」を字義どおりに保つため（2026-09-19 の設計判断）",
-          "**門は本線（agents）と画面の書き出し経路だけを覆う。** 凍結した基準実装（`backend/video_pipeline/`）は承認を通らずに `compose` で動画を作れる。検証用に CLI を残しているだけで投稿には使わないが、**塞いでいないことを言っておく**（2026-09-24 の実装で確認）",
+          "**門は「動画を書き出す主体」に置いてある** — 本線（agents）・画面の書き出し経路・`RenderWorker` の3層。2026-09-24 の gate-verifier が `POST /api/shorts/render` で**承認ゼロの 1080x1920 mp4 を実生成**して反証したので、`/api/shorts/render`・`/api/video/process`・worker 直呼び（harness の `render_final`）を塞いだ（2026-09-25）。**塞いでいないのは凍結した基準実装（`backend/video_pipeline/`）だけ** — 検証用に CLI を残しているだけで投稿には使わない",
           "**承認は CLI だけ。** 画面から承認して書き出す導線は R2-C5 で作る。`POST /api/pipeline/force-render` は 409 で承認の手順を案内するだけになった",
-          "**`export.json` が無い実走は「門を通らなかった」と判定する。** R2 より前の実走はすべてこの形なので、`--gate` は最新の1本しか見ない（成果物ゲートと同じ考え方）"
+          "**`export.json` が無い実走は「門を通らなかった」と判定する。** R2 より前の実走はすべてこの形なので、`--gate` は最新の1本しか見ない（成果物ゲートと同じ考え方）",
+          "**承認の後に生成物を手で書き換えられたら分からない。** 手動投稿用サイドカー（`*.youtube.json`）は `export.json` がパスしか持たないので、bool の開示が入った別物に差し替えれば `--gate` は通る（2026-09-24 の gate-verifier）。**意図的な回避なので塞がない**（`verification_policy` の規則2）",
+          "**人が直せるのは手動投稿用のメタデータだけ**（`working/youtube_metadata.json`）。字幕・構成・カット位置に人が手を入れた差分は承認の証跡に出ない（R2-C2 の範囲）",
+          "**開示は AI を使った工程の「宣言」から作る。** 実際には失敗した AI 呼び出しも「AI を使った工程」に載る（過大申告側なので安全方向）"
         ],
         "gates": [
           "G1",

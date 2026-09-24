@@ -496,47 +496,20 @@ async def trigger_render(req: RenderRequest = RenderRequest()):
 
 @router.post("/video/process")
 async def start_video_processing(background_tasks: BackgroundTasks, req: VideoProcessRequest):
-    """本番動画処理を開始（video_processor統合版）"""
-    from video_processor import video_processor
-    
-    task_id = str(uuid.uuid4())[:8]
-    
-    # タスク登録
-    task = video_processor.create_task(
-        task_id=task_id,
-        video_paths=req.video_paths,
-        mood=req.mood,
-        guest_assets=req.guest_assets,
-        output_name=req.output_name
+    """本番動画処理を開始（video_processor統合版）→ **R2-C1 で閉じた**（2026-09-25）
+
+    この経路は承認を1件も見ずに ffmpeg を3回回して
+    `backend/temp/video_output/` に完成動画を書いていた（2026-09-24 の gate-verifier）。
+    画面のカタログ（`frontend/src/gateway/endpoints.js`）には無く、本線とも別実装なので、
+    **承認を通す流れに載せ直すまで止める。** 引数はそのまま受ける（呼ぶ側を壊さず断る）。
+    """
+    raise HTTPException(
+        status_code=409,
+        detail="承認していない動画は書き出せません（R2-C1）。この経路は本線ではありません。"
+               "本線で作って承認を通してください: "
+               "python -m backend.agents.pipeline_coordinator <動画> → "
+               "python -m backend.revenue.approval_gate --approve <run_id> --synthetic yes|no → --export <run_id>",
     )
-    
-    _video_tasks[task_id] = {
-        "status": "processing",
-        "progress": 0,
-        "current_step": "初期化中..."
-    }
-    
-    # バックグラウンド処理
-    async def process_video_task():
-        def update_progress(t):
-            _video_tasks[task_id] = {
-                "status": t.phase.value,
-                "progress": t.progress,
-                "current_step": t.current_step,
-                "output_path": t.output_path,
-                "preview_url": t.preview_url
-            }
-        
-        video_processor.set_progress_callback(update_progress)
-        video_processor.process_video(task_id)
-    
-    background_tasks.add_task(process_video_task)
-    
-    return {
-        "task_id": task_id,
-        "status": "processing",
-        "message": f"動画処理を開始しました（ムード: {req.mood}）"
-    }
 
 
 @router.get("/video/status/{task_id}")

@@ -39,6 +39,18 @@ class RenderWorker(PipelineStageWorker):
         """
         return "出力ファイルが存在し、サイズが1MB以上、本番品質でエンコード済みであること"
 
+    @staticmethod
+    def _承認を確かめる(ctx: PipelineContext) -> tuple[bool, str]:
+        """この実行が承認を通っているか。**確かめられなければ書き出さない。**"""
+        run_dir = getattr(ctx, "run_dir", None)
+        if not run_dir:
+            return False, ("実行記録を指していないので承認を確かめられません"
+                           "（本線は `python -m backend.agents.pipeline_coordinator <動画>` → "
+                           "`--approve` → `--export`）")
+        from backend.revenue.approval_gate import export_allowed
+
+        return export_allowed(run_dir)
+
     async def execute(self, ctx: PipelineContext) -> StageResult:
         """
         最終レンダリング処理を実行します。
@@ -56,6 +68,21 @@ class RenderWorker(PipelineStageWorker):
             StageResult: ステージの実行結果。
         """
         start = time.time()
+
+        # **承認していない動画は書き出せない**（R2-C1・2026-09-25）。
+        # 門は coordinator にもあるが、**書き出すのはここ**なので、ここでも引く。
+        # harness の `render_final` のように worker を直接呼ぶ経路が素通りしていた
+        # （2026-09-24 の gate-verifier が `vault-outputs/final/` への抜け道として報告）。
+        # 承認は実行記録の隣にあるので、**記録を指せない文脈では書き出さない**（fail-closed）。
+        許可, 理由 = self._承認を確かめる(ctx)
+        if not 許可:
+            logger.warning(f"🚫 承認の門: {理由}")
+            return StageResult(
+                stage_name=self.name, success=False,
+                detail=f"承認の門: {理由}",
+                duration_seconds=round(time.time() - start, 1),
+            )
+
         try:
             from safe_io import VAULT_OUTPUTS_DIR
             final_dir = VAULT_OUTPUTS_DIR / "final"
