@@ -400,6 +400,12 @@
   color: var(--color-accent-success);
 }
 
+/* R2-C1: 承認待ち。完了（緑）とも実行中（紫）とも違う */
+.pipeline-status-badge.awaiting {
+  background: rgba(234, 179, 8, 0.14);
+  color: #a16207;
+}
+
 .pipeline-status-badge.error {
   background: rgba(239, 68, 68, 0.12);
   color: var(--accent-danger);

@@ -383,6 +383,8 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
 
   const isRunning = pipelineStatus?.status === "running";
   const isCompleted = pipelineStatus?.status === "completed";
+  // R2-C1: 本線は書き出さずに提案で止まる。**承認するまで完了ではない**
+  const isAwaitingApproval = pipelineStatus?.status === "awaiting_approval";
   const hasError = pipelineStatus?.status === "error";
 
   return (
@@ -394,6 +396,11 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
             🎬 制作パイプライン
             {isRunning && <span className="pipeline-status-badge running"><span className="pipeline-spinner" /> 実行中</span>}
             {isCompleted && <span className="pipeline-status-badge completed">✅ 完了</span>}
+            {isAwaitingApproval && (
+              <span className="pipeline-status-badge awaiting" data-testid="pipeline-awaiting-approval">
+                ⏸ 承認待ち
+              </span>
+            )}
             {hasError && <span className="pipeline-status-badge error">❌ エラー</span>}
             {isRunning && (
               <span
@@ -813,6 +820,30 @@ export default function ProductionPipeline({ onClose, onWizardStart }) {
                   </div>
                 ))}
               </div>
+
+              {/* 承認待ち: 何が出来ていて、次に何をするのか（承認画面は R2-C5） */}
+              {isAwaitingApproval && pipelineStatus.result && (
+                <div className="pipeline-result">
+                  <h3>⏸ 承認待ち — プレビューまで出来ています</h3>
+                  <p style={{ fontSize: '0.85rem', lineHeight: 1.7 }}>
+                    <strong>承認するまで書き出しません。</strong>
+                    プレビューを見て、直すなら提案（<code>working/youtube_metadata.json</code>）を
+                    直してから承認してください。承認した人・直した差分・AI 生成の開示は実行記録に残ります。
+                  </p>
+                  {pipelineStatus.result.run_id && (
+                    <pre style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', margin: 0 }}>
+                      {`python -m backend.revenue.approval_gate --trace ${pipelineStatus.result.run_id}
+`}
+                      {`python -m backend.revenue.approval_gate --approve ${pipelineStatus.result.run_id} --synthetic yes|no
+`}
+                      {`python -m backend.revenue.approval_gate --export ${pipelineStatus.result.run_id}`}
+                    </pre>
+                  )}
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>
+                    この画面から承認して書き出せるようにするのは R2-C5 です。
+                  </p>
+                </div>
+              )}
 
               {/* 完了結果 */}
               {isCompleted && pipelineStatus.result && (
