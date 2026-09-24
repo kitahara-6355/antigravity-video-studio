@@ -437,6 +437,17 @@
         "created": "2026-09-24",
         "detail": "実キーの実走 20260924T051804461600-0000 で観測。youtube_opt が出すのは `titles`（候補の配列）・`tags`・`description`・`chapters` で、**`title` が無い**。手動投稿用サイドカー（`*.youtube.json`）も題が欠けたまま出る。今回は承認のときに人が `title` を入れて埋めたが、**毎回手で足すのは承認工程の意味が薄い。**候補から1つ選ぶのは人の判断なので、R2-C5 の承認画面で選ばせるのが筋",
         "found_by": "2026-09-24 の R2-C1〜C3 実走確認"
+      },
+      {
+        "id": "D-46",
+        "title": "`pytest`（素）が手元では collection error で止まる（テストが import 時に sys.modules['google'] を差し替える）",
+        "status": "open",
+        "priority": "P3",
+        "axis": "quality_assurance",
+        "created": "2026-09-24",
+        "detail": "`test_ai_proofreader.py` / `test_context_compressor.py` / `test_admin_channel_router.py` などが**モジュールの import 時に** `sys.modules['google']` などを MagicMock へ差し替えて戻さない。その後 `backend/tests/test_routers_health.py` が `import faster_whisper` を実行すると `pkg_resources.declare_namespace` が壊れたモックを辿って `TypeError: ('Not a package:', 'google')` になり、**収集の段で全体が止まる**（`Interrupted: 1 error during collection`）。CLAUDE.md は作業の締めに素の `pytest` を指示しているが、手元ではこれが通らない。`--continue-on-collection-errors` で回避できる。**CI は緑**（run 35409157620 の「Python テストスイート」）なので環境差（faster_whisper の有無）。D-29（テストの分離）の系列",
+        "found_by": "2026-09-24 の R2-C1〜C3 の締めの全体実行",
+        "note": "origin/main でも同じ（2fa8087 で再現）。R2 の変更が原因ではない"
       }
     ],
     "structural": [
