@@ -282,6 +282,11 @@ def write_export(run_dir: str | Path, *, final_path: str | None,
 # 正典（vision_backlog.json の R2-C1）の定義でいう「書き出し」の置き場。
 # **プレビュー・中間物（preview / edited / merged）は含まない** — 承認の材料そのもの
 PUBLISH_DIRS = ("final", "shorts")
+# **置き場の定義はディレクトリ単位で、拡張子も深さも限定していない**（4周目の反例A）。
+# 以前は直下の `*.mp4` しか見ず、サブディレクトリ・`.webm`・`.mov` を見逃した
+VIDEO_EXTS = (".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi")
+# safe_io を読めないときの書き手の退避先（`Path("output/final")` 等）。ここも置き場
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 PUBLISH_BASELINE = Path(__file__).resolve().parent.parent / "config" / "publish_baseline.json"
 
 
@@ -302,56 +307,92 @@ def load_publish_baseline(path: str | Path | None = None) -> dict[str, str]:
     return {e["path"]: e["sha256"] for e in data.get("files", [])}
 
 
+def _is_video(p: Path) -> bool:
+    return p.is_file() and p.suffix.lower() in VIDEO_EXTS
+
+
+def _approval_holds(run_dir: Path, export: dict) -> bool:
+    """その実走の承認が**その提案の承認として成り立ち、書き出しの後も変わっていない**か。
+
+    4周目の反例C: 中身が `{}` の承認と、それを指す書き出しの記録を手で置くと「辿れる」扱い
+    になっていた。docstring は「承認がいまも有効」と書いていたのに確かめていなかった。
+    **全部を手で作り込んだ記録**（提案・承認・書き出しの偽造）はここでは見えない（limits）。
+    """
+    approval_path, proposal_path = run_dir / APPROVAL, run_dir / PROPOSAL
+    if not approval_path.is_file() or not proposal_path.is_file():
+        return False
+    if export.get("approval_sha256") != _sha256_file(approval_path):
+        return False                      # 承認が書き出しの後に差し替わった
+    approval = _read_json(approval_path)
+    if approval.get("proposal_sha256") != _sha256_file(proposal_path):
+        return False                      # 別の提案の承認（提案が承認の後に変わった）
+    return disclosure_problem(approval.get("ai_disclosure")) is None
+
+
 def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
-                  baseline: dict[str, str] | None = None) -> list[str]:
+                  baseline: dict[str, str] | None = None,
+                  output_root: str | Path | None = None) -> list[str]:
     """**完成品の置き場にある動画が、1本残らず承認に辿れるか**（R2-C1）。
 
     書き方ではなく結果を見る。3周の gate-verifier は、いずれも「承認を通さずに書ける
     場所」で C1 を崩した（経路 → 経路 → 走査の検出漏れ）。書き方を列挙する限り次の
     書き方が出るが、**完成品はどんな書き方でも置き場に出る。**
 
+    見る動画（正典の定義）:
+    - 置き場（`final/`・`shorts/`）の下の動画**すべて** — 深さも入れ物（mp4 / webm / mov …）も問わない
+    - 退避先の置き場（`<output_root>/final`・`<output_root>/shorts`）も同じ
+    - 置き場の外でも、**手動投稿用サイドカー（`*.youtube.json`）が隣にある動画**
+      （vault と output_root の下を探す。それ以外の場所は見えない — limits）
+
     承認に辿れる = どれかの実走の `export.json` がその動画を指し、指紋（sha256）が一致し、
-    その実走の承認がいまも有効（`approval_sha256` が一致）。基準線（門ができる前からあった
-    動画）は**名前と指紋の両方**が一致したときだけ通す — 同じ名前で中身を替えたら新しい完成品。
+    その実走の承認が**その提案の承認として成り立ち**、書き出しの後も変わっていない
+    （`_approval_holds`）。基準線（門ができる前からあった動画）は**名前と指紋の両方**が
+    一致したときだけ通す — 同じ名前で中身を替えたら新しい完成品。
     """
     runs_dir = Path(runs_dir)
     vault = Path(vault_dir) if vault_dir is not None else _default_vault_dir()
+    out = Path(output_root) if output_root is not None else _PROJECT_ROOT / "output"
     baseline = load_publish_baseline() if baseline is None else baseline
 
     承認済み: dict[str, str] = {}
     for export_path in sorted(runs_dir.glob("*/" + EXPORT)):
-        run_dir = export_path.parent
         e = _read_json(export_path)
         final = e.get("final") or {}
-        approval = run_dir / APPROVAL
-        if not final.get("path") or not approval.is_file():
-            continue
-        if e.get("approval_sha256") != _sha256_file(approval):
-            continue  # 承認が書き出しの後に差し替わった実走は、承認に辿れたとは言わない
-        承認済み[os.path.normcase(os.path.abspath(final["path"]))] = final.get("sha256")
+        if final.get("path") and _approval_holds(export_path.parent, e):
+            承認済み[os.path.normcase(os.path.abspath(final["path"]))] = final.get("sha256")
 
-    # 見る動画: 置き場（final / shorts）の mp4 すべて ＋ 置き場の外でも**手動投稿用サイドカーが
-    # 隣にある** mp4（正典の定義の後半。サイドカーがあれば人はそのまま投稿できる）
-    対象: list[Path] = []
-    for sub in PUBLISH_DIRS:
-        if (vault / sub).is_dir():
-            対象 += sorted((vault / sub).glob("*.mp4"))
-    if vault.is_dir():
-        for sidecar in sorted(vault.rglob("*.youtube.json")):
-            mp4 = sidecar.with_name(sidecar.name[: -len(".youtube.json")] + ".mp4")
-            if mp4.is_file() and mp4 not in 対象:
-                対象.append(mp4)
+    def 名前(f: Path) -> str:
+        """基準線と報告に使う名前。vault の下は `final/…`、退避先は `output/…`。"""
+        for root, 頭 in ((vault, ""), (out, "output/")):
+            try:
+                return 頭 + f.relative_to(root).as_posix()
+            except ValueError:
+                continue
+        return f.as_posix()
+
+    対象: dict[str, Path] = {}
+    for root in (vault, out):
+        for sub in PUBLISH_DIRS:
+            if (root / sub).is_dir():
+                for f in sorted((root / sub).rglob("*")):
+                    if _is_video(f):
+                        対象[os.path.normcase(os.path.abspath(f))] = f
+        if root.is_dir():
+            for sidecar in sorted(root.rglob("*.youtube.json")):
+                stem = sidecar.name[: -len(".youtube.json")]
+                for f in sidecar.parent.glob(stem + ".*"):
+                    if _is_video(f):
+                        対象[os.path.normcase(os.path.abspath(f))] = f
 
     problems = []
-    for mp4 in 対象:
-        rel = mp4.relative_to(vault).as_posix()
-        sha = _sha256_file(mp4)
+    for key, f in sorted(対象.items()):
+        rel = 名前(f)
+        sha = _sha256_file(f)
         if rel in baseline:
             if baseline[rel] == sha:
                 continue
             problems.append(f"{rel}: 基準線の名前だが中身が違います（門ができた後に置き換わった）")
             continue
-        key = os.path.normcase(os.path.abspath(mp4))
         if key not in 承認済み:
             problems.append(f"{rel}: **承認に辿れない完成品**です（どの実走の書き出しの記録にもありません）")
         elif 承認済み[key] != sha:
@@ -492,13 +533,16 @@ def main(argv: list[str] | None = None) -> int:
                         help="完成品の置き場の親（既定は safe_io の VAULT_OUTPUTS_DIR）")
     parser.add_argument("--baseline", default=None,
                         help="門ができる前からあった完成品の台帳（既定 backend/config/publish_baseline.json）")
+    parser.add_argument("--output-dir", default=None,
+                        help="退避先の置き場の親（既定はリポジトリ直下の output/）")
     args = parser.parse_args(argv)
     runs_dir = Path(args.runs_dir or os.getenv("AVS_RUNS_DIR") or RUNS_DIR)
 
     if args.gate:
         ok, problems = gate(runs_dir)
         置き場 = publish_audit(runs_dir, args.vault_dir,
-                            load_publish_baseline(args.baseline) if args.baseline else None)
+                            load_publish_baseline(args.baseline) if args.baseline else None,
+                            args.output_dir)
         print("承認工程の門（R2）— 承認して、承認したものを、開示つきで書き出したか")
         print()
         if ok:

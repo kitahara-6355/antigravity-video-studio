@@ -210,7 +210,8 @@ def _gate(tmp_path, capsys):
     # 監査するので、既定の置き場を見ると同じセッションの別のテストの出力に左右される
     rc = ag.main(["--gate", "--runs-dir", str(tmp_path / "runs"),
                   "--vault-dir", str(tmp_path / "vault"),
-                  "--baseline", str(tmp_path / "基準線なし.json")])
+                  "--baseline", str(tmp_path / "基準線なし.json"),
+                  "--output-dir", str(tmp_path / "output")])
     return rc, capsys.readouterr().out
 
 

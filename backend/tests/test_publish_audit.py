@@ -69,7 +69,7 @@ def test_承認に辿れる完成品だけなら問題なし(tmp_path):
     vault = _置き場(tmp_path)
     _承認して書き出した(tmp_path, vault)
 
-    assert ag.publish_audit(tmp_path / "runs", vault, baseline={}) == []
+    assert ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output') == []
 
 
 def test_承認に辿れない完成品を見つける(tmp_path):
@@ -78,7 +78,7 @@ def test_承認に辿れない完成品を見つける(tmp_path):
     _承認して書き出した(tmp_path, vault)
     (vault / "final" / "誰かが書いた.mp4").write_bytes(b"no-approval")
 
-    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={})
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output')
 
     assert len(problems) == 1, problems
     assert "誰かが書いた.mp4" in problems[0] and "承認に辿れない" in problems[0]
@@ -89,7 +89,7 @@ def test_shorts_の置き場も見る(tmp_path):
     vault = _置き場(tmp_path)
     (vault / "shorts" / "short_1.mp4").write_bytes(b"vertical")
 
-    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={})
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output')
 
     assert any("short_1.mp4" in p for p in problems), problems
 
@@ -100,7 +100,7 @@ def test_書き出した後に差し替えた完成品を見つける(tmp_path):
     final = _承認して書き出した(tmp_path, vault)
     final.write_bytes(b"swapped-after-export")
 
-    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={})
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output')
 
     assert any("差し替" in p for p in problems), problems
 
@@ -112,7 +112,7 @@ def test_門を通る前からあった動画は基準線で扱う(tmp_path):
     old.write_bytes(b"legacy")
     baseline = {"final/final_20260919_012200.mp4": hashlib.sha256(b"legacy").hexdigest()}
 
-    assert ag.publish_audit(tmp_path / "runs", vault, baseline=baseline) == []
+    assert ag.publish_audit(tmp_path / "runs", vault, baseline=baseline, output_root=tmp_path / 'output') == []
 
 
 def test_基準線の名前で別の動画を置いても通さない(tmp_path):
@@ -121,7 +121,7 @@ def test_基準線の名前で別の動画を置いても通さない(tmp_path):
     (vault / "final" / "final_20260919_012200.mp4").write_bytes(b"replaced")
     baseline = {"final/final_20260919_012200.mp4": hashlib.sha256(b"legacy").hexdigest()}
 
-    problems = ag.publish_audit(tmp_path / "runs", vault, baseline=baseline)
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline=baseline, output_root=tmp_path / 'output')
 
     assert len(problems) == 1, problems
 
@@ -131,7 +131,7 @@ def test_取り残された途中のファイルも完成品として数える(t
     vault = _置き場(tmp_path)
     (vault / "final" / "final_X.mp4.bgm.mp4").write_bytes(b"temp")
 
-    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={})
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output')
 
     assert any("bgm" in p for p in problems), problems
 
@@ -143,7 +143,7 @@ def test_置き場の外は見ない(tmp_path):
         (vault / sub).mkdir()
         (vault / sub / "x.mp4").write_bytes(b"intermediate")
 
-    assert ag.publish_audit(tmp_path / "runs", vault, baseline={}) == []
+    assert ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output') == []
 
 
 def test_gate_は置き場の監査も通す(tmp_path, capsys):
@@ -153,7 +153,7 @@ def test_gate_は置き場の監査も通す(tmp_path, capsys):
     (vault / "final" / "未承認.mp4").write_bytes(b"x")
 
     rc = ag.main(["--gate", "--runs-dir", str(tmp_path / "runs"), "--vault-dir", str(vault),
-                  "--baseline", str(tmp_path / "無い.json")])
+                  "--baseline", str(tmp_path / "無い.json"), "--output-dir", str(tmp_path / "output")])
     out = capsys.readouterr().out
 
     assert rc == 1, out
@@ -169,7 +169,7 @@ def test_承認が書き出しの後に差し替わった実走は辿れたと�
     a["note"] = "書き出しの後に書き換えた"
     approval.write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")
 
-    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={})
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output')
 
     assert any("承認に辿れない" in p for p in problems), problems
 
@@ -179,7 +179,7 @@ def test_gate_は実走が緑でも置き場に未承認があれば落ちる(tm
     vault = _置き場(tmp_path)
     _開示つきで書き出した(tmp_path, vault)
     args = ["--gate", "--runs-dir", str(tmp_path / "runs"), "--vault-dir", str(vault),
-            "--baseline", str(tmp_path / "無い.json")]
+            "--baseline", str(tmp_path / "無い.json"), "--output-dir", str(tmp_path / "output")]
 
     # 陽性対照: 置き場がきれいなら緑
     assert ag.main(args) == 0, capsys.readouterr().out
@@ -204,7 +204,7 @@ def test_置き場の外でも投稿用サイドカーが付いた動画は完�
     (vault / "edited" / "clip.mp4").write_bytes(b"x")
     (vault / "edited" / "clip.youtube.json").write_text("{}", encoding="utf-8")
 
-    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={})
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / 'output')
 
     assert any("edited/clip.mp4" in p for p in problems), problems
 
@@ -212,13 +212,123 @@ def test_置き場の外でも投稿用サイドカーが付いた動画は完�
 def test_基準線には門ができる前の動画しか載っていない():
     """**基準線は抜け道にしてはいけない。** 門の後に承認なしで出た動画を足すと、監査が意味を失う。
 
-    承認の流れで最初に書き出したのは 2026-09-24（実走 20260924T051318897986-0000）。
-    それより後の時刻を持つ動画は基準線に載せない — 承認を通して書き出すこと。
+    境界は**門の最初のコミット**（88603e3・2026-09-19 12:10:29 +0900）。それより後の時刻を
+    持つ動画は基準線に載せない — 承認を通して書き出すこと（以前の境界は最初の書き出しの
+    2026-09-24 で、09-19 12:10〜09-23 の動画を弾けなかった。4周目の gate-verifier の付記）。
     """
     base = json.loads(ag.PUBLISH_BASELINE.read_text(encoding="utf-8"))
     assert base["files"], "基準線が空（置き場の監査が本物の置き場で赤いはず）"
-    門ができた = "2026-09-24T00:00:00"
+    門ができた = "2026-09-19T12:10:29"
     後 = [f for f in base["files"] if f["mtime"] >= 門ができた]
     assert not 後, f"門ができた後の動画が基準線に載っている: {[f['path'] for f in 後]}"
     for f in base["files"]:
         assert len(f["sha256"]) == 64 and f["path"].startswith(("final/", "shorts/")), f
+
+
+# --- 4周目の反証（2026-09-25）への手当て -------------------------------------
+
+import pytest
+
+
+@pytest.mark.parametrize("置き方", [
+    "shorts/probe.webm",            # VP9 の縦型（Shorts の書き手は format: mp4 | webm を受ける）
+    "final/sub/final_probe.mp4",    # 置き場のサブディレクトリ
+    "final/probe.mov",
+    "final/probe.MKV",              # 大文字の拡張子
+    "shorts/run/clip_01.m4v",
+])
+def test_置き場の中なら入れ物や深さに依らず見る(tmp_path, 置き方):
+    """**置き場の定義はディレクトリ単位で、拡張子も深さも限定していない**（4周目の反例A）。"""
+    vault = _置き場(tmp_path)
+    f = vault / 置き方
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(b"unapproved")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any(置き方 in p for p in problems), problems
+
+
+def test_サイドカーの組は動画の入れ物に依らない(tmp_path):
+    """`x.mov` と `x.youtube.json` の組も手動投稿用の完成品（定義の後半）。"""
+    vault = _置き場(tmp_path)
+    (vault / "edited").mkdir()
+    (vault / "edited" / "x.mov").write_bytes(b"x")
+    (vault / "edited" / "x.youtube.json").write_text("{}", encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("edited/x.mov" in p for p in problems), problems
+
+
+def test_退避先の置き場も見る(tmp_path):
+    """safe_io を読めないときの書き手の退避先（`output/final`・`output/shorts`）も置き場。"""
+    vault = _置き場(tmp_path)
+    out = tmp_path / "output"
+    (out / "shorts").mkdir(parents=True)
+    (out / "shorts" / "short_x.mp4").write_bytes(b"x")
+    (out / "clips").mkdir()
+    (out / "clips" / "y.webm").write_bytes(b"y")
+    (out / "clips" / "y.youtube.json").write_text("{}", encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=out)
+
+    assert any("output/shorts/short_x.mp4" in p for p in problems), problems
+    assert any("output/clips/y.webm" in p for p in problems), problems
+
+
+def test_中身の無い承認では辿れたと言わない(tmp_path):
+    """**承認は、その提案の承認として成り立っていること**（4周目の反例C）。
+
+    中身が `{}` の承認と、それを指す書き出しの記録を手で置いても、承認に辿れたとは言わない。
+    docstring は「承認がいまも有効」と書いていたのに確かめていなかった（私の誤り）。
+    """
+    vault = _置き場(tmp_path)
+    run_dir = tmp_path / "runs" / "FORGED"
+    run_dir.mkdir(parents=True)
+    video = vault / "final" / "forged.mp4"
+    video.write_bytes(b"forged")
+    (run_dir / "approval.json").write_text("{}", encoding="utf-8")
+    ag.write_export(run_dir, final_path=str(video), metadata_sidecar=None,
+                    quality_sidecar=None, render_mode="production")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("forged.mp4" in p for p in problems), problems
+
+
+def test_別の提案の承認では辿れたと言わない(tmp_path):
+    """承認が指す提案と、いまの提案が違えば、承認したものを書き出した証拠にならない。"""
+    vault = _置き場(tmp_path)
+    _承認して書き出した(tmp_path, vault)
+    proposal = tmp_path / "runs" / "RID" / "proposal.json"
+    d = json.loads(proposal.read_text(encoding="utf-8"))
+    d["render_mode"] = "safe"
+    proposal.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("final_A.mp4" in p for p in problems), problems
+
+
+def test_開示の欠けた承認では辿れたと言わない(tmp_path):
+    """承認に開示の判断が無い = C3 の門を通っていない。そのまま書き出した記録は辿れたと言わない。"""
+    vault = _置き場(tmp_path)
+    run_dir = tmp_path / "runs" / "RID"
+    run_dir.mkdir(parents=True)
+    ctx = SimpleNamespace(video_path="in.mp4", session_id="s", metadata={}, preview_path=None,
+                          quality_score=95, quality_scored=True, skipped_features=[], warnings=[])
+    ag.write_proposal(run_dir, ctx, run_id="RID", models_used=[])
+    ag.approve(run_dir, synthetic=False, by="北原")
+    a = json.loads((run_dir / "approval.json").read_text(encoding="utf-8"))
+    del a["ai_disclosure"]
+    (run_dir / "approval.json").write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")
+    video = vault / "final" / "no_disclosure.mp4"
+    video.write_bytes(b"x")
+    # 開示の欠けた承認を指す書き出しの記録（承認の指紋は一致させる）
+    ag.write_export(run_dir, final_path=str(video), metadata_sidecar=None,
+                    quality_sidecar=None, render_mode="production")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("no_disclosure.mp4" in p for p in problems), problems
