@@ -34,6 +34,35 @@ def test_台帳と実態が一致している():
     assert not 違反, f"台帳に無い書き出し口: {違反}"
 
 
+@pytest.mark.parametrize("書き方", [
+    "shutil.copy(src, VAULT_OUTPUTS_DIR / 'final' / 'x.mp4')",
+    "ffmpeg.run_command(['-i', src, str(output_path)])",
+    "(VAULT_OUTPUTS_DIR / 'final' / 'x.mp4').write_bytes(b'')",
+    "subprocess.Popen(['ffmpeg', '-i', src, 'x.mp4'])",
+    "shutil.move(src, str(final_path))",
+])
+def test_走査が拾うと宣言している書き方は本当に拾う(tmp_path, 書き方):
+    """**検出そのものを `scan()` を通して確かめる**（2026-09-25 の gate-verifier の指摘）。
+
+    以前のテストは候補の辞書を `audit()` に直接渡していて、検出が壊れても気づけなかった。
+    ここに並べた書き方は走査が**拾うと約束しているもの**。拾えない書き方
+    （`subprocess.run`・`open().write`・`os.replace`・`Path.rename` など）は約束していない —
+    それは置き場の監査（`approval_gate --gate`）が結果で捕まえる（正典 limits に宣言済み）。
+    """
+    mod = tmp_path / "backend" / "zz_probe.py"
+    mod.parent.mkdir(parents=True)
+    mod.write_text(
+        "import shutil, subprocess\n"
+        "from safe_io import VAULT_OUTPUTS_DIR\n"
+        f"def 書き出す(src, ffmpeg=None, output_path=None, final_path=None):\n"
+        f"    {書き方}\n",
+        encoding="utf-8")
+
+    出た = {c["id"] for c in es.scan(tmp_path)}
+
+    assert "backend/zz_probe.py::書き出す" in 出た, f"拾えていない: {書き方}"
+
+
 def test_新しい書き出し口は台帳に無いと違反になる():
     """**これが本体。** 承認を通さない書き出しを足したら、機械が見つける。"""
     ledger = es.load_ledger()

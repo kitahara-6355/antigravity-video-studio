@@ -17,6 +17,21 @@ sys.path は触らない。conftest の sys.path 操作を exec して検証し�
 
 from __future__ import annotations
 
+import os
+
+# 2026-09-25: **テストが本番の完成品の置き場（vault-outputs/final/）に偽物を書いていた。**
+# `safe_io.VAULT_OUTPUTS_DIR` は import の時点で `ANTIGRAVITY_VAULT_OUTPUTS` から決まるのに、
+# どの conftest もこれを差し替えていなかった。RenderWorker のテストが 2MiB ちょうどの偽の
+# 「完成品」を `vault-outputs/final/` に書き、76本中52本がテストの偽物になっていた
+# （R2-C1 の置き場の監査で見つけた）。**人が投稿する動画を選ぶ置き場に偽物を混ぜない。**
+# 3系統（リポジトリ直下 / backend/tests / tests）で同じ向き先になるよう、設定済みなら尊重する。
+# 末尾を `vault-outputs` にしてあるのは、置き場の名前を確かめているテストがあるため。
+if not os.environ.get("ANTIGRAVITY_VAULT_OUTPUTS"):
+    import tempfile as _tempfile_vault
+    os.environ["ANTIGRAVITY_VAULT_OUTPUTS"] = os.path.join(
+        _tempfile_vault.mkdtemp(prefix="antigravity_vault_"), "vault-outputs")
+    os.makedirs(os.environ["ANTIGRAVITY_VAULT_OUTPUTS"], exist_ok=True)
+
 import importlib.util as _ilu
 import sys as _sys
 from pathlib import Path as _Path

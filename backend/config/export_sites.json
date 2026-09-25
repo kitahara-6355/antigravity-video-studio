@@ -325,8 +325,8 @@
       "id": "backend/routers/shorts.py::_execute_ffmpeg_render",
       "file": "backend/routers/shorts.py",
       "symbol": "_execute_ffmpeg_render",
-      "status": "intermediate",
-      "reason": "`POST /api/shorts/render` を 2026-09-25 に閉じたので**どこからも呼ばれていない**。Shorts を承認の流れへ載せ直すとき（D-48）に使う部品として残してある",
+      "status": "unreachable",
+      "reason": "**完成品の置き場（`vault-outputs/shorts/`）に 1080x1920 を書く**（1周目の反例そのもの）。唯一の呼び口 `POST /api/shorts/render` を 2026-09-25 に 409 で閉じたので本番から到達しない。Shorts を承認の流れに載せ直すとき（D-48）は、ここで門を引くこと",
       "tools": [
         "run_command"
       ]

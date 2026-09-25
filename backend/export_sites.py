@@ -1,4 +1,11 @@
-"""R2-C1 の書き出し口の台帳と点検（2026-09-25）。
+"""R2-C1 の書き出し口の台帳と点検（2026-09-25）— **早期警報であって保証ではない**。
+
+**C1 の保証は `approval_gate --gate` の置き場の監査**（`final/`・`shorts/` の完成品が
+1本残らず承認に辿れること）。こちらは静的な走査なので、**書き方を列挙している以上、
+網羅は原理的に保証できない**（2026-09-25 の gate-verifier 3周目が `subprocess.run`・
+`open().write`・`os.replace`・`Path.rename` で書く関数を置いて、ゲートを緑のまま通した）。
+役目は「承認を通さない書き出し口が**増えそうなとき**に早めに気づくこと」。
+正典の limits にもそう宣言してある。
 
 ## なぜ要るか
 
@@ -31,7 +38,8 @@
 | `gated` | 承認の門を引いている（`export_allowed` を呼ぶ／門の内側にある） |
 | `refuses` | 承認を通さないので断る（閉じた経路。409 や例外） |
 | `intermediate` | 完成品ではない（プレビュー・中間物・試作）。**理由が要る** |
-| `out_of_scope` | 凍結・非推奨など、正典の limits で宣言済み。**理由が要る** |
+| `out_of_scope` | 凍結・非推奨・開発用スクリプトなど、正典の limits で宣言済み。**理由が要る** |
+| `unreachable` | **完成品の置き場に書く**が、本番から到達しない（呼び口を閉じた）。**理由が要る** |
 
 使い方:
 
@@ -79,13 +87,13 @@ LEDGER = Path(__file__).resolve().parent / "config" / "export_sites.json"
              "output_path", "final_path", "out_file", "output_file", "out_path")
 
 REQUIRED = ("id", "file", "symbol", "status", "reason")
-STATUSES = ("gated", "refuses", "intermediate", "out_of_scope")
+STATUSES = ("gated", "refuses", "intermediate", "out_of_scope", "unreachable")
 
 
-def _production_py() -> list[Path]:
+def _production_py(root: Path = ROOT) -> list[Path]:
     files = []
-    for p in ROOT.rglob("*.py"):
-        rel = p.relative_to(ROOT).as_posix()
+    for p in root.rglob("*.py"):
+        rel = p.relative_to(root).as_posix()
         if any(rel.startswith(x) or x in rel for x in 除外):
             continue
         if rel.startswith(("backend/", "tools/")) or rel.count("/") == 0:
@@ -120,16 +128,16 @@ def _関数を歩く(tree: ast.AST):
     yield from 降りる(tree, [])
 
 
-def scan() -> list[dict]:
-    """いまのソースから「動画を書きうる関数」を拾う。"""
+def scan(root: Path = ROOT) -> list[dict]:
+    """いまのソースから「動画を書きうる関数」を拾う。`root` はテストで差し替える。"""
     出た = []
-    for path in _production_py():
+    for path in _production_py(root):
         try:
             src = path.read_text(encoding="utf-8")
             tree = ast.parse(src)
         except (OSError, SyntaxError):
             continue
-        rel = path.relative_to(ROOT).as_posix()
+        rel = path.relative_to(root).as_posix()
         for 名, fn in _関数を歩く(tree):
             body = ast.get_source_segment(src, fn) or ""
             呼び = _呼び出しの名前(fn)
@@ -166,7 +174,7 @@ def check_entries(sites: list[dict]) -> list[str]:
             continue
         if s["status"] not in STATUSES:
             問題.append(f"{s['id']}: status が {s['status']}（{'/'.join(STATUSES)} のいずれか）")
-        if s["status"] in ("intermediate", "out_of_scope") and len(s["reason"]) < 20:
+        if s["status"] in ("intermediate", "out_of_scope", "unreachable") and len(s["reason"]) < 20:
             問題.append(f"{s['id']}: {s['status']} は理由を書いてください（いまの理由は {len(s['reason'])} 文字）")
     ids = [s.get("id") for s in sites]
     重複 = {i for i in ids if ids.count(i) > 1}
@@ -245,7 +253,10 @@ def main(argv: list[str] | None = None) -> int:
           f"（門を引く {sum(1 for s in sites if s['status'] == 'gated')} 件 / "
           f"断る {sum(1 for s in sites if s['status'] == 'refuses')} 件 / "
           f"完成品ではない {sum(1 for s in sites if s['status'] == 'intermediate')} 件 / "
-          f"対象外 {sum(1 for s in sites if s['status'] == 'out_of_scope')} 件）")
+          f"対象外 {sum(1 for s in sites if s['status'] == 'out_of_scope')} 件 / "
+          f"到達しない {sum(1 for s in sites if s['status'] == 'unreachable')} 件）"
+          "\n  ※ 静的な走査は**早期警報**で、網羅は保証しません。"
+          "C1 の保証は `python -m backend.revenue.approval_gate --gate` の置き場の監査です")
     return 0
 
 

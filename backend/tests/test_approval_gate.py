@@ -206,7 +206,11 @@ def _書き出した実走(tmp_path, *, 開示=True, 承認=True):
 
 
 def _gate(tmp_path, capsys):
-    rc = ag.main(["--gate", "--runs-dir", str(tmp_path / "runs")])
+    # **置き場はテストごとに空のものを渡す**（2026-09-25）。`--gate` は完成品の置き場も
+    # 監査するので、既定の置き場を見ると同じセッションの別のテストの出力に左右される
+    rc = ag.main(["--gate", "--runs-dir", str(tmp_path / "runs"),
+                  "--vault-dir", str(tmp_path / "vault"),
+                  "--baseline", str(tmp_path / "基準線なし.json")])
     return rc, capsys.readouterr().out
 
 
