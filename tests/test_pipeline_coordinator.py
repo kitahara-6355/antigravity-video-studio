@@ -35,7 +35,11 @@ def _承認済みにする(coordinator, tmp_path):
     runs = tmp_path / "runs"
     rec = RunRecorder(runs_dir=runs)
     rec.finish("awaiting_approval")
-    ag.write_proposal(rec.dir, SimpleNamespace(video_path=str(tmp_path / "dummy.mp4")),
+    # **見ていないものは承認できない**（R2-C1）ので、承認の材料のプレビューを置く
+    preview = tmp_path / "preview_for_approval.mp4"
+    preview.write_bytes(b"mock-preview")
+    ag.write_proposal(rec.dir, SimpleNamespace(video_path=str(tmp_path / "dummy.mp4"),
+                                               preview_path=str(preview)),
                       run_id=rec.run_id, models_used=[])
     ag.approve(rec.dir, synthetic=False, by="test")
     coordinator._recorder = RunRecorder.reopen(rec.run_id, runs_dir=runs)

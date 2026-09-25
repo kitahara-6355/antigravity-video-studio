@@ -133,10 +133,13 @@ def create_approved_run(root: Optional[str] = None) -> str:
 
     run_dir = Path(root or tempfile.mkdtemp(prefix="mock_run_"))
     run_dir.mkdir(parents=True, exist_ok=True)
+    # **見ていないものは承認できない**（R2-C1・4周目の反例B）ので、承認の材料のプレビューを置く
+    preview = run_dir / "mock_preview.mp4"
+    preview.write_bytes(b"mock-preview")
     ag.write_proposal(
         run_dir,
         SimpleNamespace(video_path="mock.mp4", session_id="mock", metadata={},
-                        preview_path=None, quality_score=95, quality_scored=True,
+                        preview_path=str(preview), quality_score=95, quality_scored=True,
                         skipped_features=[], warnings=[]),
         run_id=run_dir.name, models_used=[])
     ag.approve(run_dir, synthetic=False, by="mock")

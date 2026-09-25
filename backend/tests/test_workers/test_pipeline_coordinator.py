@@ -17,6 +17,7 @@ Coordinator 本体（789行）の分岐をテスト。Worker 実装は全モッ�
   - WebSocket ブロードキャストは AsyncMock で発火を検証
 """
 
+import os
 import sys
 import json
 import time
@@ -88,8 +89,14 @@ def _worker_side_effect(worker, quality_score: int = 95):
             ctx.segments = create_mock_ctx(segments=10).segments
             result.data = {"segment_count": 10, "model": "small", "device": "cuda"}
         elif isinstance(worker, PreviewWorker):
-            ctx.preview_path = "/tmp/preview.mp4"
-            result.data = {"path": "/tmp/preview.mp4", "size_mb": 5.0}
+            # **実在するプレビューを作る**（R2-C1）。見ていないものは承認できないので、
+            # 承認して書き出すテストはプレビューが要る
+            import tempfile
+            fd, preview = tempfile.mkstemp(suffix=".mp4", prefix="mock_preview_")
+            os.write(fd, b"mock-preview")
+            os.close(fd)
+            ctx.preview_path = preview
+            result.data = {"path": preview, "size_mb": 5.0}
         elif isinstance(worker, RenderWorker):
             ctx.final_path = "/tmp/final.mp4"
             result.data = {"quality": "production", "path": "/tmp/final.mp4"}
@@ -552,7 +559,11 @@ class TestC4ErrorControl:
 
     @pytest.mark.asyncio
     async def test_C4_03_preview_failure_continues_with_warning(self):
-        """C4-03: PreviewWorker 失敗 → 警告追加してパイプライン継続 (T-020b)"""
+        """C4-03: PreviewWorker 失敗 → 警告追加してパイプライン継続 (T-020b)
+
+        **継続するのは提案まで。** R2-C1 以降、プレビューが無い提案は承認できない
+        （見ていないものは承認できない・2026-09-25 ユーザー決定）。
+        """
         coord = _create_coordinator_with_mocks()
         preview = coord._find_worker(PreviewWorker)
         preview.execute = AsyncMock(
@@ -564,10 +575,13 @@ class TestC4ErrorControl:
         with patch.object(coord, '_init_harness', return_value=None), \
              patch.object(coord, '_run_retention_analysis', new_callable=AsyncMock, return_value=None), \
              patch.object(coord, '_trigger_dream_learning', new_callable=AsyncMock):
-            result = await _書き出すまで(coord, ctx)
+            result = await coord.execute(ctx)
 
-        assert result["status"] == "degraded"   # 止めない（T-020b）が完走でもない
+        assert result["status"] == "awaiting_approval"   # 止めない（T-020b）— 提案までは進む
         assert any("プレビュー" in w for w in ctx.warnings)
+        from backend.revenue import approval_gate as ag
+        with pytest.raises(ValueError, match="プレビュー"):
+            ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
 
     @pytest.mark.asyncio
     async def test_C4_04_parallel_exception_handled(self):

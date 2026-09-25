@@ -48,6 +48,81 @@ def _承認(run_dir, **kw):
     return ag.approve(run_dir, **kw)
 
 
+# --- 見ていないものは承認できない（4周目の反例B・2026-09-25 ユーザー決定） ---------
+
+def test_プレビューが無い提案は承認できない(tmp_path):
+    """**見ていないものは承認できない。** プレビュー生成が落ちても本線は止まらない（致命的な
+    工程ではない）ので、`preview: None` の提案ができる。そのまま承認できると、書き出しは素材から
+    直接レンダリングする（T-022 の退避）ため、**誰も見ていない動画が書き出される。**
+    """
+    run_dir = tmp_path / "runs" / "RID"
+    run_dir.mkdir(parents=True)
+    ctx = SimpleNamespace(video_path=str(tmp_path / "入力.mp4"), session_id="s", preview_path=None,
+                          metadata=dict(METADATA), quality_score=92, quality_scored=True,
+                          skipped_features=[])
+    ag.write_proposal(run_dir, ctx, run_id="RID", models_used=[])
+
+    with pytest.raises(ValueError, match="プレビュー"):
+        _承認(run_dir)
+    assert not (run_dir / "approval.json").exists()
+
+
+def test_書き出しの門もプレビュー無しを独立に断る(tmp_path):
+    """**門は二重。** `approve()` を通らずに承認を置かれても、書き出しの門がプレビュー無しを断る。"""
+    run_dir = tmp_path / "runs" / "RID"
+    run_dir.mkdir(parents=True)
+    ctx = SimpleNamespace(video_path=str(tmp_path / "入力.mp4"), session_id="s", preview_path=None,
+                          metadata={}, quality_score=92, quality_scored=True, skipped_features=[])
+    ag.write_proposal(run_dir, ctx, run_id="RID", models_used=[])
+    (run_dir / "approval.json").write_text(json.dumps({
+        "proposal_sha256": hashlib.sha256((run_dir / "proposal.json").read_bytes()).hexdigest(),
+        "edits": [],
+        "ai_disclosure": {"contains_synthetic_media": False, "decided_by": "北原",
+                          "decided_at": "2026-09-25T00:00:00+00:00", "ai_used_for": []},
+    }, ensure_ascii=False), encoding="utf-8")
+
+    ok, why = ag.export_allowed(run_dir)
+
+    assert ok is False and "プレビュー" in why, why
+
+
+def test_承認の後に素材を差し替えたら書き出せない(tmp_path):
+    """素材の指紋を提案に残し、書き出しの前に照合する（4周目の反例B の後半）。"""
+    source = tmp_path / "入力.mp4"
+    source.write_bytes(b"source-2sec")
+    run_dir = _提案のある実走(tmp_path)
+    _承認(run_dir)
+    assert ag.export_allowed(run_dir) == (True, "")
+
+    source.write_bytes(b"source-5sec-swapped")
+
+    ok, why = ag.export_allowed(run_dir)
+    assert ok is False and "素材" in why, why
+
+
+def test_素材の指紋が無い提案は書き出せない(tmp_path):
+    """**確かめられないものは通さない**（fail-closed）。指紋を残す前の形の提案は走り直す。"""
+    run_dir = _提案のある実走(tmp_path)
+    proposal = run_dir / "proposal.json"
+    d = json.loads(proposal.read_text(encoding="utf-8"))
+    d.pop("source", None)
+    proposal.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+
+    ok, why = ag.export_allowed(run_dir)
+    assert ok is False and "素材" in why, why
+
+
+def test_書き出しのときにプレビューが消えていたら書き出せない(tmp_path):
+    """承認した現物（プレビュー）が無くなったら、素材から直接レンダリングさせない。"""
+    run_dir = _提案のある実走(tmp_path)
+    _承認(run_dir)
+    (tmp_path / "preview.mp4").unlink()
+
+    ok, why = ag.export_allowed(run_dir)
+    assert ok is False and "プレビュー" in why, why
+
+
 # --- 承認（R2-C2・C3） -------------------------------------------------------
 
 def test_承認は提案の指紋と人の差分と開示の判断を残す(tmp_path):

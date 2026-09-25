@@ -44,6 +44,11 @@ def _coordinator(tmp_path, 落ちる=(), *, final_path=None):
         async def _fake(ctx, _w=w, _ok=ok):
             if _ok and type(_w).__name__ == "RenderWorker" and final_path:
                 ctx.final_path = str(final_path)
+            if _ok and type(_w).__name__ == "PreviewWorker":
+                # **実在するプレビューを作る**（R2-C1）。見ていないものは承認できない
+                preview = tmp_path / "preview.mp4"
+                preview.write_bytes(b"mock-preview")
+                ctx.preview_path = str(preview)
             return StageResult(stage_name=_w.name, success=_ok,
                                detail="やった" if _ok else "落ちた")
 
@@ -151,13 +156,23 @@ def test_校閲の失敗も握り潰さない(tmp_path):
 
 
 def test_プレビューの失敗は止めないが完走とも呼ばない(tmp_path):
-    """T-020b。**止めないが、成功にもしない。**"""
-    result = _run_and_export(_coordinator(tmp_path, 落ちる={"PreviewWorker"},
-                                          final_path=tmp_path / "final.mp4"), tmp_path)
+    """T-020b。**止めないが、成功にもしない。**
+
+    R2-C1 以降は**承認もできない**（2026-09-25 ユーザー決定: 見ていないものは承認できない）。
+    実走は提案まで進み（止めない）、承認待ちで残る。承認しようとすると断られる。
+    かつては承認を経ずに素材から直接書き出して degraded で閉じていた（T-022）が、
+    それは**誰も見ていない動画を書き出す**経路だった（gate-verifier 4周目の反例B）。
+    """
+    from backend.revenue import approval_gate as ag
+
+    result = _run(_coordinator(tmp_path, 落ちる={"PreviewWorker"},
+                               final_path=tmp_path / "final.mp4"), tmp_path)
     run = _run_json(tmp_path)
 
-    assert result["status"] == "degraded", "止めないが、完走とも呼ばない"
+    assert result["status"] == "awaiting_approval", "止めない（提案までは進む）"
     assert any("プレビュー" in w for w in result["health"]["warnings"])
+    with pytest.raises(ValueError, match="プレビュー"):
+        ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
     落ちた = [s["name"] for s in run["stages"] if s["status"] == "failed"]
     assert set(落ちた) == {"preview"}, f"失敗そのものは記録に残すこと: {落ちた}"
     # **やり直しも1回ずつ残す。** 「何回粘ったか」が見えないと、

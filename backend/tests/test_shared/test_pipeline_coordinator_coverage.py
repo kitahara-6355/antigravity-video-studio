@@ -1,4 +1,5 @@
 import builtins
+import os
 import sys
 from pathlib import Path
 
@@ -74,8 +75,16 @@ async def _書き出すまで(pc, ctx):
     見るテストは、承認して書き出すところまで通す。
     """
     import json as _json
+    import tempfile
     from backend.revenue import approval_gate as ag
 
+    if not ctx.preview_path:
+        # **見ていないものは承認できない**（R2-C1）。このファイルの worker は汎用のモックで
+        # プレビューを作らないので、承認の材料だけ実在させておく
+        fd, preview = tempfile.mkstemp(suffix=".mp4", prefix="mock_preview_")
+        os.write(fd, b"mock-preview")
+        os.close(fd)
+        ctx.preview_path = preview
     res = await pc.execute(ctx)
     if res["status"] != "awaiting_approval":
         return res

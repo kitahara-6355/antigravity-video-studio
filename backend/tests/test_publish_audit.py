@@ -40,7 +40,10 @@ def _承認して書き出した(tmp_path, vault: Path, name="final_A.mp4", run_
     run_dir.mkdir(parents=True)
     (run_dir / "run.json").write_text(json.dumps({"run_id": run_id, "status": "completed"}),
                                       encoding="utf-8")
-    ctx = SimpleNamespace(video_path="in.mp4", session_id="s", metadata={}, preview_path=None,
+    # **見ていないものは承認できない**ので、プレビューを持たせる（4周目の反例B）
+    preview = tmp_path / f"preview_{run_id}.mp4"
+    preview.write_bytes(b"preview-" + run_id.encode())
+    ctx = SimpleNamespace(video_path="in.mp4", session_id="s", metadata={}, preview_path=str(preview),
                           quality_score=95, quality_scored=True, skipped_features=[], warnings=[])
     ag.write_proposal(run_dir, ctx, run_id=run_id, models_used=[])
     ag.approve(run_dir, synthetic=False, by="北原")
@@ -316,7 +319,9 @@ def test_開示の欠けた承認では辿れたと言わない(tmp_path):
     vault = _置き場(tmp_path)
     run_dir = tmp_path / "runs" / "RID"
     run_dir.mkdir(parents=True)
-    ctx = SimpleNamespace(video_path="in.mp4", session_id="s", metadata={}, preview_path=None,
+    preview = tmp_path / "preview.mp4"
+    preview.write_bytes(b"preview")
+    ctx = SimpleNamespace(video_path="in.mp4", session_id="s", metadata={}, preview_path=str(preview),
                           quality_score=95, quality_scored=True, skipped_features=[], warnings=[])
     ag.write_proposal(run_dir, ctx, run_id="RID", models_used=[])
     ag.approve(run_dir, synthetic=False, by="北原")

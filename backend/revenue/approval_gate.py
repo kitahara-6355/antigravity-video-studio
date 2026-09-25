@@ -96,6 +96,8 @@ def write_proposal(run_dir: str | Path, ctx: Any, *, run_id: str,
         "status": STATUS_AWAITING_APPROVAL,
         "created_at": _now(),
         "video_path": ctx.video_path,
+        # **素材の指紋**（4周目の反例B）。承認の後に素材を差し替えられても気づけるように
+        "source": {"path": str(ctx.video_path), "sha256": _sha256_file(ctx.video_path)},
         "session_id": getattr(ctx, "session_id", ""),
         "preview": ({"path": str(preview_path), "sha256": preview_sha}
                     if preview_sha else None),
@@ -159,6 +161,12 @@ def approve(run_dir: str | Path, *, synthetic: bool | None, by: str,
                          "開示ラベルの要否はコンテンツによるので、機械は決めません")
     if not isinstance(synthetic, bool):
         raise TypeError(f"合成メディアの判断は真偽値で渡してください: {synthetic!r}")
+    if not (_read_json(proposal_path).get("preview") or {}).get("path"):
+        # **見ていないものは承認できない**（2026-09-25 ユーザー決定・4周目の反例B）。
+        # プレビュー生成は致命的な工程ではないので、落ちても提案はできる。そのまま承認できると
+        # 書き出しは素材から直接レンダリングし（T-022）、誰も見ていない動画が出る
+        raise ValueError("プレビューが無い提案は承認できません（見ていないものは承認できない）。"
+                         "プレビュー生成が落ちています。原因を直して走り直してください")
     approval_path = run_dir / APPROVAL
     if approval_path.exists():
         if (run_dir / EXPORT).exists():
@@ -243,8 +251,15 @@ def export_allowed(run_dir: str | Path) -> tuple[bool, str]:
         return False, "提案が承認の後に変わっています。承認し直してください"
     proposal = _read_json(proposal_path)
     preview = proposal.get("preview") or {}
-    if preview and _sha256_file(preview.get("path")) != preview.get("sha256"):
+    if not preview.get("path"):
+        return False, "プレビューが無い提案です（見ていないものは書き出さない）"
+    if _sha256_file(preview.get("path")) != preview.get("sha256"):
         return False, f"プレビューが承認の後に変わっています: {preview.get('path')}"
+    source = proposal.get("source")
+    if not isinstance(source, dict):
+        return False, "提案に素材の指紋がありません（確かめられないので書き出さない）。走り直してください"
+    if _sha256_file(source.get("path")) != source.get("sha256"):
+        return False, f"素材が承認の後に変わっています: {source.get('path')}"
     working = {o["name"]: o["working"] for o in proposal.get("ai_outputs") or []}
     for edit in approval.get("edits") or []:
         path = run_dir / working.get(edit["name"], "")

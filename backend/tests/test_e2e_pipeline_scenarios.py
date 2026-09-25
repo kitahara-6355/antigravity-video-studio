@@ -48,6 +48,11 @@ async def test_scenario_01_normal_full_pipeline(safe_popen_mock, tmp_path):
     ctx = PipelineContext(video_path=str(tmp_path / "tv01_real_clip.mp4"))
     ctx.session_id = "test-session-s01"
     ctx.final_path = "vault-assets/output/final.mp4"
+    # **見ていないものは承認できない**（R2-C1）。worker は汎用のモックでプレビューを
+    # 作らないので、承認の材料だけ実在させておく
+    preview = tmp_path / "preview_s01.mp4"
+    preview.write_bytes(b"mock-preview")
+    ctx.preview_path = str(preview)
     ctx.quality_score = 95
     ctx.quality_feedback = []
 
