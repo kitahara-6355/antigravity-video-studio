@@ -275,7 +275,8 @@ class TestRenderDeep:
             methods = getattr(r, 'methods', set())
             if 'POST' in methods and '{' not in r.path:
                 resp = self.client.post(r.path, json={})
-                assert resp.status_code in (200, 400, 404, 422, 500)
+                # 409 = 承認を通さない書き出しの経路（R2-C1 で閉じた）
+                assert resp.status_code in (200, 400, 404, 409, 422, 500)
 
     def test_rd_03_settings_get(self):
         r = self.client.get("/api/render/settings")

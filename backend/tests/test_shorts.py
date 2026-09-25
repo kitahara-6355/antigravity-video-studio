@@ -282,185 +282,53 @@ def test_export_shorts_general_exception():
         assert response.status_code == 500
         assert "System error" in response.json()["detail"]
 
-# Render
-def test_render_short_invalid_duration():
+# Render — **R2-C1 で閉じた**（2026-09-25）
+#
+# ここには「どう書き出すか」を見るテストが8件あった（ffmpeg の有無・字幕の焼き込み・
+# 失敗時の 500・import 退避）。**承認を1件も見ずに 1080x1920 の完成動画を書いていた経路**
+# なので、R2-C1「承認していない動画は書き出せない」と正面から衝突する（2026-09-24 の
+# gate-verifier が実際に 671,403 byte の mp4 を作って反証した）。経路を閉じたので
+# それらの分岐は到達しない。**見るものは「書き出さないこと」に変わる。**
+#
+# Shorts は収益化の主軸（登録者集め）なので消したのではなく止めただけ。承認の流れへ
+# 載せ直す工事は D-48（P1）。載せ直すときは「承認を通したら書き出す」テストがここに戻る。
+
+def test_render_short_は承認を通していないと断る():
     response = client.post(
         "/api/shorts/render",
-        json={
-            "video_path": "/path/video.mp4",
-            "start_sec": 10.0,
-            "end_sec": 5.0
-        }
+        json={"video_path": "/path/video.mp4", "start_sec": 0.0, "end_sec": 10.0}
     )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "end_sec must be greater than start_sec"
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert "承認" in detail and "approval_gate" in detail
 
-def test_render_short_ffmpeg_not_available():
+
+def test_render_short_は入力の良し悪しで挙動を変えない():
+    """**断るのが先。** end_sec の逆転（かつて 400）でも同じ 409 を返す。"""
+    for body in (
+        {"video_path": "/path/video.mp4", "start_sec": 10.0, "end_sec": 5.0},
+        {"video_path": "/path/video.mp4", "start_sec": 0.0, "end_sec": 10.0,
+         "subtitle_text": "hello:world's", "output_filename": "out.mp4"},
+    ):
+        assert client.post("/api/shorts/render", json=body).status_code == 409
+
+
+def test_render_short_は_ffmpeg_を呼ばない():
+    """**書き出しの部品を1つも動かさない。** かつてはここで ffmpeg を回していた。"""
     mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = False
+    mock_ffmpeg.is_available.return_value = True
     mock_editor = MagicMock(ffmpeg=mock_ffmpeg)
-    
+
     with patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_editor)}):
         response = client.post(
             "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 10.0,
-                "output_filename": "test.mp4"
-            }
+            json={"video_path": "/path/video.mp4", "start_sec": 0.0, "end_sec": 10.0,
+                  "output_filename": "test.mp4"}
         )
-        assert response.status_code == 500
-        assert "FFmpeg未検出" in response.json()["detail"]
 
-def test_render_short_success_with_subtitle():
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = True
-    mock_ffmpeg._get_encode_args.return_value = ["-c:v", "libx264"]
-    mock_ffmpeg.run_command.return_value = (True, "ffmpeg log")
-    mock_editor = MagicMock(ffmpeg=mock_ffmpeg)
-    
-    with patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_editor)}), \
-         patch.object(Path, "mkdir") as mock_mkdir, \
-         patch.object(Path, "exists", return_value=True) as mock_exists, \
-         patch.object(Path, "stat") as mock_stat:
-        
-        mock_stat.return_value.st_size = 10 * 1024 * 1024
-        
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 10.0,
-                "subtitle_text": "hello:world's",
-                "output_filename": "out.mp4"
-            }
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["size_mb"] == 10.0
-        assert data["duration_sec"] == 10.0
-        
-        cmd = mock_ffmpeg.run_command.call_args[0][0]
-        assert "-ss" in cmd
-        assert "drawtext" in cmd[cmd.index("-vf") + 1]
-        assert "hello\\:world\\'s" in cmd[cmd.index("-vf") + 1]
-
-def test_render_short_success_no_subtitle_no_filename():
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = True
-    mock_ffmpeg._get_encode_args.return_value = []
-    mock_ffmpeg.run_command.return_value = (True, "ffmpeg log")
-    mock_editor = MagicMock(ffmpeg=mock_ffmpeg)
-    
-    with patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_editor)}), \
-         patch.object(Path, "mkdir") as mock_mkdir, \
-         patch.object(Path, "exists", return_value=True) as mock_exists, \
-         patch.object(Path, "stat") as mock_stat:
-        
-        mock_stat.return_value.st_size = 5 * 1024 * 1024
-        
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 120.0,
-            }
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["size_mb"] == 5.0
-        assert data["duration_sec"] == 60.0
-        
-        cmd = mock_ffmpeg.run_command.call_args[0][0]
-        assert "drawtext" not in cmd[cmd.index("-vf") + 1]
-
-def test_render_short_ffmpeg_failed():
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = True
-    mock_ffmpeg._get_encode_args.return_value = []
-    mock_ffmpeg.run_command.return_value = (False, "ffmpeg failed detailed output log")
-    mock_editor = MagicMock(ffmpeg=mock_ffmpeg)
-    
-    with patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_editor)}), \
-         patch.object(Path, "mkdir") as mock_mkdir:
-        
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 10.0,
-                "output_filename": "fail.mp4"
-            }
-        )
-        assert response.status_code == 500
-        assert "ffmpeg failed" in response.json()["detail"]
-
-def test_render_short_exception_in_render_loop():
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.side_effect = RuntimeError("Fatal hardware error")
-    mock_editor = MagicMock(ffmpeg=mock_ffmpeg)
-    
-    with patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_editor)}), \
-         patch.object(Path, "mkdir") as mock_mkdir:
-        
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 10.0,
-                "output_filename": "error.mp4"
-            }
-        )
-        assert response.status_code == 500
-        assert "Fatal hardware error" in response.json()["detail"]
-
-def test_render_short_safe_io_import_error():
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = True
-    mock_ffmpeg._get_encode_args.return_value = []
-    mock_ffmpeg.run_command.return_value = (True, "ffmpeg log")
-    mock_editor = MagicMock(ffmpeg=mock_ffmpeg)
-    
-    with patch.dict("sys.modules", {"safe_io": None, "video_editor_engine": MagicMock(video_editor=mock_editor)}), \
-         patch.object(Path, "mkdir") as mock_mkdir, \
-         patch.object(Path, "exists", return_value=True) as mock_exists, \
-         patch.object(Path, "stat") as mock_stat:
-        
-        mock_stat.return_value.st_size = 2 * 1024 * 1024
-        
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 10.0,
-                "output_filename": "import_err.mp4"
-            }
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-
-def test_render_short_video_editor_engine_import_error():
-    with patch.dict("sys.modules", {"video_editor_engine": None}):
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 10.0,
-                "output_filename": "import_err.mp4"
-            }
-        )
-        assert response.status_code == 500
-        assert "No module named" in response.json()["detail"] or "import" in response.json()["detail"]
+    assert response.status_code == 409
+    mock_ffmpeg.run_command.assert_not_called()
+    mock_ffmpeg.is_available.assert_not_called()
 
 # Health Check
 def test_health_check():
@@ -567,27 +435,6 @@ def test_export_shorts_import_error():
         )
         assert response.status_code == 500
         assert "Required service module not found" in response.json()["detail"]
-
-def test_render_short_os_error():
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = True
-    mock_ffmpeg._get_encode_args.return_value = []
-    mock_ffmpeg.run_command.side_effect = OSError("Out of storage")
-    mock_editor = MagicMock(ffmpeg=mock_ffmpeg)
-    
-    with patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_editor)}),          patch.object(Path, "mkdir"),          patch.object(Path, "exists", return_value=True):
-        
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "/path/video.mp4",
-                "start_sec": 0.0,
-                "end_sec": 10.0,
-                "output_filename": "os_error.mp4"
-            }
-        )
-        assert response.status_code == 500
-        assert "Out of storage" in response.json()["detail"]
 
 @pytest.mark.asyncio
 async def test_generate_thumbnail_api_success():

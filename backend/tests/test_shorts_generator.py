@@ -400,121 +400,69 @@ def test_router_export_shorts_not_found():
 
 
 def test_router_render_short_invalid_duration():
-    """POST /api/shorts/render - duration が 0 以下の場合は 400 Bad Request"""
+    """**R2-C1 で閉じた経路**（2026-09-25）。入力の良し悪しで挙動を変えない（かつて 400）
+
+    承認を1件も見ずに 1080x1920 の完成動画を書いていたので閉じた。
+    見るものは「書き出さないこと」に変わった。
+    """
     response = client.post(
         "/api/shorts/render",
-        json={
-            "video_path": "test.mp4",
-            "start_sec": 30.0,
-            "end_sec": 20.0  # start >= end
-        }
+        json={"video_path": "/v.mp4", "start_sec": 0.0, "end_sec": 10.0},
     )
-    assert response.status_code == 400
-    assert "greater than start_sec" in response.json()["detail"]
-
+    assert response.status_code == 409
+    assert "承認" in response.json()["detail"]
 
 def test_router_render_short_success():
-    """POST /api/shorts/render - 正常系"""
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = True
-    mock_ffmpeg._get_encode_args.return_value = ["-c:v", "libx264"]
-    mock_ffmpeg.run_command.return_value = (True, "FFmpeg success output")
+    """**R2-C1 で閉じた経路**（2026-09-25）。正常系だった（かつて 200）
 
-    mock_video_editor = MagicMock()
-    mock_video_editor.ffmpeg = mock_ffmpeg
-
-    mock_video_editor_module = MagicMock()
-    mock_video_editor_module.video_editor = mock_video_editor
-
-    with patch.dict(sys.modules, {"video_editor_engine": mock_video_editor_module}):
-        with patch("pathlib.Path.exists", return_value=True):
-            with patch("pathlib.Path.stat") as mock_stat:
-                mock_stat.return_value.st_size = 5.5 * 1024 * 1024  # 5.5 MB
-                
-                response = client.post(
-                    "/api/shorts/render",
-                    json={
-                        "video_path": "test.mp4",
-                        "start_sec": 10.0,
-                        "end_sec": 30.0,
-                        "subtitle_text": "テスト字幕: テスト",
-                        "output_filename": "output_test.mp4"
-                    }
-                )
-                assert response.status_code == 200
-                data = response.json()
-                assert data["success"] is True
-                assert "output_test.mp4" in data["path"]
-                assert data["size_mb"] == 5.5
-                assert data["duration_sec"] == 20.0
-
-                mock_ffmpeg.run_command.assert_called_once()
-
+    承認を1件も見ずに 1080x1920 の完成動画を書いていたので閉じた。
+    見るものは「書き出さないこと」に変わった。
+    """
+    response = client.post(
+        "/api/shorts/render",
+        json={"video_path": "/v.mp4", "start_sec": 0.0, "end_sec": 10.0},
+    )
+    assert response.status_code == 409
+    assert "承認" in response.json()["detail"]
 
 def test_router_render_short_ffmpeg_not_available():
-    """POST /api/shorts/render - FFmpeg が利用不可の場合"""
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = False
+    """**R2-C1 で閉じた経路**（2026-09-25）。FFmpeg 不在の扱いだった（かつて 500）
 
-    mock_video_editor = MagicMock()
-    mock_video_editor.ffmpeg = mock_ffmpeg
-
-    mock_video_editor_module = MagicMock()
-    mock_video_editor_module.video_editor = mock_video_editor
-
-    with patch.dict(sys.modules, {"video_editor_engine": mock_video_editor_module}):
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "test.mp4",
-                "start_sec": 10.0,
-                "end_sec": 30.0
-            }
-        )
-        assert response.status_code == 500
-        assert "FFmpeg未検出" in response.json()["detail"]
-
+    承認を1件も見ずに 1080x1920 の完成動画を書いていたので閉じた。
+    見るものは「書き出さないこと」に変わった。
+    """
+    response = client.post(
+        "/api/shorts/render",
+        json={"video_path": "/v.mp4", "start_sec": 0.0, "end_sec": 10.0},
+    )
+    assert response.status_code == 409
+    assert "承認" in response.json()["detail"]
 
 def test_router_render_short_ffmpeg_command_failed():
-    """POST /api/shorts/render - FFmpeg コマンド実行が失敗した場合"""
-    mock_ffmpeg = MagicMock()
-    mock_ffmpeg.is_available.return_value = True
-    mock_ffmpeg._get_encode_args.return_value = []
-    mock_ffmpeg.run_command.return_value = (False, "FFmpeg error trace log")
+    """**R2-C1 で閉じた経路**（2026-09-25）。FFmpeg 失敗の扱いだった（かつて 500）
 
-    mock_video_editor = MagicMock()
-    mock_video_editor.ffmpeg = mock_ffmpeg
-
-    mock_video_editor_module = MagicMock()
-    mock_video_editor_module.video_editor = mock_video_editor
-
-    with patch.dict(sys.modules, {"video_editor_engine": mock_video_editor_module}):
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "test.mp4",
-                "start_sec": 10.0,
-                "end_sec": 30.0
-            }
-        )
-        assert response.status_code == 500
-        assert "FFmpeg error trace log" in response.json()["detail"]
-
+    承認を1件も見ずに 1080x1920 の完成動画を書いていたので閉じた。
+    見るものは「書き出さないこと」に変わった。
+    """
+    response = client.post(
+        "/api/shorts/render",
+        json={"video_path": "/v.mp4", "start_sec": 0.0, "end_sec": 10.0},
+    )
+    assert response.status_code == 409
+    assert "承認" in response.json()["detail"]
 
 def test_router_render_short_general_exception():
-    """POST /api/shorts/render - 一般例外発生時"""
-    with patch.dict(sys.modules, {"video_editor_engine": None}):
-        response = client.post(
-            "/api/shorts/render",
-            json={
-                "video_path": "test.mp4",
-                "start_sec": 10.0,
-                "end_sec": 30.0
-            }
-        )
-        assert response.status_code == 500
-        assert "detail" in response.json()
+    """**R2-C1 で閉じた経路**（2026-09-25）。内部例外の扱いだった（かつて 500）
 
+    承認を1件も見ずに 1080x1920 の完成動画を書いていたので閉じた。
+    見るものは「書き出さないこと」に変わった。
+    """
+    response = client.post(
+        "/api/shorts/render",
+        json={"video_path": "/v.mp4", "start_sec": 0.0, "end_sec": 10.0},
+    )
+    assert response.status_code == 409
+    assert "承認" in response.json()["detail"]
 
 def test_router_shorts_health():
     """GET /api/shorts/health - 正常系"""

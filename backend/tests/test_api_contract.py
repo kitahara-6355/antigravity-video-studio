@@ -525,13 +525,15 @@ class TestAC05_WebSocketMessageStructure:
                 pytest.fail(f"WebSocket /ws/progress not found: {e}")
 
     def test_pipeline_ws_broadcast_structure(self):
-        """パイプラインWSブロードキャストメッセージに type フィールドがある"""
-        # pipeline_router.py 内の broadcast データ構造を検証
-        # (実際のWS通信ではなく、コード構造テスト)
+        """パイプラインWSブロードキャストメッセージに type フィールドがある
+
+        `force_render_complete` は**もう流れない**（R2-C1・2026-09-25）。強制書き出しの
+        経路を閉じて 409 で承認へ案内するようにしたので、完了の電文そのものが無くなった。
+        **無い電文を契約に残さない**（残すと「まだ書き出せる」と読める）。
+        """
         expected_types = [
             "pipeline_start",
             "pipeline_complete",
-            "force_render_complete",
         ]
         # ソースコード内にこれらのtype文字列が存在することを確認
         router_path = Path(__file__).parent.parent / "routers" / "pipeline_router.py"
@@ -541,6 +543,15 @@ class TestAC05_WebSocketMessageStructure:
                 assert msg_type in source, (
                     f"pipeline_router.py に '{msg_type}' メッセージ型が定義されていない"
                 )
+
+    def test_強制書き出しの完了電文は無い(self):
+        """R2-C1: 閉じた経路の電文が戻っていないこと（契約の逆向きの確認）。"""
+        router_path = Path(__file__).parent.parent / "routers" / "pipeline_router.py"
+        if router_path.exists():
+            source = router_path.read_text(encoding="utf-8")
+            assert "force_render_complete" not in source, (
+                "強制書き出しの完了電文が戻っています（承認を通さない書き出しは廃止しました）"
+            )
 
     def test_websocket_message_types_documented(self):
         """WebSocketメッセージ型がコード内で定義されている"""

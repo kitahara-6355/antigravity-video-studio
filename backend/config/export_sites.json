@@ -1,0 +1,610 @@
+{
+  "criterion": "R2-C1",
+  "decided": "2026-09-25 ユーザー決定（中間ゲート1・2周目の反証を受けて走査ゲートを作った）",
+  "note": "動画を書きうる本番の関数の全件。**2周続けて「同じ実装への別入口」で C1 が崩れた**ので、手で grep するのをやめて機械に列挙させる。status は人が宣言する — 完成品か中間物かを機械に判定させると、中間物だと思い込んだ完成品が静かに素通りするため。『書き出し』の定義は正典 `vision_backlog.json` の R2-C1 にある",
+  "sites": [
+    {
+      "id": "backend/agents/_deprecated/pipeline_coordinator.py::PreviewWorker.execute",
+      "file": "backend/agents/_deprecated/pipeline_coordinator.py",
+      "symbol": "PreviewWorker.execute",
+      "status": "out_of_scope",
+      "reason": "非推奨の複製（`backend/agents/_deprecated/`）。正典 limits で宣言済み。本番コードから import されていない",
+      "tools": [
+        "render_smart_cut"
+      ]
+    },
+    {
+      "id": "backend/agents/_deprecated/pipeline_coordinator.py::RenderWorker.execute",
+      "file": "backend/agents/_deprecated/pipeline_coordinator.py",
+      "symbol": "RenderWorker.execute",
+      "status": "out_of_scope",
+      "reason": "同上。**門を持たない RenderWorker の複製**（2026-09-25 の gate-verifier が実生成した）。limits で宣言済み",
+      "tools": [
+        "_render_production_quality"
+      ]
+    },
+    {
+      "id": "backend/agents/_deprecated/pipeline_coordinator.py::RenderWorker._render_production_quality",
+      "file": "backend/agents/_deprecated/pipeline_coordinator.py",
+      "symbol": "RenderWorker._render_production_quality",
+      "status": "out_of_scope",
+      "reason": "非推奨の複製の内部（本番品質のエンコード）。`backend/agents/_deprecated/` は正典 limits で対象外と宣言済みで、本番コードから import されていない",
+      "tools": [
+        "copy",
+        "move",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/agents/_deprecated/pipeline_coordinator.py::RenderWorker._render_production_quality._do_render",
+      "file": "backend/agents/_deprecated/pipeline_coordinator.py",
+      "symbol": "RenderWorker._render_production_quality._do_render",
+      "status": "out_of_scope",
+      "reason": "非推奨の複製の内部（エンコードの実体）。`backend/agents/_deprecated/` は正典 limits で対象外と宣言済みで、本番コードから import されていない",
+      "tools": [
+        "copy",
+        "move",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/agents/_deprecated/production_pipeline.py::generate_preview",
+      "file": "backend/agents/_deprecated/production_pipeline.py",
+      "symbol": "generate_preview",
+      "status": "out_of_scope",
+      "reason": "非推奨の複製（旧 production_pipeline のプレビュー生成）。正典 limits で対象外と宣言済み。本番コードから import されていない",
+      "tools": [
+        "render_smart_cut"
+      ]
+    },
+    {
+      "id": "backend/agents/_deprecated/production_pipeline.py::render_final",
+      "file": "backend/agents/_deprecated/production_pipeline.py",
+      "symbol": "render_final",
+      "status": "out_of_scope",
+      "reason": "非推奨の複製（旧 production_pipeline の最終レンダリング）。正典 limits で対象外と宣言済み。本番コードから import されていない",
+      "tools": [
+        "render_smart_cut"
+      ]
+    },
+    {
+      "id": "backend/agents/tick_loop.py::TickLoop._action_pipeline_knowledge",
+      "file": "backend/agents/tick_loop.py",
+      "symbol": "TickLoop._action_pipeline_knowledge",
+      "status": "intermediate",
+      "reason": "ナレッジ（json）のファイル移動。動画を1バイトも書かない（走査の広めの網に掛かった誤検知）",
+      "tools": [
+        "move"
+      ]
+    },
+    {
+      "id": "backend/agents/workers/preview_worker.py::PreviewWorker.execute",
+      "file": "backend/agents/workers/preview_worker.py",
+      "symbol": "PreviewWorker.execute",
+      "status": "intermediate",
+      "reason": "プレビュー（`vault-outputs/preview/`）を作る。**承認の材料そのもの**なので止めると本線が動かない（正典 R2-C1 の定義で対象外）",
+      "tools": [
+        "render_smart_cut"
+      ]
+    },
+    {
+      "id": "backend/agents/workers/preview_worker.py::PreviewWorker.generate_thumbnail",
+      "file": "backend/agents/workers/preview_worker.py",
+      "symbol": "PreviewWorker.generate_thumbnail",
+      "status": "intermediate",
+      "reason": "サムネイルの**画像**（png）を作って移す。動画を1バイトも書かないので、この条件の「書き出し」には当たらない",
+      "tools": [
+        "move"
+      ]
+    },
+    {
+      "id": "backend/agents/workers/render_worker.py::RenderWorker.execute",
+      "file": "backend/agents/workers/render_worker.py",
+      "symbol": "RenderWorker.execute",
+      "status": "gated",
+      "reason": "**ここが門**（R2-C1）。`ctx.run_dir` から `export_allowed()` を引き、承認が無ければ書き出さない（fail-closed）。本線の書き出しは必ずここを通る",
+      "tools": [
+        "_render_production_quality"
+      ]
+    },
+    {
+      "id": "backend/agents/workers/render_worker.py::RenderWorker._encode_video_production_quality",
+      "file": "backend/agents/workers/render_worker.py",
+      "symbol": "RenderWorker._encode_video_production_quality",
+      "status": "gated",
+      "reason": "`execute` の後段（本番品質のエンコード）。門は `execute` の先頭にあり、ここへ来る時点で承認済み。単体で呼ぶ口は無い（private）",
+      "tools": [
+        "copy",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/agents/workers/render_worker.py::RenderWorker._mix_bgm",
+      "file": "backend/agents/workers/render_worker.py",
+      "symbol": "RenderWorker._mix_bgm",
+      "status": "gated",
+      "reason": "`execute` の後段（BGM のミックス）。門は `execute` の先頭にあり、ここへ来る時点で承認済み。単体で呼ぶ口は無い（private）",
+      "tools": [
+        "move",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/agents/workers/render_worker.py::RenderWorker._overlay_logo",
+      "file": "backend/agents/workers/render_worker.py",
+      "symbol": "RenderWorker._overlay_logo",
+      "status": "gated",
+      "reason": "`execute` の後段（ロゴの重畳）。門は `execute` の先頭。単体で呼ぶ口は無い（private）",
+      "tools": [
+        "move"
+      ]
+    },
+    {
+      "id": "backend/agents/workers/render_worker.py::RenderWorker._normalize_audio_loudness",
+      "file": "backend/agents/workers/render_worker.py",
+      "symbol": "RenderWorker._normalize_audio_loudness",
+      "status": "gated",
+      "reason": "`execute` の後段（ラウドネス正規化）。門は `execute` の先頭。単体で呼ぶ口は無い（private）",
+      "tools": [
+        "move",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/branding/history_manager.py::PremiumThumbnailGenerator.generate",
+      "file": "backend/branding/history_manager.py",
+      "symbol": "PremiumThumbnailGenerator.generate",
+      "status": "intermediate",
+      "reason": "サムネイル画像の生成と移動。動画ではない",
+      "tools": [
+        "move"
+      ]
+    },
+    {
+      "id": "backend/c4_response_gate.py::_一回書かせる",
+      "file": "backend/c4_response_gate.py",
+      "symbol": "_一回書かせる",
+      "status": "intermediate",
+      "reason": "C4b の門が応答の形を測るために作るダミーのファイル。投稿する動画ではない",
+      "tools": [
+        "write_bytes"
+      ]
+    },
+    {
+      "id": "backend/draft_manager.py::DraftManager.create_prefinal",
+      "file": "backend/draft_manager.py",
+      "symbol": "DraftManager.create_prefinal",
+      "status": "intermediate",
+      "reason": "下書き（`temp/drafts/prefinal/`）を作る。本番コードから呼ばれていない（`routers/render.py` にコメントで言及があるだけ）",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/draft_manager.py::DraftManager.create_final",
+      "file": "backend/draft_manager.py",
+      "symbol": "DraftManager.create_final",
+      "status": "intermediate",
+      "reason": "下書きの最終版（`temp/drafts/final/`）。本番コードから呼ばれておらず、投稿用の置き場でもない。**呼び口を作るときは門を引くこと**",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/fix_video_quality.py::fix_and_concat",
+      "file": "backend/fix_video_quality.py",
+      "symbol": "fix_and_concat",
+      "status": "out_of_scope",
+      "reason": "開発用の単発スクリプト（`__main__` から実行する画質の手直し）。サーバに載っておらず、投稿の経路ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/harness/evaluator_optimizer.py::ImprovementExecutor._action_audio_normalization",
+      "file": "backend/harness/evaluator_optimizer.py",
+      "symbol": "ImprovementExecutor._action_audio_normalization",
+      "status": "intermediate",
+      "reason": "品質改善ループの中で**プレビューを作り直す**。承認の前の工程で、完成品は作らない",
+      "tools": [
+        "move",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/integrated_preview.py::_burn_subtitles_to_video",
+      "file": "backend/integrated_preview.py",
+      "symbol": "_burn_subtitles_to_video",
+      "status": "intermediate",
+      "reason": "プレビューに字幕を焼き込む中間工程。完成品の置き場には書かない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/production_preview.py::create_production_preview",
+      "file": "backend/production_preview.py",
+      "symbol": "create_production_preview",
+      "status": "intermediate",
+      "reason": "`backend/temp/production_preview/` に確認用のプレビューを作る。完成品ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/progressive_preview.py::ProgressivePreview.create_comparison_image",
+      "file": "backend/progressive_preview.py",
+      "symbol": "ProgressivePreview.create_comparison_image",
+      "status": "intermediate",
+      "reason": "比較用の**画像**を作る。動画ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/progressive_preview.py::ProgressivePreview.create_diff_highlight",
+      "file": "backend/progressive_preview.py",
+      "symbol": "ProgressivePreview.create_diff_highlight",
+      "status": "intermediate",
+      "reason": "差分を示す**画像**を作る。動画ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/progressive_preview_report.py::_generate_fallback_thumbnail",
+      "file": "backend/progressive_preview_report.py",
+      "symbol": "_generate_fallback_thumbnail",
+      "status": "intermediate",
+      "reason": "サムネイル**画像**の退避生成。動画ではない",
+      "tools": [
+        "copy2"
+      ]
+    },
+    {
+      "id": "backend/progressive_preview_report.py::generate_progressive_preview_thumbnail",
+      "file": "backend/progressive_preview_report.py",
+      "symbol": "generate_progressive_preview_thumbnail",
+      "status": "intermediate",
+      "reason": "プレビュー用のサムネイル**画像**。動画ではない",
+      "tools": [
+        "copy2"
+      ]
+    },
+    {
+      "id": "backend/quick_check.py::run_segment",
+      "file": "backend/quick_check.py",
+      "symbol": "run_segment",
+      "status": "out_of_scope",
+      "reason": "開発用の確認スクリプト。`check_*.mp4` を作業用フォルダに作るだけで投稿の経路ではない",
+      "tools": [
+        "Popen"
+      ]
+    },
+    {
+      "id": "backend/routers/legacy_production_router.py::apply_color_grading",
+      "file": "backend/routers/legacy_production_router.py",
+      "symbol": "apply_color_grading",
+      "status": "intermediate",
+      "reason": "色補正の試作（`<uuid>_graded_<preset>.mp4`）。正典 R2-C1 の定義で明示的に対象外",
+      "tools": [
+        "apply_preset"
+      ]
+    },
+    {
+      "id": "backend/routers/legacy_production_router.py::generate_realtime_preview",
+      "file": "backend/routers/legacy_production_router.py",
+      "symbol": "generate_realtime_preview",
+      "status": "intermediate",
+      "reason": "リアルタイムプレビューの生成。承認の材料であって完成品ではない",
+      "tools": [
+        "generate_preview"
+      ]
+    },
+    {
+      "id": "backend/routers/legacy_production_router.py::generate_realtime_preview.generate_preview_task",
+      "file": "backend/routers/legacy_production_router.py",
+      "symbol": "generate_realtime_preview.generate_preview_task",
+      "status": "intermediate",
+      "reason": "リアルタイムプレビュー生成の背景タスクの本体。承認の材料であって完成品ではない（正典 R2-C1 の定義で対象外）",
+      "tools": [
+        "generate_preview"
+      ]
+    },
+    {
+      "id": "backend/routers/preview.py::apply_color_grading",
+      "file": "backend/routers/preview.py",
+      "symbol": "apply_color_grading",
+      "status": "intermediate",
+      "reason": "プレビュー画面の色補正の試作（`<uuid>_graded_<preset>.mp4`）。正典 R2-C1 の定義で明示的に対象外",
+      "tools": [
+        "apply_preset"
+      ]
+    },
+    {
+      "id": "backend/routers/shorts.py::_execute_ffmpeg_render",
+      "file": "backend/routers/shorts.py",
+      "symbol": "_execute_ffmpeg_render",
+      "status": "intermediate",
+      "reason": "`POST /api/shorts/render` を 2026-09-25 に閉じたので**どこからも呼ばれていない**。Shorts を承認の流れへ載せ直すとき（D-48）に使う部品として残してある",
+      "tools": [
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/run_self_improvement_loop.py::run_pipeline",
+      "file": "backend/run_self_improvement_loop.py",
+      "symbol": "run_pipeline",
+      "status": "out_of_scope",
+      "reason": "自己改善ループの実験用スクリプト。`backend/auto_full_build.py` を別プロセスで起動する。サーバに載っておらず投稿の経路ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/scratch/verify_video_quality_matrix.py::_verify_av_sync_offset",
+      "file": "backend/scratch/verify_video_quality_matrix.py",
+      "symbol": "_verify_av_sync_offset",
+      "status": "out_of_scope",
+      "reason": "`backend/scratch/` の検証スクリプト。音ズレの計測で、書き出しではない",
+      "tools": [
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/services/hook_preview_generator.py::HookPreviewGenerator._fallback_comparison",
+      "file": "backend/services/hook_preview_generator.py",
+      "symbol": "HookPreviewGenerator._fallback_comparison",
+      "status": "intermediate",
+      "reason": "冒頭フックの比較用プレビューの退避経路。完成品ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/services/hook_preview_generator.py::HookPreviewGenerator.resolve_hook_preview_task",
+      "file": "backend/services/hook_preview_generator.py",
+      "symbol": "HookPreviewGenerator.resolve_hook_preview_task",
+      "status": "intermediate",
+      "reason": "冒頭フックのプレビューを作る（比較用の短いクリップ）。承認の材料であって、投稿する完成品ではない",
+      "tools": [
+        "write_bytes"
+      ]
+    },
+    {
+      "id": "backend/services/thumbnail_analyzer.py::ThumbnailAnalyzer.generate_thumbnail",
+      "file": "backend/services/thumbnail_analyzer.py",
+      "symbol": "ThumbnailAnalyzer.generate_thumbnail",
+      "status": "intermediate",
+      "reason": "サムネイルの**画像**を作る。動画を1バイトも書かないので、この条件の「書き出し」には当たらない",
+      "tools": [
+        "move"
+      ]
+    },
+    {
+      "id": "backend/settings_manager.py::SettingsManager.update_video_source",
+      "file": "backend/settings_manager.py",
+      "symbol": "SettingsManager.update_video_source",
+      "status": "intermediate",
+      "reason": "**入力**の素材を差し替える（アップロードした動画を所定の場所へ移す）。書き出しではない",
+      "tools": [
+        "move"
+      ]
+    },
+    {
+      "id": "backend/smart_cut_engine.py::_burn_subtitles_ffmpeg",
+      "file": "backend/smart_cut_engine.py",
+      "symbol": "_burn_subtitles_ffmpeg",
+      "status": "intermediate",
+      "reason": "カット結果に字幕を焼き込む中間工程。プレビュー生成の内部から呼ばれる",
+      "tools": [
+        "copy",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/smart_cut_engine.py::render_smart_cut",
+      "file": "backend/smart_cut_engine.py",
+      "symbol": "render_smart_cut",
+      "status": "intermediate",
+      "reason": "カット結果（`smartcut_output.mp4`）を作る中間工程。プレビュー生成から呼ばれ、完成品は作らない",
+      "tools": [
+        "copy",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/thumbnail_engine/generator.py::resolve_generator_thumbnail_task",
+      "file": "backend/thumbnail_engine/generator.py",
+      "symbol": "resolve_generator_thumbnail_task",
+      "status": "intermediate",
+      "reason": "サムネイルの**画像**を生成して配置する。動画を1バイトも書かないので対象外",
+      "tools": [
+        "move",
+        "write_bytes"
+      ]
+    },
+    {
+      "id": "backend/verified_preview_generator.py::_overlay_logo",
+      "file": "backend/verified_preview_generator.py",
+      "symbol": "_overlay_logo",
+      "status": "intermediate",
+      "reason": "検証用プレビューにロゴを重ねる中間工程。完成品の置き場には書かない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/verified_preview_generator.py::_composite_telops",
+      "file": "backend/verified_preview_generator.py",
+      "symbol": "_composite_telops",
+      "status": "intermediate",
+      "reason": "検証用プレビューにテロップを合成する中間工程",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/verified_preview_generator.py::_export_screenshots",
+      "file": "backend/verified_preview_generator.py",
+      "symbol": "_export_screenshots",
+      "status": "intermediate",
+      "reason": "検証用の**静止画**を書き出す。動画ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::FFmpegEditor.cut_video",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "FFmpegEditor.cut_video",
+      "status": "intermediate",
+      "reason": "FFmpeg の部品（切り出し）。出力先は呼び出し側が決める。完成品を作る呼び口（`create_final_video`）は閉じている",
+      "tools": [
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::FFmpegEditor.merge_videos",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "FFmpegEditor.merge_videos",
+      "status": "intermediate",
+      "reason": "FFmpeg の部品（結合）。出力先は呼び出し側が決める",
+      "tools": [
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::FFmpegEditor.add_telop",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "FFmpegEditor.add_telop",
+      "status": "intermediate",
+      "reason": "FFmpeg の部品（テロップ）。出力先は呼び出し側が決める",
+      "tools": [
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::FFmpegEditor.apply_batch_telops",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "FFmpegEditor.apply_batch_telops",
+      "status": "intermediate",
+      "reason": "FFmpeg の部品（テロップの一括適用）。出力先は呼び出し側が決める",
+      "tools": [
+        "copy",
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::FFmpegEditor.extract_audio",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "FFmpegEditor.extract_audio",
+      "status": "intermediate",
+      "reason": "**音声**を抜き出す部品。動画を書かない",
+      "tools": [
+        "run_command"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::VideoEditorEngine.create_final_video",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "VideoEditorEngine.create_final_video",
+      "status": "intermediate",
+      "reason": "合成そのものを行う部品。唯一の呼び口（`POST /api/antigravity/editor/create-final`）を 2026-09-25 に閉じたので、本番から到達しない。**呼び口を作るときは門を引くこと**",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::VideoEditorEngine.auto_cut_silence",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "VideoEditorEngine.auto_cut_silence",
+      "status": "intermediate",
+      "reason": "無音カットの部品。`vault-outputs/edited/` に中間物を作る。完成品の置き場ではない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/video_editor_engine.py::create_final_video",
+      "file": "backend/video_editor_engine.py",
+      "symbol": "create_final_video",
+      "status": "intermediate",
+      "reason": "上のモジュール関数版の薄い包み。呼び口は同じく閉じている",
+      "tools": [
+        "create_final_video"
+      ]
+    },
+    {
+      "id": "backend/video_pipeline/pipeline_coordinator.py::PipelineCoordinator._execute_stage",
+      "file": "backend/video_pipeline/pipeline_coordinator.py",
+      "symbol": "PipelineCoordinator._execute_stage",
+      "status": "out_of_scope",
+      "reason": "凍結した基準実装（`backend/video_pipeline/`）。正典 limits で宣言済み。検証用に CLI を残しているだけで投稿には使わない",
+      "tools": [
+        "compose",
+        "render_batch"
+      ]
+    },
+    {
+      "id": "backend/video_pipeline/video_composer.py::VideoComposer.compose",
+      "file": "backend/video_pipeline/video_composer.py",
+      "symbol": "VideoComposer.compose",
+      "status": "out_of_scope",
+      "reason": "凍結した基準実装。limits で宣言済み",
+      "tools": [
+        "copy2"
+      ]
+    },
+    {
+      "id": "backend/video_pipeline/video_composer.py::VideoComposer.add_bgm",
+      "file": "backend/video_pipeline/video_composer.py",
+      "symbol": "VideoComposer.add_bgm",
+      "status": "out_of_scope",
+      "reason": "凍結した基準実装。limits で宣言済み",
+      "tools": [
+        "copy2"
+      ]
+    },
+    {
+      "id": "backend/video_processor.py::VideoProcessor._process_scene",
+      "file": "backend/video_processor.py",
+      "symbol": "VideoProcessor._process_scene",
+      "status": "intermediate",
+      "reason": "旧 video_processor の内部工程（シーンごとの処理）。唯一の入口2本（`/api/video/process` と `/api/video/process/start`）を 2026-09-25 に閉じたので本番から到達しない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/video_processor.py::VideoProcessor._merge_scenes",
+      "file": "backend/video_processor.py",
+      "symbol": "VideoProcessor._merge_scenes",
+      "status": "intermediate",
+      "reason": "同上（シーンの結合）。入口が閉じているので本番から到達しない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "backend/video_processor.py::VideoProcessor._apply_branding",
+      "file": "backend/video_processor.py",
+      "symbol": "VideoProcessor._apply_branding",
+      "status": "intermediate",
+      "reason": "同上（ブランディングの適用）。入口が閉じているので本番から到達しない",
+      "tools": [
+        "copy"
+      ]
+    },
+    {
+      "id": "run_official_pipeline.py::main",
+      "file": "run_official_pipeline.py",
+      "symbol": "main",
+      "status": "out_of_scope",
+      "reason": "字幕（srt/json）を作る単発スクリプト。**同名の `process_video` を呼ぶだけで動画は書かない**（走査の広めの網に掛かった誤検知）",
+      "tools": [
+        "process_video"
+      ]
+    }
+  ]
+}

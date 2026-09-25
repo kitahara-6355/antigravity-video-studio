@@ -332,23 +332,20 @@ async def get_editor_status():
 
 @router.post("/editor/create-final")
 async def create_final_video(req: CreateFinalVideoRequest, background_tasks: BackgroundTasks):
-    """最終動画生成"""
-    try:
-        result = video_editor.create_final_video(
-            main_video=Path(req.main_video),
-            opening=Path(req.opening) if req.opening else None,
-            ending=Path(req.ending) if req.ending else None,
-            telops=req.telops,
-            output_name=req.output_name
-        )
-        return result
-    except HTTPException:
-        raise
-    except (ValueError, TypeError, KeyError, AttributeError, OSError, RuntimeError) as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """最終動画生成 → **R2-C1 で閉じた**（2026-09-25）
 
+    opening + 本編 + ending + テロップを合成して `vault-outputs/edited/` に
+    **人がそのまま投稿できる完成品**を作っていた。置き場が `final/` ではないだけで、
+    承認を通さずに作れてよい理由が無い（走査ゲート `backend/export_sites.py` が
+    `create_final_video` の呼び口として出した5つ目の口）。画面からは呼ばれていない。
+    """
+    raise HTTPException(
+        status_code=409,
+        detail="承認していない動画は書き出せません（R2-C1）。本線で作って承認を通してください: "
+               "python -m backend.agents.pipeline_coordinator <動画> → "
+               "python -m backend.revenue.approval_gate --approve <run_id> --synthetic yes|no → --export <run_id>",
+    )
 
-# === Pipeline Status ===
 
 @router.get("/status")
 async def get_pipeline_status():

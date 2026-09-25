@@ -122,7 +122,8 @@ class TestLegacyEndpoints:
             r = client.post("/api/video/process/start", json={
                 "video_paths": [], "mood": "elegant"
             })
-            assert r.status_code in (200, 400, 404, 500)
+            # R2-C1: 承認を通さない書き出しの経路は閉じた（2026-09-25）
+            assert r.status_code == 409
 
     def test_lp_19_preview_session_create(self, client):
         r = client.post("/api/preview/session", json={})

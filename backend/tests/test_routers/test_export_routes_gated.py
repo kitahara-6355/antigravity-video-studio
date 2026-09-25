@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -171,3 +172,56 @@ async def test_worker_は承認を指せないと書き出さない(tmp_path):
     assert result.success is False
     assert "承認" in result.detail
     assert ctx.final_path is None
+
+
+def test_旧本番経路のもう1つの入口も断る():
+    """**同じ実装への2本目の入口**（2026-09-25 の gate-verifier が実生成で反証）。
+
+    `/api/video/process` を閉じても、`legacy_production_router` の
+    `/api/video/process/start` が同じ `video_processor.process_video` を呼んでいて、
+    承認ゼロで `backend/temp/video_output/` に mp4 が3本できた。
+    **入口ごとに塞ぐのではなく、同じ実装へ向かう入口を全部塞ぐ。**
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from routers.legacy_production_router import router
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    with patch("video_processor.video_processor") as vp:
+        r = client.post("/api/video/process/start", json={
+            "video_paths": ["v1.mp4"], "mood": "elegant", "output_name": "probe",
+        })
+
+    assert r.status_code == 409, r.text
+    assert "承認" in r.json()["detail"]
+    vp.create_task.assert_not_called()
+    vp.process_video.assert_not_called()
+
+
+def test_エディタの最終動画生成も断る():
+    """**5つ目の口**（2026-09-25。走査ゲートが `create_final_video` の呼び口として出した）。
+
+    `POST /editor/create-final` は opening + 本編 + ending + テロップを合成して
+    `vault-outputs/edited/` に完成した動画を作る。置き場は `final/` ではないが、
+    **人がそのまま投稿できる完成品**なので、承認を通さずに作れてよい理由が無い。
+    画面からは呼ばれていない（`frontend/src` に該当なし）。
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from antigravity_api import router
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    with patch("video_editor_engine.video_editor") as ve:
+        r = client.post("/api/antigravity/editor/create-final", json={"main_video": "v.mp4"})
+
+    assert r.status_code == 409, r.text
+    assert "承認" in r.json()["detail"]
+    ve.create_final_video.assert_not_called()

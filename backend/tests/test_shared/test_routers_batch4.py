@@ -708,81 +708,38 @@ class TestLegacyProductionRouter:
             assert result["default"] == "cinematic"
 
     @pytest.mark.asyncio
-    async def test_lpr_46_start_video_processing_success(self, monkeypatch):
-        """start_video_processing — Success with background task execution"""
-        from routers.legacy_production_router import start_video_processing, VideoProcessRequest
-        from fastapi import BackgroundTasks
-        
-        mock_video_processor = MagicMock()
-        mock_task = MagicMock()
-        mock_video_processor.create_task.return_value = mock_task
-        
-        mock_settings = MagicMock()
-        mock_settings.name = "Elegant"
-        mock_settings.transition = "fade"
-        mock_settings.telop_style = "default"
-        
-        bg_tasks = BackgroundTasks()
-        added_tasks = []
-        monkeypatch.setattr(bg_tasks, "add_task", lambda func: added_tasks.append(func))
-        
+    async def test_lpr_46_start_video_processing_success(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。正常系だった（かつて 200 でタスク登録）
+
+        `/api/video/process`（render.py）と同じ `video_processor` 実装への2本目の入口。
+        片方だけ閉じても意味が無いので、こちらも断る。
+        """
+        from fastapi import HTTPException
+
+        from routers.legacy_production_router import VideoProcessRequest, start_video_processing
+
         req = VideoProcessRequest(video_paths=["v1.mp4"], mood="elegant", output_name="out")
-        
-        with patch("routers.legacy_production_router.video_processor", mock_video_processor), \
-             patch("routers.legacy_production_router.MOOD_SETTINGS", {"elegant": mock_settings}), \
-             patch("routers.legacy_production_router.broadcaster", AsyncMock()) as mock_broadcaster:
-             
-            result = await start_video_processing(bg_tasks, req)
-            assert result["status"] == "started"
-            assert "task_id" in result
-            assert len(added_tasks) == 1
-            
-            task_id = result["task_id"]
-            process_video_task_func = added_tasks[0]
-            
-            def mock_process_video(tid):
-                cb = mock_video_processor.set_progress_callback.call_args[0][0]
-                t = MagicMock()
-                t.phase.value = "processing"
-                t.progress = 50
-                t.current_step = "レンダリング中"
-                t.output_path = "out.mp4"
-                t.preview_url = "http://preview"
-                t.error = None
-                cb(t)
-                
-            mock_video_processor.process_video.side_effect = mock_process_video
-            
-            with patch("asyncio.get_event_loop", return_value=asyncio.get_event_loop()):
-                process_video_task_func()
-                
-            mock_video_processor.process_video.assert_called_once_with(task_id)
-            mock_broadcaster.broadcast.assert_called_once()
+        with pytest.raises(HTTPException) as exc_info:
+            await start_video_processing(MagicMock(), req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_lpr_47_start_video_processing_exception(self, monkeypatch):
-        """start_video_processing — background task exception path"""
-        from routers.legacy_production_router import start_video_processing, VideoProcessRequest, _video_tasks
-        from fastapi import BackgroundTasks
-        
-        mock_video_processor = MagicMock()
-        mock_video_processor.process_video.side_effect = Exception("Processing failed")
-        
-        bg_tasks = BackgroundTasks()
-        added_tasks = []
-        monkeypatch.setattr(bg_tasks, "add_task", lambda func: added_tasks.append(func))
-        
-        req = VideoProcessRequest(video_paths=["v1.mp4"], mood="elegant")
-        
-        with patch("routers.legacy_production_router.video_processor", mock_video_processor):
-            result = await start_video_processing(bg_tasks, req)
-            task_id = result["task_id"]
-            
-            process_video_task_func = added_tasks[0]
-            process_video_task_func()
-            
-            assert _video_tasks[task_id]["status"] == "error"
-            assert _video_tasks[task_id]["error"] == "Processing failed"
+    async def test_lpr_47_start_video_processing_exception(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。背景処理の例外の扱いだった
+
+        `/api/video/process`（render.py）と同じ `video_processor` 実装への2本目の入口。
+        片方だけ閉じても意味が無いので、こちらも断る。
+        """
+        from fastapi import HTTPException
+
+        from routers.legacy_production_router import VideoProcessRequest, start_video_processing
+
+        req = VideoProcessRequest(video_paths=["v1.mp4"], mood="elegant", output_name="out")
+        with pytest.raises(HTTPException) as exc_info:
+            await start_video_processing(MagicMock(), req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_lpr_48_get_video_process_status_success(self, monkeypatch):
@@ -1041,49 +998,21 @@ class TestLegacyProductionRouter:
             assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_lpr_62_start_video_processing_broadcast_fails(self, monkeypatch):
-        """start_video_processing — broadcaster.broadcast で例外が発生してもタスク処理が続行される"""
-        from routers.legacy_production_router import start_video_processing, VideoProcessRequest, _video_tasks
-        from fastapi import BackgroundTasks
-        
-        mock_video_processor = MagicMock()
-        mock_task = MagicMock()
-        mock_video_processor.create_task.return_value = mock_task
-        
-        bg_tasks = BackgroundTasks()
-        added_tasks = []
-        monkeypatch.setattr(bg_tasks, "add_task", lambda func: added_tasks.append(func))
-        
+    async def test_lpr_62_start_video_processing_broadcast_fails(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。進捗の電文が落ちたときの扱いだった
+
+        `/api/video/process`（render.py）と同じ `video_processor` 実装への2本目の入口。
+        片方だけ閉じても意味が無いので、こちらも断る。
+        """
+        from fastapi import HTTPException
+
+        from routers.legacy_production_router import VideoProcessRequest, start_video_processing
+
         req = VideoProcessRequest(video_paths=["v1.mp4"], mood="elegant", output_name="out")
-        
-        mock_broadcaster = MagicMock()
-        mock_broadcaster.broadcast.side_effect = Exception("Broadcast failed")
-        
-        with patch("routers.legacy_production_router.video_processor", mock_video_processor),              patch("routers.legacy_production_router.MOOD_SETTINGS", {"elegant": MagicMock(name="Elegant")}),              patch("routers.legacy_production_router.broadcaster", mock_broadcaster):
-             
-            result = await start_video_processing(bg_tasks, req)
-            task_id = result["task_id"]
-            process_video_task_func = added_tasks[0]
-            
-            def mock_process_video(tid):
-                cb = mock_video_processor.set_progress_callback.call_args[0][0]
-                t = MagicMock()
-                t.phase.value = "processing"
-                t.progress = 50
-                t.current_step = "レンダリング中"
-                t.output_path = "out.mp4"
-                t.preview_url = "http://preview"
-                t.error = None
-                cb(t)
-                
-            mock_video_processor.process_video.side_effect = mock_process_video
-            
-            with patch("asyncio.get_event_loop", return_value=asyncio.get_event_loop()):
-                process_video_task_func()
-                
-            mock_video_processor.process_video.assert_called_once_with(task_id)
-            assert _video_tasks[task_id]["status"] == "processing"
-            assert _video_tasks[task_id]["progress"] == 50
+        with pytest.raises(HTTPException) as exc_info:
+            await start_video_processing(MagicMock(), req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_lpr_63_generate_realtime_preview_video_not_found(self, monkeypatch):
@@ -1171,13 +1100,21 @@ class TestShortsRouter:
 
     @pytest.mark.asyncio
     async def test_sh_08_render_short_negative_duration(self):
-        """render_short — duration≤0でHTTP 400"""
-        from routers.shorts import render_short, RenderShortRequest
+        """**R2-C1 で閉じた経路**（2026-09-25）。入力の良し悪しで挙動を変えない（かつて 400）
+
+        かつてここは「どう書き出すか」を見ていた。承認を1件も見ずに完成動画を作れる
+        経路だったので閉じた。見るものは「**書き出さないこと**」に変わった。
+        """
         from fastapi import HTTPException
-        req = RenderShortRequest(video_path="/v.mp4", start_sec=10.0, end_sec=5.0)
+
+        from routers.shorts import RenderShortRequest, render_short
+
+        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0,
+                                 output_filename="output.mp4")
         with pytest.raises(HTTPException) as exc_info:
             await render_short(req)
-        assert exc_info.value.status_code == 400
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_sh_09_extract_candidates_success(self):
@@ -1345,167 +1282,112 @@ class TestShortsRouter:
             assert "export error" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_sh_20_render_short_success_with_output_filename(self, tmp_path):
-        """render_short — 正常系: output_filename指定、FFmpeg成功"""
-        from routers.shorts import render_short, RenderShortRequest
-        req = RenderShortRequest(
-            video_path="v.mp4",
-            start_sec=10.0,
-            end_sec=20.0,
-            subtitle_text="Hello",
-            output_filename="output.mp4"
-        )
-        
-        # mock imports
-        mock_ffmpeg = MagicMock()
-        mock_ffmpeg.is_available.return_value = True
-        mock_ffmpeg._get_encode_args.return_value = ["-vcodec", "libx264"]
-        
-        # ffmpeg.run_command の side_effect でファイルを作成
-        def side_effect(cmd, **kwargs):
-            from pathlib import Path
-            out_path = Path(cmd[-1])
-            out_path.write_bytes(b"\x00" * 100)
-            return True, "ffmpeg output"
-        mock_ffmpeg.run_command.side_effect = side_effect
-        
-        mock_video_editor = MagicMock(ffmpeg=mock_ffmpeg)
-        
-        with patch("safe_io.VAULT_OUTPUTS_DIR", tmp_path), \
-             patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_video_editor)}):
-            result = await render_short(req)
-            assert result["success"] is True
-            assert "output.mp4" in result["path"]
-            assert result["duration_sec"] == 10.0
-            assert result["resolution"] == "1080x1920"
+    async def test_sh_20_render_short_success_with_output_filename(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。正常系だった（かつて 200）
 
-    @pytest.mark.asyncio
-    async def test_sh_21_render_short_success_no_filename_large_duration(self, tmp_path):
-        """render_short — 正常系: ファイル名未指定、60秒を超えるdurationは60秒にクリップされる"""
-        from routers.shorts import render_short, RenderShortRequest
-        req = RenderShortRequest(
-            video_path="v.mp4",
-            start_sec=10.0,
-            end_sec=100.0,  # duration 90s -> 60s に制限されるはず
-            subtitle_text="Subtitle: Text"
-        )
-        
-        # mock imports
-        mock_ffmpeg = MagicMock()
-        mock_ffmpeg.is_available.return_value = True
-        mock_ffmpeg._get_encode_args.return_value = ["-vcodec", "libx264"]
-        
-        # run_command が呼ばれた時に、出力先のmp4ファイルをモックで作成する
-        def side_effect(cmd, **kwargs):
-            out_path = cmd[-1]
-            from pathlib import Path
-            Path(out_path).write_bytes(b"\x00" * 50)
-            return True, "ffmpeg success"
-        
-        mock_ffmpeg.run_command.side_effect = side_effect
-        mock_video_editor = MagicMock(ffmpeg=mock_ffmpeg)
-        
-        with patch("safe_io.VAULT_OUTPUTS_DIR", tmp_path), \
-             patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_video_editor)}):
-            result = await render_short(req)
-            assert result["success"] is True
-            assert result["duration_sec"] == 60.0 # 60秒に切り詰められる
-
-    @pytest.mark.asyncio
-    async def test_sh_22_render_short_ffmpeg_not_available(self, tmp_path):
-        """render_short — FFmpeg利用不可の時エラー"""
-        from routers.shorts import render_short, RenderShortRequest
+        かつてここは「どう書き出すか」を見ていた。承認を1件も見ずに完成動画を作れる
+        経路だったので閉じた。見るものは「**書き出さないこと**」に変わった。
+        """
         from fastapi import HTTPException
-        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0)
-        
-        mock_ffmpeg = MagicMock()
-        mock_ffmpeg.is_available.return_value = False
-        mock_video_editor = MagicMock(ffmpeg=mock_ffmpeg)
-        
-        with patch("safe_io.VAULT_OUTPUTS_DIR", tmp_path), \
-             patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_video_editor)}):
-            with pytest.raises(HTTPException) as exc_info:
-                await render_short(req)
-            assert exc_info.value.status_code == 500
-            assert "FFmpeg未検出" in exc_info.value.detail
+
+        from routers.shorts import RenderShortRequest, render_short
+
+        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0,
+                                 output_filename="output.mp4")
+        with pytest.raises(HTTPException) as exc_info:
+            await render_short(req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_sh_23_render_short_ffmpeg_failed(self, tmp_path):
-        """render_short — FFmpeg実行失敗"""
-        from routers.shorts import render_short, RenderShortRequest
+    async def test_sh_21_render_short_success_no_filename_large_duration(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。正常系だった（かつて 200）
+
+        かつてここは「どう書き出すか」を見ていた。承認を1件も見ずに完成動画を作れる
+        経路だったので閉じた。見るものは「**書き出さないこと**」に変わった。
+        """
         from fastapi import HTTPException
-        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0)
-        
-        mock_ffmpeg = MagicMock()
-        mock_ffmpeg.is_available.return_value = True
-        mock_ffmpeg._get_encode_args.return_value = []
-        mock_ffmpeg.run_command.return_value = (False, "FFmpeg error message")
-        mock_video_editor = MagicMock(ffmpeg=mock_ffmpeg)
-        
-        with patch("safe_io.VAULT_OUTPUTS_DIR", tmp_path), \
-             patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_video_editor)}):
-            with pytest.raises(HTTPException) as exc_info:
-                await render_short(req)
-            assert exc_info.value.status_code == 500
-            assert "FFmpeg error message" in exc_info.value.detail
+
+        from routers.shorts import RenderShortRequest, render_short
+
+        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0,
+                                 output_filename="output.mp4")
+        with pytest.raises(HTTPException) as exc_info:
+            await render_short(req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_sh_24_render_short_internal_exception(self, tmp_path):
-        """render_short — 内部エラー発生"""
-        from routers.shorts import render_short, RenderShortRequest
+    async def test_sh_22_render_short_ffmpeg_not_available(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。FFmpeg 不在の扱いだった（かつて 500）
+
+        かつてここは「どう書き出すか」を見ていた。承認を1件も見ずに完成動画を作れる
+        経路だったので閉じた。見るものは「**書き出さないこと**」に変わった。
+        """
         from fastapi import HTTPException
-        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0)
-        
-        with patch("safe_io.VAULT_OUTPUTS_DIR", tmp_path), \
-             patch.dict("sys.modules", {"video_editor_engine": Exception("Severe Internal Error")}):
-            with pytest.raises(HTTPException) as exc_info:
-                await render_short(req)
-            assert exc_info.value.status_code == 500
+
+        from routers.shorts import RenderShortRequest, render_short
+
+        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0,
+                                 output_filename="output.mp4")
+        with pytest.raises(HTTPException) as exc_info:
+            await render_short(req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_sh_25_render_short_safe_io_import_error(self, tmp_path):
-        """render_short — safe_ioのインポートエラー時に Path("output/shorts") を使用する"""
-        from routers.shorts import render_short, RenderShortRequest
+    async def test_sh_23_render_short_ffmpeg_failed(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。FFmpeg 失敗の扱いだった（かつて 500）
+
+        かつてここは「どう書き出すか」を見ていた。承認を1件も見ずに完成動画を作れる
+        経路だったので閉じた。見るものは「**書き出さないこと**」に変わった。
+        """
         from fastapi import HTTPException
-        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0, output_filename="output.mp4")
-        
-        mock_ffmpeg = MagicMock()
-        mock_ffmpeg.is_available.return_value = True
-        mock_ffmpeg._get_encode_args.return_value = []
-        
-        # 実際に Path("output/shorts/output.mp4") が作られるようにする
-        def side_effect(cmd, **kwargs):
-            from pathlib import Path
-            out_file = Path("output/shorts/output.mp4")
-            out_file.parent.mkdir(parents=True, exist_ok=True)
-            out_file.write_bytes(b"\x00" * 100)
-            return True, "success"
-        
-        mock_ffmpeg.run_command.side_effect = side_effect
-        mock_video_editor = MagicMock(ffmpeg=mock_ffmpeg)
-        
-        # safe_io インポートエラーを模倣するため、sys.modules から削除するか patch で ImportError を発生させる
-        def custom_import(name, *args, **kwargs):
-            if name == "safe_io":
-                raise ImportError("mocked import error")
-            return orig_import(name, *args, **kwargs)
-            
-        import builtins
-        orig_import = builtins.__import__
-        
-        with patch("builtins.__import__", side_effect=custom_import), \
-             patch.dict("sys.modules", {"video_editor_engine": MagicMock(video_editor=mock_video_editor)}):
-            try:
-                result = await render_short(req)
-                assert result["success"] is True
-                assert "output/shorts" in result["path"].replace("\\", "/")
-            finally:
-                from pathlib import Path
-                p = Path("output/shorts/output.mp4")
-                if p.exists():
-                    p.unlink()
-                if p.parent.exists():
-                    p.parent.rmdir()
+
+        from routers.shorts import RenderShortRequest, render_short
+
+        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0,
+                                 output_filename="output.mp4")
+        with pytest.raises(HTTPException) as exc_info:
+            await render_short(req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_sh_24_render_short_internal_exception(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。内部例外の扱いだった（かつて 500）
+
+        かつてここは「どう書き出すか」を見ていた。承認を1件も見ずに完成動画を作れる
+        経路だったので閉じた。見るものは「**書き出さないこと**」に変わった。
+        """
+        from fastapi import HTTPException
+
+        from routers.shorts import RenderShortRequest, render_short
+
+        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0,
+                                 output_filename="output.mp4")
+        with pytest.raises(HTTPException) as exc_info:
+            await render_short(req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_sh_25_render_short_safe_io_import_error(self):
+        """**R2-C1 で閉じた経路**（2026-09-25）。safe_io の import 退避だった
+
+        かつてここは「どう書き出すか」を見ていた。承認を1件も見ずに完成動画を作れる
+        経路だったので閉じた。見るものは「**書き出さないこと**」に変わった。
+        """
+        from fastapi import HTTPException
+
+        from routers.shorts import RenderShortRequest, render_short
+
+        req = RenderShortRequest(video_path="v.mp4", start_sec=10.0, end_sec=20.0,
+                                 output_filename="output.mp4")
+        with pytest.raises(HTTPException) as exc_info:
+            await render_short(req)
+        assert exc_info.value.status_code == 409
+        assert "承認" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_sh_26_thumbnail_success(self, tmp_path):
