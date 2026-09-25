@@ -161,12 +161,14 @@ def approve(run_dir: str | Path, *, synthetic: bool | None, by: str,
                          "開示ラベルの要否はコンテンツによるので、機械は決めません")
     if not isinstance(synthetic, bool):
         raise TypeError(f"合成メディアの判断は真偽値で渡してください: {synthetic!r}")
-    if not (_read_json(proposal_path).get("preview") or {}).get("path"):
+    _preview = _read_json(proposal_path).get("preview") or {}
+    if (not _preview.get("path")
+            or _sha256_file(_preview.get("path")) != _preview.get("sha256")):
         # **見ていないものは承認できない**（2026-09-25 ユーザー決定・4周目の反例B）。
         # プレビュー生成は致命的な工程ではないので、落ちても提案はできる。そのまま承認できると
         # 書き出しは素材から直接レンダリングし（T-022）、誰も見ていない動画が出る
-        raise ValueError("プレビューが無い提案は承認できません（見ていないものは承認できない）。"
-                         "プレビュー生成が落ちています。原因を直して走り直してください")
+        raise ValueError("プレビューが無いか、提案の後に変わっています（見ていないものは承認できない）。"
+                         "プレビュー生成が落ちたか差し替わっています。原因を直して走り直してください")
     approval_path = run_dir / APPROVAL
     if approval_path.exists():
         if (run_dir / EXPORT).exists():
@@ -297,12 +299,17 @@ def write_export(run_dir: str | Path, *, final_path: str | None,
 # 正典（vision_backlog.json の R2-C1）の定義でいう「書き出し」の置き場。
 # **プレビュー・中間物（preview / edited / merged）は含まない** — 承認の材料そのもの
 PUBLISH_DIRS = ("final", "shorts")
-# **置き場の定義はディレクトリ単位で、拡張子も深さも限定していない**（4周目の反例A）。
-# 以前は直下の `*.mp4` しか見ず、サブディレクトリ・`.webm`・`.mov` を見逃した
-VIDEO_EXTS = (".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi")
+# **置き場に置けるのは「承認済みの完成品」と「その付属物」だけ**（5周目の反証・2026-09-25）。
+# 入れ物（拡張子）を列挙していた頃は、許可リストに無い `.wmv`・`.mpg`・`.flv`・`.3gp` の
+# 未承認動画が素通りした（4周目は直下の `*.mp4` しか見ずに `.webm`・`.mov` を見逃した）。
+# **列挙する限り次の入れ物が出る**ので裏返す — 付属物の名前の形だけを知っていて、
+# それ以外のファイルはすべて「承認に辿れるか」を問う
+COMPANION_SUFFIXES = (".youtube.json", ".quality.json")
 # safe_io を読めないときの書き手の退避先（`Path("output/final")` 等）。ここも置き場
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 PUBLISH_BASELINE = Path(__file__).resolve().parent.parent / "config" / "publish_baseline.json"
+# 承認の記録は書き換えない（指紋が変わる）。**実際には誰が承認したか**をここに添える
+APPROVAL_ANNOTATIONS = Path(__file__).resolve().parent.parent / "config" / "approval_annotations.json"
 
 
 def _default_vault_dir() -> Path:
@@ -322,8 +329,17 @@ def load_publish_baseline(path: str | Path | None = None) -> dict[str, str]:
     return {e["path"]: e["sha256"] for e in data.get("files", [])}
 
 
-def _is_video(p: Path) -> bool:
-    return p.is_file() and p.suffix.lower() in VIDEO_EXTS
+def _付属物の持ち主(f: Path) -> str | None:
+    """付属物（`<名前>.youtube.json` など）なら、持ち主の名前（拡張子の前まで）を返す。"""
+    for suf in COMPANION_SUFFIXES:
+        if f.name.endswith(suf):
+            return f.name[: -len(suf)]
+    return None
+
+
+def _持ち主の名前(f: Path) -> str:
+    """動画の名前から最後の拡張子を外したもの（`final_A.mp4` → `final_A`）。"""
+    return f.name.rsplit(".", 1)[0] if "." in f.name else f.name
 
 
 def _approval_holds(run_dir: Path, export: dict) -> bool:
@@ -353,10 +369,11 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
     場所」で C1 を崩した（経路 → 経路 → 走査の検出漏れ）。書き方を列挙する限り次の
     書き方が出るが、**完成品はどんな書き方でも置き場に出る。**
 
-    見る動画（正典の定義）:
-    - 置き場（`final/`・`shorts/`）の下の動画**すべて** — 深さも入れ物（mp4 / webm / mov …）も問わない
-    - 退避先の置き場（`<output_root>/final`・`<output_root>/shorts`）も同じ
-    - 置き場の外でも、**手動投稿用サイドカー（`*.youtube.json`）が隣にある動画**
+    見るもの（正典の定義）:
+    - 置き場（`final/`・`shorts/`）と退避先（`<output_root>/final`・`<output_root>/shorts`）の
+      **すべてのファイル** — 深さも入れ物も問わない。**置けるのは承認済みの完成品と、その付属物
+      （`<名前>.youtube.json`・`<名前>.quality.json`）だけ**。入れ物は列挙しない（5周目の反証）
+    - 置き場の外でも、**手動投稿用サイドカー（`*.youtube.json`）が隣にあるファイル**
       （vault と output_root の下を探す。それ以外の場所は見えない — limits）
 
     承認に辿れる = どれかの実走の `export.json` がその動画を指し、指紋（sha256）が一致し、
@@ -385,33 +402,62 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
                 continue
         return f.as_posix()
 
-    対象: dict[str, Path] = {}
-    for root in (vault, out):
-        for sub in PUBLISH_DIRS:
-            if (root / sub).is_dir():
-                for f in sorted((root / sub).rglob("*")):
-                    if _is_video(f):
-                        対象[os.path.normcase(os.path.abspath(f))] = f
-        if root.is_dir():
-            for sidecar in sorted(root.rglob("*.youtube.json")):
-                stem = sidecar.name[: -len(".youtube.json")]
-                for f in sidecar.parent.glob(stem + ".*"):
-                    if _is_video(f):
-                        対象[os.path.normcase(os.path.abspath(f))] = f
-
-    problems = []
-    for key, f in sorted(対象.items()):
+    def 判定(f: Path) -> str | None:
+        """承認に辿れる（か基準線にある）なら None、辿れなければ理由。"""
         rel = 名前(f)
         sha = _sha256_file(f)
         if rel in baseline:
             if baseline[rel] == sha:
-                continue
-            problems.append(f"{rel}: 基準線の名前だが中身が違います（門ができた後に置き換わった）")
-            continue
+                return None
+            return f"{rel}: 基準線の名前だが中身が違います（門ができた後に置き換わった）"
+        key = os.path.normcase(os.path.abspath(f))
         if key not in 承認済み:
-            problems.append(f"{rel}: **承認に辿れない完成品**です（どの実走の書き出しの記録にもありません）")
-        elif 承認済み[key] != sha:
-            problems.append(f"{rel}: 書き出した後に差し替わっています（記録の指紋と違う）")
+            return (f"{rel}: **承認に辿れないファイル**です（置き場に置けるのは"
+                    "承認済みの完成品と、その付属物だけ）")
+        if 承認済み[key] != sha:
+            return f"{rel}: 書き出した後に差し替わっています（記録の指紋と違う）"
+        return None
+
+    problems: list[str] = []
+    見た: set[str] = set()
+
+    # 1. 置き場（final / shorts と退避先）: **すべてのファイル**を問う
+    置き場 = [root / sub for root in (vault, out) for sub in PUBLISH_DIRS if (root / sub).is_dir()]
+    for d in 置き場:
+        files = [f for f in sorted(d.rglob("*")) if f.is_file()]
+        通った: set[tuple[Path, str]] = set()
+        for f in files:
+            見た.add(os.path.normcase(os.path.abspath(f)))
+            if _付属物の持ち主(f) is not None:
+                continue
+            理由 = 判定(f)
+            if 理由:
+                problems.append(理由)
+            else:
+                通った.add((f.parent, _持ち主の名前(f)))
+        for f in files:
+            owner = _付属物の持ち主(f)
+            if owner is not None and (f.parent, owner) not in 通った:
+                problems.append(f"{名前(f)}: 承認済みの完成品に結びつかない付属物です（動画が無いか、承認に辿れない）")
+
+    # 2. 置き場の外: 手動投稿用サイドカーが隣にあるファイル（入れ物を問わない・glob を使わない）
+    for root in (vault, out):
+        if not root.is_dir():
+            continue
+        for sidecar in sorted(root.rglob("*.youtube.json")):
+            if os.path.normcase(os.path.abspath(sidecar)) in 見た:
+                continue
+            owner = sidecar.name[: -len(".youtube.json")]
+            for f in sorted(sidecar.parent.iterdir()):
+                if not f.is_file() or _付属物の持ち主(f) is not None or _持ち主の名前(f) != owner:
+                    continue
+                key = os.path.normcase(os.path.abspath(f))
+                if key in 見た:
+                    continue
+                見た.add(key)
+                理由 = 判定(f)
+                if 理由:
+                    problems.append(理由)
     return problems
 
 
@@ -485,6 +531,11 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
     d = a.get("ai_disclosure") or {}
     lines += [f"  承認した時刻: {a.get('approved_at')}",
               f"  承認した人  : {a.get('approved_by')}"]
+    注記 = (_read_json(APPROVAL_ANNOTATIONS).get("runs", {})
+            if APPROVAL_ANNOTATIONS.is_file() else {}).get(run_dir.name)
+    if 注記:
+        lines.append(f"  ⚠ 記録上の承認者は {注記.get('recorded_as')} だが、"
+                     f"実際に承認したのは {注記.get('actual_approver')}（{注記.get('note', '')}）")
     if a.get("note"):
         lines.append(f"  メモ        : {a['note']}")
     for e in a.get("edits") or []:
@@ -510,18 +561,6 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
     return True, "\n".join(lines)
 
 
-def _default_approver() -> str:
-    """承認した人の既定値: git の user.name（無ければ OS のユーザー名）。"""
-    import getpass
-    import subprocess
-    try:
-        name = subprocess.run(["git", "config", "user.name"], capture_output=True,
-                              text=True, timeout=10, check=False).stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        name = ""
-    return name or getpass.getuser()
-
-
 def main(argv: list[str] | None = None) -> int:
     import argparse
     import os
@@ -539,7 +578,8 @@ def main(argv: list[str] | None = None) -> int:
     what.add_argument("--trace", metavar="RUN_ID", help="承認の証跡を出す（R2-C2）")
     parser.add_argument("--synthetic", choices=("yes", "no"),
                         help="合成メディアを含むか（--approve で必須。人が決める）")
-    parser.add_argument("--by", default=None, help="承認した人（既定は git の user.name）")
+    parser.add_argument("--by", default=None,
+                        help="承認する人（--approve で必須。**既定値で埋めない**。エージェントが試すなら claude-code）")
     parser.add_argument("--note", default="", help="承認のメモ")
     parser.add_argument("--runs-dir", default=None, help="実行記録の置き場（既定 output/runs）")
     parser.add_argument("--no-ledger", action="store_true",
@@ -565,9 +605,9 @@ def main(argv: list[str] | None = None) -> int:
         for p in problems:
             print(f"  🚫 {p}")
         print()
-        print("完成品の置き場（final / shorts）— 置いてある動画が1本残らず承認に辿れるか")
+        print("完成品の置き場（final / shorts）— 置いてあるものが1つ残らず承認に辿れるか")
         if not 置き場:
-            print("  ✅ 置き場の完成品はすべて承認に辿れます")
+            print("  ✅ 置き場のファイルはすべて、承認済みの完成品か、その付属物です")
         for p in 置き場:
             print(f"  🚫 {p}")
         return 0 if ok and not 置き場 else 1
@@ -578,13 +618,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if ok else 1
 
     if args.approve:
+        if not (args.by or "").strip():
+            print("🚫 誰が承認するのかを --by で書いてください。承認者は**既定値で埋めません**"
+                  "（以前は git の user.name を入れていたので、エージェントが試しに承認した記録が"
+                  "ユーザーの承認に見えていた）。エージェントが試すときは --by claude-code")
+            return 1
         if args.synthetic is None:
             print("🚫 合成メディアを含むかを決めてください（--synthetic yes|no）。"
                   "開示ラベルの要否はコンテンツによるので、機械は決めません")
             return 1
         try:
             a = approve(runs_dir / args.approve, synthetic=(args.synthetic == "yes"),
-                        by=args.by or _default_approver(), note=args.note)
+                        by=args.by.strip(), note=args.note)
         except (FileNotFoundError, ValueError) as e:
             print(f"🚫 {e}")
             return 1

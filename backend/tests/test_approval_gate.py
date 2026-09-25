@@ -67,6 +67,57 @@ def test_プレビューが無い提案は承認できない(tmp_path):
     assert not (run_dir / "approval.json").exists()
 
 
+def test_プレビューの実体が無いと承認できない(tmp_path):
+    """提案の欄だけでなく、**見る物そのもの**が在ること（5周目の所見）。"""
+    run_dir = _提案のある実走(tmp_path)
+    (tmp_path / "preview.mp4").unlink()
+
+    with pytest.raises(ValueError, match="プレビュー"):
+        _承認(run_dir)
+
+
+def test_承認の後にプレビューが差し替わっていたら承認し直しても断る(tmp_path):
+    """見た物と記録が違えば、承認は成り立たない。"""
+    run_dir = _提案のある実走(tmp_path)
+    (tmp_path / "preview.mp4").write_bytes(b"swapped")
+
+    with pytest.raises(ValueError, match="プレビュー"):
+        _承認(run_dir)
+
+
+def test_承認者は黙って推測しない(tmp_path, capsys):
+    """**誰が承認したかを既定値で埋めない**（2026-09-25 ユーザー決定）。
+
+    以前は git の user.name を既定の承認者にしていたので、エージェント（Claude Code）が
+    疎通確認で承認した5本が、記録上はユーザーの承認になっていた。
+    """
+    _提案のある実走(tmp_path)
+    rc = ag.main(["--approve", "RID", "--synthetic", "no", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+
+    assert rc == 1, out
+    assert "--by" in out
+    assert not (tmp_path / "runs" / "RID" / "approval.json").exists()
+
+
+def test_注記のある承認は証跡に出る(tmp_path, capsys, monkeypatch):
+    """記録を書き換えずに、**実際には誰が承認したか**を証跡に添える。"""
+    run_dir = _提案のある実走(tmp_path)
+    _承認(run_dir)
+    notes = tmp_path / "annotations.json"
+    notes.write_text(json.dumps({"runs": {"RID": {
+        "recorded_as": "北原", "actual_approver": "Claude Code（テストの疎通確認）",
+        "note": "テスト"}}}, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(ag, "APPROVAL_ANNOTATIONS", notes)
+
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "Claude Code（テストの疎通確認）" in out
+    assert "記録上の承認者" in out
+
+
 def test_書き出しの門もプレビュー無しを独立に断る(tmp_path):
     """**門は二重。** `approve()` を通らずに承認を置かれても、書き出しの門がプレビュー無しを断る。"""
     run_dir = tmp_path / "runs" / "RID"

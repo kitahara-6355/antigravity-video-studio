@@ -337,3 +337,66 @@ def test_開示の欠けた承認では辿れたと言わない(tmp_path):
     problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
 
     assert any("no_disclosure.mp4" in p for p in problems), problems
+
+
+# --- 5周目の反証（2026-09-25）への手当て: 置き場の監査を裏返す -------------------
+
+@pytest.mark.parametrize("名前", [
+    "final/zz.wmv", "final/zz.mpg", "final/zz.mpeg", "final/zz.flv", "final/zz.3gp",
+    "shorts/zz.ts", "final/zz.bin", "final/notes.txt",
+])
+def test_置き場には承認済みの完成品と付属物しか置けない(tmp_path, 名前):
+    """**入れ物を列挙しない。** 5周目の反例: 許可リスト（mp4/mov/…）に無い `.wmv` などの
+    未承認動画が置き場にあっても `--gate` が緑だった。列挙する限り次の入れ物が出るので、
+    **置き場に置けるのは「承認済みの完成品」と「その付属物」だけ**、それ以外は全部赤にする。
+    """
+    vault = _置き場(tmp_path)
+    f = vault / 名前
+    f.write_bytes(b"unknown")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any(名前 in p for p in problems), problems
+
+
+def test_承認済みの完成品の付属物は通す(tmp_path):
+    vault = _置き場(tmp_path)
+    _承認して書き出した(tmp_path, vault)
+    (vault / "final" / "final_A.youtube.json").write_text("{}", encoding="utf-8")
+    (vault / "final" / "final_A.quality.json").write_text("{}", encoding="utf-8")
+
+    assert ag.publish_audit(tmp_path / "runs", vault, baseline={},
+                            output_root=tmp_path / "output") == []
+
+
+def test_動画の無い付属物を見つける(tmp_path):
+    """付属物だけが残っている = 何かが消えたか、承認の無い何かの残骸。黙って通さない。"""
+    vault = _置き場(tmp_path)
+    (vault / "final" / "消えた.youtube.json").write_text("{}", encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("消えた.youtube.json" in p for p in problems), problems
+
+
+def test_角括弧の名前でもサイドカーの組を見つける(tmp_path):
+    """glob の特殊文字（`[` `]`）で組を見失わない（5周目の所見）。"""
+    vault = _置き場(tmp_path)
+    (vault / "edited").mkdir()
+    (vault / "edited" / "clip[1].mp4").write_bytes(b"x")
+    (vault / "edited" / "clip[1].youtube.json").write_text("{}", encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("edited/clip[1].mp4" in p for p in problems), problems
+
+
+def test_置き場の外のサイドカーの組も入れ物を問わない(tmp_path):
+    vault = _置き場(tmp_path)
+    (vault / "edited").mkdir()
+    (vault / "edited" / "y.wmv").write_bytes(b"x")
+    (vault / "edited" / "y.youtube.json").write_text("{}", encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("edited/y.wmv" in p for p in problems), problems
