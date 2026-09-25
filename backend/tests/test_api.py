@@ -399,13 +399,12 @@ class TestAntigravityAPI:
     def test_create_final_video_success(self, client):
         with patch("antigravity_api.video_editor.create_final_video", return_value={"output": "final.mp4"}):
             response = client.post("/api/antigravity/editor/create-final", json={"main_video": "main.mp4"})
-            assert response.status_code == 200
-            assert response.json()["output"] == "final.mp4"
+            assert response.status_code == 409  # R2-C1 で閉じた経路（2026-09-25）。部品を呼ばずに 409 で断る
 
     def test_create_final_video_fail(self, client):
         with patch("antigravity_api.video_editor.create_final_video", side_effect=ValueError("Failed")):
             response = client.post("/api/antigravity/editor/create-final", json={"main_video": "main.mp4"})
-            assert response.status_code == 500
+            assert response.status_code == 409  # R2-C1 で閉じた経路（2026-09-25）。部品を呼ばずに 409 で断る
 
     def test_get_pipeline_status_endpoint(self, client):
         with patch("antigravity_api.check_ffmpeg", return_value=True), \
@@ -452,7 +451,7 @@ class TestAntigravityAPI:
     def test_create_final_video_http_exception(self, client):
         with patch("antigravity_api.video_editor.create_final_video", side_effect=HTTPException(status_code=400, detail="HTTP error")):
             response = client.post("/api/antigravity/editor/create-final", json={"main_video": "main.mp4"})
-            assert response.status_code == 400
+            assert response.status_code == 409  # R2-C1 で閉じた経路（2026-09-25）。部品を呼ばずに 409 で断る
 
     def test_get_telop_proposals_not_exist(self, client):
         """提案ディレクトリが存在しない場合の挙動検証（C1分岐網羅）"""

@@ -27,7 +27,7 @@ class TestPipelineRouterDeep:
 
     @pytest.mark.asyncio
     async def test_pr_d01_force_render_completed_no_quality(self):
-        """force_render — completed だが品質レポートなし → 400"""
+        """force_render — completed だが品質レポートなし → **409**（R2-C1 で閉じた。かつては 400）"""
         from routers.pipeline_router import force_render, ForceRenderRequest, _pipeline_state, _reset_state
         from fastapi import HTTPException
         _reset_state()
@@ -36,12 +36,12 @@ class TestPipelineRouterDeep:
         req = ForceRenderRequest(reason="test")
         with pytest.raises(HTTPException) as exc:
             await force_render(req)
-        assert exc.value.status_code == 400
+        assert exc.value.status_code == 409
         _reset_state()
 
     @pytest.mark.asyncio
     async def test_pr_d02_force_render_no_preview(self):
-        """force_render — 品質レポートあり + プレビューなし → 404"""
+        """force_render — 品質レポートあり + プレビューなし → **409**（R2-C1 で閉じた。かつては 404）"""
         from routers.pipeline_router import force_render, ForceRenderRequest, _pipeline_state, _reset_state
         from fastapi import HTTPException
         _reset_state()
@@ -53,7 +53,7 @@ class TestPipelineRouterDeep:
         req = ForceRenderRequest(reason="test")
         with pytest.raises(HTTPException) as exc:
             await force_render(req)
-        assert exc.value.status_code == 404
+        assert exc.value.status_code == 409
         _reset_state()
 
     @pytest.mark.asyncio

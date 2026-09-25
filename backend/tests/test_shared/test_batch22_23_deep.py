@@ -309,8 +309,9 @@ class TestAntigravityApiDeep:
                 "output_name": "final"
             }
             resp = self.client.post("/api/antigravity/editor/create-final", json=payload)
-            assert resp.status_code == 200
-            assert resp.json()["video_path"] == "path/to/final.mp4"
+            # R2-C1 で閉じた経路（2026-09-25）。合成の部品を1つも呼ばずに断る
+            assert resp.status_code == 409
+            mock_editor.assert_not_called()
 
 
 
