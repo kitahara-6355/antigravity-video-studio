@@ -207,3 +207,18 @@ def test_置き場の外でも投稿用サイドカーが付いた動画は完�
     problems = ag.publish_audit(tmp_path / "runs", vault, baseline={})
 
     assert any("edited/clip.mp4" in p for p in problems), problems
+
+
+def test_基準線には門ができる前の動画しか載っていない():
+    """**基準線は抜け道にしてはいけない。** 門の後に承認なしで出た動画を足すと、監査が意味を失う。
+
+    承認の流れで最初に書き出したのは 2026-09-24（実走 20260924T051318897986-0000）。
+    それより後の時刻を持つ動画は基準線に載せない — 承認を通して書き出すこと。
+    """
+    base = json.loads(ag.PUBLISH_BASELINE.read_text(encoding="utf-8"))
+    assert base["files"], "基準線が空（置き場の監査が本物の置き場で赤いはず）"
+    門ができた = "2026-09-24T00:00:00"
+    後 = [f for f in base["files"] if f["mtime"] >= 門ができた]
+    assert not 後, f"門ができた後の動画が基準線に載っている: {[f['path'] for f in 後]}"
+    for f in base["files"]:
+        assert len(f["sha256"]) == 64 and f["path"].startswith(("final/", "shorts/")), f
