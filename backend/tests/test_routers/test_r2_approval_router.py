@@ -166,3 +166,100 @@ def test_画面は依存なしの1枚でAPIを呼ぶ(client):
     assert "/api/r2/runs" in body
     assert "<script src=" not in body and "cdn" not in body.lower(), "外部の依存を読み込んでいる"
     assert "なぜこのモデルか" in body
+
+
+# --- PR3: 画面から承認する（CLI と同じ門） ------------------------------------------------
+
+def _approve(client, run_id="RID", **body):
+    payload = {"by": "claude-code", "synthetic": False, "note": ""}
+    payload.update(body)
+    return client.post(f"/api/r2/runs/{run_id}/approve", json=payload)
+
+
+def test_画面から承認するとCLIと同じ承認の記録が残る(client, tmp_path):
+    d = _run(tmp_path)
+
+    r = _approve(client, note="画面から")
+
+    assert r.status_code == 200, r.text
+    a = json.loads((d / "approval.json").read_text(encoding="utf-8"))
+    assert a["approved_by"] == "claude-code" and a["note"] == "画面から"
+    assert a["ai_disclosure"]["contains_synthetic_media"] is False
+    assert a["ai_disclosure"]["decided_by"] == "claude-code"
+    assert ag.export_allowed(d) == (True, "")
+    body = r.json()
+    assert body["approved_by"] == "claude-code" and body["export_allowed"] is True
+
+
+def test_承認者は既定値で埋めない(client, tmp_path):
+    _run(tmp_path)
+    r = _approve(client, by="  ")
+    assert r.status_code == 400 and "--by" in r.json()["detail"] or "承認する人" in r.json()["detail"]
+    assert not (tmp_path / "runs" / "RID" / "approval.json").exists()
+
+
+def test_合成メディアの判断は人が決める(client, tmp_path):
+    _run(tmp_path)
+    r = client.post("/api/r2/runs/RID/approve", json={"by": "claude-code", "note": ""})
+    assert r.status_code == 400 and "合成メディア" in r.json()["detail"]
+    r = client.post("/api/r2/runs/RID/approve", json={"by": "claude-code", "synthetic": "yes"})
+    assert r.status_code == 422, "文字列の yes を True に丸めない（CLI の --synthetic と同じ厳密さ）"
+    assert not (tmp_path / "runs" / "RID" / "approval.json").exists()
+
+
+def test_有効な承認があるうちは承認し直せない(client, tmp_path):
+    _run(tmp_path, approve=True)
+    r = _approve(client)
+    assert r.status_code == 409 and "すでに承認" in r.json()["detail"]
+
+
+def test_プレビューが無い提案は画面からも承認できない(client, tmp_path):
+    """**見ていないものは承認できない**（4周目の反例B）は画面でも同じ門。"""
+    _run(tmp_path, preview=False)
+    r = _approve(client)
+    assert r.status_code == 409 and "見ていないもの" in r.json()["detail"]
+
+
+def test_無い実走は承認できない(client):
+    assert _approve(client, "NOPE").status_code == 404
+
+
+def test_人が直したメタデータは差分として承認に残る(client, tmp_path):
+    """R2-C2: **人が手を入れた差分**が画面からの承認でも見える。"""
+    d = _run(tmp_path)
+
+    r = client.get("/api/r2/runs/RID/working")
+    assert r.status_code == 200
+    w = r.json()["outputs"][0]
+    assert w["name"] == "youtube_metadata" and json.loads(w["working"])["title"] == "AI の題"
+
+    text = json.dumps({"title": "人が直した題"}, ensure_ascii=False, indent=2) + "\n"
+    r = client.put("/api/r2/runs/RID/working/youtube_metadata", json={"text": text})
+    assert r.status_code == 200, r.text
+    assert (d / "working" / "youtube_metadata.json").read_text(encoding="utf-8") == text
+
+    r = _approve(client)
+    assert r.status_code == 200
+    e = r.json()["edits"][0]
+    assert e["changed"] is True and '+  "title": "人が直した題"' in e["diff"]
+
+
+def test_直す現物はJSONでなければ受けない(client, tmp_path):
+    _run(tmp_path)
+    r = client.put("/api/r2/runs/RID/working/youtube_metadata", json={"text": "{not json"})
+    assert r.status_code == 400
+    r = client.put("/api/r2/runs/RID/working/nope", json={"text": "{}"})
+    assert r.status_code == 404
+
+
+def test_書き出した後は直せない(client, tmp_path):
+    d = _run(tmp_path, approve=True)
+    ag.write_export(d, final_path=None, metadata_sidecar=None, quality_sidecar=None, render_mode="production")
+    r = client.put("/api/r2/runs/RID/working/youtube_metadata", json={"text": "{}"})
+    assert r.status_code == 409
+
+
+def test_画面に承認の操作がある(client):
+    body = client.get("/r2/approve").text
+    for 語 in ("承認する", "合成メディア", "承認する人", "直す"):
+        assert 語 in body, 語
