@@ -615,7 +615,9 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
                 continue
             段 = f"・段 {st['tier']}" if st.get("tier") else ""
             reason = st.get("model_reason") or ""
-            if reason == "fallback":
+            if reason == "stub":
+                理由 = "**スタブ**（AI の応答を捨てて既定の出力に替えた。提案はこのモデルが出したものではない）"
+            elif reason == "fallback":
                 降格 = "、".join(f"{f.get('from')} → {f.get('to')}（{f.get('reason')}）"
                                for f in st.get("fallbacks") or [])
                 理由 = f"**降格**: {降格}"

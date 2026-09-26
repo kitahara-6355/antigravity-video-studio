@@ -447,3 +447,12 @@ def test_実測が宣言と違えば画面のAPIは実際に動いたモデル�
     assert by["youtube_opt"]["model_reason"] == "unverified"
     body = client.get("/r2/approve").text
     assert "実測が宣言と違う" in body and "未検証" in body and "実際に動いた" in body
+
+
+def test_スタブに替わった工程は画面でも宣言どおりと言わない(client, tmp_path):
+    _run(tmp_path, stages=[{"name": "youtube_opt", "model": "gemini-3.6-flash", "tier": "standard",
+                            "status": "success", "model_reason": "stub", "ai_skipped": True,
+                            "models_observed": ["gemini-3.6-flash"], "fallbacks": [], "calls": 1, "cost_jpy": 0.01}])
+    d = client.get("/api/r2/runs/RID").json()
+    assert d["stages"][0]["model_reason"] == "stub" and d["stages"][0]["ai_skipped"] is True
+    assert "スタブ" in client.get("/r2/approve").text

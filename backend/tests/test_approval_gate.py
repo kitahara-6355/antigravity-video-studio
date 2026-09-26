@@ -516,3 +516,15 @@ def test_trace_実測が宣言と違えば実際に動いたモデルを出す(t
     assert rc == 0
     assert "実測が宣言と違う" in out and "gemini-3.5-flash-lite" in out, out
     assert "未検証" in out
+
+
+def test_trace_スタブに替わった工程はそう言う(tmp_path, capsys):
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][2].update({"tier": "standard", "model_reason": "stub", "ai_skipped": True,
+                             "models_observed": ["gemini-3.6-flash"]})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "スタブ" in out, out

@@ -707,3 +707,18 @@ def test_a_local_stage_is_declared_even_without_calls(tmp_path):
         pass
     rec.finish()
     assert load_run(rec.path)["stages"][0]["model_reason"] == "declared"
+
+
+def test_a_stage_that_dropped_the_ai_output_is_a_stub_not_declared(tmp_path):
+    """呼び出しは成功したのに応答を捨ててスタブで success にした工程は「宣言どおり」ではない
+    （R2-C5 検証2周目の R1）。提案はそのモデルが出したものではない。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("youtube_opt", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_skipped"] = True
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["ai_skipped"] is True
+    assert stage["model_reason"] == "stub"
+    assert stage["calls"] == 1

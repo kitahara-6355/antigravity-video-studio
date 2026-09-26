@@ -625,3 +625,23 @@ def test_未実装のretention分析を成果物に混ぜない(tmp_path):
     assert "retention_analysis" not in (ctx.metadata or {}), ctx.metadata
     assert any("retention" in s for s in ctx.skipped_features), ctx.skipped_features
     assert r is None or r.success is False, r
+
+
+def test_AIの応答を捨てた工程はスタブとして記録に残る(tmp_path):
+    """worker が `skipped_features` に AI の印（「YouTube最適化(Gemini)」など）を積んだら、
+    その工程の `model_reason` は stub（R2-C5 検証2周目の R1）。"""
+    c = _coordinator(tmp_path)
+    for w in c.workers:
+        if type(w).__name__ == "YouTubeOptWorker":
+            async def _stub(ctx, _w=w):
+                ctx.skipped_features.append("YouTube最適化(Gemini)")   # 応答を捨ててスタブに替えた
+                ctx.metadata = {"title": "スタブの題"}
+                return StageResult(stage_name=_w.name, success=True, detail="フォールバック")
+            w.execute = _stub
+
+    _run(c, tmp_path)
+
+    stages = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert stages["youtube_opt"]["ai_skipped"] is True
+    assert stages["youtube_opt"]["model_reason"] == "stub"
+    assert stages["proofread"]["ai_skipped"] is False

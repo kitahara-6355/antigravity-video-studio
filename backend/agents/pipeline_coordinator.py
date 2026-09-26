@@ -97,6 +97,9 @@ class _StageFailed(RuntimeError):
 # 工程名（記録に残る安定した名前）と、**モデルの出どころ**。
 # 段（tier）に紐づけるのが正で、モデル名の直書きはしない — 直書きだと
 # 入替のたびに全工程を書き換えることになる。
+# 工程が AI の応答を捨てたときに `skipped_features` へ積む印（`_ai_produced` と同じ語）
+STAGE_AI_MARKS: Dict[str, str] = {"proofread": "AI校閲", "youtube_opt": "YouTube最適化"}
+
 STAGE_RECORD: Dict[str, tuple] = {
     "TranscribeWorker": ("transcribe", {"model": "local:whisper"}),
     "ProofreadWorker": ("proofread", {"task": "proofreader"}),
@@ -295,8 +298,15 @@ class PipelineCoordinator:
         name, kwargs = self._stage_args(worker, ctx)
         result: Optional[StageResult] = None
         try:
-            with self._recorder.stage(name, **kwargs):
+            with self._recorder.stage(name, **kwargs) as entry:
+                before = list(ctx.skipped_features)
                 result = await worker.execute(ctx)
+                # **AI の応答を捨ててスタブに替えた工程を記録に残す**（R2-C5 検証2周目の R1）。
+                # worker は `skipped_features` に印（「AI校閲(Gemini)」など）を積むだけで、
+                # 記録は「宣言どおり」のままだった — 提案はそのモデルが出したものではない
+                印 = STAGE_AI_MARKS.get(name)
+                if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
+                    entry["ai_skipped"] = True
                 if result is None or not result.success:
                     raise _StageFailed(
                         f"{name}: "

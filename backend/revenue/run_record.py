@@ -264,6 +264,8 @@ class RunRecorder:
             # fallback（降格。理由は fallbacks）/ observed（宣言なし・実測だけ）
             "model_reason": "",
             "fallbacks": [],
+            # 呼び出しは成功したが応答を捨ててスタブに替えた（呼び出し側が立てる）
+            "ai_skipped": False,
             "calls": 0,
             "cost_jpy": 0.0,
             "duration_sec": 0.0,
@@ -318,7 +320,10 @@ class RunRecorder:
         # の行から拾う — 以前はメモリ上のイベントとコンソールにしか無く、実走の後に追えなかった
         entry["fallbacks"] = self._fallbacks_since(offset)
         local = bool(declared) and str(declared).startswith(LOCAL_PREFIX)
-        if entry["fallbacks"]:
+        if entry.get("ai_skipped"):
+            # 応答を捨ててスタブにした（R2-C5 検証2周目の R1）。**どのモデルでも「出した」とは言わない**
+            entry["model_reason"] = "stub"
+        elif entry["fallbacks"]:
             entry["model_reason"] = "fallback"
         elif entry["model_mismatch"]:
             # 降格の行が無いのに実測が違う（理由は記録に無い）。**「宣言どおり」とは言わない**（U1）
