@@ -151,38 +151,34 @@ class TestC1InputValidation:
         result = await worker.execute(ctx)
 
         assert result.success is False
-        assert "レンダリング元なし" in result.detail
+        # T-022 の退避を閉じたので、素材の有無に依らず「承認したプレビューが無い」と断る
+        assert "プレビュー" in result.detail
 
     @pytest.mark.asyncio
     async def test_c1_03_no_preview_but_video_exists(self):
-        """W7-C1-03: プレビューなし→元動画からセーフモード (T-022)"""
-        video = _make_preview_file(2 * 1024 * 1024)
+        """W7-C1-03: プレビューなし → 素材があっても書き出さない（かつては素材からセーフモード・T-022）
+
+        **T-022 の退避は閉じた**（2026-09-26・gate-verifier 6周目の U3）。以前はプレビューが無いと
+        素材から直接レンダリングしたが、それは**人が見ていない動画**を書き出す道だった。
+        承認したプレビューが無ければ、素材があっても書き出さずに失敗を返す。
+        """
+        worker = RenderWorker()
+        video = _make_preview_file()
         try:
-            ctx = create_mock_ctx(segments=5)
+            ctx = create_mock_ctx()
             ctx.segments = _make_segments(5)
             ctx.preview_path = None
             ctx.video_path = video
-            ctx.quality_score = 90
+            ctx.skipped_features = []
 
-            vid_mod = _make_video_editor_module()
-
-            def _run_cmd(args, timeout=600):
-                out_path = args[-1]
-                Path(out_path).write_bytes(b"\x00" * (2 * 1024 * 1024))
-                return True, "ok"
-
-            vid_mod.video_editor.ffmpeg.run_command.side_effect = _run_cmd
-
-            with patch.dict("sys.modules", {
-                "video_editor_engine": vid_mod,
-                "template_config": MagicMock(),
-                "logo_overlay": MagicMock(),
-            }):
-                worker = RenderWorker()
+            with patch("video_editor_engine.video_editor") as ve:
                 result = await worker.execute(ctx)
 
-            # セーフモード発動 → "プレビュー生成" がskipped_featuresに追加される
-            assert "プレビュー生成" in ctx.skipped_features
+            assert result.success is False
+            assert "プレビュー" in result.detail
+            assert ctx.final_path is None
+            ve.ffmpeg.run_command.assert_not_called()
+            assert "プレビュー生成" not in ctx.skipped_features, "素材から書き出す退避に入っている"
         finally:
             Path(video).unlink(missing_ok=True)
 
@@ -1522,36 +1518,31 @@ class TestC5Integration:
 
     @pytest.mark.asyncio
     async def test_c5_16_safe_mode_appends_skipped_feature(self):
-        """W7-C5-05: セーフモード — "プレビュー生成"がskipped_featuresに追加"""
-        video = _make_preview_file(2 * 1024 * 1024)
+        """W7-C5-16: プレビューなしのセーフモードは無くなった（かつては skipped_features に記録して素材から書き出した）
+
+        **T-022 の退避は閉じた**（2026-09-26・gate-verifier 6周目の U3）。以前はプレビューが無いと
+        素材から直接レンダリングしたが、それは**人が見ていない動画**を書き出す道だった。
+        承認したプレビューが無ければ、素材があっても書き出さずに失敗を返す。
+        """
+        worker = RenderWorker()
+        video = _make_preview_file()
         try:
-            ctx = create_mock_ctx(segments=5)
+            ctx = create_mock_ctx()
             ctx.segments = _make_segments(5)
-            ctx.preview_path = None  # プレビューなし
+            ctx.preview_path = None
             ctx.video_path = video
+            ctx.skipped_features = []
 
-            vid_mod = _make_video_editor_module()
-
-            def _run_cmd(args, timeout=600):
-                out_path = args[-1]
-                Path(out_path).write_bytes(b"\x00" * (2 * 1024 * 1024))
-                return True, "ok"
-
-            vid_mod.video_editor.ffmpeg.run_command.side_effect = _run_cmd
-
-            with patch.dict("sys.modules", {
-                "video_editor_engine": vid_mod,
-                "template_config": MagicMock(),
-                "logo_overlay": MagicMock(),
-            }):
-                worker = RenderWorker()
+            with patch("video_editor_engine.video_editor") as ve:
                 result = await worker.execute(ctx)
 
-            assert "プレビュー生成" in ctx.skipped_features
+            assert result.success is False
+            assert "プレビュー" in result.detail
+            assert ctx.final_path is None
+            ve.ffmpeg.run_command.assert_not_called()
+            assert "プレビュー生成" not in ctx.skipped_features, "素材から書き出す退避に入っている"
         finally:
             Path(video).unlink(missing_ok=True)
-            if hasattr(ctx, "final_path") and ctx.final_path:
-                Path(ctx.final_path).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
     async def test_c5_17_video_editor_create_final_ffmpeg_unavailable(self):
@@ -2173,32 +2164,29 @@ class TestRenderWorkerCoverageExpansion:
 
     @pytest.mark.asyncio
     async def test_cov_safe_mode_fallback_empty_skipped_features(self):
-        """ctx.skipped_features が初期状態の時にセーフモードフォールバックが正しく動くか検証"""
-        video = _make_preview_file(2 * 1024 * 1024)
+        """セーフモードのフォールバックは無くなった（かつては空の skipped_features に追記して書き出した）
+
+        **T-022 の退避は閉じた**（2026-09-26・gate-verifier 6周目の U3）。以前はプレビューが無いと
+        素材から直接レンダリングしたが、それは**人が見ていない動画**を書き出す道だった。
+        承認したプレビューが無ければ、素材があっても書き出さずに失敗を返す。
+        """
+        worker = RenderWorker()
+        video = _make_preview_file()
         try:
-            ctx = create_mock_ctx(segments=5)
+            ctx = create_mock_ctx()
             ctx.segments = _make_segments(5)
             ctx.preview_path = None
             ctx.video_path = video
-            ctx.skipped_features = []  # 明示的に空のリスト
+            ctx.skipped_features = []
 
-            vid_mod = _make_video_editor_module()
-            def _run_cmd(args, timeout=600):
-                out_path = args[-1]
-                Path(out_path).write_bytes(b"\x00" * (2 * 1024 * 1024))
-                return True, "ok"
-            vid_mod.video_editor.ffmpeg.run_command.side_effect = _run_cmd
-
-            with patch.dict("sys.modules", {
-                "video_editor_engine": vid_mod,
-                "template_config": MagicMock(),
-                "logo_overlay": MagicMock(),
-            }):
-                worker = RenderWorker()
+            with patch("video_editor_engine.video_editor") as ve:
                 result = await worker.execute(ctx)
 
-            assert result.success is True
-            assert "プレビュー生成" in ctx.skipped_features
+            assert result.success is False
+            assert "プレビュー" in result.detail
+            assert ctx.final_path is None
+            ve.ffmpeg.run_command.assert_not_called()
+            assert "プレビュー生成" not in ctx.skipped_features, "素材から書き出す退避に入っている"
         finally:
             Path(video).unlink(missing_ok=True)
 

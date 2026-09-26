@@ -315,9 +315,12 @@ def _書き出した実走(tmp_path, *, 開示=True, 承認=True):
     run_dir = _提案のある実走(tmp_path)
     if 承認:
         _承認(run_dir)
-    final = tmp_path / "final.mp4"
+    # **完成品は置き場（`<vault>/final/`）に書く**。`--gate` は書き出しの記録が指す場所を
+    # 監査しているかも確かめる（置き場の取り違えで緑に倒れない・6周目の U1）
+    (tmp_path / "vault" / "final").mkdir(parents=True, exist_ok=True)
+    final = tmp_path / "vault" / "final" / "final.mp4"
     final.write_bytes(b"final-bytes")
-    sidecar = tmp_path / "final.youtube.json"
+    sidecar = tmp_path / "vault" / "final" / "final.youtube.json"
     meta = dict(METADATA)
     if 開示:
         meta["ai_disclosure"] = {"contains_synthetic_media": False, "decided_by": "北原",
@@ -404,7 +407,7 @@ def test_gate_書き出しの記録が無ければFAIL(tmp_path, capsys):
 
 def test_gate_書き出したものが承認のときと違えばFAIL(tmp_path, capsys):
     _書き出した実走(tmp_path)
-    (tmp_path / "final.mp4").write_bytes(b"swapped")
+    (tmp_path / "vault" / "final" / "final.mp4").write_bytes(b"swapped")
     rc, out = _gate(tmp_path, capsys)
     assert rc == 1 and "書き出した動画" in out
 

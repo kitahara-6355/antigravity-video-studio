@@ -400,3 +400,101 @@ def test_置き場の外のサイドカーの組も入れ物を問わない(tmp_
     problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
 
     assert any("edited/y.wmv" in p for p in problems), problems
+
+
+# --- 6周目の反証（2026-09-26）への手当て -------------------------------------
+
+def test_書き出した場所を監査していなければ赤(tmp_path):
+    """**置き場の取り違えで緑に倒れない**（6周目の U1）。
+
+    `ANTIGRAVITY_VAULT_OUTPUTS` が空・存在しない場所を指したまま `--gate` を回すと、監査する場所を
+    取り違えたまま緑だった。書き出しの記録が指す完成品が、監査した場所の外にあれば赤にする。
+    """
+    vault = _置き場(tmp_path)
+    別の置き場 = tmp_path / "別の置き場"
+    (別の置き場 / "final").mkdir(parents=True)
+    _承認して書き出した(tmp_path, 別の置き場)
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("監査していません" in p for p in problems), problems
+
+
+def test_gate_は監査した場所を名乗る(tmp_path, capsys):
+    vault = _置き場(tmp_path)
+    ag.main(["--gate", "--runs-dir", str(tmp_path / "runs"), "--vault-dir", str(vault),
+             "--baseline", str(tmp_path / "無い.json"), "--output-dir", str(tmp_path / "output")])
+    out = capsys.readouterr().out
+
+    assert str(vault / "final") in out, "どこを監査したのか出ていない"
+
+
+@pytest.mark.parametrize("動画, サイドカー", [
+    ("clip.mp4", "clip.mp4.youtube.json"),     # 動画の名前をそのままサイドカーの名前にする形
+    ("clip3.mp4", "Clip3.youtube.json"),        # 大文字小文字だけ違う
+])
+def test_サイドカーの組は名前の付け方に依らない(tmp_path, 動画, サイドカー):
+    """置き場の外のサイドカーの組（6周目の U2）。アップローダの案内も `<動画名>.youtube.json`。"""
+    vault = _置き場(tmp_path)
+    (vault / "edited").mkdir()
+    (vault / "edited" / 動画).write_bytes(b"x")
+    (vault / "edited" / サイドカー).write_text("{}", encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any(f"edited/{動画}" in p for p in problems), problems
+
+
+def test_承認済みの完成品の付属物は名前の付け方に依らず通す(tmp_path):
+    vault = _置き場(tmp_path)
+    _承認して書き出した(tmp_path, vault)
+    (vault / "final" / "final_A.mp4.youtube.json").write_text("{}", encoding="utf-8")
+    (vault / "final" / "FINAL_A.quality.json").write_text("{}", encoding="utf-8")
+
+    assert ag.publish_audit(tmp_path / "runs", vault, baseline={},
+                            output_root=tmp_path / "output") == []
+
+
+def test_付属物の名前をかぶせた動画を見つける(tmp_path):
+    """付属物は名前だけで見ない — **中身が JSON であること**（6周目の I1）。"""
+    vault = _置き場(tmp_path)
+    _承認して書き出した(tmp_path, vault)
+    (vault / "final" / "final_A.quality.json").write_bytes(b"\x00\x00\x00 ftypisom")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("final_A.quality.json" in p for p in problems), problems
+
+
+def test_置き場のリンクは赤(tmp_path):
+    """リンクの先は辿らないので、**リンクそのものを置かせない**（6周目の I2）。"""
+    vault = _置き場(tmp_path)
+    先 = tmp_path / "どこか"
+    先.mkdir()
+    (先 / "x.mp4").write_bytes(b"x")
+    try:
+        (vault / "final" / "link").symlink_to(先, target_is_directory=True)
+    except OSError:
+        pytest.skip("この環境ではシンボリックリンクを作れない")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("final/link" in p for p in problems), problems
+
+
+def test_末尾がドットや空白の名前は赤(tmp_path):
+    """Windows が名前を正規化するので、承認済みの本体と取り違える（6周目の I4）。"""
+    import os
+    vault = _置き場(tmp_path)
+    名前 = vault / "final" / "final_A.mp4."
+    try:
+        # Windows では `\\?\` を付けないと末尾のドットが落とされる
+        target = ("\\\\?\\" + str(名前)) if os.name == "nt" else str(名前)
+        with open(target, "wb") as fh:
+            fh.write(b"x")
+    except OSError:
+        pytest.skip("この環境では末尾がドットの名前を作れない")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("末尾" in p for p in problems), problems

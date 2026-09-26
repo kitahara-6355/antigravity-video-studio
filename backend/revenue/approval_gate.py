@@ -421,11 +421,35 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
     problems: list[str] = []
     見た: set[str] = set()
 
+    def 付属物が結びつく(owner: str, 動画: Path) -> bool:
+        """付属物の持ち主の名前が、動画の名前（拡張子込み・抜き）と大文字小文字を問わず一致するか。
+
+        `<名前>.youtube.json` と `<名前>.mp4.youtube.json` のどちらの付け方もある
+        （アップローダの案内は「`<動画名>.youtube.json`」）。6周目の U2 で拡張子抜きの完全一致しか
+        見ていなかったのを直した。
+        """
+        o = owner.casefold()
+        return o in (動画.name.casefold(), _持ち主の名前(動画).casefold())
+
+    def 置けない形(f: Path) -> str | None:
+        """中身を見る前に断る形（6周目の I2・I4）。"""
+        if f.is_symlink() or (hasattr(os.path, "isjunction") and os.path.isjunction(f)):
+            return f"{名前(f)}: 置き場にリンクは置けません（リンクの先は監査しない）"
+        if f.name.endswith((".", " ")):
+            return f"{名前(f)}: 末尾がドットや空白の名前は置けません（Windows が正規化して別のファイルと取り違える）"
+        return None
+
     # 1. 置き場（final / shorts と退避先）: **すべてのファイル**を問う
     置き場 = [root / sub for root in (vault, out) for sub in PUBLISH_DIRS if (root / sub).is_dir()]
     for d in 置き場:
-        files = [f for f in sorted(d.rglob("*")) if f.is_file()]
-        通った: set[tuple[Path, str]] = set()
+        entries = sorted(d.rglob("*"))
+        for f in entries:
+            形 = 置けない形(f)
+            if 形:
+                problems.append(形)
+                見た.add(os.path.normcase(os.path.abspath(f)))
+        files = [f for f in entries if f.is_file() and not 置けない形(f)]
+        通った: list[Path] = []
         for f in files:
             見た.add(os.path.normcase(os.path.abspath(f)))
             if _付属物の持ち主(f) is not None:
@@ -434,13 +458,21 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
             if 理由:
                 problems.append(理由)
             else:
-                通った.add((f.parent, _持ち主の名前(f)))
+                通った.append(f)
         for f in files:
             owner = _付属物の持ち主(f)
-            if owner is not None and (f.parent, owner) not in 通った:
+            if owner is None:
+                continue
+            if not any(v.parent == f.parent and 付属物が結びつく(owner, v) for v in 通った):
                 problems.append(f"{名前(f)}: 承認済みの完成品に結びつかない付属物です（動画が無いか、承認に辿れない）")
+                continue
+            try:
+                json.loads(f.read_text(encoding="utf-8"))
+            except (UnicodeDecodeError, ValueError):
+                # 付属物は名前だけで見ない（6周目の I1: 付属物の名前をかぶせた動画）
+                problems.append(f"{名前(f)}: 付属物の名前だが中身が JSON ではありません")
 
-    # 2. 置き場の外: 手動投稿用サイドカーが隣にあるファイル（入れ物を問わない・glob を使わない）
+    # 2. 置き場の外: 手動投稿用サイドカーが隣にあるファイル（入れ物・名前の付け方を問わない）
     for root in (vault, out):
         if not root.is_dir():
             continue
@@ -449,7 +481,8 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
                 continue
             owner = sidecar.name[: -len(".youtube.json")]
             for f in sorted(sidecar.parent.iterdir()):
-                if not f.is_file() or _付属物の持ち主(f) is not None or _持ち主の名前(f) != owner:
+                if (not f.is_file() or _付属物の持ち主(f) is not None
+                        or not 付属物が結びつく(owner, f)):
                     continue
                 key = os.path.normcase(os.path.abspath(f))
                 if key in 見た:
@@ -458,7 +491,29 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
                 理由 = 判定(f)
                 if 理由:
                     problems.append(理由)
+
+    # 3. **置き場の取り違えで緑に倒れない**（6周目の U1）。書き出しの記録が指す完成品が、
+    #    監査した場所の外にあるなら、監査は書き出し先を見ていない（`ANTIGRAVITY_VAULT_OUTPUTS` の
+    #    取り違え・`.env` の差・別の置き場への書き出し）
+    根 = [os.path.normcase(os.path.abspath(r)) for r in 置き場] or [
+        os.path.normcase(os.path.abspath(root / sub)) for root in (vault, out) for sub in PUBLISH_DIRS]
+    for export_path in sorted(runs_dir.glob("*/" + EXPORT)):
+        final = (_read_json(export_path).get("final") or {}).get("path")
+        if not final:
+            continue
+        key = os.path.normcase(os.path.abspath(final))
+        if not any(key == r or key.startswith(r + os.sep) for r in 根):
+            problems.append(f"{export_path.parent.name}: 書き出した完成品（{final}）の場所を監査していません"
+                            "（置き場の取り違え — `ANTIGRAVITY_VAULT_OUTPUTS` や `--vault-dir` を確かめる）")
     return problems
+
+
+def audited_roots(vault_dir: str | Path | None = None, output_root: str | Path | None = None) -> list[str]:
+    """`--gate` が監査する置き場（表示用）。**どこを見たのかを名乗る**（6周目の U1）。"""
+    vault = Path(vault_dir) if vault_dir is not None else _default_vault_dir()
+    out = Path(output_root) if output_root is not None else _PROJECT_ROOT / "output"
+    return [f"{root / sub}{'' if (root / sub).is_dir() else '（無い）'}"
+            for root in (vault, out) for sub in PUBLISH_DIRS]
 
 
 def gate(runs_dir: str | Path) -> tuple[bool, list[str]]:
@@ -606,6 +661,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  🚫 {p}")
         print()
         print("完成品の置き場（final / shorts）— 置いてあるものが1つ残らず承認に辿れるか")
+        for r in audited_roots(args.vault_dir, args.output_dir):
+            print(f"  見た場所: {r}")
         if not 置き場:
             print("  ✅ 置き場のファイルはすべて、承認済みの完成品か、その付属物です")
         for p in 置き場:

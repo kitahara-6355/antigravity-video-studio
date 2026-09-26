@@ -212,10 +212,14 @@ class TestT023SingleSegment:
     @pytest.mark.worker
     @pytest.mark.asyncio
     async def test_render_safe_mode(self):
-        """T-022: preview_pathなしでRenderWorkerがセーフモード動作する"""
+        """T-022: preview_pathなし → **書き出さない**（2026-09-26 にセーフモードを閉じた）
+
+        以前は素材から直接レンダリングした（セーフモード）が、それは人が見ていない動画を
+        書き出す道だった（gate-verifier 6周目の U3）。承認したプレビューからしか書き出さない。
+        """
         ctx = create_mock_ctx(segments=1)
         ctx.preview_path = None
-        # video_pathに実在するファイルをセット
+        # video_pathに実在するファイルをセット（素材があっても書き出さないことを見る）
         ctx.video_path = str(Path(__file__).parent.parent / "test_13s.mp4")
         worker = RenderWorker()
 
@@ -224,9 +228,10 @@ class TestT023SingleSegment:
         with patch.dict("sys.modules", {"safe_io": mock_safe_io}):
             result = await worker.execute(ctx)
 
-        # セーフモード発動: preview_pathがvideo_pathに設定された
-        if Path(ctx.video_path).exists():
-            assert "プレビュー生成" in ctx.skipped_features
+        assert result.success is False
+        assert "プレビュー" in result.detail
+        assert ctx.final_path is None
+        assert "プレビュー生成" not in ctx.skipped_features, "素材から書き出す退避に入っている"
 
 
 # ============================================================

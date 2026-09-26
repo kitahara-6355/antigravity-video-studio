@@ -225,3 +225,75 @@ def test_エディタの最終動画生成も断る():
     assert r.status_code == 409, r.text
     assert "承認" in r.json()["detail"]
     ve.create_final_video.assert_not_called()
+
+
+
+# --- 6周目の U3: 書き手に残っていた T-022 の退避 ----------------------------------
+
+@pytest.mark.asyncio
+async def test_worker_は承認したプレビューが無いと素材から書き出さない(tmp_path, monkeypatch):
+    """**T-022 の退避で書き出す道を閉じる**（6周目の U3）。
+
+    門の確認の後にプレビューが消えると（容量不足のとき本線のフックが実際に消す）、以前は素材から
+    直接レンダリングして completed になった。人が見たものではない動画が出る。
+    """
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.render_worker import RenderWorker
+    from tests.fixtures.mock_pipeline import create_approved_run
+
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(tmp_path / "vault"))
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    try:
+        source = tmp_path / "source.mp4"
+        source.write_bytes(b"\x00" * 4096)
+        ctx = PipelineContext(video_path=str(source))
+        ctx.run_dir = create_approved_run(str(tmp_path / "runs" / "RID"))
+        ctx.preview_path = None          # 承認したプレビューが消えた
+
+        worker = RenderWorker()
+        monkeypatch.setattr(RenderWorker, "_承認を確かめる", staticmethod(lambda c: (True, "")))
+        result = await worker.execute(ctx)
+
+        assert result.success is False
+        assert "プレビュー" in result.detail
+        assert ctx.final_path is None
+        assert not list((tmp_path / "vault").rglob("*.mp4")), "素材から書き出している"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(safe_io)
+
+
+@pytest.mark.asyncio
+async def test_worker_は書き出しの途中でプレビューが変わったら捨てる(tmp_path, monkeypatch):
+    """門の確認と書き出しの間の窓を閉じる — **書いた後にもう一度プレビューの指紋を見る**。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.render_worker import RenderWorker
+
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(tmp_path / "vault"))
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    try:
+        preview = tmp_path / "preview.mp4"
+        preview.write_bytes(b"approved-preview")
+        ctx = PipelineContext(video_path=str(tmp_path / "source.mp4"))
+        ctx.preview_path = str(preview)
+
+        async def 途中で差し替わる(self, src, dst, _ctx):
+            Path(dst).write_bytes(b"rendered-from-" + Path(src).read_bytes())
+            preview.write_bytes(b"swapped-during-render")   # 書いている間に差し替わる
+            return True
+
+        monkeypatch.setattr(RenderWorker, "_承認を確かめる", staticmethod(lambda c: (True, "")))
+        monkeypatch.setattr(RenderWorker, "_render_production_quality", 途中で差し替わる)
+        result = await RenderWorker().execute(ctx)
+
+        assert result.success is False
+        assert "プレビュー" in result.detail
+        assert ctx.final_path is None
+        assert not list((tmp_path / "vault").rglob("*.mp4")), "差し替わったプレビューの書き出しを残している"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(safe_io)

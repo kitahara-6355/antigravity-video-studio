@@ -40,6 +40,20 @@ class RenderWorker(PipelineStageWorker):
         return "出力ファイルが存在し、サイズが1MB以上、本番品質でエンコード済みであること"
 
     @staticmethod
+    def _指紋(path: str) -> str | None:
+        """プレビューの指紋（無ければ None）。書き出しの前後で同じものを書いたかを見る。"""
+        import hashlib
+
+        p = Path(path)
+        if not p.is_file():
+            return None
+        h = hashlib.sha256()
+        with p.open("rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    @staticmethod
     def _承認を確かめる(ctx: PipelineContext) -> tuple[bool, str]:
         """この実行が承認を通っているか。**確かめられなければ書き出さない。**"""
         run_dir = getattr(ctx, "run_dir", None)
@@ -90,23 +104,32 @@ class RenderWorker(PipelineStageWorker):
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             final_path = str(final_dir / f"final_{ts}.mp4")
 
-            # T-022: セーフモード — preview_path なし時は元動画から直接レンダリング
+            # **承認したプレビューからしか書き出さない**（2026-09-26・gate-verifier 6周目の U3）。
+            # 以前は T-022 のセーフモードで、プレビューが無ければ素材から直接レンダリングした。
+            # 門の確認の後にプレビューが消えると（容量不足のとき本線のフックが実際に消す）、
+            # **人が見ていない動画**が completed で出ていた。見ていないものは書き出さない
             if not ctx.preview_path or not Path(ctx.preview_path).exists():
-                if ctx.video_path and Path(ctx.video_path).exists():
-                    logger.warning("⚠️ [T-022] プレビューなし — 元動画からセーフモードレンダリング")
-                    ctx.preview_path = ctx.video_path
-                    ctx.skipped_features.append("プレビュー生成")
-                else:
-                    return StageResult(
-                        stage_name=self.name, success=False,
-                        detail="レンダリング元なし（プレビューも元動画も不在）",
-                        duration_seconds=round(time.time() - start, 1),
-                    )
+                return StageResult(
+                    stage_name=self.name, success=False,
+                    detail=("承認したプレビューがありません（素材から直接は書き出さない — "
+                            "見ていないものは書き出さない）"),
+                    duration_seconds=round(time.time() - start, 1),
+                )
+            始めの指紋 = self._指紋(ctx.preview_path)
 
             if ctx.preview_path and Path(ctx.preview_path).exists():
                 rendered = await self._render_production_quality(
                     ctx.preview_path, final_path, ctx
                 )
+                if rendered and self._指紋(ctx.preview_path) != 始めの指紋:
+                    # 門の確認と書き出しの間の窓を閉じる — **書いた後にもう一度プレビューを見る**
+                    Path(final_path).unlink(missing_ok=True)
+                    logger.warning("🚫 書き出しの途中でプレビューが変わりました。書いたものを捨てます")
+                    return StageResult(
+                        stage_name=self.name, success=False,
+                        detail="書き出しの途中で承認したプレビューが変わりました（書いたものは捨てた）",
+                        duration_seconds=round(time.time() - start, 1),
+                    )
                 if rendered:
                     size_mb = Path(final_path).stat().st_size / 1024 / 1024
                     ctx.final_path = final_path
