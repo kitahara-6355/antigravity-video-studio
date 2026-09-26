@@ -330,6 +330,31 @@ def guard_after(guard: CostGuard | None, model: str, response,
     guard.flush_to_budget()
 
 
+def record_fallback(requested: str, to: str, *, reason: str, attempts: int,
+                    caller: str = "") -> None:
+    """**降格の理由を台帳に残す**（D-39・R2-C5・2026-09-26）。
+
+    以前は `model_governance._record_event`（メモリ上・200件で切れる）とコンソールにしか
+    出なかったので、実走の後に「なぜ standard が batch に落ちたのか」が記録から追えなかった。
+    課金の行と同じ台帳に `kind: "fallback"` で載せ、`RunRecorder._close_stage` が工程に結ぶ。
+    **課金の行ではない**（`jpy` を持たない。`reconcile_ledger` と `_calls_since` は除外する）。
+    ガードが無い（ダミーキー）ときは外部に出ていないので台帳にも触らない。
+    """
+    guard = get_guard() if not is_dummy_key() else None
+    if guard is None:
+        return
+    guard._append({
+        "kind": "fallback",
+        "at": datetime.now(timezone.utc).isoformat(),
+        "requested": requested,
+        "model": to,
+        "reason": reason,
+        "attempts": int(attempts),
+        "caller": caller,
+        "budget_id": guard.budget_id,
+    })
+
+
 # --- 台帳から予算を復元する ---------------------------------------------------
 
 
@@ -360,7 +385,7 @@ def reconcile_ledger() -> float:
     # 一緒に足すと二重計上になり、budget.json に倍の額を書く。
     total = sum(float(row.get("jpy", 0)) for row in _ledger_rows()
                 if row.get("budget_id") == budget_id
-                and row.get("kind") != "run_summary")
+                and row.get("kind") not in ("run_summary", "fallback"))
 
     path = Path(BUDGET_PATH)
     if not path.is_file():

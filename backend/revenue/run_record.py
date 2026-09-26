@@ -229,7 +229,13 @@ class RunRecorder:
         「呼び出していないのに呼び出したことになる」。除外はここ1箇所。
         """
         return [r for r in self._ledger_rows(offset)
-                if r.get("kind") != "run_summary"]
+                if r.get("kind") not in ("run_summary", "fallback")]
+
+    def _fallbacks_since(self, offset: int) -> list[dict]:
+        """`offset` 以降の**降格の行**（D-39）。なぜそのモデルになったかの材料。"""
+        return [{"from": r.get("requested", ""), "to": r.get("model", ""),
+                 "reason": r.get("reason", ""), "attempts": int(r.get("attempts") or 0)}
+                for r in self._ledger_rows(offset) if r.get("kind") == "fallback"]
 
     # --- 工程 ---------------------------------------------------------------
 
@@ -254,6 +260,10 @@ class RunRecorder:
             "model_source": "",
             "models_observed": [],
             "model_mismatch": False,
+            # **なぜそのモデルになったか**（D-39・R2-C5）: declared（宣言どおり）/
+            # fallback（降格。理由は fallbacks）/ observed（宣言なし・実測だけ）
+            "model_reason": "",
+            "fallbacks": [],
             "calls": 0,
             "cost_jpy": 0.0,
             "duration_sec": 0.0,
@@ -304,6 +314,15 @@ class RunRecorder:
         # 別の段に落ちたことが、ここでだけ見える。
         entry["model_mismatch"] = bool(
             observed and declared and observed != [declared])
+        # **なぜそのモデルになったか**を記録に残す（D-39）。降格は台帳の `kind: fallback`
+        # の行から拾う — 以前はメモリ上のイベントとコンソールにしか無く、実走の後に追えなかった
+        entry["fallbacks"] = self._fallbacks_since(offset)
+        if entry["fallbacks"]:
+            entry["model_reason"] = "fallback"
+        elif declared:
+            entry["model_reason"] = "declared"
+        elif observed:
+            entry["model_reason"] = "observed"
         # **宣言しただけで一度も動いていないモデルに印を付ける。**
         # 2026-08-20 の実走で 503 を踏み、soul_feedback は2回再試行して
         # 諦め、スタブにフォールバックして success を返した。記録には
@@ -499,6 +518,8 @@ def _format_resume(runs_dir: Path, run_id: str) -> tuple[str, int]:
         f"  原因: {stage.get('error') or '(記録なし)'}",
         f"  モデル: {stage.get('model') or '(記録なし)'}"
         f"（実測: {', '.join(stage.get('models_observed') or []) or 'なし'}）",
+        *[f"  降格: {f.get('from')} → {f.get('to')}（{f.get('reason')}・{f.get('attempts')}回目で）"
+          for f in stage.get("fallbacks") or []],
         f"  完了済み: {', '.join(done) or 'なし'}", "",
         "  再開に使う入力:",
         json.dumps(stage.get("input", {}), ensure_ascii=False, indent=4),

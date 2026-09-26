@@ -5148,8 +5148,10 @@
    "symbol": "trace",
    "category": "品質スコア",
    "status": "honest",
-   "reason": "証跡の表示だけ（R2-C2）。点数は提案の `quality.score` をそのまま出し、既定値を足さない（無ければ None と出る）。L310 の `or_default` はモデル一覧が空のときに **`(記録なし)` と明示する**ための退避で、モデル名を捏造しない。もう1件の `or_default` は開示辞書の空退避。",
+   "reason": "証跡の表示だけ（R2-C2）。点数は提案の `quality.score` をそのまま出し、既定値を足さない（無ければ None と出る）。L310 の `or_default` はモデル一覧が空のときに **`(記録なし)` と明示する**ための退避で、モデル名を捏造しない。もう1件の `or_default` は開示辞書の空退避。 2026-09-26（D-39）: 3・4件目の `or_default` は工程ごとの行で（`model_reason` の空退避と） `stage.model` が空のときに **`(記録なし)` と明示する**退避。モデル名も理由も捏造しない（理由が無い古い実走は「理由の記録なし」と出す）。",
    "fingerprint": [
+    "or_default",
+    "or_default",
     "or_default",
     "or_default"
    ]

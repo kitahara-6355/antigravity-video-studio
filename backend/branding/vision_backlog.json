@@ -365,17 +365,6 @@
         "note": "うっかり型"
       },
       {
-        "id": "D-39",
-        "title": "モデルの降格（フォールバック）の理由が実行記録に残らない",
-        "status": "open",
-        "priority": "P2",
-        "axis": "pipeline_e2e",
-        "created": "2026-09-19",
-        "detail": "2026-09-19 の AI あり実走（20260918T162232479754-0000）で、standard 段（gemini-3.6-flash）が2回とも再試行のあと batch 段（gemini-3.5-flash-lite）に降格した。run.json には model_mismatch: true と実際のモデルが残るが、理由はコンソールのログと揮発するイベントにしか出ない（model_governance.py 723-733 行・343-356 行）。今回は保存していたコンソール出力で 503（サーバー混雑）と確かめた — 429 ではないので C5 の前提（standard 段 RPD 1,000 → 166本/日）は崩れていない。429 が続くと前提が崩れるので、記録から判別できるようにする",
-        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
-        "note": "モデル管理の方針『どの結果がどのモデルで出たかが常に分かる』の延長（なぜそのモデルになったか） ／ 2026-09-19: R2-C5 の条件に入れた（ユーザー決定）"
-      },
-      {
         "id": "D-40",
         "title": "Evaluator-Optimizer が毎回 TypeError で落ち、ログを出さずに握りつぶされている",
         "status": "open",
@@ -576,6 +565,18 @@
         "status": "resolved",
         "resolved_date": "2026-04-28",
         "note": "T-031テスト実装。score<90→safe_modeレンダリング。 ／ 2026-08-02: 重複エントリを統合"
+      },
+      {
+        "id": "D-39",
+        "title": "モデルの降格（フォールバック）の理由が実行記録に残らない",
+        "status": "resolved",
+        "priority": "P2",
+        "axis": "pipeline_e2e",
+        "created": "2026-09-19",
+        "detail": "2026-09-19 の AI あり実走（20260918T162232479754-0000）で、standard 段（gemini-3.6-flash）が2回とも再試行のあと batch 段（gemini-3.5-flash-lite）に降格した。run.json には model_mismatch: true と実際のモデルが残るが、理由はコンソールのログと揮発するイベントにしか出ない（model_governance.py 723-733 行・343-356 行）。今回は保存していたコンソール出力で 503（サーバー混雑）と確かめた — 429 ではないので C5 の前提（standard 段 RPD 1,000 → 166本/日）は崩れていない。429 が続くと前提が崩れるので、記録から判別できるようにする",
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
+        "note": "モデル管理の方針『どの結果がどのモデルで出たかが常に分かる』の延長（なぜそのモデルになったか） ／ 2026-09-19: R2-C5 の条件に入れた（ユーザー決定） ／ 2026-09-26 解消（R2-C5 PR1・cc/r2-c5）: `cost_guard.record_fallback` が降格を `kind: fallback` で台帳に載せ、`RunRecorder._close_stage` が工程の `fallbacks` / `model_reason`（declared / fallback / observed）に結ぶ。`--trace` と `run_record --resume` が理由を出す。降格して成功した6経路（同期/非同期 × generate/embed・ゲートウェイ）すべてに入れた",
+        "resolved": "2026-09-26"
       }
     ]
   },

@@ -758,3 +758,52 @@ def test_明示した置き場は尊重する(tmp_path, monkeypatch):
     guard = cost_guard.CostGuard(limit_jpy=100.0, ledger_path=指定)
 
     assert guard.ledger_path == 指定
+
+
+# --- 降格の理由を台帳に残す（D-39・R2-C5・2026-09-26） -----------------------------
+
+
+def test_a_fallback_is_written_to_the_ledger_as_a_non_billing_row(tmp_path, monkeypatch):
+    """**なぜそのモデルになったか**は台帳に載る。課金の行ではないので `kind` で区別する。"""
+    guard = _guard(tmp_path)
+    monkeypatch.setattr(cost_guard, "_guard", guard)
+    monkeypatch.setenv("GOOGLE_API_KEY", "AIza-real-looking")   # ダミーキーでは台帳に触らない
+
+    cost_guard.record_fallback("gemini-3.6-flash", "gemini-3.5-flash-lite",
+                               reason="503:サーバー混雑", attempts=3, caller="proofread")
+
+    rows = [json.loads(l) for l in guard.ledger_path.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["kind"] == "fallback"
+    assert row["requested"] == "gemini-3.6-flash" and row["model"] == "gemini-3.5-flash-lite"
+    assert row["reason"] == "503:サーバー混雑" and row["attempts"] == 3
+    assert row["caller"] == "proofread" and row["at"]
+    assert "jpy" not in row, "降格の行は課金の行ではない"
+
+
+def test_a_fallback_without_a_guard_is_not_written(tmp_path, monkeypatch):
+    """ダミーキー（ガード無し）では外部に出ないので、台帳にも触らない。"""
+    monkeypatch.setenv("GOOGLE_API_KEY", "dummy_key_for_ci")
+    monkeypatch.setattr(cost_guard, "_guard", None)
+    monkeypatch.setattr(cost_guard, "load_active_budget", lambda *a, **k: None)
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", tmp_path / "ledger.jsonl")
+
+    cost_guard.record_fallback("a", "b", reason="503", attempts=1, caller="t")
+
+    assert not (tmp_path / "ledger.jsonl").exists()
+
+
+def test_fallback_rows_are_not_counted_as_spend(tmp_path, monkeypatch):
+    guard = _guard(tmp_path)
+    guard.budget_id = "B"
+    monkeypatch.setattr(cost_guard, "_guard", guard)
+    monkeypatch.setenv("GOOGLE_API_KEY", "AIza-real-looking")
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", guard.ledger_path)
+    monkeypatch.setattr(cost_guard, "BUDGET_PATH", tmp_path / "budget.json")   # 本番の台帳に触らない
+    monkeypatch.setattr(cost_guard, "load_active_budget", lambda *a, **k: {"id": "B", "limit_jpy": 100})
+    cost_guard.record_fallback("a", "b", reason="429:枠枯渇", attempts=2, caller="t")
+
+    row = json.loads(guard.ledger_path.read_text(encoding="utf-8").splitlines()[0])
+    assert row["budget_id"] == "B"
+    assert cost_guard.reconcile_ledger() == 0.0

@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from google.genai.errors import APIError
 from google.api_core.exceptions import ServiceUnavailable
 
+import backend.model_governance as _mg
 from backend.model_governance import (
     ModelGovernanceEngine,
     GovernedModelsProxy,
@@ -375,3 +376,60 @@ def test_降格先に2_5系を使わない():
     doomed = sorted({v for v in engine._fallback_chain.values()
                      if v and v.startswith("gemini-2.5")})
     assert doomed == [], f"降格先に 2.5 系が残っています: {doomed}"
+
+
+# ============================================================
+# 降格の理由を台帳へ（D-39・R2-C5・2026-09-26）
+# ============================================================
+
+def test_降格して成功したら理由つきで台帳に残す(engine):
+    """再試行が尽きて model-b に降格したことと、その理由（503）が記録に残る。
+    以前は `_record_event`（メモリ上・200件で切れる）とコンソールにしか出なかった。
+    """
+    real = MagicMock()
+    calls = []
+
+    def side_effect(*, model, **kwargs):
+        calls.append(model)
+        if model == "model-a":
+            raise _api_error(503, "UNAVAILABLE")
+        return "ok"
+
+    real.generate_content.side_effect = side_effect
+    proxy = GovernedModelsProxy(real, "proofread")
+    with patch.object(_mg, "record_fallback") as spy:
+        assert proxy.generate_content(model="model-a") == "ok"
+
+    spy.assert_called_once()
+    kw = spy.call_args.kwargs
+    assert kw["requested"] == "model-a" and kw["to"] == "model-b"
+    assert kw["reason"].startswith("503"), kw
+    assert kw["attempts"] == engine.MAX_RETRY_PER_MODEL + 1
+    assert kw["caller"] == "proofread"
+
+
+def test_降格せずに成功したら台帳には書かない(engine):
+    real = MagicMock()
+    real.generate_content.return_value = "ok"
+    proxy = GovernedModelsProxy(real, "proofread")
+    with patch.object(_mg, "record_fallback") as spy:
+        proxy.generate_content(model="model-a")
+    spy.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_非同期でも降格の理由を台帳に残す(engine):
+    real = MagicMock()
+
+    async def side_effect(*, model, **kwargs):
+        if model == "model-a":
+            raise _api_error(429, "RESOURCE_EXHAUSTED")
+        return "ok"
+
+    real.generate_content = AsyncMock(side_effect=side_effect)
+    proxy = GovernedAsyncModelsProxy(real, "youtube_opt")
+    with patch.object(_mg, "record_fallback") as spy:
+        assert await proxy.generate_content(model="model-a") == "ok"
+
+    kw = spy.call_args.kwargs
+    assert kw["requested"] == "model-a" and kw["to"] == "model-b" and kw["reason"].startswith("429")

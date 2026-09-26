@@ -606,6 +606,28 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
              f"  プレビュー  : {(p.get('preview') or {}).get('path')}",
              f"  品質        : {q.get('score')} 点（{合否}）→ 書き出しのモード {p.get('render_mode')}",
              f"  使ったモデル: {', '.join(p.get('models_used') or []) or '(記録なし)'}"]
+    # **工程ごとに、なぜそのモデルになったか**（D-39・R2-C5）。実行記録から読む
+    run_path = run_dir / "run.json"
+    if run_path.is_file():
+        for st in (_read_json(run_path).get("stages") or []):
+            model = st.get("model") or "(記録なし)"
+            if str(model).startswith("local:"):
+                continue
+            段 = f"・段 {st['tier']}" if st.get("tier") else ""
+            reason = st.get("model_reason") or ""
+            if reason == "fallback":
+                降格 = "、".join(f"{f.get('from')} → {f.get('to')}（{f.get('reason')}）"
+                               for f in st.get("fallbacks") or [])
+                理由 = f"**降格**: {降格}"
+            elif reason == "declared":
+                理由 = "宣言どおり"
+            elif reason == "observed":
+                理由 = "宣言なし（実測だけ）"
+            elif st.get("model_unverified"):
+                理由 = "未検証（一度も呼ばれていない）"
+            else:
+                理由 = "（理由の記録なし — D-39 より前の実走）"
+            lines.append(f"    {st.get('name')}: {model}{段} — {理由}")
 
     history_dir = run_dir / APPROVAL_HISTORY
     for h in sorted(history_dir.glob("*.json")) if history_dir.is_dir() else []:

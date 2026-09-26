@@ -599,3 +599,78 @@ def test_読めない成果物は指紋を偽らない(tmp_path):
     rec.finish()
 
     assert load_run(rec.path)["artifact_digests"][str(tmp_path / "居ない.mp4")] is None
+
+
+# --- なぜそのモデルになったか（D-39・R2-C5・2026-09-26） ---------------------------
+
+
+def _fallback_row(path, requested, to, reason="503:サーバー混雑", attempts=3):
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"kind": "fallback", "requested": requested, "model": to,
+                             "reason": reason, "attempts": attempts, "caller": "test"}) + "\n")
+
+
+def test_a_fallback_and_its_reason_are_recorded_on_the_stage(tmp_path):
+    """記録だけを見て「宣言どおりか、降格ならなぜか」が分かる。以前はコンソールにしか出なかった。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _fallback_row(rec.ledger_path, "gemini-3.6-flash", "gemini-3.5-flash-lite")
+        _ledger_row(rec.ledger_path, "gemini-3.5-flash-lite")
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_reason"] == "fallback"
+    assert stage["fallbacks"] == [{"from": "gemini-3.6-flash", "to": "gemini-3.5-flash-lite",
+                                   "reason": "503:サーバー混雑", "attempts": 3}]
+    assert stage["model_mismatch"] is True
+    assert stage["calls"] == 1, "降格の行を呼び出しに数えている"
+    assert stage["cost_jpy"] == 0.1
+
+
+def test_a_stage_that_ran_as_declared_says_so(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_reason"] == "declared"
+    assert stage["fallbacks"] == []
+
+
+def test_a_stage_without_a_declaration_is_marked_observed(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    assert load_run(rec.path)["stages"][0]["model_reason"] == "observed"
+
+
+def test_fallbacks_of_another_stage_are_not_attributed(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("a", model="gemini-3.6-flash"):
+        _fallback_row(rec.ledger_path, "gemini-3.6-flash", "gemini-3.5-flash-lite")
+    with rec.stage("b", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    stages = load_run(rec.path)["stages"]
+    assert stages[0]["model_reason"] == "fallback"
+    assert stages[1]["model_reason"] == "declared" and stages[1]["fallbacks"] == []
+
+
+def test_the_resume_view_shows_why_the_model_changed(tmp_path, capsys):
+    from backend.revenue.run_record import main
+
+    rec = _recorder(tmp_path)
+    with pytest.raises(RuntimeError):
+        with rec.stage("proofread", model="gemini-3.6-flash", stage_input={"x": 1}):
+            _fallback_row(rec.ledger_path, "gemini-3.6-flash", "gemini-3.5-flash-lite", "429:枠枯渇", 2)
+            raise RuntimeError("落ちた")
+    rec.finish()
+
+    rc = main(["--resume", rec.run_id, "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "429:枠枯渇" in out and "gemini-3.5-flash-lite" in out, out
