@@ -645,3 +645,21 @@ def test_AIの応答を捨てた工程はスタブとして記録に残る(tmp_p
     assert stages["youtube_opt"]["ai_skipped"] is True
     assert stages["youtube_opt"]["model_reason"] == "stub"
     assert stages["proofread"]["ai_skipped"] is False
+
+
+
+def test_AIの出力を一部だけ捨てた工程は一部スタブとして記録に残る(tmp_path):
+    """一部のバッチだけ失敗（警告に AI の印）→ `ai_partial`・`model_reason: partial`（検証3周目の m1）。"""
+    c = _coordinator(tmp_path)
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _partial(ctx, _w=w):
+                ctx.warnings.append("AI校閲: 1/2バッチがリトライ上限(3回)後に失敗しました。一部セグメントは未校閲です。")
+                return StageResult(stage_name=_w.name, success=True, detail="一部")
+            w.execute = _partial
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}["proofread"]
+    assert st["ai_partial"] is True and st["ai_skipped"] is False
+    assert st["model_reason"] == "partial"

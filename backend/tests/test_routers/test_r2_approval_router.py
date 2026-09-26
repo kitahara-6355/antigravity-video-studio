@@ -456,3 +456,13 @@ def test_スタブに替わった工程は画面でも宣言どおりと言わ�
     d = client.get("/api/r2/runs/RID").json()
     assert d["stages"][0]["model_reason"] == "stub" and d["stages"][0]["ai_skipped"] is True
     assert "スタブ" in client.get("/r2/approve").text
+
+
+
+def test_一部スタブの工程は画面でも宣言どおりと言わない(client, tmp_path):
+    _run(tmp_path, stages=[{"name": "proofread", "model": "gemini-3.6-flash", "tier": "standard", "status": "success",
+                            "model_reason": "partial", "ai_partial": True, "models_observed": ["gemini-3.6-flash"],
+                            "fallbacks": [], "calls": 2, "cost_jpy": 0.2}])
+    d = client.get("/api/r2/runs/RID").json()
+    assert d["stages"][0]["model_reason"] == "partial" and d["stages"][0]["ai_partial"] is True
+    assert "一部スタブ" in client.get("/r2/approve").text

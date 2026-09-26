@@ -266,6 +266,8 @@ class RunRecorder:
             "fallbacks": [],
             # 呼び出しは成功したが応答を捨ててスタブに替えた（呼び出し側が立てる）
             "ai_skipped": False,
+            # 一部のバッチだけ捨てた（モデルの出力と元の入力が混ざっている）
+            "ai_partial": False,
             "calls": 0,
             "cost_jpy": 0.0,
             "duration_sec": 0.0,
@@ -323,6 +325,8 @@ class RunRecorder:
         if entry.get("ai_skipped"):
             # 応答を捨ててスタブにした（R2-C5 検証2周目の R1）。**どのモデルでも「出した」とは言わない**
             entry["model_reason"] = "stub"
+        elif entry.get("ai_partial"):
+            entry["model_reason"] = "partial"
         elif entry["fallbacks"]:
             entry["model_reason"] = "fallback"
         elif entry["model_mismatch"]:

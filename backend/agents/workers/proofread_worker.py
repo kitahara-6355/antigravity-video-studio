@@ -100,8 +100,13 @@ class ProofreadWorker(PipelineStageWorker):
                     f"AI校閲: {retry_stats['failed_batches']}/{retry_stats['total_batches']}バッチが"
                     f"リトライ上限({retry_stats['total_retries']}回)後に失敗しました。一部セグメントは未校閲です。"
                 )
-            if retry_stats.get("skipped"):
-                ctx.skipped_features.append("AI校閲(Gemini)")
+            total = int(retry_stats.get("total_batches", 0) or 0)
+            failed = int(retry_stats.get("failed_batches", 0) or 0)
+            if retry_stats.get("skipped") or (total > 0 and failed >= total):
+                # 呼び出しは成功しても**応答を全部捨てた**なら、AI の出力は提案に届いていない
+                # （R2-C5 検証3周目の P1）。記録には `ai_skipped` として残る
+                if "AI校閲(Gemini)" not in ctx.skipped_features:
+                    ctx.skipped_features.append("AI校閲(Gemini)")
         except Exception as e:
             logger.warning(f"Gemini AI proofread skipped: {e}")
             ctx.skipped_features.append("AI校閲(Gemini)")

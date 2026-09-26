@@ -528,3 +528,15 @@ def test_trace_スタブに替わった工程はそう言う(tmp_path, capsys):
     rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
     out = capsys.readouterr().out
     assert rc == 0 and "スタブ" in out, out
+
+
+
+def test_trace_一部スタブの工程はそう言う(tmp_path, capsys):
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][1].update({"tier": "standard", "model_reason": "partial", "ai_partial": True})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "一部スタブ" in out, out

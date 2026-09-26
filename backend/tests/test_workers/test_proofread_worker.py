@@ -1663,3 +1663,32 @@ class TestAiProofreaderBranches:
                          "total_batches", "skipped"]
         for key in required_keys:
             assert key in stats, f"stats に {key} がない"
+
+
+
+# --- R2-C5 検証3周目の P1: 応答を全部捨てた校閲は「AI校閲(Gemini)」を積む ---------------
+
+def _ctx_for_stats(monkeypatch, stats):
+    import sys
+    import types
+    fake = types.ModuleType("subtitle_engine.ai_proofreader")
+    fake.proofread_segments = lambda segs, return_stats=True: (segs, dict(stats))
+    monkeypatch.setitem(sys.modules, "subtitle_engine.ai_proofreader", fake)
+    ctx = PipelineContext(video_path="in.mp4")
+    ctx.segments = [{"text": "こんにちは", "start": 0.0, "end": 1.0}, {"text": "世界", "start": 1.0, "end": 2.0}]
+    return ctx
+
+
+@pytest.mark.asyncio
+async def test_全バッチを捨てた校閲はスタブとして印を積む(monkeypatch):
+    ctx = _ctx_for_stats(monkeypatch, {"total_batches": 2, "failed_batches": 2, "total_retries": 0, "skipped": False})
+    await ProofreadWorker().execute(ctx)
+    assert "AI校閲(Gemini)" in ctx.skipped_features
+
+
+@pytest.mark.asyncio
+async def test_一部のバッチを捨てた校閲は警告だけで印は積まない(monkeypatch):
+    ctx = _ctx_for_stats(monkeypatch, {"total_batches": 2, "failed_batches": 1, "total_retries": 0, "skipped": False})
+    await ProofreadWorker().execute(ctx)
+    assert "AI校閲(Gemini)" not in ctx.skipped_features
+    assert any("AI校閲" in w for w in ctx.warnings)

@@ -617,6 +617,8 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
             reason = st.get("model_reason") or ""
             if reason == "stub":
                 理由 = "**スタブ**（AI の応答を捨てて既定の出力に替えた。提案はこのモデルが出したものではない）"
+            elif reason == "partial":
+                理由 = "**一部スタブ**（AI の出力の一部を捨てた。モデルの出力と元の入力が混ざっている）"
             elif reason == "fallback":
                 降格 = "、".join(f"{f.get('from')} → {f.get('to')}（{f.get('reason')}）"
                                for f in st.get("fallbacks") or [])

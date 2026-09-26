@@ -115,6 +115,7 @@ def _stage_view(stage: dict) -> dict:
         "model_mismatch": bool(stage.get("model_mismatch")),
         "model_unverified": bool(stage.get("model_unverified")),
         "ai_skipped": bool(stage.get("ai_skipped")),
+        "ai_partial": bool(stage.get("ai_partial")),
         "calls": int(stage.get("calls") or 0),
         "cost_jpy": float(stage.get("cost_jpy") or 0.0),
         "duration_sec": float(stage.get("duration_sec") or 0.0),
@@ -182,6 +183,7 @@ async def get_run(run_id: str) -> dict[str, Any]:
             "render_mode": proposal.get("render_mode"),
             "preview_available": bool(preview.get("path")) and Path(str(preview.get("path"))).is_file(),
             "skipped_features": list(proposal.get("skipped_features") or []),
+            "warnings": list(proposal.get("warnings") or []),
             "degraded_stages": list(proposal.get("degraded_stages") or []),
             "ai_outputs": list(proposal.get("ai_outputs") or []),
         } if proposal else None),
@@ -433,7 +435,7 @@ _PAGE = """<!doctype html>
  table{border-collapse:collapse;width:100%;font-size:.9rem}
  th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
  .tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:.8rem}
- .declared{background:#e6f4ea}.fallback,.mismatch,.stub{background:#fdecea}.observed{background:#fff4e5}.unrecorded,.unverified{background:#eee}
+ .declared{background:#e6f4ea}.fallback,.mismatch,.stub{background:#fdecea}.partial{background:#fff4e5}.observed{background:#fff4e5}.unrecorded,.unverified{background:#eee}
  video{max-width:100%;background:#000;border-radius:6px}
  .muted{color:#777}
  .blocker{background:#fff4e5;padding:8px;border-radius:6px}
@@ -446,7 +448,7 @@ _PAGE = """<!doctype html>
  <div class="detail" id="detail"><p class="muted">左の実走を選ぶ</p></div>
 </div>
 <script>
-const REASON = {declared:"宣言どおり", stub:"スタブ（AI の応答を捨てた。この提案はこのモデルが出したものではない）", fallback:"降格", mismatch:"実測が宣言と違う（理由の記録なし）", observed:"宣言なし（実測だけ）", unverified:"未検証（一度も呼ばれていない）", unrecorded:"理由の記録なし"};
+const REASON = {declared:"宣言どおり", stub:"スタブ（AI の応答を捨てた。この提案はこのモデルが出したものではない）", partial:"一部スタブ（AI の出力の一部を捨てた。元の入力と混ざっている）", fallback:"降格", mismatch:"実測が宣言と違う（理由の記録なし）", observed:"宣言なし（実測だけ）", unverified:"未検証（一度も呼ばれていない）", unrecorded:"理由の記録なし"};
 async function j(u){const r=await fetch(u);if(!r.ok)throw new Error(u+" "+r.status);return r.json();}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 async function loadRuns(){
@@ -469,6 +471,7 @@ async function show(id){
   el.innerHTML=`<h2>${esc(id)} <small class="muted">${esc(d.status)}</small></h2>
    ${d.proposal&&d.proposal.preview_available?`<video controls preload="metadata" src="/api/r2/runs/${encodeURIComponent(id)}/preview"></video>`:'<p class="muted">プレビューがありません</p>'}
    ${(d.proposal&&d.proposal.skipped_features.length)?`<p class="blocker">この提案で落ちた・飛ばした機能: ${esc(d.proposal.skipped_features.join("、"))}</p>`:""}
+   ${(d.proposal&&d.proposal.warnings&&d.proposal.warnings.length)?`<p class="blocker">警告: ${esc(d.proposal.warnings.join(" ／ "))}</p>`:""}
    <p>品質: ${q.scored?esc(q.score)+" 点（"+(q.passed?"合格":"不合格")+"・"+esc(q.data_source)+"）":"採点されていません"} ／ 書き出しのモード: ${esc(d.proposal?d.proposal.render_mode:"-")}</p>
    <h3>工程ごとのモデル</h3>
    <table><thead><tr><th>工程</th><th>モデル</th><th>段</th><th>なぜこのモデルか</th><th>呼び出し</th><th>原価（円・上限見積もり）</th><th>不満なら</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="muted">AI の工程がありません</td></tr>'}</tbody></table>

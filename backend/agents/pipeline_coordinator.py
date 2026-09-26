@@ -300,6 +300,7 @@ class PipelineCoordinator:
         try:
             with self._recorder.stage(name, **kwargs) as entry:
                 before = list(ctx.skipped_features)
+                warn_before = list(getattr(ctx, "warnings", None) or [])
                 result = await worker.execute(ctx)
                 # **AI の応答を捨ててスタブに替えた工程を記録に残す**（R2-C5 検証2周目の R1）。
                 # worker は `skipped_features` に印（「AI校閲(Gemini)」など）を積むだけで、
@@ -307,6 +308,9 @@ class PipelineCoordinator:
                 印 = STAGE_AI_MARKS.get(name)
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
+                elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):
+                    # 一部のバッチだけ捨てた（警告に印）— モデルの出力と元の字幕が混ざっている（3周目の m1）
+                    entry["ai_partial"] = True
                 if result is None or not result.success:
                     raise _StageFailed(
                         f"{name}: "

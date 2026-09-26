@@ -722,3 +722,14 @@ def test_a_stage_that_dropped_the_ai_output_is_a_stub_not_declared(tmp_path):
     assert stage["ai_skipped"] is True
     assert stage["model_reason"] == "stub"
     assert stage["calls"] == 1
+
+
+
+def test_a_partially_dropped_stage_is_partial(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_partial"] = True
+    rec.finish()
+    st = load_run(rec.path)["stages"][0]
+    assert st["ai_partial"] is True and st["model_reason"] == "partial"

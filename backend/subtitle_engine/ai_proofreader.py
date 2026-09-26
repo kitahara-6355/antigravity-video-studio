@@ -369,7 +369,10 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
 
                         batch_correction_map[item_idx] = item["text"]
                 else:
+                    # **応答を丸ごと捨てたバッチは失敗に数える**（R2-C5 検証3周目の P1）。黙って無視すると
+                    # 記録は「宣言どおり」になり、提案がそのモデルの出力ではないことが見えない
                     logger.warning("AI Proofreader: LLM response corrected_data is not a list")
+                    stats["failed_batches"] += 1
 
                 # セグメントを更新
                 for idx, s in enumerate(batch):

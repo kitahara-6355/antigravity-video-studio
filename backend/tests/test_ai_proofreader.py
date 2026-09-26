@@ -326,6 +326,9 @@ class TestProofreadSegmentsResponseValidation:
         segments = [{"text": "テスト"}]
         result, stats = self._run_with_response_text('{"index": 0, "text": "修正済"}', segments)
         assert stats["proofread_count"] == 0
+        # **応答を丸ごと捨てたバッチは失敗に数える**（R2-C5 検証3周目の P1）。黙って無視すると
+        # 「宣言どおり」の記録になり、提案がそのモデルの出力ではないことが見えない
+        assert stats["failed_batches"] == 1
 
     def test_response_item_is_not_a_dict(self):
         """レスポンスのリストの要素が辞書ではない場合のスキップ処理"""
