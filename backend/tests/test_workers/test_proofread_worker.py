@@ -1692,3 +1692,11 @@ async def test_一部のバッチを捨てた校閲は警告だけで印は積�
     await ProofreadWorker().execute(ctx)
     assert "AI校閲(Gemini)" not in ctx.skipped_features
     assert any("AI校閲" in w for w in ctx.warnings)
+
+
+@pytest.mark.asyncio
+async def test_JSONの失敗でスタブになった警告は枠制限と言わない(monkeypatch):
+    """全バッチ失敗の理由を「API枠制限」と決めつけない（4周目の m3）。"""
+    ctx = _ctx_for_stats(monkeypatch, {"total_batches": 1, "failed_batches": 1, "total_retries": 0, "skipped": False})
+    await ProofreadWorker().execute(ctx)
+    assert not any("枠制限" in w for w in ctx.warnings), ctx.warnings

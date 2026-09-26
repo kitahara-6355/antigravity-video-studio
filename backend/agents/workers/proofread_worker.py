@@ -167,8 +167,9 @@ class ProofreadWorker(PipelineStageWorker):
         # UX-15: API枠枯渇等でAI校閲がスキップされた場合、detailに警告を表示
         skip_warn = ""
         if "AI校閲(Gemini)" in ctx.skipped_features:
-            skip_warn = " ⚠️ AI校閲スキップ(API枠制限)"
-            ctx.warnings.append("AI校閲がAPI枠制限によりスキップされました。品質に影響する可能性があります。")
+            # 理由を決めつけない（4周目の m3）: 枠制限のほかに、応答を全部捨てた場合もここに来る
+            skip_warn = " ⚠️ AI校閲は効いていない"
+            ctx.warnings.append("AI校閲は効いていません（API 枠の制限か、応答を使えなかった）。品質に影響する可能性があります。")
         # 元が Segment オブジェクトだった場合は、元の型に復元する
         if ctx.segments and has_segment_objects:
             try:

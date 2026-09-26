@@ -330,6 +330,21 @@ class TestProofreadSegmentsResponseValidation:
         # 「宣言どおり」の記録になり、提案がそのモデルの出力ではないことが見えない
         assert stats["failed_batches"] == 1
 
+    def test_採用できた項目がゼロのバッチは失敗に数える(self):
+        """リスト形でも中身を全部捨てたら失敗（R2-C5 検証4周目の R4-1）。
+        バッチ内の番号で答えた（index が範囲外）・鍵が違う・dict でない・空リスト、のどれも
+        AI の出力が提案に1文字も届いていない。"""
+        segments = [{"text": "テスト"}]
+        for text in ('["X","Y"]', '[{"index":0,"corrected_text":"X"}]', '[{"index":5,"text":"X"}]', '[]'):
+            result, stats = self._run_with_response_text(text, segments)
+            assert stats["failed_batches"] == 1, text
+            assert stats["proofread_count"] == 0
+
+    def test_直す所が無くても項目が返れば失敗ではない(self):
+        segments = [{"text": "テスト"}]
+        result, stats = self._run_with_response_text('[{"index":0,"text":"テスト"}]', segments)
+        assert stats["failed_batches"] == 0
+
     def test_response_item_is_not_a_dict(self):
         """レスポンスのリストの要素が辞書ではない場合のスキップ処理"""
         segments = [{"text": "テスト"}]
@@ -838,4 +853,5 @@ class TestCoverageEnhancementAdditional:
                 assert stats["total_retries"] == 1
                 assert stats["failed_batches"] == 0
                 assert result[0]["text"] == "修正済"
+
 
