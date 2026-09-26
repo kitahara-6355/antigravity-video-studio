@@ -5175,6 +5175,21 @@
    "marks": [
     "scored=?"
    ]
+  },
+  {
+   "id": "backend/routers/r2_approval_router.py::_quality",
+   "file": "backend/routers/r2_approval_router.py",
+   "symbol": "_quality",
+   "category": "品質スコア",
+   "status": "marked",
+   "reason": "承認画面の API（R2-C5）が提案の品質を返す口。点数は proposal.json の `quality.score` をそのまま出し、`scored` が偽なら None にして `is_real: False` / `data_source: unavailable` を名乗る（既定値で点数を作らない）。採点済みなら `measured`（ローカルの品質ゲートが実走で採点した値）。 `scored` の有無で `is_real` と `data_source` を名乗る（印は既定値ではなく提案の値から決まる）。",
+   "fingerprint": [],
+   "marks": [
+    "data_source=?",
+    "is_real=?",
+    "scored=?",
+    "scored=?"
+   ]
   }
  ]
 }

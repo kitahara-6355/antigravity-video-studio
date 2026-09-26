@@ -29,6 +29,7 @@ router_names = [
     "usage_router", "youtube_optimizer_router", "smartcut_router", "ab_test_tracker_router",
     "shorts_router", "youtube_upload_router", "antigravity_router", "manager_router",
     "soul_router", "dashboard_router", "approval_router", "philosophy_router",
+    "r2_approval_router", "r2_approval_page_router",   # R2-C5 承認画面（2026-09-26）
     "log_router", "error_router", "legacy_director_router", "legacy_council_router",
     "legacy_production_router", "legacy_management_router", "live_ws_router",
     "pipeline_router", "health_router", "pipeline_report_router", "admin_setup_router",

@@ -5011,6 +5011,41 @@
     "$:dict"
    ]
   },
+  "GET /api/r2/runs": {
+   "status": 200,
+   "kind": "json",
+   "shape": [
+    "$.runs:list",
+    "$.runs_dir:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/r2/runs/c4-gate-probe": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
+  "GET /api/r2/runs/c4-gate-probe/preview": {
+   "status": 404,
+   "kind": "json",
+   "shape": [
+    "$.code:str",
+    "$.details:null",
+    "$.error:str",
+    "$.request_id:null",
+    "$.success:bool",
+    "$.timestamp:str",
+    "$:dict"
+   ]
+  },
   "GET /api/render/download/c4-gate-probe": {
    "status": 200,
    "kind": "json",

@@ -50,6 +50,12 @@ from .approval_router import router as approval_router
 from .philosophy_router import router as philosophy_router
 
 # ============================================
+# R2-C5: 承認画面（モデルの見える化と昇格・2026-09-26）
+# ============================================
+from .r2_approval_router import router as r2_approval_router
+from .r2_approval_router import page_router as r2_approval_page_router
+
+# ============================================
 # DS-12: テーマルーター
 # ============================================
 from .themes_router import router as themes_router
@@ -108,6 +114,8 @@ __all__ = [
     "antigravity_router", "manager_router",
     # Phase 9以前
     "soul_router", "dashboard_router", "approval_router", "philosophy_router",
+    # R2-C5
+    "r2_approval_router", "r2_approval_page_router",
     # DS-12: テーマ
     "themes_router",
     # Legacy
