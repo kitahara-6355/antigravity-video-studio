@@ -263,3 +263,168 @@ def test_画面に承認の操作がある(client):
     body = client.get("/r2/approve").text
     for 語 in ("承認する", "合成メディア", "承認する人", "直す"):
         assert 語 in body, 語
+
+
+# --- PR4: 昇格してやり直す ------------------------------------------------------------
+
+@pytest.fixture
+def policy_sandbox(tmp_path, monkeypatch):
+    """現物の段の設定・上書き・履歴に触らない。"""
+    from backend import model_policy
+
+    config = {"text_generation": {"default_model": "m-standard",
+                                  "tier_order": ["batch", "standard", "premium", "pro"],
+                                  "tiers": {"batch": {"model": "m-batch"}, "standard": {"model": "m-standard"},
+                                            "premium": {"model": "m-premium"}, "pro": {"model": "m-pro"}}},
+              "task_mapping": {"proofreader": "standard", "youtube_optimization": "premium"}}
+    (tmp_path / "model_config.json").write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setattr(model_policy, "CONFIG_PATH", tmp_path / "model_config.json")
+    monkeypatch.setattr(model_policy, "OVERRIDES_PATH", tmp_path / "model_overrides.json")
+    monkeypatch.setattr(model_policy, "HISTORY_PATH", tmp_path / "history.jsonl")
+    import importlib
+    r2 = importlib.import_module("routers.r2_approval_router")   # routers/__init__ の同名 APIRouter と区別する
+    monkeypatch.setattr(r2, "_PRICES", {"m-batch": (0.1, 0.4, True), "m-standard": (1.5, 7.5, True),
+                                        "m-premium": (0.75, 3.75, True), "m-pro": (2.0, 12.0, False)})
+    return tmp_path
+
+
+def _stages_with_task():
+    return [{"name": "transcribe", "model": "local:whisper", "status": "success"},
+            {"name": "proofread", "model": "m-standard", "tier": "standard", "task": "proofreader",
+             "status": "success", "model_reason": "declared", "fallbacks": [], "calls": 2, "cost_jpy": 0.30},
+            {"name": "youtube_opt", "model": "m-premium", "tier": "premium", "task": "youtube_optimization",
+             "status": "success", "model_reason": "declared", "fallbacks": [], "calls": 1, "cost_jpy": 0.10}]
+
+
+def test_見積もりだけなら段は動かない(client, tmp_path, policy_sandbox):
+    _run(tmp_path, stages=_stages_with_task())
+
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "proofread", "reason": "字幕が固い", "dry_run": True})
+
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["from"] == {"tier": "standard", "model": "m-standard"}
+    assert b["to"] == {"tier": "premium", "model": "m-premium"}
+    assert b["billable"] is False and b["estimate_jpy"] == pytest.approx(0.30 * 0.5, abs=1e-4)
+    assert b["applied"] is False
+    assert not (policy_sandbox / "model_overrides.json").exists()
+
+
+def test_昇格すると段の上書きと履歴と実走の記録に残る(client, tmp_path, policy_sandbox):
+    d = _run(tmp_path, stages=_stages_with_task())
+
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "proofread", "reason": "字幕が固い"})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["applied"] is True and r.json()["to"]["tier"] == "premium"
+    ov = json.loads((policy_sandbox / "model_overrides.json").read_text(encoding="utf-8"))
+    assert ov["tasks"]["proofreader"]["tier"] == "premium" and ov["tasks"]["proofreader"]["reason"] == "字幕が固い"
+    hist = [json.loads(l) for l in (policy_sandbox / "history.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert hist[-1]["action"] == "escalate" and hist[-1]["task"] == "proofreader"
+    esc = json.loads((d / "escalations.json").read_text(encoding="utf-8"))
+    assert esc[0]["stage"] == "proofread" and esc[0]["to"]["tier"] == "premium" and esc[0]["reason"] == "字幕が固い"
+    assert client.get("/api/r2/runs/RID").json()["escalations"][0]["stage"] == "proofread"
+
+
+def test_理由が無ければ昇格できない(client, tmp_path, policy_sandbox):
+    _run(tmp_path, stages=_stages_with_task())
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "proofread", "reason": "  "})
+    assert r.status_code == 400 and not (policy_sandbox / "model_overrides.json").exists()
+
+
+def test_AIの工程でなければ昇格できない(client, tmp_path, policy_sandbox):
+    _run(tmp_path, stages=_stages_with_task())
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "transcribe", "reason": "遅い"})
+    assert r.status_code == 400 and "段" in r.json()["detail"]
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "nope", "reason": "x"})
+    assert r.status_code == 404
+
+
+def test_課金の段へは予算が無ければ上げられない(client, tmp_path, policy_sandbox, monkeypatch):
+    """**pro は課金。** 予算が無い・足りないなら押せない（fail-closed・憲法第3条）。"""
+    from backend import cost_guard
+    _run(tmp_path, stages=_stages_with_task())
+
+    monkeypatch.setattr(cost_guard, "load_active_budget", lambda *a, **k: None)
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "youtube_opt", "reason": "題が弱い"})
+    assert r.status_code == 402, r.text
+    assert r.json()["detail"]["billable"] is True and "予算" in r.json()["detail"]["why"]
+    assert not (policy_sandbox / "model_overrides.json").exists()
+
+    monkeypatch.setattr(cost_guard, "load_active_budget",
+                        lambda *a, **k: {"id": "B", "limit_jpy": 1.0, "spent_jpy": 0.9})
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "youtube_opt", "reason": "題が弱い"})
+    assert r.status_code == 402 and "残" in r.json()["detail"]["why"]
+
+
+def test_課金の段でも予算があれば見積もりつきで上がる(client, tmp_path, policy_sandbox, monkeypatch):
+    from backend import cost_guard
+    _run(tmp_path, stages=_stages_with_task())
+    monkeypatch.setattr(cost_guard, "load_active_budget",
+                        lambda *a, **k: {"id": "B", "limit_jpy": 1000.0, "spent_jpy": 4.71})
+
+    r = client.post("/api/r2/runs/RID/escalate", json={"stage": "youtube_opt", "reason": "題が弱い"})
+
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["billable"] is True and b["budget"]["id"] == "B" and b["budget"]["remaining_jpy"] == pytest.approx(995.29)
+    assert b["estimate_jpy"] == pytest.approx(0.10 * (2.0 + 12.0) / (0.75 + 3.75), abs=1e-4)
+
+
+def test_やり直しは同じ素材で新しい実走を起こし古い記録に結ぶ(client, tmp_path, policy_sandbox, monkeypatch):
+    d = _run(tmp_path, stages=_stages_with_task())
+    (tmp_path / "in.mp4").write_bytes(b"video")
+    called = {}
+
+    async def fake_start(req):
+        called["paths"] = req.video_paths
+        called["minutes"] = req.target_minutes
+        return {"status": "started", "session_id": "SESSION-NEW", "video_count": 1}
+
+    import importlib
+    pr = importlib.import_module("routers.pipeline_router")
+    monkeypatch.setattr(pr, "start_pipeline", fake_start)
+
+    r = client.post("/api/r2/runs/RID/rerun", json={"reason": "昇格した proofread でやり直す"})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["session_id"] == "SESSION-NEW"
+    assert called["paths"] == [str(tmp_path / "in.mp4")]
+    rr = json.loads((d / "rerun.json").read_text(encoding="utf-8"))
+    assert rr["session_id"] == "SESSION-NEW" and rr["reason"] == "昇格した proofread でやり直す"
+    assert client.get("/api/r2/runs/RID").json()["rerun"]["session_id"] == "SESSION-NEW"
+
+    # 新しい実走は session_id で古い実走に結ばれる
+    _run(tmp_path, "RID2", stages=_stages_with_task())
+    run2 = json.loads((tmp_path / "runs" / "RID2" / "run.json").read_text(encoding="utf-8"))
+    run2["inputs"]["session_id"] = "SESSION-NEW"
+    (tmp_path / "runs" / "RID2" / "run.json").write_text(json.dumps(run2), encoding="utf-8")
+    runs = {x["run_id"]: x for x in client.get("/api/r2/runs").json()["runs"]}
+    assert runs["RID2"]["supersedes"] == "RID" and runs["RID"]["superseded_by"] == "RID2"
+
+
+def test_素材が無ければやり直せない(client, tmp_path, policy_sandbox):
+    _run(tmp_path, stages=_stages_with_task())
+    r = client.post("/api/r2/runs/RID/rerun", json={"reason": "x"})
+    assert r.status_code == 404 and "素材" in r.json()["detail"]
+
+
+def test_やり直しは既に走っていれば断る(client, tmp_path, policy_sandbox, monkeypatch):
+    from fastapi import HTTPException
+    _run(tmp_path, stages=_stages_with_task())
+    (tmp_path / "in.mp4").write_bytes(b"video")
+
+    async def busy(req):
+        raise HTTPException(400, "パイプラインは既に実行中です")
+
+    import importlib
+    pr = importlib.import_module("routers.pipeline_router")
+    monkeypatch.setattr(pr, "start_pipeline", busy)
+    r = client.post("/api/r2/runs/RID/rerun", json={"reason": "x"})
+    assert r.status_code == 409
+
+
+def test_画面に昇格とやり直しの操作がある(client):
+    body = client.get("/r2/approve").text
+    for 語 in ("1段上げる", "やり直す", "見積もり"):
+        assert 語 in body, 語

@@ -26,6 +26,38 @@ from revenue.approval_gate import (
 )
 from revenue.run_record import RUNS_DIR
 
+# **`backend.model_policy` を先に取る。** `model_policy`（backend/ を起点にした同じファイル）とは
+# 別のモジュール実体で、上書き・履歴のパスをテストが差し替えるのは `backend.` 側
+try:
+    from backend import model_policy
+except ImportError:  # リポジトリ直下が import の起点に無いとき
+    import model_policy
+
+ESCALATIONS = "escalations.json"
+RERUN = "rerun.json"
+
+# 工程名 → model_policy の工程名（記録に `task` が無い古い実走のため）
+_STAGE_TASKS = {"proofread": "proofreader", "youtube_opt": "youtube_optimization",
+                "quality_gate": "quality_gate", "soul_feedback": "director"}
+
+
+def _load_prices() -> dict[str, tuple[float, float, bool]]:
+    """単価表（USD/1M tokens・無料枠か）。テストでは差し替える。"""
+    try:
+        from backend import cost_guard
+    except ImportError:
+        import cost_guard
+    prices, _meta = cost_guard._load_pricing()
+    return {m: (p.input_usd, p.output_usd, bool(p.free_tier)) for m, p in prices.items()}
+
+
+_PRICES: dict[str, tuple[float, float, bool]] | None = None
+
+
+def _price(model: str) -> tuple[float, float, bool] | None:
+    prices = _PRICES if _PRICES is not None else _load_prices()
+    return prices.get(model)
+
 router = APIRouter(prefix="/api/r2", tags=["R2 承認"])
 page_router = APIRouter(tags=["R2 承認"])
 
@@ -93,20 +125,36 @@ async def list_runs() -> dict[str, Any]:
     """承認に関わる実走の一覧（新しい順）。"""
     runs: list[dict] = []
     root = _runs_dir()
+    by_session: dict[str, str] = {}      # やり直しで起こした session_id → 古い実走
     if root.is_dir():
         for p in sorted(root.glob("*/run.json"), reverse=True):
             run = _read(p) or {}
             d = p.parent
             proposal = _read(d / PROPOSAL)
+            rerun = _read(d / RERUN)
+            if rerun and rerun.get("session_id"):
+                by_session[rerun["session_id"]] = d.name
             runs.append({
                 "run_id": d.name,
                 "status": run.get("status"),
                 "started_at": run.get("started_at"),
+                "session_id": (run.get("inputs") or {}).get("session_id"),
                 "has_proposal": proposal is not None,
                 "approved": (d / APPROVAL).is_file(),
                 "exported": (d / EXPORT).is_file(),
+                "rerun_requested": rerun is not None,
+                "supersedes": None,
+                "superseded_by": None,
                 "quality": _quality(proposal),
             })
+        # **やり直しの前後を結ぶ**（PR4）: 新しい実走は inputs.session_id で古い実走を指す
+        by_id = {r["run_id"]: r for r in runs}
+        for r in runs:
+            old = by_session.get(r.get("session_id") or "")
+            if old and old != r["run_id"]:
+                r["supersedes"] = old
+                if old in by_id:
+                    by_id[old]["superseded_by"] = r["run_id"]
     return {"runs": runs, "runs_dir": str(root)}
 
 
@@ -152,6 +200,8 @@ async def get_run(run_id: str) -> dict[str, Any]:
         } if export else None),
         "export_allowed": bool(ok),
         "export_blocker": why or None,
+        "escalations": list(_read(d / ESCALATIONS) or []),
+        "rerun": _read(d / RERUN),
     }
 
 
@@ -240,6 +290,134 @@ async def approve_run(run_id: str, body: ApproveBody) -> dict[str, Any]:
             "export_allowed": bool(ok), "export_blocker": why or None}
 
 
+class EscalateBody(BaseModel):
+    stage: str
+    reason: str = ""
+    dry_run: bool = False
+
+
+class RerunBody(BaseModel):
+    reason: str = ""
+
+
+def _escalation_plan(d: Path, stage_name: str) -> dict:
+    """この工程を1段上げたら**どのモデルになり、いくらか**（見積もり・上限）。"""
+    run = _read(d / "run.json") or {}
+    stage = next((s for s in run.get("stages") or [] if s.get("name") == stage_name), None)
+    if stage is None:
+        raise HTTPException(status_code=404, detail=f"工程がありません: {stage_name}")
+    task = stage.get("task") or _STAGE_TASKS.get(stage_name)
+    model = str(stage.get("model") or "")
+    if not task or model.startswith("local:"):
+        raise HTTPException(status_code=400, detail=f"{stage_name} は段に紐づく AI の工程ではありません（上げられない）")
+    current = model_policy.resolve(task)
+    order = model_policy.tier_order()
+    if current.tier not in order or order.index(current.tier) >= len(order) - 1:
+        raise HTTPException(status_code=409, detail=f"{stage_name}（{task}）は既に最上段です: {current.tier} / {current.model}")
+    to_tier = order[order.index(current.tier) + 1]
+    to_model = model_policy.model_of_tier(to_tier)
+    p_from, p_to = _price(current.model), _price(to_model)
+    billable = not (p_to[2] if p_to else False)     # 単価が無いモデルは課金扱い（fail-closed）
+    cost = float(stage.get("cost_jpy") or 0.0)
+    if p_from and p_to and (p_from[0] + p_from[1]) > 0:
+        estimate = cost * (p_to[0] + p_to[1]) / (p_from[0] + p_from[1])
+    else:
+        estimate = cost
+    return {"stage": stage_name, "task": task,
+            "from": {"tier": current.tier, "model": current.model},
+            "to": {"tier": to_tier, "model": to_model},
+            "billable": billable,
+            "estimate_jpy": round(estimate, 4),
+            "estimate_note": "この工程の前回の原価（上限見積もり）に単価の比を掛けたもの。無料枠なら実費 ¥0"}
+
+
+def _budget_check(plan: dict) -> dict | None:
+    """課金の段なら**予算を確かめる**（憲法第3条・fail-closed）。通らなければ 402。"""
+    if not plan["billable"]:
+        return None
+    try:
+        from backend import cost_guard
+    except ImportError:
+        import cost_guard
+    budget = cost_guard.load_active_budget()
+    if budget is None:
+        raise HTTPException(status_code=402, detail={
+            "why": "承認済みの予算がありません（.claude/budget.json に active な予算がない）。課金の段へは上げません",
+            "billable": True, "estimate_jpy": plan["estimate_jpy"]})
+    remaining = float(budget.get("limit_jpy", 0)) - float(budget.get("spent_jpy", 0))
+    if remaining < plan["estimate_jpy"] + cost_guard.DEFAULT_RESERVE_JPY:
+        raise HTTPException(status_code=402, detail={
+            "why": f"予算の残りが足りません（残 {remaining:.2f} 円 / 見積もり {plan['estimate_jpy']:.2f} 円）。追加承認を取ってください",
+            "billable": True, "estimate_jpy": plan["estimate_jpy"], "remaining_jpy": round(remaining, 2)})
+    return {"id": budget.get("id"), "limit_jpy": float(budget.get("limit_jpy", 0)),
+            "spent_jpy": float(budget.get("spent_jpy", 0)), "remaining_jpy": round(remaining, 2)}
+
+
+@router.post("/runs/{run_id}/escalate")
+async def escalate_stage(run_id: str, body: EscalateBody) -> dict[str, Any]:
+    """**不満な工程を1段上げる**（R2-C5）。CLI の `model_policy --up` と同じ規則・同じ履歴。
+
+    `dry_run` なら見積もりだけ（段は動かない）。課金の段（pro）へは予算が無ければ上げない。
+    """
+    d = _run_dir(run_id)
+    plan = _escalation_plan(d, body.stage)
+    budget = _budget_check(plan)
+    plan["budget"] = budget
+    plan["applied"] = False
+    if body.dry_run:
+        return plan
+    reason = (body.reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="理由を書いてください（あとで効果を検証できなくなります。CLI の --reason と同じ）")
+    try:
+        after = model_policy.escalate(plan["task"], reason)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    import json as _json
+    from datetime import datetime, timezone
+    rows = list(_read(d / ESCALATIONS) or [])
+    rows.append({"at": datetime.now(timezone.utc).isoformat(), "stage": plan["stage"], "task": plan["task"],
+                 "from": plan["from"], "to": {"tier": after.tier, "model": after.model},
+                 "reason": reason, "estimate_jpy": plan["estimate_jpy"], "billable": plan["billable"]})
+    (d / ESCALATIONS).write_text(_json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    plan["to"] = {"tier": after.tier, "model": after.model}
+    plan["applied"] = True
+    plan["reason"] = reason
+    return plan
+
+
+@router.post("/runs/{run_id}/rerun")
+async def rerun(run_id: str, body: RerunBody) -> dict[str, Any]:
+    """**同じ素材でやり直す**（新しい実走を起こす）。昇格した段が次の実走から効く。
+
+    本線に再開は無いので、入力からやり直す（`run_record --resume` と同じ案内）。
+    古い実走には `rerun.json` を残し、新しい実走は inputs.session_id で結ばれる。
+    """
+    d = _run_dir(run_id)
+    run = _read(d / "run.json") or {}
+    proposal = _read(d / PROPOSAL) or {}
+    video = str(proposal.get("video_path") or (run.get("inputs") or {}).get("video_path") or "")
+    if not video or not Path(video).is_file():
+        raise HTTPException(status_code=404, detail=f"素材がありません（やり直せない）: {video or '(記録なし)'}")
+    minutes = int((run.get("inputs") or {}).get("target_minutes") or 20)
+    # `routers.pipeline_router` は routers/__init__.py が APIRouter を同名で出しているので、
+    # `import routers.pipeline_router as pr` では属性（APIRouter）が返る。モジュールで取る
+    import importlib
+    pr = importlib.import_module("routers.pipeline_router")
+    try:
+        started = await pr.start_pipeline(pr.PipelineStartRequest(video_paths=[video], target_minutes=minutes))
+    except HTTPException as e:
+        raise HTTPException(status_code=409, detail=f"やり直しを起こせません: {e.detail}")
+    import json as _json
+    from datetime import datetime, timezone
+    record = {"requested_at": datetime.now(timezone.utc).isoformat(), "reason": (body.reason or "").strip(),
+              "session_id": started.get("session_id"), "video_path": video,
+              "escalations": list(_read(d / ESCALATIONS) or [])}
+    (d / RERUN).write_text(_json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"run_id": run_id, "session_id": started.get("session_id"), "status": started.get("status"),
+            "note": "新しい実走は提案で止まります。承認画面の一覧に出たら、そちらを見て承認してください"}
+
+
 _PAGE = """<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>承認画面 — R2</title>
@@ -261,7 +439,7 @@ _PAGE = """<!doctype html>
 </style></head>
 <body>
 <h1>承認画面（R2-C5）</h1>
-<p class="muted">提案ごとに、どのモデルで出たか・なぜそのモデルになったかを見て、人が直してから承認する。昇格してやり直すのはこの後の PR で足す。</p>
+<p class="muted">提案ごとに、どのモデルで出たか・なぜそのモデルになったかを見て、人が直してから承認する。不満なら工程を1段上げて（見積もりを見てから）、同じ素材でやり直す。</p>
 <div class="row">
  <div class="runs" id="runs"><p class="muted">実走を読み込み中…</p></div>
  <div class="detail" id="detail"><p class="muted">左の実走を選ぶ</p></div>
@@ -281,14 +459,17 @@ async function show(id){
   const stages=d.stages.filter(s=>s.model&&!String(s.model).startsWith("local:"));
   const rows=stages.map(s=>{
     const fb=(s.fallbacks||[]).map(f=>`${esc(f.from)} → ${esc(f.to)}（${esc(f.reason)}）`).join("<br>");
-    return `<tr><td>${esc(s.name)}</td><td>${esc(s.model)}</td><td>${esc(s.tier||"")}</td><td><span class="tag ${esc(s.model_reason)}">${esc(REASON[s.model_reason]||s.model_reason)}</span>${fb?"<br>"+fb:""}</td><td>${s.calls}</td><td>${s.cost_jpy.toFixed(2)}</td></tr>`;
+    const up=(d.export||!s.tier)?"":`<button type="button" onclick="escalate('${esc(id)}','${esc(s.name)}',this)">1段上げる</button>`;
+    return `<tr><td>${esc(s.name)}</td><td>${esc(s.model)}</td><td>${esc(s.tier||"")}</td><td><span class="tag ${esc(s.model_reason)}">${esc(REASON[s.model_reason]||s.model_reason)}</span>${fb?"<br>"+fb:""}</td><td>${s.calls}</td><td>${s.cost_jpy.toFixed(2)}</td><td>${up}</td></tr>`;
   }).join("");
   const el=document.getElementById("detail");
   el.innerHTML=`<h2>${esc(id)} <small class="muted">${esc(d.status)}</small></h2>
    ${d.proposal&&d.proposal.preview_available?`<video controls preload="metadata" src="/api/r2/runs/${encodeURIComponent(id)}/preview"></video>`:'<p class="muted">プレビューがありません</p>'}
    <p>品質: ${q.scored?esc(q.score)+" 点（"+(q.passed?"合格":"不合格")+"・"+esc(q.data_source)+"）":"採点されていません"} ／ 書き出しのモード: ${esc(d.proposal?d.proposal.render_mode:"-")}</p>
    <h3>工程ごとのモデル</h3>
-   <table><thead><tr><th>工程</th><th>モデル</th><th>段</th><th>なぜこのモデルか</th><th>呼び出し</th><th>原価（円・上限見積もり）</th></tr></thead><tbody>${rows||'<tr><td colspan="6" class="muted">AI の工程がありません</td></tr>'}</tbody></table>
+   <table><thead><tr><th>工程</th><th>モデル</th><th>段</th><th>なぜこのモデルか</th><th>呼び出し</th><th>原価（円・上限見積もり）</th><th>不満なら</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="muted">AI の工程がありません</td></tr>'}</tbody></table>
+   ${(d.escalations||[]).length?`<p>昇格の記録: ${d.escalations.map(e=>esc(e.stage)+" "+esc(e.from.tier)+"→"+esc(e.to.tier)+"（"+esc(e.reason)+"）").join("、")}</p>`:""}
+   ${d.rerun?`<p class="blocker">やり直しを起こしました（${esc(d.rerun.requested_at)}・session ${esc(d.rerun.session_id)}）。新しい実走が一覧に出たらそちらを承認する</p>`:(d.export?"":`<p><button type="button" onclick="rerun('${esc(id)}',this)">同じ素材でやり直す</button> <span class="muted" id="rerunMsg"></span></p>`)}
    <h3>人が直す（手動投稿用のメタデータ）</h3>
    <div id="working"><p class="muted">読み込み中…</p></div>
    <h3>承認</h3>
@@ -315,6 +496,23 @@ async function saveWorking(id,name,btn){
   const ta=document.querySelector('textarea[data-name="'+name+'"]');const msg=btn.nextElementSibling;
   const r=await fetch("/api/r2/runs/"+encodeURIComponent(id)+"/working/"+encodeURIComponent(name),{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({text:ta.value})});
   const b=await r.json(); msg.textContent=r.ok?"保存した（承認し直しが要る）":("保存できない: "+(b.detail||r.status)); if(r.ok) show(id);
+}
+async function escalate(id,stage,btn){
+  const msg=btn.parentElement;
+  const q=await fetch("/api/r2/runs/"+encodeURIComponent(id)+"/escalate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({stage,reason:"",dry_run:true})});
+  const plan=await q.json();
+  if(!q.ok){alert("上げられない: "+(plan.detail&&plan.detail.why?plan.detail.why:JSON.stringify(plan.detail)));return;}
+  const reason=prompt(`${stage}: ${plan.from.tier}（${plan.from.model}）→ ${plan.to.tier}（${plan.to.model}）\n見積もり: ${plan.estimate_jpy} 円（上限）${plan.billable?" ※課金の段。予算 "+(plan.budget?plan.budget.remaining_jpy+" 円残":"なし"):"（無料枠）"}\n\n何が不満か（理由。必須）:`);
+  if(reason===null) return;
+  const r=await fetch("/api/r2/runs/"+encodeURIComponent(id)+"/escalate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({stage,reason})});
+  const b=await r.json(); if(!r.ok){alert("上げられない: "+(b.detail&&b.detail.why?b.detail.why:JSON.stringify(b.detail)));return;}
+  show(id);
+}
+async function rerun(id,btn){
+  const msg=document.getElementById("rerunMsg");
+  const reason=prompt("やり直す理由（任意）:"); if(reason===null) return;
+  const r=await fetch("/api/r2/runs/"+encodeURIComponent(id)+"/rerun",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({reason})});
+  const b=await r.json(); msg.textContent=r.ok?("起こした: "+b.session_id+"。"+b.note):("起こせない: "+(b.detail||r.status)); if(r.ok) show(id);
 }
 async function doApprove(ev,id){
   ev.preventDefault(); const f=ev.target; const msg=document.getElementById("approveMsg");
