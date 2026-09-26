@@ -326,6 +326,32 @@ class TestProofreadSegmentsResponseValidation:
         segments = [{"text": "テスト"}]
         result, stats = self._run_with_response_text('{"index": 0, "text": "修正済"}', segments)
         assert stats["proofread_count"] == 0
+        # **応答を丸ごと捨てたバッチは失敗に数える**（R2-C5 検証3周目の P1）。黙って無視すると
+        # 「宣言どおり」の記録になり、提案がそのモデルの出力ではないことが見えない
+        assert stats["failed_batches"] == 1
+
+    def test_採用できた項目がゼロのバッチは失敗に数える(self):
+        """リスト形でも中身を全部捨てたら失敗（R2-C5 検証4周目の R4-1）。
+        バッチ内の番号で答えた（index が範囲外）・鍵が違う・dict でない・空リスト、のどれも
+        AI の出力が提案に1文字も届いていない。"""
+        segments = [{"text": "テスト"}]
+        for text in ('["X","Y"]', '[{"index":0,"corrected_text":"X"}]', '[{"index":5,"text":"X"}]', '[]'):
+            result, stats = self._run_with_response_text(text, segments)
+            assert stats["failed_batches"] == 1, text
+            assert stats["proofread_count"] == 0
+
+    def test_直す所が無くても項目が返れば失敗ではない(self):
+        segments = [{"text": "テスト"}]
+        result, stats = self._run_with_response_text('[{"index":0,"text":"テスト"}]', segments)
+        assert stats["failed_batches"] == 0
+
+    def test_採用した項目の数を返す(self):
+        """**採用した AI の出力の件数**が統計に載る（R2-C5・作りの変更 2026-09-26）。記録の証拠になる。"""
+        segments = [{"text": "テスト"}, {"text": "二つ目"}]
+        result, stats = self._run_with_response_text('[{"index":0,"text":"修正"},{"index":1,"text":"二つ目"}]', segments)
+        assert stats["accepted_items"] == 2
+        result, stats = self._run_with_response_text('[{"index":9,"text":"x"}]', segments)
+        assert stats["accepted_items"] == 0
 
     def test_response_item_is_not_a_dict(self):
         """レスポンスのリストの要素が辞書ではない場合のスキップ処理"""
@@ -835,4 +861,6 @@ class TestCoverageEnhancementAdditional:
                 assert stats["total_retries"] == 1
                 assert stats["failed_batches"] == 0
                 assert result[0]["text"] == "修正済"
+
+
 

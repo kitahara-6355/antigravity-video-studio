@@ -67,3 +67,14 @@
 - 中間ゲートを通すか（`docs/GATE_R2_INTERIM_C1-C3_20260926.md`）
 - C5 を条文どおり作るか、フェーズの定義を変えて後へ回すか
 - 画面を FastAPI の1枚にする方針でよいか（既存の React 画面に組み込むなら、フロントの CI を先に作る必要がある）
+
+
+## 追記（2026-09-26・検証4周の後・ユーザー決定）
+
+gate-verifier の2〜4周目はすべて同じ類（AI の出力が提案に届いていないのに「宣言どおり」）だった。経路を列挙して塞ぐ限り次の経路が出るので、**作りを変えた**:
+
+- **「宣言どおり」は断定ではなく証拠で決める。** 工程は「採用した AI の出力の件数」（`ai_accepted`）を `ctx.ai_accepted[印]` で報告し、coordinator が記録の工程に写す
+  - 校閲: `ai_proofreader` の `accepted_items`（採用した項目の数）。全バッチ失敗・空リスト・鍵違い・範囲外は 0
+  - YouTube 最適化: 応答の dict に中身のある鍵（titles / tags / description / chapters）の数。0 なら形だけなのでスタブに落とす
+- `model_reason` の順: **stub（`ai_skipped` か `ai_accepted == 0`）** → partial → fallback → mismatch → unverified → declared → observed
+- 画面と `--trace` は「宣言どおり（採用 N 件）」／「宣言どおり（採用の証拠なし — 件数を報告しない工程）」と出す

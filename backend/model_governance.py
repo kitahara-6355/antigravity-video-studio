@@ -34,7 +34,7 @@ from google.api_core.exceptions import GoogleAPICallError
 # 従量課金のキルスイッチ（憲法第3条）。**全呼び出しがここを通る。**
 # 本番の 40 モジュールはすべて gemini_client_factory 経由で、直接 genai を
 # 叩く本番モジュールは実測 0 件。だから絞り口はここ1つでよい。
-from cost_guard import guard_after, guard_before
+from cost_guard import guard_after, guard_before, record_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +340,19 @@ class ModelGovernanceEngine:
     # Layer 3: 監査ログ
     # ============================================================
 
+    def _classify_error(self, error) -> str:
+        """エラーを簡潔に分類（降格の理由として記録に残す・D-39）。"""
+        s = str(error)
+        if "429" in s or "RESOURCE_EXHAUSTED" in s:
+            return "429:枠枯渇"
+        if "503" in s or "UNAVAILABLE" in s:
+            return "503:サーバー混雑"
+        if "404" in s or "NOT_FOUND" in s:
+            return "404:モデル不在"
+        if "limit: 0" in s or "quota" in s:
+            return "quota=0:利用不可"
+        return f"unknown:{s[:60]}"
+
     def _record_event(
         self, event_type: str, original: str,
         resolved: str, caller: str, error: str = "",
@@ -445,6 +458,16 @@ class ModelGovernanceEngine:
                     f"'{fallback}' に降格 (task={task})"
                 )
                 resolved = fallback
+            if resolved != original:
+                # **事前の枠チェックでの降格も理由つきで台帳へ**（R2-C5 検証1周目の U1）。
+                # 本線の proofread / youtube_opt はここでモデルを決めるので、ここを落とすと
+                # 実行記録は「宣言どおり」のまま実測だけが違う
+                try:
+                    record_fallback(requested=original, to=resolved,
+                                    reason=f"quota_precheck:枠枯渇（usage={_ut.get_usage_ratio(original):.1%}）",
+                                    attempts=0, caller=f"resolve:{task}")
+                except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
+                    logger.warning(f"⚠️ 降格の理由を台帳に残せませんでした: {e}")
         except ImportError:
             pass  # usage_tracker 未導入時は枠チェックスキップ
         except (AttributeError, TypeError, ImportError, RuntimeError) as e:
@@ -532,6 +555,7 @@ class ModelGovernanceEngine:
                         "fallback_success", resolved_model, try_model,
                         caller_id,
                     )
+                    _note_fallback(resolved_model, try_model, last_error, i, caller_id)
                     logger.info(
                         f"🛡️ Gateway fallback success: "
                         f"'{resolved_model}' → '{try_model}' "
@@ -654,6 +678,24 @@ async def _attempt_with_backoff_async(call, *, model: str, caller: str):
             await asyncio.sleep(delay)
 
 
+def _note_fallback(requested: str, to: str, last_error, hops: int, caller: str) -> None:
+    """降格して成功したことを**理由つきで台帳に残す**（D-39・R2-C5）。
+
+    `_record_event` はメモリ上（200件で切れる）で、実走の後に追えない。
+    台帳の行は `RunRecorder._close_stage` が工程に結び、`run.json` の `fallbacks` になる。
+    `attempts` は成功するまでに失敗した呼び出しの数（再試行する種類のエラーなら段ごとに
+    上限＋1回、404 のように再試行しないなら段ごとに1回）。記録の失敗で呼び出しを落とさない。
+    """
+    try:
+        per_hop = (model_governance.MAX_RETRY_PER_MODEL + 1
+                   if last_error is not None and model_governance.is_retryable_error(last_error) else 1)
+        record_fallback(requested=requested, to=to,
+                        reason=model_governance._classify_error(last_error) if last_error else "unknown",
+                        attempts=hops * per_hop, caller=caller)
+    except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
+        logger.warning(f"⚠️ 降格の理由を台帳に残せませんでした: {e}")
+
+
 # ============================================================
 # Governed Client — 自動フォールバック付きプロキシ
 # ============================================================
@@ -701,6 +743,7 @@ class GovernedModelsProxy:
                         "fallback_success", model, try_model,
                         self._caller,
                     )
+                    _note_fallback(model, try_model, last_error, i, self._caller)
                     logger.info(
                         f"🛡️ ModelGovernance: fallback success "
                         f"'{model}' → '{try_model}' (caller={self._caller})"
@@ -773,6 +816,7 @@ class GovernedModelsProxy:
                         "fallback_success", model, try_model,
                         self._caller,
                     )
+                    _note_fallback(model, try_model, last_error, i, self._caller)
                     logger.info(
                         f"🛡️ ModelGovernance: fallback success "
                         f"'{model}' → '{try_model}' (caller={self._caller})"
@@ -869,6 +913,7 @@ class GovernedAsyncModelsProxy:
                         "fallback_success", model, try_model,
                         self._caller,
                     )
+                    _note_fallback(model, try_model, last_error, i, self._caller)
                     logger.info(
                         f"🛡️ Async fallback success: "
                         f"'{model}' → '{try_model}'"
@@ -937,6 +982,7 @@ class GovernedAsyncModelsProxy:
                         "fallback_success", model, try_model,
                         self._caller,
                     )
+                    _note_fallback(model, try_model, last_error, i, self._caller)
                     logger.info(
                         f"🛡️ Async fallback success: "
                         f"'{model}' → '{try_model}'"

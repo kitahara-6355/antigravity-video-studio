@@ -90,6 +90,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
         "failed_batches": 0,
         "total_batches": 0,
         "skipped": False,
+        # **採用した AI の出力の件数**（R2-C5・2026-09-26）。記録の「宣言どおり」の証拠
+        "accepted_items": 0,
     }
 
     def _return(segs):
@@ -369,7 +371,21 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
 
                         batch_correction_map[item_idx] = item["text"]
                 else:
+                    # **応答を丸ごと捨てたバッチは失敗に数える**（R2-C5 検証3周目の P1）。黙って無視すると
+                    # 記録は「宣言どおり」になり、提案がそのモデルの出力ではないことが見えない
                     logger.warning("AI Proofreader: LLM response corrected_data is not a list")
+                    stats["failed_batches"] += 1
+                    continue
+
+                if not batch_correction_map:
+                    # **採用できた項目がゼロのバッチは失敗**（R2-C5 検証4周目の R4-1）。バッチ内の番号で
+                    # 答えた・鍵が違う・空リスト、のどれも AI の出力が提案に届いていない。黙って通すと
+                    # 記録が「宣言どおり」になる
+                    logger.warning("AI Proofreader: no usable item in the response (counted as a failed batch)")
+                    stats["failed_batches"] += 1
+                    continue
+
+                stats["accepted_items"] += len(batch_correction_map)
 
                 # セグメントを更新
                 for idx, s in enumerate(batch):

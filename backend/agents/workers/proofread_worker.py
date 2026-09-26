@@ -100,11 +100,20 @@ class ProofreadWorker(PipelineStageWorker):
                     f"AI校閲: {retry_stats['failed_batches']}/{retry_stats['total_batches']}バッチが"
                     f"リトライ上限({retry_stats['total_retries']}回)後に失敗しました。一部セグメントは未校閲です。"
                 )
-            if retry_stats.get("skipped"):
-                ctx.skipped_features.append("AI校閲(Gemini)")
+            total = int(retry_stats.get("total_batches", 0) or 0)
+            failed = int(retry_stats.get("failed_batches", 0) or 0)
+            # **採用した AI の出力の件数を記録に渡す**（宣言どおりは断定ではなく証拠で決める）
+            ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}),
+                               "AI校閲": int(retry_stats.get("accepted_items", 0) or 0)}
+            if retry_stats.get("skipped") or (total > 0 and failed >= total):
+                # 呼び出しは成功しても**応答を全部捨てた**なら、AI の出力は提案に届いていない
+                # （R2-C5 検証3周目の P1）。記録には `ai_skipped` として残る
+                if "AI校閲(Gemini)" not in ctx.skipped_features:
+                    ctx.skipped_features.append("AI校閲(Gemini)")
         except Exception as e:
             logger.warning(f"Gemini AI proofread skipped: {e}")
             ctx.skipped_features.append("AI校閲(Gemini)")
+            ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}), "AI校閲": 0}
 
         # ━━━ FIX-3A: テキスト整形（旧 src/clean_linguistic.py 復元） ━━━
         # 長文を18文字/行に分割し、字幕の画面はみ出しを防止
@@ -162,8 +171,9 @@ class ProofreadWorker(PipelineStageWorker):
         # UX-15: API枠枯渇等でAI校閲がスキップされた場合、detailに警告を表示
         skip_warn = ""
         if "AI校閲(Gemini)" in ctx.skipped_features:
-            skip_warn = " ⚠️ AI校閲スキップ(API枠制限)"
-            ctx.warnings.append("AI校閲がAPI枠制限によりスキップされました。品質に影響する可能性があります。")
+            # 理由を決めつけない（4周目の m3）: 枠制限のほかに、応答を全部捨てた場合もここに来る
+            skip_warn = " ⚠️ AI校閲は効いていない"
+            ctx.warnings.append("AI校閲は効いていません（API 枠の制限か、応答を使えなかった）。品質に影響する可能性があります。")
         # 元が Segment オブジェクトだった場合は、元の型に復元する
         if ctx.segments and has_segment_objects:
             try:

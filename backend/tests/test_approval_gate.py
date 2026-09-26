@@ -478,3 +478,78 @@ def test_サイドカーが無ければ無いと言う(tmp_path, capsys):
     assert rc == 1
     assert "開示を載せるサイドカー）が出力にありません" in out, out
     assert "開示の判断がありません" not in out, out
+
+
+# --- なぜそのモデルになったか（D-39・R2-C5・2026-09-26） -------------------------
+
+def test_trace_工程ごとのモデルと降格の理由が出る(tmp_path, capsys):
+    """承認する人が『どのモデルの提案か・宣言どおりか・降格ならなぜか』を証跡で読める。"""
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][1].update({"tier": "standard", "model_reason": "fallback",
+                             "models_observed": ["gemini-3.5-flash-lite"],
+                             "fallbacks": [{"from": "gemini-3.6-flash", "to": "gemini-3.5-flash-lite",
+                                            "reason": "503:サーバー混雑", "attempts": 3}]})
+    run["stages"][2].update({"tier": "standard", "model_reason": "declared", "fallbacks": []})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "proofread" in out and "降格" in out and "503:サーバー混雑" in out, out
+    assert "gemini-3.6-flash → gemini-3.5-flash-lite" in out, out
+    assert "youtube_opt" in out and "宣言どおり" in out, out
+
+
+def test_trace_実測が宣言と違えば実際に動いたモデルを出す(tmp_path, capsys):
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][1].update({"tier": "standard", "model_reason": "mismatch",
+                             "models_observed": ["gemini-3.5-flash-lite"], "model_mismatch": True})
+    run["stages"][2].update({"tier": "standard", "model_reason": "unverified", "model_unverified": True})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "実測が宣言と違う" in out and "gemini-3.5-flash-lite" in out, out
+    assert "未検証" in out
+
+
+def test_trace_スタブに替わった工程はそう言う(tmp_path, capsys):
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][2].update({"tier": "standard", "model_reason": "stub", "ai_skipped": True,
+                             "models_observed": ["gemini-3.6-flash"]})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "スタブ" in out, out
+
+
+
+def test_trace_一部スタブの工程はそう言う(tmp_path, capsys):
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][1].update({"tier": "standard", "model_reason": "partial", "ai_partial": True})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "一部スタブ" in out, out
+
+
+
+def test_trace_採用の件数と証拠なしを出す(tmp_path, capsys):
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][1].update({"tier": "standard", "model_reason": "declared", "ai_accepted": 4})
+    run["stages"][2].update({"tier": "standard", "model_reason": "declared"})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "採用 4 件" in out and "採用の証拠なし" in out, out

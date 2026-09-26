@@ -72,7 +72,7 @@ async def test_proofread_worker_ai_retry_and_warnings():
         result = await worker.execute(ctx)
         assert result.success is True
         assert len(ctx.warnings) >= 2
-        assert "AI校閲がAPI枠制限によりスキップされました" in ctx.warnings[1]
+        assert "AI校閲は効いていません" in ctx.warnings[1]
         assert "AI校閲(Gemini)" in ctx.skipped_features
 
 @pytest.mark.asyncio

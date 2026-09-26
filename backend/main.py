@@ -190,6 +190,9 @@ def register_all_routers(app: FastAPI) -> None:
         dashboard_router,
         approval_router,
         philosophy_router,
+        # --- R2-C5: 承認画面 ---
+        r2_approval_router,
+        r2_approval_page_router,
         # --- ログ & エラーレポート ---
         log_router,
         error_router,
@@ -248,6 +251,10 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(dashboard_router)
     app.include_router(approval_router)
     app.include_router(philosophy_router)
+
+    # R2-C5: 承認画面（読むだけ。承認と昇格は後の PR）
+    app.include_router(r2_approval_router)
+    app.include_router(r2_approval_page_router)
 
     # DS-12: テーマ
     app.include_router(themes_router)

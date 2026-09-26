@@ -1663,3 +1663,64 @@ class TestAiProofreaderBranches:
                          "total_batches", "skipped"]
         for key in required_keys:
             assert key in stats, f"stats に {key} がない"
+
+
+
+# --- R2-C5 検証3周目の P1: 応答を全部捨てた校閲は「AI校閲(Gemini)」を積む ---------------
+
+def _ctx_for_stats(monkeypatch, stats):
+    import sys
+    import types
+    fake = types.ModuleType("subtitle_engine.ai_proofreader")
+    fake.proofread_segments = lambda segs, return_stats=True: (segs, dict(stats))
+    monkeypatch.setitem(sys.modules, "subtitle_engine.ai_proofreader", fake)
+    ctx = PipelineContext(video_path="in.mp4")
+    ctx.segments = [{"text": "こんにちは", "start": 0.0, "end": 1.0}, {"text": "世界", "start": 1.0, "end": 2.0}]
+    return ctx
+
+
+@pytest.mark.asyncio
+async def test_全バッチを捨てた校閲はスタブとして印を積む(monkeypatch):
+    ctx = _ctx_for_stats(monkeypatch, {"total_batches": 2, "failed_batches": 2, "total_retries": 0, "skipped": False})
+    await ProofreadWorker().execute(ctx)
+    assert "AI校閲(Gemini)" in ctx.skipped_features
+
+
+@pytest.mark.asyncio
+async def test_一部のバッチを捨てた校閲は警告だけで印は積まない(monkeypatch):
+    ctx = _ctx_for_stats(monkeypatch, {"total_batches": 2, "failed_batches": 1, "total_retries": 0, "skipped": False})
+    await ProofreadWorker().execute(ctx)
+    assert "AI校閲(Gemini)" not in ctx.skipped_features
+    assert any("AI校閲" in w for w in ctx.warnings)
+
+
+@pytest.mark.asyncio
+async def test_JSONの失敗でスタブになった警告は枠制限と言わない(monkeypatch):
+    """全バッチ失敗の理由を「API枠制限」と決めつけない（4周目の m3）。"""
+    ctx = _ctx_for_stats(monkeypatch, {"total_batches": 1, "failed_batches": 1, "total_retries": 0, "skipped": False})
+    await ProofreadWorker().execute(ctx)
+    assert not any("枠制限" in w for w in ctx.warnings), ctx.warnings
+
+
+@pytest.mark.asyncio
+async def test_校閲は採用したAIの出力の件数をctxに残す(monkeypatch):
+    ctx = _ctx_for_stats(monkeypatch, {"total_batches": 1, "failed_batches": 0, "total_retries": 0,
+                                       "skipped": False, "accepted_items": 2})
+    await ProofreadWorker().execute(ctx)
+    assert ctx.ai_accepted["AI校閲"] == 2
+
+
+@pytest.mark.asyncio
+async def test_校閲が落ちたら採用ゼロを残す(monkeypatch):
+    import sys
+    import types
+    from agents.pipeline_types import PipelineContext
+    fake = types.ModuleType("subtitle_engine.ai_proofreader")
+    def _boom(segs, return_stats=True):
+        raise RuntimeError("落ちた")
+    fake.proofread_segments = _boom
+    monkeypatch.setitem(sys.modules, "subtitle_engine.ai_proofreader", fake)
+    ctx = PipelineContext(video_path="in.mp4")
+    ctx.segments = [{"text": "a", "start": 0.0, "end": 1.0}]
+    await ProofreadWorker().execute(ctx)
+    assert ctx.ai_accepted["AI校閲"] == 0 and "AI校閲(Gemini)" in ctx.skipped_features

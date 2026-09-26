@@ -599,3 +599,166 @@ def test_読めない成果物は指紋を偽らない(tmp_path):
     rec.finish()
 
     assert load_run(rec.path)["artifact_digests"][str(tmp_path / "居ない.mp4")] is None
+
+
+# --- なぜそのモデルになったか（D-39・R2-C5・2026-09-26） ---------------------------
+
+
+def _fallback_row(path, requested, to, reason="503:サーバー混雑", attempts=3):
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"kind": "fallback", "requested": requested, "model": to,
+                             "reason": reason, "attempts": attempts, "caller": "test"}) + "\n")
+
+
+def test_a_fallback_and_its_reason_are_recorded_on_the_stage(tmp_path):
+    """記録だけを見て「宣言どおりか、降格ならなぜか」が分かる。以前はコンソールにしか出なかった。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _fallback_row(rec.ledger_path, "gemini-3.6-flash", "gemini-3.5-flash-lite")
+        _ledger_row(rec.ledger_path, "gemini-3.5-flash-lite")
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_reason"] == "fallback"
+    assert stage["fallbacks"] == [{"from": "gemini-3.6-flash", "to": "gemini-3.5-flash-lite",
+                                   "reason": "503:サーバー混雑", "attempts": 3}]
+    assert stage["model_mismatch"] is True
+    assert stage["calls"] == 1, "降格の行を呼び出しに数えている"
+    assert stage["cost_jpy"] == 0.1
+
+
+def test_a_stage_that_ran_as_declared_says_so(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_reason"] == "declared"
+    assert stage["fallbacks"] == []
+
+
+def test_a_stage_without_a_declaration_is_marked_observed(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    assert load_run(rec.path)["stages"][0]["model_reason"] == "observed"
+
+
+def test_fallbacks_of_another_stage_are_not_attributed(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("a", model="gemini-3.6-flash"):
+        _fallback_row(rec.ledger_path, "gemini-3.6-flash", "gemini-3.5-flash-lite")
+    with rec.stage("b", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+
+    stages = load_run(rec.path)["stages"]
+    assert stages[0]["model_reason"] == "fallback"
+    assert stages[1]["model_reason"] == "declared" and stages[1]["fallbacks"] == []
+
+
+def test_the_resume_view_shows_why_the_model_changed(tmp_path, capsys):
+    from backend.revenue.run_record import main
+
+    rec = _recorder(tmp_path)
+    with pytest.raises(RuntimeError):
+        with rec.stage("proofread", model="gemini-3.6-flash", stage_input={"x": 1}):
+            _fallback_row(rec.ledger_path, "gemini-3.6-flash", "gemini-3.5-flash-lite", "429:枠枯渇", 2)
+            raise RuntimeError("落ちた")
+    rec.finish()
+
+    rc = main(["--resume", rec.run_id, "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "429:枠枯渇" in out and "gemini-3.5-flash-lite" in out, out
+
+
+def test_a_declared_stage_with_no_calls_is_unverified_not_declared(tmp_path):
+    """**宣言があって一度も呼ばれていない工程は「宣言どおり」ではない**（R2-C5 検証1周目の U2）。
+    2026-08-20 の事故（全段 503 → スタブ → success）と同じ形。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        pass
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_unverified"] is True
+    assert stage["model_reason"] == "unverified"
+
+
+def test_observed_differs_without_a_fallback_row_is_mismatch(tmp_path):
+    """降格の行が無いのに実測が宣言と違う（事前の枠チェックなど）→ 「宣言どおり」と言わない（U1）。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.5-flash-lite")
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_mismatch"] is True
+    assert stage["model_reason"] == "mismatch"
+
+
+def test_a_local_stage_is_declared_even_without_calls(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("transcribe", model="local:whisper"):
+        pass
+    rec.finish()
+    assert load_run(rec.path)["stages"][0]["model_reason"] == "declared"
+
+
+def test_a_stage_that_dropped_the_ai_output_is_a_stub_not_declared(tmp_path):
+    """呼び出しは成功したのに応答を捨ててスタブで success にした工程は「宣言どおり」ではない
+    （R2-C5 検証2周目の R1）。提案はそのモデルが出したものではない。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("youtube_opt", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_skipped"] = True
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["ai_skipped"] is True
+    assert stage["model_reason"] == "stub"
+    assert stage["calls"] == 1
+
+
+
+def test_a_partially_dropped_stage_is_partial(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_partial"] = True
+    rec.finish()
+    st = load_run(rec.path)["stages"][0]
+    assert st["ai_partial"] is True and st["model_reason"] == "partial"
+
+
+
+def test_zero_accepted_output_is_a_stub_whatever_the_path(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_accepted"] = 0
+    rec.finish()
+    st = load_run(rec.path)["stages"][0]
+    assert st["ai_accepted"] == 0 and st["model_reason"] == "stub"
+
+
+def test_accepted_output_with_calls_is_declared_with_evidence(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_accepted"] = 4
+    rec.finish()
+    st = load_run(rec.path)["stages"][0]
+    assert st["ai_accepted"] == 4 and st["model_reason"] == "declared"
+
+
+def test_unreported_acceptance_is_none(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+    assert load_run(rec.path)["stages"][0]["ai_accepted"] is None

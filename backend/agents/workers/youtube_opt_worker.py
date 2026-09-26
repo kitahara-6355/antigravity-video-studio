@@ -130,6 +130,13 @@ class YouTubeOptWorker(PipelineStageWorker):
 
         try:
             metadata, model_name = await self._generate_ai_metadata(all_text)
+            # **採用した AI の出力の件数**（R2-C5・2026-09-26）: 期待する鍵のうち中身のあるもの。
+            # ゼロなら形だけの dict なので、AI の出力は提案に届いていない → スタブに落とす
+            accepted = sum(1 for k in ("titles", "tags", "description", "chapters")
+                           if isinstance(metadata, dict) and metadata.get(k))
+            ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}), "YouTube最適化": accepted}
+            if accepted == 0:
+                raise ValueError("応答に使える鍵（titles / tags / description / chapters）が無い")
             ctx.metadata = metadata
             self._run_cross_media_analysis(ctx)
             titles = metadata.get("titles", [])
@@ -151,6 +158,7 @@ class YouTubeOptWorker(PipelineStageWorker):
         ) as e:
             logger.warning(f"YouTube AI生成スキップ (詳細: {e})", exc_info=True)
             ctx.skipped_features.append("YouTube最適化(Gemini)")
+            ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}), "YouTube最適化": 0}
 
         # ━━━ フォールバック: キーワード抽出 + チャプター自動生成 ━━━
         fallback_metadata = self._generate_fallback_metadata(all_text, ctx.segments)

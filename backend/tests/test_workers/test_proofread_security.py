@@ -79,14 +79,15 @@ class TestProofreadLLMResponseValidation:
 
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"})
     def test_response_is_not_list(self):
-        """LLMの返却値がリストではない場合は無視"""
+        """LLMの返却値がリストではない場合は無視 — ただし**失敗に数える**（R2-C5 検証3周目の P1。
+        黙って捨てると記録が「宣言どおり」になる）"""
         segments = [{"text": "テスト文"}]
         res, stats = _run_proofread_with_mock(
             segments,
             [_make_response(json.dumps({"index": 0, "text": "修正後"}))],
             return_stats=True
         )
-        assert stats["failed_batches"] == 0
+        assert stats["failed_batches"] == 1
         assert res[0]["text"] == "テスト文"
 
     @patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"})
