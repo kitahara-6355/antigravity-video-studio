@@ -328,3 +328,35 @@ def test_前半で落ちた工程と警告は書き出した後の記録にも�
     assert "proofread" in rec["health"]["failed_stages"], rec["health"]
     assert "前半の警告" in rec["health"]["warnings"]
     assert "前半の警告" in out["health"]["warnings"]
+
+
+def test_開示のサイドカーを書けなければ書き出しを止めて完成品を残さない(tmp_path, monkeypatch):
+    """**開示が欠けたら書き出しは止まる**（R2-C3・2026-09-26・9周目の C3-1）。
+
+    以前はサイドカーの書き込みが I/O（容量不足・権限・パス長）で落ちても「書けなくても
+    実行は止めない」で completed / exit 0 になり、開示の無い完成品が置き場に残った。
+    """
+    from backend.revenue import approval_gate as ag
+
+    c = _coordinator(tmp_path)
+    res = _run(c, tmp_path, optimize=_合格)
+    d = _run_dir(tmp_path)
+    ag.approve(d, synthetic=False, by="claude-code")
+    本物 = Path.write_text
+
+    def 容量不足(self, *a, **kw):
+        if self.name.endswith(".youtube.json"):
+            raise OSError(28, "No space left on device")
+        return 本物(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "write_text", 容量不足)
+    out = _export(c, res["run_id"])
+    monkeypatch.undo()
+
+    assert out["status"] == "error", out
+    # tmp の路にテスト名（「開示」を含む）が入るので、文言そのもので見る
+    assert "開示を載せるサイドカー" in (out.get("error") or ""), out
+    assert not (tmp_path / "final.mp4").exists(), "開示の無い完成品が残っている"
+    assert not (d / "export.json").exists(), "開示の無い書き出しを記録した"
+    run = json.loads((d / "run.json").read_text(encoding="utf-8"))
+    assert run["status"] == "failed"

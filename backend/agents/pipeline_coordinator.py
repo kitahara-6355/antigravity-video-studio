@@ -71,6 +71,7 @@ from backend.revenue.approval_gate import (
     EXPORT,
     PROPOSAL,
     STATUS_AWAITING_APPROVAL,
+    disclosure_output_problem,
     export_allowed,
     write_export,
     write_proposal,
@@ -812,6 +813,25 @@ class PipelineCoordinator:
                 return self._build_result(
                     ctx, "error", total_start, f"工程が失敗しました: {'、'.join(致命)}")
 
+            # **開示が出力に載らなければ書き出しを止める**（R2-C3・2026-09-26・9周目の C3-1）。
+            # サイドカーは「書けなくても実行は止めない」作りなので、I/O（容量不足・権限・パス長）で
+            # 落ちると開示の無い完成品が completed で置き場に残っていた。書いた後に確かめ、
+            # 欠けていたら完成品ごと捨てて失敗で閉じる（`export.json` は書かない）
+            self._sidecar_path = self._write_metadata_sidecar(ctx)
+            # 完成品が無ければ置き場に出るものも無い（`--gate` が「書き出した動画が無い」で落とす）
+            欠け = (disclosure_output_problem(Path(ctx.final_path), self._sidecar_path)
+                    if ctx.final_path else None)
+            if 欠け:
+                for 捨てる in (ctx.final_path, self._sidecar_path):
+                    if 捨てる:
+                        Path(捨てる).unlink(missing_ok=True)
+                ctx.final_path = None
+                self._sidecar_path = None
+                self._close_recorder(ctx, "failed")
+                return self._build_result(
+                    ctx, "error", total_start,
+                    f"開示を載せるサイドカーを出力できなかったので書き出しを止めました（完成品は捨てた）: {欠け}")
+
             # 学習は**完成した動画から**学ぶので書き出しの後（retention 分析は提案の段）
             await self._trigger_dream_learning(ctx)
 
@@ -1004,7 +1024,8 @@ class PipelineCoordinator:
         if recorder is None:
             return
         try:
-            self._sidecar_path = self._write_metadata_sidecar(ctx)
+            if self._sidecar_path is None:   # 書き出しは開示を確かめるために先に書いている
+                self._sidecar_path = self._write_metadata_sidecar(ctx)
             self._quality_sidecar_path = self._write_quality_sidecar(ctx)
             for path in (ctx.final_path, ctx.preview_path,
                          self._sidecar_path, self._quality_sidecar_path):

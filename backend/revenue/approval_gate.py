@@ -360,6 +360,31 @@ def _approval_holds(run_dir: Path, export: dict) -> bool:
     return disclosure_problem(approval.get("ai_disclosure")) is None
 
 
+def disclosure_output_problem(final: Path, sidecar: str | None) -> str | None:
+    """**完成品の隣に開示つきの手動投稿用サイドカーがあるか**（R2-C3・2026-09-26）。無ければ理由。
+
+    9周目の C3-1: サイドカーの書き込みが I/O で落ちても書き出しは completed で終わり、
+    開示の無い完成品が置き場に残った。`--gate` は最新の1本しか見ないので、次の実走を
+    書き出すと緑に戻った。置き場の監査は全部を見るので、**結果の側でも**開示を問う。
+    """
+    if not sidecar:
+        return "書き出しの記録に手動投稿用サイドカーがありません（開示が出力に含まれていない）"
+    sc = Path(sidecar)
+    if not sc.is_file():
+        return f"書き出しの記録が指す手動投稿用サイドカーがありません: {sidecar}"
+    if (os.path.normcase(os.path.abspath(sc.parent)) != os.path.normcase(os.path.abspath(final.parent))
+            or _付属物の持ち主(sc) is None
+            or _付属物の持ち主(sc).casefold() not in (final.name.casefold(),
+                                                   _持ち主の名前(final).casefold())):
+        return f"手動投稿用サイドカーが完成品の隣にありません: {sidecar}"
+    try:
+        disclosure = json.loads(sc.read_text(encoding="utf-8")).get("ai_disclosure")
+    except (UnicodeDecodeError, ValueError, AttributeError):
+        return f"手動投稿用サイドカーが JSON として読めません: {sidecar}"
+    問題 = disclosure_problem(disclosure)
+    return f"サイドカーの開示が不十分です（{問題}）" if 問題 else None
+
+
 def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
                   baseline: dict[str, str] | None = None,
                   output_root: str | Path | None = None) -> list[str]:
@@ -388,11 +413,16 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
     baseline = load_publish_baseline() if baseline is None else baseline
 
     承認済み: dict[str, str] = {}
+    開示の欠け: dict[str, str] = {}
     for export_path in sorted(runs_dir.glob("*/" + EXPORT)):
         e = _read_json(export_path)
         final = e.get("final") or {}
         if final.get("path") and _approval_holds(export_path.parent, e):
-            承認済み[os.path.normcase(os.path.abspath(final["path"]))] = final.get("sha256")
+            key = os.path.normcase(os.path.abspath(final["path"]))
+            承認済み[key] = final.get("sha256")
+            欠け = disclosure_output_problem(Path(final["path"]), e.get("metadata_sidecar"))
+            if 欠け:
+                開示の欠け[key] = 欠け
 
     def 名前(f: Path) -> str:
         """基準線と報告に使う名前。vault の下は `final/…`、退避先は `output/…`。"""
@@ -417,6 +447,8 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
                     "承認済みの完成品と、その付属物だけ）")
         if 承認済み[key] != sha:
             return f"{rel}: 書き出した後に差し替わっています（記録の指紋と違う）"
+        if key in 開示の欠け:
+            return f"{rel}: **開示の出力が欠けた完成品**です — {開示の欠け[key]}"
         return None
 
     problems: list[str] = []
@@ -548,11 +580,14 @@ def gate(runs_dir: str | Path) -> tuple[bool, list[str]]:
         problems.append("書き出した動画が記録と違います（無いか、書き出しの後に変わった）: "
                         f"{final.get('path')}")
     sidecar = export.get("metadata_sidecar")
-    disclosure = (_read_json(Path(sidecar)).get("ai_disclosure")
-                  if sidecar and Path(sidecar).is_file() else None)
-    問題 = disclosure_problem(disclosure)
-    if 問題:
-        problems.append(f"手動投稿用のメタデータの AI 生成の開示が不十分です — {問題}")
+    if not sidecar or not Path(sidecar).is_file():
+        # **原因を取り違えない**（9周目の M3）。承認に開示はあっても、出力に載っていなければ欠け
+        problems.append("手動投稿用のメタデータ（開示を載せるサイドカー）が出力にありません: "
+                        f"{sidecar or '(書き出しの記録に無い)'}")
+    else:
+        問題 = disclosure_problem(_read_json(Path(sidecar)).get("ai_disclosure"))
+        if 問題:
+            problems.append(f"手動投稿用のメタデータの AI 生成の開示が不十分です — {問題}")
     return (not problems), [f"{run_dir.name}: {p}" for p in problems]
 
 

@@ -464,3 +464,17 @@ def test_approve_CLIで承認できる(tmp_path, capsys):
     assert rc == 0, capsys.readouterr().out
     assert json.loads((run_dir / "approval.json").read_text(encoding="utf-8"))[
         "ai_disclosure"]["contains_synthetic_media"] is False
+
+
+def test_サイドカーが無ければ無いと言う(tmp_path, capsys):
+    """**原因を取り違えない**（9周目の M3）。承認に開示はあってもサイドカーが無いなら、
+    「開示の判断がありません」ではなく「サイドカーが出力にありません」と言う。
+    """
+    run_dir = _書き出した実走(tmp_path)
+    (tmp_path / "vault" / "final" / "final.youtube.json").unlink()
+
+    rc, out = _gate(tmp_path, capsys)
+
+    assert rc == 1
+    assert "開示を載せるサイドカー）が出力にありません" in out, out
+    assert "開示の判断がありません" not in out, out

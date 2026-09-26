@@ -49,7 +49,13 @@ def _承認して書き出した(tmp_path, vault: Path, name="final_A.mp4", run_
     ag.approve(run_dir, synthetic=False, by="北原")
     final = vault / "final" / name
     final.write_bytes(b"approved-final-" + run_id.encode())
-    ag.write_export(run_dir, final_path=str(final), metadata_sidecar=None,
+    # **開示の出力が欠けた完成品は承認に辿れない**（2026-09-26・9周目の C3-1）ので、付属物も置く
+    sidecar = final.with_suffix(".youtube.json")
+    sidecar.write_text(json.dumps({"title": "題", "ai_disclosure": {
+        "contains_synthetic_media": False, "decided_by": "北原",
+        "decided_at": "2026-09-25T00:00:00+00:00", "ai_used_for": []}}, ensure_ascii=False),
+        encoding="utf-8")
+    ag.write_export(run_dir, final_path=str(final), metadata_sidecar=str(sidecar),
                     quality_sidecar=None, render_mode="production")
     return final
 
@@ -361,8 +367,7 @@ def test_置き場には承認済みの完成品と付属物しか置けない(t
 
 def test_承認済みの完成品の付属物は通す(tmp_path):
     vault = _置き場(tmp_path)
-    _承認して書き出した(tmp_path, vault)
-    (vault / "final" / "final_A.youtube.json").write_text("{}", encoding="utf-8")
+    _承認して書き出した(tmp_path, vault)   # final_A.youtube.json（開示つき）も置く
     (vault / "final" / "final_A.quality.json").write_text("{}", encoding="utf-8")
 
     assert ag.publish_audit(tmp_path / "runs", vault, baseline={},
@@ -527,7 +532,67 @@ def test_サイドカーのあるフォルダでも承認済みなら通す(tmp_
     vault = _置き場(tmp_path)
     (vault / "edited").mkdir()
     final = _承認して書き出した(tmp_path, vault, name="../edited/clip.mp4")
-    (final.parent / "clip.youtube.json").write_text("{}", encoding="utf-8")
+    assert (final.parent / "clip.youtube.json").is_file()   # 開示つきの付属物は書き出しが置く
 
     assert ag.publish_audit(tmp_path / "runs", vault, baseline={},
                             output_root=tmp_path / "output") == []
+
+
+# --- 9周目の C3-1: 開示の出力が欠けた完成品 ------------------------------------------
+
+def test_開示のサイドカーが無い完成品は承認に辿れない(tmp_path):
+    """**開示が欠けたら書き出しは止まる**（R2-C3）を結果の側でも見る（9周目の C3-1）。
+
+    書き手がサイドカーを書けずに完成品だけ置き場に残すと、次の実走を1本書き出した時点で
+    `--gate`（最新の1本だけを見る）は緑に戻っていた。置き場の監査は全部を見るので、ここで捕まえる。
+    """
+    vault = _置き場(tmp_path)
+    final = _承認して書き出した(tmp_path, vault)
+    run_dir = tmp_path / "runs" / "RID"
+    final.with_suffix(".youtube.json").unlink()
+    ag.write_export(run_dir, final_path=str(final), metadata_sidecar=None,
+                    quality_sidecar=None, render_mode="production")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert len(problems) == 1, problems
+    assert "final_A.mp4" in problems[0] and "開示" in problems[0]
+
+
+def test_開示のサイドカーが消えた完成品は承認に辿れない(tmp_path):
+    """記録はサイドカーを指しているが、実物が無い（書き出しの後に消えた）。"""
+    vault = _置き場(tmp_path)
+    final = _承認して書き出した(tmp_path, vault)
+    final.with_suffix(".youtube.json").unlink()
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert len(problems) == 1, problems
+    assert "開示" in problems[0]
+
+
+def test_開示の中身が欠けたサイドカーの完成品は承認に辿れない(tmp_path):
+    vault = _置き場(tmp_path)
+    final = _承認して書き出した(tmp_path, vault)
+    final.with_suffix(".youtube.json").write_text(json.dumps({"title": "題"}), encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("final_A.mp4" in p and "開示" in p for p in problems), problems
+
+
+def test_別のフォルダのサイドカーを指す完成品は承認に辿れない(tmp_path):
+    """開示は**投稿する動画の隣**に無ければ手動投稿で使われない。"""
+    vault = _置き場(tmp_path)
+    final = _承認して書き出した(tmp_path, vault)
+    sc = final.with_suffix(".youtube.json")
+    よそ = tmp_path / "elsewhere"
+    よそ.mkdir()
+    移した = よそ / sc.name
+    sc.rename(移した)
+    ag.write_export(tmp_path / "runs" / "RID", final_path=str(final), metadata_sidecar=str(移した),
+                    quality_sidecar=None, render_mode="production")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any("開示" in p and "final_A.mp4" in p for p in problems), problems
