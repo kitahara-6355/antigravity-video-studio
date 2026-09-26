@@ -678,16 +678,14 @@
    ]
   },
   {
-   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator.export",
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._export_locked",
    "file": "backend/agents/pipeline_coordinator.py",
-   "symbol": "PipelineCoordinator.export",
+   "symbol": "PipelineCoordinator._export_locked",
    "category": "retention",
    "status": "out_of_scope",
-   "reason": "retention の数字をここでは作らない。retention 分析は**提案の段**（`execute`。承認の材料なので書き出しの前）で走り、site としては`_analyze_retention` 側に登録済み。この関数の `or_default` 2件は開き直した記録の `intermediates` と `failed_stages` の**空リスト退避**、`except_returns` は記録を開き直せないときに書き出しを断る（`_断る` は status=error を返し、記録に触らない）。数字を1つも作らない。",
+   "reason": "retention の数字をここでは作らない（2026-09-26 に `export` から書き出しの本体を分けた。`export` は書き出し中の印を排他的に取るだけの薄い入口）。retention 分析は**提案の段**（`execute`。承認の材料なので書き出しの前）で走り、site としては `_analyze_retention` 側に登録済み。`except_returns` は記録を開き直せないときに書き出しを断る（`_断る` は status=error を返し、記録に触らない）。数字を1つも作らない",
    "fingerprint": [
-    "except_returns",
-    "or_default",
-    "or_default"
+    "except_returns"
    ]
   },
   {
