@@ -133,41 +133,47 @@ class RenderWorker(PipelineStageWorker):
                     duration_seconds=round(time.time() - start, 1),
                 )
 
-            if ctx.preview_path and Path(ctx.preview_path).exists():
-                try:
-                    rendered = await self._render_production_quality(
-                        ctx.preview_path, final_path, ctx
+            # **取った名前は、書き出しに成功したときだけ残す**（2026-09-26・gate-verifier 8周目）。
+            # 以前は、名前を取った後にプレビューが消えると 0 バイトの完成品が置き場に残り、
+            # 指紋の読み直しで落ちても書いたものが残った。どこで抜けても最後に消す
+            成功 = False
+            try:
+                if not Path(ctx.preview_path).exists():
+                    return StageResult(
+                        stage_name=self.name, success=False,
+                        detail="名前を取った後に承認したプレビューが消えました（書き出さない）",
+                        duration_seconds=round(time.time() - start, 1),
                     )
-                except BaseException:
-                    Path(final_path).unlink(missing_ok=True)   # 取った名前の空きファイルを残さない
-                    raise
-                if rendered and self._指紋(ctx.preview_path) != 始めの指紋:
+                rendered = await self._render_production_quality(
+                    ctx.preview_path, final_path, ctx
+                )
+                if not rendered:
+                    return StageResult(
+                        stage_name=self.name, success=False,
+                        detail="本番品質レンダリング失敗",
+                        duration_seconds=round(time.time() - start, 1),
+                    )
+                if self._指紋(ctx.preview_path) != 始めの指紋:
                     # 門の確認と書き出しの間の窓を閉じる — **書いた後にもう一度プレビューを見る**
-                    Path(final_path).unlink(missing_ok=True)
                     logger.warning("🚫 書き出しの途中でプレビューが変わりました。書いたものを捨てます")
                     return StageResult(
                         stage_name=self.name, success=False,
                         detail="書き出しの途中で承認したプレビューが変わりました（書いたものは捨てた）",
                         duration_seconds=round(time.time() - start, 1),
                     )
-                if rendered:
-                    size_mb = Path(final_path).stat().st_size / 1024 / 1024
-                    ctx.final_path = final_path
-                    return StageResult(
-                        stage_name=self.name, success=True,
-                        detail=f"最終出力: {size_mb:.1f}MB (本番品質)",
-                        data={"path": final_path, "size_mb": round(size_mb, 1),
-                              "quality": "production"},
-                        duration_seconds=round(time.time() - start, 1),
-                    )
-                else:
-                    # 取った名前の空きファイル（や書きかけ）を置き場に残さない
-                    Path(final_path).unlink(missing_ok=True)
-                    return StageResult(
-                        stage_name=self.name, success=False,
-                        detail="本番品質レンダリング失敗",
-                        duration_seconds=round(time.time() - start, 1),
-                    )
+                size_mb = Path(final_path).stat().st_size / 1024 / 1024
+                ctx.final_path = final_path
+                成功 = True
+                return StageResult(
+                    stage_name=self.name, success=True,
+                    detail=f"最終出力: {size_mb:.1f}MB (本番品質)",
+                    data={"path": final_path, "size_mb": round(size_mb, 1),
+                          "quality": "production"},
+                    duration_seconds=round(time.time() - start, 1),
+                )
+            finally:
+                if not 成功:
+                    Path(final_path).unlink(missing_ok=True)   # 取った名前・書きかけを置き場に残さない
         except (ImportError, OSError, ValueError, KeyError, AttributeError, RuntimeError, TypeError) as e:
             logger.error(f"RenderWorker 実行時致命的エラー [{type(e).__name__}]: {e}", exc_info=True)
             return StageResult(

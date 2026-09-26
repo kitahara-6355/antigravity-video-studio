@@ -1917,7 +1917,10 @@ class TestRenderWorkerCoverageExpansion:
 
     @pytest.mark.asyncio
     async def test_cov_reach_end_no_render_source(self):
-        """Line 82: プレビューパス存在チェックが途中でFalseになった場合の挙動"""
+        """プレビューの存在確認が途中で False になった場合の挙動。
+
+        名前を取った後に消えたら書き出さず、**取った名前も残さない**（2026-09-26・8周目）。
+        """
         preview = _make_preview_file(2 * 1024 * 1024)
         try:
             ctx = create_mock_ctx(segments=5)
@@ -1930,7 +1933,8 @@ class TestRenderWorkerCoverageExpansion:
                 result = await worker.execute(ctx)
                 
             assert result.success is False
-            assert result.detail == "レンダリング元なし"
+            assert "プレビューが消えました" in result.detail
+            assert not getattr(ctx, "final_path", None)
         finally:
             Path(preview).unlink(missing_ok=True)
 

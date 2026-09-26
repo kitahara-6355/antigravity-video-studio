@@ -408,3 +408,132 @@ async def test_同じ実走の書き出しを重ねない(tmp_path):
 
     assert result["status"] == "error"
     assert "書き出し中" in result["error"]
+
+
+# --- 8周目の軽微な所見: 取った名前・書き出し中の印の塞ぎ残し ----------------------------
+
+@pytest.mark.asyncio
+async def test_worker_は名前を取った後にプレビューが消えても空の完成品を残さない(tmp_path, monkeypatch):
+    """**失敗したら取った名前を残さない**（8周目）。名前を排他的に取った直後にプレビューが
+    消えると、0バイトの `final_<時刻>_<run_id>.mp4` が置き場に残っていた。
+    """
+    import builtins
+
+    import agents.workers.render_worker as rw
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.render_worker import RenderWorker
+
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(tmp_path / "vault"))
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    try:
+        preview = tmp_path / "preview.mp4"
+        preview.write_bytes(b"p")
+        本物の_open = builtins.open
+
+        def 取った直後に消す(path, mode="r", *a, **kw):
+            f = 本物の_open(path, mode, *a, **kw)
+            if mode == "xb":
+                preview.unlink()
+            return f
+
+        async def 書く(self, src, dst, _ctx):
+            Path(dst).write_bytes(b"rendered")
+            return True
+
+        monkeypatch.setattr(rw, "open", 取った直後に消す, raising=False)
+        monkeypatch.setattr(RenderWorker, "_承認を確かめる", staticmethod(lambda c: (True, "")))
+        monkeypatch.setattr(RenderWorker, "_render_production_quality", 書く)
+        ctx = PipelineContext(video_path=str(tmp_path / "src.mp4"))
+        ctx.preview_path = str(preview)
+        ctx.run_dir = str(tmp_path / "runs" / "RUN_A")
+
+        result = await RenderWorker().execute(ctx)
+
+        assert result.success is False
+        残り = list((tmp_path / "vault" / "final").glob("*"))
+        assert 残り == [], f"取った名前が置き場に残っている: {残り}"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(safe_io)
+
+
+@pytest.mark.asyncio
+async def test_worker_は名前を取った後に落ちても空の完成品を残さない(tmp_path, monkeypatch):
+    """書き出しの前後のどこで落ちても（指紋が読めない等）、取った名前を置き場に残さない。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.render_worker import RenderWorker
+
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(tmp_path / "vault"))
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    try:
+        preview = tmp_path / "preview.mp4"
+        preview.write_bytes(b"p")
+        呼ばれた = []
+
+        def 二度目で落ちる(path):
+            呼ばれた.append(path)
+            if len(呼ばれた) >= 2:
+                raise OSError("読めない")
+            return "sha"
+
+        async def 書く(self, src, dst, _ctx):
+            Path(dst).write_bytes(b"rendered")
+            return True
+
+        monkeypatch.setattr(RenderWorker, "_指紋", staticmethod(二度目で落ちる))
+        monkeypatch.setattr(RenderWorker, "_承認を確かめる", staticmethod(lambda c: (True, "")))
+        monkeypatch.setattr(RenderWorker, "_render_production_quality", 書く)
+        ctx = PipelineContext(video_path=str(tmp_path / "src.mp4"))
+        ctx.preview_path = str(preview)
+        ctx.run_dir = str(tmp_path / "runs" / "RUN_A")
+
+        result = await RenderWorker().execute(ctx)
+
+        assert result.success is False
+        残り = list((tmp_path / "vault" / "final").glob("*"))
+        assert 残り == [], f"書いたものが置き場に残っている: {残り}"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(safe_io)
+
+
+@pytest.mark.asyncio
+async def test_印を取った後に書き出し済みになっていたら断る(tmp_path, monkeypatch):
+    """`export.json` の確認を**書き出し中の印の中**でもやり直す（8周目）。
+
+    先の書き出しが「印の外の確認」と「印を取る」の間に終わる（`export.json` を書いて印を消す）と、
+    後の書き出しは印を取れてしまい、同じ実走をもう一度書き出していた。
+    """
+    import agents.pipeline_coordinator as pc
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from tests.fixtures.mock_pipeline import create_approved_run
+
+    run_dir = Path(create_approved_run(str(tmp_path / "runs" / "RID")))
+    本物の_open = pc.os.open
+
+    def 印を取る間に先の書き出しが終わる(path, flags, *a, **kw):
+        if str(path).endswith(".export.lock"):
+            (run_dir / "export.json").write_text("{}", encoding="utf-8")
+        return 本物の_open(path, flags, *a, **kw)
+
+    monkeypatch.setattr(pc.os, "open", 印を取る間に先の書き出しが終わる)
+    書いた = []
+
+    async def 書き出しの工程(self, ctx, *_a):
+        書いた.append(ctx)
+
+    monkeypatch.setattr(PipelineCoordinator, "_execute_final_rendering_stage", 書き出しの工程)
+    c = PipelineCoordinator()
+    c.runs_dir = tmp_path / "runs"
+
+    result = await c.export("RID")
+
+    assert result["status"] == "error"
+    # tmp の路にテスト名（「書き出し済み」を含む）が入るので、先頭で見る
+    assert result["error"].startswith("書き出し済みです"), result["error"]
+    assert 書いた == [], "書き出し済みの実走をもう一度書き出した"
+    assert not (run_dir / ".export.lock").exists()

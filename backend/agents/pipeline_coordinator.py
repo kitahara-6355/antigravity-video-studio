@@ -774,6 +774,11 @@ class PipelineCoordinator:
     async def _export_locked(self, run_id: str, run_dir: Path, total_start: float, _断る) -> Dict:
         """書き出しの本体（`export` が書き出し中の印を持っている間だけ呼ぶ）。"""
         runs_dir = run_dir.parent
+        # **印の中でも書き出し済みかを確かめ直す**（2026-09-26・gate-verifier 8周目）。
+        # 印の外の確認と印を取る間に先の書き出しが終わる（`export.json` を書いて印を消す）と、
+        # 同じ実走をもう一度書き出していた。外の確認は早く断るためだけに残す
+        if (run_dir / EXPORT).exists():
+            return _断る(f"書き出し済みです: {run_dir / EXPORT}")
         ok, why = export_allowed(run_dir)
         if not ok:
             return _断る(why)
