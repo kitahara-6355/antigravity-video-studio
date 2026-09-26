@@ -910,9 +910,21 @@ class TestJT03TroubleshooterJourney:
                 w.verify = MagicMock(return_value=True)
 
         result = await coordinator.execute(ctx)
+        # R2-C1: 本線は提案で止まる（中断ではない）。承認して書き出すまで通す
+        assert result["status"] == "awaiting_approval", (
+            f"非致命的Worker失敗でパイプラインが中断: {result['status']}"
+        )
+        from pathlib import Path
+        from backend.revenue import approval_gate as ag
+        ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
+        result = await coordinator.export(result["run_id"])
 
         # 検証: パイプライン全体は完了(error でない)
-        assert result["status"] == "completed", (
+        # プレビューが落ちたら「止めないが完走とも呼ばない」= degraded（R1.5-C1b。
+        # test_agents_run_record.py が固定している）。以前ここは completed を期待していたが、
+        # 単独で流すと origin/main でも degraded で落ちる（順序依存・2026-09-19 に確かめた）。
+        # このテストの意図は「中断しない」ことなので、中断していないことを見る
+        assert result["status"] in ("completed", "degraded"), (
             f"非致命的Worker失敗でパイプラインが中断: {result['status']}"
         )
         # warningsに記録

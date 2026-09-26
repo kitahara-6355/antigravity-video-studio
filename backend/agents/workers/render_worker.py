@@ -8,6 +8,7 @@ import logging
 import asyncio
 import time
 import shutil
+import uuid
 from pathlib import Path
 from datetime import datetime
 
@@ -39,6 +40,32 @@ class RenderWorker(PipelineStageWorker):
         """
         return "出力ファイルが存在し、サイズが1MB以上、本番品質でエンコード済みであること"
 
+    @staticmethod
+    def _指紋(path: str) -> str | None:
+        """プレビューの指紋（無ければ None）。書き出しの前後で同じものを書いたかを見る。"""
+        import hashlib
+
+        p = Path(path)
+        if not p.is_file():
+            return None
+        h = hashlib.sha256()
+        with p.open("rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    @staticmethod
+    def _承認を確かめる(ctx: PipelineContext) -> tuple[bool, str]:
+        """この実行が承認を通っているか。**確かめられなければ書き出さない。**"""
+        run_dir = getattr(ctx, "run_dir", None)
+        if not run_dir:
+            return False, ("実行記録を指していないので承認を確かめられません"
+                           "（本線は `python -m backend.agents.pipeline_coordinator <動画>` → "
+                           "`--approve` → `--export`）")
+        from backend.revenue.approval_gate import export_allowed
+
+        return export_allowed(run_dir)
+
     async def execute(self, ctx: PipelineContext) -> StageResult:
         """
         最終レンダリング処理を実行します。
@@ -56,46 +83,97 @@ class RenderWorker(PipelineStageWorker):
             StageResult: ステージの実行結果。
         """
         start = time.time()
+
+        # **承認していない動画は書き出せない**（R2-C1・2026-09-25）。
+        # 門は coordinator にもあるが、**書き出すのはここ**なので、ここでも引く。
+        # harness の `render_final` のように worker を直接呼ぶ経路が素通りしていた
+        # （2026-09-24 の gate-verifier が `vault-outputs/final/` への抜け道として報告）。
+        # 承認は実行記録の隣にあるので、**記録を指せない文脈では書き出さない**（fail-closed）。
+        許可, 理由 = self._承認を確かめる(ctx)
+        if not 許可:
+            logger.warning(f"🚫 承認の門: {理由}")
+            return StageResult(
+                stage_name=self.name, success=False,
+                detail=f"承認の門: {理由}",
+                duration_seconds=round(time.time() - start, 1),
+            )
+
         try:
             from safe_io import VAULT_OUTPUTS_DIR
             final_dir = VAULT_OUTPUTS_DIR / "final"
             final_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            final_path = str(final_dir / f"final_{ts}.mp4")
+            # **名前は実走ごとに一意**（2026-09-26・gate-verifier 7周目の F2）。以前は
+            # `final_<秒>.mp4` で、承認済みの2本を同じ秒に書き出すと同じ名前を取り合い、
+            # 片方の承認済み動画が消えて証跡が相手の動画を指した
+            run_tag = Path(ctx.run_dir).name if getattr(ctx, "run_dir", None) else uuid.uuid4().hex[:8]
+            final_path = str(final_dir / f"final_{ts}_{run_tag}.mp4")
 
-            # T-022: セーフモード — preview_path なし時は元動画から直接レンダリング
+            # **承認したプレビューからしか書き出さない**（2026-09-26・gate-verifier 6周目の U3）。
+            # 以前は T-022 のセーフモードで、プレビューが無ければ素材から直接レンダリングした。
+            # 門の確認の後にプレビューが消えると（容量不足のとき本線のフックが実際に消す）、
+            # **人が見ていない動画**が completed で出ていた。見ていないものは書き出さない
             if not ctx.preview_path or not Path(ctx.preview_path).exists():
-                if ctx.video_path and Path(ctx.video_path).exists():
-                    logger.warning("⚠️ [T-022] プレビューなし — 元動画からセーフモードレンダリング")
-                    ctx.preview_path = ctx.video_path
-                    ctx.skipped_features.append("プレビュー生成")
-                else:
+                return StageResult(
+                    stage_name=self.name, success=False,
+                    detail=("承認したプレビューがありません（素材から直接は書き出さない — "
+                            "見ていないものは書き出さない）"),
+                    duration_seconds=round(time.time() - start, 1),
+                )
+            始めの指紋 = self._指紋(ctx.preview_path)
+
+            # 名前を**排他的に取る** — 既に同じ名前があれば上書きせずに断る（同じ実走の二重書き出し）
+            try:
+                with open(final_path, "xb"):
+                    pass
+            except FileExistsError:
+                return StageResult(
+                    stage_name=self.name, success=False,
+                    detail=f"同じ名前の完成品が既にあります（上書きしない）: {final_path}",
+                    duration_seconds=round(time.time() - start, 1),
+                )
+
+            # **取った名前は、書き出しに成功したときだけ残す**（2026-09-26・gate-verifier 8周目）。
+            # 以前は、名前を取った後にプレビューが消えると 0 バイトの完成品が置き場に残り、
+            # 指紋の読み直しで落ちても書いたものが残った。どこで抜けても最後に消す
+            成功 = False
+            try:
+                if not Path(ctx.preview_path).exists():
                     return StageResult(
                         stage_name=self.name, success=False,
-                        detail="レンダリング元なし（プレビューも元動画も不在）",
+                        detail="名前を取った後に承認したプレビューが消えました（書き出さない）",
                         duration_seconds=round(time.time() - start, 1),
                     )
-
-            if ctx.preview_path and Path(ctx.preview_path).exists():
                 rendered = await self._render_production_quality(
                     ctx.preview_path, final_path, ctx
                 )
-                if rendered:
-                    size_mb = Path(final_path).stat().st_size / 1024 / 1024
-                    ctx.final_path = final_path
-                    return StageResult(
-                        stage_name=self.name, success=True,
-                        detail=f"最終出力: {size_mb:.1f}MB (本番品質)",
-                        data={"path": final_path, "size_mb": round(size_mb, 1),
-                              "quality": "production"},
-                        duration_seconds=round(time.time() - start, 1),
-                    )
-                else:
+                if not rendered:
                     return StageResult(
                         stage_name=self.name, success=False,
                         detail="本番品質レンダリング失敗",
                         duration_seconds=round(time.time() - start, 1),
                     )
+                if self._指紋(ctx.preview_path) != 始めの指紋:
+                    # 門の確認と書き出しの間の窓を閉じる — **書いた後にもう一度プレビューを見る**
+                    logger.warning("🚫 書き出しの途中でプレビューが変わりました。書いたものを捨てます")
+                    return StageResult(
+                        stage_name=self.name, success=False,
+                        detail="書き出しの途中で承認したプレビューが変わりました（書いたものは捨てた）",
+                        duration_seconds=round(time.time() - start, 1),
+                    )
+                size_mb = Path(final_path).stat().st_size / 1024 / 1024
+                ctx.final_path = final_path
+                成功 = True
+                return StageResult(
+                    stage_name=self.name, success=True,
+                    detail=f"最終出力: {size_mb:.1f}MB (本番品質)",
+                    data={"path": final_path, "size_mb": round(size_mb, 1),
+                          "quality": "production"},
+                    duration_seconds=round(time.time() - start, 1),
+                )
+            finally:
+                if not 成功:
+                    Path(final_path).unlink(missing_ok=True)   # 取った名前・書きかけを置き場に残さない
         except (ImportError, OSError, ValueError, KeyError, AttributeError, RuntimeError, TypeError) as e:
             logger.error(f"RenderWorker 実行時致命的エラー [{type(e).__name__}]: {e}", exc_info=True)
             return StageResult(

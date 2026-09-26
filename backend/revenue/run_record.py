@@ -137,6 +137,8 @@ class RunRecorder:
         self._summary_to_ledger = ledger_path is not None
         self._started = time.monotonic()
         self._ledger_start = self._ledger_offset()
+        # 開き直したとき（`reopen`）に、前半の分をここへ持ち越す
+        self._carried: dict[str, float] = {"calls": 0, "cost_jpy": 0.0, "duration_sec": 0.0}
         self._record: dict[str, Any] = {
             "run_id": self.run_id,
             "started_at": _now(),
@@ -153,9 +155,42 @@ class RunRecorder:
         }
         self._write()
 
+    @classmethod
+    def reopen(cls, run_id: str, runs_dir: Path = RUNS_DIR,
+               ledger_path: Path | None = None) -> RunRecorder:
+        """**同じ実行の記録を開き直す**（R2: 承認の後の書き出し）。
+
+        本線は提案で止まって記録を `awaiting_approval` で閉じる。書き出しは
+        同じ記録に工程を足す — 1本の動画の記録が2つに割れると、成果物ゲートが
+        「使ったモデル」か「動画」の欠けた記録を見ることになる。
+        呼び出し回数・原価・所要時間は前半の分に**足し込む**（上書きすると消える）。
+        """
+        path = Path(runs_dir) / run_id / "run.json"
+        if not path.is_file():
+            raise FileNotFoundError(f"実行記録がありません: {path}")
+        self = cls.__new__(cls)
+        self.run_id = run_id
+        self.dir = path.parent
+        self.ledger_path = Path(
+            ledger_path if ledger_path is not None else cost_guard.LEDGER_PATH)
+        self._summary_to_ledger = ledger_path is not None
+        self._started = time.monotonic()
+        self._ledger_start = self._ledger_offset()
+        self._record = json.loads(path.read_text(encoding="utf-8"))
+        self._carried = {k: float(self._record.get(k) or 0)
+                         for k in ("calls", "cost_jpy", "duration_sec")}
+        self._record["status"] = "running"
+        self._write()
+        return self
+
     @property
     def path(self) -> Path:
         return self.dir / "run.json"
+
+    @property
+    def record(self) -> dict:
+        """いまの記録の写し（読むだけ）。"""
+        return json.loads(json.dumps(self._record, ensure_ascii=False))
 
     # --- 台帳（実測） -------------------------------------------------------
 
@@ -306,21 +341,31 @@ class RunRecorder:
 
     # --- 締め ---------------------------------------------------------------
 
-    def finish(self, status: str | None = None,
-               health: dict | None = None) -> dict:
-        # **要約の行は呼び出しではない。** `_close_stage` では除外していたのに
-        # ここだけ除外し忘れていた（2026-08-21 の指摘）。除外を1箇所に寄せる。
-        rows = self._calls_since(self._ledger_start)
+    def models_so_far(self) -> list[str]:
+        """ここまでの工程で使ったモデル（宣言と実測の和）。
+
+        締める前にも要る — 承認工程（R2）の提案は、書き出しの前に
+        「どのモデルの提案か」を残す。
+        """
         used: set[str] = set()
         for stage in self._record["stages"]:
             if stage.get("model"):
                 used.add(stage["model"])
             used.update(stage.get("models_observed") or [])
-        self._record["models_used"] = sorted(used)
-        self._record["calls"] = len(rows)
+        return sorted(used)
+
+    def finish(self, status: str | None = None,
+               health: dict | None = None) -> dict:
+        # **要約の行は呼び出しではない。** `_close_stage` では除外していたのに
+        # ここだけ除外し忘れていた（2026-08-21 の指摘）。除外を1箇所に寄せる。
+        rows = self._calls_since(self._ledger_start)
+        self._record["models_used"] = self.models_so_far()
+        # 開き直した記録では、提案までの分（`_carried`）に足し込む
+        self._record["calls"] = int(self._carried["calls"]) + len(rows)
         self._record["cost_jpy"] = round(
-            sum(float(r.get("jpy") or 0) for r in rows), 4)
-        self._record["duration_sec"] = round(time.monotonic() - self._started, 3)
+            self._carried["cost_jpy"] + sum(float(r.get("jpy") or 0) for r in rows), 4)
+        self._record["duration_sec"] = round(
+            self._carried["duration_sec"] + time.monotonic() - self._started, 3)
         self._record["finished_at"] = _now()
         self._record["status"] = status or (
             "failed" if failed_stage(self._record) else "completed")
@@ -392,7 +437,9 @@ def _format_list(runs_dir: Path) -> str:
         return f"実行記録がありません（{runs_dir}）"
     lines = [f"実行記録 {len(runs)} 件", ""]
     for run in runs:
-        mark = {"completed": "✅", "failed": "🚫"}.get(run.get("status"), "…")
+        mark = {"completed": "✅", "failed": "🚫",
+                # 承認待ち（R2-C1）は走っている途中（…）とは違う
+                "awaiting_approval": "⏸"}.get(run.get("status"), "…")
         lines.append(
             f"  {mark} {run.get('run_id')}  "
             f"{len(run.get('stages') or [])} 工程 / "
@@ -431,6 +478,19 @@ def _format_resume(runs_dir: Path, run_id: str) -> tuple[str, int]:
     except (OSError, ValueError) as e:
         return f"🚫 実行記録を読めません: {path}（{e}）", 1
     stage = failed_stage(run)
+    if stage is None and run.get("status") == "awaiting_approval":
+        # **承認待ちは「やることが無い」ではない**（R2-C1）。工程はどれも落ちていないので
+        # 失敗の案内は出せないが、止まっている理由と次の手を出す
+        return ("\n".join([
+            f"⏸ {run_id} は**承認待ち**です（提案までで止まっています。工程の失敗はありません）",
+            "",
+            "  プレビューと提案を見る:",
+            f"    python -m backend.revenue.approval_gate --trace {run_id}",
+            "",
+            "  承認してから書き出す:",
+            f"    python -m backend.revenue.approval_gate --approve {run_id} --synthetic yes|no",
+            f"    python -m backend.revenue.approval_gate --export {run_id}",
+        ]), 1)
     if stage is None:
         return f"✅ {run_id} に失敗した工程はありません（status={run.get('status')}）", 0
     done = [s["name"] for s in run["stages"] if s.get("status") == "success"]

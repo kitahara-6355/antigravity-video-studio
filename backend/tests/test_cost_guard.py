@@ -666,6 +666,48 @@ def test_要約は再計算でも二重計上されない(tmp_path, monkeypatch)
     assert total == pytest.approx(0.3), f"要約を足している: {total}"
 
 
+def test_同じ実走を二度数えない(tmp_path):
+    """**R2 で1本の実走が台帳に2行書く**（提案で閉じ、書き出しで閉じ直す）。
+
+    後の行は前の分（所要時間・原価・呼び出し回数）を足し込んだ**総計**なので、
+    2行を別の実走として数えると本数が倍になり、1本あたりの見積もりが狂う。
+    R1-C2 が要求しているのは「1本あたり」なので、実走 ID で最後の行だけを見る。
+    """
+    lines = cost_guard._format_per_run([
+        {"run_id": "A", "status": "awaiting_approval", "duration_sec": 47.5,
+         "cost_jpy": 4.0, "calls": 2},
+        {"run_id": "A", "status": "degraded", "duration_sec": 57.5,
+         "cost_jpy": 4.0, "calls": 2},   # 承認の後に書き出して閉じ直した総計
+        {"run_id": "B", "status": "completed", "duration_sec": 100.0,
+         "cost_jpy": 2.0, "calls": 1},
+    ])
+    text = "\n".join(lines)
+
+    assert "1本あたり: 2 本" in text, text
+    assert text.count("A  ") == 1, "同じ実走が2回出ています"
+    assert "57.5 秒" in text and "47.5 秒" not in text, "提案までの途中の行を出しています"
+    assert "動画が出た 2 本の平均" in text
+    assert "78.8 秒" in text and "3.0000 円" in text
+
+
+def test_承認待ちのまま終わった実走は平均から外す():
+    """**まだ動画が出ていない。** 承認を待っている実走を平均に入れると、
+
+    「1本あたり」の所要時間と原価が、書き出し前の値で薄まる。
+    """
+    lines = cost_guard._format_per_run([
+        {"run_id": "A", "status": "awaiting_approval", "duration_sec": 47.5,
+         "cost_jpy": 4.0, "calls": 2},
+        {"run_id": "B", "status": "completed", "duration_sec": 100.0,
+         "cost_jpy": 2.0, "calls": 1},
+    ])
+    text = "\n".join(lines)
+
+    assert "動画が出た 1 本の平均" in text, text
+    assert "100.0 秒" in text and "2.0000 円" in text
+    assert "⏸" in text, "承認待ちだと分かる印が無い"
+
+
 def test_一部の工程が落ちた実行も1本あたりに数える():
     """**うまくいった回だけの平均は嘘になる。**
 

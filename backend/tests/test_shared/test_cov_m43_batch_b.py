@@ -261,79 +261,48 @@ class TestCovB_PipelineRouter:
             assert data["probe_success"] is False
             assert "unexpected error" in data["probe_error"]
 
-    # ─── COV-B06: force_render 成功パス (L676-742) ───
+    # ─── COV-B06: force_render は書き出さない（R2-C1 で経路を閉じた） ───
     def test_pipeline_cancel_during_stage(self, pipeline_client, tmp_path):
-        """COV-B06: force_render成功パス → final_path生成+WS通知
+        """COV-B06: force_render → 書き出さずに承認へ案内する
 
-        対象行: L676-742
-        - safe_io ImportError → final_dir = Path("output/final") (L679-680)
-        - shutil.copy フォールバック (L700-702)
-        - evolution_log 記録 (L707-710)
-        - pipeline結果更新 (L713-714)
-        - WebSocket通知 (L717-723)
-        - 成功レスポンス (L730-736)
-        - except Exception → HTTPException(500) (L740-742)
+        かつてここは**成功パス**（safe_io の ImportError 退避・`shutil.copy` への
+        フォールバック・evolution_log 記録・WS 通知・200 応答・例外時 500）を見ていた。
+        **R2-C1 でこの経路を閉じた**ので、見るものが変わった —
+        **書き出さないこと・電文を流さないこと・どの実走を承認すべきか案内すること。**
         """
+        import shutil
+
         from routers.pipeline_router import _pipeline_state, pipeline_ws
 
-        # プレビューファイル準備
         preview = tmp_path / "preview.mp4"
         preview.write_bytes(b"\x00" * 2048)
 
-        # パイプライン状態をcompleted + quality_gate_report有りに設定
         _pipeline_state["status"] = "completed"
         _pipeline_state["result"] = {
+            "run_id": "20260924_000000_abc",
             "quality_gate_report": {"score": 70},
             "preview_path": str(preview),
         }
 
-        # ケース1: safe_io ImportError (L679-680) + video_editor_engine ImportError (L701-702)
-        with patch.dict("sys.modules", {
-            "safe_io": None,  # ImportError → final_dir = Path("output/final")
-            "video_editor_engine": None,  # ImportError → shutil.copy
-        }):
-            with patch("routers.pipeline_router._record_force_render",
-                       new_callable=AsyncMock) as mock_record:
-                with patch.object(pipeline_ws, "broadcast",
-                                  new_callable=AsyncMock) as mock_broadcast:
-                    resp = pipeline_client.post(
-                        "/api/pipeline/force-render",
-                        json={"reason": "品質テスト", "session_id": "test-session"}
-                    )
+        with patch("routers.pipeline_router._record_force_render",
+                   new_callable=AsyncMock) as mock_record,              patch.object(pipeline_ws, "broadcast",
+                          new_callable=AsyncMock) as mock_broadcast,              patch.object(shutil, "copy") as mock_copy:
+            resp = pipeline_client.post(
+                "/api/pipeline/force-render",
+                json={"reason": "品質テスト", "session_id": "test-session"}
+            )
 
-                    assert resp.status_code == 200
-                    data = resp.json()
-                    assert data["status"] == "force_rendered"
-                    assert data["quality_score"] == 70
-                    assert data["reason"] == "品質テスト"
-                    assert "final_path" in data
+        assert resp.status_code == 409, resp.text
+        detail = resp.json()["detail"]
+        assert "approval_gate --approve" in detail, "承認の手順を案内していない"
+        assert "20260924_000000_abc" in detail, "どの実走を承認すればよいのか分からない"
 
-                    mock_record.assert_called_once()
-                    mock_broadcast.assert_called_once()
-                    broadcast_data = mock_broadcast.call_args[0][0]
-                    assert broadcast_data["type"] == "force_render_complete"
-
-        # クリーンアップ: force_renderが作ったファイル
-        import shutil
-        if Path("output/final").exists():
-            shutil.rmtree("output/final", ignore_errors=True)
-
-        # ケース2: except Exception → HTTPException(500) (L740-742)
-        _pipeline_state["status"] = "completed"
-        _pipeline_state["result"] = {
-            "quality_gate_report": {"score": 70},
-            "preview_path": str(preview),
-        }
-        with patch.dict("sys.modules", {
-            "safe_io": None,
-        }):
-            # shutil.copy を例外で失敗させる → except Exception → 500
-            with patch("shutil.copy", side_effect=PermissionError("disk full")):
-                resp = pipeline_client.post(
-                    "/api/pipeline/force-render",
-                    json={"reason": "fail test"}
-                )
-                assert resp.status_code == 500
+        # 書き出しの痕跡が1つも残らないこと
+        mock_copy.assert_not_called()
+        mock_record.assert_not_called()
+        mock_broadcast.assert_not_called()
+        assert _pipeline_state["result"].get("final_path") is None
+        assert _pipeline_state["result"].get("force_rendered") is None
 
         # 状態リセット
         _pipeline_state["status"] = "idle"

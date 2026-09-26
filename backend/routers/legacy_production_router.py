@@ -414,44 +414,21 @@ def get_color_presets():
 
 @router.post("/api/video/process/start")
 async def start_video_processing(background_tasks: BackgroundTasks, req: VideoProcessRequest):
-    """本番動画処理を開始"""
-    import time
+    """本番動画処理を開始 → **R2-C1 で閉じた**（2026-09-25）
 
-    task_id = str(uuid.uuid4())
-    task = video_processor.create_task(task_id=task_id, video_paths=req.video_paths, mood=req.mood, guest_assets=req.guest_assets, output_name=req.output_name)
+    `routers/render.py` の `/api/video/process` と**同じ `video_processor` 実装へ向かう
+    2本目の入口**。片方だけ閉じても意味が無い（2026-09-25 の gate-verifier が、こちらから
+    承認ゼロで `backend/temp/video_output/` に mp4 を3本作って反証した）。
 
-    _video_tasks[task_id] = {
-        "status": "starting", "progress": 0, "current_step": "初期化中...",
-        "mood": req.mood, "video_paths": req.video_paths,
-        "output_path": None, "preview_url": None, "error": None, "created_at": time.time()
-    }
-
-    loop = asyncio.get_running_loop()
-
-    def process_video_task():
-        try:
-            def update_progress(t):
-                _video_tasks[task_id]["status"] = t.phase.value
-                _video_tasks[task_id]["progress"] = t.progress
-                _video_tasks[task_id]["current_step"] = t.current_step
-                _video_tasks[task_id]["output_path"] = t.output_path
-                _video_tasks[task_id]["preview_url"] = t.preview_url
-                _video_tasks[task_id]["error"] = t.error
-                try:
-                    coro = broadcaster.broadcast({"type": "video_progress", "task_id": task_id, "phase": t.phase.value, "progress": t.progress, "current_step": t.current_step})
-                    asyncio.run_coroutine_threadsafe(coro, loop)
-                except Exception:
-                    pass
-            video_processor.set_progress_callback(update_progress)
-            video_processor.process_video(task_id)
-        except Exception as e:
-            _video_tasks[task_id]["status"] = "error"
-            _video_tasks[task_id]["error"] = str(e)
-            logger.error(f"Video processing error: {e}")
-
-    background_tasks.add_task(process_video_task)
-    mood_settings = MOOD_SETTINGS.get(req.mood.lower(), MOOD_SETTINGS["elegant"])
-    return {"task_id": task_id, "status": "started", "message": f"ムード '{mood_settings.name}' で動画処理を開始しました", "mood_settings": {"name": mood_settings.name, "transition": mood_settings.transition, "telop_style": mood_settings.telop_style}}
+    本線は `backend.agents.pipeline_coordinator` で、書き出しは承認を通る。
+    """
+    raise HTTPException(
+        status_code=409,
+        detail="承認していない動画は書き出せません（R2-C1）。この経路は本線ではありません。"
+               "本線で作って承認を通してください: "
+               "python -m backend.agents.pipeline_coordinator <動画> → "
+               "python -m backend.revenue.approval_gate --approve <run_id> --synthetic yes|no → --export <run_id>",
+    )
 
 
 @router.get("/api/video/process/status/{task_id}")

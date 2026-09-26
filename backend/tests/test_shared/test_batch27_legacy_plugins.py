@@ -140,7 +140,8 @@ class TestLegacyRouterAllEndpoints:
         with patch("video_processor.subprocess.Popen", return_value=proc):
             r = self.client.post("/api/video/process/start",
                                  json={"video_paths": [], "mood": "elegant", "output_name": "test"})
-            assert r.status_code in (200, 500)
+            # R2-C1: 承認を通さない書き出しの経路は閉じた（2026-09-25）
+            assert r.status_code == 409
 
     def test_lp_20_process_status_not_found(self):
         r = self.client.get("/api/video/process/status/nonexistent")

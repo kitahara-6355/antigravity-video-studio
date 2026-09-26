@@ -1,3 +1,5 @@
+import builtins
+import os
 import sys
 from pathlib import Path
 
@@ -66,6 +68,37 @@ from agents.pipeline_coordinator import PipelineCoordinator, PipelineContext, St
 # Restore dummy modules disabled to prevent test pollution
 pass
 
+async def _書き出すまで(pc, ctx):
+    """**提案 → 承認 → 書き出し**（R2-C1）。
+
+    本線（execute）は書き出さずに提案で止まる（awaiting_approval）。書き出しの工程を
+    見るテストは、承認して書き出すところまで通す。
+    """
+    import json as _json
+    import tempfile
+    from backend.revenue import approval_gate as ag
+
+    if not ctx.preview_path:
+        # **見ていないものは承認できない**（R2-C1）。このファイルの worker は汎用のモックで
+        # プレビューを作らないので、承認の材料だけ実在させておく
+        fd, preview = tempfile.mkstemp(suffix=".mp4", prefix="mock_preview_")
+        os.write(fd, b"mock-preview")
+        os.close(fd)
+        ctx.preview_path = preview
+    res = await pc.execute(ctx)
+    if res["status"] != "awaiting_approval":
+        return res
+    ag.approve(Path(res["proposal_path"]).parent, synthetic=False, by="test")
+    return await pc.export(res["run_id"])
+
+
+def _提案(res):
+    """提案（proposal.json）の中身。書き出しのモードや前半で落ちた工程はここに残る。"""
+    import json as _json
+
+    return _json.loads(Path(res["proposal_path"]).read_text(encoding="utf-8"))
+
+
 class TestPipelineCoordinatorCoverage:
     """pipeline_coordinator.py のカバレッジ100%を達成するためのテストクラス"""
 
@@ -122,7 +155,9 @@ class TestPipelineCoordinatorCoverage:
         pc = PipelineCoordinator()
         ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
-        with patch("harness.session_manager.session_manager.create_session", side_effect=Exception("Mocked general error")):
+        # **ディスクに残ったセッションに左右されない。** session_id が残っていると
+        # resume_session が通ってしまい、create_session の経路に入らない
+        with patch("harness.session_manager.session_manager.resume_session", return_value=None),              patch("harness.session_manager.session_manager.create_session", side_effect=Exception("Mocked general error")):
             harness = pc._init_harness(ctx)
             assert harness is None
 
@@ -218,7 +253,7 @@ class TestPipelineCoordinatorCoverage:
                 
             res = await pc.execute(ctx)
             assert "ディスク残量注意: 3.0GB" in ctx.warnings
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_execute_disk_check_exception(self):
@@ -233,22 +268,34 @@ class TestPipelineCoordinatorCoverage:
                 w.verify = MagicMock(return_value=True)
                 
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_performance_budget_manager_import_error(self):
         pc = PipelineCoordinator()
         ctx = PipelineContext(video_path=self.video_path, target_minutes=10, session_id="s123")
         
+        # ハーネスは差し替える。本物を動かすと backend/data/ にセッションを書き、
+        # 後続のテスト（resume_session の経路）の前提まで変わる
+        pc._init_harness = MagicMock(return_value=None)
+
+        真の_import = builtins.__import__
+
+        def _性能の予算だけ失敗(name, *args, **kwargs):
+            # **丸ごと失敗させない。** 実行記録まで開けなくなり、提案が残らない（R2-C1）
+            if "performance_budget_manager" in name:
+                raise ImportError("Mocked PerformanceBudgetManager import error")
+            return 真の_import(name, *args, **kwargs)
+
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage), \
-             patch("builtins.__import__", side_effect=ImportError("Mocked PerformanceBudgetManager import error")):
+             patch("builtins.__import__", side_effect=_性能の予算だけ失敗):
             for w in pc.workers:
                 w.execute = AsyncMock(return_value=StageResult(stage_name=w.name, success=True, detail="ok", duration_seconds=0.1, data={}))
                 w.verify = MagicMock(return_value=True)
                 
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_pre_hook_governance_permission_denied(self):
@@ -390,7 +437,7 @@ class TestPipelineCoordinatorCoverage:
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
             transcribe_res = next(r for r in ctx.stage_results if r.stage_name == transcribe_worker.name)
             assert transcribe_res.success is True
             assert transcribe_res.retries == 1
@@ -460,9 +507,10 @@ class TestPipelineCoordinatorCoverage:
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
             # 並列で落ちても止めないが、完走とも呼ばない（R1.5-C1）
-            assert res["status"] == "degraded"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
             assert any("プレビュー生成失敗" in w for w in ctx.warnings)
-            assert ctx.render_mode == "safe"
+            # 書き出しのモードは書き出しの工程で決まる。提案に載る値を見る（D-41）
+            assert _提案(res)["render_mode"] == "safe"
             mock_ws.assert_called()
 
     @pytest.mark.asyncio
@@ -489,7 +537,7 @@ class TestPipelineCoordinatorCoverage:
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
             # 断られた工程は動いていない。止めないが完走とも呼ばない（R1.5-C1）
-            assert res["status"] == "degraded"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_execute_evaluator_optimizer_success(self):
@@ -525,7 +573,7 @@ class TestPipelineCoordinatorCoverage:
         with patch("shutil.disk_usage", return_value=mock_usage), \
              patch("harness.evaluator_optimizer.evaluator_optimizer", mock_evaluator_optimizer):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_execute_evaluator_optimizer_failed(self):
@@ -557,7 +605,7 @@ class TestPipelineCoordinatorCoverage:
         with patch("shutil.disk_usage", return_value=mock_usage), \
              patch("harness.evaluator_optimizer.evaluator_optimizer", mock_evaluator_optimizer):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_quality_improvement_loop_fallback_success(self):
@@ -579,11 +627,19 @@ class TestPipelineCoordinatorCoverage:
         qg_worker = pc._find_worker(QualityGateWorker)
         qg_worker.verify = MagicMock(side_effect=[False, False, False, True])
         
+        真の_import = builtins.__import__
+
+        def _改善器だけ失敗(name, *args, **kwargs):
+            # **丸ごと失敗させない。** 実行記録まで開けなくなり、提案が残らない（R2-C1）
+            if "evaluator_optimizer" in name:
+                raise ImportError("evaluator_optimizer not found")
+            return 真の_import(name, *args, **kwargs)
+
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage), \
-             patch("builtins.__import__", side_effect=ImportError("evaluator_optimizer not found")):
+             patch("builtins.__import__", side_effect=_改善器だけ失敗):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_quality_improvement_loop_with_perf_manager(self):
@@ -861,7 +917,7 @@ class TestPipelineCoordinatorCoverage:
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
             assert ctx.session_id == "new_session_id_456"
             assert ctx.render_mode == "production"
             # 565 が実行されて ctx.stage_results に追加されていること
@@ -908,11 +964,19 @@ class TestPipelineCoordinatorCoverage:
         preview_worker = pc._find_worker(PreviewWorker)
         preview_worker.execute = AsyncMock(return_value=StageResult(stage_name=preview_worker.name, success=True, detail="ok", duration_seconds=0.1, data={}))
         
+        真の_import = builtins.__import__
+
+        def _改善器だけ失敗(name, *args, **kwargs):
+            # **丸ごと失敗させない。** 実行記録まで開けなくなり、提案が残らない（R2-C1）
+            if "evaluator_optimizer" in name:
+                raise ImportError("evaluator_optimizer not found")
+            return 真の_import(name, *args, **kwargs)
+
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage), \
-             patch("builtins.__import__", side_effect=ImportError("evaluator_optimizer not found")):
+             patch("builtins.__import__", side_effect=_改善器だけ失敗):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_execute_performance_budget_save_report_exception(self):
@@ -936,7 +1000,7 @@ class TestPipelineCoordinatorCoverage:
         with patch("shutil.disk_usage", return_value=mock_usage), \
              patch("services.performance_budget_manager.PerformanceBudgetManager", return_value=mock_perf_manager):
             res = await pc.execute(ctx)
-            assert res["status"] == "completed"
+            assert res["status"] == "awaiting_approval"  # R2-C1: 提案で止まる（完走は書き出した後）
 
     @pytest.mark.asyncio
     async def test_quality_improvement_loop_preview_fail(self):
@@ -976,7 +1040,7 @@ class TestPipelineCoordinatorCoverage:
         
         mock_usage = MagicMock(free=10 * 1024 * 1024 * 1024)
         with patch("shutil.disk_usage", return_value=mock_usage):
-            res = await pc.execute(ctx)
+            res = await _書き出すまで(pc, ctx)
             # **動画が無いのに完了と言わない**（R1.5-C1）
             assert res["status"] == "error"
 

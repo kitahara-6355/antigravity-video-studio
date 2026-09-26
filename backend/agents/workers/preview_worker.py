@@ -9,6 +9,7 @@ except ImportError:
     from path_resolver import writable_path as _writable_path
 
 
+import uuid
 import logging
 import time
 from pathlib import Path
@@ -110,7 +111,9 @@ class PreviewWorker(PipelineStageWorker):
             preview_dir = VAULT_OUTPUTS_DIR / "preview"
             preview_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            preview_path = str(preview_dir / f"preview_{ts}.mp4")
+            # **名前は実走ごとに一意**（2026-09-26・7周目の F2）。同じ秒の2本が同じプレビューを
+            # 取り合うと、片方の提案が相手のプレビューを指す（承認の指紋の照合で止まるが、止まる前に防ぐ）
+            preview_path = str(preview_dir / f"preview_{ts}_{uuid.uuid4().hex[:8]}.mp4")
 
             success = render_smart_cut(ctx.selected_segments, ctx.video_path, preview_path)
             if success and Path(preview_path).exists() and Path(preview_path).stat().st_size >= 1024:

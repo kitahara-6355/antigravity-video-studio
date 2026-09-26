@@ -474,12 +474,21 @@ def test_safe_json_store_unlink_os_error_ignored(tmp_path):
 # 解決を1点に集約し、環境変数ひとつで差し替えられる状態を保つ。
 
 def test_vault_outputs_dir_defaults_to_project_root(monkeypatch):
-    """環境変数が無ければ従来どおり PROJECT_ROOT/vault-outputs を指す"""
+    """環境変数が無ければ従来どおり PROJECT_ROOT/vault-outputs を指す
+
+    **確かめたら元の向き先に戻す**（2026-09-25）。reload したままにすると、この後の
+    テストがすべて本番の置き場（vault-outputs/final/）へ書く。conftest がテスト用の
+    置き場に振り向けているので、環境変数を戻してから reload し直す。
+    """
     monkeypatch.delenv("ANTIGRAVITY_VAULT_OUTPUTS", raising=False)
     import importlib
     import safe_io
-    importlib.reload(safe_io)
-    assert safe_io.VAULT_OUTPUTS_DIR == safe_io.PROJECT_ROOT / "vault-outputs"
+    try:
+        importlib.reload(safe_io)
+        assert safe_io.VAULT_OUTPUTS_DIR == safe_io.PROJECT_ROOT / "vault-outputs"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(safe_io)
 
 
 def test_vault_outputs_dir_honors_env(monkeypatch, tmp_path):
@@ -488,10 +497,14 @@ def test_vault_outputs_dir_honors_env(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(target))
     import importlib
     import safe_io
-    importlib.reload(safe_io)
-    assert safe_io.VAULT_OUTPUTS_DIR == target
-    monkeypatch.delenv("ANTIGRAVITY_VAULT_OUTPUTS", raising=False)
-    importlib.reload(safe_io)
+    try:
+        importlib.reload(safe_io)
+        assert safe_io.VAULT_OUTPUTS_DIR == target
+    finally:
+        # 環境変数を**消して** reload すると本番の置き場を向いてしまう（2026-09-25）。
+        # conftest が振り向けた元の値に戻してから reload する
+        monkeypatch.undo()
+        importlib.reload(safe_io)
 
 
 def test_disk_manager_fallback_honors_env(monkeypatch, tmp_path):

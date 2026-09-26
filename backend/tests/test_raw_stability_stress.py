@@ -157,7 +157,12 @@ async def test_raw_stability_stress(safe_popen_mock, monkeypatch):
             ctx.quality_score = 95  # 品質ゲートをパスさせ、production モードで走らせる
             
             result = await coordinator.execute(ctx)
-            assert result["status"] == "completed"
+            # R2-C1: 提案で止まる。承認して書き出すまでが1本（資源の計測も1本ぶん）
+            assert result["status"] == "awaiting_approval", result.get("error")
+            from backend.revenue import approval_gate as ag
+            ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
+            result = await coordinator.export(result["run_id"])
+            assert result["status"] == "completed", result.get("error")
             
             # 各イテレーション終了時のリソース計測
             current_rss = process.memory_info().rss

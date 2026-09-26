@@ -319,7 +319,11 @@ class TestC2CoreLogic:
 
     @pytest.mark.asyncio
     async def test_c2_03_timestamp_filename(self):
-        """W4-C2-03: タイムスタンプ付きファイル名 — preview_YYYYMMDD_HHMMSS.mp4"""
+        """W4-C2-03: タイムスタンプ付きファイル名 — preview_YYYYMMDD_HHMMSS_<一意>.mp4
+
+        2026-09-26（gate-verifier 7周目の F2）: 同じ秒の2本が同じプレビューを取り合わないよう、
+        時刻の後ろに実走ごとに一意な8文字を付けた。
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             ctx = _make_preview_ctx(selected_count=3)
             filename_holder = {}
@@ -346,10 +350,12 @@ class TestC2CoreLogic:
         # "preview_" プレフィックスと ".mp4" 拡張子
         assert name.startswith("preview_"), f"ファイル名が不正: {name}"
         assert name.endswith(".mp4"), f"拡張子が不正: {name}"
-        # タイムスタンプ部分 (YYYYMMDD_HHMMSS = 15文字)
-        ts_part = name[len("preview_"):-len(".mp4")]
+        # タイムスタンプ部分 (YYYYMMDD_HHMMSS = 15文字) + "_" + 一意な8文字
+        rest = name[len("preview_"):-len(".mp4")]
+        ts_part, uniq = rest[:15], rest[16:]
         assert len(ts_part) == 15, f"タイムスタンプ部分が不正: {ts_part}"
         assert ts_part[8] == "_", f"アンダースコア位置が不正: {ts_part}"
+        assert rest[15] == "_" and len(uniq) == 8, f"一意な部分が不正: {rest}"
 
     @pytest.mark.asyncio
     async def test_c2_04_file_size_calculation_mb(self):

@@ -17,13 +17,27 @@ if services_dir not in sys.path:
 from preview_engine import PreviewEngine, preview_engine
 from color_grading import color_grading
 
-# テスト用にデバッグモードとカラープリセットをセットアップ
-os.environ["DEBUG_MODE"] = "1"
+# テスト用にカラープリセットをセットアップ
 color_grading.PRESETS["TEST_PRESET"] = "eq=contrast=1.5"
 
-# テスト全体で Path.is_file は基本 True とする（実在チェックは exists で行われているため）
+# 本物の `Path.is_file`（下のテストの一部が一時的に本物へ戻すのに使う）。
+# **ここで保存するだけで、書き換えはしない**
 original_is_file = Path.is_file
-Path.is_file = lambda self: True
+
+
+@pytest.fixture(autouse=True)
+def _このファイルの間だけ差し替える(monkeypatch):
+    """このファイルのテストでは `Path.is_file` を常に真・`DEBUG_MODE=1` とする。
+
+    **モジュールの import 時に書き換えない**（2026-09-25）。以前は
+    `Path.is_file = lambda self: True` と `os.environ["DEBUG_MODE"] = "1"` を import 時に
+    実行して戻していなかった。pytest はテストを走らせる前に**全ファイルを収集する**ので、
+    このファイルが同じバッチにあるだけで、**バッチの全テストが「存在しないファイルが
+    存在する」世界で走っていた。** R2-C1 の門（`export_allowed`）のテストが CI のバッチ
+    でだけ落ちて気づいた — 無い `approval.json` を「在る」と判定して読みに行っていた。
+    """
+    monkeypatch.setattr(Path, "is_file", lambda self: True)
+    monkeypatch.setenv("DEBUG_MODE", "1")
 
 def test_init_ffmpeg_found():
     """ffmpeg が見つかる通常ケースの初期化テスト"""

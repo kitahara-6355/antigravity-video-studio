@@ -476,10 +476,22 @@ def _format_per_run(summaries: list[dict]) -> list[str]:
                 "（上の実績は期間全体の合計です）。実行記録が台帳に要約を"
                 "書いていないので、1本の原価と所要時間は切り出せません"]
 
+    # **同じ実走を二度数えない**（R2-C1）。承認工程が入って、1本の実走が
+    # 台帳に2行書くようになった — 提案で閉じ（awaiting_approval）、承認の後に
+    # 書き出して閉じ直す（completed / degraded）。後の行は前の分を足し込んだ
+    # **総計**なので、実走 ID ごとに最後の行だけを見る。2行を別の実走として
+    # 数えると本数が倍になり、「1本あたり」（R1-C2）が狂う。
+    最後の行: dict[str, dict] = {}
+    for row in summaries:
+        最後の行[str(row.get("run_id") or id(row))] = row
+    summaries = list(最後の行.values())
+
     lines = [f"  1本あたり: {len(summaries)} 本"]
     for row in summaries:
         mark = {"completed": "✅", "degraded": "⚠（一部失敗）",
-                "failed": "🚫（失敗）"}.get(row.get("status", ""), "…")
+                "failed": "🚫（失敗）",
+                # まだ動画が出ていない（人の承認を待っている）
+                "awaiting_approval": "⏸（承認待ち）"}.get(row.get("status", ""), "…")
         lines.append(
             f"      {mark} {row.get('run_id', '(id なし)')}  "
             f"{float(row.get('duration_sec') or 0):.1f} 秒 / "

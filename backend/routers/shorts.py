@@ -289,49 +289,22 @@ async def export_shorts(req: ExportShortsRequest) -> Dict[str, Any]:
 
 @router.post("/render")
 async def render_short(req: RenderShortRequest) -> Dict[str, Any]:
+    """HR-2: Shorts候補の縦型レンダリング → **R2-C1 で閉じた**（2026-09-25）
+
+    ここは承認を1件も見ずに 1080x1920 の完成動画を `vault-outputs/shorts/` へ書いていた
+    （2026-09-24 の gate-verifier が 671,403 byte の mp4 を実生成して反証した）。
+
+    **Shorts は収益化の主軸（登録者集め）なので、消すのではなく本線に載せ直す。**
+    提案 → 承認 → 書き出しの流れに Shorts を載せるのは R3 以降。それまでは止める。
+    候補の抽出（`/candidates`）は分析なので通す。
     """
-    HR-2: Shorts候補を縦型（9:16, 1080x1920）でレンダリング。
-
-    FFmpeg filtergraph:
-    1. 指定範囲をカット（最大60秒）
-    2. crop=ih*9/16:ih → scale=1080:1920 (センタークロップ)
-    3. 字幕焼き込み（画面中央・大文字・太字白文字・黒縁取り）
-    4. 音声ラウドネス正規化(-14 LUFS — Shorts推奨)
-    """
-    # 60秒制限
-    duration = min(req.end_sec - req.start_sec, 60.0)
-    if duration <= 0:
-        raise HTTPException(status_code=400, detail="end_sec must be greater than start_sec")
-
-    output_path = _get_shorts_output_path(req.output_filename)
-    loop = asyncio.get_running_loop()
-
-    def _do_render():
-        try:
-            vf_str = _build_ffmpeg_filters(req.subtitle_text, duration)
-            return _execute_ffmpeg_render(
-                video_path=req.video_path,
-                start_sec=req.start_sec,
-                duration=duration,
-                vf_str=vf_str,
-                output_path=output_path
-            )
-        except (ValueError, KeyError) as e:
-            logger.error(f"Invalid render parameter: {e}")
-            return {"success": False, "error": f"Invalid parameter: {e}"}
-        except (ImportError, ModuleNotFoundError) as e:
-            logger.error(f"Import failed during render execution: {e}")
-            return {"success": False, "error": f"Import failed: {e}"}
-        except (RuntimeError, OSError) as e:
-            logger.error(f"Shorts render execution error: {e}")
-            return {"success": False, "error": str(e)}
-
-    result = await loop.run_in_executor(None, _do_render)
-
-    if not result.get("success"):
-        raise HTTPException(status_code=500, detail=result.get("error", "Render failed"))
-
-    return result
+    raise HTTPException(
+        status_code=409,
+        detail="承認していない動画は書き出せません（R2-C1）。Shorts の書き出しは、"
+               "本線（agents）の提案を承認する流れに載せるまで止めています: "
+               "python -m backend.agents.pipeline_coordinator <動画> → "
+               "python -m backend.revenue.approval_gate --approve <run_id> --synthetic yes|no → --export <run_id>",
+    )
 
 
 @router.post("/thumbnail")

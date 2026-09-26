@@ -207,16 +207,18 @@ def test_trigger_render():
     assert res.json()["status"] == "completed"
 
 def test_start_video_processing():
+    """**R2-C1 で閉じた経路**（2026-09-25）。承認を1件も見ずに ffmpeg を回していた。
+
+    かつては 200 でタスクを登録し、背景で `backend/temp/video_output/` に完成動画を
+    書いていた。いまは断るので、**タスクも登録しない**（書き出しの準備すらしない）。
+    """
+    before = set(_video_tasks)
     res = client.post("/api/video/process", json={
         "video_paths": ["v1.mp4"], "mood": "warm", "output_name": "final_vid"
     })
-    assert res.status_code == 200
-    task_id = res.json()["task_id"]
-    assert task_id in _video_tasks
-    
-    res_status = client.get(f"/api/video/status/{task_id}")
-    assert res_status.status_code == 200
-    assert res_status.json()["status"] == "processing"
+    assert res.status_code == 409, res.text
+    assert "承認" in res.json()["detail"]
+    assert set(_video_tasks) == before, "断ったのにタスクを登録しています"
 
 def test_video_status_not_found():
     res = client.get("/api/video/status/nonexistent")
@@ -334,34 +336,26 @@ def test_start_render_実測が90未満ならブロックする():
         assert 越えた["quality_score"] == 89
 
 def test_video_processing_progress_callback():
+    """**進捗コールバックの経路ごと閉じた**（R2-C1・2026-09-25）。
+
+    ここは背景処理の `update_progress` が `_video_tasks` を completed に書き換えるところを
+    見ていた。経路を閉じたので背景処理そのものが無く、見るべきものは
+    「**書き出しに至る部品を1つも動かさないこと**」に変わった。
+    """
     from video_processor import video_processor
-    
-    callback_holder = {}
-    def mock_set_callback(cb):
-        callback_holder["cb"] = cb
-        
-    def mock_process_video(task_id):
-        if "cb" in callback_holder:
-            mock_t = MagicMock()
-            mock_t.phase.value = "completed"
-            mock_t.progress = 100
-            mock_t.current_step = "完了"
-            mock_t.output_path = "/tmp/out.mp4"
-            mock_t.preview_url = "http://preview/out"
-            callback_holder["cb"](mock_t)
-            
-    video_processor.set_progress_callback.side_effect = mock_set_callback
-    video_processor.process_video.side_effect = mock_process_video
-    
+
+    video_processor.set_progress_callback.reset_mock()
+    video_processor.process_video.reset_mock()
+    video_processor.create_task.reset_mock()
+
     res = client.post("/api/video/process", json={
         "video_paths": ["v1.mp4"], "mood": "warm", "output_name": "final_vid"
     })
-    assert res.status_code == 200
-    task_id = res.json()["task_id"]
-    
-    assert _video_tasks[task_id]["status"] == "completed"
-    assert _video_tasks[task_id]["progress"] == 100
-    assert _video_tasks[task_id]["output_path"] == "/tmp/out.mp4"
+
+    assert res.status_code == 409
+    video_processor.create_task.assert_not_called()
+    video_processor.set_progress_callback.assert_not_called()
+    video_processor.process_video.assert_not_called()
 
 
 def test_start_render_auto_fallback():

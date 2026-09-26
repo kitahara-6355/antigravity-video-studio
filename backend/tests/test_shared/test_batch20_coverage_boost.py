@@ -62,7 +62,7 @@ class TestPipelineRouterExtra:
         _pipeline_state["result"] = {}
         r = self.client.post("/api/pipeline/force-render",
                              json={"session_id": "", "reason": "test"})
-        assert r.status_code == 400
+        assert r.status_code == 409  # R2-C1: 承認を通す（かつては 400）
         _reset_state()
 
     def test_pre_05_format_duration_edge(self):

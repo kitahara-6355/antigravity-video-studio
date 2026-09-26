@@ -48,6 +48,11 @@ async def test_scenario_01_normal_full_pipeline(safe_popen_mock, tmp_path):
     ctx = PipelineContext(video_path=str(tmp_path / "tv01_real_clip.mp4"))
     ctx.session_id = "test-session-s01"
     ctx.final_path = "vault-assets/output/final.mp4"
+    # **見ていないものは承認できない**（R2-C1）。worker は汎用のモックでプレビューを
+    # 作らないので、承認の材料だけ実在させておく
+    preview = tmp_path / "preview_s01.mp4"
+    preview.write_bytes(b"mock-preview")
+    ctx.preview_path = str(preview)
     ctx.quality_score = 95
     ctx.quality_feedback = []
 
@@ -60,8 +65,14 @@ async def test_scenario_01_normal_full_pipeline(safe_popen_mock, tmp_path):
         mock_disk.return_value = MagicMock(free=10 * (1024 ** 3))
         
         result = await coordinator.execute(ctx)
-        
-        assert result["status"] == "completed"
+        # R2-C1: 本線は提案で止まる。承認して書き出して初めて完走する
+        assert result["status"] == "awaiting_approval", result.get("error")
+        from pathlib import Path
+        from backend.revenue import approval_gate as ag
+        ag.approve(Path(result["proposal_path"]).parent, synthetic=False, by="test")
+        result = await coordinator.export(result["run_id"])
+
+        assert result["status"] == "completed", result.get("error")
         assert result["quality_score"] == 95
         assert len(result["stage_results"]) > 0
         for stage in result["stage_results"]:

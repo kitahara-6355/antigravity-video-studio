@@ -13,6 +13,7 @@ MASTER v3.6 モックデータカタログ (MD-01〜MD-07) 対応。
     ctx = create_mock_ctx(corrupt=True)               # MD-05: 破損データ
     ctx = create_mock_ctx(type_error=True)             # MD-06: 型不正
     ctx = create_mock_ctx(segments=100)                # MD-07: 長尺
+    ctx = create_mock_ctx(approved=False)              # 承認していない実走（R2-C1 の門を見る）
 """
 
 import copy
@@ -116,6 +117,35 @@ def create_mock_segments(
 # PipelineContext 生成
 # ============================================================
 
+def create_approved_run(root: Optional[str] = None) -> str:
+    """**承認済みの実行記録**を1つ作って、その置き場を返す（R2-C1）。
+
+    `RenderWorker` は承認を確かめてからでないと書き出さない（2026-09-25。承認を通さない
+    書き出し口が2周続けて見つかったので、**書く主体そのもの**に門を置いた）。
+    worker の中身（エンコード・BGM・ロゴ）を見るテストは、この記録を `ctx.run_dir` に
+    入れて門を通す。**門そのものを見るのはここではない** —
+    `backend/tests/test_routers/test_export_routes_gated.py` が見る。
+    """
+    import tempfile
+    from types import SimpleNamespace
+
+    from backend.revenue import approval_gate as ag
+
+    run_dir = Path(root or tempfile.mkdtemp(prefix="mock_run_"))
+    run_dir.mkdir(parents=True, exist_ok=True)
+    # **見ていないものは承認できない**（R2-C1・4周目の反例B）ので、承認の材料のプレビューを置く
+    preview = run_dir / "mock_preview.mp4"
+    preview.write_bytes(b"mock-preview")
+    ag.write_proposal(
+        run_dir,
+        SimpleNamespace(video_path="mock.mp4", session_id="mock", metadata={},
+                        preview_path=str(preview), quality_score=95, quality_scored=True,
+                        skipped_features=[], warnings=[]),
+        run_id=run_dir.name, models_used=[])
+    ag.approve(run_dir, synthetic=False, by="mock")
+    return str(run_dir)
+
+
 def create_mock_ctx(
     segments: int = 10,
     video_path: str = "",
@@ -126,6 +156,7 @@ def create_mock_ctx(
     template_id: Optional[str] = None,
     session_id: str = "test-session-001",
     duration_each: float = 15.0,
+    approved: bool = True,
 ) -> PipelineContext:
     """PipelineContext モックファクトリ
 
@@ -177,6 +208,11 @@ def create_mock_ctx(
 
     if template_id:
         ctx.template_id = template_id
+
+    # **既定で承認済みの実行記録を指す**（R2-C1）。worker の中身を見るテストを
+    # 門で止めないため。門を見るテストは `approved=False` で組む
+    if approved:
+        ctx.run_dir = create_approved_run()
 
     return ctx
 

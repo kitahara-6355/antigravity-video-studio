@@ -159,6 +159,8 @@ REQUIRED_RUN_KEYS = ("run_id", "started_at", "stages", "models_used")
 # ここに無いもの（`failed` / `error` / 途中で死んで `running` のまま / 見知らぬ値）は
 # すべて赤に倒す。**「確かめられなかった」を「問題なし」にしない。**
 GREEN_RUN_STATUSES = ("completed", "degraded")
+# 承認待ち（R2-C1）。緑ではないが**失敗でもない** — 人の判断を待っている状態
+AWAITING_APPROVAL = "awaiting_approval"
 
 
 def load_runs(runs_dir: Path = RUNS_DIR) -> list[dict]:
@@ -260,6 +262,15 @@ def check_run_status(runs: list[dict]) -> list[Finding]:
             "run_status_missing", rid,
             "実行の状態が記録されていません。**動いたかどうかを判定できない**"
             "ので緑にはしません")]
+    if status == AWAITING_APPROVAL:
+        # **承認待ちは「動かなかった」ではない**（R2-C1）。緑にはしないが、
+        # 実装を疑わせない。次にやることは人の承認と書き出し
+        return [Finding(
+            "run_awaiting_approval", rid,
+            "最新の実走は**承認待ち**です（提案までで止まっています）。"
+            "成果物はまだ無いので緑にはしません。プレビューを見てから "
+            f"`python -m backend.revenue.approval_gate --approve {rid} --synthetic yes|no` → "
+            f"`--export {rid}`")]
     if status not in GREEN_RUN_STATUSES:
         return [Finding(
             "run_failed", rid,

@@ -404,35 +404,26 @@ def test_editor():
         assert response.status_code == 200
         assert response.json()["ffmpeg_available"] is True
         
-    # create final video normal
-    with patch("antigravity_api.video_editor") as mock_editor:
-        mock_editor.create_final_video.return_value = {"success": True}
-        response = client.post("/api/antigravity/editor/create-final", json={
-            "main_video": "main.mp4",
-            "opening": "open.mp4",
-            "ending": "end.mp4",
-            "telops": [],
-            "output_name": "final.mp4"
-        })
-        assert response.status_code == 200
-        assert response.json()["success"] is True
-
-    # create final video HTTPException
-    with patch("antigravity_api.video_editor") as mock_editor:
-        mock_editor.create_final_video.side_effect = HTTPException(status_code=400, detail="HTTP error")
-        response = client.post("/api/antigravity/editor/create-final", json={
-            "main_video": "main.mp4"
-        })
-        assert response.status_code == 400
-
-    # create final video ValueError
-    with patch("antigravity_api.video_editor") as mock_editor:
-        mock_editor.create_final_video.side_effect = ValueError("Editor error")
-        response = client.post("/api/antigravity/editor/create-final", json={
-            "main_video": "main.mp4"
-        })
-        assert response.status_code == 500
-        assert "Editor error" in response.json()["detail"]
+    # create final video — **R2-C1 で閉じた経路**（2026-09-25）
+    # かつては正常系（200）・HTTPException（400）・ValueError（500）の3分岐を見ていた。
+    # 合成した完成品を承認なしで `vault-outputs/edited/` に作っていたので閉じた。
+    # **入力や部品の失敗の仕方で挙動が変わらない**（どれでも 409）ことと、
+    # 合成の部品を1つも呼ばないことを見る
+    for side_effect in (None, HTTPException(status_code=400, detail="HTTP error"),
+                        ValueError("Editor error")):
+        with patch("antigravity_api.video_editor") as mock_editor:
+            mock_editor.create_final_video.return_value = {"success": True}
+            mock_editor.create_final_video.side_effect = side_effect
+            response = client.post("/api/antigravity/editor/create-final", json={
+                "main_video": "main.mp4",
+                "opening": "open.mp4",
+                "ending": "end.mp4",
+                "telops": [],
+                "output_name": "final.mp4"
+            })
+            assert response.status_code == 409
+            assert "承認" in response.json()["detail"]
+            mock_editor.create_final_video.assert_not_called()
 
 def test_pipeline_status():
     with patch("antigravity_api.AntigravityPipeline") as mock_pipeline_cls, \
@@ -494,7 +485,10 @@ def test_approve_telop_invalid_action():
         mock_approve.assert_not_called()
 
 def test_create_final_video_type_error():
-    # TypeError や OSError を投げるケース
+    """**R2-C1 で閉じた経路**（2026-09-25）。かつては TypeError → 500 を見ていた。
+
+    部品が何を投げても、そもそも部品を呼ばないので 409 で断る。
+    """
     with patch("antigravity_api.video_editor") as mock_editor:
         mock_editor.create_final_video.side_effect = TypeError("Invalid path argument type")
         response = client.post("/api/antigravity/editor/create-final", json={
@@ -504,8 +498,8 @@ def test_create_final_video_type_error():
             "telops": [],
             "output_name": "final.mp4"
         })
-        assert response.status_code == 500
-        assert "Invalid path argument type" in response.json()["detail"]
+        assert response.status_code == 409
+        mock_editor.create_final_video.assert_not_called()
 
 
 def test_add_proper_noun_other_errors():

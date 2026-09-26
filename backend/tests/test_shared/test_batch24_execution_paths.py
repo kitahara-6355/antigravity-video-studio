@@ -138,7 +138,8 @@ class TestPipelineRouterExecution:
         }
         r = self.client.post("/api/pipeline/force-render",
                              json={"session_id": "test", "reason": "quality override"})
-        assert r.status_code in (200, 400, 500)
+        # R2-C1: 承認を通さない書き出しは断る（かつては 200 で書き出していた）
+        assert r.status_code == 409
         _reset_state()
 
     def test_pex_11_validate_mixed_files(self, tmp_path):
@@ -242,9 +243,10 @@ class TestRenderExecution:
         assert r.status_code in (200, 400, 422, 500)
 
     def test_rex_05_video_process(self):
+        # R2-C1: 承認を通さない書き出しの経路は閉じた（入力が足りなければ 422 が先に立つ）
         r = self.client.post("/api/video/process",
                              json={"video_path": "test.mp4"})
-        assert r.status_code in (200, 400, 422, 500)
+        assert r.status_code in (409, 422)
 
 
 # ============================================================
@@ -264,9 +266,10 @@ class TestShortsExecution:
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def test_sex_01_render(self):
+        # R2-C1: 承認ゼロで縦型 mp4 を作っていた経路は閉じた（入力不足なら 422 が先）
         r = self.client.post("/api/shorts/render",
                              json={"short_id": "test_b24"})
-        assert r.status_code in (200, 400, 422, 500)
+        assert r.status_code in (409, 422)
 
     def test_sex_02_export(self):
         r = self.client.post("/api/shorts/export",
