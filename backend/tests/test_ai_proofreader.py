@@ -345,6 +345,14 @@ class TestProofreadSegmentsResponseValidation:
         result, stats = self._run_with_response_text('[{"index":0,"text":"テスト"}]', segments)
         assert stats["failed_batches"] == 0
 
+    def test_採用した項目の数を返す(self):
+        """**採用した AI の出力の件数**が統計に載る（R2-C5・作りの変更 2026-09-26）。記録の証拠になる。"""
+        segments = [{"text": "テスト"}, {"text": "二つ目"}]
+        result, stats = self._run_with_response_text('[{"index":0,"text":"修正"},{"index":1,"text":"二つ目"}]', segments)
+        assert stats["accepted_items"] == 2
+        result, stats = self._run_with_response_text('[{"index":9,"text":"x"}]', segments)
+        assert stats["accepted_items"] == 0
+
     def test_response_item_is_not_a_dict(self):
         """レスポンスのリストの要素が辞書ではない場合のスキップ処理"""
         segments = [{"text": "テスト"}]
@@ -853,5 +861,6 @@ class TestCoverageEnhancementAdditional:
                 assert stats["total_retries"] == 1
                 assert stats["failed_batches"] == 0
                 assert result[0]["text"] == "修正済"
+
 
 

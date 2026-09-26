@@ -116,6 +116,7 @@ def _stage_view(stage: dict) -> dict:
         "model_unverified": bool(stage.get("model_unverified")),
         "ai_skipped": bool(stage.get("ai_skipped")),
         "ai_partial": bool(stage.get("ai_partial")),
+        "ai_accepted": (int(stage["ai_accepted"]) if isinstance(stage.get("ai_accepted"), int) else None),
         "calls": int(stage.get("calls") or 0),
         "cost_jpy": float(stage.get("cost_jpy") or 0.0),
         "duration_sec": float(stage.get("duration_sec") or 0.0),
@@ -464,8 +465,9 @@ async function show(id){
     const fb=(s.fallbacks||[]).map(f=>`${esc(f.from)} → ${esc(f.to)}（${esc(f.reason)}）`).join("<br>");
     const obs=(s.models_observed||[]).filter(m=>m!==s.model);
     const actual=(s.model_mismatch&&obs.length)?`<br>実際に動いた: ${esc(obs.join(", "))}`:"";
+    const ev=(s.model_reason==="declared")?(Number.isInteger(s.ai_accepted)?`<br><small>採用 ${s.ai_accepted} 件</small>`:'<br><small class="muted">採用の証拠なし（件数を報告しない工程）</small>'):"";
     const up=(d.export||!s.tier)?"":`<button type="button" onclick="escalate('${esc(id)}','${esc(s.name)}',this)">1段上げる</button>`;
-    return `<tr><td>${esc(s.name)}</td><td>${esc(s.model)}</td><td>${esc(s.tier||"")}</td><td><span class="tag ${esc(s.model_reason)}">${esc(REASON[s.model_reason]||s.model_reason)}</span>${fb?"<br>"+fb:""}${actual}</td><td>${s.calls}</td><td>${s.cost_jpy.toFixed(2)}</td><td>${up}</td></tr>`;
+    return `<tr><td>${esc(s.name)}</td><td>${esc(s.model)}</td><td>${esc(s.tier||"")}</td><td><span class="tag ${esc(s.model_reason)}">${esc(REASON[s.model_reason]||s.model_reason)}</span>${fb?"<br>"+fb:""}${actual}${ev}</td><td>${s.calls}</td><td>${s.cost_jpy.toFixed(2)}</td><td>${up}</td></tr>`;
   }).join("");
   const el=document.getElementById("detail");
   el.innerHTML=`<h2>${esc(id)} <small class="muted">${esc(d.status)}</small></h2>

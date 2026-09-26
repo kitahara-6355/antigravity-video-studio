@@ -306,6 +306,10 @@ class PipelineCoordinator:
                 # worker は `skipped_features` に印（「AI校閲(Gemini)」など）を積むだけで、
                 # 記録は「宣言どおり」のままだった — 提案はそのモデルが出したものではない
                 印 = STAGE_AI_MARKS.get(name)
+                # **採用した AI の出力の件数**（2026-09-26 ユーザー決定: 宣言どおりは証拠で決める）
+                採用 = (getattr(ctx, "ai_accepted", None) or {}).get(印) if 印 else None
+                if 採用 is not None:
+                    entry["ai_accepted"] = int(採用)
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
                 elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):

@@ -624,7 +624,9 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
                                for f in st.get("fallbacks") or [])
                 理由 = f"**降格**: {降格}"
             elif reason == "declared":
-                理由 = "宣言どおり"
+                採用 = st.get("ai_accepted")
+                理由 = (f"宣言どおり（採用 {int(採用)} 件）" if isinstance(採用, int)
+                        else "宣言どおり（採用の証拠なし — この工程は件数を報告しない）")
             elif reason == "mismatch":
                 理由 = (f"**実測が宣言と違う**（実際に動いた: {', '.join(st.get('models_observed') or []) or '?'}。"
                         "理由の記録なし）")

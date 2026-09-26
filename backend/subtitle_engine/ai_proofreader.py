@@ -90,6 +90,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
         "failed_batches": 0,
         "total_batches": 0,
         "skipped": False,
+        # **採用した AI の出力の件数**（R2-C5・2026-09-26）。記録の「宣言どおり」の証拠
+        "accepted_items": 0,
     }
 
     def _return(segs):
@@ -382,6 +384,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                     logger.warning("AI Proofreader: no usable item in the response (counted as a failed batch)")
                     stats["failed_batches"] += 1
                     continue
+
+                stats["accepted_items"] += len(batch_correction_map)
 
                 # セグメントを更新
                 for idx, s in enumerate(batch):

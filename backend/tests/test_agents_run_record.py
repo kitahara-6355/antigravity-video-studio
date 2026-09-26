@@ -663,3 +663,29 @@ def test_AIの出力を一部だけ捨てた工程は一部スタブとして記
     st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}["proofread"]
     assert st["ai_partial"] is True and st["ai_skipped"] is False
     assert st["model_reason"] == "partial"
+
+
+
+def test_採用したAIの出力の件数が記録に残りゼロならスタブ(tmp_path):
+    """**「宣言どおり」は断定ではなく証拠で決める**（2026-09-26 ユーザー決定・作りの変更）。
+    工程が採用した AI の出力の件数を記録に残し、ゼロなら経路に依らず stub。"""
+    c = _coordinator(tmp_path)
+    for w in c.workers:
+        if type(w).__name__ == "YouTubeOptWorker":
+            async def _zero(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "YouTube最適化": 0}
+                ctx.metadata = {"title": "形だけ"}
+                return StageResult(stage_name=_w.name, success=True, detail="形だけ")
+            w.execute = _zero
+        if type(w).__name__ == "ProofreadWorker":
+            async def _three(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="3件")
+            w.execute = _three
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["youtube_opt"]["ai_accepted"] == 0 and st["youtube_opt"]["model_reason"] == "stub"
+    assert st["proofread"]["ai_accepted"] == 3
+    assert st["transcribe"]["ai_accepted"] is None

@@ -733,3 +733,32 @@ def test_a_partially_dropped_stage_is_partial(tmp_path):
     rec.finish()
     st = load_run(rec.path)["stages"][0]
     assert st["ai_partial"] is True and st["model_reason"] == "partial"
+
+
+
+def test_zero_accepted_output_is_a_stub_whatever_the_path(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_accepted"] = 0
+    rec.finish()
+    st = load_run(rec.path)["stages"][0]
+    assert st["ai_accepted"] == 0 and st["model_reason"] == "stub"
+
+
+def test_accepted_output_with_calls_is_declared_with_evidence(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash") as entry:
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+        entry["ai_accepted"] = 4
+    rec.finish()
+    st = load_run(rec.path)["stages"][0]
+    assert st["ai_accepted"] == 4 and st["model_reason"] == "declared"
+
+
+def test_unreported_acceptance_is_none(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.6-flash")
+    rec.finish()
+    assert load_run(rec.path)["stages"][0]["ai_accepted"] is None

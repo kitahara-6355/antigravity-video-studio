@@ -268,6 +268,8 @@ class RunRecorder:
             "ai_skipped": False,
             # 一部のバッチだけ捨てた（モデルの出力と元の入力が混ざっている）
             "ai_partial": False,
+            # 採用した AI の出力の件数（工程が報告する。None = 報告なし = 証拠なし）
+            "ai_accepted": None,
             "calls": 0,
             "cost_jpy": 0.0,
             "duration_sec": 0.0,
@@ -322,8 +324,10 @@ class RunRecorder:
         # の行から拾う — 以前はメモリ上のイベントとコンソールにしか無く、実走の後に追えなかった
         entry["fallbacks"] = self._fallbacks_since(offset)
         local = bool(declared) and str(declared).startswith(LOCAL_PREFIX)
-        if entry.get("ai_skipped"):
-            # 応答を捨ててスタブにした（R2-C5 検証2周目の R1）。**どのモデルでも「出した」とは言わない**
+        採用 = entry.get("ai_accepted")
+        if entry.get("ai_skipped") or (採用 is not None and int(採用) == 0 and not local):
+            # 応答を捨ててスタブにした（R2-C5 検証2周目の R1）／採用した出力がゼロ（経路に依らない規則・
+            # 2026-09-26 ユーザー決定）。**どのモデルでも「出した」とは言わない**
             entry["model_reason"] = "stub"
         elif entry.get("ai_partial"):
             entry["model_reason"] = "partial"

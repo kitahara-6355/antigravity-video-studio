@@ -540,3 +540,16 @@ def test_trace_一部スタブの工程はそう言う(tmp_path, capsys):
     rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
     out = capsys.readouterr().out
     assert rc == 0 and "一部スタブ" in out, out
+
+
+
+def test_trace_採用の件数と証拠なしを出す(tmp_path, capsys):
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][1].update({"tier": "standard", "model_reason": "declared", "ai_accepted": 4})
+    run["stages"][2].update({"tier": "standard", "model_reason": "declared"})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "採用 4 件" in out and "採用の証拠なし" in out, out

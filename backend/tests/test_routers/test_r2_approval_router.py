@@ -466,3 +466,16 @@ def test_一部スタブの工程は画面でも宣言どおりと言わない(c
     d = client.get("/api/r2/runs/RID").json()
     assert d["stages"][0]["model_reason"] == "partial" and d["stages"][0]["ai_partial"] is True
     assert "一部スタブ" in client.get("/r2/approve").text
+
+
+
+def test_採用の件数が画面に出て無ければ証拠なしと言う(client, tmp_path):
+    _run(tmp_path, stages=[
+        {"name": "proofread", "model": "gemini-3.6-flash", "tier": "standard", "status": "success",
+         "model_reason": "declared", "ai_accepted": 4, "models_observed": ["gemini-3.6-flash"], "fallbacks": [], "calls": 1, "cost_jpy": 0.1},
+        {"name": "youtube_opt", "model": "gemini-3.6-flash", "tier": "standard", "status": "success",
+         "model_reason": "declared", "models_observed": ["gemini-3.6-flash"], "fallbacks": [], "calls": 1, "cost_jpy": 0.1}])
+    by = {s["name"]: s for s in client.get("/api/r2/runs/RID").json()["stages"]}
+    assert by["proofread"]["ai_accepted"] == 4 and by["youtube_opt"]["ai_accepted"] is None
+    body = client.get("/r2/approve").text
+    assert "採用" in body and "採用の証拠なし" in body

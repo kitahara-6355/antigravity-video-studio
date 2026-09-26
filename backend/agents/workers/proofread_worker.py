@@ -102,6 +102,9 @@ class ProofreadWorker(PipelineStageWorker):
                 )
             total = int(retry_stats.get("total_batches", 0) or 0)
             failed = int(retry_stats.get("failed_batches", 0) or 0)
+            # **採用した AI の出力の件数を記録に渡す**（宣言どおりは断定ではなく証拠で決める）
+            ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}),
+                               "AI校閲": int(retry_stats.get("accepted_items", 0) or 0)}
             if retry_stats.get("skipped") or (total > 0 and failed >= total):
                 # 呼び出しは成功しても**応答を全部捨てた**なら、AI の出力は提案に届いていない
                 # （R2-C5 検証3周目の P1）。記録には `ai_skipped` として残る
@@ -110,6 +113,7 @@ class ProofreadWorker(PipelineStageWorker):
         except Exception as e:
             logger.warning(f"Gemini AI proofread skipped: {e}")
             ctx.skipped_features.append("AI校閲(Gemini)")
+            ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}), "AI校閲": 0}
 
         # ━━━ FIX-3A: テキスト整形（旧 src/clean_linguistic.py 復元） ━━━
         # 長文を18文字/行に分割し、字幕の画面はみ出しを防止
