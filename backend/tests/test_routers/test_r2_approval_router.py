@@ -319,7 +319,7 @@ def test_昇格すると段の上書きと履歴と実走の記録に残る(clie
     assert r.json()["applied"] is True and r.json()["to"]["tier"] == "premium"
     ov = json.loads((policy_sandbox / "model_overrides.json").read_text(encoding="utf-8"))
     assert ov["tasks"]["proofreader"]["tier"] == "premium" and ov["tasks"]["proofreader"]["reason"] == "字幕が固い"
-    hist = [json.loads(l) for l in (policy_sandbox / "history.jsonl").read_text(encoding="utf-8").splitlines()]
+    hist = [json.loads(line) for line in (policy_sandbox / "history.jsonl").read_text(encoding="utf-8").splitlines()]
     assert hist[-1]["action"] == "escalate" and hist[-1]["task"] == "proofreader"
     esc = json.loads((d / "escalations.json").read_text(encoding="utf-8"))
     assert esc[0]["stage"] == "proofread" and esc[0]["to"]["tier"] == "premium" and esc[0]["reason"] == "字幕が固い"

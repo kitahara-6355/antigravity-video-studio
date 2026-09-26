@@ -772,7 +772,7 @@ def test_a_fallback_is_written_to_the_ledger_as_a_non_billing_row(tmp_path, monk
     cost_guard.record_fallback("gemini-3.6-flash", "gemini-3.5-flash-lite",
                                reason="503:サーバー混雑", attempts=3, caller="proofread")
 
-    rows = [json.loads(l) for l in guard.ledger_path.read_text(encoding="utf-8").splitlines()]
+    rows = [json.loads(line) for line in guard.ledger_path.read_text(encoding="utf-8").splitlines()]
     assert len(rows) == 1
     row = rows[0]
     assert row["kind"] == "fallback"
