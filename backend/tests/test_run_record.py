@@ -674,3 +674,36 @@ def test_the_resume_view_shows_why_the_model_changed(tmp_path, capsys):
     out = capsys.readouterr().out
     assert rc == 1
     assert "429:枠枯渇" in out and "gemini-3.5-flash-lite" in out, out
+
+
+def test_a_declared_stage_with_no_calls_is_unverified_not_declared(tmp_path):
+    """**宣言があって一度も呼ばれていない工程は「宣言どおり」ではない**（R2-C5 検証1周目の U2）。
+    2026-08-20 の事故（全段 503 → スタブ → success）と同じ形。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        pass
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_unverified"] is True
+    assert stage["model_reason"] == "unverified"
+
+
+def test_observed_differs_without_a_fallback_row_is_mismatch(tmp_path):
+    """降格の行が無いのに実測が宣言と違う（事前の枠チェックなど）→ 「宣言どおり」と言わない（U1）。"""
+    rec = _recorder(tmp_path)
+    with rec.stage("proofread", model="gemini-3.6-flash"):
+        _ledger_row(rec.ledger_path, "gemini-3.5-flash-lite")
+    rec.finish()
+
+    stage = load_run(rec.path)["stages"][0]
+    assert stage["model_mismatch"] is True
+    assert stage["model_reason"] == "mismatch"
+
+
+def test_a_local_stage_is_declared_even_without_calls(tmp_path):
+    rec = _recorder(tmp_path)
+    with rec.stage("transcribe", model="local:whisper"):
+        pass
+    rec.finish()
+    assert load_run(rec.path)["stages"][0]["model_reason"] == "declared"

@@ -621,10 +621,13 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
                 理由 = f"**降格**: {降格}"
             elif reason == "declared":
                 理由 = "宣言どおり"
+            elif reason == "mismatch":
+                理由 = (f"**実測が宣言と違う**（実際に動いた: {', '.join(st.get('models_observed') or []) or '?'}。"
+                        "理由の記録なし）")
             elif reason == "observed":
                 理由 = "宣言なし（実測だけ）"
-            elif st.get("model_unverified"):
-                理由 = "未検証（一度も呼ばれていない）"
+            elif reason == "unverified" or st.get("model_unverified"):
+                理由 = "**未検証**（一度も呼ばれていない — 提案はこのモデルが出したものではない）"
             else:
                 理由 = "（理由の記録なし — D-39 より前の実走）"
             lines.append(f"    {st.get('name')}: {model}{段} — {理由}")

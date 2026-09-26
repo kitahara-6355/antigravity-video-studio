@@ -317,8 +317,15 @@ class RunRecorder:
         # **なぜそのモデルになったか**を記録に残す（D-39）。降格は台帳の `kind: fallback`
         # の行から拾う — 以前はメモリ上のイベントとコンソールにしか無く、実走の後に追えなかった
         entry["fallbacks"] = self._fallbacks_since(offset)
+        local = bool(declared) and str(declared).startswith(LOCAL_PREFIX)
         if entry["fallbacks"]:
             entry["model_reason"] = "fallback"
+        elif entry["model_mismatch"]:
+            # 降格の行が無いのに実測が違う（理由は記録に無い）。**「宣言どおり」とは言わない**（U1）
+            entry["model_reason"] = "mismatch"
+        elif declared and not local and not observed:
+            # 宣言があって一度も呼ばれていない（2026-08-20 の 503 → スタブ → success と同じ形・U2）
+            entry["model_reason"] = "unverified"
         elif declared:
             entry["model_reason"] = "declared"
         elif observed:

@@ -428,3 +428,22 @@ def test_画面に昇格とやり直しの操作がある(client):
     body = client.get("/r2/approve").text
     for 語 in ("1段上げる", "やり直す", "見積もり"):
         assert 語 in body, 語
+
+
+# --- 検証1周目（U1・U2）: 実測が宣言と違う／一度も呼ばれていない、を「宣言どおり」と言わない -----------
+
+def test_実測が宣言と違えば画面のAPIは実際に動いたモデルを出す(client, tmp_path):
+    _run(tmp_path, stages=[
+        {"name": "proofread", "model": "gemini-3.6-flash", "tier": "standard", "status": "success",
+         "model_reason": "mismatch", "models_observed": ["gemini-3.5-flash-lite"], "model_mismatch": True,
+         "fallbacks": [], "calls": 1, "cost_jpy": 0.1},
+        {"name": "youtube_opt", "model": "gemini-3.6-flash", "tier": "standard", "status": "success",
+         "model_reason": "unverified", "models_observed": [], "model_unverified": True, "fallbacks": []}])
+
+    by = {s["name"]: s for s in client.get("/api/r2/runs/RID").json()["stages"]}
+
+    assert by["proofread"]["model_reason"] == "mismatch"
+    assert by["proofread"]["models_observed"] == ["gemini-3.5-flash-lite"]
+    assert by["youtube_opt"]["model_reason"] == "unverified"
+    body = client.get("/r2/approve").text
+    assert "実測が宣言と違う" in body and "未検証" in body and "実際に動いた" in body

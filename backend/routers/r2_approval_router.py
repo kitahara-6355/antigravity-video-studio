@@ -432,7 +432,7 @@ _PAGE = """<!doctype html>
  table{border-collapse:collapse;width:100%;font-size:.9rem}
  th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
  .tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:.8rem}
- .declared{background:#e6f4ea}.fallback{background:#fdecea}.observed{background:#fff4e5}.unrecorded,.unverified{background:#eee}
+ .declared{background:#e6f4ea}.fallback,.mismatch{background:#fdecea}.observed{background:#fff4e5}.unrecorded,.unverified{background:#eee}
  video{max-width:100%;background:#000;border-radius:6px}
  .muted{color:#777}
  .blocker{background:#fff4e5;padding:8px;border-radius:6px}
@@ -445,9 +445,9 @@ _PAGE = """<!doctype html>
  <div class="detail" id="detail"><p class="muted">左の実走を選ぶ</p></div>
 </div>
 <script>
-const REASON = {declared:"宣言どおり", fallback:"降格", observed:"宣言なし（実測だけ）", unverified:"未検証（一度も呼ばれていない）", unrecorded:"理由の記録なし"};
+const REASON = {declared:"宣言どおり", fallback:"降格", mismatch:"実測が宣言と違う（理由の記録なし）", observed:"宣言なし（実測だけ）", unverified:"未検証（一度も呼ばれていない）", unrecorded:"理由の記録なし"};
 async function j(u){const r=await fetch(u);if(!r.ok)throw new Error(u+" "+r.status);return r.json();}
-function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 async function loadRuns(){
   const d=await j("/api/r2/runs");const el=document.getElementById("runs");
   if(!d.runs.length){el.innerHTML='<p class="muted">実走がありません（'+esc(d.runs_dir)+'）</p>';return;}
@@ -459,8 +459,10 @@ async function show(id){
   const stages=d.stages.filter(s=>s.model&&!String(s.model).startsWith("local:"));
   const rows=stages.map(s=>{
     const fb=(s.fallbacks||[]).map(f=>`${esc(f.from)} → ${esc(f.to)}（${esc(f.reason)}）`).join("<br>");
+    const obs=(s.models_observed||[]).filter(m=>m!==s.model);
+    const actual=(s.model_mismatch&&obs.length)?`<br>実際に動いた: ${esc(obs.join(", "))}`:"";
     const up=(d.export||!s.tier)?"":`<button type="button" onclick="escalate('${esc(id)}','${esc(s.name)}',this)">1段上げる</button>`;
-    return `<tr><td>${esc(s.name)}</td><td>${esc(s.model)}</td><td>${esc(s.tier||"")}</td><td><span class="tag ${esc(s.model_reason)}">${esc(REASON[s.model_reason]||s.model_reason)}</span>${fb?"<br>"+fb:""}</td><td>${s.calls}</td><td>${s.cost_jpy.toFixed(2)}</td><td>${up}</td></tr>`;
+    return `<tr><td>${esc(s.name)}</td><td>${esc(s.model)}</td><td>${esc(s.tier||"")}</td><td><span class="tag ${esc(s.model_reason)}">${esc(REASON[s.model_reason]||s.model_reason)}</span>${fb?"<br>"+fb:""}${actual}</td><td>${s.calls}</td><td>${s.cost_jpy.toFixed(2)}</td><td>${up}</td></tr>`;
   }).join("");
   const el=document.getElementById("detail");
   el.innerHTML=`<h2>${esc(id)} <small class="muted">${esc(d.status)}</small></h2>

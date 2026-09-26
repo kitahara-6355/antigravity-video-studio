@@ -433,3 +433,24 @@ async def test_非同期でも降格の理由を台帳に残す(engine):
 
     kw = spy.call_args.kwargs
     assert kw["requested"] == "model-a" and kw["to"] == "model-b" and kw["reason"].startswith("429")
+
+
+def test_事前の枠チェックで降格しても理由つきで台帳に残す(engine, monkeypatch):
+    """`_resolve_model` の枠枯渇による降格（quota_precheck）も **なぜそのモデルか** に載る（検証1周目の U1）。
+    本線の proofread / youtube_opt はこの経路でモデルを決めている。"""
+    import sys
+    import types
+    engine._task_mapping = {"t": "model-a"}
+    fake = types.ModuleType("usage_tracker.tracker")
+    fake.usage_tracker = MagicMock()
+    fake.usage_tracker.can_make_request.side_effect = lambda m: m == "model-b"
+    fake.usage_tracker.get_usage_ratio.return_value = 1.0
+    monkeypatch.setitem(sys.modules, "usage_tracker.tracker", fake)
+
+    with patch.object(_mg, "record_fallback") as spy:
+        assert engine._resolve_model("t") == "model-b"
+
+    kw = spy.call_args.kwargs
+    assert kw["requested"] == "model-a" and kw["to"] == "model-b"
+    assert kw["reason"].startswith("quota_precheck"), kw
+    assert kw["caller"] == "resolve:t"

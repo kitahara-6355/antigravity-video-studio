@@ -458,6 +458,16 @@ class ModelGovernanceEngine:
                     f"'{fallback}' に降格 (task={task})"
                 )
                 resolved = fallback
+            if resolved != original:
+                # **事前の枠チェックでの降格も理由つきで台帳へ**（R2-C5 検証1周目の U1）。
+                # 本線の proofread / youtube_opt はここでモデルを決めるので、ここを落とすと
+                # 実行記録は「宣言どおり」のまま実測だけが違う
+                try:
+                    record_fallback(requested=original, to=resolved,
+                                    reason=f"quota_precheck:枠枯渇（usage={_ut.get_usage_ratio(original):.1%}）",
+                                    attempts=0, caller=f"resolve:{task}")
+                except Exception as e:  # noqa: BLE001 — 記録の失敗で実行を落とさない
+                    logger.warning(f"⚠️ 降格の理由を台帳に残せませんでした: {e}")
         except ImportError:
             pass  # usage_tracker 未導入時は枠チェックスキップ
         except (AttributeError, TypeError, ImportError, RuntimeError) as e:
