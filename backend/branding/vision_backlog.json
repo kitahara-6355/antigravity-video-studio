@@ -1394,6 +1394,7 @@
     "decided_by": "ユーザー（収益化から引き直す・承認工程を必須にする・予算¥3,000・停止規則）",
     "order": [
       "R2",
+      "R2.5",
       "R3",
       "R4",
       "R5"
@@ -1489,7 +1490,7 @@
         "why": "収益化は外部の実績で決まる。**測っていない状態で走り続けない。** 期限（2027-02-01）に対する必要ペースが出れば、以降の判断が数字でできる",
         "budget_jpy": 0,
         "budget_note": "YouTube Data API / Analytics API は無料枠。Gemini は使わない想定",
-        "status": "blocked_by_R2",
+        "status": "blocked_by_R2.5",
         "exit_criteria": [
           {
             "id": "R3-C1",
@@ -1528,7 +1529,7 @@
         "gates": [
           "G3"
         ],
-        "note": "**投稿の自動化は R5 に移した**（2026-08-26 ユーザー決定）。収益化に必要なのは『動画が投稿されること』であって『システムが投稿すること』ではないので、当面は手動で投稿する。R3 に残るのは YouTube Data API の**読み取りだけ**（チャンネル統計）。OAuth + resumable upload の塊が丸ごと後ろに回る",
+        "note": "**投稿の自動化は R5 に移した**（2026-08-26 ユーザー決定）。収益化に必要なのは『動画が投稿されること』であって『システムが投稿すること』ではないので、当面は手動で投稿する。R3 に残るのは YouTube Data API の**読み取りだけ**（チャンネル統計）。OAuth + resumable upload の塊が丸ごと後ろに回る ／ 2026-09-26: 計画書の M3（C1〜C4）と M4（C5・D-48・見出し）に対応。G4 の到達確率を初回の pace で実数にする（見直し点 V2）",
         "assumptions": [
           "YouTube Data API の読み取りだけで G3 が満たせる（投稿は手動）",
           "`admin_channel_router` の現在の実装は**固定値を返す偽物**なので、土台にならない（確認済み）"
@@ -1569,7 +1570,8 @@
         ],
         "assumptions": [
           "R1.5-C5 で測り直した原価が、必要本数を掛けても予算内に収まる（**未検証**）"
-        ]
+        ],
+        "note": " ／ 2026-09-26: 計画書の M5。4週の運用で G2。ゲートで憲法の第2回改訂（V3）"
       },
       "R5": {
         "title": "投稿を自動化する",
@@ -1598,6 +1600,59 @@
         ],
         "limits": [
           "**Google の OAuth 審査は範囲外。** 自分のチャンネルに投稿するだけなら審査は要らない想定だが、一次情報の確認は着手時に行う"
+        ],
+        "note": " ／ 2026-09-26: 計画書の M7。M6（feature_gaps: B ロール・サムネ・BGM）の後"
+      },
+      "R2.5": {
+        "title": "G1: raw 4本を結合した1本目（結合＋カット＋字幕）",
+        "why": "出せる物が無ければ何も始まらない（G1）。承認工程（R2）の上に、**人に見せられる完成品**を1本置く。以降の機能（見出し・Shorts・B ロール・サムネ・BGM）は動く1本に順次足す進化型",
+        "budget_jpy": 1000,
+        "budget_note": "18分素材 × 数回の実走（Gemini 音声入力＋Flash 系）。無料枠なら実費 ¥0 の見込み。上限は計画書 §4 の M2 枠",
+        "status": "blocked_by_R2",
+        "exit_criteria": [
+          {
+            "id": "R2.5-C1",
+            "met": false,
+            "verify": "python -m backend.revenue.approval_gate --gate",
+            "condition": "raw 4本を結合した素材（約18分）から、**承認済みの完成品**が置き場に出る（`--gate` exit 0）。人が見て『見せられる』と言える"
+          },
+          {
+            "id": "R2.5-C2",
+            "met": false,
+            "verify": "python -m backend.revenue.approval_gate --trace <run_id>",
+            "condition": "品質ゲートが **90 以上で合格**して production で書き出される（safe ではない）。未実装機能の固定減点は `feature_gaps` の `gate_checks` で除外し、**除外した事実を品質サイドカーに残す**"
+          },
+          {
+            "id": "R2.5-C3",
+            "met": false,
+            "verify": "python -m backend.revenue.artifact_gate --ai-effect",
+            "condition": "AI が編集に効いている（AI あり／なしの完成品の指紋が違い、差分が字幕とカットに出る）"
+          },
+          {
+            "id": "R2.5-C4",
+            "met": false,
+            "verify": "python -m backend.revenue.transcribe_check --gate",
+            "condition": "文字起こしが **Gemini 音声入力**で通り、Whisper との一致率（WER）が記録に残る。基準を下回ったら Whisper に切り替わる（切り替えの事実が記録に残る）"
+          },
+          {
+            "id": "R2.5-C5",
+            "met": false,
+            "verify": "python -m backend.verify_account --projects",
+            "condition": "**クラウドのセッションだけで** C1〜C4 が再現する（素材は GCS 等の読み口、実キーは環境シークレット。raw は読み取り専用）"
+          }
+        ],
+        "limits": [
+          "1本目の範囲は結合＋カット＋字幕まで（2026-09-26 ユーザー決定）。見出し・Shorts・B ロール・サムネ・BGM は後のフェーズ",
+          "文字起こしの主は Gemini 音声入力、従は Whisper（2026-09-26 ユーザー決定）。クラウドのコンテナは GPU 無し"
+        ],
+        "gates": [
+          "G1"
+        ],
+        "note": "計画書 docs/plans/2026-09-26-master-plan-100.md の M2。判定コマンドが未実装のもの（transcribe_check・verify_account --projects）は、このフェーズの最初の作業として作る",
+        "assumptions": [
+          "raw 4本（1.1GB）が GCS 等からクラウドのセッションに読める（M0 のユーザー作業が済んでいる）",
+          "Gemini の音声入力（Flash 系）が 18 分の日本語音声をタイムスタンプ付きで起こせる。精度が足りなければ Whisper（ローカル）に切り替える",
+          "品質ゲートの閾値 90 は、未実装機能の固定減点を除けば到達できる（2026-08-27 の 30 分素材で 94 点の実績）"
         ]
       }
     },
@@ -1606,6 +1661,29 @@
       "P6": "Admin UX 保証。収益化に寄与しないので凍結。運用で必要になったら解凍する",
       "static_gates": "P1〜P5 で作った claim_audit / executor / ui_api / ui_api_closure / dead_code のゲートとラチェットは CI で動かし続ける（回帰防止）。**新しい検証機構は作らない**",
       "trinity_roadmap": "trigger_score 70 に対して current 71.2 だが、収益化とは独立。凍結"
+    },
+    "plan": {
+      "_comment": "**完成度 100% 計画書（2026-09-26 ユーザー承認）。** フェーズ M0〜M8 と正典の R の対応。計画書は説明と見積もりで、正典が勝つ",
+      "doc": "docs/plans/2026-09-26-master-plan-100.md",
+      "approved_at": "2026-09-26",
+      "budget_total_jpy": 10000,
+      "budget_rule": "**¥10,000 は絶対の天井。** どんな理由でも超えない。見込みがユーザーの認識（フェーズ枠）と違いそうになった時点で追加承認を取る。事故（Google 側の従量課金の暴走）を仕組みで止める — spend cap・予算アラート・請求先を Free tier の本番プロジェクトに付けない",
+      "mapping": {
+        "M0": "前提（クラウド主環境）",
+        "M1": "R2-C5",
+        "M1g": "R2 ゲート＋憲法の第1回改訂",
+        "M2": "R2.5",
+        "M2g": "G1 ゲート",
+        "M3": "R3-C1〜C4",
+        "M4": "R3-C5・D-48・見出し",
+        "M5": "R4",
+        "M5g": "G2 ゲート＋憲法の第2回改訂",
+        "M6": "feature_gaps（B ロール・サムネ・BGM）",
+        "M7": "R5",
+        "M8": "運用・上位目標の見直し"
+      },
+      "definition_of_100": "G1〜G3 が met、週に長尺1本＋Shorts 2本を4週連続で実測維持、憲法の全条文が『必達で met』か『後送／削除で承認済み』。G4（YPP 到達）は北極星として残し到達目標",
+      "constitution_revision": "ゲートごとに達成度で改訂（M1g・M5g・M8）。§6 議長権限は『承認が要るのは完成品の書き出し・投稿・課金』へ絞る方向で承認済み（2026-09-26）"
     }
   },
   "verification_policy": {
