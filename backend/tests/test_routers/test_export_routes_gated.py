@@ -297,3 +297,114 @@ async def test_worker_は書き出しの途中でプレビューが変わった�
     finally:
         monkeypatch.undo()
         importlib.reload(safe_io)
+
+
+
+# --- 7周目の F2: 並列の書き出しで完成品の名前が衝突する ----------------------------
+
+def _時刻を止める(monkeypatch, 時刻="20260926_101010"):
+    import agents.workers.render_worker as rw
+
+    class _止まった時計:
+        @staticmethod
+        def now():
+            class _t:
+                @staticmethod
+                def strftime(fmt):
+                    return 時刻
+            return _t()
+
+    monkeypatch.setattr(rw, "datetime", _止まった時計)
+
+
+@pytest.mark.asyncio
+async def test_worker_の完成品の名前は実走ごとに一意(tmp_path, monkeypatch):
+    """**同じ秒に書き出しても衝突しない**（7周目の F2）。以前は `final_<秒>.mp4` で、
+    承認済みの2本を並べて書き出すと同じ名前を取り合い、片方の承認済み動画が消えた。
+    """
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.render_worker import RenderWorker
+
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(tmp_path / "vault"))
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    try:
+        _時刻を止める(monkeypatch)
+
+        async def 書く(self, src, dst, _ctx):
+            Path(dst).write_bytes(b"rendered-" + Path(src).read_bytes())
+            return True
+
+        monkeypatch.setattr(RenderWorker, "_承認を確かめる", staticmethod(lambda c: (True, "")))
+        monkeypatch.setattr(RenderWorker, "_render_production_quality", 書く)
+        書いた = []
+        for rid in ("RUN_A", "RUN_B"):
+            preview = tmp_path / f"preview_{rid}.mp4"
+            preview.write_bytes(rid.encode())
+            ctx = PipelineContext(video_path=str(tmp_path / "src.mp4"))
+            ctx.preview_path = str(preview)
+            ctx.run_dir = str(tmp_path / "runs" / rid)
+            result = await RenderWorker().execute(ctx)
+            assert result.success, result.detail
+            書いた.append(ctx.final_path)
+
+        assert 書いた[0] != 書いた[1], "同じ秒の書き出しが同じ名前を取り合っている"
+        assert "RUN_A" in Path(書いた[0]).name and "RUN_B" in Path(書いた[1]).name
+        assert Path(書いた[0]).read_bytes() == b"rendered-RUN_A"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(safe_io)
+
+
+@pytest.mark.asyncio
+async def test_worker_は既にある完成品を上書きしない(tmp_path, monkeypatch):
+    """名前を**排他的に取る** — 既に同じ名前の完成品があれば、上書きせずに断る。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.render_worker import RenderWorker
+
+    monkeypatch.setenv("ANTIGRAVITY_VAULT_OUTPUTS", str(tmp_path / "vault"))
+    import importlib
+    import safe_io
+    importlib.reload(safe_io)
+    try:
+        _時刻を止める(monkeypatch)
+        (tmp_path / "vault" / "final").mkdir(parents=True)
+        先客 = tmp_path / "vault" / "final" / "final_20260926_101010_RUN_A.mp4"
+        先客.write_bytes(b"approved-earlier")
+
+        async def 書く(self, src, dst, _ctx):
+            Path(dst).write_bytes(b"overwritten")
+            return True
+
+        monkeypatch.setattr(RenderWorker, "_承認を確かめる", staticmethod(lambda c: (True, "")))
+        monkeypatch.setattr(RenderWorker, "_render_production_quality", 書く)
+        preview = tmp_path / "preview.mp4"
+        preview.write_bytes(b"p")
+        ctx = PipelineContext(video_path=str(tmp_path / "src.mp4"))
+        ctx.preview_path = str(preview)
+        ctx.run_dir = str(tmp_path / "runs" / "RUN_A")
+        result = await RenderWorker().execute(ctx)
+
+        assert result.success is False
+        assert 先客.read_bytes() == b"approved-earlier", "先にあった完成品を上書きした"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(safe_io)
+
+
+@pytest.mark.asyncio
+async def test_同じ実走の書き出しを重ねない(tmp_path):
+    """同じ実走を2本並べて書き出さない — 書き出し中の印があれば断る（7周目の F2）。"""
+    from agents.pipeline_coordinator import PipelineCoordinator
+    from tests.fixtures.mock_pipeline import create_approved_run
+
+    run_dir = Path(create_approved_run(str(tmp_path / "runs" / "RID")))
+    (run_dir / ".export.lock").write_text("pid", encoding="utf-8")
+    c = PipelineCoordinator()
+    c.runs_dir = tmp_path / "runs"
+
+    result = await c.export("RID")
+
+    assert result["status"] == "error"
+    assert "書き出し中" in result["error"]

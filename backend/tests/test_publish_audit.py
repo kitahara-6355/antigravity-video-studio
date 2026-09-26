@@ -498,3 +498,36 @@ def test_末尾がドットや空白の名前は赤(tmp_path):
     problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
 
     assert any("末尾" in p for p in problems), problems
+
+
+# --- 7周目の反証（2026-09-26）への手当て -------------------------------------
+
+@pytest.mark.parametrize("動画, サイドカー", [
+    ("edit_20260926.mp4", "upload.youtube.json"),   # 名前がまったく違う
+    ("clip.final.mp4", "clip.youtube.json"),         # 拡張子の前に別の点がある
+])
+def test_サイドカーのあるフォルダは置き場として扱う(tmp_path, 動画, サイドカー):
+    """**名前で結ばない**（7周目の F1・U2 の塞ぎ残し）。
+
+    手動投稿用サイドカーがあるフォルダは、そこから投稿される。サイドカーの名前と動画の名前が
+    違っても「伴う出力」なので、フォルダの中身を置き場と同じ規則で全部問う。
+    """
+    vault = _置き場(tmp_path)
+    (vault / "edited").mkdir()
+    (vault / "edited" / 動画).write_bytes(b"x")
+    (vault / "edited" / サイドカー).write_text("{}", encoding="utf-8")
+
+    problems = ag.publish_audit(tmp_path / "runs", vault, baseline={}, output_root=tmp_path / "output")
+
+    assert any(f"edited/{動画}" in p for p in problems), problems
+
+
+def test_サイドカーのあるフォルダでも承認済みなら通す(tmp_path):
+    """置き場の外に書き出した承認済みの完成品と、その付属物は通す（取り違えの赤にもしない）。"""
+    vault = _置き場(tmp_path)
+    (vault / "edited").mkdir()
+    final = _承認して書き出した(tmp_path, vault, name="../edited/clip.mp4")
+    (final.parent / "clip.youtube.json").write_text("{}", encoding="utf-8")
+
+    assert ag.publish_audit(tmp_path / "runs", vault, baseline={},
+                            output_root=tmp_path / "output") == []

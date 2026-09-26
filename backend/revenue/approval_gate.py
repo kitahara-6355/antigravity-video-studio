@@ -373,8 +373,9 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
     - 置き場（`final/`・`shorts/`）と退避先（`<output_root>/final`・`<output_root>/shorts`）の
       **すべてのファイル** — 深さも入れ物も問わない。**置けるのは承認済みの完成品と、その付属物
       （`<名前>.youtube.json`・`<名前>.quality.json`）だけ**。入れ物は列挙しない（5周目の反証）
-    - 置き場の外でも、**手動投稿用サイドカー（`*.youtube.json`）が隣にあるファイル**
-      （vault と output_root の下を探す。それ以外の場所は見えない — limits）
+    - **手動投稿用サイドカー（`*.youtube.json`）があるフォルダ**は置き場として扱い、直下の中身を
+      同じ規則で全部問う — 名前で結ばない（7周目の反証）。vault と output_root の下を探す
+      （それ以外の場所は見えない — limits）
 
     承認に辿れる = どれかの実走の `export.json` がその動画を指し、指紋（sha256）が一致し、
     その実走の承認が**その提案の承認として成り立ち**、書き出しの後も変わっていない
@@ -439,10 +440,8 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
             return f"{名前(f)}: 末尾がドットや空白の名前は置けません（Windows が正規化して別のファイルと取り違える）"
         return None
 
-    # 1. 置き場（final / shorts と退避先）: **すべてのファイル**を問う
-    置き場 = [root / sub for root in (vault, out) for sub in PUBLISH_DIRS if (root / sub).is_dir()]
-    for d in 置き場:
-        entries = sorted(d.rglob("*"))
+    def フォルダを問う(d: Path, entries: list[Path]) -> None:
+        """置き場と同じ規則で、フォルダの中身を全部問う — 承認済みの完成品と付属物だけが置ける。"""
         for f in entries:
             形 = 置けない形(f)
             if 形:
@@ -472,30 +471,31 @@ def publish_audit(runs_dir: str | Path, vault_dir: str | Path | None = None,
                 # 付属物は名前だけで見ない（6周目の I1: 付属物の名前をかぶせた動画）
                 problems.append(f"{名前(f)}: 付属物の名前だが中身が JSON ではありません")
 
-    # 2. 置き場の外: 手動投稿用サイドカーが隣にあるファイル（入れ物・名前の付け方を問わない）
-    for root in (vault, out):
-        if not root.is_dir():
-            continue
-        for sidecar in sorted(root.rglob("*.youtube.json")):
-            if os.path.normcase(os.path.abspath(sidecar)) in 見た:
-                continue
-            owner = sidecar.name[: -len(".youtube.json")]
-            for f in sorted(sidecar.parent.iterdir()):
-                if (not f.is_file() or _付属物の持ち主(f) is not None
-                        or not 付属物が結びつく(owner, f)):
-                    continue
-                key = os.path.normcase(os.path.abspath(f))
-                if key in 見た:
-                    continue
-                見た.add(key)
-                理由 = 判定(f)
-                if 理由:
-                    problems.append(理由)
+    # 1. 置き場（final / shorts と退避先）: **すべてのファイル**を問う（深さも問わない）
+    置き場 = [root / sub for root in (vault, out) for sub in PUBLISH_DIRS if (root / sub).is_dir()]
+    for d in 置き場:
+        フォルダを問う(d, sorted(d.rglob("*")))
+
+    # 2. **手動投稿用サイドカーがあるフォルダは置き場として扱う**（2026-09-26・7周目の F1）。
+    #    以前はサイドカーと名前が一致する動画だけを問うていたので、名前の違う未承認の動画
+    #    （`edit_X.mp4` と `upload.youtube.json`）を見逃した。**名前で結ばない** —
+    #    サイドカーがあれば、そのフォルダ（直下）から投稿されうる
+    置き場の根 = [os.path.normcase(os.path.abspath(d)) for d in 置き場]
+
+    def 置き場の中(d: Path) -> bool:
+        k = os.path.normcase(os.path.abspath(d))
+        return any(k == r or k.startswith(r + os.sep) for r in 置き場の根)
+
+    サイドカーのフォルダ = sorted({sc.parent for root in (vault, out) if root.is_dir()
+                           for sc in root.rglob("*.youtube.json")
+                           if not 置き場の中(sc.parent)})
+    for d in サイドカーのフォルダ:
+        フォルダを問う(d, sorted(d.iterdir()))
 
     # 3. **置き場の取り違えで緑に倒れない**（6周目の U1）。書き出しの記録が指す完成品が、
     #    監査した場所の外にあるなら、監査は書き出し先を見ていない（`ANTIGRAVITY_VAULT_OUTPUTS` の
     #    取り違え・`.env` の差・別の置き場への書き出し）
-    根 = [os.path.normcase(os.path.abspath(r)) for r in 置き場] or [
+    根 = [os.path.normcase(os.path.abspath(r)) for r in 置き場 + サイドカーのフォルダ] or [
         os.path.normcase(os.path.abspath(root / sub)) for root in (vault, out) for sub in PUBLISH_DIRS]
     for export_path in sorted(runs_dir.glob("*/" + EXPORT)):
         final = (_read_json(export_path).get("final") or {}).get("path")

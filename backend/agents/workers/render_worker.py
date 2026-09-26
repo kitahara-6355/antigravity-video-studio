@@ -8,6 +8,7 @@ import logging
 import asyncio
 import time
 import shutil
+import uuid
 from pathlib import Path
 from datetime import datetime
 
@@ -102,7 +103,11 @@ class RenderWorker(PipelineStageWorker):
             final_dir = VAULT_OUTPUTS_DIR / "final"
             final_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            final_path = str(final_dir / f"final_{ts}.mp4")
+            # **名前は実走ごとに一意**（2026-09-26・gate-verifier 7周目の F2）。以前は
+            # `final_<秒>.mp4` で、承認済みの2本を同じ秒に書き出すと同じ名前を取り合い、
+            # 片方の承認済み動画が消えて証跡が相手の動画を指した
+            run_tag = Path(ctx.run_dir).name if getattr(ctx, "run_dir", None) else uuid.uuid4().hex[:8]
+            final_path = str(final_dir / f"final_{ts}_{run_tag}.mp4")
 
             # **承認したプレビューからしか書き出さない**（2026-09-26・gate-verifier 6周目の U3）。
             # 以前は T-022 のセーフモードで、プレビューが無ければ素材から直接レンダリングした。
@@ -117,10 +122,25 @@ class RenderWorker(PipelineStageWorker):
                 )
             始めの指紋 = self._指紋(ctx.preview_path)
 
-            if ctx.preview_path and Path(ctx.preview_path).exists():
-                rendered = await self._render_production_quality(
-                    ctx.preview_path, final_path, ctx
+            # 名前を**排他的に取る** — 既に同じ名前があれば上書きせずに断る（同じ実走の二重書き出し）
+            try:
+                with open(final_path, "xb"):
+                    pass
+            except FileExistsError:
+                return StageResult(
+                    stage_name=self.name, success=False,
+                    detail=f"同じ名前の完成品が既にあります（上書きしない）: {final_path}",
+                    duration_seconds=round(time.time() - start, 1),
                 )
+
+            if ctx.preview_path and Path(ctx.preview_path).exists():
+                try:
+                    rendered = await self._render_production_quality(
+                        ctx.preview_path, final_path, ctx
+                    )
+                except BaseException:
+                    Path(final_path).unlink(missing_ok=True)   # 取った名前の空きファイルを残さない
+                    raise
                 if rendered and self._指紋(ctx.preview_path) != 始めの指紋:
                     # 門の確認と書き出しの間の窓を閉じる — **書いた後にもう一度プレビューを見る**
                     Path(final_path).unlink(missing_ok=True)
@@ -141,6 +161,8 @@ class RenderWorker(PipelineStageWorker):
                         duration_seconds=round(time.time() - start, 1),
                     )
                 else:
+                    # 取った名前の空きファイル（や書きかけ）を置き場に残さない
+                    Path(final_path).unlink(missing_ok=True)
                     return StageResult(
                         stage_name=self.name, success=False,
                         detail="本番品質レンダリング失敗",

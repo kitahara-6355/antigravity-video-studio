@@ -755,6 +755,25 @@ class PipelineCoordinator:
 
         if (run_dir / EXPORT).exists():
             return _断る(f"書き出し済みです: {run_dir / EXPORT}")
+        # **同じ実走を重ねて書き出さない**（2026-09-26・gate-verifier 7周目の F2）。
+        # 書き出し中の印を排他的に作る。落ちて印が残ったら、確かめてから消す
+        lock = run_dir / ".export.lock"
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return _断る(f"書き出し中です（{lock} がある。前の書き出しが落ちたなら、確かめてから消す）")
+        except FileNotFoundError:
+            return _断る(f"実行記録がありません: {run_dir}")
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        try:
+            return await self._export_locked(run_id, run_dir, total_start, _断る)
+        finally:
+            lock.unlink(missing_ok=True)
+
+    async def _export_locked(self, run_id: str, run_dir: Path, total_start: float, _断る) -> Dict:
+        """書き出しの本体（`export` が書き出し中の印を持っている間だけ呼ぶ）。"""
+        runs_dir = run_dir.parent
         ok, why = export_allowed(run_dir)
         if not ok:
             return _断る(why)
