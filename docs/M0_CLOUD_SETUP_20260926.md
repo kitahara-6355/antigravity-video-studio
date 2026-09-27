@@ -47,6 +47,6 @@ python -m backend.cost_guard --status            # active な予算枠（plan-M1
 
 | 項目 | いつ |
 |---|---|
-| raw 4本の保管場所 | **決定済み（2026-09-27）: Cloudflare R2 無料枠。** 手順書 `docs/M2_STORAGE_SETUP_20260927.md` |
+| raw 4本の保管場所 | **決定済み（2026-09-27）: 法人 Workspace の Google Drive。** 手順書 `docs/M2_STORAGE_SETUP_20260927.md` |
 | Monthly spend cap（pro のプロジェクト） | pro のキーをどこかに置く直前（M1 PR4 をローカルでやるとき） |
 | YouTube Data API の OAuth | M3 の着手時（`docs/youtube_api_setup.md`） |

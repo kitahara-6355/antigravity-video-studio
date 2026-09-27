@@ -221,7 +221,7 @@ python -m backend.model_policy --audit      # 検知（要 exit 0）
 ### 台帳と突き合わせ（2026-09-27 実装。残りは R2.5 の中で）
 
 - **済** 台帳 `backend/config/api_projects.json`（**キー本体は入れない**・末尾4文字だけ）。
-  raw の保管（Cloudflare R2・読み取り専用トークン）の行もここ
+  raw の保管（法人 Workspace の Google Drive・読み取り専用の OAuth）の行もここ
 - **済** `python -m backend.verify_account --projects` — 台帳と `.env` / クラウドの Secrets の実態を
   突き合わせ、**食い違いを FAIL で出す**（台帳にないキー／請求先の想定違い／旧式の変数名／
   クラウドに置いてはいけない `GOOGLE_API_KEY_PRO`／保管のトークンの不揃い）。外には出ない

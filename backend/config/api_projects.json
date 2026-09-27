@@ -6,9 +6,15 @@
     "キー本体はリポジトリに一切書かない。.env（ローカル）かクラウドの Secrets だけ",
     "請求先の有無＝段の区分。billing: true のキーを GOOGLE_API_KEY（無料枠の口）に入れない"
   ],
-  "cloud_allowed_env": ["GOOGLE_API_KEY", "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"],
-  "cloud_rule": "クラウドの Secrets に置くのは avs-prod-free のキーと raw の読み取り専用トークンだけ（2026-09-26 ユーザー決定）。GOOGLE_API_KEY_PRO をクラウドに置かない → クラウドからは課金が物理的に起きない",
-  "deprecated_env": ["GEMINI_API_KEY"],
+  "cloud_allowed_env": [
+    "GOOGLE_API_KEY",
+    "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
+    "AVS_RAW_DRIVE_FOLDER_ID"
+  ],
+  "cloud_rule": "クラウドの Secrets に置くのは avs-prod-free のキーと raw の読み取り専用トークン（Drive）だけ（2026-09-26 ユーザー決定）。GOOGLE_API_KEY_PRO をクラウドに置かない → クラウドからは課金が物理的に起きない",
+  "deprecated_env": [
+    "GEMINI_API_KEY"
+  ],
   "projects": [
     {
       "id": "avs-prod-free",
@@ -55,10 +61,15 @@
   "storage": [
     {
       "id": "avs-raw",
-      "provider": "cloudflare_r2",
-      "role": "raw 4本の保管（読むだけ）。2026-09-27 ユーザー決定。手順書 docs/M2_STORAGE_SETUP_20260927.md",
-      "env": ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"],
-      "suffix_env": "R2_ACCESS_KEY_ID",
+      "provider": "google_drive",
+      "role": "raw 4本の保管（読むだけ）。法人 Workspace の共有ドライブ。2026-09-27 ユーザー決定（Workspace 優先。当初の Cloudflare R2 を同日改めた）。手順書 docs/M2_STORAGE_SETUP_20260927.md",
+      "gcp_project": "avs-prod-free",
+      "oauth_scope": "https://www.googleapis.com/auth/drive.readonly",
+      "env": [
+        "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
+        "AVS_RAW_DRIVE_FOLDER_ID"
+      ],
+      "suffix_env": "AVS_RAW_DRIVE_FOLDER_ID",
       "key_suffix": null,
       "read_only": true,
       "status": "planned"

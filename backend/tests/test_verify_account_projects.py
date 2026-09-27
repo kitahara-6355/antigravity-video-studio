@@ -69,7 +69,9 @@ def test_the_real_ledger_names_the_three_projects_and_the_raw_bucket():
     ids = {p["id"] for p in ledger["projects"]}
 
     assert {"avs-prod-free", "avs-prod-paid", "avs-dev-free"} <= ids
-    assert ledger["storage"][0]["id"] == "avs-raw"
+    raw = ledger["storage"][0]
+    assert raw["id"] == "avs-raw"
+    assert raw["provider"] == "google_drive" and raw["read_only"] is True
     assert "GOOGLE_API_KEY_PRO" not in ledger["cloud_allowed_env"]
 
 

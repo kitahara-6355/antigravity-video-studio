@@ -712,11 +712,11 @@
       }
     ],
     "condition_notes": [
-      "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は Cloudflare R2 無料枠（GCS on avs-prod-paid ではない）。C5 の『GCS 等の読み口』は Cloudflare R2（S3 互換）を指す。憲法の第1回仕分け表を承認（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める"
+      "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は法人 Workspace の Google Drive（GCS on avs-prod-paid でも Cloudflare R2 でもない。環境の方針は「Workspace 優先・GCP は足りないときだけ・将来はスマホ1台で完結」）。C5 の『GCS 等の読み口』は Drive を指す。憲法の第1回仕分け表を承認し、環境の階層の条文を改訂に加える（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める"
     ],
     "note": "計画書 docs/plans/2026-09-26-master-plan-100.md の M2。判定コマンドが未実装のもの（transcribe_check・verify_account --projects）は、このフェーズの最初の作業として作る",
     "assumptions": [
-      "raw 4本（1.1GB）の保管場所は **Cloudflare R2 の無料枠**（2026-09-27 ユーザー決定・M1g）。読み取り専用のトークンをクラウドの Secrets に置き、raw は読むだけ。置くまでの実走はローカル。**支払い方法の登録が要るかは一次情報で未確認**（手順書 docs/M2_STORAGE_SETUP_20260927.md）",
+      "raw 4本（1.1GB）の保管場所は **法人 Workspace の Google Drive（共有ドライブ・読み取り専用の OAuth）**（2026-09-27 ユーザー決定・M1g。当初の Cloudflare R2 を同日「Workspace 優先」の方針で改めた）。トークンをクラウドの Secrets に置き、raw は読むだけ。置くまでの実走はローカル。手順書 docs/M2_STORAGE_SETUP_20260927.md",
       "Gemini の音声入力（Flash 系）が 18 分の日本語音声をタイムスタンプ付きで起こせる。精度が足りなければ Whisper（ローカル）に切り替える",
       "品質ゲートの閾値 90 は、未実装機能の固定減点を除けば到達できる（2026-08-27 の 30 分素材で 94 点の実績）"
     ]
@@ -1676,14 +1676,14 @@
         ],
         "note": "計画書 docs/plans/2026-09-26-master-plan-100.md の M2。判定コマンドが未実装のもの（transcribe_check・verify_account --projects）は、このフェーズの最初の作業として作る",
         "assumptions": [
-          "raw 4本（1.1GB）の保管場所は **Cloudflare R2 の無料枠**（2026-09-27 ユーザー決定・M1g）。読み取り専用のトークンをクラウドの Secrets に置き、raw は読むだけ。置くまでの実走はローカル。**支払い方法の登録が要るかは一次情報で未確認**（手順書 docs/M2_STORAGE_SETUP_20260927.md）",
+          "raw 4本（1.1GB）の保管場所は **法人 Workspace の Google Drive（共有ドライブ・読み取り専用の OAuth）**（2026-09-27 ユーザー決定・M1g。当初の Cloudflare R2 を同日「Workspace 優先」の方針で改めた）。トークンをクラウドの Secrets に置き、raw は読むだけ。置くまでの実走はローカル。手順書 docs/M2_STORAGE_SETUP_20260927.md",
           "Gemini の音声入力（Flash 系）が 18 分の日本語音声をタイムスタンプ付きで起こせる。精度が足りなければ Whisper（ローカル）に切り替える",
           "品質ゲートの閾値 90 は、未実装機能の固定減点を除けば到達できる（2026-08-27 の 30 分素材で 94 点の実績）"
         ],
         "started_at": "2026-09-27",
         "budget_id": "plan-M2",
         "condition_notes": [
-          "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は Cloudflare R2 無料枠（GCS on avs-prod-paid ではない）。C5 の『GCS 等の読み口』は Cloudflare R2（S3 互換）を指す。憲法の第1回仕分け表を承認（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める"
+          "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は法人 Workspace の Google Drive（GCS on avs-prod-paid でも Cloudflare R2 でもない。環境の方針は「Workspace 優先・GCP は足りないときだけ・将来はスマホ1台で完結」）。C5 の『GCS 等の読み口』は Drive を指す。憲法の第1回仕分け表を承認し、環境の階層の条文を改訂に加える（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める"
         ]
       }
     },
@@ -1714,7 +1714,7 @@
         "M8": "運用・上位目標の見直し"
       },
       "definition_of_100": "G1〜G3 が met、週に長尺1本＋Shorts 2本を4週連続で実測維持、憲法の全条文が『必達で met』か『後送／削除で承認済み』。G4（YPP 到達）は北極星として残し到達目標",
-      "constitution_revision": "ゲートごとに達成度で改訂（M1g・M5g・M8）。§6 議長権限は『承認が要るのは完成品の書き出し・投稿・課金』へ絞る方向で承認済み（2026-09-26）。**第1回の仕分け表は 2026-09-27 に承認**（docs/specs/2026-09-26-constitution-triage-draft.md）。改訂文は docs/specs/2026-09-27-constitution-revision-1.md に置き、憲法本文への適用はユーザー承認の PR で行う"
+      "constitution_revision": "ゲートごとに達成度で改訂（M1g・M5g・M8）。§6 議長権限は『承認が要るのは完成品の書き出し・投稿・課金』へ絞る方向で承認済み（2026-09-26）。**第1回の仕分け表は 2026-09-27 に承認**（docs/specs/2026-09-26-constitution-triage-draft.md）。改訂文は docs/specs/2026-09-27-constitution-revision-1.md に置き、憲法本文への適用はユーザー承認の PR で行う。**2026-09-27 追加**: 「環境の階層」（目標: スマホ1台で完結・Workspace 優先・GCP は足りないときだけ／現段階: PC＋ローカル、開発はクラウド）を新条文とし、§11・§13.1・§19.2・§19.4 のローカル前提を現段階の記述に格下げする"
     }
   },
   "verification_policy": {
