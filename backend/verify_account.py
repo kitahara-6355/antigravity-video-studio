@@ -26,13 +26,36 @@
 
     python -m backend.verify_account            # 無料の点検だけ
     python -m backend.verify_account --probe    # 無料枠の有無まで確かめる
+    python -m backend.verify_account --projects # 台帳と環境変数の突き合わせ（外に出ない）
+
+## `--projects`（M0・CLAUDE.md「API プロジェクトとキーの管理」）
+
+台帳 `backend/config/api_projects.json`（キー本体は入れない・末尾4文字だけ）と
+環境変数の実態を突き合わせ、**食い違いを FAIL で出す**:
+
+- 台帳にないキー（末尾4文字が一致する行が無い）
+- 請求先の想定違い（billing: true のキーが無料枠の口 `GOOGLE_API_KEY` に入っている）
+- 旧式の変数名（`GEMINI_API_KEY`）
+- クラウドのセッションに置いてはいけないキー（`GOOGLE_API_KEY_PRO`）
+- 保管（Cloudflare R2）のトークンが揃っていない
 """
 from __future__ import annotations
 
 import argparse
+import json
 import os
+from pathlib import Path
+from typing import Iterable, Mapping
 
 from backend import model_policy
+
+LEDGER_PATH = Path(__file__).resolve().parent / "config" / "api_projects.json"
+
+# クラウドのセッション（Claude Code on the web）にだけある環境変数。
+# **値は空のことがある**ので、有無で見る。見つかれば「クラウドに置いてはいけないキー」の検査を有効にする。
+CLOUD_MARKERS = ("CCR_SESSION_PROFILE",)
+
+Finding = tuple[str, str]  # ("OK" | "INFO" | "FAIL", 説明)
 
 # **最小の呼び出し。** 無料枠の有無を見るだけなので、トークンを使わない。
 PROBE_PROMPT = "hi"
@@ -171,6 +194,120 @@ def _format(probe: bool) -> tuple[str, int]:
     return "\n".join(lines), 1
 
 
+# --- 台帳との突き合わせ（--projects） -----------------------------------------
+
+
+def load_ledger(path: Path = LEDGER_PATH) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def key_suffix(value: str) -> str:
+    """**同定に使うのは末尾4文字だけ。** 台帳にも出力にもそれ以上は出さない。"""
+    return value[-4:]
+
+
+def is_cloud_session(env: Mapping[str, str] | None = None) -> bool:
+    env = os.environ if env is None else env
+    return any(marker in env for marker in CLOUD_MARKERS)
+
+
+def _is_dummy(value: str) -> bool:
+    return value.startswith(("dummy", "test"))
+
+
+def _check_gemini_keys(env: Mapping[str, str], ledger: dict,
+                       cloud: bool) -> Iterable[Finding]:
+    projects = ledger.get("projects", [])
+    allowed_in_cloud = set(ledger.get("cloud_allowed_env", []))
+    for name in sorted({p["env"] for p in projects}):
+        rows = [p for p in projects if p["env"] == name]
+        value = env.get(name) or ""
+        if not value:
+            active = [p["id"] for p in rows if p.get("status") == "active"]
+            if active:
+                yield "FAIL", (f"{name} が未設定（台帳では {', '.join(active)} が "
+                               f"active）。.env かクラウドの Secrets に置いてください")
+            else:
+                yield "INFO", f"{name} は未設定（台帳の {', '.join(p['id'] for p in rows)} は未着手）"
+            continue
+        if _is_dummy(value):
+            yield "FAIL", f"{name} はダミーキー（{value}）。実キーではないので突き合わせできません"
+            continue
+        if cloud and name not in allowed_in_cloud:
+            yield "FAIL", (f"{name} がクラウドのセッションに置かれています。クラウドの Secrets は "
+                           f"avs-prod-free のキーと raw の読み取り専用トークンだけ（2026-09-26 ユーザー決定）。"
+                           f"環境設定から外してください")
+        suffix = key_suffix(value)
+        matched = [p for p in rows if p.get("key_suffix") == suffix]
+        if not matched:
+            yield "FAIL", (f"{name} のキー（末尾 {suffix}）が台帳にない。"
+                           f"台帳 {LEDGER_PATH.name} の該当行に key_suffix を書くか、"
+                           f"どのプロジェクトのキーか分からなければ使わないでください")
+            continue
+        for p in matched:
+            if p.get("billing") and name == "GOOGLE_API_KEY":
+                yield "FAIL", (f"{name} に入っているのは {p['id']}（請求先あり）。"
+                               f"無料枠の口に課金するキーを入れると Tier 1 で回ります — 請求先の想定違い")
+            else:
+                billing = "請求先あり" if p.get("billing") else "請求先なし"
+                yield "OK", f"{name} = {p['id']}（末尾 {suffix}・{billing}・{p.get('status', '?')}）"
+
+
+def _check_deprecated(env: Mapping[str, str], ledger: dict) -> Iterable[Finding]:
+    for name in ledger.get("deprecated_env", []):
+        if env.get(name):
+            yield "FAIL", (f"{name} が設定されています — 旧式の変数名。"
+                           f"GOOGLE_API_KEY に一本化してください（CLAUDE.md の未実装項目・変数名の混在が混乱の一因）")
+
+
+def _check_storage(env: Mapping[str, str], ledger: dict) -> Iterable[Finding]:
+    for row in ledger.get("storage", []):
+        names = row["env"]
+        present = [n for n in names if env.get(n)]
+        if not present:
+            yield "INFO", f"{row['id']} のトークンは未設定（{row.get('status', '?')}）"
+            continue
+        missing = [n for n in names if n not in present]
+        if missing:
+            yield "FAIL", (f"{row['id']} のトークンが揃っていません。"
+                           f"不足: {', '.join(missing)}（手順書の Secrets 4つをすべて置く）")
+            continue
+        suffix = key_suffix(env[row["suffix_env"]])
+        if row.get("key_suffix") is None:
+            yield "FAIL", (f"{row['id']} のトークン（{row['suffix_env']} 末尾 {suffix}）が台帳に未記載。"
+                           f"key_suffix を書いてください")
+        elif row["key_suffix"] != suffix:
+            yield "FAIL", (f"{row['id']} のトークン（末尾 {suffix}）が台帳（末尾 {row['key_suffix']}）と違う")
+        else:
+            yield "OK", f"{row['id']} = {row.get('provider', '?')}（末尾 {suffix}・読み取り専用）"
+
+
+def check_projects(env: Mapping[str, str], ledger: dict, *,
+                   cloud: bool) -> list[Finding]:
+    """台帳と環境変数を突き合わせる。**外には出ない**（API を叩かない）。"""
+    findings: list[Finding] = []
+    findings += _check_deprecated(env, ledger)
+    findings += _check_gemini_keys(env, ledger, cloud)
+    findings += _check_storage(env, ledger)
+    return findings
+
+
+def _format_projects(findings: list[Finding], cloud: bool) -> tuple[str, int]:
+    marks = {"OK": "✅", "INFO": "ℹ", "FAIL": "🚫 FAIL"}
+    where = "クラウドのセッション" if cloud else "ローカル"
+    lines = ["API プロジェクトの台帳との突き合わせ", "",
+             f"  台帳: {LEDGER_PATH}", f"  環境: {where}", ""]
+    for level, text in findings:
+        lines.append(f"  {marks[level]} {text}")
+    fails = sum(1 for level, _ in findings if level == "FAIL")
+    lines.append("")
+    if fails:
+        lines.append(f"  🚫 食い違い {fails} 件。直してから先へ進んでください")
+        return "\n".join(lines), 1
+    lines.append("  ✅ 台帳と実態は一致しています")
+    return "\n".join(lines), 0
+
+
 def main(argv: list[str] | None = None) -> int:
     from backend.cost_guard import load_env
     load_env()
@@ -178,7 +315,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--probe", action="store_true",
         help="最小の生成を1回だけ実行して、無料枠の有無を確かめる")
+    parser.add_argument(
+        "--projects", action="store_true",
+        help="台帳 backend/config/api_projects.json と環境変数を突き合わせる（外に出ない）")
     args = parser.parse_args(argv)
+
+    if args.projects:
+        cloud = is_cloud_session()
+        text, code = _format_projects(
+            check_projects(os.environ, load_ledger(), cloud=cloud), cloud)
+        print(text)
+        return code
 
     text, code = _format(args.probe)
     print(text)

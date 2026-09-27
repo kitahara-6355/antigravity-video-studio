@@ -28,15 +28,15 @@ pro のキーは登録しない → クラウドからは**課金が物理的に
 
 ## 3. 台帳に末尾4文字を記す（2分）
 
-- `backend/config/api_projects.json`（M0 で私が作る台帳）に、`avs-prod-free` のキーの**末尾4文字だけ**を書きます。
-  私が作った後に、末尾4文字を教えてください（キー本体は送らないでください）
+- `backend/config/api_projects.json`（台帳・2026-09-27 に作成済み）の `avs-prod-free` の行に、キーの**末尾4文字だけ**を書きます。
+  **末尾4文字を教えてください**（キー本体は送らないでください）。書くまでは `--projects` が「台帳にない」で FAIL します（それが正しい動き）
 
 ## 4. 確認（私がやる）
 
 新しいクラウドのセッションで:
 
 ```
-python -m backend.verify_account --projects      # 台帳と Secrets の突き合わせ（M0 で作る）
+python -m backend.verify_account --projects      # 台帳と Secrets の突き合わせ（2026-09-27 実装済み・外に出ない）
 python -m backend.model_policy --audit           # models.list と照合（実キーで初めて通る）
 python -m backend.cost_guard --status            # active な予算枠（plan-M1）の残高
 ```
@@ -47,6 +47,6 @@ python -m backend.cost_guard --status            # active な予算枠（plan-M1
 
 | 項目 | いつ |
 |---|---|
-| raw 4本の保管場所（GCS on avs-prod-paid ＋ 請求先の自動切断 ／ Cloudflare R2 無料枠） | **M1g** |
+| raw 4本の保管場所 | **決定済み（2026-09-27）: Cloudflare R2 無料枠。** 手順書 `docs/M2_STORAGE_SETUP_20260927.md` |
 | Monthly spend cap（pro のプロジェクト） | pro のキーをどこかに置く直前（M1 PR4 をローカルでやるとき） |
 | YouTube Data API の OAuth | M3 の着手時（`docs/youtube_api_setup.md`） |

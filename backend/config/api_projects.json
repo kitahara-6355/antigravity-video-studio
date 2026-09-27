@@ -1,0 +1,73 @@
+{
+  "_comment": "API プロジェクトとキーの台帳（CLAUDE.md「API プロジェクトとキーの管理」・2026-08-17 ユーザー決定）。**キー本体は入れない。末尾4文字（key_suffix）だけ。** 現物との突き合わせは `python -m backend.verify_account --projects`（食い違いは FAIL）。key_suffix が null の行は『まだ発行していない／末尾を聞いていない』。",
+  "_rules": [
+    "1プロジェクト1キー。用途別にキーを増やさない（レート制限は per project であって per key ではない）",
+    "キー名＝プロジェクト表示名",
+    "キー本体はリポジトリに一切書かない。.env（ローカル）かクラウドの Secrets だけ",
+    "請求先の有無＝段の区分。billing: true のキーを GOOGLE_API_KEY（無料枠の口）に入れない"
+  ],
+  "cloud_allowed_env": ["GOOGLE_API_KEY", "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"],
+  "cloud_rule": "クラウドの Secrets に置くのは avs-prod-free のキーと raw の読み取り専用トークンだけ（2026-09-26 ユーザー決定）。GOOGLE_API_KEY_PRO をクラウドに置かない → クラウドからは課金が物理的に起きない",
+  "deprecated_env": ["GEMINI_API_KEY"],
+  "projects": [
+    {
+      "id": "avs-prod-free",
+      "account": "corporate",
+      "account_note": "法人（info@kitahara-birei.com）。旧 antigravity-pipeline-504015 を改名",
+      "role": "本番・通常運転（batch / standard / premium）",
+      "billing": false,
+      "tier": "free",
+      "env": "GOOGLE_API_KEY",
+      "key_suffix": null,
+      "status": "active"
+    },
+    {
+      "id": "avs-prod-paid",
+      "account": "corporate",
+      "role": "本番・昇格専用（pro のみ）。Monthly spend cap を先に置く",
+      "billing": true,
+      "tier": "tier1",
+      "env": "GOOGLE_API_KEY_PRO",
+      "key_suffix": null,
+      "status": "planned"
+    },
+    {
+      "id": "avs-dev-free",
+      "account": "personal",
+      "role": "開発・実験（dev 側の .env）",
+      "billing": false,
+      "tier": "free",
+      "env": "GOOGLE_API_KEY",
+      "key_suffix": null,
+      "status": "planned"
+    },
+    {
+      "id": "video-automation-489607",
+      "account": "personal",
+      "role": "R1 の間だけ昇格用の暫定の代役。法人側が通ったら閉じる",
+      "billing": true,
+      "tier": "tier1",
+      "env": "GOOGLE_API_KEY_PRO",
+      "key_suffix": "KqrA",
+      "status": "interim"
+    }
+  ],
+  "storage": [
+    {
+      "id": "avs-raw",
+      "provider": "cloudflare_r2",
+      "role": "raw 4本の保管（読むだけ）。2026-09-27 ユーザー決定。手順書 docs/M2_STORAGE_SETUP_20260927.md",
+      "env": ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"],
+      "suffix_env": "R2_ACCESS_KEY_ID",
+      "key_suffix": null,
+      "read_only": true,
+      "status": "planned"
+    }
+  ],
+  "not_ours": [
+    {
+      "id": "gen-lang-client-0733068258",
+      "note": "個人・Jigyokei（…U6uw）。jigyokei-app 専用。AVS に流用しない"
+    }
+  ]
+}
