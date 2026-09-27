@@ -24,8 +24,9 @@
       "billing": false,
       "tier": "free",
       "env": "GOOGLE_API_KEY",
-      "key_suffix": null,
-      "status": "active"
+      "key_suffix": "Ek1g",
+      "status": "active",
+      "tier_confirmed": "2026-09-27 AI Studio の API キー一覧で『無料枠』を目視（スクリーンショット）"
     },
     {
       "id": "avs-prod-paid",
