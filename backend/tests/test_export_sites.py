@@ -156,5 +156,7 @@ def test_台帳は正典の定義を指している():
     assert "vision_backlog" in ledger.get("note", ""), ledger.get("note")
     canon = json.loads((Path(__file__).parent.parent / "branding" / "vision_backlog.json")
                        .read_text(encoding="utf-8"))
-    c1 = [c for c in canon["current_phase"]["exit_criteria"] if c["id"] == "R2-C1"][0]
+    # R2 は 2026-09-27 に完了して phase_history へ移った。定義はどちらにあっても効く
+    phases = [canon["current_phase"], *canon["phase_history"]]
+    c1 = [c for ph in phases for c in ph.get("exit_criteria", []) if c["id"] == "R2-C1"][0]
     assert "「書き出し」" in c1["condition"], "正典に書き出しの定義が無い"
