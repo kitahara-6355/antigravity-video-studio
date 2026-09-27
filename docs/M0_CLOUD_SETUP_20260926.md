@@ -12,31 +12,46 @@ pro のキーは登録しない → クラウドからは**課金が物理的に
    - `Tier 1` と出ていたら、CLAUDE.md「Free tier のプロジェクトの作り方」の手順2（請求先のリンク解除）へ戻る。**この状態で先へ進まない**
 3. キー本体はコピーしておく（このあと Secrets に貼る）。**リポジトリには書かない**（キーのルール3）
 
-## 2. クラウド環境の Secrets に登録する（5分）
+## 2. クラウド環境に登録する（5分・**2026-09-27 に実際の画面で確かめた手順**）
 
-1. Claude Code（Web）の **環境（Environment）設定** を開く（このセッションを作った環境）
-2. **Secrets / 環境変数** に追加:
+Claude Code（Web）の環境は「API認証情報」（プロキシが許可したサイトへの通信にだけ鍵を差し込む。値は保存後に見えない）と
+「環境変数」（同じ環境を使う全員に見える。**鍵を入れない**）の2つを持つ。鍵は前者に置く。
 
-   | 名前 | 値 |
+1. 左の **「新規」** → 環境を選ぶ欄の `Default` → **編集**（「クラウド環境を編集」の画面）
+2. **API認証情報** → **「＋ 認証情報を追加」**:
+
+   | 欄 | 値 |
    |---|---|
-   | `GOOGLE_API_KEY` | `avs-prod-free` のキー本体 |
+   | 名前 | `avs-prod-free` |
+   | 認証情報タイプ | `Bearer`（一覧にカスタムヘッダーは無い。下の行で書き換える） |
+   | 許可ウェブサイト | `generativelanguage.googleapis.com` |
+   | カスタムヘッダー 名前 | `x-goog-api-key`（既定の `Authorization` を消す） |
+   | カスタムヘッダー プレフィックス | **空欄**（既定の `Bearer` を消す） |
+   | カスタムヘッダー 値 | `avs-prod-free` のキー本体 |
 
-   `GOOGLE_API_KEY_PRO` は**登録しない**（クラウドからの課金経路を作らない）
-3. 保存する。**次に作るセッションから**有効になる（いまのセッションには入らない）
+   → **「連携／連携させる」**
+3. **環境変数** に目印を1行（本物の鍵ではない。プログラムが「鍵なし」と判断して止まるのを防ぎ、末尾で台帳と同定する）:
 
-設定画面の場所が分からないときは、私に「環境の設定を出して」と言ってください（`read_documentation` で現在の手順を出します）。
+   ```
+   GOOGLE_API_KEY=proxy-managed-Ek1g
+   ```
+
+4. **「変更を保存」**。**次に作るセッションから**有効（いまのセッションには入らない）
+
+`GOOGLE_API_KEY_PRO` は**登録しない**（クラウドからの課金経路を作らない）。
+この方式で `models.list` が通るかは §4 で確かめる。通らなければ次善（環境変数に鍵そのもの）を選択肢で出す。
 
 ## 3. 台帳に末尾4文字を記す（2分）
 
-- `backend/config/api_projects.json`（M0 で私が作る台帳）に、`avs-prod-free` のキーの**末尾4文字だけ**を書きます。
-  私が作った後に、末尾4文字を教えてください（キー本体は送らないでください）
+- `backend/config/api_projects.json`（台帳・2026-09-27 に作成済み）の `avs-prod-free` の行に、キーの**末尾4文字だけ**を書きます。
+  **末尾4文字を教えてください**（キー本体は送らないでください）。書くまでは `--projects` が「台帳にない」で FAIL します（それが正しい動き）
 
 ## 4. 確認（私がやる）
 
 新しいクラウドのセッションで:
 
 ```
-python -m backend.verify_account --projects      # 台帳と Secrets の突き合わせ（M0 で作る）
+python -m backend.verify_account --projects      # 台帳と Secrets の突き合わせ（2026-09-27 実装済み・外に出ない）
 python -m backend.model_policy --audit           # models.list と照合（実キーで初めて通る）
 python -m backend.cost_guard --status            # active な予算枠（plan-M1）の残高
 ```
@@ -47,6 +62,6 @@ python -m backend.cost_guard --status            # active な予算枠（plan-M1
 
 | 項目 | いつ |
 |---|---|
-| raw 4本の保管場所（GCS on avs-prod-paid ＋ 請求先の自動切断 ／ Cloudflare R2 無料枠） | **M1g** |
+| raw 4本の保管場所 | **決定済み（2026-09-27）: 法人 Workspace の Google Drive。** 手順書 `docs/M2_STORAGE_SETUP_20260927.md` |
 | Monthly spend cap（pro のプロジェクト） | pro のキーをどこかに置く直前（M1 PR4 をローカルでやるとき） |
 | YouTube Data API の OAuth | M3 の着手時（`docs/youtube_api_setup.md`） |

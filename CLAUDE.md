@@ -218,14 +218,16 @@ python -m backend.model_policy --audit      # 検知（要 exit 0）
 | 個人 `gen-lang-client-0733068258`（Jigyokei・`...U6uw`） | **触らない。jigyokei-app 専用のまま。AVS に流用しない** |
 | 法人 `antigravity-pipeline-504015` | `avs-prod-free` に改名して使う。**請求先を付けない**ので Free tier のまま |
 
-### 未実装（R1 の後に入れる・2026-08-17 ユーザー決定）
+### 台帳と突き合わせ（2026-09-27 実装。残りは R2.5 の中で）
 
-- 台帳 `backend/config/api_projects.json`（**キー本体は入れない**）
-- `python -m backend.verify_account --projects` — 台帳と `.env` の実態を突き合わせ、
-  **食い違いを FAIL で出す**（台帳にないキー／請求先の想定違い／旧式の変数名）
-- 段ごとにキーを選ぶ層。`gemini_client_factory.py` の `_get_api_key()` が唯一の読み口なので
+- **済** 台帳 `backend/config/api_projects.json`（**キー本体は入れない**・末尾4文字だけ）。
+  raw の保管（法人 Workspace の Google Drive・読み取り専用の OAuth）の行もここ
+- **済** `python -m backend.verify_account --projects` — 台帳と `.env` / クラウドの Secrets の実態を
+  突き合わせ、**食い違いを FAIL で出す**（台帳にないキー／請求先の想定違い／旧式の変数名／
+  クラウドに置いてはいけない `GOOGLE_API_KEY_PRO`／保管のトークンの不揃い）。外には出ない
+- 未: 段ごとにキーを選ぶ層。`gemini_client_factory.py` の `_get_api_key()` が唯一の読み口なので
   そこに寄せる。工程側は無変更
-- **`GEMINI_API_KEY` を `GOOGLE_API_KEY` に一本化する。** `backend/agents/council_graph.py` が
+- 未: **`GEMINI_API_KEY` を `GOOGLE_API_KEY` に一本化する。** `backend/agents/council_graph.py` が
   旧名を読んでいて、変数名が2種類混在している。**これも混乱の一因**
 
 ## 完了の定義（DoD）— **利用者に見える成果で示す**
