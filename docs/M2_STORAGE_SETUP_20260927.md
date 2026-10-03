@@ -32,7 +32,7 @@
 
 ## 2. GCP 側（`avs-prod-free`・10分・請求先は付けない）
 
-1. [Cloud Console](https://console.cloud.google.com/) で **`avs-prod-free`** を選ぶ（法人アカウントで）
+1. [Cloud Console](https://console.cloud.google.com/) で **`avs-prod-free`**（プロジェクト ID は `avs-prod-free-kb`）を選ぶ（法人アカウントで）
 2. 「API とサービス」→「ライブラリ」→ **Google Drive API** を有効化
 3. 「OAuth 同意画面」: User Type **内部**、アプリ名 `avs-raw-reader`、連絡先 `info@kitahara-birei.com`。スコープに `https://www.googleapis.com/auth/drive.readonly` を追加
 4. 「認証情報」→ OAuth クライアント ID → 種類 **デスクトップアプリ**、名前 `avs-raw-reader`。JSON をダウンロード
