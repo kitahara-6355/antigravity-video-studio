@@ -33,7 +33,7 @@
       "id": "avs-prod-paid",
       "project_id": "antigravity-pipeline-504015",
       "account": "corporate",
-      "account_note": "2026-10-04 実画面で確認: 504015 の表示名は avs-prod-paid、請求先は無料トライアル。ここに名前が『avs-prod-free』のキー（末尾 4LVQ）が入っていて紛らわしい — 名前と実体が食い違うので key_suffix には書かない。扱い（改名か削除）は未定",
+      "account_note": "2026-10-04 実画面で確認: 504015 の表示名は avs-prod-paid、請求先は無料トライアル。名前が『avs-prod-free』のキー（末尾 4LVQ）が入っていて紛らわしかったため、2026-10-04 に北原さんの判断で削除した。現在このプロジェクトにキーは無い。pro で使うときは名前 avs-prod-paid で1本作る",
       "role": "本番・昇格専用（pro のみ）。Monthly spend cap を先に置く",
       "billing": true,
       "tier": "tier1",
