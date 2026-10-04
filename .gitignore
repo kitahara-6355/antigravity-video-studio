@@ -47,6 +47,11 @@ credentials.json
 token.json
 *_token.json
 oauth_token*.json
+# `--readonly` の token_raw_readonly.json は上の3つのどれにも当たらず、
+# 2026-10-04 に `git add -A` でコミットされうる状態だった（PR #91 の後）。
+# token で始まる名前も塞ぎ、Google の認証情報の置き場はディレクトリごと無視する。
+token*.json
+backend/data/google/
 
 # Large Media Files (RAW素材は聖域として保護されるが、Gitには含めない)
 raw_videos/
