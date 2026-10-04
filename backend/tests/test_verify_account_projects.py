@@ -238,3 +238,63 @@ def test_projects_mode_does_not_call_the_api(monkeypatch, flag):
                         lambda: (_ for _ in ()).throw(AssertionError("API を叩いた")))
 
     assert verify_account.main([flag]) == 0
+
+
+# --- 4. raw の Drive トークンは読み取り専用（M2） -----------------------------------
+
+_READONLY = "https://www.googleapis.com/auth/drive.readonly"
+
+
+def _drive_ledger() -> dict:
+    ledger = _ledger()
+    ledger["storage"] = [{
+        "id": "avs-raw", "provider": "google_drive",
+        "env": ["ANTIGRAVITY_GOOGLE_TOKEN_JSON", "AVS_RAW_DRIVE_FOLDER_ID"],
+        "token_env": "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
+        "suffix_env": "AVS_RAW_DRIVE_FOLDER_ID", "key_suffix": "2h-z",
+        "oauth_scope": _READONLY, "read_only": True, "status": "planned",
+    }]
+    return ledger
+
+
+def _drive_env(token) -> dict:
+    value = token if isinstance(token, str) else json.dumps(token)
+    return dict(GOOD, ANTIGRAVITY_GOOGLE_TOKEN_JSON=value,
+                AVS_RAW_DRIVE_FOLDER_ID="1AbCdEfGh2h-z")
+
+
+def test_a_readonly_drive_token_passes():
+    env = _drive_env({"refresh_token": "SECRET-RT", "scopes": [_READONLY]})
+    findings = check_projects(env, _drive_ledger(), cloud=True)
+
+    assert _fails(findings) == []
+    assert any(level == "OK" and "avs-raw" in t for level, t in findings)
+
+
+@pytest.mark.parametrize("scopes", [
+    ["https://www.googleapis.com/auth/drive"],
+    [_READONLY, "https://www.googleapis.com/auth/spreadsheets"],
+    [],
+])
+def test_a_drive_token_that_is_not_readonly_fails(scopes):
+    env = _drive_env({"refresh_token": "SECRET-RT", "scopes": scopes})
+    fails = _fails(check_projects(env, _drive_ledger(), cloud=True))
+
+    assert any("avs-raw" in t and "権限" in t for t in fails)
+    assert not any("SECRET-RT" in t for t in fails)
+
+
+def test_a_broken_drive_token_fails_without_echoing_it():
+    env = _drive_env('{"refresh_token": "SECRET-RT", oops')
+    fails = _fails(check_projects(env, _drive_ledger(), cloud=True))
+
+    assert any("JSON" in t for t in fails)
+    assert not any("SECRET-RT" in t for t in fails)
+
+
+def test_the_real_ledger_checks_the_drive_token_scope():
+    """実台帳の raw 行が、スコープの点検の対象になっている。"""
+    row = next(r for r in json.loads(LEDGER.read_text(encoding="utf-8"))["storage"]
+               if r["id"] == "avs-raw")
+    assert row["token_env"] in row["env"]
+    assert row["oauth_scope"] == _READONLY
