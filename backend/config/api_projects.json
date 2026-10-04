@@ -19,18 +19,21 @@
     {
       "id": "avs-prod-free",
       "account": "corporate",
-      "account_note": "法人（info@kitahara-birei.com）。旧 antigravity-pipeline-504015 を改名",
+      "project_id": "avs-prod-free-kb",
+      "account_note": "法人（info@kitahara-birei.com）。2026-10-04 に Cloud Console で新規作成。ID `avs-prod-free` は既に使用済みで取れなかったので `avs-prod-free-kb`（表示名は avs-prod-free）。既定で付いた請求先（無料トライアル）のリンクは作成直後に解除。旧記載の『antigravity-pipeline-504015 を改名』は誤り（504015 の表示名は avs-prod-paid）",
       "role": "本番・通常運転（batch / standard / premium）",
       "billing": false,
       "tier": "free",
       "env": "GOOGLE_API_KEY",
-      "key_suffix": "Ek1g",
+      "key_suffix": "s50Q",
       "status": "active",
-      "tier_confirmed": "2026-09-27 AI Studio の API キー一覧で『無料枠』を目視（スクリーンショット）"
+      "tier_confirmed": "2026-10-04 AI Studio の API キー一覧で『無料枠』を目視（スクリーンショット）。旧キー Ek1g は AI Studio の一覧に無く、2026-10-04 に差し替えた"
     },
     {
       "id": "avs-prod-paid",
+      "project_id": "antigravity-pipeline-504015",
       "account": "corporate",
+      "account_note": "2026-10-04 実画面で確認: 504015 の表示名は avs-prod-paid、請求先は無料トライアル。ここに名前が『avs-prod-free』のキー（末尾 4LVQ）が入っていて紛らわしい — 名前と実体が食い違うので key_suffix には書かない。扱い（改名か削除）は未定",
       "role": "本番・昇格専用（pro のみ）。Monthly spend cap を先に置く",
       "billing": true,
       "tier": "tier1",
@@ -65,13 +68,14 @@
       "provider": "google_drive",
       "role": "raw 4本の保管（読むだけ）。法人 Workspace の共有ドライブ。2026-09-27 ユーザー決定（Workspace 優先。当初の Cloudflare R2 を同日改めた）。手順書 docs/M2_STORAGE_SETUP_20260927.md",
       "gcp_project": "avs-prod-free",
+      "gcp_project_id": "avs-prod-free-kb",
       "oauth_scope": "https://www.googleapis.com/auth/drive.readonly",
       "env": [
         "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
         "AVS_RAW_DRIVE_FOLDER_ID"
       ],
       "suffix_env": "AVS_RAW_DRIVE_FOLDER_ID",
-      "key_suffix": null,
+      "key_suffix": "2h-z",
       "read_only": true,
       "status": "planned"
     }

@@ -201,7 +201,9 @@ python -m backend.model_policy --audit      # 検知（要 exit 0）
 1. **Cloud Console** でプロジェクトを作る（AI Studio 内で作らない）。
    AI Studio 内だと**プロジェクト ID が `gen-lang-client-XXXXX` の自動生成**になる。
    **ID は作成時にしか決められず、後から絶対に変更できない**
-   （表示名は変えられる）。`avs-prod-free` は ID もその名前で取れた
+   （表示名は変えられる）。**削除済みも含めて一度使われた ID は二度と取れない。**
+   `avs-prod-free` は ID が既に使用済みで、2026-10-04 に `avs-prod-free-kb` で作り直した
+   （表示名は `avs-prod-free`）。当初ここに「ID もその名前で取れた」と書いていたが誤りだった
 2. **作った後に請求先のリンクを解除する**
    （`console.cloud.google.com/billing/linkedaccount?project=<ID>` → 課金を無効にする）。
    **API キーは消えない。** リンクを切るだけ
@@ -216,7 +218,8 @@ python -m backend.model_policy --audit      # 検知（要 exit 0）
 |---|---|
 | 個人 `video-automation-489607`（Tier 1・`...KqrA`） | **R1 の間だけ暫定で昇格用の代役。** 法人側が通ったら閉じる（前払い移行の警告もこれで消える。残高 ¥0 なので没収なし） |
 | 個人 `gen-lang-client-0733068258`（Jigyokei・`...U6uw`） | **触らない。jigyokei-app 専用のまま。AVS に流用しない** |
-| 法人 `antigravity-pipeline-504015` | `avs-prod-free` に改名して使う。**請求先を付けない**ので Free tier のまま |
+| 法人 `antigravity-pipeline-504015`（表示名 `avs-prod-paid`・無料トライアルの請求先あり） | **`avs-prod-free` ではない**（2026-10-04 に実画面で確認。当初「`avs-prod-free` に改名して使う」と書いていたが、実際は `avs-prod-paid` になっていた）。名前が `avs-prod-free` のキー `...4LVQ` が入っていて紛らわしい。扱いは未定 |
+| 法人 `avs-prod-free-kb`（表示名 `avs-prod-free`） | **本番・通常運転の実体。** 2026-10-04 に新規作成し、請求先のリンクを解除。キーは `...s50Q`（無料枠）。Drive API と OAuth 同意画面（内部・`avs-raw-reader`）もここ |
 
 ### 台帳と突き合わせ（2026-09-27 実装。残りは R2.5 の中で）
 

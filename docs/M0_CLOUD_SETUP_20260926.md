@@ -33,8 +33,10 @@ Claude Code（Web）の環境は「API認証情報」（プロキシが許可し
 3. **環境変数** に目印を1行（本物の鍵ではない。プログラムが「鍵なし」と判断して止まるのを防ぎ、末尾で台帳と同定する）:
 
    ```
-   GOOGLE_API_KEY=proxy-managed-Ek1g
+   GOOGLE_API_KEY=proxy-managed-s50Q
    ```
+
+   （2026-10-04 にキーを `avs-prod-free-kb` の `...s50Q` へ差し替えた。それまでは `proxy-managed-Ek1g`）
 
 4. **「変更を保存」**。**次に作るセッションから**有効（いまのセッションには入らない）
 
