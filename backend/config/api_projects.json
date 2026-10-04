@@ -74,6 +74,7 @@
         "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
         "AVS_RAW_DRIVE_FOLDER_ID"
       ],
+      "token_env": "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
       "suffix_env": "AVS_RAW_DRIVE_FOLDER_ID",
       "key_suffix": "2h-z",
       "read_only": true,

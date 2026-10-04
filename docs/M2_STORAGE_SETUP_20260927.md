@@ -38,31 +38,41 @@
 4. 「認証情報」→ OAuth クライアント ID → 種類 **デスクトップアプリ**、名前 `avs-raw-reader`。JSON をダウンロード
 5. ダウンロードした JSON を**ローカルの** `backend/data/google/client_secret.json` に置く（`.gitignore` 済み。リポジトリに入れない）
 
-## 3. ローカルで同意してトークンを作る（5分・私が用意するスクリプト）
+## 3. ローカルで同意してトークンを作る（5分・B-6）
 
 ```
-python scripts/google_oauth_login.py --readonly --token backend/data/google/token_raw_readonly.json
+python scripts/google_oauth_login.py --readonly
 ```
 
-（`--readonly` と `--token` は M2 の最初の PR で足す。それまでは実行しない）
-ブラウザが開くので、**法人アカウント**で同意する。トークンが 1 ファイルできる（秘密）。
+- 要求するのは **`drive.readonly` だけ**（読むだけ）。ブラウザが開くので、**法人アカウント**で同意する
+- トークンは `backend/data/google/token_raw_readonly.json` に **1行の JSON** でできる（秘密。`.gitignore` 済み）。
+  通常の `token.json`（読み書き）は上書きしない。保存先を変えるなら `--token <パス>`
+- 終わると「この中身を環境変数 `ANTIGRAVITY_GOOGLE_TOKEN_JSON` に貼る」と表示される
 
-## 4. クラウド環境の Secrets に登録する（5分）
+## 4. クラウド環境に環境変数として登録する（5分・B-7）
 
-Claude Code（Web）の環境設定 → Secrets / 環境変数に 2 つ追加する（`GOOGLE_API_KEY` と同じ場所）:
+**「API 認証情報」ではなく「環境変数」に置く。** トークンの更新にはトークンの中のクライアント秘密が要り、
+プロキシの差し込み（`GOOGLE_API_KEY` の方式）では足りないため。
 
-| 名前 | 値 |
-|---|---|
-| `ANTIGRAVITY_GOOGLE_TOKEN_JSON` | 手順 3 でできたトークンファイルの**中身**（JSON をそのまま貼る） |
-| `AVS_RAW_DRIVE_FOLDER_ID` | 手順 1 のフォルダ ID |
+場所: プロジェクト設定 → クラウド環境 → 選んでいる環境（`Default`）の歯車 → 環境変数。
+次の 2 行を足す（`GOOGLE_API_KEY=proxy-managed-s50Q` と同じ欄）:
 
-保存すると**次に作るセッションから**有効。台帳（`backend/config/api_projects.json`）にはフォルダ ID の末尾4文字だけを記す（教えてください）。
+```
+ANTIGRAVITY_GOOGLE_TOKEN_JSON=<token_raw_readonly.json の中身を1行のまま>
+AVS_RAW_DRIVE_FOLDER_ID=<手順 1 のフォルダ ID>
+```
+
+- トークンの中身は**チャットに貼らない**。環境変数の欄にだけ置く
+- 保存すると**次に作るセッションから**有効
+- 台帳（`backend/config/api_projects.json`）のフォルダ ID 末尾4文字は記入済み（`2h-z`）。
+  別のフォルダにしたら末尾4文字を教えてください（B-8）
+- 書けるトークン（`drive` など）を入れると、`verify_account --projects` と `raw_source --list` の両方が FAIL で止める
 
 ## 5. 確認（私がやる・新しいクラウドのセッションで）
 
 ```
-python -m backend.verify_account --projects   # 台帳と Secrets の突き合わせ（Drive の 2 変数も見る）
-python -m backend.raw_source --list           # Drive から raw 4本の名前と大きさを読む（M2 で作る。読むだけ）
+python -m backend.verify_account --projects   # 台帳と環境変数の突き合わせ（Drive の 2 変数と読み取り専用も見る）
+python -m backend.raw_source --list           # Drive から raw 4本の名前と大きさを読む（読むだけ）
 ```
 
 2つとも exit 0 で保管場所の準備は完了。**実走はしない**（実走は R2.5 の PR で、`plan-M2` の枠内）。

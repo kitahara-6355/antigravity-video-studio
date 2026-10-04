@@ -37,7 +37,7 @@
 - 請求先の想定違い（billing: true のキーが無料枠の口 `GOOGLE_API_KEY` に入っている）
 - 旧式の変数名（`GEMINI_API_KEY`）
 - クラウドのセッションに置いてはいけないキー（`GOOGLE_API_KEY_PRO`）
-- 保管（Cloudflare R2）のトークンが揃っていない
+- 保管（raw の Google Drive）のトークンが揃っていない・読み取り専用でない
 """
 from __future__ import annotations
 
@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from backend import model_policy
+from backend.services.google_oauth import token_scopes
 
 LEDGER_PATH = Path(__file__).resolve().parent / "config" / "api_projects.json"
 
@@ -270,7 +271,7 @@ def _check_storage(env: Mapping[str, str], ledger: dict) -> Iterable[Finding]:
         missing = [n for n in names if n not in present]
         if missing:
             yield "FAIL", (f"{row['id']} のトークンが揃っていません。"
-                           f"不足: {', '.join(missing)}（手順書の Secrets 4つをすべて置く）")
+                           f"不足: {', '.join(missing)}（手順書の環境変数をすべて置く）")
             continue
         suffix = key_suffix(env[row["suffix_env"]])
         if row.get("key_suffix") is None:
@@ -279,7 +280,33 @@ def _check_storage(env: Mapping[str, str], ledger: dict) -> Iterable[Finding]:
         elif row["key_suffix"] != suffix:
             yield "FAIL", (f"{row['id']} のトークン（末尾 {suffix}）が台帳（末尾 {row['key_suffix']}）と違う")
         else:
-            yield "OK", f"{row['id']} = {row.get('provider', '?')}（末尾 {suffix}・読み取り専用）"
+            scope_fail = _token_scope_problem(env, row)
+            if scope_fail:
+                yield "FAIL", scope_fail
+            else:
+                yield "OK", f"{row['id']} = {row.get('provider', '?')}（末尾 {suffix}・読み取り専用）"
+
+
+def _token_scope_problem(env: Mapping[str, str], row: dict) -> str | None:
+    """トークンのスコープが台帳の `oauth_scope` だけかを見る。問題が無ければ None。
+
+    `token_env` と `oauth_scope` を持つ行だけが対象。**中身（秘密）は出さない。**
+    """
+    name, expected = row.get("token_env"), row.get("oauth_scope")
+    if not name or not expected:
+        return None
+    try:
+        info = json.loads(env[name])
+    except (KeyError, json.JSONDecodeError):
+        return f"{row['id']} の {name} が JSON として読めない（トークンファイルの中身を1行のまま貼る）"
+    if not isinstance(info, dict):
+        return f"{row['id']} の {name} が JSON オブジェクトではない"
+    granted = token_scopes(info)
+    if granted != {expected}:
+        shown = ", ".join(sorted(granted)) or "記録なし"
+        return (f"{row['id']} のトークンの権限が台帳（{expected} だけ）と違う: {shown}。"
+                f"scripts/google_oauth_login.py --readonly で作り直す")
+    return None
 
 
 def check_projects(env: Mapping[str, str], ledger: dict, *,

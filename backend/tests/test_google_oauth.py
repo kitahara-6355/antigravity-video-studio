@@ -157,3 +157,91 @@ def test_drive_scope_allows_reading_preexisting_files():
     """drive.file は「アプリが作ったファイル」しか見えない。
     手で置いた素材を読む用途なので、それでは足りない。"""
     assert not any(s.endswith("/drive.file") for s in google_oauth.DRIVE_SCOPES)
+
+
+# ---- クラウド用: トークンの中身を環境変数で受ける（M2） ----
+
+_TOKEN_INFO = {
+    "token": "at",
+    "refresh_token": "rt",
+    "client_id": "cid",
+    "client_secret": "cs",
+    "scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+}
+
+
+def test_drive_readonly_scope_is_read_only():
+    """raw を読む口は drive.readonly だけ。書ける権限を混ぜない。"""
+    assert google_oauth.DRIVE_READONLY_SCOPES == (
+        "https://www.googleapis.com/auth/drive.readonly",
+    )
+
+
+def test_token_json_env_is_preferred_over_the_file(monkeypatch, tmp_path):
+    """環境変数に中身があれば、ファイルより優先する（クラウドにはファイルが無い）。"""
+    tok = _write_token(tmp_path)  # こちらは drive（読み書き）
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tok))
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, json.dumps(_TOKEN_INFO))
+
+    info, source, save_to = google_oauth.read_token_info()
+
+    assert info["scopes"] == _TOKEN_INFO["scopes"]
+    assert google_oauth.TOKEN_JSON_ENV in source
+    assert save_to is None
+
+
+def test_token_json_env_is_refreshed_but_never_written_anywhere(monkeypatch, tmp_path):
+    """環境変数から読んだトークンは、リフレッシュしても書き戻さない。"""
+    tok = tmp_path / "tok.json"
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tok))
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, json.dumps(_TOKEN_INFO))
+
+    fake = MagicMock(expired=True, valid=True, refresh_token="rt")
+    with patch.object(google_oauth, "_credentials_from_info", return_value=fake), \
+         patch.object(google_oauth, "_transport_request", return_value=MagicMock()), \
+         patch.object(google_oauth, "_save_token") as save:
+        load_credentials(google_oauth.DRIVE_READONLY_SCOPES)
+
+    fake.refresh.assert_called_once()
+    save.assert_not_called()
+    assert not tok.exists()
+
+
+def test_broken_token_json_env_raises_without_echoing_the_secret(monkeypatch):
+    """壊れた中身は例外。メッセージに中身（秘密）を出さない。"""
+    secret = '{"refresh_token": "SECRET-RT-123", oops'
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, secret)
+
+    with pytest.raises(GoogleAuthError) as exc:
+        load_credentials(google_oauth.DRIVE_READONLY_SCOPES)
+
+    assert "SECRET-RT-123" not in str(exc.value)
+    assert exc.value.__cause__ is None
+
+
+def test_token_json_env_must_be_an_object(monkeypatch):
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, '["not", "an", "object"]')
+    with pytest.raises(GoogleAuthError):
+        google_oauth.read_token_info()
+
+
+def test_empty_token_json_env_falls_back_to_the_file(monkeypatch, tmp_path):
+    """空文字は未設定扱い（他の環境変数と同じ）。"""
+    tok = _write_token(tmp_path)
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tok))
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, "")
+
+    _, source, save_to = google_oauth.read_token_info()
+
+    assert save_to == tok
+    assert source == str(tok)
+
+
+@pytest.mark.parametrize("info, expected", [
+    ({"scopes": ["a", "b"]}, {"a", "b"}),
+    ({"scopes": "a b"}, {"a", "b"}),
+    ({"scope": "a"}, {"a"}),
+    ({}, set()),
+])
+def test_token_scopes_reads_list_or_space_separated(info, expected):
+    assert google_oauth.token_scopes(info) == expected

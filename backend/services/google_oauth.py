@@ -20,6 +20,13 @@
 どちらも秘密。`.gitignore` で塞いであるが、リポジトリ外に置くのが望ましい。
 `ANTIGRAVITY_GOOGLE_CLIENT_SECRET` / `ANTIGRAVITY_GOOGLE_TOKEN` で差し替わる。
 
+## クラウドのセッションではトークンの「中身」を環境変数で受ける（M2）
+
+クラウドのセッションにはファイルを置けない。`ANTIGRAVITY_GOOGLE_TOKEN_JSON` に
+トークンの JSON そのものが入っていれば、ファイルより優先してそれを使う。
+この経路ではリフレッシュ後のトークンを**書き戻さない**（書き戻す先が無い。
+リフレッシュトークン自体は変わらないので、次回も同じ値で更新できる）。
+
 ## 失敗したら例外を上げる
 
 このモジュールは**フォールバックしない**。認証できないまま処理を続けると、
@@ -43,13 +50,17 @@ except ImportError:  # backend/ を直接 sys.path に載せている経路向�
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "DRIVE_READONLY_SCOPES",
     "DRIVE_SCOPES",
+    "TOKEN_JSON_ENV",
     "SHEETS_SCOPES",
     "CredentialsNotFoundError",
     "GoogleAuthError",
     "client_secret_path",
     "load_credentials",
+    "read_token_info",
     "token_path",
+    "token_scopes",
 ]
 
 
@@ -68,8 +79,16 @@ class CredentialsNotFoundError(GoogleAuthError):
 # 読み取りと書き込みの両方が要るため `drive` を使う。
 DRIVE_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/drive",)
 
+# raw 素材を読むだけの口（M2・憲法 §11「raw は聖域」）。クラウドのセッションに
+# 渡すトークンはこれだけで作る。書けないトークンなら、誤って raw を消しようがない。
+DRIVE_READONLY_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/drive.readonly",)
+
 # 進捗の書き戻しがあるので readonly では足りない。
 SHEETS_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/spreadsheets",)
+
+
+# トークンの中身（JSON）を直接受ける環境変数。クラウドのセッション用。
+TOKEN_JSON_ENV = "ANTIGRAVITY_GOOGLE_TOKEN_JSON"
 
 
 def _from_env(*names: str) -> Path | None:
@@ -140,6 +159,60 @@ def _save_token(path: Path, credentials: Any) -> None:
         os.chmod(path, 0o600)
 
 
+def read_token_info() -> tuple[dict[str, Any], str, Path | None]:
+    """保存済みトークンの中身を読む。リフレッシュはしない。
+
+    `ANTIGRAVITY_GOOGLE_TOKEN_JSON` があればそれを、無ければトークンファイルを読む。
+
+    Returns:
+        (中身, 出どころの説明, 書き戻し先)。環境変数から読んだときの書き戻し先は None。
+        出どころの説明にトークンの中身は含めない（ログに出してよい）。
+
+    Raises:
+        CredentialsNotFoundError: トークン未作成。初回セットアップが必要。
+        GoogleAuthError: 読み取り不能、または JSON として壊れている。
+    """
+    raw = os.environ.get(TOKEN_JSON_ENV)
+    if raw:
+        source = f"環境変数 {TOKEN_JSON_ENV}"
+        try:
+            info = json.loads(raw)
+        except json.JSONDecodeError as e:
+            # e の文字列には中身の断片が入りうるので、位置だけを出す
+            raise GoogleAuthError(
+                f"{source} が JSON として読めません（{e.lineno} 行 {e.colno} 文字目）。"
+                "トークンファイルの中身を1行のまま貼ってください"
+            ) from None
+        if not isinstance(info, dict):
+            raise GoogleAuthError(f"{source} の中身が JSON オブジェクトではありません")
+        return info, source, None
+
+    path = token_path()
+    if not path.exists():
+        raise CredentialsNotFoundError(
+            f"Google の認証トークンがありません: {path}\n"
+            "初回セットアップを実行してください: python scripts/google_oauth_login.py\n"
+            "保存先を変えるには ANTIGRAVITY_GOOGLE_TOKEN を設定します。"
+            f"クラウドのセッションでは {TOKEN_JSON_ENV} に中身を入れます。"
+        )
+    try:
+        info = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise GoogleAuthError(f"認証トークンを読めません ({path}): {e}") from e
+    return info, str(path), path
+
+
+def token_scopes(info: dict[str, Any]) -> set[str]:
+    """トークンの中身に記録されたスコープ。
+
+    `Credentials.to_json()` はリストで書くが、空白区切りの文字列で来ることもある。
+    """
+    scopes = info.get("scopes") or info.get("scope") or []
+    if isinstance(scopes, str):
+        scopes = scopes.split()
+    return {str(s) for s in scopes}
+
+
 def load_credentials(scopes: Sequence[str]) -> Any:
     """保存済みトークンを読み、必要ならリフレッシュして返す。
 
@@ -147,35 +220,25 @@ def load_credentials(scopes: Sequence[str]) -> Any:
         CredentialsNotFoundError: トークン未作成。初回セットアップが必要。
         GoogleAuthError: 読み取り不能、またはリフレッシュ不能。
     """
-    path = token_path()
-    if not path.exists():
-        raise CredentialsNotFoundError(
-            f"Google の認証トークンがありません: {path}\n"
-            "初回セットアップを実行してください: python scripts/google_oauth_login.py\n"
-            "保存先を変えるには ANTIGRAVITY_GOOGLE_TOKEN を設定します。"
-        )
-
-    try:
-        info = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
-        raise GoogleAuthError(f"認証トークンを読めません ({path}): {e}") from e
+    info, source, save_to = read_token_info()
 
     try:
         credentials = _credentials_from_info(info, scopes)
     except (ValueError, KeyError) as e:
-        raise GoogleAuthError(f"認証トークンの形式が不正です ({path}): {e}") from e
+        raise GoogleAuthError(f"認証トークンの形式が不正です ({source}): {e}") from e
 
     if getattr(credentials, "expired", False):
         if not getattr(credentials, "refresh_token", None):
             raise GoogleAuthError(
-                f"認証トークンが期限切れで、リフレッシュトークンがありません ({path})。"
+                f"認証トークンが期限切れで、リフレッシュトークンがありません ({source})。"
                 "再度 python scripts/google_oauth_login.py を実行してください。"
             )
         try:
             credentials.refresh(_transport_request())
         except _refresh_error_types() as e:
             raise GoogleAuthError(f"認証トークンのリフレッシュに失敗しました: {e}") from e
-        _save_token(path, credentials)
+        if save_to is not None:
+            _save_token(save_to, credentials)
         logger.info("[Google OAuth] トークンをリフレッシュしました")
 
     return credentials
