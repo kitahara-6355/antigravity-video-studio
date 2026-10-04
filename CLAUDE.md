@@ -218,7 +218,7 @@ python -m backend.model_policy --audit      # 検知（要 exit 0）
 |---|---|
 | 個人 `video-automation-489607`（Tier 1・`...KqrA`） | **R1 の間だけ暫定で昇格用の代役。** 法人側が通ったら閉じる（前払い移行の警告もこれで消える。残高 ¥0 なので没収なし） |
 | 個人 `gen-lang-client-0733068258`（Jigyokei・`...U6uw`） | **触らない。jigyokei-app 専用のまま。AVS に流用しない** |
-| 法人 `antigravity-pipeline-504015`（表示名 `avs-prod-paid`・無料トライアルの請求先あり） | **`avs-prod-free` ではない**（2026-10-04 に実画面で確認。当初「`avs-prod-free` に改名して使う」と書いていたが、実際は `avs-prod-paid` になっていた）。名前が `avs-prod-free` のキー `...4LVQ` が入っていて紛らわしい。扱いは未定 |
+| 法人 `antigravity-pipeline-504015`（表示名 `avs-prod-paid`・無料トライアルの請求先あり） | **`avs-prod-free` ではない**（2026-10-04 に実画面で確認。当初「`avs-prod-free` に改名して使う」と書いていたが、実際は `avs-prod-paid` になっていた）。名前が `avs-prod-free` のキー `...4LVQ` が入っていて紛らわしかったので、2026-10-04 に削除した。**今はキーが無い。** pro で使うときは `avs-prod-paid` の名前で1本作る |
 | 法人 `avs-prod-free-kb`（表示名 `avs-prod-free`） | **本番・通常運転の実体。** 2026-10-04 に新規作成し、請求先のリンクを解除。キーは `...s50Q`（無料枠）。Drive API と OAuth 同意画面（内部・`avs-raw-reader`）もここ |
 
 ### 台帳と突き合わせ（2026-09-27 実装。残りは R2.5 の中で）
