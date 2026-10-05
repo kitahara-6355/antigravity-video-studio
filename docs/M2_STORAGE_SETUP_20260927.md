@@ -45,7 +45,7 @@ python scripts/google_oauth_login.py --readonly
 ```
 
 - 要求するのは **`drive.readonly` だけ**（読むだけ）。ブラウザが開くので、**法人アカウント**で同意する
-- トークンは `backend/data/google/token_raw_readonly.json` に **1行の JSON** でできる（秘密。`.gitignore` 済み）。
+- トークンは `backend/data/google/token_raw_readonly.json` に **1行の JSON** でできる（秘密。`backend/data/google/` ごと `.gitignore` 済み）。
   通常の `token.json`（読み書き）は上書きしない。保存先を変えるなら `--token <パス>`
 - 終わると「この中身を環境変数 `ANTIGRAVITY_GOOGLE_TOKEN_JSON` に貼る」と表示される
 
