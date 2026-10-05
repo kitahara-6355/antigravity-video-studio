@@ -307,15 +307,24 @@ class QualityGateWorker(PipelineStageWorker):
             target_minutes = 0
         target_sec = target_minutes * 60
 
+        # **目標尺が素材の尺から決まったときは、SmartCut の計画尺と照らす。**
+        # 素材の尺は「出来上がりの長さ」ではない — 無音を詰めれば必ず短くなる。
+        # 43分の素材から発話 37分を残した実走で、正しく詰めたのに -50 点だった（2026-10-05）
+        expected_label = f"目標{target_minutes}分"
+        planned = getattr(ctx, "planned_output_sec", None)
+        if getattr(ctx, "target_auto", False) and planned:
+            target_sec = planned
+            expected_label = f"計画{planned/60:.1f}分（目標は素材から自動）"
+
         if target_sec > 0 and actual_duration > 0:
             diff_min = abs(actual_duration - target_sec) / 60
             if diff_min > 5:
                 failures.append({
-                    "message": f"出力尺異常: {actual_duration/60:.1f}分 (目標{target_minutes}分, 差{diff_min:.1f}分)",
+                    "message": f"出力尺異常: {actual_duration/60:.1f}分 ({expected_label}, 差{diff_min:.1f}分)",
                     "deduction": 50
                 })
             elif diff_min > 3:
-                warnings.append(f"出力尺やや乖離: {actual_duration/60:.1f}分 (目標{target_minutes}分)")
+                warnings.append(f"出力尺やや乖離: {actual_duration/60:.1f}分 ({expected_label})")
 
         # QV-02: 出力尺がRAW合計尺を超えていないか
         # (SmartCutで短くなるべきなのに長くなっていたら明らかなバグ)

@@ -27,6 +27,39 @@ def _get_segment_duration(segment) -> float:
     return max(end - start, 0.0)
 
 
+def _source_key(segment) -> tuple:
+    """字幕の行が指す**元の区間**。校閲の整形で1つの発話が数行に分かれても、
+    行はみな同じ sourceStart/sourceEnd を持つ（レンダリングはこの区間で切る）。"""
+    start = _get_segment_field(segment, "sourceStart", _get_segment_field(segment, "start", 0))
+    end = _get_segment_field(segment, "sourceEnd", _get_segment_field(segment, "end", 0))
+    return (start, end)
+
+
+def _unique_duration(segments) -> float:
+    """元の区間ごとに1回だけ数えた尺。"""
+    return sum(max(e - s, 0.0) for s, e in {_source_key(seg) for seg in segments})
+
+
+MERGE_TOLERANCE_SEC = 0.3  # smart_cut_engine.render_smart_cut と同じ結合の許容
+
+
+def planned_output_seconds(segments) -> float:
+    """残す区間を、レンダリングと同じ規則（隙間 0.3秒以内はつなぐ）で結合した合計尺。"""
+    ranges = sorted({_source_key(seg) for seg in segments})
+    total = 0.0
+    cur = None
+    for start, end in ranges:
+        if cur and start <= cur[1] + MERGE_TOLERANCE_SEC:
+            cur[1] = max(cur[1], end)
+            continue
+        if cur:
+            total += max(cur[1] - cur[0], 0.0)
+        cur = [start, end]
+    if cur:
+        total += max(cur[1] - cur[0], 0.0)
+    return total
+
+
 class SmartCutWorker(PipelineStageWorker):
     def __init__(self):
         super().__init__("SmartCut構成", "✂️", 2)
@@ -91,10 +124,21 @@ class SmartCutWorker(PipelineStageWorker):
     def _select_segments_by_score(
         self,
         scored_segments: list[tuple[float, float, int, dict]],
-        target_seconds: float
+        target_seconds: float,
+        segments: list | None = None,
     ) -> tuple[set[int], float]:
-        """スコアの高い順にセグメントを累積し、目標尺に達するまで選定する"""
+        """スコアの高い順に**元の区間**を累積し、目標尺に達するまで選定する。
+
+        同じ元の区間を指す行（校閲の整形で分かれた行）は、1行選ばれたら全部選び、
+        尺は1回だけ数える。以前は行の数だけ数えていて、38分の発話が19分になった
+        （2026-10-05 の raw 4本の実走）。
+        """
+        siblings: dict[tuple, list[int]] = {}
+        for i, seg in enumerate(segments or []):
+            siblings.setdefault(_source_key(seg), []).append(i)
+
         selected_indices = set()
+        counted: set[tuple] = set()
         accumulated_duration = 0.0
 
         # スコア降順ソート
@@ -102,7 +146,11 @@ class SmartCutWorker(PipelineStageWorker):
         for score, duration, index, segment in sorted_scored:
             if accumulated_duration >= target_seconds:
                 break
-            selected_indices.add(index)
+            key = _source_key(segment)
+            if key in counted:
+                continue
+            counted.add(key)
+            selected_indices.update(siblings.get(key, [index]))
             accumulated_duration += duration
 
         return selected_indices, accumulated_duration
@@ -142,10 +190,7 @@ class SmartCutWorker(PipelineStageWorker):
         filtered_indices = set()
         removed_duration = 0.0
         for run in continuous_runs:
-            run_duration = sum(
-                _get_segment_duration(segments[idx])
-                for idx in run
-            )
+            run_duration = _unique_duration(segments[idx] for idx in run)
             if run_duration >= MIN_KEPT_DURATION or len(continuous_runs) <= 3:
                 for idx in run:
                     filtered_indices.add(idx)
@@ -189,6 +234,7 @@ class SmartCutWorker(PipelineStageWorker):
         if total_duration <= target_seconds:
             # 目標尺以下 → カット不要
             ctx.selected_segments = segments
+            ctx.planned_output_sec = planned_output_seconds(segments)
             return StageResult(
                 stage_name=self.name, success=True,
                 detail=f"カット不要 — 元尺{total_duration/60:.1f}分 ≤ 目標{ctx.target_minutes}分",
@@ -200,18 +246,17 @@ class SmartCutWorker(PipelineStageWorker):
         scored_segments = self._score_segments(segments)
 
         # 目標尺まで累積
-        selected_indices, accumulated_duration = self._select_segments_by_score(scored_segments, target_seconds)
+        selected_indices, accumulated_duration = self._select_segments_by_score(
+            scored_segments, target_seconds, segments)
 
         # A-5: 連続保持区間の最小尺チェック（短い孤立区間の除去）
         selected_indices = self._filter_short_runs(selected_indices, segments, target_seconds, accumulated_duration)
 
         selected_segments = [segments[index] for index in sorted(selected_indices)]
         ctx.selected_segments = selected_segments
+        ctx.planned_output_sec = planned_output_seconds(selected_segments)
 
-        estimated_duration = sum(
-            _get_segment_duration(segment)
-            for segment in selected_segments
-        )
+        estimated_duration = _unique_duration(selected_segments)
         cut_percent = (1.0 - len(selected_segments) / len(segments)) * 100.0
 
         return StageResult(

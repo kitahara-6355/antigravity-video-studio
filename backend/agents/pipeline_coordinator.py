@@ -1806,6 +1806,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     ctx = PipelineContext(video_path=str(video),
                           target_minutes=target_minutes,
+                          target_auto=args.target_minutes is None,
                           session_id=f"cli-{uuid.uuid4().hex[:8]}")
 
     result = asyncio.run(coordinator.execute(ctx))
