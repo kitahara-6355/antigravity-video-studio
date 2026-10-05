@@ -225,6 +225,68 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
 
 
 
+CUT_SUBTITLE_BUFFER = 0.5  # A-3: カット直後の字幕バッファ（秒）
+
+
+def _display_span(seg: dict) -> tuple[float, float]:
+    """字幕の行を**表示する**時刻（元の動画の時間軸）。
+
+    校閲の整形は1つの発話を数行に分け、各行の start/end を発話の中で按分する。
+    sourceStart/sourceEnd は発話全体の区間のまま（切る区間を決めるため）。
+    以前は表示にも sourceStart/sourceEnd を使っていて、**同じ発話の全行が同時に
+    出て下から逆順に積み上がっていた**（2026-10-05 raw 4本の実走）。
+    行の start/end が発話の区間に収まっていればそれを使う。
+    """
+    src_start = float(seg.get("sourceStart", seg.get("start", 0)))
+    src_end = float(seg.get("sourceEnd", seg.get("end", 0)))
+    start = seg.get("start")
+    end = seg.get("end")
+    if start is not None and end is not None:
+        start, end = float(start), float(end)
+        if src_start - 0.01 <= start < end <= src_end + 0.5:
+            return start, end
+    return src_start, src_end
+
+
+def retime_segments(segments, merged):
+    """BUG-PV02/PV04: 字幕の時刻をカット後の時間軸に直す。
+
+    merged は元の動画の時間軸で残す区間。merged[0]=(s0,e0) は出力の 0〜(e0-s0) 秒、
+    merged[1]=(s1,e1) は (e0-s0)〜(e0-s0)+(e1-s1) 秒に並ぶ。
+    どの区間に属するかは発話の区間（sourceStart/sourceEnd）で、表示の時刻は
+    `_display_span` で決める。返り値は (直した字幕, 出力の尺, カット点)。
+    """
+    recalculated_segments = []
+    output_offset = 0.0
+    cut_points = []  # カットポイントの出力タイムライン位置を記録
+    for ri, (range_start, range_end) in enumerate(merged):
+        if ri > 0:
+            cut_points.append(output_offset)
+        for seg in segments:
+            seg_start = seg.get("sourceStart", seg.get("start", 0))
+            seg_end = seg.get("sourceEnd", seg.get("end", 0))
+            # セグメントがこのrangeに含まれるか判定
+            if seg_start >= range_start and seg_end <= range_end + 0.5:
+                show_start, show_end = _display_span(seg)
+                new_seg = dict(seg)
+                new_start = output_offset + (show_start - range_start)
+                new_end = output_offset + (min(show_end, range_end) - range_start)
+
+                # A-3: カットポイント直後の字幕バッファ
+                # カット直後0.5秒以内に始まる字幕は開始を遅らせる
+                for cp in cut_points:
+                    if cp <= new_start < cp + CUT_SUBTITLE_BUFFER:
+                        new_start = cp + CUT_SUBTITLE_BUFFER
+                        break
+
+                if new_end > new_start:  # バッファ適用後も有効な場合のみ追加
+                    new_seg["start"] = new_start
+                    new_seg["end"] = new_end
+                    recalculated_segments.append(new_seg)
+        output_offset += (range_end - range_start)
+    return recalculated_segments, output_offset, cut_points
+
+
 def render_smart_cut(
     segments,
     original_video_path,
@@ -322,34 +384,7 @@ def render_smart_cut(
         # merged rangesは元動画の時間軸。カット後の新タイムラインを構築する。
         # merged[0]=(s0,e0) → 出力0〜(e0-s0)秒
         # merged[1]=(s1,e1) → 出力(e0-s0)〜(e0-s0)+(e1-s1)秒
-        CUT_SUBTITLE_BUFFER = 0.5  # A-3: カット直後の字幕バッファ（秒）
-        recalculated_segments = []
-        output_offset = 0.0
-        cut_points = []  # カットポイントの出力タイムライン位置を記録
-        for ri, (range_start, range_end) in enumerate(merged):
-            if ri > 0:
-                cut_points.append(output_offset)
-            for seg in segments:
-                seg_start = seg.get("sourceStart", seg.get("start", 0))
-                seg_end = seg.get("sourceEnd", seg.get("end", 0))
-                # セグメントがこのrangeに含まれるか判定
-                if seg_start >= range_start and seg_end <= range_end + 0.5:
-                    new_seg = dict(seg)
-                    new_start = output_offset + (seg_start - range_start)
-                    new_end = output_offset + (seg_end - range_start)
-
-                    # A-3: カットポイント直後の字幕バッファ
-                    # カット直後0.5秒以内に始まる字幕は開始を遅らせる
-                    for cp in cut_points:
-                        if cp <= new_start < cp + CUT_SUBTITLE_BUFFER:
-                            new_start = cp + CUT_SUBTITLE_BUFFER
-                            break
-
-                    if new_end > new_start:  # バッファ適用後も有効な場合のみ追加
-                        new_seg["start"] = new_start
-                        new_seg["end"] = new_end
-                        recalculated_segments.append(new_seg)
-            output_offset += (range_end - range_start)
+        recalculated_segments, output_offset, cut_points = retime_segments(segments, merged)
 
         logger.info(f"SRTタイムスタンプ再計算: {len(segments)}seg → {len(recalculated_segments)}seg, 出力尺={output_offset:.1f}s, カットポイント={len(cut_points)}箇所")
 

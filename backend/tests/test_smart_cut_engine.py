@@ -1258,3 +1258,40 @@ def test_burn_subtitles_ffmpeg_logo_height_invalid_type(mock_run, dummy_video, t
                 str(dummy_video), segments, str(output_path), ffmpeg_editor
             )
             assert result is True
+
+
+# --- 分割された字幕の行の時刻（2026-10-05 raw 4本の実走）-----------------------------
+
+
+def test_split_lines_of_one_utterance_show_one_after_another():
+    """校閲の整形で3行に分かれた発話は、行ごとの時刻で順に出す。
+    発話の区間で出すと3行が同時に出て、下から逆順に積み上がっていた。"""
+    segs = [
+        {"start": 4.0, "end": 6.0, "text": "このチャンネルでは書を", "sourceStart": 4.0, "sourceEnd": 10.0},
+        {"start": 6.0, "end": 8.0, "text": "通して人々の心に触れ、その", "sourceStart": 4.0, "sourceEnd": 10.0},
+        {"start": 8.0, "end": 10.0, "text": "思いを深くお聞きしていきます。", "sourceStart": 4.0, "sourceEnd": 10.0},
+    ]
+
+    out, total, _ = smart_cut_engine.retime_segments(segs, [(4.0, 10.0)])
+
+    assert [(s["start"], s["end"]) for s in out] == [(0.0, 2.0), (2.0, 4.0), (4.0, 6.0)]
+    assert total == 6.0
+
+
+def test_lines_without_their_own_time_fall_back_to_the_utterance():
+    segs = [{"start": 100.0, "end": 101.0, "text": "外れた時刻", "sourceStart": 4.0, "sourceEnd": 6.0}]
+
+    out, _, _ = smart_cut_engine.retime_segments(segs, [(4.0, 6.0)])
+
+    assert (out[0]["start"], out[0]["end"]) == (0.0, 2.0)
+
+
+def test_retime_shifts_later_ranges_and_marks_cut_points():
+    segs = [{"start": 0.0, "end": 2.0, "text": "a", "sourceStart": 0.0, "sourceEnd": 2.0},
+            {"start": 11.0, "end": 12.0, "text": "b", "sourceStart": 10.0, "sourceEnd": 12.0}]
+
+    out, total, cuts = smart_cut_engine.retime_segments(segs, [(0.0, 2.0), (10.0, 12.0)])
+
+    assert cuts == [2.0]
+    assert (out[1]["start"], out[1]["end"]) == (3.0, 4.0)
+    assert total == 4.0
