@@ -252,6 +252,7 @@
     "telop_suggestion": "standard",
     "ai_confirmation": "standard",
     "proofreader": "standard",
+    "transcription": "standard",
     "youtube_optimization": "standard",
     "branding": "standard",
     "live_api": "standard",

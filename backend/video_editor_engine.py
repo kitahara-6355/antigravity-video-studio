@@ -126,6 +126,19 @@ class FFmpegEditor:
             )
             has_nvenc = "h264_nvenc" in result.stdout
             if has_nvenc:
+                # **一覧に載っていても使えるとは限らない。** ビルドに入っているだけで、
+                # GPU もドライバも無いクラウドのコンテナでは `Cannot load libcuda.so.1` で
+                # 開けず、字幕の焼き込みが全部「字幕なしのコピー」に落ちていた（2026-10-05 実走）。
+                # 小さく1回エンコードして確かめる
+                probe = subprocess.run(
+                    [self.ffmpeg_path, "-v", "error", "-f", "lavfi",
+                     "-i", "color=c=black:s=256x144:d=0.1", "-c:v", "h264_nvenc",
+                     "-f", "null", "-"],
+                    capture_output=True, text=True, timeout=20
+                )
+                if probe.returncode != 0:
+                    logger.info("⚠️ NVENC はビルドにあるが開けない（GPU なし）— CPU エンコードを使います")
+                    return False
                 logger.info("✅ GPU (NVENC) detected — hardware encoding enabled")
             else:
                 logger.info("⚠️ NVENC not available — falling back to CPU encoding")

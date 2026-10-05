@@ -4,11 +4,17 @@ TranscribeWorker — 文字起こしステージ
 Whisperサブプロセスによる音声文字起こし。
 CTranslate2デストラクタ→CUDAクラッシュ回避のためサブプロセス分離。
 チェックポイント(JSONL)による冪等性を保証。
+
+**エンジンは2つ**（2026-09-26 ユーザー決定: 主は Gemini 音声入力、従は Whisper）。
+`AVS_TRANSCRIBE_ENGINE=gemini` で Gemini（`subtitle_engine.gemini_transcriber`）を使い、
+落ちたら Whisper に切り替える（切り替えた事実は警告と結果に残す）。
+既定は whisper のまま — Gemini は課金経路なので、明示した実走だけが叩く。
 """
 
 import json
 import logging
 import asyncio
+import os
 import time
 import sys
 import subprocess
@@ -18,6 +24,22 @@ from pathlib import Path
 from agents.pipeline_types import PipelineStageWorker, PipelineContext, StageResult
 
 logger = logging.getLogger(__name__)
+
+ENGINE_ENV = "AVS_TRANSCRIBE_ENGINE"
+ENGINES = ("whisper", "gemini")
+
+
+def transcribe_engine() -> str:
+    """この実走の文字起こしエンジン。知らない値は whisper に倒さず止める。"""
+    engine = (os.environ.get(ENGINE_ENV) or "whisper").strip().lower()
+    if engine not in ENGINES:
+        raise ValueError(f"{ENGINE_ENV}={engine!r} は使えません（{' / '.join(ENGINES)}）")
+    return engine
+
+
+def _gemini_checkpoint(whisper_checkpoint: str) -> str:
+    p = Path(whisper_checkpoint)
+    return str(p.with_name(p.name.replace("_whisper_", "_gemini_", 1)))
 
 
 class TranscribeWorker(PipelineStageWorker):
@@ -161,7 +183,8 @@ class TranscribeWorker(PipelineStageWorker):
             logger.warning("⚠️ サブプロセスのstdout解析失敗、チェックポイントファイルから復旧")
             return {"status": "completed", "device": "unknown", "model": model_size}
 
-        raise RuntimeError(f"Whisperサブプロセス失敗: exit={proc.returncode}, stderr={stderr_out[:500]}")
+        # **末尾を出す。** 先頭は起動時の INFO ログで埋まり、原因（例外）が切れて見えなかった
+        raise RuntimeError(f"Whisperサブプロセス失敗: exit={proc.returncode}, stderr=…{stderr_out[-800:]}")
 
     async def execute(self, ctx: PipelineContext) -> StageResult:
         """文字起こしを実行
@@ -181,6 +204,13 @@ class TranscribeWorker(PipelineStageWorker):
             old_checkpoint = Path(ctx.video_path).parent / OLD_CHECKPOINT_NAME
             if old_checkpoint.exists():
                 logger.info(f"⚠️ 旧形式キャッシュ検出 — 無視します: {old_checkpoint}")
+
+            engine = transcribe_engine()
+            if engine == "gemini":
+                result = await self._execute_gemini(ctx, checkpoint_path, start)
+                if result is not None:
+                    return result
+                # 落ちた → Whisper へ（切り替えた事実は _execute_gemini が警告に残した）
 
             # 既存のチェックポイントがある場合はWhisperを完全スキップ
             if Path(checkpoint_path).exists() and Path(checkpoint_path).stat().st_size > 1000:
@@ -223,6 +253,37 @@ class TranscribeWorker(PipelineStageWorker):
                 stage_name=self.name, success=False,
                 detail=str(e), duration_seconds=round(time.time() - start, 1),
             )
+
+    async def _execute_gemini(self, ctx: PipelineContext, whisper_checkpoint: str,
+                              start: float):
+        """Gemini で起こす。**落ちたら `None`**（呼び出し側が Whisper に切り替える）。"""
+        checkpoint = _gemini_checkpoint(whisper_checkpoint)
+        if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
+            segments = self._load_segments_from_checkpoint(checkpoint)
+            ctx.segments = segments
+            return StageResult(
+                stage_name=self.name, success=True,
+                detail=f"{len(segments)}セグメント検出 (Gemini・キャッシュ)",
+                data={"segment_count": len(segments), "engine": "gemini", "model": "cached"},
+                duration_seconds=round(time.time() - start, 1),
+            )
+        try:
+            from subtitle_engine import gemini_transcriber
+            loop = asyncio.get_running_loop()
+            tx = await loop.run_in_executor(None, gemini_transcriber.transcribe, ctx.video_path)
+            gemini_transcriber.write_checkpoint(tx.segments, checkpoint)
+        except Exception as e:  # noqa: BLE001 — 主経路の失敗は従経路へ。理由は残す
+            logger.warning(f"⚠️ Gemini 文字起こしに失敗 → Whisper に切り替えます: {e}")
+            ctx.warnings.append(f"文字起こし: Gemini が失敗したため Whisper に切り替えました（{e}）")
+            return None
+        ctx.segments = tx.segments
+        return StageResult(
+            stage_name=self.name, success=True,
+            detail=f"{len(tx.segments)}セグメント検出 (Gemini {', '.join(tx.models_used)}・{tx.chunks}チャンク)",
+            data={"segment_count": len(tx.segments), "engine": "gemini", "model": tx.model,
+                  "models_used": tx.models_used, "chunks": tx.chunks},
+            duration_seconds=round(time.time() - start, 1),
+        )
 
     def verify(self, result: StageResult) -> bool:
         return result.success and result.data.get("segment_count", 0) > 0

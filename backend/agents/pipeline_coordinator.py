@@ -132,6 +132,15 @@ STATUS_COMPLETED = "completed"
 STATUS_DEGRADED = "degraded"
 
 
+def _transcribe_engine_or_none() -> Optional[str]:
+    """記録の宣言に使うエンジン。値が不正なら `None`（工程側が理由つきで落とす）。"""
+    from agents.workers.transcribe_worker import transcribe_engine
+    try:
+        return transcribe_engine()
+    except ValueError:
+        return None
+
+
 def _merge_intermediates(before: list, after: list) -> list:
     """提案まで（`before`）と書き出し（`after`）の中間成果物の使われ方を合わせる。
 
@@ -201,6 +210,10 @@ class PipelineCoordinator:
         """記録に残す工程名と、モデルの出どころ、再開に要る入力。"""
         name, source = STAGE_RECORD.get(
             type(worker).__name__, (type(worker).__name__, {}))
+        if isinstance(worker, TranscribeWorker) and _transcribe_engine_or_none() == "gemini":
+            # **Gemini 音声入力の実走は段から引く**（R2.5-C4）。Whisper に切り替わったら
+            # 台帳に Gemini の呼び出しが残らず、記録の実測との食い違いで見える
+            source = {"task": "transcription"}
         return name, {
             **source,
             "stage_input": {
@@ -1761,7 +1774,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="実行記録の置き場（既定 output/runs）")
     parser.add_argument("--no-ledger", action="store_true",
                         help="台帳に1本ぶんの要約を書かない（試し撃ち用）")
+    parser.add_argument("--transcriber", choices=("whisper", "gemini"), default=None,
+                        help="文字起こしのエンジン（既定は環境変数 AVS_TRANSCRIBE_ENGINE、無ければ whisper）。"
+                             "gemini は課金経路（無料枠の段）")
     args = parser.parse_args(argv)
+    if args.transcriber:
+        os.environ["AVS_TRANSCRIBE_ENGINE"] = args.transcriber
 
     video = Path(args.video)
     if not video.is_file():

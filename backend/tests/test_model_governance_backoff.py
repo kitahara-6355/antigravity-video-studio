@@ -38,9 +38,11 @@ def engine():
     eng._fallback_chain = {"model-a": "model-b"}
     eng._task_mapping = {}
     eng.RETRY_DELAY_SECONDS = 0.001  # テストを待たせない
+    eng._exhausted = {}
     try:
         yield eng
     finally:
+        eng._exhausted = {}
         (
             eng._fallback_chain,
             eng._task_mapping,
@@ -454,3 +456,88 @@ def test_事前の枠チェックで降格しても理由つきで台帳に残�
     assert kw["requested"] == "model-a" and kw["to"] == "model-b"
     assert kw["reason"].startswith("quota_precheck"), kw
     assert kw["caller"] == "resolve:t"
+
+
+# ============================================================
+# 日次の枠切れ（待っても戻らない 429）— 2026-10-05 の実走
+# ============================================================
+
+
+def _daily_quota_error():
+    """無料枠 1日20回が尽きたときの実物の形（retryDelay は約11時間）。"""
+    return _api_error(429, "RESOURCE_EXHAUSTED", details=[
+        {"@type": "type.googleapis.com/google.rpc.QuotaFailure",
+         "violations": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]},
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "39958s"},
+    ])
+
+
+def test_日次の枠切れは待たずにすぐ降格する(engine):
+    calls = []
+
+    def side_effect(*, model, **kw):
+        calls.append(model)
+        if model == "model-a":
+            raise _daily_quota_error()
+        return "ok"
+
+    real = MagicMock()
+    real.generate_content.side_effect = side_effect
+    proxy = GovernedModelsProxy(real, "test")
+
+    with patch("backend.model_governance.time.sleep") as slept:
+        assert proxy.generate_content(model="model-a") == "ok"
+
+    assert calls == ["model-a", "model-b"], "11時間後に戻る枠を同じ段で待たない"
+    assert all(c.args[0] < 60 for c in slept.call_args_list)
+
+
+def test_日次の枠切れのモデルは次の呼び出しから叩かない(engine):
+    calls = []
+
+    def side_effect(*, model, **kw):
+        calls.append(model)
+        if model == "model-a":
+            raise _daily_quota_error()
+        return "ok"
+
+    real = MagicMock()
+    real.generate_content.side_effect = side_effect
+    proxy = GovernedModelsProxy(real, "test")
+
+    proxy.generate_content(model="model-a")
+    proxy.generate_content(model="model-a")
+
+    assert calls == ["model-a", "model-b", "model-b"]
+
+
+def test_枠切れで飛ばしても降格の理由は台帳に残る(engine):
+    real = MagicMock()
+    real.generate_content.side_effect = lambda *, model, **kw: (
+        (_ for _ in ()).throw(_daily_quota_error()) if model == "model-a" else "ok")
+    proxy = GovernedModelsProxy(real, "test")
+    proxy.generate_content(model="model-a")
+
+    with patch.object(_mg, "record_fallback") as rec:
+        proxy.generate_content(model="model-a")
+
+    assert rec.call_args.kwargs["reason"] == "429:枠枯渇"
+    assert rec.call_args.kwargs["to"] == "model-b"
+
+
+def test_末端のモデルは枠切れでも試す(engine):
+    """飛ばした先が無いなら、黙って諦めず叩いて結果を返す。"""
+    engine.mark_exhausted("model-b", _daily_quota_error())
+    real = MagicMock()
+    real.generate_content.return_value = "ok"
+    proxy = GovernedModelsProxy(real, "test")
+
+    assert proxy.generate_content(model="model-b") == "ok"
+
+
+def test_枠が戻ったらまた叩く(engine, monkeypatch):
+    engine.mark_exhausted("model-a", _daily_quota_error())
+    now = _mg.time.monotonic()
+    monkeypatch.setattr(_mg.time, "monotonic", lambda: now + 40000)
+
+    assert engine.exhausted_error("model-a") is None

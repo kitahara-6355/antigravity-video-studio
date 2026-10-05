@@ -152,6 +152,15 @@ class TestFFmpegEditor:
                 editor = FFmpegEditor(output_dir=tmp_path)
                 assert editor.use_gpu is True
 
+            # 1b. 一覧にはあるが開けない（GPU の無いコンテナ・2026-10-05 実走）
+            mock_run = MagicMock(side_effect=[
+                subprocess.CompletedProcess(args=[], returncode=0, stdout="h264_nvenc enabled"),
+                subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="Cannot load libcuda.so.1"),
+            ])
+            with patch("subprocess.run", mock_run):
+                editor = FFmpegEditor(output_dir=tmp_path)
+                assert editor.use_gpu is False
+
             # 2. GPU非対応 (h264_nvencなし)
             mock_run = MagicMock(return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="other encoders"))
             with patch("subprocess.run", mock_run):
