@@ -899,3 +899,13 @@ def test_get_video_info_json_decode_error(tmp_path, caplog):
             "duration": 0.0
         }
         assert any("Failed to get video info" in record.message for record in caplog.records)
+
+
+@pytest.mark.parametrize("use_gpu", [True, False])
+def test_encode_args_always_ask_for_yuv420p(tmp_path, use_gpu):
+    """どの書き出しも 4:2:0。4:4:4 は一般のプレーヤーで映像が出ない（2026-10-05）。"""
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = use_gpu
+    for quality in ("fast", "balanced", "quality"):
+        args = editor._get_encode_args(quality)
+        assert args[args.index("-pix_fmt") + 1] == "yuv420p"

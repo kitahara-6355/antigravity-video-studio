@@ -166,6 +166,11 @@ class FFmpegEditor:
                 "-c:v", "h264_nvenc",
                 "-preset", preset_cfg["gpu"][0],
                 "-cq", preset_cfg["gpu"][1],
+                # **yuv420p を明示する。** 指定しないと字幕・ロゴの合成（RGBA の PNG を
+                # overlay）で yuv444p（High 4:4:4）になり、Windows の標準プレーヤーや
+                # ブラウザ・スマホで**音だけ鳴って映像が出ない**（2026-10-05 ユーザー報告）。
+                # YouTube の推奨も 4:2:0
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
             ]
         else:
@@ -173,6 +178,11 @@ class FFmpegEditor:
                 "-c:v", "libx264",
                 "-preset", preset_cfg["cpu"][0],
                 "-crf", preset_cfg["cpu"][1],
+                # **yuv420p を明示する。** 指定しないと字幕・ロゴの合成（RGBA の PNG を
+                # overlay）で yuv444p（High 4:4:4）になり、Windows の標準プレーヤーや
+                # ブラウザ・スマホで**音だけ鳴って映像が出ない**（2026-10-05 ユーザー報告）。
+                # YouTube の推奨も 4:2:0
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
             ]
     

@@ -1295,3 +1295,29 @@ def test_retime_shifts_later_ranges_and_marks_cut_points():
     assert cuts == [2.0]
     assert (out[1]["start"], out[1]["end"]) == (3.0, 4.0)
     assert total == 4.0
+
+
+# --- 書き出しの画素形式（2026-10-05 ユーザー報告: 音だけで映像が出ない）--------------
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg が無い")
+def test_burned_preview_is_yuv420p_so_ordinary_players_show_the_picture(tmp_path):
+    """字幕とロゴ（RGBA の PNG）を合成すると、指定が無ければ yuv444p になる。
+    yuv444p（High 4:4:4）は Windows の標準プレーヤーやブラウザで映像が出ない。"""
+    import subprocess
+    from video_editor_engine import FFmpegEditor
+
+    src = tmp_path / "src.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=320x180:rate=10",
+                    "-f", "lavfi", "-i", "sine=duration=2", "-shortest", "-pix_fmt", "yuv420p", str(src)], check=True)
+    out = tmp_path / "out.mp4"
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = False
+
+    result = smart_cut_engine._burn_subtitles_ffmpeg(
+        str(src), [{"start": 0.0, "end": 1.5, "text": "テスト"}], str(out), editor)
+
+    assert result is True
+    pix = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt",
+                          "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
+    assert pix == "yuv420p"

@@ -168,6 +168,250 @@ def enforce_line_length(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> str:
 
 
 # ============================================================
+# 意味の塊での字幕分割（2026-10-05 ユーザー指摘）
+# ============================================================
+#
+# `_split_at_boundary` は「は・が・を・に・の・で・と」の**文字**を見て、15文字に
+# 収まる最後の位置で切る。語の途中の「の」「で」にも当たり、「書を|通して」
+# 「その|思いを」のように意味の塊を割っていた。しかも1字幕1行（15文字）に
+# 切るので、文が細切れになって次々に流れた。
+#
+# ここでは BudouX（Google の日本語の文節区切り）で文節に分け、
+# 1) 文末（。！？）では必ず区切る 2) 1枚の字幕は max_lines 行まで詰める
+# 3) 区切り・改行は「、」や助詞の後を選び、連体詞や「の」の直後は避ける。
+# BudouX が無ければ従来の分割に戻る。
+
+SENTENCE_END = "。！？!?"
+_LEADING_PUNCT = "、。，．,.！？!?」』）)…ー〜"
+_OPENING = "「『（(“"
+_ADNOMINALS = ("この", "その", "あの", "どの", "こんな", "そんな", "あんな", "どんな")
+# 後ろで切ってよい語尾。強いほど先に並べる（2点）
+_GOOD_TAILS = ("から", "けど", "ので", "のに", "ため", "って", "では", "には", "とは",
+               "は", "て", "で", "し", "ね", "よ", "な")
+# 格助詞の直後は、次の動詞とひと塊のことが多い（「書を|通して」）ので弱め（1点）
+_WEAK_TAILS = ("を", "に", "が", "と", "へ", "も", "や")
+
+_budoux_parser = None
+
+
+def _phrase_parser():
+    """BudouX の日本語パーサ（無ければ None）。"""
+    global _budoux_parser
+    if _budoux_parser is None:
+        try:
+            import budoux
+            _budoux_parser = budoux.load_default_japanese_parser()
+        except ImportError:
+            _budoux_parser = False
+    return _budoux_parser or None
+
+
+def _break_score(phrase: str) -> int:
+    """この文節の**後ろで**切るときの良さ。大きいほど自然。"""
+    p = phrase.rstrip()
+    if not p:
+        return 0
+    if p.rfind("「") > p.rfind("」") or p.rfind("『") > p.rfind("』"):
+        return -2  # 鉤括弧の中では割らない
+    if p[-1] in SENTENCE_END:
+        return 5
+    if p[-1] in "、,…":
+        return 4
+    if p in _ADNOMINALS or p.endswith("の"):
+        return -3  # 「この|チャンネル」「人々の|心に」は割らない
+    if p.endswith(_GOOD_TAILS):
+        return 2
+    if p.endswith(_WEAK_TAILS):
+        return 1
+    return 0
+
+
+def _script(ch: str) -> str:
+    if "\u30a0" <= ch <= "\u30ff":
+        return "katakana"
+    if "\u3040" <= ch <= "\u309f":
+        return "hiragana"
+    if "\u4e00" <= ch <= "\u9fff" or ch in "々〆":
+        return "kanji"
+    return "other"
+
+
+def _is_bare_tail(text: str) -> bool:
+    """ひらがなと句読点だけの短い切れ端（「で、」「は」）。1行にすると浮く。"""
+    return len(text) <= 3 and all(_script(c) == "hiragana" or c in _LEADING_PUNCT for c in text)
+
+
+def _cut_score(text: str, i: int) -> int | None:
+    """長い文節を位置 i で割るときの良さ（割れない位置は None）。
+
+    2: 漢字・カタカナの語の頭（「日本デザイン|書道」）
+    1: 「た・て・で・だ」の後ろでひらがなが続く（「教えた|のかも」）
+    0: 漢字の後ろの送り仮名の手前（「教|えた」）— 最後の手段
+    """
+    prev, cur = text[i - 1], text[i]
+    if cur in _LEADING_PUNCT or _is_bare_tail(text[i:]):
+        return None
+    a, b = _script(prev), _script(cur)
+    if a != b and b in ("kanji", "katakana"):
+        return 2
+    if a == b == "hiragana" and prev in "たてでだ":
+        return 1
+    if a != b:
+        return 0
+    return None
+
+
+def _split_long_phrase(phrase: str, max_chars: int) -> list[str]:
+    """1行に入らない文節（長い複合名詞など）を、語の切れ目らしい位置で割る。
+
+    「日本デザイン書道作家協会理事長で、」→「日本デザイン」「書道作家協会理事長で、」。
+    左が短すぎる位置（1行の4割未満）は後回し。割れる位置が無ければ max_chars で切る。
+    """
+    out = []
+    rest = phrase
+    while len(rest) > max_chars:
+        cuts = [(_cut_score(rest, i), i) for i in range(1, min(len(rest), max_chars + 1))]
+        cuts = [(sc, i) for sc, i in cuts if sc is not None]
+        if cuts:
+            _, _, cut = max((i >= max_chars * 0.4, sc, i) for sc, i in cuts)
+        else:
+            cut = max_chars
+        out.append(rest[:cut])
+        rest = rest[cut:]
+    if rest:
+        out.append(rest)
+    return out
+
+
+def _phrases(text: str, max_chars: int) -> list[str]:
+    parser = _phrase_parser()
+    if parser is None:
+        return []
+    phrases: list[str] = []
+    for part in parser.parse(text):
+        # 句読点で始まる文節は前の文節に付ける（行頭に「、」を置かない）
+        while part and part[0] in _LEADING_PUNCT and phrases:
+            phrases[-1] += part[0]
+            part = part[1:]
+        # 前の文節が開き括弧で終わっていたら、括弧をこの文節に回す（行末に「「」を置かない）
+        while part and phrases and phrases[-1] and phrases[-1][-1] in _OPENING:
+            part = phrases[-1][-1] + part
+            phrases[-1] = phrases[-1][:-1]
+            if not phrases[-1]:
+                phrases.pop()
+        if part:
+            phrases.extend(_split_long_phrase(part, max_chars))
+    return phrases
+
+
+def _sentences(phrases: list[str]) -> list[list[str]]:
+    out, cur = [], []
+    for ph in phrases:
+        cur.append(ph)
+        if ph.rstrip()[-1:] in SENTENCE_END:
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int):
+    """1枚の字幕を max_lines 行以内に折る。改行も文節の境目を選ぶ。
+
+    折れなければ None（呼び出し側が字幕を短くする）。返り値は (本文, 改行の良さ)。
+    """
+    text = "".join(phrases)
+    if len(text) <= max_chars:
+        return text, 0
+    if max_lines <= 1:
+        return None
+    best = None
+    acc = 0
+    for i, ph in enumerate(phrases[:-1], start=1):
+        acc += len(ph)
+        if acc > max_chars:
+            break
+        tail = _wrap_lines(phrases[i:], max_chars, max_lines - 1)
+        if tail is None:
+            continue
+        rest = len(text) - acc
+        # 区切りの良さを優先し、同じなら行の長さが揃う方
+        key = (_break_score(ph) + tail[1], -abs(acc - rest))
+        if best is None or key > best[0]:
+            best = (key, "".join(phrases[:i]) + "\n" + tail[0])
+    if best is None:
+        return None
+    return best[1], best[0][0]
+
+
+def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
+                        max_lines: int = 2) -> list[str]:
+    """発話を、意味の塊で区切った字幕（1枚 max_lines 行まで・改行は \\n）に分ける。
+
+    - 文末（。！？）では必ず区切る
+    - 1枚に入りきらない文は、入る範囲で区切りの良さが最大の文節の後ろで切る
+      （短すぎる字幕は作らない: 1枚の容量の 4割以上）
+    - 改行・区切りは「、」や助詞の後を選び、連体詞や「の」の直後は避ける
+
+    BudouX が無ければ空リストを返す（呼び出し側が従来の分割に戻る）。
+    """
+    if not isinstance(text, str) or not text.strip():
+        return []
+    max_lines = max(1, int(max_lines or 1))
+    phrases = _phrases(text.strip(), max_chars)
+    if not phrases:
+        return []
+    capacity = max_chars * max_lines
+    captions: list[str] = []
+    for sentence in _sentences(phrases):
+        rest = sentence
+        while rest:
+            choice = None  # (key, n, text)
+            acc = 0
+            for n in range(1, len(rest) + 1):
+                acc += len(rest[n - 1])
+                if acc > capacity and n > 1:
+                    break
+                wrapped = _wrap_lines(rest[:n], max_chars, max_lines)
+                if wrapped is None:
+                    continue
+                whole = n == len(rest)
+                cut_score = 9 if whole else _break_score(rest[n - 1])
+                long_enough = whole or acc >= capacity * 0.4
+                key = (long_enough, cut_score + wrapped[1], acc)
+                if choice is None or key > choice[0]:
+                    choice = (key, n, wrapped[0])
+            if choice is None:  # 1文節でも折れない（来ないはず）— そのまま置く
+                choice = (None, 1, enforce_line_length(rest[0], max_chars))
+            captions.append(choice[2])
+            rest = rest[choice[1]:]
+    return [c for c in captions if c.strip()]
+
+
+def _semantic_line_break(text: str) -> str | None:
+    """1行の字幕を、文節の境目で2行に折る（区切りの良さ優先・同点なら長さが揃う方）。
+
+    端（2文字以内）では折らない。BudouX が無い・境目が無ければ None。
+    """
+    if "\n" in text or _phrase_parser() is None:
+        return None
+    phrases = _phrases(text, len(text))
+    best = None
+    acc = 0
+    for i, ph in enumerate(phrases[:-1], start=1):
+        acc += len(ph)
+        if not 2 < acc < len(text) - 2:
+            continue
+        key = (_break_score(ph), -abs(acc - (len(text) - acc)))
+        if best is None or key > best[0]:
+            best = (key, acc)
+    if best is None or best[0][0] < 1:  # 「の」の後や語の途中では折らない
+        return None
+    return text[:best[1]] + "\n" + text[best[1]:]
+
+
+# ============================================================
 # Phase C: 単語タイミングベース分割
 # ============================================================
 
@@ -306,8 +550,10 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
         except (ValueError, TypeError):
             max_chars = MAX_CHARS_PER_LINE
 
+    max_lines = get_max_lines_from_template()
     formatted = []
     split_count = 0
+    semantic_count = 0
     filler_count = 0
     word_split_count = 0
 
@@ -345,16 +591,21 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
                 formatted.append(new_seg)
                 continue
 
-            # Step 4: 従来の言語境界分割 + タイミング按分
-            chunks = _split_at_boundary(cleaned, max_chars)
+            # Step 4: 意味の塊で字幕に分ける（BudouX が無ければ従来の言語境界分割）+ タイミング按分
+            chunks = split_into_captions(cleaned, max_chars, max_lines)
+            if chunks:
+                semantic_count += 1
+            else:
+                chunks = _split_at_boundary(cleaned, max_chars)
 
             if len(chunks) <= 1:
                 new_seg = _safe_copy_segment(seg)
-                new_seg["text"] = cleaned
+                # 1枚に収まった（2行に折っただけ）ならその折り方を使う
+                new_seg["text"] = chunks[0] if chunks else cleaned
                 formatted.append(new_seg)
                 continue
 
-            total_chars = sum(len(c) for c in chunks)
+            total_chars = sum(len(c.replace("\n", "")) for c in chunks)
             
             start = seg.get("start")
             end = seg.get("end")
@@ -368,7 +619,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
             current_start = start
 
             for chunk in chunks:
-                chunk_duration = (len(chunk) / total_chars) * duration if total_chars > 0 else duration / len(chunks)
+                chunk_duration = (len(chunk.replace("\n", "")) / total_chars) * duration if total_chars > 0 else duration / len(chunks)
                 new_seg = _safe_copy_segment(seg)
                 new_seg["text"] = chunk
                 new_seg["start"] = current_start
@@ -390,7 +641,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
         logger.info(
             f"✂️ テキスト整形完了: フィラー除去 {filler_count}件, "
             f"word_timestamps分割 {word_split_count}件, "
-            f"言語境界分割 {split_count}件 ({len(segments)} → {len(formatted)} セグメント)"
+            f"言語境界分割 {split_count}件（うち意味の塊 {semantic_count}件） ({len(segments)} → {len(formatted)} セグメント)"
         )
 
     # 字幕速度の自動調整を適用
@@ -499,8 +750,17 @@ def adjust_segment_speeds(segments: list[dict], max_cps: float = None) -> list[d
 
         # --- ステップ2: 改行の挿入による最長行文字数の削減 ---
         if current_cps > limit_cps and "\n" not in text and len(text) > 8:
+            # 文節の境目で改行できればそれを使う（意味の塊を割らない）
+            broken = _semantic_line_break(text)
+            if broken:
+                seg["text"] = broken
+                max_line_len = max(len(line) for line in broken.split("\n"))
+                current_cps = max_line_len / dur
             # 助詞・句読点で自然に改行できるか調べる
-            split_points = [m.end() - 1 for m in SPLIT_PATTERN.finditer(text)]
+            # BudouX が使えるときは文字単位の折り方（語の途中で割る）に戻らない
+            semantic = _phrase_parser() is not None
+            split_points = ([m.end() - 1 for m in SPLIT_PATTERN.finditer(text)]
+                            if not broken and not semantic else [])
             if split_points:
                 # 文字列の中央に最も近い分割ポイントを選択
                 mid = len(text) // 2
@@ -516,7 +776,7 @@ def adjust_segment_speeds(segments: list[dict], max_cps: float = None) -> list[d
                     current_cps = max_line_len / dur
 
             # それでもダメなら中央で単純に改行を入れる
-            if current_cps > limit_cps and "\n" not in seg["text"]:
+            if current_cps > limit_cps and "\n" not in seg["text"] and not semantic:
                 mid = len(text) // 2
                 new_text = text[:mid] + "\n" + text[mid:]
                 seg["text"] = new_text
@@ -547,6 +807,18 @@ def get_max_chars_from_template() -> int:
     except Exception as e:
         logger.warning(f"Template config fallback due to template/system exception: {e}")
         return MAX_CHARS_PER_LINE
+
+
+def get_max_lines_from_template() -> int:
+    """テンプレートから1枚の字幕の最大行数を取得（未設定時は2行）"""
+    try:
+        from template_config import template_config
+        rules = template_config.get_subtitle_rules()
+        val = rules.get("max_lines", 2) if isinstance(rules, dict) else 2
+        return val if isinstance(val, int) and val >= 1 else 2
+    except Exception as e:
+        logger.warning(f"Template config max_lines fallback: {e}")
+        return 2
 
 
 def get_chars_per_second_from_template() -> float:
