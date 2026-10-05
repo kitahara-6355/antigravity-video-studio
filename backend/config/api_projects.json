@@ -78,7 +78,7 @@
       "suffix_env": "AVS_RAW_DRIVE_FOLDER_ID",
       "key_suffix": "2h-z",
       "read_only": true,
-      "status": "planned"
+      "status": "active"
     }
   ],
   "not_ours": [
