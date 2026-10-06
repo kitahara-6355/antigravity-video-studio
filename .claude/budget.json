@@ -90,7 +90,7 @@
       "purpose": "R2.5 1本目の実走",
       "approved_at": "2026-09-26",
       "limit_jpy": 1000,
-      "spent_jpy": 225.93,
+      "spent_jpy": 241.25,
       "status": "active",
       "note": "計画書 docs/plans/2026-09-26-master-plan-100.md §4 の枠。着手時に active にする（active は常に1つ）。**枠は上限であって見込みではない** — Flash 系は無料枠なので実費は大半が ¥0 の見込み ／ **2026-09-27 に active**（R2 ゲート承認・R2.5 着手）。クラウドには実キーが無いので、実走はローカルか M0 完了後。見込み ¥0（Flash 系の無料枠）。pro は使わない",
       "billing_mode": "free_tier_only",
