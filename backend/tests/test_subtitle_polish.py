@@ -239,3 +239,35 @@ def test_line_length_check_follows_the_formatters_line_width():
     long = SimpleNamespace(segments=[{"text": "あ" * (width + 1)} for _ in range(5)])
     assert SubtitleLineCheck().analyze(ok)["deductions"] == 0
     assert SubtitleLineCheck().analyze(long)["deductions"] == 5
+
+
+def test_word_spaced_transcript_is_joined():
+    # 実例（31 分〜）: 起こし直した区切りが「久田 先生 って 普段 どんな 人 な ん だろ うっ て」と
+    # 語ごとに空白で区切って返り、校閲が空白を詰めなかった回は字幕に「人 な\nん だろ うっ て」と出た
+    from subtitle_engine import gemini_transcriber as gt
+    segs = [{"start": 0.0, "end": 2.0, "text": "さん 、 久田 先生 って 普段 どんな 人 な ん だろ うっ て 、"},
+            {"start": 2.0, "end": 3.0, "text": "オフ の 人 か は 何 し てる ん です か ?"},
+            {"start": 3.0, "end": 4.0, "text": "YouTube の チャンネル"}]
+    out = gt.join_spaced_words(segs)
+    assert out[0]["text"] == "さん、久田先生って普段どんな人なんだろうって、"
+    assert out[1]["text"] == "オフの人かは何してるんですか?"
+    assert out[2]["text"] == "YouTube のチャンネル"
+    assert segs[0]["text"].startswith("さん 、")  # 元のリストは書き換えない
+
+
+def test_particle_left_at_the_head_of_the_next_segment_goes_back():
+    # 実例（56 秒）: 30 秒ごとの起こしの区切りで「…久木田デザイン書道塾」「を主宰されていて、そして、…」と
+    # 割れ、字幕が「を主宰されていて」で始まった。「を」「に」は文の頭に来ない
+    segs = [{"start": 50.0, "end": 60.0, "text": "先生はアドシアター代表で久木田デザイン書道塾"},
+            {"start": 60.0, "end": 67.0, "text": "を主宰されていて、そして、一般社団法人の理事長で"}]
+    out = tf.format_segments(segs, 18)
+    texts = [s["text"].replace("\n", "") for s in out]
+    assert not any(t.startswith("を") for t in texts)
+    assert any(t.endswith("書道塾を主宰されていて") for t in texts)
+
+
+def test_a_segment_after_a_full_stop_keeps_its_head():
+    segs = [{"start": 0.0, "end": 2.0, "text": "そうなんです。"},
+            {"start": 2.0, "end": 4.0, "text": "にこにこしてました"}]
+    out = tf.format_segments(segs, 18)
+    assert [s["text"] for s in out] == ["そうなんです", "にこにこしてました"]

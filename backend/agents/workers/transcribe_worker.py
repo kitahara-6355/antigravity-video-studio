@@ -266,8 +266,8 @@ class TranscribeWorker(PipelineStageWorker):
         checkpoint = _gemini_checkpoint(whisper_checkpoint)
         if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
             from subtitle_engine import gemini_transcriber
-            segments = gemini_transcriber.drop_boundary_echoes(
-                self._load_segments_from_checkpoint(checkpoint))
+            segments = gemini_transcriber.drop_boundary_echoes(gemini_transcriber.join_spaced_words(
+                self._load_segments_from_checkpoint(checkpoint)))
             ctx.segments = segments
             meta = gemini_transcriber.read_meta(checkpoint)
             ctx.verified_quiet = [tuple(q) for q in meta.get("quiet", [])]

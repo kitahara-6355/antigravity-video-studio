@@ -622,6 +622,32 @@ def _split_by_word_timing(words: list[dict], max_chars: int, parent_seg: dict) -
 # メイン整形関数
 # ============================================================
 
+# 文の頭には来ない助詞。セグメントがこれで始まり、前のセグメントが文の途中で終わっていれば、
+# 30 秒ごとの起こしの区切りで文が割れている（56 秒の「…書道塾」「を主宰されていて、」・2026-10-06 実測）
+_HEAD_PARTICLES = "をに"
+_HEAD_MAX_CHARS = 12
+_HEAD_RE = re.compile(r"[^、。，．,.!?！？\s　]{2,%d}(?=[、,，])" % _HEAD_MAX_CHARS)
+
+
+def _rejoin_particle_heads(segments: list) -> list:
+    """割れた文の頭（助詞から最初の読点まで）を、前のセグメントの尻に戻す。元のリストは変えない。"""
+    out = []
+    for seg in segments:
+        try:
+            text = seg.get("text") if isinstance(seg, dict) else None
+            prev = out[-1].get("text") if out and isinstance(out[-1], dict) else None
+            if (isinstance(text, str) and isinstance(prev, str) and text[:1] in _HEAD_PARTICLES
+                    and prev.rstrip() and prev.rstrip()[-1] not in SENTENCE_END + _LEAD_PUNCT):
+                m = _HEAD_RE.match(text)
+                if m:
+                    out[-1] = {**out[-1], "text": prev.rstrip() + m.group(0)}
+                    seg = {**seg, "text": text[m.end():].lstrip("、,， 　")}
+        except Exception:  # 読めないセグメントはそのまま（整形の本体が扱う）
+            pass
+        out.append(seg)
+    return out
+
+
 def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -> list[dict]:
     """
     セグメントリストにテキスト整形を適用する。
@@ -653,6 +679,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
             max_chars = MAX_CHARS_PER_LINE
 
     max_lines = get_max_lines_from_template()
+    segments = _rejoin_particle_heads(segments)
     lead_words = _omit_words("omit_lead_words")
     bare_words = _omit_words("omit_lead_words_bare")
     formatted = []

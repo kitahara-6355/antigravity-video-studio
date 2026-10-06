@@ -214,6 +214,27 @@ def _call(client: Any, model: str, audio: Path, duration: float) -> tuple[str, s
 ECHO_MAX_CHARS = 8
 
 
+# 日本語どうしの間の半角空白（と、日本語の後ろの「?」「!」の前の空白）
+_SPACED = re.compile(r"(?<=[^\x00-\x7f]) +(?=(?:[^\x00-\x7f]|[?!]))")
+
+
+def join_spaced_words(segments: list[dict]) -> list[dict]:
+    """語ごとに空白で区切って起こされた文（「久田 先生 って 普段」）を詰める。
+
+    起こし直した区切りがこの形で返ることがある（2026-10-06 実測）。校閲が詰めなかった回は
+    字幕に「人 な\nん だろ うっ て」と出た。英字の語の間の空白は残す。
+    """
+    out = []
+    for seg in segments:
+        text = seg.get("text") if isinstance(seg, dict) else None
+        if isinstance(text, str) and " " in text:
+            joined = _SPACED.sub("", text)
+            if joined != text:
+                seg = {**seg, "text": joined}
+        out.append(seg)
+    return out
+
+
 def drop_boundary_echoes(segments: list[dict], chunk_sec: float = CHUNK_SEC) -> list[dict]:
     """区切り（chunk_sec 秒ごと）の頭のセグメントが、直前のセグメントの尻尾の繰り返しなら除く。
 
@@ -312,7 +333,7 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                 if _is_sparse(results[i][0], speech, offset, dur):
                     quiet.append((round(offset, 2), round(offset + dur, 2)))
 
-    segments = drop_boundary_echoes([s for segs, _ in results for s in segs], chunk_sec)
+    segments = drop_boundary_echoes(join_spaced_words([s for segs, _ in results for s in segs]), chunk_sec)
     if not segments:
         raise TranscriptionError("発話が1件も起こせませんでした")
     used = sorted({u for _, u in results})
