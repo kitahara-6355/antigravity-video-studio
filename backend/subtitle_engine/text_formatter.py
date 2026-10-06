@@ -392,6 +392,12 @@ def _phrases(text: str, max_chars: int) -> list[str]:
             phrases[-1] = phrases[-1][:-1]
             if not phrases[-1]:
                 phrases.pop()
+        # 漢字1字だけの文節は、漢字で終わる前の文節に付ける。BudouX は熟語の末尾を
+        # 分けることがある（「一般社団法｜人」が「一般社団法\n人…」の折り目になった）
+        if (len(part) == 1 and _script(part) == "kanji" and phrases and phrases[-1]
+                and _script(phrases[-1][-1]) == "kanji" and len(phrases[-1]) < max_chars):
+            phrases[-1] += part
+            continue
         if part:
             phrases.extend(_split_long_phrase(part, max_chars))
     return phrases

@@ -216,3 +216,14 @@ def test_filler_only_caption_is_not_shown(text, expected):
     # 実例（4分02秒）: 「あの」だけの字幕が 0.9 秒出た。音声認識にも聞こえていない
     from template_constants import _DEFAULT_SUBTITLE_RULES as rules
     assert tf.is_standalone_omittable(text, rules["omit_standalone_words"]) is expected
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_lone_kanji_is_not_split_from_its_compound():
+    # 実例（56 秒）: BudouX が「一般社団法人」を「一般社団法｜人」と分け、
+    # 行の折り目が「一般社団法\n人日本デザイン…」になった
+    caps = tf.split_into_captions(
+        "を主宰されていて、そして、一般社団法人日本デザイン書道作家協会の理事長で", 18, 2)
+    lines = [line for c in caps for line in c.split("\n")]
+    assert not any(line.startswith("人") for line in lines)
+    assert any("一般社団法人" in line for line in lines)
