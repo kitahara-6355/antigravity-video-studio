@@ -750,6 +750,12 @@ def _rejoin_split_heads(segments: list) -> list:
                 # 起こしの窓の重なりで前の尻が繰り返された頭（「…問題はっていう。」「っていう…」）は捨てる
                 echo = _echo_len(base, cur) if _is_bound(cur) else 0
                 n = 0 if echo else _split_head(base, cur, parser)
+                if n and not _is_bound(cur):
+                    # 戻す助詞が前の尻にもう付いている（校閲が「あと」を「あとは」に直し、後ろの
+                    # 「は有名な…」が残った。戻すと「あとはは」になる・13 分 43 秒の実例）なら、後ろの頭を捨てる
+                    dup = next((m for m in range(min(n, 3), 0, -1) if base.endswith(cur[:m])), 0)
+                    if dup:
+                        echo, n = dup, 0
                 if echo or n:
                     if n and _is_bound(cur):
                         base = base.rstrip(_HEAD_PUNCT)

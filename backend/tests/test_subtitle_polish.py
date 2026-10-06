@@ -359,3 +359,15 @@ def test_a_title_split_from_the_name_goes_back(stop):
 def test_nouns_next_to_each_other_without_a_comma_stay_apart():
     segs = [{"start": 0.0, "end": 1.0, "text": "東京"}, {"start": 1.5, "end": 4.0, "text": "大阪に行きました"}]
     assert [s["text"] for s in tf.format_segments(segs, 18)] == ["東京", "大阪に行きました"]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_particle_the_previous_segment_already_has_is_not_doubled():
+    # 13 分 43 秒の実例: 校閲が前の「…とかあと」を「…とかあとは」に直し、後ろに「は有名な…」が残った。
+    # 頭を前に戻すと「あとはは」になった
+    segs = [{"start": 0.0, "end": 2.0, "text": "ね、コラボしたりとかあとは"},
+            {"start": 2.0, "end": 5.0, "text": "は有名なフォントがあるじゃないですか、先生。"}]
+    texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
+    assert not any("あとはは" in t for t in texts)
+    assert not any(t.startswith("は有名") for t in texts)
+    assert any(t.endswith("コラボしたりとかあとは") for t in texts)
