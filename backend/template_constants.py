@@ -14,9 +14,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["ドキュメンタリー", "教育", "解説", "インタビュー"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            # 1行の文字数。日本語の放送・配信は 13〜15 が目安だが、1280px の画面では 20 でも収まる。
-    # 15 だと意味の塊を割りやすかったので 18 にした（2026-10-06 ユーザー了承）
-    "max_chars_per_line": 18,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 2,
             "lead_frames": 3,
             "trail_frames": 5,
@@ -50,9 +48,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["エンタメ", "チャレンジ", "企画", "バラエティ"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            # 1行の文字数。日本語の放送・配信は 13〜15 が目安だが、1280px の画面では 20 でも収まる。
-    # 15 だと意味の塊を割りやすかったので 18 にした（2026-10-06 ユーザー了承）
-    "max_chars_per_line": 18,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 2,
             "lead_frames": 2,
             "trail_frames": 3,
@@ -88,9 +84,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["Vlog", "トーク", "商品レビュー", "日常"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            # 1行の文字数。日本語の放送・配信は 13〜15 が目安だが、1280px の画面では 20 でも収まる。
-    # 15 だと意味の塊を割りやすかったので 18 にした（2026-10-06 ユーザー了承）
-    "max_chars_per_line": 18,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 2,
             "lead_frames": 3,
             "trail_frames": 5,
@@ -125,9 +119,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["ASMR", "リラクゼーション", "睡眠", "環境音"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            # 1行の文字数。日本語の放送・配信は 13〜15 が目安だが、1280px の画面では 20 でも収まる。
-    # 15 だと意味の塊を割りやすかったので 18 にした（2026-10-06 ユーザー了承）
-    "max_chars_per_line": 18,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 1,
             "lead_frames": 4,
             "trail_frames": 8,

@@ -1,5 +1,9 @@
 import pytest
 from backend.template_config import TemplateConfigProvider
+from backend.template_constants import _DEFAULT_SUBTITLE_RULES
+
+# 1行の文字数は 2026-10-06 に 15→18 へ変えた。数字は定義側の1か所だけに置く
+DEFAULT_LINE = _DEFAULT_SUBTITLE_RULES["max_chars_per_line"]
 
 def test_template_config_default():
     provider = TemplateConfigProvider()
@@ -9,10 +13,10 @@ def test_template_config_default():
     # デフォルト値の確認
     rules = provider.get_subtitle_rules()
     assert rules["chars_per_second"] == 4
-    assert rules["max_chars_per_line"] == 15
+    assert rules["max_chars_per_line"] == DEFAULT_LINE
     assert rules["max_lines"] == 2
     
-    assert provider.get_max_chars_per_line() == 15
+    assert provider.get_max_chars_per_line() == DEFAULT_LINE
     assert provider.get_chars_per_second() == 4.0
     assert provider.get_min_display_seconds() == 1.2
     
@@ -151,7 +155,7 @@ def test_edge_cases_and_type_coercion():
     
     rules = provider.get_subtitle_rules()
     assert rules["chars_per_second"] == 4.0
-    assert rules["max_chars_per_line"] == 15
+    assert rules["max_chars_per_line"] == DEFAULT_LINE
     assert rules["max_lines"] == 3
     assert rules["safe_area_margin_percent"] == 2.0
     assert rules["font_size_min_px"] == 8
@@ -170,7 +174,7 @@ def test_edge_cases_and_type_coercion():
     assert qb["audio_loudness_lufs"] == -16.0
     
     # get_max_chars_per_line etc.
-    assert provider.get_max_chars_per_line() == 15
+    assert provider.get_max_chars_per_line() == DEFAULT_LINE
     assert provider.get_chars_per_second() == 4.0
     assert provider.get_min_display_seconds() == 1.2
     
@@ -262,7 +266,7 @@ def test_template_config_coverage_gap():
         "chars_per_second": object(),
         "min_display_seconds": object()
     }
-    assert provider.get_max_chars_per_line() == 15
+    assert provider.get_max_chars_per_line() == DEFAULT_LINE
     assert provider.get_chars_per_second() == 4.0
     assert provider.get_min_display_seconds() == 1.2
     
