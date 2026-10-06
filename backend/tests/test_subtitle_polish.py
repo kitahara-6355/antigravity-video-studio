@@ -464,3 +464,40 @@ def test_a_particle_the_previous_segment_already_has_is_not_doubled():
     assert not any("あとはは" in t for t in texts)
     assert not any(t.startswith("は有名") for t in texts)
     assert any(t.endswith("コラボしたりとかあとは") for t in texts)
+
+
+def _junctions(captions):
+    """字幕の切れ目と行の折り目の前後（前の行, 次の行）を、句読点を外した形で並べる。"""
+    lines = [ln for c in captions for ln in tf.strip_punctuation(c).split("\n")]
+    return list(zip(lines, lines[1:]))
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,head,helper", [
+    # 26回目の 27 秒: 「…お届けして」と「まいります」が別の字幕になり、「まいります」が 0.8 秒だけ出た
+    ("手書きの文字に込められた人生観や書道の魅力を皆様にお届けしてまいります。", "お届けして", "まいります"),
+    # 61 秒: 「…理事長で」と「いらっしゃいまして」が別の字幕になった
+    ("一般社団法人日本デザイン書道作家協会の理事長でいらっしゃいまして、", "理事長で", "いらっしゃいまして"),
+    ("大切にされている言葉をこれから先生に書いていただきます。", "書いて", "いただきます"),
+    ("今でもその当時の教室のことをはっきりと覚えております。", "覚えて", "おります"),
+])
+def test_a_helper_verb_stays_with_the_verb_it_helps(text, head, helper):
+    # 「て・で」の後ろの補助の動詞（まいる・いらっしゃる・いただく・おる）は前の動詞とひと塊。
+    # 字幕の切れ目でも行の折り目でも、そこでは割らない
+    caps = tf.split_into_captions(text, 18, 2, trim=True)
+    assert not any(a.endswith(head) and b.startswith(helper) for a, b in _junctions(caps)), caps
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_the_quoting_tte_stays_with_iu():
+    # 76 秒: 「…出会ったきっかけって」/「いうのは…」と折れた
+    caps = tf.split_into_captions("最初に書に出会ったきっかけっていうのはなんかありますでしょうか？", 18, 2, trim=True)
+    assert not any(a.endswith("って") and b.startswith("いう") for a, b in _junctions(caps)), caps
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_te_followed_by_a_new_verb_may_still_be_split():
+    # 補助の動詞でなければ「て」の後ろは切ってよい所のまま（「書いて、/送ってくれた」）
+    assert tf._break_score("書いて", "送ってくれた") > 0
+    assert tf._break_score("お届けして", "まいります。") < 0
+

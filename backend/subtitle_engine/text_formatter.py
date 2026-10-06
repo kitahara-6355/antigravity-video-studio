@@ -317,6 +317,18 @@ _GOOD_TAILS = ("から", "けど", "ので", "のに", "ため", "って", "で�
                "は", "て", "で", "し", "ね", "よ", "な")
 # 格助詞の直後は、次の動詞とひと塊のことが多い（「書を|通して」）ので弱め（1点）
 _WEAK_TAILS = ("を", "に", "が", "と", "へ", "も", "や")
+# 「て」の後ろに付く補助の動詞。前の動詞とひと塊なので、その手前では割らない
+# （26回目の 27 秒「お届けして|まいります」で「まいります」だけが 0.8 秒出た・2026-10-06）
+_HELPERS_AFTER_TE = ("いる", "いま", "いた", "いて", "いな", "いれ", "いく", "いき", "いっ", "いか", "いこ",
+                     "おる", "おり", "おっ", "おら", "まい", "いただ", "いらっしゃ", "くれ", "くだ",
+                     "もら", "しま", "おく", "おき", "みる", "みま", "みた", "みて", "みよ",
+                     "くる", "きた", "きま", "きて", "こな", "ある", "あり", "あっ", "ござ", "ほし",
+                     "あげ", "さしあげ", "頂", "下さ", "参り", "参る", "貰", "欲し", "差し上げ")
+# 名詞の後ろの「で」に付くもの（「理事長で|いらっしゃいまして」「先生で|あります」）
+_HELPERS_AFTER_DE = ("いらっしゃ", "ござ", "ある", "あり", "あっ", "いる", "いま")
+# 引用の「って・と」と「いう」はひと塊（「きっかけって|いうのは」）
+_QUOTE_TAILS = ("って", "と")
+_QUOTE_HEADS = ("いう", "いっ", "いい", "言う", "言っ", "言い")
 
 _budoux_parser = None
 
@@ -333,8 +345,21 @@ def _phrase_parser():
     return _budoux_parser or None
 
 
-def _break_score(phrase: str) -> int:
-    """この文節の**後ろで**切るときの良さ。大きいほど自然。"""
+def _binds_to_next(p: str, nxt: str) -> bool:
+    """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」）か。"""
+    nxt = nxt.lstrip()
+    if not nxt:
+        return False
+    if p.endswith(_QUOTE_TAILS) and nxt.startswith(_QUOTE_HEADS):
+        return True
+    # 動詞の「て・で」（書いて・読んで・泳いで）と、名詞の後ろの「で」で、付くものが違う
+    if p.endswith("て") or p.endswith(("んで", "いで")):
+        return nxt.startswith(_HELPERS_AFTER_TE)
+    return p.endswith("で") and nxt.startswith(_HELPERS_AFTER_DE)
+
+
+def _break_score(phrase: str, nxt: str = "") -> int:
+    """この文節の**後ろで**切るときの良さ。大きいほど自然。nxt は次の文節（あれば見る）。"""
     p = phrase.rstrip()
     if not p:
         return 0
@@ -346,6 +371,10 @@ def _break_score(phrase: str) -> int:
         return 4
     if p in _ADNOMINALS or p.endswith("の"):
         return -3  # 「この|チャンネル」「人々の|心に」は割らない
+    if _binds_to_next(p, nxt):
+        # 「お届けして|まいります」「きっかけって|いうのは」は割らない。「の」の後ろ（「協会の|理事長で
+        # いらっしゃいまして」）より悪い
+        return -4
     if p.endswith(_GOOD_TAILS):
         return 2
     if p.endswith(_WEAK_TAILS):
@@ -472,6 +501,10 @@ def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int, trim: bool =
         head = "".join(phrases[:i])
         if _line_len(head, trim) > max_chars:
             break
+        if _binds_to_next(ph.rstrip(), phrases[i]):
+            # 補助の動詞・「っていう」の手前では折らない。ほかに折れなければ字幕の方を分ける
+            # （76 秒「きっかけって/いうのは」・2026-10-06）
+            continue
         tail = _wrap_lines(phrases[i:], max_chars, max_lines - 1, trim)
         if tail is None:
             continue
@@ -479,7 +512,7 @@ def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int, trim: bool =
         # 1〜2字だけの行は、ほかに折り方が無いときだけ（「が」/「もう1個別の…」・2026-10-06 実測）
         short = _line_len(head, trim) <= 2 or ("\n" not in tail[0] and _line_len(tail[0], trim) <= 2)
         # 区切りの良さを優先し、同じなら行の長さが揃う方
-        key = (_break_score(ph) + tail[1] - 6 * short, -abs(acc - rest))
+        key = (_break_score(ph, phrases[i]) + tail[1] - 6 * short, -abs(acc - rest))
         if best is None or key > best[0]:
             best = (key, "".join(phrases[:i]) + "\n" + tail[0])
     if best is None:
@@ -521,7 +554,7 @@ def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
                 if wrapped is None:
                     continue
                 whole = n == len(rest)
-                cut_score = 9 if whole else _break_score(rest[n - 1])
+                cut_score = 9 if whole else _break_score(rest[n - 1], rest[n])
                 long_enough = whole or acc >= capacity * 0.4
                 # 字幕の切れ目は行の折り目より優先する。「この対談では、/各界で」＋
                 # 「ご活躍されている方を」のように、字幕の途中で文節をまたがせない
@@ -550,7 +583,7 @@ def _semantic_line_break(text: str) -> str | None:
         acc += len(ph)
         if not 2 < acc < len(text) - 2:
             continue
-        key = (_break_score(ph), -abs(acc - (len(text) - acc)))
+        key = (_break_score(ph, phrases[i]), -abs(acc - (len(text) - acc)))
         if best is None or key > best[0]:
             best = (key, acc)
     if best is None or best[0][0] < 1:  # 「の」の後や語の途中では折らない
