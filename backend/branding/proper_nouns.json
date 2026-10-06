@@ -61,7 +61,7 @@
       "type": "term",
       "context_hint": "久木田先生の専門分野",
       "confirmed": true,
-      "usage_count": 291,
+      "usage_count": 285,
       "created_at": "2026-01-17T20:07:00Z"
     },
     {
@@ -71,7 +71,7 @@
       "type": "organization",
       "context_hint": "久木田先生が理事長",
       "confirmed": true,
-      "usage_count": 73,
+      "usage_count": 72,
       "created_at": "2026-01-17T20:07:00Z"
     },
     {
@@ -191,7 +191,7 @@
       "type": "term",
       "context_hint": "広告向け書道",
       "confirmed": true,
-      "usage_count": 20,
+      "usage_count": 19,
       "created_at": "2026-01-17T20:07:00Z"
     },
     {
@@ -211,7 +211,7 @@
       "type": "person_name",
       "context_hint": "久木田先生の幼馴染",
       "confirmed": true,
-      "usage_count": 19,
+      "usage_count": 18,
       "created_at": "2026-01-17T20:07:00Z"
     },
     {
@@ -291,7 +291,7 @@
       "type": "person_name",
       "context_hint": "書家名の別の誤認識パターン",
       "confirmed": true,
-      "usage_count": 1,
+      "usage_count": 0,
       "created_at": "2026-04-01T07:00:00Z"
     },
     {
@@ -301,7 +301,7 @@
       "type": "organization",
       "context_hint": "久木田先生主催の書道塾",
       "confirmed": true,
-      "usage_count": 18,
+      "usage_count": 17,
       "created_at": "2026-04-01T07:00:00Z"
     },
     {
@@ -311,7 +311,7 @@
       "type": "word_context",
       "context_hint": "書道用語: 書を選ぶ",
       "confirmed": false,
-      "usage_count": 17,
+      "usage_count": 16,
       "created_at": "2026-04-01T07:00:00Z"
     },
     {
@@ -1981,7 +1981,7 @@
       "type": "word",
       "context_hint": "「第1回」の意味（Gemini の誤変換・2026-10-06 ユーザー指摘）",
       "confirmed": true,
-      "usage_count": 1,
+      "usage_count": 0,
       "created_at": "2026-10-06T09:00:00Z"
     },
     {
