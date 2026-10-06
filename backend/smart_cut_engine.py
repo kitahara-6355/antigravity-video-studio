@@ -259,11 +259,27 @@ def _display_span(seg: dict) -> tuple[float, float]:
     return src_start, src_end
 
 
-def _align_to_speech(cut_path, segments, cut_points):
-    """カット後の動画の音声で字幕の時刻を合わせる。音声が読めなければそのまま返す。"""
+def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=None):
+    """字幕の時刻を音声に合わせる。音声が読めなければそのまま返す。
+
+    1. 素材を音声認識して**文字ごとの時刻**を取り、字幕の文字と突き合わせる
+       （モデルが無ければ飛ばす）
+    2. 残り（突き合わなかった字幕）を、声の切れ目と見せ方の規則で整える
+    """
     try:
         if not segments or not Path(cut_path).is_file() or Path(cut_path).stat().st_size == 0:
             return segments
+        if source_path:
+            try:
+                from subtitle_engine import aligner
+                tokens = aligner.tokens_for(str(source_path))
+                if tokens:
+                    n = aligner.align_captions(segments, aligner.to_output(tokens, ranges or []))
+                    m = aligner.interpolate_unaligned(segments)
+                    logger.info(f"🎯 音声認識で時刻を合わせた字幕: {n}枚（間に配り直し {m}枚）"
+                                f"/ 全 {len(segments)}枚")
+            except Exception as e:
+                logger.warning(f"音声認識による時刻合わせをスキップ: {e}")
         from subtitle_engine import sync
         aligned, _ = sync.align_segments(segments, sync.speech_map(str(cut_path)),
                                          cut_points, sync.timing_rules())
@@ -480,7 +496,8 @@ def render_smart_cut(
 
         # 字幕の出だし・終わりを、カット後の音声の話し始め・話し終わりに合わせる
         # （2026-10-06 ユーザー指摘「言葉より先に出すぎる」）。文字起こしの時刻は粗い推定
-        recalculated_segments = _align_to_speech(temp_cut_path, recalculated_segments, cut_points)
+        recalculated_segments = _align_to_speech(temp_cut_path, recalculated_segments, cut_points,
+                                                 source_path=input_path, ranges=merged)
 
         # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
         # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）

@@ -19,3 +19,6 @@ requests
 pillow
 websockets
 python-multipart
+# 字幕の時刻合わせ（文字ごとの時刻を取る・CPU・無料）。モデルは
+# python -m backend.subtitle_engine.aligner --setup で取得する
+sherpa-onnx
