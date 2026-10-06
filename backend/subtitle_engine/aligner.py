@@ -223,20 +223,56 @@ def _heard_ratio(text: str, heard: str) -> float:
 
 
 TRIM_CONTEXT = 4  # 足された字の前後で、認識と照らし合わせる文字数
+# 置き換えを戻すのは、元の語がこれだけの長さ（そろえた文字数）からにする。
+# 1文字の置き換え（助詞の「が」→「は」）は認識で決め切れない
+SWAP_MIN_CHARS = 2
+# 置き換えの前後に付けて認識と照らし合わせる文字数と、照らし合わせる長さの下限
+SWAP_CONTEXT = 1
+SWAP_MIN_PROBE = 3
 
 
-def drop_unheard_insertions(original: str, corrected: str, heard: str) -> str:
-    """校閲が元の文に足した字のうち、音声認識が「足さない形」で聞いているものを戻す。
+def _is_kanji(ch: str) -> bool:
+    return "\u4e00" <= ch <= "\u9fff" or ch in "々〇"
 
-    置き換え（「読んで」→「呼んで」）と削除（フィラー）は触らない。認識が前後を
-    聞き取れていない所も触らない。heard は `_norm_text` 済みの認識の文字。
+
+def _is_kana(ch: str) -> bool:
+    return "\u3041" <= ch <= "\u30ff"
+
+
+def _keeps_the_sound(old: str, new: str) -> bool:
+    """音を変えない（かもしれない）置き換え。認識では裁かない（`_norm_text` 済みの文字で見る）。
+
+    - 同じ長さの漢字どうし（「読」→「呼」「会」→「回」「始」→「初」）は同音の直しかもしれない。
+      認識も漢字を選ぶので、同じ誤りを聞くことがある
+    - かなを漢字にする（「たんじゅん」→「単純」「みれ」→「美麗」）のは変換の直し
+    """
+    if len(old) == len(new) and all(map(_is_kanji, old + new)):
+        return True
+    return all(map(_is_kana, old)) and any(map(_is_kanji, new))
+
+
+def _heard_in(heard: str, left: str, word: str, right: str) -> bool:
+    """word を前後の1文字と合わせて、認識の文字の中に聞いたか。"""
+    probes = [p for p in (left + word, word + right) if len(p) >= SWAP_MIN_PROBE]
+    return any(p in heard for p in probes)
+
+
+def drop_unheard_edits(original: str, corrected: str, heard: str, keep=()) -> str:
+    """校閲の直しのうち、音声認識と食い違うものを戻す。heard は `_norm_text` 済みの認識の文字。
+
+    - 足し: 認識が「足さない形」で聞いているものを戻す（「最初に書に」→「最初にな書に」）
+    - 置き換え: 認識が元の語をそのまま聞いていて、直した語を聞いていなければ戻す
+      （「私が手がけた仕事」→「私がつなげた仕事」・29分00秒、「第1回め」→「初回め」・37分16秒）。
+      音を変えないかもしれない直し（同音の漢字・かなを漢字に）と、辞書どおりの直し（keep の
+      (誤, 正) のうち、元の文に「誤」があり、直した所が「正」に掛かるもの）は戻さない
+    - 削除（フィラー）は触らない。認識が前後を聞き取れていない所も触らない
     """
     if not heard or not corrected:
         return corrected
     base = "".join(ch for ch in original or "" if ch not in " 　")
     sm = difflib.SequenceMatcher(None, base, corrected, autojunk=False)
     out = []
-    for op, _i1, _i2, j1, j2 in sm.get_opcodes():
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
         if op == "insert":
             added = _norm_text(corrected[j1:j2])
             left = _norm_text(corrected[:j1])[-TRIM_CONTEXT:]
@@ -244,16 +280,50 @@ def drop_unheard_insertions(original: str, corrected: str, heard: str) -> str:
             if (added and len(left) + len(right) >= TRIM_CONTEXT
                     and left + right in heard and left + added + right not in heard):
                 continue
+        elif op == "replace" and _contradicted(base, corrected, i1, i2, j1, j2, heard, keep):
+            out.append(base[i1:i2])
+            continue
         out.append(corrected[j1:j2])
     return "".join(out)
+
+
+def _contradicted(base, corrected, i1, i2, j1, j2, heard, keep) -> bool:
+    """置き換え base[i1:i2] → corrected[j1:j2] を、認識が打ち消しているか。"""
+    old, new = _norm_text(base[i1:i2]), _norm_text(corrected[j1:j2])
+    if len(old) < SWAP_MIN_CHARS or not new or old == new or _keeps_the_sound(old, new):
+        return False
+    for wrong, term in keep or ():
+        # 辞書どおりの直しだけ。辞書の語（「初回」）を作っただけの直し（「第1回」→「初回」）は裁く
+        if not wrong or not term or wrong not in base:
+            continue
+        k = corrected.find(term)
+        while k != -1:
+            if k < j2 and j1 < k + len(term):  # 直した所が辞書の語に掛かる
+                return False
+            k = corrected.find(term, k + 1)
+    left = _norm_text(corrected[:j1])[-SWAP_CONTEXT:]
+    right = _norm_text(corrected[j2:])[:SWAP_CONTEXT]
+    return _heard_in(heard, left, old, right) and not _heard_in(heard, left, new, right)
+
+
+def _dictionary_terms() -> tuple:
+    """辞書の (誤, 正) の組（校閲が辞書どおりに直した語は、認識が違って聞いても戻さない）。"""
+    try:
+        from proper_noun_dict import proper_noun_dict
+        return tuple(sorted({(str(e.get("incorrect") or ""), str(e.get("correct") or ""))
+                             for e in proper_noun_dict.get_all_entries()
+                             if e.get("incorrect") and e.get("correct")}))
+    except Exception:  # 辞書が読めなくても裁く
+        return ()
 
 
 class Referee:
     """校閲の直しを音声認識の文字で確かめる。segment の start/end は素材の時間軸。"""
 
-    def __init__(self, tokens: list[tuple[str, float]]):
+    def __init__(self, tokens: list[tuple[str, float]], keep=None):
         self._tokens = tokens
         self._times = [t for _, t in tokens]
+        self._keep = keep
 
     def heard(self, segment: dict) -> str:
         """その行の時刻の前後で認識した文字（`_norm_text` 済み）。"""
@@ -279,14 +349,19 @@ class Referee:
         return after >= REFEREE_MIN and after >= before + REFEREE_MARGIN
 
     def trim(self, segment: dict, corrected: str) -> str:
-        """直しのうち、誰も言っていない足し（「最初に書に」→「最初にな書に」）を戻す。"""
-        return drop_unheard_insertions(str(segment.get("text") or ""), corrected,
-                                       self.heard(segment))
+        """直しのうち、声と食い違うもの（誰も言っていない足し・言った語と違う語への置き換え）を戻す。"""
+        if self._keep is None:
+            self._keep = _dictionary_terms()
+        return drop_unheard_edits(str(segment.get("text") or ""), corrected,
+                                  self.heard(segment), self._keep)
 
 
-def referee_from_tokens(tokens: list[tuple[str, float]]) -> Referee:
-    """校閲の直しを音声認識で確かめる `Referee` を作る（judge(segment, corrected) -> bool）。"""
-    return Referee(tokens)
+def referee_from_tokens(tokens: list[tuple[str, float]], keep=None) -> Referee:
+    """校閲の直しを音声認識で確かめる `Referee` を作る（judge(segment, corrected) -> bool）。
+
+    keep は戻さない直し（辞書の (誤, 正) の組）。None なら辞書から読む。
+    """
+    return Referee(tokens, keep)
 
 
 def referee_for(media: str):

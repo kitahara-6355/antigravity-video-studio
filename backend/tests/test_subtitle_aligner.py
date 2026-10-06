@@ -206,6 +206,51 @@ def test_replacements_are_not_trimmed():
     assert ref.trim(seg, "もう初回ね。呼んでいただいて。") == "もう初回ね。呼んでいただいて。"
 
 
+def test_a_replacement_that_changes_what_was_said_is_undone():
+    # 実例（29分00秒）: 校閲が「私が手がけた仕事」を「私がつなげた仕事」にした。認識も「手がけた」
+    ref = aligner.referee_from_tokens(toks("デザイン書道講座私が手がけた仕事をそれこそ", 1953.0), keep=())
+    seg = {"start": 1954.4, "end": 1958.0, "text": "私が手がけた仕事"}
+    assert ref.trim(seg, "私がつなげた仕事") == "私が手がけた仕事"
+
+
+def test_only_the_replacement_the_audio_contradicts_is_undone():
+    # 実例（37分16秒）: 「第1回め」→「初回め」は戻し、「ミレ」→「美麗」（かなを漢字に）は残す
+    ref = aligner.referee_from_tokens(
+        toks("今日ね初めての初めてはい第一回目のミレチャンネルのゲストとして来て頂いたんですが",
+             2567.6, 0.15), keep=())
+    seg = {"start": 2569.4, "end": 2574.3,
+           "text": "始めてですね、第1回めのミレチャンネルのゲストとして出ていただいたんですが、"}
+    got = ref.trim(seg, "始めてですね、初回めの美麗チャンネルのゲストとして出ていただいたんですが、")
+    assert got == "始めてですね、第1回めの美麗チャンネルのゲストとして出ていただいたんですが、"
+
+
+def test_kana_turned_into_kanji_is_kept():
+    ref = aligner.referee_from_tokens(toks("すごいたんじゅんな形", 10.0), keep=())
+    seg = {"start": 10.0, "end": 12.0, "text": "すごいたんじゅんな形"}
+    assert ref.trim(seg, "すごい単純な形") == "すごい単純な形"
+
+
+def test_a_dictionary_fix_is_kept_even_if_the_recogniser_heard_it_wrong():
+    ref = aligner.referee_from_tokens(toks("株式会社バドシアター代表で", 10.0),
+                                      keep=(("バドシアター", "アドシアター"),))
+    seg = {"start": 10.0, "end": 12.0, "text": "株式会社バドシアター代表で"}
+    assert ref.trim(seg, "株式会社アドシアター代表で") == "株式会社アドシアター代表で"
+
+
+def test_making_a_dictionary_word_without_its_wrong_form_is_still_judged():
+    # 実例（37分16秒）: 辞書に「初会」→「初回」があるが、元の文は「第1回め」。辞書どおりの直しではない
+    ref = aligner.referee_from_tokens(toks("はい第一回目のゲストとして", 10.0),
+                                      keep=(("初会", "初回"),))
+    seg = {"start": 10.0, "end": 12.0, "text": "第1回めのゲストとして"}
+    assert ref.trim(seg, "初回めのゲストとして") == "第1回めのゲストとして"
+
+
+def test_a_replacement_the_recogniser_did_not_hear_either_way_is_kept():
+    ref = aligner.referee_from_tokens(toks("それこそこういう考え", 10.0), keep=())
+    seg = {"start": 10.0, "end": 12.0, "text": "鬼滅の槍がすごい"}
+    assert ref.trim(seg, "鬼滅の刃がすごい") == "鬼滅の刃がすごい"
+
+
 def test_nothing_is_trimmed_where_the_recogniser_heard_nothing():
     ref = aligner.referee_from_tokens(toks("まったく別の話", 300.0))
     seg = {"start": 70.0, "end": 76.0, "text": "最初に書に出会った"}
