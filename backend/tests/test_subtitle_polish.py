@@ -247,11 +247,16 @@ def test_word_spaced_transcript_is_joined():
     from subtitle_engine import gemini_transcriber as gt
     segs = [{"start": 0.0, "end": 2.0, "text": "さん 、 久田 先生 って 普段 どんな 人 な ん だろ うっ て 、"},
             {"start": 2.0, "end": 3.0, "text": "オフ の 人 か は 何 し てる ん です か ?"},
-            {"start": 3.0, "end": 4.0, "text": "YouTube の チャンネル"}]
+            {"start": 3.0, "end": 4.0, "text": "YouTube の チャンネル"},
+            # 77 秒の実例: 数字の両側の空白が残り、字幕に「小学校 3 年生」と出た
+            {"start": 4.0, "end": 6.0, "text": "私 は あの 、 小 学校 3 年 生 の 時 に"},
+            {"start": 6.0, "end": 7.0, "text": "僕 が 入っ て 23 ぐらい の 時 かな"}]
     out = gt.join_spaced_words(segs)
     assert out[0]["text"] == "さん、久田先生って普段どんな人なんだろうって、"
     assert out[1]["text"] == "オフの人かは何してるんですか?"
     assert out[2]["text"] == "YouTube のチャンネル"
+    assert out[3]["text"] == "私はあの、小学校3年生の時に"
+    assert out[4]["text"] == "僕が入って23ぐらいの時かな"
     assert segs[0]["text"].startswith("さん 、")  # 元のリストは書き換えない
 
 

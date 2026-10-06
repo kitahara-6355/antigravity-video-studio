@@ -215,7 +215,8 @@ ECHO_MAX_CHARS = 8
 
 
 # 日本語どうしの間の半角空白（と、日本語の後ろの「?」「!」の前の空白）
-_SPACED = re.compile(r"(?<=[^\x00-\x7f]) +(?=(?:[^\x00-\x7f]|[?!]))")
+# 数字の両側の空白も詰める（「小学校 3 年生」・2026-10-06 実測）。英字の語との間（「YouTube の」）は残す
+_SPACED = re.compile(r"(?<=[^\x00-\x7f]) +(?=(?:[^\x00-\x7f]|[?!0-9]))|(?<=[0-9]) +(?=[^\x00-\x7f])")
 
 
 def join_spaced_words(segments: list[dict]) -> list[dict]:
