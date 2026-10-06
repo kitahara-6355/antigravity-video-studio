@@ -65,6 +65,31 @@ def _build_proper_noun_context() -> str:
 
 
 
+# 直した文が元の文とこれ以上似ていなければ、別の行の文とみなして捨てる
+MIN_SIMILARITY = 0.5
+SHORT_LINE = 5
+
+
+def _plausible_correction(original: str, corrected: str) -> bool:
+    """校閲の直しが、同じ行の文の直しとして妥当か（番号ずれ・行の入れ替えを弾く）。
+
+    句読点と空白を除いて比べる。フィラーを消しただけの短縮は通す（直した文が元の文に含まれる）。
+    """
+    import difflib
+
+    def norm(t):
+        return "".join(ch for ch in str(t) if ch not in "、。，．,. 　\n「」『』！？!?")
+
+    a, b = norm(original), norm(corrected)
+    if not a or not b or a == b:
+        return True
+    if b in a:  # 消しただけ
+        return True
+    if max(len(a), len(b)) <= SHORT_LINE:  # 短い行どうしは比べても決まらない
+        return True
+    return difflib.SequenceMatcher(None, a, b).ratio() >= MIN_SIMILARITY
+
+
 def proofread_segments(segments, update_callback=None, return_stats=False):
     """
     Gemini APIを使用して字幕セグメントを校閲
@@ -197,8 +222,10 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
 3. **自然な日本語**: 文末が不自然な助詞で終わっている場合、自然な言い切りや継続する形に修正してください。
 4. **読みやすさ**: 意味を変えずに、字幕として読みやすい長さに調整してください。
 5. **同音異義語の誤変換**: 音は合っているが文脈に合わない漢字を、前後の流れから正してください
-   （例: ゲストを招いた場面の「読んでいただいて」→「呼んでいただいて」、初めての回の「初会」→「初回」）。
-   辞書の「文脈で判断」の項目も同じ扱いです。
+   （例: ゲストを招いた場面の「読んでいただいて」→「呼んでいただいて」、「もう初会ね」→「もう初回ね」）。
+   辞書の「文脈で判断」の項目も同じ扱いです。誤りでない語は言い換えないでください。
+6. **行の対応を崩さない**: 各行は同じ index の行だけを直してください。行をまとめたり、
+   別の行の文を移したりしないでください。直す所が無い行も、そのままの文で返してください。
 
 {proper_noun_context}
 
@@ -377,6 +404,15 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                             logger.warning(f"AI Proofreader: Ignored item with non-string text: {item}")
                             continue
 
+                        # 番号ずれの検知: 元の文とかけ離れた直しは採らない（2026-10-06 実走で、AI が
+                        # 短い行「います。」を前に寄せ、以降の文を1つずつ前の行に詰めて返した。
+                        # 字幕が前の発話の時刻に出て、0.3 秒ずつに潰れた）
+                        if not _plausible_correction(segments[item_idx]["text"], item["text"]):
+                            stats["rejected_items"] = stats.get("rejected_items", 0) + 1
+                            logger.warning(
+                                f"AI Proofreader: 元の文と離れすぎた直しを捨てました [{item_idx}] "
+                                f"{segments[item_idx]['text'][:20]!r} → {item['text'][:20]!r}")
+                            continue
                         batch_correction_map[item_idx] = item["text"]
                 else:
                     # **応答を丸ごと捨てたバッチは失敗に数える**（R2-C5 検証3周目の P1）。黙って無視すると

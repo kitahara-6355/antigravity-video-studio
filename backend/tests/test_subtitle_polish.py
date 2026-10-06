@@ -106,3 +106,14 @@ def test_quality_gate_blocks_unproofread_subtitles(tmp_path, monkeypatch):
     result = SubtitleCoverageCheck().analyze(ctx)
     assert result["blocking"] is True
     assert any("未校閲" in f for f in result["feedback"])
+
+
+@pytest.mark.parametrize("orig,new,ok", [
+    ("います。", "では記念すべき第1回めのゲストは日本デザイン", False),   # 番号ずれ（実走）
+    ("こんにちは。もう初会ね。読んでいただいて。", "こんにちは。もう初回ね。呼んでいただいて。", True),
+    ("えー、あの、そうですね", "そうですね", True),
+    ("先生どうぞよろしく", "先生、どうぞよろしく。", True),
+])
+def test_proofread_rejects_text_from_another_line(orig, new, ok):
+    from subtitle_engine.ai_proofreader import _plausible_correction
+    assert _plausible_correction(orig, new) is ok

@@ -322,6 +322,8 @@ class HookCheck(QualityCheckPlugin):
 
 # 間の後の話し始めのうち、字幕が早すぎ・遅すぎの割合の上限。合わせる前の実測は 21.5%、合わせた後は 8.1%
 SYNC_OFF_RATIO_MAX = 0.15
+# これより短く出る字幕は読めない
+FLASH_SEC = 0.5
 
 
 class SubtitleCoverageCheck(QualityCheckPlugin):
@@ -431,6 +433,14 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                 if skey not in cache:
                     cache[skey] = sync.speech_map(out[1])
                 timing = sync.measure_sync(out[2], cache[skey])
+                # 一瞬で消える字幕（読めない）。校閲の行ずれ・時刻の潰れで出る（2026-10-06 実走）
+                flashes = [r for r in out[2] if isinstance(r, dict) and r.get("text")
+                           and float(r.get("end", 0)) - float(r.get("start", 0)) < FLASH_SEC]
+                timing["flash"] = len(flashes)
+                if flashes:
+                    deductions += 3
+                    feedback.append(f"⚠ 一瞬で消える字幕（{FLASH_SEC}秒未満）: {len(flashes)}枚 — "
+                                    + ", ".join(coverage._mmss(float(r['start'])) for r in flashes[:6]))
                 if timing["off_ratio"] > SYNC_OFF_RATIO_MAX:
                     deductions += 3
                     feedback.append(
