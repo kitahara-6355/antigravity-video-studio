@@ -234,11 +234,23 @@ def drop_boundary_echoes(segments: list[dict], chunk_sec: float = CHUNK_SEC) -> 
         at_boundary = start > 0 and abs(start - round(start / chunk_sec) * chunk_sec) < 0.3
         text = norm(seg.get("text", ""))
         prev = norm(out[-1].get("text", "")) if out else ""
-        if at_boundary and text and len(text) <= ECHO_MAX_CHARS and prev.endswith(text):
+        if at_boundary and _is_echo(text, prev):
             logger.info(f"区切りの境目の繰り返しを除きました: {start:.1f}秒 {seg.get('text')!r}")
             continue
         out.append(seg)
     return out
+
+
+def _is_echo(text: str, prev: str) -> bool:
+    """text が prev の尻尾の繰り返しか。尻尾の音だけを起こすので字が少し変わる
+    （「まいります」の尻尾が「います」）。尻尾の数文字に順に含まれ、終わり2文字が同じなら繰り返し。"""
+    if not text or not prev or len(text) > ECHO_MAX_CHARS:
+        return False
+    if prev.endswith(text):
+        return True
+    rest = iter(prev[-(len(text) + 2):])
+    in_tail = all(ch in rest for ch in text)
+    return in_tail and len(text) >= 2 and text[-2:] == prev[-2:]
 
 
 def transcribe(video_path: str | Path, *, client: Any = None, model: str | None = None,

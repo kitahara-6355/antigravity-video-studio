@@ -203,6 +203,53 @@ def _lagged(tokens) -> list[tuple[str, float]]:
     return [(c, round(float(t) + LAG_SEC, 3)) for c, t in tokens]
 
 
+# 校閲の直しを裁くとき、行の前後これだけの認識結果を聞く
+REFEREE_PAD_SEC = 1.0
+# 直した文の文字が、認識の文字にこれだけ含まれ、元の文より REFEREE_MARGIN 以上多ければ採る
+REFEREE_MIN = 0.6
+REFEREE_MARGIN = 0.2
+
+
+def _heard_ratio(text: str, heard: str) -> float:
+    """text の文字のうち、認識の文字に順に見つかる割合。"""
+    if not text or not heard:
+        return 0.0
+    sm = difflib.SequenceMatcher(None, text, heard, autojunk=False)
+    return sum(b.size for b in sm.get_matching_blocks()) / len(text)
+
+
+def referee_from_tokens(tokens: list[tuple[str, float]]):
+    """校閲の直しを音声認識で裁く関数 judge(segment, corrected) -> bool を作る。
+
+    元の文から離れた直し（「歌詞織」→「菓子折り」）は、番号ずれか作り話かもしれないので
+    校閲側で捨てている。認識の文字（その行の時刻の前後）に、直した文の方がはっきり近いときだけ採る。
+    segment の start/end は素材の時間軸。
+    """
+    import bisect
+
+    times = [t for _, t in tokens]
+
+    def judge(segment: dict, corrected: str) -> bool:
+        try:
+            a = float(segment["start"]) - REFEREE_PAD_SEC
+            b = float(segment["end"]) + REFEREE_PAD_SEC
+        except (KeyError, TypeError, ValueError):
+            return False
+        lo, hi = bisect.bisect_left(times, a), bisect.bisect_right(times, b)
+        heard = _norm_text("".join(c for c, _ in tokens[lo:hi]))
+        before = _heard_ratio(_norm_text(segment.get("text")), heard)
+        after = _heard_ratio(_norm_text(corrected), heard)
+        return after >= REFEREE_MIN and after >= before + REFEREE_MARGIN
+
+    return judge
+
+
+def referee_for(media: str):
+    """素材の認識結果から裁く関数を作る。認識が使えなければ None（裁かない）。"""
+    tokens = tokens_for(media) if media else None
+    return referee_from_tokens(tokens) if tokens else None
+
+
 def to_output(tokens: list[tuple[str, float]], ranges) -> list[tuple[str, float]]:
     """素材の時間軸の認識結果を、カット後（残した区間を順に並べた）時間軸に写す。"""
     out, offset = [], 0.0
@@ -292,6 +339,8 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         cap["_est_start"] = float(cap["start"])
         cap["start"], cap["end"] = round(start, 3), round(end, 3)
         cap["_asr"] = True
+        # 最初に拾えた文字の時刻。頭の文字を拾えなかったときは start は外挿になる
+        cap["_asr_first"] = round(t0, 3)
         aligned += 1
     return aligned
 

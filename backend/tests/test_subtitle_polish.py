@@ -188,3 +188,19 @@ def test_segment_at_a_boundary_that_is_not_an_echo_stays():
             {"start": 30.0, "end": 31.2, "text": "います。"},
             {"start": 40.0, "end": 41.0, "text": "はい。"}]
     assert len(gt.drop_boundary_echoes(segs, 30)) == 3
+
+
+def test_shifted_line_is_never_rescued_by_the_referee():
+    from subtitle_engine.ai_proofreader import _correction_verdict
+    assert _correction_verdict("います。", "では記念すべき第1回めのゲストは日本デザイン",
+                               ["", "では記念すべき第1回目のゲストは日本デザイン"]) == "shifted"
+    assert _correction_verdict("歌詞織 です ギャラ は", "菓子折り、ギャラは", []) == "dissimilar"
+    assert _correction_verdict("もう初会ね", "もう初回ね", []) == "ok"
+
+
+def test_lead_word_at_the_head_of_a_later_caption_is_removed():
+    # 実例（39分17秒）: 「…思ってるところで、じゃあ筆が本当に入ってこなかったら…」を
+    # 分けた2枚目が「じゃあ筆が」で始まった
+    text = "で、ちょっと大変なことになるなって思ってるところで、じゃあ筆が本当に入ってこなかったら、筆作ろうかなみたいな。"
+    out = tf.format_segments([{"text": text, "start": 0.0, "end": 8.0}], 18)
+    assert out and not any(s["text"].startswith("じゃあ") for s in out)

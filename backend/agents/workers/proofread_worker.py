@@ -84,15 +84,20 @@ class ProofreadWorker(PipelineStageWorker):
             # → ステータスAPIの応答性を確保し、フロントエンドのタイムアウトを防止
             loop = asyncio.get_running_loop()
             # P-02: return_stats=Trueでリトライ統計を取得
-            result = await loop.run_in_executor(
-                None, lambda: proofread_segments(ctx.segments, return_stats=True)
-            )
+            # 元の文から遠い直しを、音声認識の文字で裁く（認識が使えなければ裁かない）
+            referee = await loop.run_in_executor(None, lambda: _referee_for(ctx.video_path))
+            extra = {"referee": referee} if referee else {}
+
+            def proofread(segs, return_stats=True):
+                return proofread_segments(segs, return_stats=return_stats, **extra)
+
+            result = await loop.run_in_executor(None, lambda: proofread(ctx.segments))
             ctx.segments, retry_stats = result
             # 失敗したバッチは小さく分けて校閲し直す（2026-10-06: 1/7 バッチが落ち、
             # 「呼んで→読んで」「初回→初会」が未校閲のまま字幕に出た）
             if retry_stats.get("failed_ranges"):
                 retry_stats = await loop.run_in_executor(
-                    None, lambda: _repair_failed_batches(ctx.segments, retry_stats, proofread_segments))
+                    None, lambda: _repair_failed_batches(ctx.segments, retry_stats, proofread))
             for i, seg in enumerate(ctx.segments):
                 if i < len(original) and seg.get("text", "") != original[i]:
                     ai_corrections += 1
@@ -205,6 +210,16 @@ class ProofreadWorker(PipelineStageWorker):
 
 # 失敗したバッチを半分ずつに分けて校閲し直す回数
 REPAIR_ROUNDS = 2
+
+
+def _referee_for(video_path):
+    """校閲の直しを裁く関数（音声認識）。使えなければ None。"""
+    try:
+        from subtitle_engine import aligner
+        return aligner.referee_for(str(video_path)) if video_path else None
+    except Exception as e:  # 認識が無くても校閲はする
+        logger.debug(f"音声認識での裏付けを使いません: {e}")
+        return None
 
 
 def _repair_failed_batches(segments, stats, proofread):

@@ -226,6 +226,16 @@ def test_unrecognised_caption_does_not_take_the_next_recognised_onset():
     assert shown["start"] == pytest.approx(44.38, abs=0.02)
 
 
+def test_unrecognised_head_starts_at_the_onset_before_the_first_recognised_word():
+    # 実例（35.3 秒）: 「デザイン書道の…」の「デザイン」を認識が拾わず、最初に拾えた「書」から
+    # 4 文字分さかのぼった 34.8 秒に出た（前の文の終わり）。声は 35.3 秒から
+    sp = _map([(28.5, 34.9), (35.3, 39.4)], total=45)
+    segs = [{"start": 28.5, "end": 34.7, "text": "記念すべき", "_asr": True, "_asr_first": 28.5},
+            {"start": 34.78, "end": 39.4, "text": "デザイン書道の", "_asr": True, "_asr_first": 35.3}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(35.3, abs=0.02)
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg が無い")
 def test_speech_map_reads_media(tmp_path):
     media = tmp_path / "tone.wav"

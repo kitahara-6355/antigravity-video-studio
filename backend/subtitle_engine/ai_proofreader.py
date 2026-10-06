@@ -75,11 +75,17 @@ def _has_kanji(text: str) -> bool:
 
 
 def _plausible_correction(original: str, corrected: str, neighbours=()) -> bool:
-    """校閲の直しが、同じ行の文の直しとして妥当か（番号ずれ・行の入れ替えを弾く）。
+    """校閲の直しが、同じ行の文の直しとして妥当か（番号ずれ・行の入れ替えを弾く）。"""
+    return _correction_verdict(original, corrected, neighbours) == "ok"
+
+
+def _correction_verdict(original: str, corrected: str, neighbours=()) -> str:
+    """校閲の直しの判定。"ok" / "shifted"（前後の行の文。番号ずれ）/ "dissimilar"（元の文から遠い）。
 
     句読点と空白を除いて比べる。フィラーを消しただけの短縮は通す（直した文が元の文に含まれる）。
-    neighbours（前後の行の元の文）の方に近い直しは、番号ずれとみなして捨てる。
     かなだけの行を漢字に直すのは変換の直しなので通す（「たんじゅ」→「単純」）。
+    "dissimilar" は音声認識で裏付けが取れれば採れる（proofread_segments の referee）。
+    "shifted" は裏付けがあっても採らない（隣の行の声が聞こえる範囲に入るため）。
     """
     import difflib
 
@@ -88,24 +94,26 @@ def _plausible_correction(original: str, corrected: str, neighbours=()) -> bool:
 
     a, b = norm(original), norm(corrected)
     if not a or not b or a == b:
-        return True
+        return "ok"
     if b in a:  # 消しただけ
-        return True
+        return "ok"
     ratio = difflib.SequenceMatcher(None, a, b).ratio()
     for other in neighbours or ():
         m = norm(other)
         if m and difflib.SequenceMatcher(None, m, b).ratio() > max(ratio, MIN_SIMILARITY):
-            return False
+            return "shifted"
     if max(len(a), len(b)) <= SHORT_LINE:  # 短い行どうしは比べても決まらない
-        return True
+        return "ok"
     if ratio >= MIN_SIMILARITY:
-        return True
+        return "ok"
     # かなだけの行を漢字に直した。漢字はかなより短く書けるので、長くはならない
     kana_only = all("\u3041" <= ch <= "\u30ff" for ch in a)
-    return kana_only and _has_kanji(b) and 0.3 * len(a) <= len(b) <= 1.2 * len(a)
+    if kana_only and _has_kanji(b) and 0.3 * len(a) <= len(b) <= 1.2 * len(a):
+        return "ok"
+    return "dissimilar"
 
 
-def proofread_segments(segments, update_callback=None, return_stats=False):
+def proofread_segments(segments, update_callback=None, return_stats=False, referee=None):
     """
     Gemini APIを使用して字幕セグメントを校閲
 
@@ -424,8 +432,21 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                         # 字幕が前の発話の時刻に出て、0.3 秒ずつに潰れた）
                         neighbours = [segments[k]["text"] for k in (item_idx - 1, item_idx + 1)
                                       if 0 <= k < len(segments)]
-                        if not _plausible_correction(segments[item_idx]["text"], item["text"],
-                                                     neighbours):
+                        verdict = _correction_verdict(segments[item_idx]["text"], item["text"],
+                                                      neighbours)
+                        # 元の文から遠い直しでも、音声認識の文字がはっきり裏付けるなら採る
+                        # （「歌詞織」→「菓子折り」を捨てていた・2026-10-06 実走）
+                        if verdict == "dissimilar" and referee is not None:
+                            try:
+                                if referee(segments[item_idx], item["text"]):
+                                    verdict = "ok"
+                                    stats["refereed_items"] = stats.get("refereed_items", 0) + 1
+                                    logger.info(
+                                        f"AI Proofreader: 音声認識で裏付けた直しを採りました [{item_idx}] "
+                                        f"{segments[item_idx]['text'][:20]!r} → {item['text'][:20]!r}")
+                            except Exception as e:  # 裁けなくても校閲は続ける
+                                logger.debug(f"音声認識での裏付けをスキップ: {e}")
+                        if verdict != "ok":
                             stats["rejected_items"] = stats.get("rejected_items", 0) + 1
                             logger.warning(
                                 f"AI Proofreader: 元の文と離れすぎた直しを捨てました [{item_idx}] "

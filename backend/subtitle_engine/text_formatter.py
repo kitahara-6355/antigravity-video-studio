@@ -714,6 +714,9 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
             duration = end - start
             current_start = start
 
+            # 2枚目以降の頭に来た「じゃあ」なども外す（文の途中で分けた字幕の頭・39分17秒の実例）
+            chunks = chunks[:1] + [strip_lead_words(c, lead_words, bare_words) for c in chunks[1:]]
+            total_chars = sum(len(c.replace("\n", "")) for c in chunks)
             for chunk in chunks:
                 chunk_duration = (len(chunk.replace("\n", "")) / total_chars) * duration if total_chars > 0 else duration / len(chunks)
                 new_seg = _safe_copy_segment(seg)

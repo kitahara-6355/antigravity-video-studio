@@ -367,14 +367,20 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     for k, s in enumerate(items):
         a, b = float(s["start"]), float(s["end"])
         floor = onsets[-1] + MIN_STEP_SEC if onsets else -1.0
-        if s.get("_asr"):
-            before, after = ASR_SNAP_BEFORE_SEC, ASR_SNAP_AFTER_SEC
-            cands = [o for o in speech.onsets if o >= floor]
+        first = float(s.get("_asr_first", a)) if s.get("_asr") else a
+        if s.get("_asr") and first - a > 0.05:
+            # 頭の何文字かを認識が拾えず、出だしを外挿している。拾えた最初の文字の直前の
+            # 話し始めが出だし（35 秒の「デザイン書道の」が前の文の終わりの 34.8 秒に出た）
+            near = [o for o in speech.onsets
+                    if o >= floor and a - ASR_SNAP_BEFORE_SEC <= o <= first + 0.05]
+            on = max(near) if near else None
+        elif s.get("_asr"):
+            on = _nearest_biased([o for o in speech.onsets if o >= floor], a,
+                                 ASR_SNAP_BEFORE_SEC, ASR_SNAP_AFTER_SEC)
         else:
             # 文字起こしの時刻は早めに出がち（実測で早すぎ 163 件・遅すぎ 23 件）なので、後ろ側を広く探す
-            before, after = r["snap_window_sec"] * 0.6, r["snap_window_sec"] * 1.25
-            cands = [o for o in speech.onsets if floor <= o < claimed[k + 1]]
-        on = _nearest_biased(cands, a, before, after)
+            on = _nearest_biased([o for o in speech.onsets if floor <= o < claimed[k + 1]], a,
+                                 r["snap_window_sec"] * 0.6, r["snap_window_sec"] * 1.25)
         off = _nearest(speech.offsets, b, r["snap_window_sec"])
         snapped_in += on is not None
         snapped_out += off is not None

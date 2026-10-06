@@ -116,3 +116,36 @@ def test_a_character_glued_across_a_long_gap_is_not_used():
     aligner.align_captions(caps, tokens)
     assert caps[1]["_asr"]
     assert caps[1]["start"] == pytest.approx(13.5 - aligner.CHAR_SEC, abs=0.05)
+
+
+def test_referee_accepts_a_correction_the_audio_supports():
+    # 実例: 校閲の「歌詞織ですギャラは → 菓子折りギャラは」は元の文から離れているので
+    # 捨てていた。音声認識の文字に近い方を採る
+    judge = aligner.referee_from_tokens(toks("菓子折りですギャラは", 100.0))
+    seg = {"start": 100.0, "end": 102.0, "text": "歌詞織 です ギャラ は"}
+    assert judge(seg, "菓子折り、ギャラは") is True
+
+
+def test_referee_rejects_a_correction_the_audio_does_not_support():
+    # 実例: 「あと2日後これ工事って言」→「あと二兎を追う者は一兎をも得」（作り話）
+    judge = aligner.referee_from_tokens(toks("新版画賞とあと二日後これ工事っていう", 50.0))
+    seg = {"start": 50.0, "end": 54.0, "text": "新版画賞と、あと 2 日後これ工事って言"}
+    assert judge(seg, "新版画賞と、あと二兎を追う者は一兎をも得") is False
+
+
+def test_referee_only_listens_near_the_line():
+    judge = aligner.referee_from_tokens(toks("菓子折りですギャラは", 300.0))
+    seg = {"start": 100.0, "end": 102.0, "text": "歌詞織 です ギャラ は"}
+    assert judge(seg, "菓子折り、ギャラは") is False
+
+
+def test_no_referee_without_recognition(tmp_path, monkeypatch):
+    monkeypatch.setenv("AVS_ALIGN_MODEL_DIR", str(tmp_path / "none"))
+    assert aligner.referee_for(str(tmp_path / "missing.mp4")) is None
+
+
+def test_first_recognised_time_is_kept():
+    caps = [{"start": 0.0, "end": 2.0, "text": "デザイン書道の第一人者"}]
+    aligner.align_captions(caps, toks("書道の第一人者", 35.3))
+    assert caps[0]["_asr_first"] == pytest.approx(35.3)
+    assert caps[0]["start"] == pytest.approx(35.3 - 4 * aligner.CHAR_SEC, abs=0.01)
