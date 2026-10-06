@@ -371,3 +371,16 @@ def test_gate_blocks_on_gaps_found_at_transcription(tmp_path, monkeypatch):
 
     assert result["blocking"] is True
     assert any("文字起こし" in f and "1:00" in f for f in result["feedback"])
+
+
+def test_sidecar_keeps_what_the_alignment_started_from(tmp_path):
+    # 時刻合わせの前の推定とカット点も残す。合わせ方の不具合（15分26秒の 0.33 秒の字幕）を、
+    # 43 分を書き出し直さずに同じ入力で再現するため
+    from smart_cut_engine import write_subtitle_sidecar
+    preview = tmp_path / "preview.mp4"
+    write_subtitle_sidecar(preview, [{"start": 1.0, "end": 2.0, "text": "a"}], [(0.0, 5.0)],
+                           estimated=[{"start": 0.5, "end": 2.5, "text": "a"}], cut_points=[3.0])
+    data = json.loads((tmp_path / "preview.subtitles.json").read_text(encoding="utf-8"))
+    assert data["segments"] == [{"start": 1.0, "end": 2.0, "text": "a"}]
+    assert data["estimated"] == [{"start": 0.5, "end": 2.5, "text": "a"}]
+    assert data["cut_points"] == [3.0]

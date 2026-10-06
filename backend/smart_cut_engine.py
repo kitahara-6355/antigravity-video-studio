@@ -331,13 +331,25 @@ def subtitle_sidecar_path(video_path) -> Path:
     return p.with_name(p.stem + ".subtitles.json")
 
 
-def write_subtitle_sidecar(video_path, segments, ranges=None, path=None) -> None:
-    """出力の時間軸の字幕と、素材のどの区間を残したか（`ranges`）を書く。"""
+def _sidecar_rows(segments) -> list[dict]:
+    return [{"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
+             "text": s.get("text", "")} for s in segments]
+
+
+def write_subtitle_sidecar(video_path, segments, ranges=None, path=None, estimated=None,
+                           cut_points=None) -> None:
+    """出力の時間軸の字幕と、素材のどの区間を残したか（`ranges`）を書く。
+
+    `estimated`（時刻合わせの前の推定）と `cut_points` もあれば残す。合わせ方の不具合を、
+    書き出し直さずに同じ入力で再現できるようにするため。
+    """
     try:
-        rows = [{"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
-                 "text": s.get("text", "")} for s in segments]
-        data = {"segments": rows,
+        data = {"segments": _sidecar_rows(segments),
                 "ranges": [[round(float(a), 3), round(float(b), 3)] for a, b in (ranges or [])]}
+        if estimated is not None:
+            data["estimated"] = _sidecar_rows(estimated)
+        if cut_points is not None:
+            data["cut_points"] = [round(float(c), 3) for c in cut_points]
         (path or subtitle_sidecar_path(video_path)).write_text(
             json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     except (OSError, TypeError, ValueError) as e:
@@ -496,13 +508,15 @@ def render_smart_cut(
 
         # 字幕の出だし・終わりを、カット後の音声の話し始め・話し終わりに合わせる
         # （2026-10-06 ユーザー指摘「言葉より先に出すぎる」）。文字起こしの時刻は粗い推定
+        estimated_segments = [dict(s) for s in recalculated_segments]
         recalculated_segments = _align_to_speech(temp_cut_path, recalculated_segments, cut_points,
                                                  source_path=input_path, ranges=merged)
 
         # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
         # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）
         # 置き場所は temp_cut_path（<出力>.tmp.mp4）の隣。出力と同じ名前で .subtitles.json
-        write_subtitle_sidecar(None, recalculated_segments, merged,
+        write_subtitle_sidecar(None, recalculated_segments, merged, estimated=estimated_segments,
+                               cut_points=cut_points,
                                path=temp_cut_path.with_name(
                                    temp_cut_path.name[:-len(".tmp.mp4")] + ".subtitles.json"))
 
