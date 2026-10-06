@@ -77,7 +77,7 @@
     {
       "id": "pn_008",
       "incorrect": "角シアター",
-      "correct": "角シアター",
+      "correct": "アドシアター",
       "type": "company",
       "context_hint": "久木田先生の会社",
       "confirmed": true,
@@ -1923,6 +1923,56 @@
       "confirmed": true,
       "usage_count": 0,
       "created_at": "2026-06-28T15:58:15.319629"
+    },
+    {
+      "id": "pn_193",
+      "incorrect": "バドシアター",
+      "correct": "アドシアター",
+      "type": "company",
+      "context_hint": "久木田先生の会社（Gemini の聞き違い）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T02:00:00Z"
+    },
+    {
+      "id": "pn_194",
+      "incorrect": "アドシアタ―",
+      "correct": "アドシアター",
+      "type": "company",
+      "context_hint": "久木田先生の会社（長音記号の揺れ）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T02:00:00Z"
+    },
+    {
+      "id": "pn_195",
+      "incorrect": "久保田デザイン書道塾",
+      "correct": "久木田デザイン書道塾",
+      "type": "organization",
+      "context_hint": "久木田先生主宰の書道塾（Gemini の聞き違い）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T02:00:00Z"
+    },
+    {
+      "id": "pn_196",
+      "incorrect": "久保田博信",
+      "correct": "久木田博信",
+      "type": "person_name",
+      "context_hint": "ゲスト名（Gemini の聞き違い）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T02:00:00Z"
+    },
+    {
+      "id": "pn_197",
+      "incorrect": "久保田先生",
+      "correct": "久木田先生",
+      "type": "person_name",
+      "context_hint": "ゲスト名（Gemini の聞き違い）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T02:00:00Z"
     }
   ],
   "pending_confirmations": []
