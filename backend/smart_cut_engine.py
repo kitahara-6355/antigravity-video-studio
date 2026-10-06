@@ -299,14 +299,14 @@ def subtitle_sidecar_path(video_path) -> Path:
     return p.with_name(p.stem + ".subtitles.json")
 
 
-def write_subtitle_sidecar(video_path, segments, ranges=None) -> None:
+def write_subtitle_sidecar(video_path, segments, ranges=None, path=None) -> None:
     """出力の時間軸の字幕と、素材のどの区間を残したか（`ranges`）を書く。"""
     try:
         rows = [{"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
                  "text": s.get("text", "")} for s in segments]
         data = {"segments": rows,
                 "ranges": [[round(float(a), 3), round(float(b), 3)] for a, b in (ranges or [])]}
-        subtitle_sidecar_path(video_path).write_text(
+        (path or subtitle_sidecar_path(video_path)).write_text(
             json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     except (OSError, TypeError, ValueError) as e:
         logger.warning(f"字幕の横置き JSON を書けませんでした: {e}")
@@ -402,16 +402,19 @@ def render_smart_cut(
         # **1回のエンコードで残す区間だけを抜く**（2026-10-06）。パーツに -c copy で
         # 切って concat すると、キーフレーム・AAC の端数がパーツごとに積み上がり、
         # 178 パーツで**映像と音声が字幕より 22 秒遅れた**（素材 25 分地点で 15 秒）。
-        exact = len(merged) > 1 and _cut_kept_ranges_exact(ffmpeg, input_path, merged, temp_cut_path)
+        # 動画の長さを取得（境界チェック用）
+        total_duration = ffmpeg.get_duration(input_path)
+        if total_duration is None:
+            logger.warning("Could not determine video duration, proceeding anyway")
+            total_duration = float('inf')
+        clamped = [(max(0, min(a, total_duration)), max(0, min(b, total_duration))) for a, b in merged]
+        clamped = [(a, b) for a, b in clamped if b > a]
+        exact = (len(clamped) > 1
+                 and getattr(ffmpeg, "supports_exact_range_cut", False) is True
+                 and _cut_kept_ranges_exact(ffmpeg, input_path, clamped, temp_cut_path))
         if not exact:
-            if len(merged) > 1:
+            if len(clamped) > 1 and getattr(ffmpeg, "supports_exact_range_cut", False) is True:
                 logger.warning("区間の一括抽出に失敗 → パーツを切って結合する従来の方法に戻します（ずれが出ます）")
-        
-            # 動画の長さを取得（境界チェック用）
-            total_duration = ffmpeg.get_duration(input_path)
-            if total_duration is None:
-                logger.warning("Could not determine video duration, proceeding anyway")
-                total_duration = float('inf')
         
             for i, (start, end) in enumerate(merged):
                 # 境界チェック
@@ -433,7 +436,6 @@ def render_smart_cut(
             logger.info(f"SmartCut: {len(temp_parts)} parts to merge")
 
             # 3. Merge all parts
-            temp_cut_path = Path(output_path).with_suffix('.tmp.mp4')
             if len(temp_parts) == 1:
                 # 単一セグメントの場合はコピー
                 import shutil
@@ -462,7 +464,10 @@ def render_smart_cut(
 
         # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
         # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）
-        write_subtitle_sidecar(output_path, recalculated_segments, merged)
+        # 置き場所は temp_cut_path（<出力>.tmp.mp4）の隣。出力と同じ名前で .subtitles.json
+        write_subtitle_sidecar(None, recalculated_segments, merged,
+                               path=temp_cut_path.with_name(
+                                   temp_cut_path.name[:-len(".tmp.mp4")] + ".subtitles.json"))
 
         # 5. Overlay Subtitles via FFmpeg (Phase D: MoviePy 完全脱却)
         burn_result = _burn_subtitles_ffmpeg(str(temp_cut_path), recalculated_segments, output_path, ffmpeg)

@@ -52,6 +52,10 @@ class VideoClip:
 
 class FFmpegEditor:
     """FFmpeg連携エディター（Phase D: GPU/NVENC対応）"""
+
+    # smart_cut_engine が「残す区間を1回のエンコードで抜く」経路を使ってよい印
+    # （select/aselect のフィルタ台本を実行できる本物の ffmpeg であること）
+    supports_exact_range_cut = True
     
     def __init__(self, output_dir: Path = None):
         self.output_dir = output_dir or DEFAULT_OUTPUT_DIR
