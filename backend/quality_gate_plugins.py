@@ -343,10 +343,12 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
             from backend.subtitle_engine import coverage  # type: ignore[no-redef]
 
         checks = []
+        # 文字起こしで「音はあるが発話ではない」と確認した区間（書いている場面・BGM）
+        quiet = [tuple(q) for q in (getattr(ctx, "verified_quiet", None) or [])]
         segments = getattr(ctx, "segments", None) or []
         video = getattr(ctx, "video_path", None)
         if segments and video and Path(str(video)).exists():
-            checks.append(("素材", str(video), segments, "sourceStart", "sourceEnd"))
+            checks.append(("素材", str(video), segments, "sourceStart", "sourceEnd", quiet))
         preview = getattr(ctx, "preview_path", None)
         if preview and Path(str(preview)).exists():
             try:
@@ -356,8 +358,11 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
             side = subtitle_sidecar_path(preview)
             if side.exists():
                 try:
-                    rows = json.loads(side.read_text(encoding="utf-8"))
-                    checks.append(("出力", str(preview), rows, "start", "end"))
+                    data = json.loads(side.read_text(encoding="utf-8"))
+                    rows = data.get("segments", []) if isinstance(data, dict) else data
+                    ranges = data.get("ranges", []) if isinstance(data, dict) else []
+                    checks.append(("出力", str(preview), rows, "start", "end",
+                                   coverage.map_to_output(quiet, ranges)))
                 except (OSError, ValueError) as e:
                     logger.warning(f"字幕の横置き JSON を読めません: {e}")
         if not checks:
@@ -372,13 +377,14 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
             except AttributeError:
                 pass
         feedback, reports, blocking = [], {}, False
-        for label, media, segs, sk, ek in checks:
-            key = (label, media, len(segs))
+        for label, media, segs, sk, ek, exclude in checks:
+            key = (label, media, len(segs), len(exclude))
             try:
                 if key not in cache:
                     keyed = [s if s.get(sk) is not None else {**s, sk: s.get("start"), ek: s.get("end")}
                              for s in segs if isinstance(s, dict)]
-                    cache[key] = coverage.check_media(media, keyed, start_key=sk, end_key=ek)
+                    cache[key] = coverage.check_media(media, keyed, start_key=sk, end_key=ek,
+                                                      exclude=exclude)
                 rep = cache[key]
             except Exception as e:  # ffmpeg が無い・読めない
                 return {"deductions": 0, "feedback": [], "checked": False,
@@ -387,6 +393,9 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
             if rep.has_gaps:
                 blocking = True
                 feedback.append(f"⛔ 字幕の欠落（{label}）: {rep.summary()}")
+            if label == "素材" and rep.excluded:
+                feedback.append("⚠ 発話が少ない区間（2回起こしても文字が出ない・人が確認）: "
+                                + ", ".join(coverage._mmss(a) for a, _ in rep.excluded[:6]))
         deductions = 30 if blocking else 0
         return {"deductions": deductions, "feedback": feedback, "blocking": blocking,
                 "coverage": reports}

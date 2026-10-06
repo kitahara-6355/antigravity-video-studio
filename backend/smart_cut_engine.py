@@ -265,12 +265,15 @@ def subtitle_sidecar_path(video_path) -> Path:
     return p.with_name(p.stem + ".subtitles.json")
 
 
-def write_subtitle_sidecar(video_path, segments) -> None:
+def write_subtitle_sidecar(video_path, segments, ranges=None) -> None:
+    """出力の時間軸の字幕と、素材のどの区間を残したか（`ranges`）を書く。"""
     try:
         rows = [{"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
                  "text": s.get("text", "")} for s in segments]
+        data = {"segments": rows,
+                "ranges": [[round(float(a), 3), round(float(b), 3)] for a, b in (ranges or [])]}
         subtitle_sidecar_path(video_path).write_text(
-            json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+            json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     except (OSError, TypeError, ValueError) as e:
         logger.warning(f"字幕の横置き JSON を書けませんでした: {e}")
 
@@ -417,7 +420,7 @@ def render_smart_cut(
 
         # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
         # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）
-        write_subtitle_sidecar(output_path, recalculated_segments)
+        write_subtitle_sidecar(output_path, recalculated_segments, merged)
 
         # 5. Overlay Subtitles via FFmpeg (Phase D: MoviePy 完全脱却)
         burn_result = _burn_subtitles_ffmpeg(str(temp_cut_path), recalculated_segments, output_path, ffmpeg)

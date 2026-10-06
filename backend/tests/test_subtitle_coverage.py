@@ -278,3 +278,65 @@ def test_burned_srt_skips_aizuchi_only_captions(tmp_path, monkeypatch):
 
     assert "はい。" not in written["srt"]
     assert "書道の魅力です。" in written["srt"]
+
+
+# ------------------------------------------------------------
+# 5. 書いている場面（音はあるが発話ではない）は欠落に数えない
+# ------------------------------------------------------------
+
+def test_verified_quiet_windows_are_not_gaps():
+    """30:00〜31:00 は書道を書いている場面。2回起こしても文字が出ないので除外する。"""
+    speech = [(0.0, 60.0)]
+    segs = [{"start": 0.0, "end": 30.0, "text": "あ" * 210}]
+
+    assert cv.measure(segs, speech, 60.0).has_gaps
+    rep = cv.measure(segs, speech, 60.0, exclude=[(30.0, 60.0)])
+    assert not rep.has_gaps
+    assert rep.excluded == [(30.0, 60.0)]
+
+
+def test_source_windows_map_onto_the_cut_timeline():
+    ranges = [(10.0, 20.0), (50.0, 70.0)]
+
+    assert cv.map_to_output([(15.0, 55.0)], ranges) == [(5.0, 10.0), (10.0, 15.0)]
+
+
+@needs_ffmpeg
+def test_a_chunk_that_stays_thin_after_retry_is_marked_quiet(tmp_path):
+    from subtitle_engine import gemini_transcriber as gt
+
+    clip = tmp_path / "writing.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=20",
+                    "-c:a", "aac", str(clip)], check=True)
+
+    def call(client, model, audio, duration):
+        return json.dumps([{"start": 0, "end": 1, "text": "うん"}]), model
+
+    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=20, parallel=1, call=call, backoff=0)
+
+    assert result.quiet == [(0.0, 20.0)]
+    assert not result.coverage["has_gaps"]
+
+
+def test_quiet_windows_survive_the_cache(tmp_path):
+    from subtitle_engine import gemini_transcriber as gt
+
+    ckpt = tmp_path / "_gemini_c30_x.jsonl"
+    gt.write_checkpoint([{"start": 0, "end": 1, "text": "a"}], ckpt, meta={"quiet": [[1800.0, 1830.0]]})
+
+    assert gt.read_meta(ckpt)["quiet"] == [[1800.0, 1830.0]]
+
+
+def test_gate_excludes_quiet_windows_and_still_reports_them(tmp_path, monkeypatch):
+    from quality_gate_plugins import SubtitleCoverageCheck
+
+    video = tmp_path / "src.mp4"
+    video.write_bytes(b"x")
+    monkeypatch.setattr(cv, "speech_intervals", lambda media: ([(0.0, 60.0)], 60.0))
+    ctx = SimpleNamespace(segments=[{"start": 0, "end": 30, "sourceStart": 0, "sourceEnd": 30, "text": "あ" * 210}],
+                          video_path=str(video), preview_path=None, verified_quiet=[(30.0, 60.0)])
+
+    result = SubtitleCoverageCheck().analyze(ctx)
+
+    assert result["blocking"] is False
+    assert any("人が確認" in f for f in result["feedback"])

@@ -116,6 +116,8 @@ class PipelineContext:
     target_auto: bool = False
     # SmartCut が残すと決めた区間の合計（秒）。レンダリングと同じ規則で結合した値
     planned_output_sec: Optional[float] = None
+    # 文字起こしで「音はあるが発話ではない」と確認した区間（素材の秒）。品質ゲートの欠落検知が除外する
+    verified_quiet: list = field(default_factory=list)
     session_id: str = ""
     started_at: str = ""
     segments: List[Segment] = field(default_factory=list)

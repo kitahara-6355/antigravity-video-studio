@@ -68,6 +68,8 @@ class TranscribeResult:
     rechecked: list[dict] = field(default_factory=list)
     # 起こし終えた後の欠落の測定（coverage.CoverageReport.to_dict()）。測れなければ None
     coverage: dict | None = None
+    # 起こし直しても文字が薄いままだった区間（素材の秒）。発話ではないとみなし、人の確認に回す
+    quiet: list[tuple[float, float]] = field(default_factory=list)
 
 
 def _extract_json_array(text: str) -> list:
@@ -244,6 +246,7 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
 
         speech = _speech_or_none(video_path)
         rechecked: list[dict] = []
+        quiet: list[tuple[float, float]] = []
         if speech is not None:
             for i, (path, offset, dur) in enumerate(chunks):
                 if not _is_sparse(results[i][0], speech, offset, dur):
@@ -262,6 +265,9 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                                f"{before} → {after} 文字")
                 if after > before:
                     results[i] = redo
+                # 刻み方を変えた2回目でも薄い → 書いている場面や BGM。欠落ではなく静かな区間
+                if _is_sparse(results[i][0], speech, offset, dur):
+                    quiet.append((round(offset, 2), round(offset + dur, 2)))
 
     segments = [s for segs, _ in results for s in segs]
     if not segments:
@@ -270,12 +276,13 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
     report = None
     if speech is not None:
         from subtitle_engine import coverage
-        report = coverage.measure(segments, speech[0], speech[1]).to_dict()
+        report = coverage.measure(segments, speech[0], speech[1], exclude=quiet).to_dict()
         if report["has_gaps"]:
             logger.warning(f"⚠️ 文字起こしに欠落が残っています: {report['uncovered_sec']}秒・"
                            f"薄い区間 {len(report['sparse'])}件")
     return TranscribeResult(segments=segments, model=model, chunks=len(chunks), models_used=used,
-                            rechecked=rechecked, coverage=report)
+                            rechecked=rechecked, coverage=report,
+                            quiet=quiet if speech is not None else [])
 
 
 def _chars(segs: list[dict]) -> int:
@@ -317,7 +324,23 @@ def _retranscribe_halves(path: Path, offset: float, dur: float, work: Path, idx:
     return segs, used
 
 
-def write_checkpoint(segments: list[dict], path: str | Path) -> None:
+def write_checkpoint(segments: list[dict], path: str | Path,
+                     meta: dict | None = None) -> None:
     with open(path, "w", encoding="utf-8") as f:
         for seg in segments:
             f.write(json.dumps(seg, ensure_ascii=False) + "\n")
+    if meta is not None:
+        meta_path(path).write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def meta_path(checkpoint: str | Path) -> Path:
+    """起こしの付帯情報（静かな区間・欠落の測定）の置き場所。キャッシュと一緒に使い回す。"""
+    p = Path(checkpoint)
+    return p.with_name(p.stem + ".meta.json")
+
+
+def read_meta(checkpoint: str | Path) -> dict:
+    try:
+        return json.loads(meta_path(checkpoint).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}

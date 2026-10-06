@@ -267,6 +267,8 @@ class TranscribeWorker(PipelineStageWorker):
         if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
             segments = self._load_segments_from_checkpoint(checkpoint)
             ctx.segments = segments
+            from subtitle_engine import gemini_transcriber
+            ctx.verified_quiet = [tuple(q) for q in gemini_transcriber.read_meta(checkpoint).get("quiet", [])]
             return StageResult(
                 stage_name=self.name, success=True,
                 detail=f"{len(segments)}セグメント検出 (Gemini・キャッシュ)",
@@ -277,12 +279,15 @@ class TranscribeWorker(PipelineStageWorker):
             from subtitle_engine import gemini_transcriber
             loop = asyncio.get_running_loop()
             tx = await loop.run_in_executor(None, gemini_transcriber.transcribe, ctx.video_path)
-            gemini_transcriber.write_checkpoint(tx.segments, checkpoint)
+            gemini_transcriber.write_checkpoint(
+                tx.segments, checkpoint,
+                meta={"quiet": tx.quiet, "coverage": tx.coverage, "rechecked": tx.rechecked})
         except Exception as e:  # noqa: BLE001 — 主経路の失敗は従経路へ。理由は残す
             logger.warning(f"⚠️ Gemini 文字起こしに失敗 → Whisper に切り替えます: {e}")
             ctx.warnings.append(f"文字起こし: Gemini が失敗したため Whisper に切り替えました（{e}）")
             return None
         ctx.segments = tx.segments
+        ctx.verified_quiet = list(tx.quiet)
         return StageResult(
             stage_name=self.name, success=True,
             detail=f"{len(tx.segments)}セグメント検出 (Gemini {', '.join(tx.models_used)}・{tx.chunks}チャンク)",

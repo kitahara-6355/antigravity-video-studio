@@ -44,6 +44,8 @@ class CoverageReport:
     uncovered_sec: float
     uncovered: list[tuple[float, float]] = field(default_factory=list)
     sparse: list[dict] = field(default_factory=list)
+    # 起こし直しても文字が出なかった区間（書いている場面・BGM など）。欠落に数えず、人の確認に回す
+    excluded: list[tuple[float, float]] = field(default_factory=list)
 
     @property
     def uncovered_ratio(self) -> float:
@@ -61,6 +63,7 @@ class CoverageReport:
             "uncovered_ratio": round(self.uncovered_ratio, 4),
             "uncovered": [(round(a, 2), round(b, 2)) for a, b in self.uncovered],
             "sparse": self.sparse,
+            "excluded": [(round(a, 2), round(b, 2)) for a, b in self.excluded],
             "has_gaps": self.has_gaps,
         }
 
@@ -156,8 +159,16 @@ def _seg_chars(seg: dict) -> int:
 
 def measure(segments: list[dict], speech: list[tuple[float, float]], duration: float,
             *, start_key: str = "start", end_key: str = "end",
-            window: float = WINDOW_SEC) -> CoverageReport:
-    """字幕（`start_key`/`end_key` の時間軸）が発話をどれだけ覆っているか。"""
+            window: float = WINDOW_SEC,
+            exclude: list[tuple[float, float]] | None = None) -> CoverageReport:
+    """字幕（`start_key`/`end_key` の時間軸）が発話をどれだけ覆っているか。
+
+    `exclude` は「音はあるが発話ではない」と確認済みの区間（2回の起こしで文字が出なかった）。
+    その中の音は発話として数えない。
+    """
+    exclude = sorted((float(a), float(b)) for a, b in (exclude or []) if b > a)
+    if exclude:
+        speech = _subtract(speech, exclude)
     spans = []
     for s in segments:
         try:
@@ -187,7 +198,21 @@ def measure(segments: list[dict], speech: list[tuple[float, float]], duration: f
     return CoverageReport(duration=duration,
                           speech_sec=sum(b - a for a, b in speech),
                           uncovered_sec=sum(b - a for a, b in uncovered),
-                          uncovered=uncovered, sparse=sparse)
+                          uncovered=uncovered, sparse=sparse, excluded=exclude)
+
+
+def map_to_output(intervals: list[tuple[float, float]],
+                  ranges: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """素材の時間軸の区間を、カット後（残した区間 `ranges` を順に並べた）時間軸に写す。"""
+    out = []
+    offset = 0.0
+    for s0, s1 in ranges:
+        for a, b in intervals:
+            lo, hi = max(a, s0), min(b, s1)
+            if hi > lo:
+                out.append((offset + lo - s0, offset + hi - s0))
+        offset += s1 - s0
+    return out
 
 
 def check_media(media: str | Path, segments: list[dict], **kw) -> CoverageReport:
