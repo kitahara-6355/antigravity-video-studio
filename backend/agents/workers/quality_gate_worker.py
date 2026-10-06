@@ -15,6 +15,9 @@ from agents.pipeline_types import PipelineStageWorker, PipelineContext, StageRes
 
 logger = logging.getLogger(__name__)
 
+# 合格させない欠陥（字幕の欠落など）があるときの上限。合格点 90 の下・ランク C
+BLOCKING_SCORE_CAP = 79
+
 
 class QualityGateWorker(PipelineStageWorker):
     """
@@ -153,6 +156,12 @@ class QualityGateWorker(PipelineStageWorker):
                 result = run_all_plugins(ctx, _tc)
                 score -= result["total_deductions"]
                 feedback.extend(result["feedback"])
+                # **欠陥は点数で薄めない**（2026-10-06 ユーザー指摘）。字幕の欠落が
+                # あっても他の項目が満点なら 90 点に届いてしまう。合格点の下に抑える
+                if result.get("blocking"):
+                    score = min(score, BLOCKING_SCORE_CAP)
+                    feedback.append(f"⛔ 合格させない欠陥があります: {', '.join(result['blocking'])}"
+                                    f"（{BLOCKING_SCORE_CAP}点以下に抑えました）")
             except ImportError:
                 # W6-C4-41仕様: ImportErrorはそのまま上流に伝播させる
                 raise

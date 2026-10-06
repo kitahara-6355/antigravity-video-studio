@@ -320,6 +320,78 @@ class HookCheck(QualityCheckPlugin):
         return {"deductions": deductions, "feedback": feedback}
 
 
+class SubtitleCoverageCheck(QualityCheckPlugin):
+    """字幕の欠落チェック — 喋っているのに字幕が無い・極端に薄い区間（2026-10-06 ユーザー指摘）。
+
+    Gemini の起こしが約 30 秒の発話を落とし、字幕の無い区間を SmartCut が
+    動画から消していた。それでも 86 点が出た（欠落を数える項目が無かった）。
+
+    2つの時間軸で見る:
+    - **素材**（`ctx.video_path` と字幕の `sourceStart/sourceEnd`）— 起こし漏れ。
+      漏れた発話はカットで消えるので、出力だけ見ても分からない
+    - **出力**（`ctx.preview_path` と横置きの字幕 JSON）— 焼き込んだ字幕の抜け
+
+    欠落があれば `blocking` を立てる。**点数に関わらず合格させない**（quality_gate_worker）。
+    """
+    name = "subtitle_coverage_check"
+    category = "core"
+
+    def analyze(self, ctx, template_config=None):
+        try:
+            from subtitle_engine import coverage
+        except ImportError:
+            from backend.subtitle_engine import coverage  # type: ignore[no-redef]
+
+        checks = []
+        segments = getattr(ctx, "segments", None) or []
+        video = getattr(ctx, "video_path", None)
+        if segments and video and Path(str(video)).exists():
+            checks.append(("素材", str(video), segments, "sourceStart", "sourceEnd"))
+        preview = getattr(ctx, "preview_path", None)
+        if preview and Path(str(preview)).exists():
+            try:
+                from smart_cut_engine import subtitle_sidecar_path
+            except ImportError:
+                from backend.smart_cut_engine import subtitle_sidecar_path  # type: ignore[no-redef]
+            side = subtitle_sidecar_path(preview)
+            if side.exists():
+                try:
+                    rows = json.loads(side.read_text(encoding="utf-8"))
+                    checks.append(("出力", str(preview), rows, "start", "end"))
+                except (OSError, ValueError) as e:
+                    logger.warning(f"字幕の横置き JSON を読めません: {e}")
+        if not checks:
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "素材・出力と字幕の組が揃いません"}
+
+        cache = getattr(ctx, "_coverage_cache", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            try:
+                ctx._coverage_cache = cache
+            except AttributeError:
+                pass
+        feedback, reports, blocking = [], {}, False
+        for label, media, segs, sk, ek in checks:
+            key = (label, media, len(segs))
+            try:
+                if key not in cache:
+                    keyed = [s if s.get(sk) is not None else {**s, sk: s.get("start"), ek: s.get("end")}
+                             for s in segs if isinstance(s, dict)]
+                    cache[key] = coverage.check_media(media, keyed, start_key=sk, end_key=ek)
+                rep = cache[key]
+            except Exception as e:  # ffmpeg が無い・読めない
+                return {"deductions": 0, "feedback": [], "checked": False,
+                        "skip_reason": f"発話区間を測れません: {e}"}
+            reports[label] = rep.to_dict()
+            if rep.has_gaps:
+                blocking = True
+                feedback.append(f"⛔ 字幕の欠落（{label}）: {rep.summary()}")
+        deductions = 30 if blocking else 0
+        return {"deductions": deductions, "feedback": feedback, "blocking": blocking,
+                "coverage": reports}
+
+
 class DeadAirCheck(QualityCheckPlugin):
     """無音区間チェック（dead_air_max_seconds）"""
     name = "dead_air_check"
@@ -1196,6 +1268,7 @@ PLUGIN_REGISTRY: List[QualityCheckPlugin] = [
     AIRuleCheck(),
     AudioPresenceCheck(),
     DurationSanityCheck(),
+    SubtitleCoverageCheck(),
     # テンプレート基準
     SubtitleSpeedCheck(),
     SubtitleLineCheck(),
@@ -1421,5 +1494,8 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
         # 減点 0 として点に効いてしまう。値ではなくこの2つで表す。
         "failed_plugins": failed_plugins,
         "all_plugins_ran": not failed_plugins,
+        # **点数に関わらず合格させない欠陥**（字幕の欠落など）。名前の一覧
+        "blocking": [n for n, r in plugin_results.items()
+                     if isinstance(r, dict) and r.get("blocking")],
     }
 

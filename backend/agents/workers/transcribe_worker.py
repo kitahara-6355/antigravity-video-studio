@@ -38,8 +38,14 @@ def transcribe_engine() -> str:
 
 
 def _gemini_checkpoint(whisper_checkpoint: str) -> str:
+    """Gemini の起こしのキャッシュ。**刻み方が変わったら別のキャッシュにする**
+    （120 秒チャンクで欠落した起こしを、30 秒に変えた後も使い回さないため）。"""
+    from subtitle_engine.gemini_transcriber import CHUNK_SEC
     p = Path(whisper_checkpoint)
-    return str(p.with_name(p.name.replace("_whisper_", "_gemini_", 1)))
+    name = p.name.replace("_whisper_", "_gemini_", 1)
+    if CHUNK_SEC != 120:  # 120 秒時代のキャッシュ名はそのまま読めるようにしておく
+        name = name.replace("_gemini_", f"_gemini_c{CHUNK_SEC}_", 1)
+    return str(p.with_name(name))
 
 
 class TranscribeWorker(PipelineStageWorker):
@@ -281,7 +287,8 @@ class TranscribeWorker(PipelineStageWorker):
             stage_name=self.name, success=True,
             detail=f"{len(tx.segments)}セグメント検出 (Gemini {', '.join(tx.models_used)}・{tx.chunks}チャンク)",
             data={"segment_count": len(tx.segments), "engine": "gemini", "model": tx.model,
-                  "models_used": tx.models_used, "chunks": tx.chunks},
+                  "models_used": tx.models_used, "chunks": tx.chunks,
+                  "rechecked": tx.rechecked, "coverage": tx.coverage},
             duration_seconds=round(time.time() - start, 1),
         )
 

@@ -57,6 +57,81 @@ def remove_fillers(text: str) -> str:
 
 
 # ============================================================
+# 聞くだけで足りる言葉（2026-10-06 ユーザー指摘）
+# ============================================================
+# 「さて」「それから」は文字にすると重要そうに見えるが、話の中身には触れない。
+# 耳で聞けば足りるので字幕から外す。一覧はテンプレートの subtitle_rules
+# （omit_lead_words / omit_standalone_words）。
+
+_LEAD_PUNCT = "、,，"
+_STANDALONE_STRIP = "、。，．,.！？!?…ー〜～ 　"
+
+
+def _omit_words(key: str) -> list[str]:
+    try:
+        from template_config import template_config
+        words = template_config.get_subtitle_rules().get(key)
+    except Exception:  # テンプレートが読めなければ外さない
+        return []
+    if not isinstance(words, list):
+        return []
+    return sorted({w for w in words if isinstance(w, str) and w}, key=len, reverse=True)
+
+
+def strip_lead_words(text: str, words: list[str] | None = None) -> str:
+    """文頭（文・字幕の頭）の「さて、」「それから、」などを外す。
+
+    **後ろに「、」が続くときだけ。**「それから3年後」のように内容に掛かる用法は残す。
+    外した結果が空になるときは元のまま返す（相づちだけの字幕は別の規則で扱う）。
+    """
+    if not isinstance(text, str) or not text:
+        return text
+    words = _omit_words("omit_lead_words") if words is None else words
+    if not words:
+        return text
+    out, i, n = [], 0, len(text)
+    at_head = True
+    while i < n:
+        if at_head:
+            hit = next((w for w in words if text.startswith(w, i)
+                        and i + len(w) < n and text[i + len(w)] in _LEAD_PUNCT), None)
+            if hit:
+                i += len(hit) + 1
+                while i < n and text[i] in " 　":
+                    i += 1
+                continue
+        ch = text[i]
+        if at_head and ch in _LEAD_PUNCT:  # フィラーを外した跡の「、」
+            i += 1
+            continue
+        out.append(ch)
+        at_head = ch in SENTENCE_END
+        i += 1
+    result = "".join(out).strip()
+    return result if result else text
+
+
+def is_standalone_omittable(text: str, words: list[str] | None = None) -> bool:
+    """相づちだけの字幕か（「はい。」「うん、なるほど。」）。音声は残し、字幕だけ出さない。"""
+    if not isinstance(text, str):
+        return False
+    body = "".join(ch for ch in text if ch not in _STANDALONE_STRIP and ch != "\n")
+    if not body:
+        return False
+    words = _omit_words("omit_standalone_words") if words is None else words
+    if not words:
+        return False
+    # 一覧の言葉だけでできているか（「はいはい」「うんうん」も）
+    reachable = [True] + [False] * len(body)
+    for i in range(len(body)):
+        if reachable[i]:
+            for w in words:
+                if body.startswith(w, i):
+                    reachable[i + len(w)] = True
+    return reachable[-1]
+
+
+# ============================================================
 # 言語境界分割（メイン）
 # ============================================================
 
@@ -551,6 +626,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
             max_chars = MAX_CHARS_PER_LINE
 
     max_lines = get_max_lines_from_template()
+    lead_words = _omit_words("omit_lead_words")
     formatted = []
     split_count = 0
     semantic_count = 0
@@ -567,8 +643,8 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
                 continue
             text = text.strip()
 
-            # Step 1: フィラー除去
-            cleaned = remove_fillers(text)
+            # Step 1: フィラー除去・文頭の聞き流し語（さて、それから、）を外す
+            cleaned = strip_lead_words(remove_fillers(text), lead_words)
             if cleaned != text:
                 filler_count += 1
 

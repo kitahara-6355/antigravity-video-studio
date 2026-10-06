@@ -15,6 +15,12 @@
    （cost_guard の台帳・枠の降格が効く）。モデルは `model_policy` の
    `transcription` 工程の段から引く（直書きしない）
 3. 応答の時刻を**チャンクの長さに収め**、重なりを詰めて、絶対時刻に直す
+4. **欠落を自分で検知して起こし直す。** 音声の「喋っている長さ」に比べて文字が
+   極端に少ないチャンクは、半分の長さに刻んでもう一度起こし、文字が増えた方を採る
+   （`coverage.py`）。残った欠落は結果の `coverage` に載せ、品質ゲートが見る
+
+2026-10-06: チャンクを 120 秒 → 30 秒にした。120 秒では Flash 系が約 30 秒の発話を
+丸ごと落とし、残った1文に 54 秒分の時刻を付けた（同じ区間を 30 秒で起こすと正しく出た）。
 
 **1チャンクでも落ちたら全体を失敗にする。** 後段の SmartCut は字幕のある範囲だけを
 残すので、黙って抜けたチャンクはそのまま動画から消える。
@@ -34,7 +40,7 @@ from typing import Any, Callable
 logger = logging.getLogger(__name__)
 
 TASK = "transcription"
-CHUNK_SEC = 120
+CHUNK_SEC = 30
 PARALLEL = 4
 MIN_SEG_SEC = 0.3
 
@@ -57,6 +63,10 @@ class TranscribeResult:
     model: str
     chunks: int
     models_used: list[str] = field(default_factory=list)
+    # 起こし直したチャンク（開始秒・元の文字数・起こし直し後の文字数）
+    rechecked: list[dict] = field(default_factory=list)
+    # 起こし終えた後の欠落の測定（coverage.CoverageReport.to_dict()）。測れなければ None
+    coverage: dict | None = None
 
 
 def _extract_json_array(text: str) -> list:
@@ -227,11 +237,79 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
             results = list(pool.map(one, enumerate(chunks)))
 
+        speech = _speech_or_none(video_path)
+        rechecked: list[dict] = []
+        if speech is not None:
+            for i, (path, offset, dur) in enumerate(chunks):
+                if not _is_sparse(results[i][0], speech, offset, dur):
+                    continue
+                before = _chars(results[i][0])
+                try:
+                    redo = _retranscribe_halves(path, offset, dur, Path(tmp), i,
+                                                lambda p, o, d: call(client, model, p, d))
+                except _retryable() as e:
+                    logger.warning(f"  ⚠️ チャンク {i + 1} の起こし直しに失敗: {e}")
+                    continue
+                after = _chars(redo[0])
+                rechecked.append({"start": round(offset, 1), "chars_before": before,
+                                  "chars_after": after, "adopted": after > before})
+                logger.warning(f"  🔁 チャンク {i + 1}（{offset:.0f}秒〜）は文字が薄いので起こし直し: "
+                               f"{before} → {after} 文字")
+                if after > before:
+                    results[i] = redo
+
     segments = [s for segs, _ in results for s in segs]
     if not segments:
         raise TranscriptionError("発話が1件も起こせませんでした")
     used = sorted({u for _, u in results})
-    return TranscribeResult(segments=segments, model=model, chunks=len(chunks), models_used=used)
+    report = None
+    if speech is not None:
+        from subtitle_engine import coverage
+        report = coverage.measure(segments, speech[0], speech[1]).to_dict()
+        if report["has_gaps"]:
+            logger.warning(f"⚠️ 文字起こしに欠落が残っています: {report['uncovered_sec']}秒・"
+                           f"薄い区間 {len(report['sparse'])}件")
+    return TranscribeResult(segments=segments, model=model, chunks=len(chunks), models_used=used,
+                            rechecked=rechecked, coverage=report)
+
+
+def _chars(segs: list[dict]) -> int:
+    return sum(len(s.get("text", "")) for s in segs)
+
+
+def _speech_or_none(video_path: str | Path):
+    """(音がある区間, 全体の長さ)。測れなければ None（起こし直しと測定を飛ばす）。"""
+    try:
+        from subtitle_engine import coverage
+        return coverage.speech_intervals(video_path)
+    except Exception as e:  # ffmpeg が無い・テストの差し替え音源など
+        logger.warning(f"発話区間を測れないので欠落の検知を飛ばします: {e}")
+        return None
+
+
+def _is_sparse(segs: list[dict], speech, offset: float, dur: float) -> bool:
+    from subtitle_engine import coverage
+    talk = sum(coverage._overlap(a, b, offset, offset + dur) for a, b in speech[0])
+    if talk < coverage.MIN_SPEECH_IN_WINDOW:
+        return False
+    return _chars(segs) / talk < coverage.SPARSE_CPS
+
+
+def _retranscribe_halves(path: Path, offset: float, dur: float, work: Path, idx: int,
+                         call_one) -> tuple[list[dict], str]:
+    """1チャンクを半分ずつに刻んで起こし直す。"""
+    half = dur / 2
+    segs: list[dict] = []
+    used = ""
+    for j in range(2):
+        sub = work / f"chunk_{idx:03d}_{j}.mp3"
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-ss", f"{j * half:.3f}", "-t", f"{half:.3f}",
+             "-i", str(path), "-c", "copy", str(sub)],
+            capture_output=True, text=True, check=True, timeout=120)
+        text, used = call_one(sub, offset + j * half, half)
+        segs.extend(parse_segments(text, offset + j * half, half))
+    return segs, used
 
 
 def write_checkpoint(segments: list[dict], path: str | Path) -> None:

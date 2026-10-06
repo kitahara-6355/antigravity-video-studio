@@ -9,6 +9,7 @@ Phase D 変更:
   - video_editor_engine.FFmpegEditor を利用
 """
 
+import json
 import os
 import sys
 import logging
@@ -73,12 +74,22 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
         logger.warning(f"入力動画duration取得失敗: {e}")
     
     # SRT ファイルを一時生成
+    # 相づちだけの字幕（「はい。」）は出さない。音声とカットはそのまま（2026-10-06 ユーザー指摘）
+    try:
+        from subtitle_engine.text_formatter import is_standalone_omittable, _omit_words
+        standalone = _omit_words("omit_standalone_words")
+    except ImportError:
+        is_standalone_omittable, standalone = None, []
     srt_lines = []
+    hidden = 0
     for i, s in enumerate(segments, 1):
         start = s.get("start", 0)
         end = s.get("end", 0)
         text = s.get("text", "").strip()
         if not text:
+            continue
+        if standalone and is_standalone_omittable(text, standalone):
+            hidden += 1
             continue
         
         def _fmt_srt(sec):
@@ -96,7 +107,7 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
     # BUG-PV02: SRT末尾のタイムスタンプをログ出力
     if srt_lines:
         max_end = max((s.get("end", 0) for s in segments), default=0)
-        logger.info(f"SRT生成: {len([l for l in srt_lines if l.strip() and '-->' in l])}エントリ, max(end)={max_end:.1f}s")
+        logger.info(f"SRT生成: {len([l for l in srt_lines if l.strip() and '-->' in l])}エントリ, max(end)={max_end:.1f}s, 相づちで非表示={hidden}件")
         if video_duration and max_end > video_duration + 5:
             logger.warning(f"⚠️ SRT max(end)={max_end:.1f}s > 動画尺{video_duration:.1f}s — 動画膨張リスク!")
     
@@ -248,6 +259,22 @@ def _display_span(seg: dict) -> tuple[float, float]:
     return src_start, src_end
 
 
+def subtitle_sidecar_path(video_path) -> Path:
+    """出力動画の時間軸の字幕（JSON）の置き場所。"""
+    p = Path(video_path)
+    return p.with_name(p.stem + ".subtitles.json")
+
+
+def write_subtitle_sidecar(video_path, segments) -> None:
+    try:
+        rows = [{"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
+                 "text": s.get("text", "")} for s in segments]
+        subtitle_sidecar_path(video_path).write_text(
+            json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+    except (OSError, TypeError, ValueError) as e:
+        logger.warning(f"字幕の横置き JSON を書けませんでした: {e}")
+
+
 def retime_segments(segments, merged):
     """BUG-PV02/PV04: 字幕の時刻をカット後の時間軸に直す。
 
@@ -387,6 +414,10 @@ def render_smart_cut(
         recalculated_segments, output_offset, cut_points = retime_segments(segments, merged)
 
         logger.info(f"SRTタイムスタンプ再計算: {len(segments)}seg → {len(recalculated_segments)}seg, 出力尺={output_offset:.1f}s, カットポイント={len(cut_points)}箇所")
+
+        # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
+        # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）
+        write_subtitle_sidecar(output_path, recalculated_segments)
 
         # 5. Overlay Subtitles via FFmpeg (Phase D: MoviePy 完全脱却)
         burn_result = _burn_subtitles_ffmpeg(str(temp_cut_path), recalculated_segments, output_path, ffmpeg)
