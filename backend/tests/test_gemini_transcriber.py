@@ -91,7 +91,7 @@ def test_transcribe_splits_into_chunks_and_offsets_each(clip):
         seen.append(round(duration, 1))
         return json.dumps([{"start": 0.5, "end": 1.5, "text": f"c{len(seen)}"}]), model
 
-    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=call)
+    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=call, backoff=0)
 
     assert result.chunks == 3
     assert [s["start"] for s in result.segments] == [0.5, 2.5, 4.5]
@@ -107,7 +107,7 @@ def test_one_failed_chunk_fails_the_whole_transcription(clip):
         return json.dumps([{"start": 0, "end": 1, "text": "a"}]), model
 
     with pytest.raises(gt.TranscriptionError) as exc:
-        gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=call)
+        gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=call, backoff=0)
     assert "チャンク 2/3" in str(exc.value)
 
 
@@ -121,7 +121,7 @@ def test_a_flaky_chunk_is_retried(clip):
             return "壊れた応答", model
         return json.dumps([{"start": 0, "end": 1, "text": "a"}]), model
 
-    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=10, parallel=1, call=call)
+    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=10, parallel=1, call=call, backoff=0)
 
     assert calls["n"] == 2
     assert len(result.segments) == 1
@@ -147,5 +147,5 @@ def test_a_budget_stop_is_not_retried(clip):
         raise CostLimitExceeded("残高なし")
 
     with pytest.raises(CostLimitExceeded):
-        gt.transcribe(clip, client=object(), model="m", chunk_sec=10, parallel=1, call=call)
+        gt.transcribe(clip, client=object(), model="m", chunk_sec=10, parallel=1, call=call, backoff=0)
     assert calls["n"] == 1

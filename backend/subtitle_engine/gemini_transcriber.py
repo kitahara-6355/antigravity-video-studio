@@ -32,6 +32,7 @@ import logging
 import re
 import subprocess
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -210,7 +211,7 @@ def _call(client: Any, model: str, audio: Path, duration: float) -> tuple[str, s
 def transcribe(video_path: str | Path, *, client: Any = None, model: str | None = None,
                chunk_sec: int = CHUNK_SEC, parallel: int = PARALLEL,
                call: Callable[..., tuple[str, str]] | None = None,
-               attempts: int = 2) -> TranscribeResult:
+               attempts: int = 4, backoff: float = 3.0) -> TranscribeResult:
     """動画の音声を Gemini で起こす。1チャンクでも起こせなければ `TranscriptionError`。"""
     model = model or _resolve_model()
     client = client if client is not None else _default_client()
@@ -232,6 +233,10 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                 except _retryable() as e:
                     last = e
                     logger.warning(f"  ⚠️ チャンク {i + 1}/{len(chunks)} 試行 {attempt + 1}: {e}")
+                    # 502/503（上流の混雑）は数秒で戻ることが多い。チャンクが 87 本あると
+                    # 2回だけでは1本は当たって全体が落ちる（2026-10-06 実測）
+                    if attempt + 1 < attempts and backoff > 0:
+                        time.sleep(backoff * (2 ** attempt))
             raise TranscriptionError(f"チャンク {i + 1}/{len(chunks)}（{offset:.0f}秒〜）を起こせません: {last}")
 
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:

@@ -187,7 +187,7 @@ def test_sparse_chunk_is_retranscribed_in_halves(tmp_path, monkeypatch):
             return json.dumps([{"start": 0, "end": 20, "text": "あ" * 20}]), model
         return json.dumps([{"start": 0, "end": duration, "text": "い" * 70}]), model
 
-    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=20, parallel=1, call=call)
+    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=20, parallel=1, call=call, backoff=0)
 
     assert calls == [20, 10, 10]
     assert result.rechecked == [{"start": 0.0, "chars_before": 20, "chars_after": 140, "adopted": True}]
