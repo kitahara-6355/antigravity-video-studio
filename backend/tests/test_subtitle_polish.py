@@ -204,3 +204,15 @@ def test_lead_word_at_the_head_of_a_later_caption_is_removed():
     text = "で、ちょっと大変なことになるなって思ってるところで、じゃあ筆が本当に入ってこなかったら、筆作ろうかなみたいな。"
     out = tf.format_segments([{"text": text, "start": 0.0, "end": 8.0}], 18)
     assert out and not any(s["text"].startswith("じゃあ") for s in out)
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("あの", True),
+    ("えー、あの。", True),
+    ("えっと", True),
+    ("あの映画のタイトル", False),
+])
+def test_filler_only_caption_is_not_shown(text, expected):
+    # 実例（4分02秒）: 「あの」だけの字幕が 0.9 秒出た。音声認識にも聞こえていない
+    from template_constants import _DEFAULT_SUBTITLE_RULES as rules
+    assert tf.is_standalone_omittable(text, rules["omit_standalone_words"]) is expected

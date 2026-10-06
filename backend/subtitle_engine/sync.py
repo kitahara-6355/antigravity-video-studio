@@ -355,6 +355,25 @@ def _drop_unheard_flashes(items: list[dict]) -> int:
     return dropped
 
 
+def _drop_past_end(items: list[dict], end: float) -> int:
+    """映像の終わりより後ろの字幕は出さず、終わりをまたぐ字幕は終わりで切る。
+
+    締めの字幕が、前の字幕の時刻合わせに押されて尺の外に出た（37分45秒・2026-10-06 実測）。
+    """
+    if not end or end <= 0:
+        return 0
+    dropped = 0
+    for s in items:
+        if s.get("_merged"):
+            continue
+        if s["start"] >= end - MIN_STEP_SEC:
+            s["_merged"] = True
+            dropped += 1
+        elif s["end"] > end:
+            s["end"] = round(end, 3)
+    return dropped
+
+
 def align_segments(segments: list[dict], speech: SpeechMap,
                    cut_points: list[float] | None = None,
                    rules: dict | None = None) -> tuple[list[dict], dict]:
@@ -446,8 +465,9 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     for s, a, b in zip(items, ins, outs):
         s["start"], s["end"] = round(a, 3), round(max(b, a + 0.2), 3)
         result.append(s)
+    past_end = _drop_past_end(result, speech.duration)
     merged = _merge_flashes(result, r["min_display_sec"])
-    dropped = _drop_unheard_flashes(result)
+    dropped = _drop_unheard_flashes(result) + past_end
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
              "redistributed": redistributed, "merged": merged, "dropped": dropped}
     result = [s for s in result if not s.get("_merged")]

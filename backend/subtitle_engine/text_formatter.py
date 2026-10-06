@@ -135,6 +135,8 @@ def is_standalone_omittable(text: str, words: list[str] | None = None) -> bool:
     if not body:
         return False
     words = _omit_words("omit_standalone_words") if words is None else words
+    # 一覧の言葉も本文と同じく伸ばし棒などを除いて比べる（「えー」は本文では「え」になる）
+    words = [w for w in ("".join(ch for ch in w if ch not in _STANDALONE_STRIP) for w in words) if w]
     if not words:
         return False
     # 一覧の言葉だけでできているか（「はいはい」「うんうん」も）

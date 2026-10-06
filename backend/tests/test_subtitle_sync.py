@@ -271,3 +271,16 @@ def test_speech_map_reads_media(tmp_path):
     sp = sync.speech_map(str(media))
     assert sp.onsets == pytest.approx([1.0], abs=0.05)
     assert sp.offsets == pytest.approx([3.0], abs=0.05)
+
+
+def test_captions_past_the_end_of_the_video_are_not_shown():
+    # 実例（37分45秒）: 締めの「ありがとうございました」が映像の終わり（2265.4 秒）より
+    # 後ろに出ていた。終わりをまたぐ字幕は終わりで切り、後ろの字幕は出さない
+    sp = _map([(0.5, 2.0), (2.5, 4.6)], total=5.0)
+    segs = [{"start": 0.5, "end": 2.0, "text": "本日は"},
+            {"start": 2.5, "end": 6.0, "text": "どうもありがとうございました"},
+            {"start": 6.2, "end": 7.0, "text": "ありがとうございました"}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["本日は", "どうもありがとうございました"]
+    assert out[-1]["end"] <= sp.duration
+    assert stats["dropped"] == 1
