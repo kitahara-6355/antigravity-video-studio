@@ -90,7 +90,9 @@ class ModelGovernanceEngine:
     # 同一モデルで再試行する対象。**404 は入れない。**
     # 存在しないモデルは待っても現れない。降格だけが正しい対処で、
     # 叩き直すのは無駄な負荷にしかならない。
-    RETRYABLE_ERROR_CODES = {429, 503}
+    # 500/502/504 はサーバー側・経路上の一時エラー（2026-10-06 の実走で
+    # 校閲のバッチの多くが 502 で落ち、同じ時間帯に数秒で通る呼び出しもあった）。
+    RETRYABLE_ERROR_CODES = {429, 500, 502, 503, 504}
     RETRYABLE_ERROR_KEYWORDS = ("RESOURCE_EXHAUSTED", "UNAVAILABLE")
 
     # リトライ設定

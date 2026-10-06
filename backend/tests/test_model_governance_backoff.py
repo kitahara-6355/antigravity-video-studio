@@ -68,6 +68,14 @@ def test_429と503は再試行対象(engine):
     assert engine.is_retryable_error(ServiceUnavailable("overloaded")) is True
 
 
+@pytest.mark.parametrize("code", [500, 502, 504])
+def test_サーバーと経路の一時エラーも再試行対象(engine, code):
+    """2026-10-06 の実走: 校閲のバッチの多くが 502 Bad Gateway
+    （upstream request failed）で落ち、再試行されずに未校閲で残りかけた。
+    同じ時間帯でも数秒で通る呼び出しがあり、待てば通る一時エラーだった。"""
+    assert engine.is_retryable_error(_api_error(code, "upstream request failed")) is True
+
+
 def test_404と400は再試行しない(engine):
     """モデル不在も不正リクエストも、待って直るものではない。"""
     assert engine.is_retryable_error(_api_error(404, "NOT_FOUND")) is False
@@ -139,6 +147,23 @@ def test_503は同じモデルで再試行してから成功する(engine):
 
     assert proxy.generate_content(model="model-a") == "ok"
     assert calls == ["model-a", "model-a", "model-a"], "降格せず同じ段で粘るはず"
+
+
+def test_502は同じモデルで再試行してから成功する(engine):
+    real = MagicMock()
+    calls = []
+
+    def side_effect(*, model, **kwargs):
+        calls.append(model)
+        if len(calls) < 2:
+            raise _api_error(502, "upstream request failed")
+        return "ok"
+
+    real.generate_content.side_effect = side_effect
+    proxy = GovernedModelsProxy(real, "test")
+
+    assert proxy.generate_content(model="model-a") == "ok"
+    assert calls == ["model-a", "model-a"]
 
 
 def test_再試行の待ち時間が実際に指数で伸びる(engine):
