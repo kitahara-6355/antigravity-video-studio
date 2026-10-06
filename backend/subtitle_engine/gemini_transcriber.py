@@ -29,6 +29,14 @@
 残った（素材の 90 秒の境目で「…スタートし」+「だったんですけど」。認識は「スタートしたんですけど」）。
 静かな所で切ると語の途中は 3 か所（前後に認識した文字の間が 0.25 秒未満の区切りを数えた）。
 
+試して捨てた案（2026-10-06）: 固有名詞辞書の人名・用語を指示に添えて先に教える
+（Whisper の initial_prompt の考え）。名前の聞き違いは 13→7 件に減ったが、別の語が名前に
+置き換わり（「広島の熊野も」→「広島の久木田のも」）、字を書いている無音の場面に「久木田博信」が
+出た。名前の直しは校閲の辞書に任せる。
+
+2026-10-06: 区切りをずらしてもう1回起こし、食い違いを手元の音声認識で決める
+（`transcript_fusion`・文字起こしの工程が呼ぶ）。区切りを変えると聞き違いが別の所に出るため。
+
 **1チャンクでも落ちたら全体を失敗にする。** 後段の SmartCut は字幕のある範囲だけを
 残すので、黙って抜けたチャンクはそのまま動画から消える。
 """
@@ -64,6 +72,11 @@ QUIET_RATE = 8000
 QUIET_TIE = 0.05
 # キャッシュ名の印。区切り方が変わったら変える（transcribe_worker._gemini_checkpoint）
 CUT_TAG = "q"
+# 2回目の起こし（transcript_fusion）: 最初のチャンクを半分にして、区切りを1回目の区切りの中ほどにずらす。
+# 1回目の区切りの前後の語が、2回目ではチャンクの真ん中に来る
+SECOND_PASS = True
+SECOND_PASS_FIRST_SEC = CHUNK_SEC / 2
+SECOND_PASS_TAG = "b"
 
 PROMPT = """この音声は日本語の会話（{duration:.0f}秒）です。発話をすべて文字起こししてください。
 
@@ -215,23 +228,26 @@ class QuietMap:
 
 
 def plan_chunks(total: float, chunk_sec: float = CHUNK_SEC,
-                quiet: QuietMap | None = None) -> list[tuple[float, float]]:
+                quiet: QuietMap | None = None, first: float | None = None) -> list[tuple[float, float]]:
     """チャンクの (開始, 長さ) の並び。
 
     区切りは前の区切りから chunk_sec の 2/3〜1 倍の間で一番静かな所（同じくらい静かなら
     長い方）。音の地図が無ければ chunk_sec 秒ごと（従来どおり）。
+    first は最初のチャンクの長さ（2回目の起こしで区切りをずらす: `SECOND_PASS_FIRST_SEC`）。
     """
-    shortest = chunk_sec * MIN_CHUNK_RATIO
     out: list[tuple[float, float]] = []
     offset = 0.0
+    length = first or chunk_sec
     while offset < total - 0.05:
-        end = offset + chunk_sec
+        end = offset + length
         if end >= total - 0.05:
             out.append((offset, total - offset))
             break
-        cut = quiet.quietest(offset + shortest, end, target=end) if quiet is not None else end
+        cut = (quiet.quietest(offset + length * MIN_CHUNK_RATIO, end, target=end)
+               if quiet is not None else end)
         out.append((offset, cut - offset))
         offset = cut
+        length = chunk_sec
     return out
 
 
@@ -382,15 +398,19 @@ def _is_echo(text: str, prev: str) -> bool:
 def transcribe(video_path: str | Path, *, client: Any = None, model: str | None = None,
                chunk_sec: int = CHUNK_SEC, parallel: int = PARALLEL,
                call: Callable[..., tuple[str, str]] | None = None,
-               attempts: int = 4, backoff: float = 3.0) -> TranscribeResult:
-    """動画の音声を Gemini で起こす。1チャンクでも起こせなければ `TranscriptionError`。"""
+               attempts: int = 4, backoff: float = 3.0,
+               first_chunk_sec: float | None = None) -> TranscribeResult:
+    """動画の音声を Gemini で起こす。1チャンクでも起こせなければ `TranscriptionError`。
+
+    first_chunk_sec は最初のチャンクの長さ（2回目の起こしで区切りをずらす）。
+    """
     model = model or _resolve_model()
     client = client if client is not None else _default_client()
     call = call or _call
 
     with tempfile.TemporaryDirectory(prefix="gemini_tx_") as tmp:
         quiet_map = QuietMap.from_media(video_path)
-        plan = plan_chunks(_probe_duration(video_path), chunk_sec, quiet_map)
+        plan = plan_chunks(_probe_duration(video_path), chunk_sec, quiet_map, first=first_chunk_sec)
         chunks = split_audio(video_path, tmp, plan=plan)
         logger.info(f"🎤 Gemini 文字起こし: {len(chunks)} チャンク（長くても{chunk_sec}秒・"
                     f"{'話の切れ目' if quiet_map is not None else '機械的'}に区切る）model={model}")
