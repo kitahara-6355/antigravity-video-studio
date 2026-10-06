@@ -270,7 +270,13 @@ class SubtitleLineCheck(QualityCheckPlugin):
             max_cpl = template_config.get_subtitle_rules().get("max_chars_per_line", 15)
         else:
             tmpl_id = "業界標準"
-            max_cpl = 15  # テレビ放送標準: 15文字/行
+            # 字幕の整形と同じ既定値で測る（1行 18 字・2026-10-06 ユーザー了承）。放送の 15 字の
+            # ままだと、整形どおりの字幕が毎回「長い行」として 5 点引かれる
+            try:
+                from template_constants import _DEFAULT_SUBTITLE_RULES
+                max_cpl = int(_DEFAULT_SUBTITLE_RULES["max_chars_per_line"])
+            except (ImportError, KeyError, TypeError, ValueError):
+                max_cpl = 15  # テレビ放送標準: 15文字/行
         long_lines = 0
         
         for seg in ctx.segments:

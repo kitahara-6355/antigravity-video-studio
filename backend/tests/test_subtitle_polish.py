@@ -227,3 +227,15 @@ def test_a_lone_kanji_is_not_split_from_its_compound():
     lines = [line for c in caps for line in c.split("\n")]
     assert not any(line.startswith("人") for line in lines)
     assert any("一般社団法人" in line for line in lines)
+
+
+def test_line_length_check_follows_the_formatters_line_width():
+    # 1行 18 字に広げた（2026-10-06 ユーザー了承）のに、品質ゲートはテンプレートが無いと
+    # 放送の 15 字で測り、整形どおりの字幕で毎回 5 点引いていた
+    from quality_gate_plugins import SubtitleLineCheck
+    from template_constants import _DEFAULT_SUBTITLE_RULES as rules
+    width = rules["max_chars_per_line"]
+    ok = SimpleNamespace(segments=[{"text": "あ" * width} for _ in range(5)])
+    long = SimpleNamespace(segments=[{"text": "あ" * (width + 1)} for _ in range(5)])
+    assert SubtitleLineCheck().analyze(ok)["deductions"] == 0
+    assert SubtitleLineCheck().analyze(long)["deductions"] == 5
