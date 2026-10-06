@@ -383,8 +383,10 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                 if key not in cache:
                     keyed = [s if s.get(sk) is not None else {**s, sk: s.get("start"), ek: s.get("end")}
                              for s in segs if isinstance(s, dict)]
+                    # 文字の薄さは見ない（整形でフィラー・相づちを外すと減るのが正しい）。
+                    # 薄さは文字起こしの段階の測定（ctx.transcript_coverage）で見る
                     cache[key] = coverage.check_media(media, keyed, start_key=sk, end_key=ek,
-                                                      exclude=exclude)
+                                                      exclude=exclude, check_sparse=False)
                 rep = cache[key]
             except Exception as e:  # ffmpeg が無い・読めない
                 return {"deductions": 0, "feedback": [], "checked": False,
@@ -397,6 +399,14 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                 feedback.append("⚠ 発話が少ない区間（2回起こしても文字が出ない・人が確認）: "
                                 + ", ".join(coverage._mmss(a) for a, _ in rep.excluded[:6]))
         # 点は品質ゲート側で合格点の下に抑える。ここで大きく引くと他の項目の良し悪しが読めなくなる
+        tx = getattr(ctx, "transcript_coverage", None)
+        if isinstance(tx, dict):
+            reports["文字起こし"] = tx
+            if tx.get("has_gaps"):
+                blocking = True
+                feedback.append(
+                    f"⛔ 字幕の欠落（文字起こし）: 覆われていない発話 {tx.get('uncovered_sec', 0):.0f}秒・"
+                    f"文字が薄い区間 " + (", ".join(coverage._mmss(w["start"]) for w in tx.get("sparse", [])[:6]) or "なし"))
         deductions = 10 if blocking else 0
         return {"deductions": deductions, "feedback": feedback, "blocking": blocking,
                 "coverage": reports}

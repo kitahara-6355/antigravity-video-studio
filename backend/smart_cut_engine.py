@@ -268,7 +268,9 @@ def _cut_kept_ranges_exact(ffmpeg, input_path, ranges, out_path) -> bool:
     """
     if not ranges or not hasattr(ffmpeg, "run_command"):
         return False
-    expr = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in ranges)
+    # 終わりは含めない（gte・lt）。between は両端を含むので、区間ごとに1フレーム余分に
+    # 入り、179 区間で映像が音声より 3 秒長くなった（2026-10-06 実測）
+    expr = "+".join(f"gte(t,{a:.3f})*lt(t,{b:.3f})" for a, b in ranges)
     graph = (f"[0:v]select='{expr}',setpts=N/FRAME_RATE/TB[v];"
              f"[0:a]asetnsamples=n=480:p=0,aselect='{expr}',asetpts=N/SR/TB[a]")
     script = Path(out_path).with_suffix(".filter.txt")

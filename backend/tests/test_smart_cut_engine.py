@@ -1334,7 +1334,8 @@ def test_kept_ranges_are_cut_without_drift(tmp_path):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=60:size=160x90:rate=30",
                     "-f", "lavfi", "-i", "sine=duration=60", "-shortest", "-g", "60", "-pix_fmt", "yuv420p",
                     "-c:a", "aac", str(src)], check=True)
-    ranges = [(t + 0.37, t + 1.71) for t in range(0, 58, 3)]  # 20 区間・キーフレームの間を切る
+    # 20 区間・キーフレームの間を切る。半分はフレームの境目ちょうど（終わりを含めると1フレーム余る）
+    ranges = [(t + 0.37, t + 1.71) if t % 2 else (float(t), t + 1.5) for t in range(0, 58, 3)]
     out = tmp_path / "cut.mp4"
     editor = FFmpegEditor(output_dir=tmp_path)
     editor.use_gpu = False
@@ -1346,4 +1347,4 @@ def test_kept_ranges_are_cut_without_drift(tmp_path):
         dur = float(subprocess.run(["ffprobe", "-v", "error", "-select_streams", stream, "-show_entries",
                                     "stream=duration", "-of", "csv=p=0", str(out)],
                                    capture_output=True, text=True).stdout.strip())
-        assert abs(dur - expected) < 0.15, (stream, dur, expected)
+        assert abs(dur - expected) < 0.1, (stream, dur, expected)

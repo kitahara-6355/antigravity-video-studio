@@ -118,6 +118,8 @@ class PipelineContext:
     planned_output_sec: Optional[float] = None
     # 文字起こしで「音はあるが発話ではない」と確認した区間（素材の秒）。品質ゲートの欠落検知が除外する
     verified_quiet: list = field(default_factory=list)
+    # 文字起こしの段階で測った欠落（coverage.CoverageReport.to_dict()）。文字の薄さはここでだけ測る
+    transcript_coverage: Optional[dict] = None
     session_id: str = ""
     started_at: str = ""
     segments: List[Segment] = field(default_factory=list)

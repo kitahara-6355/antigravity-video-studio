@@ -160,11 +160,16 @@ def _seg_chars(seg: dict) -> int:
 def measure(segments: list[dict], speech: list[tuple[float, float]], duration: float,
             *, start_key: str = "start", end_key: str = "end",
             window: float = WINDOW_SEC,
-            exclude: list[tuple[float, float]] | None = None) -> CoverageReport:
+            exclude: list[tuple[float, float]] | None = None,
+            check_sparse: bool = True) -> CoverageReport:
     """字幕（`start_key`/`end_key` の時間軸）が発話をどれだけ覆っているか。
 
     `exclude` は「音はあるが発話ではない」と確認済みの区間（2回の起こしで文字が出なかった）。
     その中の音は発話として数えない。
+
+    `check_sparse=False` は時間で覆っているかだけを見る。**整形後の字幕**（フィラー・
+    「さて、」・相づちを外した後）は文字が減るのが正しいので、文字の薄さは
+    文字起こしの段階（`gemini_transcriber`）でだけ測る。
     """
     exclude = sorted((float(a), float(b)) for a, b in (exclude or []) if b > a)
     if exclude:
@@ -183,7 +188,7 @@ def measure(segments: list[dict], speech: list[tuple[float, float]], duration: f
     uncovered = [(a, b) for a, b in uncovered if b - a >= 0.5]
 
     sparse = []
-    w0 = 0.0
+    w0 = 0.0 if check_sparse else duration
     while w0 < duration:
         w1 = min(w0 + window, duration)
         talk = sum(_overlap(a, b, w0, w1) for a, b in speech)

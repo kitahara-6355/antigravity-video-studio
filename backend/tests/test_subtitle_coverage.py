@@ -340,3 +340,33 @@ def test_gate_excludes_quiet_windows_and_still_reports_them(tmp_path, monkeypatc
 
     assert result["blocking"] is False
     assert any("人が確認" in f for f in result["feedback"])
+
+
+# ------------------------------------------------------------
+# 6. 文字の薄さは文字起こしの段階でだけ測る（整形後は減るのが正しい）
+# ------------------------------------------------------------
+
+def test_formatted_subtitles_are_checked_for_time_only():
+    """フィラー・相づちを外した字幕は文字が減る。時間で覆っていれば欠落ではない。"""
+    speech = [(0.0, 30.0)]
+    segs = [{"start": 0.0, "end": 30.0, "text": "あ" * 30}]
+
+    assert cv.measure(segs, speech, 30.0).sparse
+    assert not cv.measure(segs, speech, 30.0, check_sparse=False).has_gaps
+
+
+def test_gate_blocks_on_gaps_found_at_transcription(tmp_path, monkeypatch):
+    from quality_gate_plugins import SubtitleCoverageCheck
+
+    video = tmp_path / "src.mp4"
+    video.write_bytes(b"x")
+    monkeypatch.setattr(cv, "speech_intervals", lambda media: ([(0.0, 30.0)], 30.0))
+    ctx = SimpleNamespace(segments=[{"start": 0, "end": 30, "sourceStart": 0, "sourceEnd": 30, "text": "あ" * 30}],
+                          video_path=str(video), preview_path=None, verified_quiet=[],
+                          transcript_coverage={"has_gaps": True, "uncovered_sec": 0.0,
+                                               "sparse": [{"start": 60.0}]})
+
+    result = SubtitleCoverageCheck().analyze(ctx)
+
+    assert result["blocking"] is True
+    assert any("文字起こし" in f and "1:00" in f for f in result["feedback"])

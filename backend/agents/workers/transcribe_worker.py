@@ -268,7 +268,9 @@ class TranscribeWorker(PipelineStageWorker):
             segments = self._load_segments_from_checkpoint(checkpoint)
             ctx.segments = segments
             from subtitle_engine import gemini_transcriber
-            ctx.verified_quiet = [tuple(q) for q in gemini_transcriber.read_meta(checkpoint).get("quiet", [])]
+            meta = gemini_transcriber.read_meta(checkpoint)
+            ctx.verified_quiet = [tuple(q) for q in meta.get("quiet", [])]
+            ctx.transcript_coverage = meta.get("coverage")
             return StageResult(
                 stage_name=self.name, success=True,
                 detail=f"{len(segments)}セグメント検出 (Gemini・キャッシュ)",
@@ -288,6 +290,7 @@ class TranscribeWorker(PipelineStageWorker):
             return None
         ctx.segments = tx.segments
         ctx.verified_quiet = list(tx.quiet)
+        ctx.transcript_coverage = tx.coverage
         return StageResult(
             stage_name=self.name, success=True,
             detail=f"{len(tx.segments)}セグメント検出 (Gemini {', '.join(tx.models_used)}・{tx.chunks}チャンク)",
