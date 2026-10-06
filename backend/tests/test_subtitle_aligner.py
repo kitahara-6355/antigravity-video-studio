@@ -181,3 +181,32 @@ def test_unaligned_captions_keep_their_order_when_there_is_no_room():
     aligner.align_captions(caps, toks("あいうえお", 10.0) + toks("かきくけこ", 11.0))
     aligner.interpolate_unaligned(caps)
     assert caps[0]["start"] <= caps[1]["start"] <= caps[2]["start"]
+
+
+def test_a_character_the_proofreader_added_but_nobody_said_is_removed():
+    # 実例（68 秒）: 校閲が「最初 に 書 に」を「最初にな書に」にした（前の回は「最初実に」）
+    ref = aligner.referee_from_tokens(toks("まず先生が最初に書に出会ったきっかけっていうのは", 70.0))
+    seg = {"start": 70.0, "end": 76.0,
+           "text": "まず 先生 が え 、 最初 に 書 に 出会っ た きっかけっ て いう の は"}
+    want = "まず先生が最初に書に出会ったきっかけっていうのは"
+    assert ref.trim(seg, "まず先生が最初にな書に出会ったきっかけっていうのは") == want
+    assert ref.trim(seg, "まず先生が最初実に書に出会ったきっかけっていうのは") == want
+
+
+def test_an_added_word_the_audio_has_is_kept():
+    ref = aligner.referee_from_tokens(toks("久木田デザイン書道塾を主宰されて", 50.0))
+    seg = {"start": 50.0, "end": 54.0, "text": "久木田デザイン書道塾主宰されて"}
+    assert ref.trim(seg, "久木田デザイン書道塾を主宰されて") == "久木田デザイン書道塾を主宰されて"
+
+
+def test_replacements_are_not_trimmed():
+    # 「読んで」→「呼んで」は、認識も「読んで」と聞くが、足しではなく置き換えなので戻さない
+    ref = aligner.referee_from_tokens(toks("もう初回ね読んでいただいて", 44.0))
+    seg = {"start": 44.0, "end": 46.0, "text": "もう初会ね。読んでいただいて。"}
+    assert ref.trim(seg, "もう初回ね。呼んでいただいて。") == "もう初回ね。呼んでいただいて。"
+
+
+def test_nothing_is_trimmed_where_the_recogniser_heard_nothing():
+    ref = aligner.referee_from_tokens(toks("まったく別の話", 300.0))
+    seg = {"start": 70.0, "end": 76.0, "text": "最初に書に出会った"}
+    assert ref.trim(seg, "最初にな書に出会った") == "最初にな書に出会った"

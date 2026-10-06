@@ -353,6 +353,26 @@ class TestProofreadSegmentsResponseValidation:
         result, stats = self._run_with_response_text('[{"index":9,"text":"x"}]', segments)
         assert stats["accepted_items"] == 0
 
+    def test_校閲が足した聞こえない字は戻す(self):
+        """2026-10-06 実走: 「最初 に 書 に」→「最初にな書に」。音声認識に無い足しは戻す。"""
+        class Ref:
+            def __call__(self, seg, corrected):
+                return False
+
+            def trim(self, seg, corrected):
+                return corrected.replace("にな書", "に書")
+
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = '[{"index":0,"text":"最初にな書に出会った"}]'
+        mock_client.models.generate_content.return_value = mock_response
+        segments = [{"text": "最初 に 書 に 出会っ た", "start": 0.0, "end": 2.0}]
+        with patch.dict("sys.modules", {"model_governance": MagicMock(get_governed_client=lambda x: mock_client)}):
+            with patch("subtitle_engine.ai_proofreader._get_current_model", return_value="gemini-2.5-flash"):
+                result, stats = ai_proofreader.proofread_segments(segments, return_stats=True, referee=Ref())
+        assert result[0]["text"] == "最初に書に出会った"
+        assert stats["trimmed_items"] == 1
+
     def test_response_item_is_not_a_dict(self):
         """レスポンスのリストの要素が辞書ではない場合のスキップ処理"""
         segments = [{"text": "テスト"}]

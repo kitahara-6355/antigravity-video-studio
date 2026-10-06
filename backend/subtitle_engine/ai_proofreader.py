@@ -452,7 +452,21 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                                 f"AI Proofreader: 元の文と離れすぎた直しを捨てました [{item_idx}] "
                                 f"{segments[item_idx]['text'][:20]!r} → {item['text'][:20]!r}")
                             continue
-                        batch_correction_map[item_idx] = item["text"]
+                        text = item["text"]
+                        # 校閲が足した字のうち、音声認識が「足さない形」で聞いているものは戻す
+                        # （「最初 に 書 に」→「最初にな書に」・2026-10-06 実走）
+                        trim = getattr(referee, "trim", None)
+                        if trim is not None:
+                            try:
+                                trimmed = trim(segments[item_idx], text)
+                                if trimmed != text:
+                                    stats["trimmed_items"] = stats.get("trimmed_items", 0) + 1
+                                    logger.info(f"AI Proofreader: 音声に無い足しを戻しました [{item_idx}] "
+                                                f"{text[:24]!r} → {trimmed[:24]!r}")
+                                    text = trimmed
+                            except Exception as e:  # 確かめられなくても校閲は続ける
+                                logger.debug(f"音声認識での足しの確認をスキップ: {e}")
+                        batch_correction_map[item_idx] = text
                 else:
                     # **応答を丸ごと捨てたバッチは失敗に数える**（R2-C5 検証3周目の P1）。黙って無視すると
                     # 記録は「宣言どおり」になり、提案がそのモデルの出力ではないことが見えない

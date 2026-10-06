@@ -222,30 +222,71 @@ def _heard_ratio(text: str, heard: str) -> float:
     return sum(b.size for b in sm.get_matching_blocks()) / len(text)
 
 
-def referee_from_tokens(tokens: list[tuple[str, float]]):
-    """校閲の直しを音声認識で裁く関数 judge(segment, corrected) -> bool を作る。
+TRIM_CONTEXT = 4  # 足された字の前後で、認識と照らし合わせる文字数
 
-    元の文から離れた直し（「歌詞織」→「菓子折り」）は、番号ずれか作り話かもしれないので
-    校閲側で捨てている。認識の文字（その行の時刻の前後）に、直した文の方がはっきり近いときだけ採る。
-    segment の start/end は素材の時間軸。
+
+def drop_unheard_insertions(original: str, corrected: str, heard: str) -> str:
+    """校閲が元の文に足した字のうち、音声認識が「足さない形」で聞いているものを戻す。
+
+    置き換え（「読んで」→「呼んで」）と削除（フィラー）は触らない。認識が前後を
+    聞き取れていない所も触らない。heard は `_norm_text` 済みの認識の文字。
     """
-    import bisect
+    if not heard or not corrected:
+        return corrected
+    base = "".join(ch for ch in original or "" if ch not in " 　")
+    sm = difflib.SequenceMatcher(None, base, corrected, autojunk=False)
+    out = []
+    for op, _i1, _i2, j1, j2 in sm.get_opcodes():
+        if op == "insert":
+            added = _norm_text(corrected[j1:j2])
+            left = _norm_text(corrected[:j1])[-TRIM_CONTEXT:]
+            right = _norm_text(corrected[j2:])[:TRIM_CONTEXT]
+            if (added and len(left) + len(right) >= TRIM_CONTEXT
+                    and left + right in heard and left + added + right not in heard):
+                continue
+        out.append(corrected[j1:j2])
+    return "".join(out)
 
-    times = [t for _, t in tokens]
 
-    def judge(segment: dict, corrected: str) -> bool:
+class Referee:
+    """校閲の直しを音声認識の文字で確かめる。segment の start/end は素材の時間軸。"""
+
+    def __init__(self, tokens: list[tuple[str, float]]):
+        self._tokens = tokens
+        self._times = [t for _, t in tokens]
+
+    def heard(self, segment: dict) -> str:
+        """その行の時刻の前後で認識した文字（`_norm_text` 済み）。"""
+        import bisect
+
         try:
             a = float(segment["start"]) - REFEREE_PAD_SEC
             b = float(segment["end"]) + REFEREE_PAD_SEC
         except (KeyError, TypeError, ValueError):
-            return False
-        lo, hi = bisect.bisect_left(times, a), bisect.bisect_right(times, b)
-        heard = _norm_text("".join(c for c, _ in tokens[lo:hi]))
+            return ""
+        lo, hi = bisect.bisect_left(self._times, a), bisect.bisect_right(self._times, b)
+        return _norm_text("".join(c for c, _ in self._tokens[lo:hi]))
+
+    def __call__(self, segment: dict, corrected: str) -> bool:
+        """元の文から離れた直し（「歌詞織」→「菓子折り」）を採ってよいか。
+
+        番号ずれか作り話かもしれないので校閲側で捨てている。認識の文字に、直した文の方が
+        はっきり近いときだけ採る。
+        """
+        heard = self.heard(segment)
         before = _heard_ratio(_norm_text(segment.get("text")), heard)
         after = _heard_ratio(_norm_text(corrected), heard)
         return after >= REFEREE_MIN and after >= before + REFEREE_MARGIN
 
-    return judge
+    def trim(self, segment: dict, corrected: str) -> str:
+        """直しのうち、誰も言っていない足し（「最初に書に」→「最初にな書に」）を戻す。"""
+        return drop_unheard_insertions(str(segment.get("text") or ""), corrected,
+                                       self.heard(segment))
+
+
+def referee_from_tokens(tokens: list[tuple[str, float]]) -> Referee:
+    """校閲の直しを音声認識で確かめる `Referee` を作る（judge(segment, corrected) -> bool）。"""
+    return Referee(tokens)
 
 
 def referee_for(media: str):
