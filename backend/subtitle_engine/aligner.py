@@ -449,6 +449,8 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         pairs = _main_pairs(hits.get(i) or [])
         if not pairs:
             continue
+        # 時刻を採るには足りなくても、声の一部は聞こえている（早口の「いらっしゃいまして」の「いら」）
+        cap["_asr_heard"] = len(pairs)
         length = len(_norm_text(cap.get("text")))
         if len(pairs) < max(MIN_HITS, MIN_MATCH_RATIO * length):
             continue
@@ -466,6 +468,8 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         cap["_asr"] = True
         # 最初に拾えた文字の時刻。頭の文字を拾えなかったときは start は外挿になる
         cap["_asr_first"] = round(t0, 3)
+        # 拾えた文字ごとの (字幕の何文字目か, 時刻)。短すぎる字幕の切れ目を動かすときに使う
+        cap["_asr_marks"] = [(c, round(t, 3)) for c, t in pairs]
         aligned += 1
     return aligned
 

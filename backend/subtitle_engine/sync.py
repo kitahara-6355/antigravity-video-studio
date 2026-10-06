@@ -272,6 +272,18 @@ def _distribute_by_speech(items: list[dict], speech: SpeechMap) -> int:
 
 
 FLASH_SEC = 0.5
+# 読み切れない速さ（1秒あたりの字数）。出る時間が min_display_sec に届かず、これより速い字幕も
+# 隣とまとめる（2分41秒の 16 字「行かなくなったってことはないんで」が 0.76 秒・2026-10-06 実測）。
+# 「はい」のような短い語は 0.6 秒でも読めるので残す
+FAST_CPS = 8.0
+# 切れ目を動かすのは、2枚の字幕のすき間がこれ以内のとき（続けて話している）
+RESPLIT_MAX_GAP_SEC = 0.3
+
+
+def _too_short(s: dict, min_display: float) -> bool:
+    """読めないほど短く出る字幕か。"""
+    dur = float(s["end"]) - float(s["start"])
+    return dur < FLASH_SEC or (dur < min_display and _chars(s) > FAST_CPS * max(dur, 0.01))
 
 
 def _caption_limits() -> tuple[int, int]:
@@ -295,7 +307,8 @@ def _as_one_caption(first: str, second: str, max_chars: int, max_lines: int) -> 
     except Exception:  # 組み直せなくても字幕は出す
         caps = []
     if caps:
-        return caps[0] if len(caps) == 1 else None
+        # 継ぎ目の空白が行頭・行末に来たら消す（「…次の週から\n　行かなく…」）
+        return "\n".join(line.strip("\u3000 ") for line in caps[0].split("\n")) if len(caps) == 1 else None
     if len(flat) > max_chars * max_lines:
         return None
     return "\n".join(flat[k:k + max_chars] for k in range(0, len(flat), max_chars))
@@ -303,7 +316,7 @@ def _as_one_caption(first: str, second: str, max_chars: int, max_lines: int) -> 
 
 def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None = None,
                    max_lines: int | None = None) -> int:
-    """出る時間が FLASH_SEC 未満の字幕を、隣の字幕とまとめて1枚にする（読めない字幕を作らない）。
+    """読めないほど短く出る字幕（`_too_short`）を、隣の字幕とまとめて1枚にする。
 
     隣が1行なら行として足す。隣が2行でも、続けて1枚に組み直せるならそうする
     （2分36秒の「もう強烈な」が 0.49 秒で消えた・2026-10-06 実測）。
@@ -313,7 +326,10 @@ def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None 
         max_chars, max_lines = _caption_limits()
     merged = 0
     for i, s in enumerate(items):
-        if s.get("_merged") or s["end"] - s["start"] >= FLASH_SEC:
+        if s.get("_merged") or not _too_short(s, min_display):
+            continue
+        # 声の拾えない字幕は 0.5 秒未満のときだけまとめる（速さで延ばすと、カットで消えた言葉が長く出る）
+        if _unheard(s) and float(s["end"]) - float(s["start"]) >= FLASH_SEC:
             continue
         cands = []
         for j in (i - 1, i + 1):
@@ -339,6 +355,93 @@ def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None 
     return merged
 
 
+def _wrap_one(text: str, max_chars: int, max_lines: int) -> str | None:
+    """1枚（max_lines 行・1行 max_chars 字）に組んだ形。入らなければ None。"""
+    try:
+        from subtitle_engine import text_formatter as tf
+        caps = tf.split_into_captions(text, max_chars, max_lines)
+    except Exception:  # 組めなければ動かさない
+        return None
+    if len(caps) != 1:
+        return None
+    return "\n".join(line.strip("\u3000 ") for line in caps[0].split("\n"))
+
+
+def _cut_times(s: dict) -> list[tuple[int, int, float]]:
+    """字幕の文節の切れ目と、その切れ目の次の文字を話した時刻（認識）: (位置, 文字の番号, 時刻)。"""
+    marks = dict(s.get("_asr_marks") or ())
+    if not marks:
+        return []
+    try:
+        from subtitle_engine import aligner
+        from subtitle_engine import text_formatter as tf
+        parser = tf._phrase_parser()
+    except Exception:  # 文節が読めなければ動かさない
+        return []
+    flat = str(s.get("text") or "").replace("\n", "")
+    if parser is None or not flat:
+        return []
+    out = []
+    for k in tf._phrase_ends(parser, flat)[:-1]:
+        n = len(aligner._norm_text(flat[:k]))
+        if n in marks:
+            out.append((k, n, float(marks[n])))
+    return out
+
+
+def _resplit_flashes(items: list[dict], min_display: float, max_chars: int | None = None,
+                     max_lines: int | None = None) -> int:
+    """隣とまとめられなかった短すぎる字幕に、前の字幕の終わりの文節を移して、出る時間を延ばす。
+
+    実例（62秒）: 「…理事長で|いらっしゃいまして」と切れ、早口の「いらっしゃいまして」が 0.7 秒で
+    消えた。隣はどちらも2行でまとめられない。前の字幕の文節の切れ目のうち、音声認識で話した時刻が
+    分かる所で切り直し、両方が min_display_sec 以上出る最も少ない移し方を採る。
+    続けて話している（すき間が RESPLIT_MAX_GAP_SEC 以内）ときだけ動かす。声が聞こえない字幕
+    （カットで声が消えた言葉）は動かさない。別の発話から移すときは間を1字空ける。
+    """
+    if max_chars is None or max_lines is None:
+        max_chars, max_lines = _caption_limits()
+    live = [s for s in items if not s.get("_merged")]
+    moved = 0
+    for i, s in enumerate(live):
+        if i == 0 or _unheard(s) or not _too_short(s, min_display):
+            continue
+        p = live[i - 1]
+        if float(s["start"]) - float(p["end"]) > RESPLIT_MAX_GAP_SEC:
+            continue
+        text = str(s.get("text") or "").replace("\n", "")
+        flat = str(p.get("text") or "").replace("\n", "")
+        a, b = p.get("sourceStart"), s.get("sourceStart")
+        sep = "\u3000" if a is not None and b is not None and a != b else ""
+        for k, n, t in reversed(_cut_times(p)):
+            if t - 2 * VIDEO_FRAME - float(p["start"]) < min_display or float(s["end"]) - t < min_display:
+                continue
+            head = _wrap_one(flat[:k].rstrip("\u3000 "), max_chars, max_lines)
+            tail = _wrap_one(flat[k:].strip("\u3000 ") + sep + text, max_chars, max_lines)
+            if head and tail:
+                p["text"], p["end"] = head, round(t - 2 * VIDEO_FRAME, 3)
+                s["text"], s["start"] = tail, round(t, 3)
+                _move_marks(p, s, n, flat[k:])
+                moved += 1
+                break
+    return moved
+
+
+def _move_marks(p: dict, s: dict, n: int, moved: str) -> None:
+    """前の字幕の n 文字目から後ろ（moved）を次の字幕の頭へ移したあと、文字ごとの時刻も付け直す。"""
+    from subtitle_engine import aligner
+    shift = len(aligner._norm_text(moved))
+    marks = list(p.get("_asr_marks") or ())
+    p["_asr_marks"] = [(c, t) for c, t in marks if c < n]
+    s["_asr_marks"] = [(c - n, t) for c, t in marks if c >= n] + [
+        (c + shift, t) for c, t in (s.get("_asr_marks") or ())]
+
+
+def _unheard(s: dict) -> bool:
+    """音声認識に声が1文字も無く、前後の字幕の間に配っただけの字幕（カットで声が消えた言葉など）。"""
+    return bool(s.get("_asr_interp") and not s.get("_asr") and not s.get("_asr_heard"))
+
+
 def _drop_unheard_flashes(items: list[dict]) -> int:
     """隣とまとめられなかった一瞬の字幕のうち、音声認識に声が無いものを出さない。
 
@@ -349,7 +452,7 @@ def _drop_unheard_flashes(items: list[dict]) -> int:
     for s in items:
         if s.get("_merged") or s["end"] - s["start"] >= FLASH_SEC:
             continue
-        if s.get("_asr_interp") and not s.get("_asr"):
+        if _unheard(s):
             s["_merged"] = True
             dropped += 1
     return dropped
@@ -467,9 +570,11 @@ def align_segments(segments: list[dict], speech: SpeechMap,
         result.append(s)
     past_end = _drop_past_end(result, speech.duration)
     merged = _merge_flashes(result, r["min_display_sec"])
+    resplit = _resplit_flashes(result, r["min_display_sec"])
     dropped = _drop_unheard_flashes(result) + past_end
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
-             "redistributed": redistributed, "merged": merged, "dropped": dropped}
+             "redistributed": redistributed, "merged": merged, "resplit": resplit,
+             "dropped": dropped}
     result = [s for s in result if not s.get("_merged")]
     logger.info(f"🎯 字幕の出だし・終わりを音声に合わせました: {n}枚, 話し始めに寄せた {snapped_in}, "
                 f"話し終わりに寄せた {snapped_out}")

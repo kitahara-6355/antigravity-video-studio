@@ -157,6 +157,99 @@ def test_flash_caption_that_does_not_fit_stays():
     assert sync._merge_flashes(items, 0.8, max_chars=18, max_lines=2) == 0
 
 
+def test_a_long_caption_shown_too_briefly_to_read_is_merged():
+    # 実例（2分41秒）: 16 字の「行かなくなったってことはないんで」が 0.76 秒で消えた
+    from subtitle_engine import sync
+    items = [{"start": 156.82, "end": 161.17, "text": "そういう\nもっと嫌な思いして次の週から"},
+             {"start": 161.24, "end": 162.0, "text": "行かなくなったってことはないんで"},
+             {"start": 162.14, "end": 163.9, "text": "克服しようと"}]
+    assert sync._merge_flashes(items, 0.8, max_chars=18, max_lines=2) == 1
+    assert items[0]["text"] == "そういうもっと嫌な思いして次の週から\n行かなくなったってことはないんで"
+    assert items[0]["end"] == 162.0
+
+
+def test_a_short_word_shown_briefly_is_left_alone():
+    from subtitle_engine import sync
+    items = [{"start": 0.0, "end": 2.0, "text": "そうなんですよ"},
+             {"start": 2.07, "end": 2.72, "text": "はい"},
+             {"start": 2.8, "end": 5.0, "text": "次の文"}]
+    assert sync._merge_flashes(items, 0.8, max_chars=18, max_lines=2) == 0
+
+
+def _marks(text, start, step=0.2):
+    from subtitle_engine import aligner
+    return [(k, round(start + k * step, 3)) for k in range(len(aligner._norm_text(text)))]
+
+
+def test_a_flash_that_cannot_be_merged_takes_the_end_of_the_previous_caption():
+    # 実例（62秒）: 「理事長で|いらっしゃいまして」と切れ、早口の「いらっしゃいまして」が 0.7 秒で
+    # 消えた。隣はどちらも2行で、まとめられない。前の字幕の終わりの文節を、認識の時刻で移す
+    from subtitle_engine import sync
+    prev = "そして　一般社団法人\n日本デザイン書道作家協会の理事長で"
+    items = [{"start": 56.88, "end": 62.58, "text": prev, "_asr": True, "sourceStart": 60.0,
+              "_asr_marks": _marks(prev, 56.9)},
+             {"start": 62.65, "end": 63.35, "text": "いらっしゃいまして", "_asr": True, "sourceStart": 60.0},
+             {"start": 63.42, "end": 68.62,
+              "text": "著者としても筆文字デザインの書籍が\n多数おありだということなんですが", "_asr": True}]
+    assert sync._resplit_flashes(items, 0.8, max_chars=18, max_lines=2) == 1
+    assert items[0]["text"].replace("\n", "") == "そして　一般社団法人日本デザイン書道作家協会の"
+    assert items[1]["text"] == "理事長でいらっしゃいまして"
+    assert items[1]["start"] == pytest.approx(56.9 + 22 * 0.2)
+    assert items[0]["end"] < items[1]["start"]
+    assert items[1]["end"] - items[1]["start"] >= 0.8
+
+
+def test_moved_words_carry_their_times():
+    # 切れ目を動かしたら、文字ごとの時刻も一緒に移す（短い字幕が続くと、次の切り直しが
+    # ずれた番号で時刻を引いてしまう）
+    from subtitle_engine import sync
+    prev = "そして　一般社団法人\n日本デザイン書道作家協会の理事長で"
+    flash = "いらっしゃいまして"
+    items = [{"start": 56.88, "end": 62.58, "text": prev, "_asr": True, "sourceStart": 60.0,
+              "_asr_marks": _marks(prev, 56.9)},
+             {"start": 62.65, "end": 63.35, "text": flash, "_asr": True, "sourceStart": 60.0,
+              "_asr_marks": _marks(flash, 62.65, 0.07)}]
+    assert sync._resplit_flashes(items, 0.8, max_chars=18, max_lines=2) == 1
+    head, tail = dict(items[0]["_asr_marks"]), dict(items[1]["_asr_marks"])
+    assert max(head) == 21  # 「協会の」まで
+    assert tail[0] == pytest.approx(56.9 + 22 * 0.2)  # 移した「理」
+    assert tail[4] == pytest.approx(62.65)  # もとの「い」
+    assert len(tail) == 4 + 9
+
+
+def test_words_moved_from_another_utterance_are_spaced():
+    # 実例（24分41秒）: 「座右の銘って僕ないんだけどね」（ゲスト）の後の「座右の銘じゃなくてもいいんです」
+    # （聞き手）が 0.8 秒で消えた。別の発話から移した語との間は1字空ける
+    from subtitle_engine import sync
+    prev = "いや\u3000それがね\u3000できて\n座右の銘って僕ないんだけどね"
+    items = [{"start": 1480.34, "end": 1483.12, "text": prev, "_asr": True, "sourceStart": 1700.0,
+              "_asr_marks": _marks(prev, 1480.4, 0.12)},
+             {"start": 1483.19, "end": 1483.99, "text": "座右の銘じゃなくてもいいんです", "_asr": True,
+              "sourceStart": 1703.5}]
+    assert sync._resplit_flashes(items, 0.8, max_chars=18, max_lines=2) == 1
+    assert "\u3000座右の銘じゃなくても" in items[1]["text"].replace("\n", "")
+    assert items[1]["end"] - items[1]["start"] >= 0.8
+
+
+def test_an_unheard_flash_is_not_resplit():
+    # カットで声が消えた言葉（9分39秒の「いたんだよね」）は延ばさない
+    from subtitle_engine import sync
+    prev = "担当とかこう広告担当があって\nスタッフ集まったら30人以上"
+    items = [{"start": 572.67, "end": 576.7, "text": prev, "_asr": True,
+              "_asr_marks": _marks(prev, 572.7)},
+             {"start": 576.77, "end": 577.03, "text": "いたんだよね", "_asr_interp": True}]
+    assert sync._resplit_flashes(items, 0.8, max_chars=18, max_lines=2) == 0
+
+
+def test_a_flash_after_a_long_pause_is_not_resplit():
+    from subtitle_engine import sync
+    prev = "はい　これからも\nどうぞよろしくお願いいたします"
+    items = [{"start": 2250.24, "end": 2253.76, "text": prev, "_asr": True,
+              "_asr_marks": _marks(prev, 2250.3)},
+             {"start": 2257.66, "end": 2257.99, "text": "はい\nどうもありがとうございました", "_asr": True}]
+    assert sync._resplit_flashes(items, 0.8, max_chars=18, max_lines=2) == 0
+
+
 @pytest.mark.parametrize("orig,new,neighbours,ok", [
     # かなだけの行を漢字に直すのは変換の直し（2026-10-06 実走で「単純」を捨てていた）
     ("たんじゅ、たんじゅ。", "単純、単純。", (), True),
