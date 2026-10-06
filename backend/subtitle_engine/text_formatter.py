@@ -78,16 +78,25 @@ def _omit_words(key: str) -> list[str]:
     return sorted({w for w in words if isinstance(w, str) and w}, key=len, reverse=True)
 
 
-def strip_lead_words(text: str, words: list[str] | None = None) -> str:
+def _bare_follow_ok(text: str, j: int) -> bool:
+    """「、」の無い文頭語の後ろが、別の語の始まりか（ひらがなが続くなら同じ語の一部とみなす）。"""
+    return j < len(text) and (text[j] in " 　\n" or _script(text[j]) != "hiragana")
+
+
+def strip_lead_words(text: str, words: list[str] | None = None,
+                     bare: list[str] | None = None) -> str:
     """文頭（文・字幕の頭）の「さて、」「それから、」などを外す。
 
-    **後ろに「、」が続くときだけ。**「それから3年後」のように内容に掛かる用法は残す。
+    `words` は**後ろに「、」が続くときだけ**外す。「それから3年後」のように内容に掛かる用法は残す。
+    `bare`（「では」「さて」など話題に掛からない語）は「、」が無くても外す。ただし後ろに
+    ひらがなが続くとき（「ではありません」）は残す（2026-10-06 ユーザー指摘「では」）。
     外した結果が空になるときは元のまま返す（相づちだけの字幕は別の規則で扱う）。
     """
     if not isinstance(text, str) or not text:
         return text
     words = _omit_words("omit_lead_words") if words is None else words
-    if not words:
+    bare = _omit_words("omit_lead_words_bare") if bare is None else bare
+    if not words and not bare:
         return text
     out, i, n = [], 0, len(text)
     at_head = True
@@ -98,6 +107,13 @@ def strip_lead_words(text: str, words: list[str] | None = None) -> str:
             if hit:
                 i += len(hit) + 1
                 while i < n and text[i] in " 　":
+                    i += 1
+                continue
+            hit = next((w for w in bare if text.startswith(w, i)
+                        and _bare_follow_ok(text, i + len(w))), None)
+            if hit:
+                i += len(hit)
+                while i < n and text[i] in " 　\n":
                     i += 1
                 continue
         ch = text[i]
@@ -454,7 +470,10 @@ def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
                 whole = n == len(rest)
                 cut_score = 9 if whole else _break_score(rest[n - 1])
                 long_enough = whole or acc >= capacity * 0.4
-                key = (long_enough, cut_score + wrapped[1], acc)
+                # 字幕の切れ目は行の折り目より優先する。「この対談では、/各界で」＋
+                # 「ご活躍されている方を」のように、字幕の途中で文節をまたがせない
+                # （2026-10-06 ユーザー指摘）
+                key = (long_enough, cut_score, wrapped[1], acc)
                 if choice is None or key > choice[0]:
                     choice = (key, n, wrapped[0])
             if choice is None:  # 1文節でも折れない（来ないはず）— そのまま置く
@@ -627,6 +646,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
 
     max_lines = get_max_lines_from_template()
     lead_words = _omit_words("omit_lead_words")
+    bare_words = _omit_words("omit_lead_words_bare")
     formatted = []
     split_count = 0
     semantic_count = 0
@@ -644,7 +664,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
             text = text.strip()
 
             # Step 1: フィラー除去・文頭の聞き流し語（さて、それから、）を外す
-            cleaned = strip_lead_words(remove_fillers(text), lead_words)
+            cleaned = strip_lead_words(remove_fillers(text), lead_words, bare_words)
             if cleaned != text:
                 filler_count += 1
 
@@ -728,7 +748,45 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
         if isinstance(seg, dict) and "text" in seg:
             seg["text"] = enforce_line_length(seg["text"], max_chars)
 
+    # 句読点を出さない（区切りの判定に使い終わってから外す）
+    if _strip_punctuation_enabled():
+        for seg in formatted:
+            if isinstance(seg, dict) and isinstance(seg.get("text"), str):
+                seg["text"] = strip_punctuation(seg["text"])
+
     return formatted
+
+
+_PUNCT = "、。，．,"
+
+
+def _strip_punctuation_enabled() -> bool:
+    try:
+        from template_config import template_config
+        return bool(template_config.get_subtitle_rules().get("strip_punctuation", False))
+    except Exception:
+        return False
+
+
+def strip_punctuation(text: str) -> str:
+    """字幕から句読点（、。）を外す（2026-10-06 ユーザー指摘「句読点は不要」）。
+
+    行末の句読点は消す。行の途中の句読点は全角スペースにして、語の切れ目を残す
+    （「はい、いえいえ。」→「はい　いえいえ」）。「！」「？」は語気なので残す。
+    """
+    if not isinstance(text, str):
+        return text
+    lines = []
+    for line in text.split("\n"):
+        out = []
+        for ch in line:
+            if ch in _PUNCT:
+                if out and out[-1] != "　":
+                    out.append("　")
+            else:
+                out.append(ch)
+        lines.append("".join(out).strip(" 　"))
+    return "\n".join(l for l in lines if l) or text
 
 
 # ============================================================

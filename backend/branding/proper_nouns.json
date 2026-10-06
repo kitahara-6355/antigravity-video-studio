@@ -1973,6 +1973,26 @@
       "confirmed": true,
       "usage_count": 0,
       "created_at": "2026-10-06T02:00:00Z"
+    },
+    {
+      "id": "pn_198",
+      "incorrect": "初会",
+      "correct": "初回",
+      "type": "word",
+      "context_hint": "「第1回」の意味（Gemini の誤変換・2026-10-06 ユーザー指摘）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T09:00:00Z"
+    },
+    {
+      "id": "pn_199",
+      "incorrect": "読んでいただいて",
+      "correct": "呼んでいただいて",
+      "type": "hint",
+      "context_hint": "ゲストを招いた・呼んだ場面のお礼（本を読む話なら直さない）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T09:00:00Z"
     }
   ],
   "pending_confirmations": []

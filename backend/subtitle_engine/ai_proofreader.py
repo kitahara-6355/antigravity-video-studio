@@ -48,6 +48,8 @@ def _build_proper_noun_context() -> str:
             correct = entry.get("correct", "")
             context = entry.get("context_hint", "")
             hint = f"（{context}）" if context else ""
+            if entry.get("type") == "hint":
+                hint += "（文脈で判断。合うときだけ直す）"
             lines.append(f"- 「{incorrect}」→「{correct}」{hint}")
         
         return "\n".join(lines)
@@ -87,6 +89,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
     stats = {
         "proofread_count": 0,
         "total_retries": 0,
+        # 失敗したバッチの [開始, 終了) 。呼び出し側が小さく分けて校閲し直す
+        "failed_ranges": [],
         "failed_batches": 0,
         "total_batches": 0,
         "skipped": False,
@@ -192,6 +196,9 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
 2. **フィラーの削除**: 「えー」「あの」「えっと」「あー」などの不要な言葉を削除してください。
 3. **自然な日本語**: 文末が不自然な助詞で終わっている場合、自然な言い切りや継続する形に修正してください。
 4. **読みやすさ**: 意味を変えずに、字幕として読みやすい長さに調整してください。
+5. **同音異義語の誤変換**: 音は合っているが文脈に合わない漢字を、前後の流れから正してください
+   （例: ゲストを招いた場面の「読んでいただいて」→「呼んでいただいて」、初めての回の「初会」→「初回」）。
+   辞書の「文脈で判断」の項目も同じ扱いです。
 
 {proper_noun_context}
 
@@ -339,6 +346,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                     logger.error(f"AI Proofreader: Failed to decode JSON response: {jde}")
                     # JSONパース失敗はバッチ失敗とする
                     stats["failed_batches"] += 1
+                    stats["failed_ranges"].append([i, i + len(batch)])
                     continue
 
                 batch_correction_map = {}
@@ -375,6 +383,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                     # 記録は「宣言どおり」になり、提案がそのモデルの出力ではないことが見えない
                     logger.warning("AI Proofreader: LLM response corrected_data is not a list")
                     stats["failed_batches"] += 1
+                    stats["failed_ranges"].append([i, i + len(batch)])
                     continue
 
                 if not batch_correction_map:
@@ -383,6 +392,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                     # 記録が「宣言どおり」になる
                     logger.warning("AI Proofreader: no usable item in the response (counted as a failed batch)")
                     stats["failed_batches"] += 1
+                    stats["failed_ranges"].append([i, i + len(batch)])
                     continue
 
                 stats["accepted_items"] += len(batch_correction_map)
@@ -399,6 +409,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                             logger.debug(f"Corrected [{abs_index}]: '{original}' -> '{corrected}'")
             else:
                 stats["failed_batches"] += 1
+                stats["failed_ranges"].append([i, i + len(batch)])
 
         stats["proofread_count"] = proofread_count
         logger.info(f"AI Proofreader: Successfully corrected {proofread_count} segments total."

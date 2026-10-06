@@ -57,8 +57,8 @@ def test_caption_that_came_early_waits_for_speech_plus_lead_in():
             {"start": 34.87, "end": 36.53, "text": "久木田博信先生です。"},
             {"start": 36.53, "end": 39.7, "text": "先生、どうぞよろしく"}]
     out, _ = sync.align_segments(segs, sp, [], RULES)
-    assert out[1]["start"] == pytest.approx(35.31 + 0.3, abs=0.02)
-    assert out[2]["start"] == pytest.approx(37.8 + 0.3, abs=0.02)
+    assert out[1]["start"] == pytest.approx(35.31, abs=0.02)
+    assert out[2]["start"] == pytest.approx(37.8, abs=0.02)
 
 
 def test_caption_ends_before_next_sentence_starts():
@@ -77,12 +77,43 @@ def test_caption_ends_before_next_sentence_starts():
 
 
 def test_end_is_before_next_onset_by_user_margin_when_pause_is_short():
+    sp = _map([(1.0, 3.0), (3.6, 6.0)])
+    segs = [{"start": 1.0, "end": 3.0, "text": "一文目"},
+            {"start": 3.6, "end": 6.0, "text": "二文目"}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[0]["end"] == pytest.approx(3.4, abs=0.02)
+    assert out[1]["start"] == pytest.approx(3.6, abs=0.02)
+
+
+def test_very_short_pause_is_chained():
+    # 0.4 秒の間なら、0.2 秒だけ消して出し直すより続けて出す（ちらつき防止・Netflix）
     sp = _map([(1.0, 3.0), (3.4, 6.0)])
     segs = [{"start": 1.0, "end": 3.0, "text": "一文目"},
             {"start": 3.4, "end": 6.0, "text": "二文目"}]
     out, _ = sync.align_segments(segs, sp, [], RULES)
-    assert out[0]["end"] == pytest.approx(3.2, abs=0.02)
-    assert out[1]["start"] == pytest.approx(3.7, abs=0.02)
+    assert 0 < out[1]["start"] - out[0]["end"] <= 2 * sync.VIDEO_FRAME + 0.01
+
+
+def test_lead_in_starts_on_the_onset_by_default():
+    assert sync.DEFAULT_TIMING["lead_in_sec"] == 0.0
+
+
+def test_soft_onset_is_pulled_back():
+    # 立ち上がりの弱い声（背景+8dB）が 0.1 秒あってから本体が来る
+    lv = _levels([(1.1, 2.0)], 5.0)
+    lv[int(1.0 / sync.FRAME_SEC):int(1.1 / sync.FRAME_SEC)] = -42.0
+    sp = sync.speech_map_from_levels(lv)
+    assert sp.onsets[0] == pytest.approx(1.0, abs=0.02)
+
+
+def test_split_captions_are_timed_by_speaking_time_not_wall_time():
+    # 1つの発話を2枚に分けた。途中に 2 秒の間がある。文字数は同じ
+    sp = _map([(1.0, 3.0), (5.0, 7.0)])
+    segs = [{"start": 1.0, "end": 4.0, "text": "あいうえお", "sourceStart": 0, "sourceEnd": 7},
+            {"start": 4.0, "end": 7.0, "text": "かきくけこ", "sourceStart": 0, "sourceEnd": 7}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert stats["redistributed"] == 1
+    assert out[1]["start"] == pytest.approx(5.0, abs=0.05)
 
 
 def test_split_sentence_is_chained_without_blinking():
@@ -117,9 +148,9 @@ def test_caption_does_not_start_just_before_a_cut():
     sp = _map([(1.0, 3.0), (5.0, 8.0)])
     segs = [{"start": 1.0, "end": 3.0, "text": "一"},
             {"start": 4.8, "end": 8.0, "text": "二"}]
-    # 出だし 5.3 の直後 5.4 にカット → カット点に揃える
-    out, _ = sync.align_segments(segs, sp, [5.4], RULES)
-    assert out[1]["start"] == pytest.approx(5.4, abs=0.01)
+    # 出だし 5.0 の直後 5.1 にカット → カット点に揃える
+    out, _ = sync.align_segments(segs, sp, [5.1], RULES)
+    assert out[1]["start"] == pytest.approx(5.1, abs=0.01)
 
 
 def test_rules_can_be_overridden():

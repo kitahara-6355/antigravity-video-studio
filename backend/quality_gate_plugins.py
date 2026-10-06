@@ -411,6 +411,12 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                 feedback.append(
                     f"⛔ 字幕の欠落（文字起こし）: 覆われていない発話 {tx.get('uncovered_sec', 0):.0f}秒・"
                     f"文字が薄い区間 " + (", ".join(coverage._mmss(w["start"]) for w in tx.get("sparse", [])[:6]) or "なし"))
+        # 校閲（AI）が落ちた字幕は誤変換が残る（2026-10-06「読んで」「初会」）。合格させない
+        unproofed = getattr(ctx, "proofread_failed_ranges", None) or []
+        if unproofed:
+            blocking = True
+            feedback.append(f"⛔ 未校閲の字幕あり: AI校閲の失敗 {len(unproofed)}か所"
+                            f"（{sum(b - a for a, b in unproofed)}行）")
         deductions = 10 if blocking else 0
         # 字幕の出だしが話し始めに合っているか（2026-10-06 ユーザー指摘「言葉より先に出すぎる」）
         timing = None

@@ -29,8 +29,9 @@ FRAME_SEC = 0.01
 VIDEO_FRAME = 1 / 30
 
 DEFAULT_TIMING = {
-    # 出だし: 話し始めからこの秒数だけ遅らせる（ユーザー指定 0.3）
-    "lead_in_sec": 0.3,
+    # 出だし: 話し始めからこの秒数だけ遅らせる。業界の標準（Netflix・DCMP）は話し始めちょうど。
+    # 0.3 秒は冒頭で遅く感じた（2026-10-06 ユーザー確認）ので 0 にした
+    "lead_in_sec": 0.0,
     # 終わり: 次の話し始めのこの秒数前に消す（ユーザー指定 0.2）
     "end_before_next_sec": 0.2,
     # 話し終わってから残してよい最長（間が長いときに出しっぱなしにしない）
@@ -53,6 +54,9 @@ MIN_SPEECH_SEC = 0.1
 # 局所の背景音（その前後数秒の静かな側）より、これだけ大きければ声とみなす
 SPEECH_ABOVE_FLOOR_DB = 12.0
 FLOOR_WINDOW_SEC = 3.0
+# 話し始めの頭を戻す範囲と、立ち上がりとみなす大きさ
+ONSET_BACKTRACK_SEC = 0.15
+ONSET_ABOVE_FLOOR_DB = 6.0
 FLOOR_PERCENTILE = 10
 GLOBAL_FLOOR_PERCENTILE = 30
 
@@ -103,8 +107,15 @@ def speech_mask(levels: np.ndarray) -> np.ndarray:
     floor = np.interp(np.arange(len(levels)), centers, floors)
     # 声が数秒続くと局所の基準が声そのものになるので、全体の静かな側で頭を抑える
     floor = np.minimum(floor, np.percentile(levels, GLOBAL_FLOOR_PERCENTILE))
-    mask = levels > floor + SPEECH_ABOVE_FLOOR_DB
-    return _clean(mask)
+    mask = _clean(levels > floor + SPEECH_ABOVE_FLOOR_DB)
+    # 話し始めは声が立ち上がる途中から。弱い立ち上がり（子音・息）まで頭を戻す
+    back = int(ONSET_BACKTRACK_SEC / FRAME_SEC)
+    for a, _ in _runs(mask, True):
+        j = a
+        while j > 0 and a - j < back and not mask[j - 1] and levels[j - 1] > floor[j - 1] + ONSET_ABOVE_FLOOR_DB:
+            j -= 1
+        mask[j:a] = True
+    return mask
 
 
 def _runs(mask: np.ndarray, value: bool) -> list[tuple[int, int]]:
@@ -197,6 +208,61 @@ def _in_cut_zone(t: float, cut_points: list[float], zone: float) -> float | None
     return None
 
 
+def _chars(seg: dict) -> int:
+    return max(1, len("".join(str(seg.get("text") or "").split())))
+
+
+def _active(speech: SpeechMap, a: float, b: float) -> list[tuple[float, float]]:
+    out = []
+    for on, off in zip(speech.onsets, speech.offsets):
+        lo, hi = max(on, a), min(off, b)
+        if hi > lo:
+            out.append((lo, hi))
+    return out
+
+
+def _clock(active: list[tuple[float, float]], x: float) -> float:
+    """喋っている時間の先頭から x 秒の位置の時刻。"""
+    for lo, hi in active:
+        if x <= hi - lo:
+            return lo + x
+        x -= hi - lo
+    return active[-1][1]
+
+
+def _distribute_by_speech(items: list[dict], speech: SpeechMap) -> int:
+    """同じ発話（sourceStart/sourceEnd が同じ）から分けた字幕の時刻を、文字数で
+    **喋っている時間**に配り直す。これまでは間も含めた時間で按分していたので、
+    発話の途中に間があると後ろの字幕ほど早く出た（2026-10-06 ユーザー指摘 12秒・32〜42秒）。
+    """
+    def key(s):
+        return (s.get("sourceStart"), s.get("sourceEnd"))
+
+    done = 0
+    i = 0
+    while i < len(items):
+        j = i + 1
+        if key(items[i]) != (None, None):
+            while j < len(items) and key(items[j]) == key(items[i]):
+                j += 1
+        group = items[i:j]
+        if len(group) >= 2:
+            a, b = float(group[0]["start"]), float(group[-1]["end"])
+            active = _active(speech, a, b)
+            total = sum(hi - lo for lo, hi in active)
+            if total >= MIN_STEP_SEC * len(group):
+                chars = [_chars(s) for s in group]
+                whole = sum(chars)
+                acc = 0
+                for s, c in zip(group, chars):
+                    s["start"] = _clock(active, total * acc / whole)
+                    acc += c
+                    s["end"] = _clock(active, total * acc / whole - 1e-6)
+                done += 1
+        i = j
+    return done
+
+
 def align_segments(segments: list[dict], speech: SpeechMap,
                    cut_points: list[float] | None = None,
                    rules: dict | None = None) -> tuple[list[dict], dict]:
@@ -210,6 +276,9 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     items = sorted((dict(s) for s in segments), key=lambda s: float(s.get("start", 0)))
     n = len(items)
     snapped_in = snapped_out = 0
+
+    # 0. 1つの発話を分けた字幕は、時刻を「喋っている時間」で配り直す（間には文字を置かない）
+    redistributed = _distribute_by_speech(items, speech)
 
     # 1. 話し始め・話し終わりに寄せる。同じ話し始めを2枚で取り合わない
     onsets, offsets = [], []
@@ -268,7 +337,8 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     for s, a, b in zip(items, ins, outs):
         s["start"], s["end"] = round(a, 3), round(max(b, a + 0.2), 3)
         result.append(s)
-    stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out}
+    stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
+             "redistributed": redistributed}
     logger.info(f"🎯 字幕の出だし・終わりを音声に合わせました: {n}枚, 話し始めに寄せた {snapped_in}, "
                 f"話し終わりに寄せた {snapped_out}")
     return result, stats

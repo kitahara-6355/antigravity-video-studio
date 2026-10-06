@@ -36,7 +36,7 @@ class DictionaryEntry:
     id: str
     incorrect: str
     correct: str
-    type: str  # person_name, word, word_context, title
+    type: str  # person_name, word, word_context, title, hint（置き換えず校閲に渡すだけ）
     context_hint: str = ""
     confirmed: bool = True
     usage_count: int = 0
@@ -124,6 +124,9 @@ class ProperNounDictionary:
         corrected_text = text
         
         for entry in self.entries:
+            # hint は校閲（AI）に文脈で判断させる項目。機械的には置き換えない
+            if entry.type == "hint":
+                continue
             if entry.incorrect in corrected_text:
                 corrected_text = corrected_text.replace(entry.incorrect, entry.correct)
                 corrections.append({

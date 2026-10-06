@@ -251,7 +251,8 @@ def test_the_word_lists_live_in_the_template_rules():
 def test_format_segments_drops_lead_words():
     segs = [{"text": "さて、今日のゲストです。", "start": 0.0, "end": 2.0}]
 
-    assert tf.format_segments(segs, 15)[0]["text"] == "今日のゲストです。"
+    # 句読点も出さない（2026-10-06 ユーザー指摘）
+    assert tf.format_segments(segs, 15)[0]["text"] == "今日のゲストです"
 
 
 def test_burned_srt_skips_aizuchi_only_captions(tmp_path, monkeypatch):
