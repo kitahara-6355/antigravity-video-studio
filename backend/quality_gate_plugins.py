@@ -434,8 +434,15 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                     cache[skey] = sync.speech_map(out[1])
                 timing = sync.measure_sync(out[2], cache[skey])
                 # 一瞬で消える字幕（読めない）。校閲の行ずれ・時刻の潰れで出る（2026-10-06 実走）
+                try:
+                    from subtitle_engine.text_formatter import is_standalone_omittable, _omit_words
+                    aizuchi = _omit_words("omit_standalone_words")
+                except ImportError:
+                    is_standalone_omittable, aizuchi = None, []
+                # 相づちだけの字幕は焼き込まないので数えない
                 flashes = [r for r in out[2] if isinstance(r, dict) and r.get("text")
-                           and float(r.get("end", 0)) - float(r.get("start", 0)) < FLASH_SEC]
+                           and float(r.get("end", 0)) - float(r.get("start", 0)) < FLASH_SEC
+                           and not (aizuchi and is_standalone_omittable(r["text"], aizuchi))]
                 timing["flash"] = len(flashes)
                 if flashes:
                     deductions += 3

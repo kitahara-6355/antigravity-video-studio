@@ -753,6 +753,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
         for seg in formatted:
             if isinstance(seg, dict) and isinstance(seg.get("text"), str):
                 seg["text"] = strip_punctuation(seg["text"])
+        formatted = [s for s in formatted if not isinstance(s, dict) or s.get("text") != ""]
 
     return formatted
 
@@ -786,7 +787,8 @@ def strip_punctuation(text: str) -> str:
             else:
                 out.append(ch)
         lines.append("".join(out).strip(" 　"))
-    return "\n".join(line for line in lines if line) or text
+    # 句読点だけの字幕は空にする（呼び出し側が捨てる）
+    return "\n".join(line for line in lines if line)
 
 
 # ============================================================

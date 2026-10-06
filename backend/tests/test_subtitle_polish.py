@@ -21,7 +21,7 @@ from subtitle_engine import text_formatter as tf  # noqa: E402
     ("はい、いえいえ。", "はい　いえいえ"),
     ("こんにちは、\n書家の北原美麗です。", "こんにちは\n書家の北原美麗です"),
     ("本当ですか？", "本当ですか？"),
-    ("。", "。"),
+    ("。", ""),
 ])
 def test_strip_punctuation(text, expected):
     assert tf.strip_punctuation(text) == expected
@@ -117,3 +117,19 @@ def test_quality_gate_blocks_unproofread_subtitles(tmp_path, monkeypatch):
 def test_proofread_rejects_text_from_another_line(orig, new, ok):
     from subtitle_engine.ai_proofreader import _plausible_correction
     assert _plausible_correction(orig, new) is ok
+
+
+def test_flash_caption_is_merged_into_neighbour():
+    from subtitle_engine import sync
+    items = [{"start": 0.0, "end": 2.0, "text": "お腹が"},
+             {"start": 2.07, "end": 2.4, "text": "すくようになった"},
+             {"start": 3.5, "end": 5.0, "text": "次の文"}]
+    n = sync._merge_flashes(items, 0.8)
+    assert n == 1 and items[0]["text"] == "お腹が\nすくようになった" and items[0]["end"] == 2.4
+
+
+def test_punctuation_only_caption_is_dropped():
+    out = tf.format_segments([{"text": "。", "start": 0.0, "end": 1.0},
+                              {"text": "次です。", "start": 1.0, "end": 2.0}], 15)
+    if tf._strip_punctuation_enabled():
+        assert [s["text"] for s in out] == ["次です"]

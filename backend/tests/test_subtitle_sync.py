@@ -138,8 +138,9 @@ def test_min_display_and_no_overlap():
 
 def test_two_captions_do_not_snap_to_the_same_onset():
     sp = _map([(1.0, 6.0)])
-    segs = [{"start": 1.0, "end": 2.0, "text": "一"},
-            {"start": 1.2, "end": 6.0, "text": "二"}]
+    # 2行の字幕は隣に足せない（一瞬の字幕をまとめる規則が働かない）
+    segs = [{"start": 1.0, "end": 2.0, "text": "一\n一"},
+            {"start": 1.2, "end": 6.0, "text": "二\n二"}]
     out, _ = sync.align_segments(segs, sp, [], RULES)
     assert out[1]["start"] - out[0]["start"] >= sync.MIN_STEP_SEC - 1e-6
 

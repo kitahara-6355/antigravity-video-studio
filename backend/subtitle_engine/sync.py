@@ -263,6 +263,40 @@ def _distribute_by_speech(items: list[dict], speech: SpeechMap) -> int:
     return done
 
 
+FLASH_SEC = 0.5
+
+
+def _merge_flashes(items: list[dict], min_display: float) -> int:
+    """出る時間が FLASH_SEC 未満の字幕を、隣の字幕に1行として足す（読めない字幕を作らない）。
+
+    隣が1行で、足しても2行に収まるときだけ。詰まっている側（すき間が短い側）に寄せる。
+    """
+    merged = 0
+    for i, s in enumerate(items):
+        if s.get("_merged") or s["end"] - s["start"] >= FLASH_SEC:
+            continue
+        cands = []
+        for j in (i - 1, i + 1):
+            if 0 <= j < len(items) and not items[j].get("_merged"):
+                o = items[j]
+                if "\n" not in str(o.get("text", "")) and "\n" not in str(s.get("text", "")):
+                    gap = s["start"] - o["end"] if j < i else o["start"] - s["end"]
+                    cands.append((gap, j))
+        if not cands:
+            continue
+        _, j = min(cands)
+        o = items[j]
+        if j < i:
+            o["text"] = f"{o['text']}\n{s['text']}"
+            o["end"] = max(o["end"], s["end"])
+        else:
+            o["text"] = f"{s['text']}\n{o['text']}"
+            o["start"] = min(o["start"], s["start"])
+        s["_merged"] = True
+        merged += 1
+    return merged
+
+
 def align_segments(segments: list[dict], speech: SpeechMap,
                    cut_points: list[float] | None = None,
                    rules: dict | None = None) -> tuple[list[dict], dict]:
@@ -337,8 +371,10 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     for s, a, b in zip(items, ins, outs):
         s["start"], s["end"] = round(a, 3), round(max(b, a + 0.2), 3)
         result.append(s)
+    merged = _merge_flashes(result, r["min_display_sec"])
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
-             "redistributed": redistributed}
+             "redistributed": redistributed, "merged": merged}
+    result = [s for s in result if not s.get("_merged")]
     logger.info(f"🎯 字幕の出だし・終わりを音声に合わせました: {n}枚, 話し始めに寄せた {snapped_in}, "
                 f"話し終わりに寄せた {snapped_out}")
     return result, stats
