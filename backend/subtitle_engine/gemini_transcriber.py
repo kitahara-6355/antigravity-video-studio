@@ -210,6 +210,37 @@ def _call(client: Any, model: str, audio: Path, duration: float) -> tuple[str, s
     return response.text or "", getattr(response, "model_version", None) or model
 
 
+# 区切りの頭に残る、前の区切りの語の尻尾（「まいります」の後の「います」）の長さの上限
+ECHO_MAX_CHARS = 8
+
+
+def drop_boundary_echoes(segments: list[dict], chunk_sec: float = CHUNK_SEC) -> list[dict]:
+    """区切り（chunk_sec 秒ごと）の頭のセグメントが、直前のセグメントの尻尾の繰り返しなら除く。
+
+    境目をまたいだ語は、前の区切りで言い切りまで起こされ、次の区切りの頭に尻尾だけが
+    もう一度出る（2026-10-06 実測: 30 秒で「…まいります。」の後に「います。」が残り、
+    「では」を言っている所に字幕が出た）。
+    """
+    def norm(t):
+        return "".join(ch for ch in str(t) if ch not in "、。，．,. 　\n「」『』！？!?")
+
+    out: list[dict] = []
+    for seg in segments:
+        try:
+            start = float(seg.get("start", 0))
+        except (TypeError, ValueError, AttributeError):
+            out.append(seg)
+            continue
+        at_boundary = start > 0 and abs(start - round(start / chunk_sec) * chunk_sec) < 0.3
+        text = norm(seg.get("text", ""))
+        prev = norm(out[-1].get("text", "")) if out else ""
+        if at_boundary and text and len(text) <= ECHO_MAX_CHARS and prev.endswith(text):
+            logger.info(f"区切りの境目の繰り返しを除きました: {start:.1f}秒 {seg.get('text')!r}")
+            continue
+        out.append(seg)
+    return out
+
+
 def transcribe(video_path: str | Path, *, client: Any = None, model: str | None = None,
                chunk_sec: int = CHUNK_SEC, parallel: int = PARALLEL,
                call: Callable[..., tuple[str, str]] | None = None,
@@ -269,7 +300,7 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                 if _is_sparse(results[i][0], speech, offset, dur):
                     quiet.append((round(offset, 2), round(offset + dur, 2)))
 
-    segments = [s for segs, _ in results for s in segs]
+    segments = drop_boundary_echoes([s for segs, _ in results for s in segs], chunk_sec)
     if not segments:
         raise TranscriptionError("発話が1件も起こせませんでした")
     used = sorted({u for _, u in results})

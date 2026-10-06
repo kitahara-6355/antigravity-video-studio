@@ -169,3 +169,22 @@ def test_flash_caption_that_does_not_fit_stays():
 def test_kana_line_may_be_converted_to_kanji(orig, new, neighbours, ok):
     from subtitle_engine.ai_proofreader import _plausible_correction
     assert _plausible_correction(orig, new, neighbours) is ok
+
+
+def test_echo_of_a_word_cut_by_the_chunk_boundary_is_dropped():
+    # 実例（30 秒）: 30 秒ごとに切って起こすと、境目をまたいだ「まいります」の尻尾が
+    # 次の区切りの頭に「います。」として残り、「では」の所に字幕が出た
+    from subtitle_engine import gemini_transcriber as gt
+    segs = [{"start": 23.1, "end": 29.8, "text": "皆さまにお届けしてまいります。"},
+            {"start": 30.0, "end": 31.2, "text": "います。"},
+            {"start": 31.2, "end": 43.7, "text": "では記念すべき"}]
+    assert [s["text"] for s in gt.drop_boundary_echoes(segs, 30)] == [
+        "皆さまにお届けしてまいります。", "では記念すべき"]
+
+
+def test_segment_at_a_boundary_that_is_not_an_echo_stays():
+    from subtitle_engine import gemini_transcriber as gt
+    segs = [{"start": 23.1, "end": 29.8, "text": "はい。"},
+            {"start": 30.0, "end": 31.2, "text": "います。"},
+            {"start": 40.0, "end": 41.0, "text": "はい。"}]
+    assert len(gt.drop_boundary_echoes(segs, 30)) == 3

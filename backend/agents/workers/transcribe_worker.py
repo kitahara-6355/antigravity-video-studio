@@ -265,9 +265,10 @@ class TranscribeWorker(PipelineStageWorker):
         """Gemini で起こす。**落ちたら `None`**（呼び出し側が Whisper に切り替える）。"""
         checkpoint = _gemini_checkpoint(whisper_checkpoint)
         if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
-            segments = self._load_segments_from_checkpoint(checkpoint)
-            ctx.segments = segments
             from subtitle_engine import gemini_transcriber
+            segments = gemini_transcriber.drop_boundary_echoes(
+                self._load_segments_from_checkpoint(checkpoint))
+            ctx.segments = segments
             meta = gemini_transcriber.read_meta(checkpoint)
             ctx.verified_quiet = [tuple(q) for q in meta.get("quiet", [])]
             ctx.transcript_coverage = meta.get("coverage")

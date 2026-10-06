@@ -214,6 +214,18 @@ def test_recognised_caption_still_snaps_to_a_nearby_onset():
     assert out[1]["start"] == pytest.approx(3.8, abs=0.02)
 
 
+def test_unrecognised_caption_does_not_take_the_next_recognised_onset():
+    # 実例（44.4 秒）: 認識で拾えなかった「こんにちは」が、次の「もう初回ね」の話し始めを取り、
+    # 「もう初回ね」が 0.4 秒遅れた
+    sp = _map([(41.2, 43.96), (44.38, 45.37)], total=50)
+    segs = [{"start": 41.2, "end": 43.4, "text": "先生どうぞよろしくお願いいたします", "_asr": True},
+            {"start": 43.5, "end": 44.1, "text": "こんにちは", "_asr_interp": True},
+            {"start": 44.16, "end": 45.3, "text": "もう初回ね", "_asr": True}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    shown = [s for s in out if "初回" in s["text"]][0]
+    assert shown["start"] == pytest.approx(44.38, abs=0.02)
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg が無い")
 def test_speech_map_reads_media(tmp_path):
     media = tmp_path / "tone.wav"

@@ -357,16 +357,24 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     redistributed = _distribute_by_speech(items, speech)
 
     # 1. 話し始め・話し終わりに寄せる。同じ話し始めを2枚で取り合わない
+    # 音声認識で時刻を取った字幕の近くの話し始めは、その字幕のもの。手前の（認識で拾えなかった）
+    # 字幕には取らせない（44 秒の「こんにちは」が「もう初回ね」の話し始めを取り、0.4 秒遅れた）
+    claimed = [float("inf")] * (n + 1)
+    for k in range(n - 1, -1, -1):
+        claimed[k] = (float(items[k]["start"]) - ASR_SNAP_BEFORE_SEC
+                      if items[k].get("_asr") else claimed[k + 1])
     onsets, offsets = [], []
-    for s in items:
+    for k, s in enumerate(items):
         a, b = float(s["start"]), float(s["end"])
         floor = onsets[-1] + MIN_STEP_SEC if onsets else -1.0
         if s.get("_asr"):
             before, after = ASR_SNAP_BEFORE_SEC, ASR_SNAP_AFTER_SEC
+            cands = [o for o in speech.onsets if o >= floor]
         else:
             # 文字起こしの時刻は早めに出がち（実測で早すぎ 163 件・遅すぎ 23 件）なので、後ろ側を広く探す
             before, after = r["snap_window_sec"] * 0.6, r["snap_window_sec"] * 1.25
-        on = _nearest_biased([o for o in speech.onsets if o >= floor], a, before, after)
+            cands = [o for o in speech.onsets if floor <= o < claimed[k + 1]]
+        on = _nearest_biased(cands, a, before, after)
         off = _nearest(speech.offsets, b, r["snap_window_sec"])
         snapped_in += on is not None
         snapped_out += off is not None
