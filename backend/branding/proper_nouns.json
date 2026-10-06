@@ -1993,6 +1993,16 @@
       "confirmed": true,
       "usage_count": 0,
       "created_at": "2026-10-06T09:00:00Z"
+    },
+    {
+      "id": "pn_200",
+      "incorrect": "第1人者",
+      "correct": "第一人者",
+      "type": "word",
+      "context_hint": "慣用の語は漢数字（2026-10-06 実走で校閲が直したり直さなかったりした）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-06T14:00:00Z"
     }
   ],
   "pending_confirmations": []

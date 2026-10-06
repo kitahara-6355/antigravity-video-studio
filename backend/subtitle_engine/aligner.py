@@ -59,6 +59,10 @@ MIN_HITS = 3
 # 突き合わせは一致を前後に伸ばすので、間の向こうの1文字がくっつく（20分08秒の
 # 「なるべくね」の「な」が 2.3 秒前の「しれない」の「な」になった・2026-10-06 実測）
 MAX_CHAR_GAP_SEC = 1.0
+# 1枚の字幕の中で、時刻の離れた塊のうちこれより小さいもの（はぐれた 1〜2 文字）は使わない。
+# 25分44秒で「偉そう」の「う」とはぐれた「書」が「もうこう書き直して」に突き合い、
+# 字幕が 3.5 秒早く出て前の2枚と順番まで入れ替わった（2026-10-06 実測）
+MIN_CLUSTER = 3
 # 認識の時刻は、声の立ち上がり（音の大きさ）より約 0.2 秒早い。2026-10-06 実測:
 # 0.11→0.37、10.25→10.44、28.17→28.47、35.10→35.30、39.60→39.80 秒（5 か所とも 0.19〜0.30）
 LAG_SEC = 0.2
@@ -324,8 +328,9 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
                     hits.setdefault(owner[ci], []).append((offset_in[ci], rec_times[blk.b + e]))
             first = d
     aligned = 0
+    prev_last = None  # 前の字幕で最後に突き合った文字の時刻
     for i, cap in enumerate(captions):
-        pairs = hits.get(i)
+        pairs = _main_pairs(hits.get(i) or [])
         if not pairs:
             continue
         length = len(_norm_text(cap.get("text")))
@@ -333,9 +338,13 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
             continue
         (c0, t0), (c1, t1) = pairs[0], pairs[-1]
         start = t0 - c0 * CHAR_SEC
+        # 外挿した頭が、前の字幕の言葉より前に戻らない（順番が入れ替わる）
+        if prev_last is not None and start < prev_last + 0.05:
+            start = min(t0, prev_last + 0.05)
         end = t1 + (length - 1 - c1) * CHAR_SEC + CHAR_SEC
         if end <= start:
             continue
+        prev_last = t1
         cap["_est_start"] = float(cap["start"])
         cap["start"], cap["end"] = round(start, 3), round(end, 3)
         cap["_asr"] = True
@@ -343,6 +352,29 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         cap["_asr_first"] = round(t0, 3)
         aligned += 1
     return aligned
+
+
+def _main_pairs(pairs: list[tuple[int, float]]) -> list[tuple[int, float]]:
+    """1枚の字幕の突き合った文字を、時刻の離れ目で塊に分け、はぐれた小さな塊を除く。
+
+    MIN_CLUSTER 文字以上の塊だけを残す（無ければいちばん大きい塊）。字幕の中の本当の間
+    （言葉の塊どうし）は残る。端のはぐれた 1〜2 文字だけが落ちる。
+    """
+    if not pairs:
+        return []
+    groups = [[pairs[0]]]
+    for p, q in zip(pairs, pairs[1:]):
+        if q[1] - p[1] > MAX_CHAR_GAP_SEC:
+            groups.append([q])
+        else:
+            groups[-1].append(q)
+    if len(groups) == 1:
+        return pairs
+    big = [g for g in groups if len(g) >= MIN_CLUSTER]
+    if not big:
+        big = [max(groups, key=len)]
+    first, last = groups.index(big[0]), groups.index(big[-1])
+    return [p for g in groups[first:last + 1] for p in g]
 
 
 def interpolate_unaligned(captions: list[dict]) -> int:
@@ -365,8 +397,9 @@ def interpolate_unaligned(captions: list[dict]) -> int:
         if not run:
             continue
         t0, t1 = float(captions[a]["end"]), float(captions[b]["start"])
-        if t1 - t0 < 0.2 * len(run):  # 詰められないほど狭いときは触らない
-            continue
+        # 狭くても順番どおりに置く（推定の時刻のまま残すと、並べ直しで順番が入れ替わる）。
+        # 出る時間が足りない字幕は、後で隣とまとめる
+        t1 = max(t1, t0)
         total = sum(chars(c) for c in run)
         acc = 0.0
         for c in run:

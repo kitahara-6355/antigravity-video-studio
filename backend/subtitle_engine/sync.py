@@ -339,6 +339,22 @@ def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None 
     return merged
 
 
+def _drop_unheard_flashes(items: list[dict]) -> int:
+    """隣とまとめられなかった一瞬の字幕のうち、音声認識に声が無いものを出さない。
+
+    カットで声が消えた言葉が、カット点に 0.3 秒だけ残る（9分39秒の「いたんだよね」・
+    2026-10-06 実測）。読めず、言葉も聞こえないので出す意味が無い。認識に声がある字幕は残す。
+    """
+    dropped = 0
+    for s in items:
+        if s.get("_merged") or s["end"] - s["start"] >= FLASH_SEC:
+            continue
+        if s.get("_asr_interp") and not s.get("_asr"):
+            s["_merged"] = True
+            dropped += 1
+    return dropped
+
+
 def align_segments(segments: list[dict], speech: SpeechMap,
                    cut_points: list[float] | None = None,
                    rules: dict | None = None) -> tuple[list[dict], dict]:
@@ -431,8 +447,9 @@ def align_segments(segments: list[dict], speech: SpeechMap,
         s["start"], s["end"] = round(a, 3), round(max(b, a + 0.2), 3)
         result.append(s)
     merged = _merge_flashes(result, r["min_display_sec"])
+    dropped = _drop_unheard_flashes(result)
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
-             "redistributed": redistributed, "merged": merged}
+             "redistributed": redistributed, "merged": merged, "dropped": dropped}
     result = [s for s in result if not s.get("_merged")]
     logger.info(f"🎯 字幕の出だし・終わりを音声に合わせました: {n}枚, 話し始めに寄せた {snapped_in}, "
                 f"話し終わりに寄せた {snapped_out}")

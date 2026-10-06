@@ -236,6 +236,30 @@ def test_unrecognised_head_starts_at_the_onset_before_the_first_recognised_word(
     assert out[1]["start"] == pytest.approx(35.3, abs=0.02)
 
 
+def test_unheard_flash_that_cannot_be_merged_is_dropped():
+    # 実例（9分39秒）: カットで声が消えた「いたんだよね」が、カット点に 0.3 秒だけ出た。
+    # 認識にも無く、隣ともまとめられない一瞬の字幕は出さない
+    sp = _map([(570.0, 578.9), (579.2, 584.0)], total=600)
+    full = "あ" * 18 + "\n" + "い" * 18
+    segs = [{"start": 574.9, "end": 578.86, "text": full, "_asr": True},
+            {"start": 578.86, "end": 579.18, "text": "いたんだよね", "_asr_interp": True},
+            {"start": 579.18, "end": 584.4, "text": full, "_asr": True}]
+    out, stats = sync.align_segments(segs, sp, [578.9], RULES)
+    assert all(s["text"] != "いたんだよね" for s in out)
+    assert stats["dropped"] == 1
+
+
+def test_recognised_flash_is_kept():
+    sp = _map([(570.0, 578.9), (579.2, 584.0)], total=600)
+    full = "あ" * 18 + "\n" + "い" * 18
+    segs = [{"start": 574.9, "end": 578.86, "text": full, "_asr": True},
+            {"start": 578.86, "end": 579.18, "text": "いたんだよね", "_asr": True},
+            {"start": 579.18, "end": 584.4, "text": full, "_asr": True}]
+    out, stats = sync.align_segments(segs, sp, [578.9], RULES)
+    assert any(s["text"] == "いたんだよね" for s in out)
+    assert stats["dropped"] == 0
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg が無い")
 def test_speech_map_reads_media(tmp_path):
     media = tmp_path / "tone.wav"

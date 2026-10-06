@@ -149,3 +149,35 @@ def test_first_recognised_time_is_kept():
     aligner.align_captions(caps, toks("書道の第一人者", 35.3))
     assert caps[0]["_asr_first"] == pytest.approx(35.3)
     assert caps[0]["start"] == pytest.approx(35.3 - 4 * aligner.CHAR_SEC, abs=0.01)
+
+
+def test_a_small_stray_match_far_from_the_rest_is_ignored():
+    # 実例（25分44秒）: 「もうこう書き直して…」の「う書」が、3 秒前の「偉そう」の「う」と
+    # はぐれた「書」に突き合い、字幕が 3.5 秒早く出て、前の2枚と順番まで入れ替わった
+    caps = [{"start": 0.0, "end": 2.0, "text": "先生って言われると偉そうじゃない"},
+            {"start": 2.0, "end": 4.0, "text": "もうこう書き直してくれっていう"}]
+    tokens = (toks("先生って言われるから何か偉そう", 10.0) + [("書", 13.5)]
+              + toks("き直してくれって言われて", 16.6))
+    aligner.align_captions(caps, tokens)
+    assert caps[1]["_asr_first"] == pytest.approx(16.6)
+    # 拾えなかった頭の「もうこう書」の5文字ぶんだけ、さかのぼる
+    assert caps[1]["start"] == pytest.approx(16.6 - 5 * aligner.CHAR_SEC, abs=0.01)
+
+
+def test_recognised_starts_never_go_back_before_the_previous_caption():
+    caps = [{"start": 0.0, "end": 1.0, "text": "あいうえお"},
+            {"start": 1.0, "end": 2.0, "text": "かきくけこさしすせそ"}]
+    # 2枚目は頭の5文字を拾えず、外挿すると1枚目より前に出る
+    tokens = toks("あいうえお", 10.0, 0.1) + toks("しすせそ", 10.6, 0.1)
+    aligner.align_captions(caps, tokens)
+    assert caps[1]["start"] >= caps[0]["start"]
+    assert caps[1]["start"] >= 10.4
+
+
+def test_unaligned_captions_keep_their_order_when_there_is_no_room():
+    caps = [{"start": 0.0, "end": 1.0, "text": "あいうえお"},
+            {"start": 50.0, "end": 51.0, "text": "ききとれない"},
+            {"start": 1.0, "end": 2.0, "text": "かきくけこ"}]
+    aligner.align_captions(caps, toks("あいうえお", 10.0) + toks("かきくけこ", 11.0))
+    aligner.interpolate_unaligned(caps)
+    assert caps[0]["start"] <= caps[1]["start"] <= caps[2]["start"]
