@@ -542,9 +542,11 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     ins = []
     for i in range(n):
         t = onsets[i] + r["lead_in_sec"]
-        # 間の中で出さない。話し始めを待たせる字幕は「早すぎ」に見える
+        # 間の中で出さない。話し始めを待たせる字幕は「早すぎ」に見える。
+        # ただし間の後ろの話し始めが次の（認識で時刻を取った）字幕のものなら送らない。送ると次の字幕と
+        # ぶつかって一瞬で消え、次の字幕も遅れる（21分28秒の「ふうに思ってますね」・後ろ半分はカットで消えた）
         resume = _pause_end(t, speech)
-        if resume is not None:
+        if resume is not None and resume < claimed[i + 1]:
             onsets[i] = resume
             t = resume + r["lead_in_sec"]
         cp = _in_cut_zone(t, cut_points, r["cut_zone_sec"])

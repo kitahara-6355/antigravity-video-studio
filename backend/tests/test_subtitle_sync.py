@@ -268,6 +268,24 @@ def test_an_unheard_caption_with_no_room_does_not_cut_a_heard_one_short():
     assert stats["dropped"] == 1
 
 
+def test_a_caption_is_not_pushed_onto_the_next_recognised_onset():
+    # 実例（21分28秒）: 「…いけないなってい|ふうに思ってますね」の「思ってますね」はカットで消え、
+    # 字幕の出だしが間に入った。間の終わり（次の「先ほどね」の話し始め）まで送ったので、
+    # 0.33 秒で消え、「先ほどね」も 0.4 秒遅れた
+    sp = _map([(1282.98, 1284.78), (1285.12, 1287.37), (1288.78, 1289.97), (1290.14, 1290.94)],
+              total=1300)
+    segs = [{"start": 1282.97, "end": 1287.46, "text": "この文化庁セットでやっぱり\n考えていかないといけないなってい",
+             "_asr": True, "_asr_first": 1282.97},
+            {"start": 1287.46, "end": 1288.37, "text": "ふうに思ってますね", "_asr_interp": True, "_asr_heard": 3},
+            {"start": 1288.78, "end": 1293.99, "text": "先ほどね　お習字っていうワードが\n出たんですけども",
+             "_asr": True, "_asr_first": 1288.78}]
+    out, _ = sync.align_segments(segs, sp, [1287.7], RULES)
+    nxt = [s for s in out if s["text"].startswith("先ほどね")][0]
+    assert nxt["start"] == pytest.approx(1288.78, abs=0.05)
+    mid = [s for s in out if s["text"] == "ふうに思ってますね"][0]
+    assert mid["end"] - mid["start"] >= 0.8
+
+
 def test_recognised_flash_is_kept():
     sp = _map([(570.0, 578.9), (579.2, 584.0)], total=600)
     full = "あ" * 18 + "\n" + "い" * 18
