@@ -255,6 +255,43 @@ def test_format_segments_drops_lead_words():
     assert tf.format_segments(segs, 15)[0]["text"] == "今日のゲストです"
 
 
+# 「、」で挟まれた言いよどみは文の途中でも外す（2026-10-06）。25回目の書き出しで字幕に
+# 「あの」24・「まあ」10・「ま」5 などが残っていた（1分18秒「時に　ま/お習字を」）
+FILLERS_MID = ["え", "ま", "まあ", "あ", "あの", "その"]
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("私は小学校3年生の時に、え、ま、お習字をスタートした", "私は小学校3年生の時に、お習字をスタートした"),
+    ("先生にとっては、ま、美しい文字というか、あの、良い文字", "先生にとっては、美しい文字というか、良い文字"),
+    ("こだわってるんですけども、あの。", "こだわってるんですけども。"),
+    ("こだわってるんですけども、あの", "こだわってるんですけども"),
+    ("その、ゲームのタイトル", "ゲームのタイトル"),
+    ("VPかな、あ、またそれもね", "VPかな、またそれもね"),
+    # 語の一部・「、」で挟まれていないものは残す
+    ("あの人の作品", "あの人の作品"),
+    ("まあまあの出来、その筆", "まあまあの出来、その筆"),
+    ("ですけどまああの書道界", "ですけどまああの書道界"),
+    # 言いよどみだけなら残す（相づちだけの字幕の規則が扱う）
+    ("あの", "あの"),
+    ("まあ、", "まあ、"),
+])
+def test_fillers_between_commas_are_dropped_anywhere(text, expected):
+    assert tf.strip_interjections(text, FILLERS_MID) == expected
+
+
+def test_format_segments_drops_fillers_between_commas():
+    segs = [{"text": "私は小学校3年生の時に、え、ま、お習字をスタートした。", "start": 0.0, "end": 6.0}]
+
+    texts = [s["text"] for s in tf.format_segments(segs, 18)]
+    assert "".join(texts).replace("\n", "").replace("\u3000", "") == "私は小学校3年生の時にお習字をスタートした"
+
+
+def test_the_mid_sentence_fillers_live_in_the_template_rules():
+    from template_config import template_config
+
+    assert "まあ" in template_config.get_subtitle_rules()["omit_interjections"]
+
+
 def test_burned_srt_skips_aizuchi_only_captions(tmp_path, monkeypatch):
     """相づちだけの字幕は焼き込まない（音声とカットは残す）。"""
     import pathlib as _pl
@@ -384,3 +421,123 @@ def test_sidecar_keeps_what_the_alignment_started_from(tmp_path):
     assert data["segments"] == [{"start": 1.0, "end": 2.0, "text": "a"}]
     assert data["estimated"] == [{"start": 0.5, "end": 2.5, "text": "a"}]
     assert data["cut_points"] == [3.0]
+
+
+# ------------------------------------------------------------
+# 7. 文字起こしの区切りは話の切れ目に置く（2026-10-06）
+# ------------------------------------------------------------
+# 30 秒ごとに機械的に切ると、43 分の素材で区切り 86 か所のうち 32 か所が語の途中だった
+# （前後に認識した文字の間が 0.25 秒未満）。境目をまたいだ語は前の区切りで言い切りまで
+# 補われ、次の区切りの頭に壊れた語が残る（素材の 90 秒の境目で「…スタートし」+「だったんですけど」）。
+
+def _energy(total, quiet_at=(), frame=0.02):
+    """quiet_at の (開始, 終了) だけ静かな、音の大きさの並び（フレームごと）。"""
+    e = [1.0] * int(round(total / frame))
+    for a, b in quiet_at:
+        for i in range(int(round(a / frame)), int(round(b / frame))):
+            e[i] = 0.001
+    return e
+
+
+def test_chunks_are_cut_in_the_pauses():
+    from subtitle_engine import gemini_transcriber as gt
+    quiet = gt.QuietMap(_energy(70, [(24.6, 25.4), (47.0, 47.6)]))
+
+    chunks = gt.plan_chunks(70, 30, quiet)
+
+    assert len(chunks) == 3
+    assert 24.6 < chunks[1][0] < 25.4
+    assert 47.0 < chunks[2][0] < 47.6
+    # 隙間も重なりもなく素材の終わりまで続く
+    assert all(abs(o + d - n) < 1e-6 for (o, d), (n, _) in zip(chunks, chunks[1:]))
+    assert abs(chunks[-1][0] + chunks[-1][1] - 70) < 1e-6
+
+
+def test_a_chunk_stays_between_two_thirds_and_the_full_length():
+    # 区切りの候補に入らない所の間（5 秒）は使わない。間が無ければ従来どおり chunk_sec で切る
+    from subtitle_engine import gemini_transcriber as gt
+    quiet = gt.QuietMap(_energy(100, [(5.0, 6.0), (50.0, 51.0)]))
+
+    chunks = gt.plan_chunks(100, 30, quiet)
+
+    assert chunks[0] == (0.0, 30.0)
+    assert 50.0 < chunks[2][0] < 51.0
+    assert all(20 - 1e-6 <= d <= 30 + 1e-6 for _, d in chunks[:-1])
+
+
+def test_without_a_sound_map_chunks_are_cut_every_chunk_sec():
+    from subtitle_engine import gemini_transcriber as gt
+
+    assert gt.plan_chunks(65, 30, None) == [(0.0, 30.0), (30.0, 30.0), (60.0, 5.0)]
+
+
+def test_echoes_are_looked_for_at_the_actual_cuts():
+    from subtitle_engine import gemini_transcriber as gt
+    segs = [{"start": 20.1, "end": 27.3, "text": "皆さまにお届けしてまいります。"},
+            {"start": 27.4, "end": 28.2, "text": "います。"},
+            {"start": 28.2, "end": 40.0, "text": "では記念すべき"}]
+
+    assert [s["text"] for s in gt.drop_boundary_echoes(segs, cuts=[27.4])] == [
+        "皆さまにお届けしてまいります。", "では記念すべき"]
+    # 30 秒の倍数ではないので、区切りを渡さなければ境目とは見ない
+    assert len(gt.drop_boundary_echoes(segs, 30)) == 3
+
+
+def _clip_with_pauses(path, total, pauses):
+    """440Hz の音で、pauses の (開始, 終了) だけ無音のクリップを作る。"""
+    gate = "*".join(f"(lt(t\\,{a})+gt(t\\,{b}))" for a, b in pauses)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
+                    "-i", f"aevalsrc=exprs=sin(2*PI*440*t)*{gate}:d={total}:s=16000",
+                    "-c:a", "aac", str(path)], check=True)
+
+
+@needs_ffmpeg
+def test_transcribe_cuts_the_audio_in_the_pauses(tmp_path):
+    from subtitle_engine import gemini_transcriber as gt
+    clip = tmp_path / "talk.mp4"
+    _clip_with_pauses(clip, 45, [(16.5, 17.5), (35.0, 36.0)])
+    calls = []
+
+    def call(client, model, audio, duration):
+        calls.append(duration)
+        return json.dumps([{"start": 0, "end": duration, "text": "い" * int(duration * 5)}]), model
+
+    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=20, parallel=1, call=call, backoff=0)
+
+    assert len(calls) == 3
+    assert 16.5 < result.cuts[0] < 17.5 and 35.0 < result.cuts[1] < 36.0
+    assert abs(sum(calls) - 45) < 0.1
+
+
+@needs_ffmpeg
+def test_a_sparse_chunk_is_halved_in_a_pause_near_the_middle(tmp_path):
+    from subtitle_engine import gemini_transcriber as gt
+    clip = tmp_path / "talk.mp4"
+    _clip_with_pauses(clip, 20, [(7.5, 8.5)])
+    calls = []
+
+    def call(client, model, audio, duration):
+        calls.append(duration)
+        if len(calls) == 1:  # 最初の 20 秒: 1文に全部の時刻を付けて中身を落とす
+            return json.dumps([{"start": 0, "end": 20, "text": "あ" * 20}]), model
+        return json.dumps([{"start": 0, "end": duration, "text": "い" * 70}]), model
+
+    gt.transcribe(clip, client=object(), model="m", chunk_sec=20, parallel=1, call=call, backoff=0)
+
+    assert len(calls) == 3
+    assert 7.5 < calls[1] < 8.5 and abs(calls[1] + calls[2] - 20) < 1e-6
+
+
+def test_the_cache_of_the_fixed_cuts_is_not_reused():
+    from agents.workers.transcribe_worker import _gemini_checkpoint
+
+    assert _gemini_checkpoint("work/_whisper_abc.jsonl") != "work/_gemini_c30_abc.jsonl"
+
+
+def test_the_cuts_survive_the_cache(tmp_path):
+    from subtitle_engine import gemini_transcriber as gt
+
+    ckpt = tmp_path / "_gemini_c30q_x.jsonl"
+    gt.write_checkpoint([{"start": 0, "end": 1, "text": "a"}], ckpt, meta={"cuts": [27.4, 55.1]})
+
+    assert gt.read_meta(ckpt)["cuts"] == [27.4, 55.1]

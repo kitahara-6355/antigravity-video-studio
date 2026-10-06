@@ -9,8 +9,10 @@
 
 ## 作り
 
-1. 音声を mono 16kHz の mp3 にして `CHUNK_SEC` 秒ずつに切る
-   （短く切るほどタイムスタンプがずれにくい。Flash 系は長い音声で時刻が伸びる）
+1. 音声を mono 16kHz の mp3 にして、長くても `CHUNK_SEC` 秒に切る
+   （短く切るほどタイムスタンプがずれにくい。Flash 系は長い音声で時刻が伸びる）。
+   **区切りは話の切れ目に置く** — 前の区切りから CHUNK_SEC の 2/3〜1 倍の間で一番静かな所
+   （`plan_chunks`）。長い音声を無音で区切ってから起こす定石（WhisperX の VAD 区切りと同じ考え）
 2. 1チャンク1呼び出し。**課金経路は `model_governance.get_governed_client` を通る**
    （cost_guard の台帳・枠の降格が効く）。モデルは `model_policy` の
    `transcription` 工程の段から引く（直書きしない）
@@ -22,11 +24,17 @@
 2026-10-06: チャンクを 120 秒 → 30 秒にした。120 秒では Flash 系が約 30 秒の発話を
 丸ごと落とし、残った1文に 54 秒分の時刻を付けた（同じ区間を 30 秒で起こすと正しく出た）。
 
+2026-10-06: 30 秒ごとの機械的な区切りをやめた。43 分の素材で区切り 86 か所のうち 32 か所が
+語の途中で、境目をまたいだ語は前の区切りで言い切りまで補われ、次の区切りの頭に壊れた語が
+残った（素材の 90 秒の境目で「…スタートし」+「だったんですけど」。認識は「スタートしたんですけど」）。
+静かな所で切ると語の途中は 3 か所（前後に認識した文字の間が 0.25 秒未満の区切りを数えた）。
+
 **1チャンクでも落ちたら全体を失敗にする。** 後段の SmartCut は字幕のある範囲だけを
 残すので、黙って抜けたチャンクはそのまま動画から消える。
 """
 from __future__ import annotations
 
+import bisect
 import json
 import logging
 import re
@@ -44,6 +52,18 @@ TASK = "transcription"
 CHUNK_SEC = 30
 PARALLEL = 4
 MIN_SEG_SEC = 0.3
+
+# 区切りは前の区切りから CHUNK_SEC × MIN_CHUNK_RATIO〜CHUNK_SEC 秒の間で一番静かな所に置く
+MIN_CHUNK_RATIO = 2 / 3
+# 静かさを測る幅。文の切れ目の間（0.3〜1 秒）を拾い、子音の弱い所（0.1 秒未満）は拾わない。
+# 43 分の素材で 0.2〜0.8 秒を比べ、語の途中で切る数が少なかった幅（2026-10-06）
+QUIET_SPAN_SEC = 0.5
+QUIET_FRAME_SEC = 0.02
+QUIET_RATE = 8000
+# 一番静かな所と同じくらい静かな候補（この割合まで）が並ぶなら、狙いの位置に近い方を採る
+QUIET_TIE = 0.05
+# キャッシュ名の印。区切り方が変わったら変える（transcribe_worker._gemini_checkpoint）
+CUT_TAG = "q"
 
 PROMPT = """この音声は日本語の会話（{duration:.0f}秒）です。発話をすべて文字起こししてください。
 
@@ -70,6 +90,8 @@ class TranscribeResult:
     coverage: dict | None = None
     # 起こし直しても文字が薄いままだった区間（素材の秒）。発話ではないとみなし、人の確認に回す
     quiet: list[tuple[float, float]] = field(default_factory=list)
+    # チャンクの区切り（素材の秒・先頭の 0 は含まない）。境目の繰り返しを探す所
+    cuts: list[float] = field(default_factory=list)
 
 
 def _extract_json_array(text: str) -> list:
@@ -143,16 +165,89 @@ def _probe_duration(path: str | Path) -> float:
     return float(out.strip())
 
 
+class QuietMap:
+    """音の大きさの地図（フレームごとのエネルギー）。区切りを一番静かな所に置くために使う。"""
+
+    def __init__(self, energy, frame_sec: float = QUIET_FRAME_SEC,
+                 span_sec: float = QUIET_SPAN_SEC):
+        import numpy as np
+
+        e = np.asarray(energy, dtype=np.float64)
+        k = max(1, int(round(span_sec / frame_sec)))
+        # i 番目の値は、i 番目のフレームを中心にした span_sec 秒の平均
+        self._smooth = np.convolve(e, np.ones(k) / k, mode="same") if len(e) else e
+        self.frame_sec = frame_sec
+
+    @classmethod
+    def from_media(cls, media: str | Path) -> "QuietMap | None":
+        """音声を読んで地図を作る。読めなければ None（呼び出し側は機械的な区切りに戻る）。"""
+        try:
+            import numpy as np
+
+            pcm = subprocess.run(
+                ["ffmpeg", "-v", "error", "-i", str(media), "-vn", "-ac", "1",
+                 "-ar", str(QUIET_RATE), "-f", "s16le", "-"],
+                capture_output=True, check=True, timeout=600).stdout
+        except (ImportError, OSError, subprocess.SubprocessError) as e:
+            logger.warning(f"音の大きさを測れないので {CHUNK_SEC} 秒ごとに区切ります: {e}")
+            return None
+        hop = int(QUIET_RATE * QUIET_FRAME_SEC)
+        x = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+        n = len(x) // hop
+        if n == 0:
+            return None
+        return cls((x[:n * hop].reshape(n, hop) ** 2).mean(axis=1))
+
+    def quietest(self, lo: float, hi: float, target: float) -> float:
+        """lo〜hi 秒で一番静かな所。同じくらい静かな所が並ぶなら target に近い方。"""
+        import numpy as np
+
+        f = self.frame_sec
+        i0 = max(0, int(np.ceil(lo / f - 1e-9)))
+        i1 = min(len(self._smooth), int(np.floor(hi / f + 1e-9)) + 1)
+        if i1 <= i0:  # 地図の外（音声が映像より短いなど）
+            return target
+        window = self._smooth[i0:i1]
+        floor = float(window.min())
+        near = np.flatnonzero(window <= floor * (1 + QUIET_TIE) + 1e-12) + i0
+        best = int(near[np.argmin(np.abs(near * f - target))])
+        return min(max(round(best * f, 3), lo), hi)
+
+
+def plan_chunks(total: float, chunk_sec: float = CHUNK_SEC,
+                quiet: QuietMap | None = None) -> list[tuple[float, float]]:
+    """チャンクの (開始, 長さ) の並び。
+
+    区切りは前の区切りから chunk_sec の 2/3〜1 倍の間で一番静かな所（同じくらい静かなら
+    長い方）。音の地図が無ければ chunk_sec 秒ごと（従来どおり）。
+    """
+    shortest = chunk_sec * MIN_CHUNK_RATIO
+    out: list[tuple[float, float]] = []
+    offset = 0.0
+    while offset < total - 0.05:
+        end = offset + chunk_sec
+        if end >= total - 0.05:
+            out.append((offset, total - offset))
+            break
+        cut = quiet.quietest(offset + shortest, end, target=end) if quiet is not None else end
+        out.append((offset, cut - offset))
+        offset = cut
+    return out
+
+
 def split_audio(video_path: str | Path, work_dir: str | Path,
-                chunk_sec: int = CHUNK_SEC) -> list[tuple[Path, float, float]]:
-    """音声を mono 16kHz の mp3 にして `chunk_sec` 秒ずつに切る。(path, offset, duration)。"""
-    total = _probe_duration(video_path)
+                chunk_sec: int = CHUNK_SEC,
+                plan: list[tuple[float, float]] | None = None) -> list[tuple[Path, float, float]]:
+    """音声を mono 16kHz の mp3 にして切る。(path, offset, duration)。
+
+    plan（`plan_chunks` の (開始, 長さ)）が無ければ `chunk_sec` 秒ずつ。
+    """
+    if plan is None:
+        plan = plan_chunks(_probe_duration(video_path), chunk_sec, None)
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     chunks = []
-    offset, idx = 0.0, 0
-    while offset < total - 0.05:
-        dur = min(chunk_sec, total - offset)
+    for idx, (offset, dur) in enumerate(plan):
         path = work_dir / f"chunk_{idx:03d}.mp3"
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-ss", f"{offset:.3f}", "-t", f"{dur:.3f}",
@@ -160,8 +255,6 @@ def split_audio(video_path: str | Path, work_dir: str | Path,
              str(path)],
             capture_output=True, text=True, check=True, timeout=300)
         chunks.append((path, offset, dur))
-        offset += dur
-        idx += 1
     return chunks
 
 
@@ -236,8 +329,11 @@ def join_spaced_words(segments: list[dict]) -> list[dict]:
     return out
 
 
-def drop_boundary_echoes(segments: list[dict], chunk_sec: float = CHUNK_SEC) -> list[dict]:
-    """区切り（chunk_sec 秒ごと）の頭のセグメントが、直前のセグメントの尻尾の繰り返しなら除く。
+def drop_boundary_echoes(segments: list[dict], chunk_sec: float = CHUNK_SEC,
+                         cuts: list[float] | None = None) -> list[dict]:
+    """区切りの頭のセグメントが、直前のセグメントの尻尾の繰り返しなら除く。
+
+    区切りは cuts（素材の秒）。無ければ chunk_sec 秒ごと（区切りを記録していない古いキャッシュ）。
 
     境目をまたいだ語は、前の区切りで言い切りまで起こされ、次の区切りの頭に尻尾だけが
     もう一度出る（2026-10-06 実測: 30 秒で「…まいります。」の後に「います。」が残り、
@@ -246,6 +342,14 @@ def drop_boundary_echoes(segments: list[dict], chunk_sec: float = CHUNK_SEC) -> 
     def norm(t):
         return "".join(ch for ch in str(t) if ch not in "、。，．,. 　\n「」『』！？!?")
 
+    marks = sorted(float(c) for c in cuts) if cuts is not None else None
+
+    def at_cut(start: float) -> bool:
+        if marks is None:
+            return start > 0 and abs(start - round(start / chunk_sec) * chunk_sec) < 0.3
+        i = bisect.bisect_left(marks, start)
+        return any(abs(start - marks[j]) < 0.3 for j in (i - 1, i) if 0 <= j < len(marks))
+
     out: list[dict] = []
     for seg in segments:
         try:
@@ -253,7 +357,7 @@ def drop_boundary_echoes(segments: list[dict], chunk_sec: float = CHUNK_SEC) -> 
         except (TypeError, ValueError, AttributeError):
             out.append(seg)
             continue
-        at_boundary = start > 0 and abs(start - round(start / chunk_sec) * chunk_sec) < 0.3
+        at_boundary = at_cut(start)
         text = norm(seg.get("text", ""))
         prev = norm(out[-1].get("text", "")) if out else ""
         if at_boundary and _is_echo(text, prev):
@@ -285,8 +389,11 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
     call = call or _call
 
     with tempfile.TemporaryDirectory(prefix="gemini_tx_") as tmp:
-        chunks = split_audio(video_path, tmp, chunk_sec)
-        logger.info(f"🎤 Gemini 文字起こし: {len(chunks)} チャンク（{chunk_sec}秒ずつ）model={model}")
+        quiet_map = QuietMap.from_media(video_path)
+        plan = plan_chunks(_probe_duration(video_path), chunk_sec, quiet_map)
+        chunks = split_audio(video_path, tmp, plan=plan)
+        logger.info(f"🎤 Gemini 文字起こし: {len(chunks)} チャンク（長くても{chunk_sec}秒・"
+                    f"{'話の切れ目' if quiet_map is not None else '機械的'}に区切る）model={model}")
 
         def one(args: tuple[int, tuple[Path, float, float]]) -> tuple[list[dict], str]:
             i, (path, offset, dur) = args
@@ -317,9 +424,12 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                 if not _is_sparse(results[i][0], speech, offset, dur):
                     continue
                 before = _chars(results[i][0])
+                # 半分に刻む所も、真ん中あたりで一番静かな所
+                mid = (quiet_map.quietest(offset + dur * 0.3, offset + dur * 0.7, offset + dur / 2) - offset
+                       if quiet_map is not None else dur / 2)
                 try:
                     redo = _retranscribe_halves(path, offset, dur, Path(tmp), i,
-                                                lambda p, o, d: call(client, model, p, d))
+                                                lambda p, o, d: call(client, model, p, d), mid=mid)
                 except _retryable() as e:
                     logger.warning(f"  ⚠️ チャンク {i + 1} の起こし直しに失敗: {e}")
                     continue
@@ -334,7 +444,9 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                 if _is_sparse(results[i][0], speech, offset, dur):
                     quiet.append((round(offset, 2), round(offset + dur, 2)))
 
-    segments = drop_boundary_echoes(join_spaced_words([s for segs, _ in results for s in segs]), chunk_sec)
+    cuts = [round(offset, 3) for _, offset, _ in chunks[1:]]
+    segments = drop_boundary_echoes(join_spaced_words([s for segs, _ in results for s in segs]),
+                                    chunk_sec, cuts=cuts)
     if not segments:
         raise TranscriptionError("発話が1件も起こせませんでした")
     used = sorted({u for _, u in results})
@@ -347,7 +459,7 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                            f"薄い区間 {len(report['sparse'])}件")
     return TranscribeResult(segments=segments, model=model, chunks=len(chunks), models_used=used,
                             rechecked=rechecked, coverage=report,
-                            quiet=quiet if speech is not None else [])
+                            quiet=quiet if speech is not None else [], cuts=cuts)
 
 
 def _chars(segs: list[dict]) -> int:
@@ -373,19 +485,19 @@ def _is_sparse(segs: list[dict], speech, offset: float, dur: float) -> bool:
 
 
 def _retranscribe_halves(path: Path, offset: float, dur: float, work: Path, idx: int,
-                         call_one) -> tuple[list[dict], str]:
-    """1チャンクを半分ずつに刻んで起こし直す。"""
-    half = dur / 2
+                         call_one, mid: float | None = None) -> tuple[list[dict], str]:
+    """1チャンクを2つに刻んで起こし直す。刻む所はチャンクの頭から mid 秒（既定は真ん中）。"""
+    mid = dur / 2 if mid is None else mid
     segs: list[dict] = []
     used = ""
-    for j in range(2):
+    for j, (a, b) in enumerate(((0.0, mid), (mid, dur))):
         sub = work / f"chunk_{idx:03d}_{j}.mp3"
         subprocess.run(
-            ["ffmpeg", "-v", "error", "-y", "-ss", f"{j * half:.3f}", "-t", f"{half:.3f}",
+            ["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t", f"{b - a:.3f}",
              "-i", str(path), "-c", "copy", str(sub)],
             capture_output=True, text=True, check=True, timeout=120)
-        text, used = call_one(sub, offset + j * half, half)
-        segs.extend(parse_segments(text, offset + j * half, half))
+        text, used = call_one(sub, offset + a, b - a)
+        segs.extend(parse_segments(text, offset + a, b - a))
     return segs, used
 
 

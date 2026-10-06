@@ -39,12 +39,13 @@ def transcribe_engine() -> str:
 
 def _gemini_checkpoint(whisper_checkpoint: str) -> str:
     """Gemini の起こしのキャッシュ。**刻み方が変わったら別のキャッシュにする**
-    （120 秒チャンクで欠落した起こしを、30 秒に変えた後も使い回さないため）。"""
-    from subtitle_engine.gemini_transcriber import CHUNK_SEC
+    （120 秒チャンクで欠落した起こしを、30 秒に変えた後も使い回さないため。
+    30 秒ごとの機械的な区切りの起こしを、話の切れ目で区切るようにした後も使い回さないため）。"""
+    from subtitle_engine.gemini_transcriber import CHUNK_SEC, CUT_TAG
     p = Path(whisper_checkpoint)
     name = p.name.replace("_whisper_", "_gemini_", 1)
     if CHUNK_SEC != 120:  # 120 秒時代のキャッシュ名はそのまま読めるようにしておく
-        name = name.replace("_gemini_", f"_gemini_c{CHUNK_SEC}_", 1)
+        name = name.replace("_gemini_", f"_gemini_c{CHUNK_SEC}{CUT_TAG}_", 1)
     return str(p.with_name(name))
 
 
@@ -266,10 +267,10 @@ class TranscribeWorker(PipelineStageWorker):
         checkpoint = _gemini_checkpoint(whisper_checkpoint)
         if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
             from subtitle_engine import gemini_transcriber
-            segments = gemini_transcriber.drop_boundary_echoes(gemini_transcriber.join_spaced_words(
-                self._load_segments_from_checkpoint(checkpoint)))
-            ctx.segments = segments
             meta = gemini_transcriber.read_meta(checkpoint)
+            segments = gemini_transcriber.drop_boundary_echoes(gemini_transcriber.join_spaced_words(
+                self._load_segments_from_checkpoint(checkpoint)), cuts=meta.get("cuts"))
+            ctx.segments = segments
             ctx.verified_quiet = [tuple(q) for q in meta.get("quiet", [])]
             ctx.transcript_coverage = meta.get("coverage")
             return StageResult(
@@ -284,7 +285,8 @@ class TranscribeWorker(PipelineStageWorker):
             tx = await loop.run_in_executor(None, gemini_transcriber.transcribe, ctx.video_path)
             gemini_transcriber.write_checkpoint(
                 tx.segments, checkpoint,
-                meta={"quiet": tx.quiet, "coverage": tx.coverage, "rechecked": tx.rechecked})
+                meta={"quiet": tx.quiet, "coverage": tx.coverage, "rechecked": tx.rechecked,
+                      "cuts": tx.cuts})
         except Exception as e:  # noqa: BLE001 — 主経路の失敗は従経路へ。理由は残す
             logger.warning(f"⚠️ Gemini 文字起こしに失敗 → Whisper に切り替えます: {e}")
             ctx.warnings.append(f"文字起こし: Gemini が失敗したため Whisper に切り替えました（{e}）")

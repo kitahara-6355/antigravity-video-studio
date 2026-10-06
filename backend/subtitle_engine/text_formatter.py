@@ -127,6 +127,40 @@ def strip_lead_words(text: str, words: list[str] | None = None,
     return result if result else text
 
 
+_FILLER_LEFT = "、,，。！？!? 　\n"
+_FILLER_COMMA = "、,，"
+_FILLER_END = "。！？!?"
+
+
+def strip_interjections(text: str, words: list[str] | None = None) -> str:
+    """「、」で挟まれた言いよどみ（「時に、え、ま、お習字を」の「え」「ま」）を、文の途中でも外す。
+
+    前が文頭・句読点・空白で、後ろが「、」か文末のときだけ外す。「あの人」「まあまあ」の
+    ように語の一部になっているもの、「、」で区切られていないものは残す（2026-10-06 ユーザー指摘の
+    「話題に触れないつなぎ言葉は字幕にしない」を、文頭だけでなく文の途中にも広げた）。
+    外した結果が空（言いよどみだけ）なら元のまま返す（相づちだけの字幕の規則が扱う）。
+    """
+    if not isinstance(text, str) or not text:
+        return text
+    words = _omit_words("omit_interjections") if words is None else words
+    if not words:
+        return text
+    alt = "|".join(re.escape(w) for w in sorted(words, key=len, reverse=True))
+    left = f"(?:^|(?<=[{re.escape(_FILLER_LEFT)}]))"
+    # 後ろに「、」: 言いよどみと「、」を外す（前の区切りは残す）
+    before_comma = re.compile(f"{left}(?:{alt})[{re.escape(_FILLER_COMMA)}][ 　]*")
+    # 後ろが文末: 前の「、」ごと外す（「けども、あの。」→「けども。」）
+    at_end = re.compile(f"[{re.escape(_FILLER_COMMA)}][ 　]*(?:{alt})(?=[{re.escape(_FILLER_END)}]|$)")
+    out = text
+    while True:  # 「え、ま、」のように続くもの
+        nxt = at_end.sub("", before_comma.sub("", out))
+        if nxt == out:
+            break
+        out = nxt
+    out = out.strip()
+    return out if out.strip(_FILLER_LEFT + _FILLER_END) else text
+
+
 def is_standalone_omittable(text: str, words: list[str] | None = None) -> bool:
     """相づちだけの字幕か（「はい。」「うん、なるほど。」）。音声は残し、字幕だけ出さない。"""
     if not isinstance(text, str):
@@ -809,6 +843,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
     segments = _rejoin_split_heads(segments)
     lead_words = _omit_words("omit_lead_words")
     bare_words = _omit_words("omit_lead_words_bare")
+    mid_fillers = _omit_words("omit_interjections")
     formatted = []
     split_count = 0
     semantic_count = 0
@@ -825,8 +860,9 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
                 continue
             text = text.strip()
 
-            # Step 1: フィラー除去・文頭の聞き流し語（さて、それから、）を外す
-            cleaned = strip_lead_words(remove_fillers(text), lead_words, bare_words)
+            # Step 1: フィラー除去・「、」で挟まれた言いよどみと文頭の聞き流し語（さて、それから、）を外す
+            cleaned = strip_lead_words(strip_interjections(remove_fillers(text), mid_fillers),
+                                       lead_words, bare_words)
             if cleaned != text:
                 filler_count += 1
 
