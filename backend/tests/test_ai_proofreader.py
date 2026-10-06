@@ -90,6 +90,18 @@ class TestBuildProperNounContext:
             assert "「きたはら」→「北原」（人名）" in context
             assert "「ぷろじぇくと」→「プロジェクト」" in context
 
+    def test_同じ組は1行だけ載せる(self):
+        """2026-10-06: 辞書の 200 件のうち 161 件がテストの残した同じ組（「テスト誤」→「テスト正」）で、
+        校閲の指示の大半を占めていた。"""
+        mock_module = MagicMock()
+        mock_module.proper_noun_dict.get_all_entries.return_value = (
+            [{"incorrect": "初会", "correct": "初回"}]
+            + [{"incorrect": "テスト誤", "correct": "テスト正"}] * 3)
+        with patch.dict("sys.modules", {"proper_noun_dict": mock_module}):
+            context = ai_proofreader._build_proper_noun_context()
+        assert context.count("「テスト誤」→「テスト正」") == 1
+        assert "「初会」→「初回」" in context
+
     def test_build_context_empty(self):
         """辞書データが空工程のケース"""
         mock_module = MagicMock()
@@ -409,6 +421,16 @@ class TestProofreadSegmentsResponseValidation:
         result, stats = self._run_with_response_text('[{"index": 0, "text": "こんにちは、テストです。"}]', segments)
         assert stats["proofread_count"] == 1
         assert result[0]["text"] == "こんにちは、テストです。"
+
+    def test_同じ文には毎回同じ直しを返させる(self):
+        """2026-10-06 実走: 書き出すたびに校閲の出来が変わった（22回目は「初回」、23回目は冒頭4分で劣化）。
+        温度を 0 にし、乱数の種を固定する（文字起こしと同じ）。"""
+        mock_types = MagicMock()
+        with patch.object(ai_proofreader, "types", mock_types):
+            self._run_with_response_text('[{"index": 0, "text": "テスト"}]', [{"text": "テスト"}])
+        config = mock_types.GenerateContentConfig.call_args.kwargs
+        assert config["temperature"] == 0
+        assert config["seed"] == ai_proofreader.SEED
 
 
 class TestProofreadSegmentsRetryAndBackoff:

@@ -43,9 +43,14 @@ def _build_proper_noun_context() -> str:
             return "## 固有名詞辞書\n（辞書は空です。一般的な日本語校閲のみ実行してください）"
         
         lines = ["## 固有名詞辞書", "以下の固有名詞が出現する可能性があります。音声認識の誤変換を修正してください："]
+        seen = set()
         for entry in entries:
             incorrect = entry.get("incorrect", "")
             correct = entry.get("correct", "")
+            # 同じ組は1行だけ（テストが残した同じ組が 161 件、指示の大半を占めていた・2026-10-06）
+            if (incorrect, correct) in seen:
+                continue
+            seen.add((incorrect, correct))
             context = entry.get("context_hint", "")
             hint = f"（{context}）" if context else ""
             if entry.get("type") == "hint":
@@ -64,6 +69,10 @@ def _build_proper_noun_context() -> str:
         return "## 固有名詞辞書\n（辞書の処理中に予期せぬエラーが発生しました。一般的な日本語校閲のみ実行してください）"
 
 
+
+# 乱数の種。温度 0 と合わせて、同じ文には毎回同じ直しを返させる（2026-10-06 実走で、
+# 書き出すたびに校閲の出来が変わり、直ったはずの誤変換が次の書き出しで戻った）
+SEED = 20261006
 
 # 直した文が元の文とこれ以上似ていなければ、別の行の文とみなして捨てる
 MIN_SIMILARITY = 0.5
@@ -287,6 +296,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                         contents=prompt,
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
+                            temperature=0,
+                            seed=SEED,
                         )
                     )
                     batch_succeeded = True
