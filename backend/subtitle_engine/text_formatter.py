@@ -415,13 +415,19 @@ def _sentences(phrases: list[str]) -> list[list[str]]:
     return out
 
 
-def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int):
+def _line_len(line: str, trim: bool = False) -> int:
+    """行の字数。trim なら、行末で消える句読点（strip_punctuation）を数えない。"""
+    return len(line.rstrip(_PUNCT)) if trim else len(line)
+
+
+def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int, trim: bool = False):
     """1枚の字幕を max_lines 行以内に折る。改行も文節の境目を選ぶ。
 
     折れなければ None（呼び出し側が字幕を短くする）。返り値は (本文, 改行の良さ)。
+    trim なら行末の句読点を字数に数えない（後で消えるので。見える字が18字なら折らない）。
     """
     text = "".join(phrases)
-    if len(text) <= max_chars:
+    if _line_len(text, trim) <= max_chars:
         return text, 0
     if max_lines <= 1:
         return None
@@ -429,14 +435,17 @@ def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int):
     acc = 0
     for i, ph in enumerate(phrases[:-1], start=1):
         acc += len(ph)
-        if acc > max_chars:
+        head = "".join(phrases[:i])
+        if _line_len(head, trim) > max_chars:
             break
-        tail = _wrap_lines(phrases[i:], max_chars, max_lines - 1)
+        tail = _wrap_lines(phrases[i:], max_chars, max_lines - 1, trim)
         if tail is None:
             continue
         rest = len(text) - acc
+        # 1〜2字だけの行は、ほかに折り方が無いときだけ（「が」/「もう1個別の…」・2026-10-06 実測）
+        short = _line_len(head, trim) <= 2 or ("\n" not in tail[0] and _line_len(tail[0], trim) <= 2)
         # 区切りの良さを優先し、同じなら行の長さが揃う方
-        key = (_break_score(ph) + tail[1], -abs(acc - rest))
+        key = (_break_score(ph) + tail[1] - 6 * short, -abs(acc - rest))
         if best is None or key > best[0]:
             best = (key, "".join(phrases[:i]) + "\n" + tail[0])
     if best is None:
@@ -445,13 +454,15 @@ def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int):
 
 
 def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
-                        max_lines: int = 2) -> list[str]:
+                        max_lines: int = 2, trim: bool = False) -> list[str]:
     """発話を、意味の塊で区切った字幕（1枚 max_lines 行まで・改行は \\n）に分ける。
 
     - 文末（。！？）では必ず区切る
     - 1枚に入りきらない文は、入る範囲で区切りの良さが最大の文節の後ろで切る
       （短すぎる字幕は作らない: 1枚の容量の 4割以上）
     - 改行・区切りは「、」や助詞の後を選び、連体詞や「の」の直後は避ける
+
+    - trim なら行末の句読点を字数に数えない（strip_punctuation で消える）
 
     BudouX が無ければ空リストを返す（呼び出し側が従来の分割に戻る）。
     """
@@ -472,7 +483,7 @@ def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
                 acc += len(rest[n - 1])
                 if acc > capacity and n > 1:
                     break
-                wrapped = _wrap_lines(rest[:n], max_chars, max_lines)
+                wrapped = _wrap_lines(rest[:n], max_chars, max_lines, trim)
                 if wrapped is None:
                     continue
                 whole = n == len(rest)
@@ -622,26 +633,135 @@ def _split_by_word_timing(words: list[dict], max_chars: int, parent_seg: dict) -
 # メイン整形関数
 # ============================================================
 
-# 文の頭には来ない助詞。セグメントがこれで始まり、前のセグメントが文の途中で終わっていれば、
-# 30 秒ごとの起こしの区切りで文が割れている（56 秒の「…書道塾」「を主宰されていて、」・2026-10-06 実測）
-_HEAD_PARTICLES = "をに"
+# 起こしの区切り（30 秒ごと）や話の間で、1つの文節が2つのセグメントに割れることがある。
+# 字幕が助詞から始まり、文の途中で切れて見える（2026-10-06 実測: 56 秒「…書道塾」「を主宰されていて、」、
+# 29 分「私が手がけた仕事」「を深掘りして」、13 分「…とかあと」「は…」「…中国は取れる」「とかがあったんで、」）。
+# つなぎ目が文節の途中（BudouX でつないで読むと前の文節に付き、後ろだけで読んでも頭が1文節）で、
+# 後ろの頭が前の語に付く短い助詞なら、頭を前のセグメントの尻に戻す。読点・文末が近ければ
+# （12 字以内）そこまで、セグメントが短ければ全部を戻す。
+# 小書きの字（「っていう」）で始まる語は無いので、前が文末でも戻す（相づちの後ろには付けない）。
 _HEAD_MAX_CHARS = 12
-_HEAD_RE = re.compile(r"[^、。，．,.!?！？\s　]{2,%d}(?=[、,，])" % _HEAD_MAX_CHARS)
+_DEPENDENT_HEADS = ("を", "は", "が", "に", "と", "で", "も", "の", "へ", "や", "か", "よ", "ね",
+                    "し", "ば", "けど", "けれど", "まで", "より", "から")
+# 3 字以上で戻してよい助詞の連なり。これ以外の長い頭は語の一部（「やっぱり」）
+_HEAD_COMPOUNDS = ("とかが", "とかは", "とかも", "とかね", "けれど", "けれども", "までは", "よりも",
+                   "からは", "からね", "ですね", "ですよ")
+# 上の字で始まるが、それだけで文を始められる語（「はい」「もう」「でも」）
+_FREE_HEADS = ("はい", "はあ", "はー", "へえ", "へー", "ねえ", "ねー", "もう", "もし", "もっと",
+               "もちろん", "よし", "よく", "とても", "とにかく", "とりあえず", "ところで",
+               "でも", "では", "でしょ", "ですから", "しかし", "しかも", "かな", "やっぱ", "やはり")
+# 文末の「です」「ます」の後ろに付くのは終助詞・接続助詞だけ（「ですに」「ますを」は無い）
+_POLITE_ENDS = ("です", "ます", "でした", "ました")
+_AFTER_POLITE = ("ね", "よ", "か", "が", "けど", "けれど", "から", "し", "ので", "のに", "って", "と")
+_SMALL_KANA = "っゃゅょぁぃぅぇぉゎー"
+_NOUN_SCRIPTS = ("kanji", "katakana")
+_BOUND_N = ("んで", "んだ", "んじゃ", "んす")
+_HEAD_PUNCT = "、,，" + SENTENCE_END
 
 
-def _rejoin_particle_heads(segments: list) -> list:
-    """割れた文の頭（助詞から最初の読点まで）を、前のセグメントの尻に戻す。元のリストは変えない。"""
+def _phrase_ends(parser, text: str) -> list[int]:
+    ends, pos = [], 0
+    for ph in parser.parse(text):
+        pos += len(ph)
+        ends.append(pos)
+    return ends
+
+
+def _is_bound(text: str) -> bool:
+    """単独では語を始められない頭（「っていう」「んです」）。"""
+    return text[:1] in _SMALL_KANA or text.startswith(_BOUND_N)
+
+
+def _echo_len(prev: str, cur: str) -> int:
+    """cur の頭が prev の尻の繰り返し（「…この問題はっていう。」「っていう…」）なら、その字数。"""
+    tail = prev.rstrip(_HEAD_PUNCT)
+    for n in range(min(8, len(cur)), 1, -1):
+        if cur[n - 1] not in _HEAD_PUNCT and tail.endswith(cur[:n]):
+            return n
+    return 0
+
+
+def _split_head(prev: str, cur: str, parser) -> int:
+    """cur の頭のうち、prev の続きとして前に戻す字数（戻さなければ 0）。"""
+    if _is_bound(cur):
+        # 相づちの後ろには付けない（「…じゃないやって。うん。」「って、どういうわけだか」）
+        last = re.split(r"[。！？!?]", prev.rstrip(_HEAD_PUNCT))[-1]
+        if prev[-1] in SENTENCE_END and is_standalone_omittable(last):
+            return 0
+        k = _phrase_ends(parser, cur)[0]
+    else:
+        if prev[-1] in _HEAD_PUNCT or cur.startswith(_FREE_HEADS):
+            return 0
+        noun = _script(prev[-1]) in _NOUN_SCRIPTS and _script(cur[0]) in _NOUN_SCRIPTS
+        if not noun and not cur.startswith(_DEPENDENT_HEADS):
+            return 0
+        tail = prev[-20:]
+        ends = _phrase_ends(parser, tail + cur[:24])
+        # つなぎ目がちょうど文節の切れ目なら、後ろは新しい文節（「すごい」「もう…」）
+        if len(tail) in ends:
+            return 0
+        k = next(e for e in ends if e > len(tail)) - len(tail)
+        head = cur[:k].rstrip(_HEAD_PUNCT)
+        if noun:
+            # 名詞が割れた（56 秒「…久木田デザイン書道塾」「主宰、そして」）。読点までの短い名詞だけ戻す
+            # （「東京」「大阪に行きました」のような、読点の無いつなぎは割れ目と決められない）
+            if not (0 < len(head) <= 4 and k == len(head) + 1 and cur[len(head)] in _LEAD_PUNCT
+                    and all(_script(c) in _NOUN_SCRIPTS for c in head)):
+                return 0
+            return k if k in _phrase_ends(parser, cur[:24]) else 0
+        if not head or any(_script(c) != "hiragana" for c in head):
+            return 0
+        if len(head) > 2 and head not in _HEAD_COMPOUNDS:
+            return 0
+        # 「で」は前が「ん」で終わるとき（「選ん」「で」）だけ。ほかは接続詞の「で、」（「思うし」「で、実際に」）
+        if head == "で" and not prev.endswith("ん"):
+            return 0
+        if prev.endswith(_POLITE_ENDS) and not head.startswith(_AFTER_POLITE):
+            return 0
+        # 「にこにこ」「はらはら」のような畳語は1語（BudouX は「に|こに|こ…」と割ることがある）
+        if cur[:2] == cur[2:4] or cur[:3] == cur[3:6]:
+            return 0
+        # 後ろだけで読んでも頭が1文節であること（「は|い」「や|っぱり」を割らない）
+        if k != len(cur) and k not in _phrase_ends(parser, cur[:24]):
+            return 0
+    # 読点・文末が近ければそこまで、短いセグメントなら全部を戻す
+    stops = [i + 1 for i, c in enumerate(cur) if c in _HEAD_PUNCT]
+    if stops and k <= stops[0] <= _HEAD_MAX_CHARS + 1:
+        return stops[0]
+    if len(cur) <= _HEAD_MAX_CHARS + 1 and not any(c in SENTENCE_END for c in cur[:-1]):
+        return len(cur)
+    return k
+
+
+def _rejoin_split_heads(segments: list) -> list:
+    """文節の途中で割れたセグメントの頭を、前のセグメントの尻に戻す。元のリストは変えない。"""
+    parser = _phrase_parser()
+    if parser is None:
+        return segments
     out = []
     for seg in segments:
         try:
             text = seg.get("text") if isinstance(seg, dict) else None
-            prev = out[-1].get("text") if out and isinstance(out[-1], dict) else None
-            if (isinstance(text, str) and isinstance(prev, str) and text[:1] in _HEAD_PARTICLES
-                    and prev.rstrip() and prev.rstrip()[-1] not in SENTENCE_END + _LEAD_PUNCT):
-                m = _HEAD_RE.match(text)
-                if m:
-                    out[-1] = {**out[-1], "text": prev.rstrip() + m.group(0)}
-                    seg = {**seg, "text": text[m.end():].lstrip("、,， 　")}
+            prev_seg = out[-1] if out and isinstance(out[-1], dict) else None
+            prev = prev_seg.get("text") if prev_seg else None
+            if (isinstance(text, str) and isinstance(prev, str) and prev.strip() and text.strip()
+                    and not seg.get("words") and not prev_seg.get("words")):
+                cur, base = text.strip(), prev.rstrip()
+                # 起こしの窓の重なりで前の尻が繰り返された頭（「…問題はっていう。」「っていう…」）は捨てる
+                echo = _echo_len(base, cur) if _is_bound(cur) else 0
+                n = 0 if echo else _split_head(base, cur, parser)
+                if echo or n:
+                    if n and _is_bound(cur):
+                        base = base.rstrip(_HEAD_PUNCT)
+                    rest = cur[echo or n:].lstrip(_HEAD_PUNCT + " 　")
+                    joined = {**prev_seg, "text": base + cur[:n]}
+                    if not rest:
+                        if n and isinstance(seg.get("end"), (int, float)) and isinstance(joined.get("end"), (int, float)):
+                            joined["end"] = max(joined["end"], seg["end"])
+                        out[-1] = joined
+                        continue
+                    out[-1] = joined
+                    seg = {**seg, "text": rest}
         except Exception:  # 読めないセグメントはそのまま（整形の本体が扱う）
             pass
         out.append(seg)
@@ -679,7 +799,8 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
             max_chars = MAX_CHARS_PER_LINE
 
     max_lines = get_max_lines_from_template()
-    segments = _rejoin_particle_heads(segments)
+    trim = _strip_punctuation_enabled()
+    segments = _rejoin_split_heads(segments)
     lead_words = _omit_words("omit_lead_words")
     bare_words = _omit_words("omit_lead_words_bare")
     formatted = []
@@ -715,15 +836,15 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
                     word_split_count += 1
                     continue
 
-            # Step 3: 短いテキストはそのまま
-            if len(cleaned) <= max_chars:
+            # Step 3: 短いテキストはそのまま（行末で消える句読点は数えない）
+            if _line_len(cleaned, trim) <= max_chars:
                 new_seg = _safe_copy_segment(seg)
                 new_seg["text"] = cleaned
                 formatted.append(new_seg)
                 continue
 
             # Step 4: 意味の塊で字幕に分ける（BudouX が無ければ従来の言語境界分割）+ タイミング按分
-            chunks = split_into_captions(cleaned, max_chars, max_lines)
+            chunks = split_into_captions(cleaned, max_chars, max_lines, trim)
             if chunks:
                 semantic_count += 1
             else:
@@ -781,17 +902,18 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
     # 字幕速度の自動調整を適用
     formatted = adjust_segment_speeds(formatted)
 
-    # 1行の強制改行制限を適用
-    for seg in formatted:
-        if isinstance(seg, dict) and "text" in seg:
-            seg["text"] = enforce_line_length(seg["text"], max_chars)
-
-    # 句読点を出さない（区切りの判定に使い終わってから外す）
-    if _strip_punctuation_enabled():
+    # 句読点を出さない（区切りの判定に使い終わってから外す）。行の長さは消した後の見える字で測る
+    # （「。」まで数えて、見える字が18字の行を「も」/「お料理…」に折っていた・2026-10-06 実測）
+    if trim:
         for seg in formatted:
             if isinstance(seg, dict) and isinstance(seg.get("text"), str):
                 seg["text"] = strip_punctuation(seg["text"])
         formatted = [s for s in formatted if not isinstance(s, dict) or s.get("text") != ""]
+
+    # 1行の強制改行制限を適用
+    for seg in formatted:
+        if isinstance(seg, dict) and "text" in seg:
+            seg["text"] = enforce_line_length(seg["text"], max_chars)
 
     return formatted
 

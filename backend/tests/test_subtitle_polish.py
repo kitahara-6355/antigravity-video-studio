@@ -271,3 +271,84 @@ def test_a_segment_after_a_full_stop_keeps_its_head():
             {"start": 2.0, "end": 4.0, "text": "にこにこしてました"}]
     out = tf.format_segments(segs, 18)
     assert [s["text"] for s in out] == ["そうなんです", "にこにこしてました"]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("prev,cur,joined,bad_head", [
+    # 29分の実例: 間を置いて「私が手がけた仕事」「を深掘りして」と2つに起こされた（読点なし）
+    ("私が手がけた仕事", "を深掘りして", "私が手がけた仕事を深掘りして", "を"),
+    # 13分の実例: 「…中国は取れる」「とかがあったんで、使えないんですよ」
+    ("日本は取れない言葉だけど、中国は取れる", "とかがあったんで、使えないんですよ",
+     "中国は取れるとかがあったんで", "とかが"),
+    # 13分の実例: 「あと」「は」が語の途中で割れた
+    ("ね、コラボしたりとかあと", "はちょっと有名なフォントがあるじゃないですか、先生。",
+     "コラボしたりとかあとは", "はちょっと"),
+])
+def test_a_segment_that_continues_the_previous_phrase_goes_back(prev, cur, joined, bad_head):
+    segs = [{"start": 0.0, "end": 4.0, "text": prev}, {"start": 4.5, "end": 9.0, "text": cur}]
+    texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
+    assert any(joined in t for t in texts)
+    assert not any(t.startswith(bad_head) for t in texts)
+
+
+def test_a_segment_starting_with_a_small_kana_joins_the_previous_sentence():
+    # 37分の実例: 「魚の市場。もう口すごい。」「っていうことですかね。…」。「っ」で始まる語は無い
+    segs = [{"start": 0.0, "end": 3.0, "text": "魚の市場。もう口すごい。"},
+            {"start": 3.0, "end": 8.0, "text": "っていうことですかね。もお料理好きの皆さんびっくりですよね。"}]
+    texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
+    assert not any(t.startswith("っ") for t in texts)
+    assert any("もう口すごいっていうことですかね" in t for t in texts)
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("prev,cur", [
+    ("そうなんです", "にこにこしてました"),
+    ("すごいですね", "はい、そうです"),
+    ("これは", "はい、そうです"),
+    ("本当にすごい", "もう終わりです"),
+    ("昔はね", "コピーライターのことを"),
+])
+def test_a_segment_that_starts_a_new_phrase_keeps_its_head(prev, cur):
+    segs = [{"start": 0.0, "end": 2.0, "text": prev}, {"start": 2.5, "end": 5.0, "text": cur}]
+    texts = [s["text"] for s in tf.format_segments(segs, 18)]
+    assert texts == [tf.strip_punctuation(prev), tf.strip_punctuation(cur)]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_whole_segment_moved_back_keeps_its_end_time():
+    segs = [{"start": 10.0, "end": 13.6, "text": "私が手がけた仕事"},
+            {"start": 14.1, "end": 15.7, "text": "を深掘りして"}]
+    out = tf.format_segments(segs, 18)
+    assert [s["text"] for s in out] == ["私が手がけた仕事を深掘りして"]
+    assert out[0]["start"] == 10.0 and out[0]["end"] >= 15.7
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_no_line_is_left_with_one_or_two_characters():
+    # 7分45秒の実例: 「が、もう1個…」が「が」だけの1行と残りに折られた
+    out = tf.split_into_captions("が、もう1個別のを言うじゃないですかって思ったんですよ。", 18, 2)
+    lines = [ln for c in out for ln in tf.strip_punctuation(c).split("\n")]
+    assert all(len(ln) > 2 for ln in lines), lines
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_punctuation_that_will_be_removed_does_not_count_toward_the_line():
+    # 37分の実例: 見える字は18字なのに、消える「。」まで数えて「も」/「お料理…」に折った
+    out = tf.format_segments([{"start": 0.0, "end": 4.0, "text": "もお料理好きの皆さんびっくりですよね。"}], 18)
+    assert [s["text"] for s in out] == ["もお料理好きの皆さんびっくりですよね"]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_title_split_from_the_name_goes_back():
+    # 56 秒の実例: 「…久木田デザイン書道塾」「主宰、そして、一般社団法人…」と割れ、字幕が「主宰」で始まった
+    segs = [{"start": 50.0, "end": 60.0, "text": "先生は株式会社アドシアター代表で久木田デザイン書道塾"},
+            {"start": 60.0, "end": 67.0, "text": "主宰、そして、一般社団法人日本デザイン書道作家協会の理事長でいらっしゃいまして、"}]
+    texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
+    assert any("久木田デザイン書道塾主宰" in t for t in texts)
+    assert not any(t.startswith("主宰") for t in texts)
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_nouns_next_to_each_other_without_a_comma_stay_apart():
+    segs = [{"start": 0.0, "end": 1.0, "text": "東京"}, {"start": 1.5, "end": 4.0, "text": "大阪に行きました"}]
+    assert [s["text"] for s in tf.format_segments(segs, 18)] == ["東京", "大阪に行きました"]
