@@ -301,6 +301,12 @@
       "sources": {
         "ai_proofreader": 6
       }
+    },
+    "2026-10-06": {
+      "total": 7,
+      "sources": {
+        "ai_proofreader": 7
+      }
     }
   },
   "limit": 500

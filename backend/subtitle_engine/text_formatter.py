@@ -786,7 +786,7 @@ def strip_punctuation(text: str) -> str:
             else:
                 out.append(ch)
         lines.append("".join(out).strip(" 　"))
-    return "\n".join(l for l in lines if l) or text
+    return "\n".join(line for line in lines if line) or text
 
 
 # ============================================================
