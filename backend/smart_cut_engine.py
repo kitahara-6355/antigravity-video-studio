@@ -259,6 +259,40 @@ def _display_span(seg: dict) -> tuple[float, float]:
     return src_start, src_end
 
 
+def _cut_kept_ranges_exact(ffmpeg, input_path, ranges, out_path) -> bool:
+    """残す区間（素材の秒）だけを、1回のエンコードで時間ぴったりに抜き出す。
+
+    select / aselect で区間内のフレームだけを通し、時刻を詰め直す。出力の長さは
+    区間の合計とほぼ一致し（1区間あたり ±1 フレーム・±10ms・偏りなし）、字幕の時刻
+    （`retime_segments`）とずれが積み上がらない。
+    """
+    if not ranges or not hasattr(ffmpeg, "run_command"):
+        return False
+    expr = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in ranges)
+    graph = (f"[0:v]select='{expr}',setpts=N/FRAME_RATE/TB[v];"
+             f"[0:a]asetnsamples=n=480:p=0,aselect='{expr}',asetpts=N/SR/TB[a]")
+    script = Path(out_path).with_suffix(".filter.txt")
+    try:
+        script.write_text(graph, encoding="utf-8")
+        try:
+            enc = [a for a in ffmpeg._get_encode_args() if a not in ("-c:a", "aac")]
+        except (AttributeError, TypeError):
+            enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p"]
+        args = ["-y", "-i", str(input_path), "-filter_complex_script", str(script),
+                "-map", "[v]", "-map", "[a]", *enc, "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart", str(out_path)]
+        ok, _ = ffmpeg.run_command(args, timeout=7200)
+        return bool(ok) and Path(out_path).exists() and Path(out_path).stat().st_size > 1024
+    except (OSError, TypeError, ValueError) as e:
+        logger.warning(f"区間の一括抽出に失敗: {e}")
+        return False
+    finally:
+        try:
+            script.unlink()
+        except OSError:
+            pass
+
+
 def subtitle_sidecar_path(video_path) -> Path:
     """出力動画の時間軸の字幕（JSON）の置き場所。"""
     p = Path(video_path)
@@ -364,51 +398,59 @@ def render_smart_cut(
     try:
         ffmpeg = video_editor.ffmpeg
         input_path = Path(original_video_path)
-        
-        # 動画の長さを取得（境界チェック用）
-        total_duration = ffmpeg.get_duration(input_path)
-        if total_duration is None:
-            logger.warning("Could not determine video duration, proceeding anyway")
-            total_duration = float('inf')
-        
-        for i, (start, end) in enumerate(merged):
-            # 境界チェック
-            s = max(0, min(start, total_duration))
-            e = max(0, min(end, total_duration))
-            if e <= s:
-                continue
-            
-            temp_path = Path(output_path).parent / f"_smartcut_part_{i:04d}.mp4"
-            if ffmpeg.cut_video(input_path, temp_path, s, e):
-                temp_parts.append(temp_path)
-            else:
-                logger.warning(f"Failed to cut segment {i} ({s:.2f}-{e:.2f})")
-        
-        if not temp_parts:
-            logger.error("No valid ranges to keep.")
-            return False
-
-        logger.info(f"SmartCut: {len(temp_parts)} parts to merge")
-
-        # 3. Merge all parts
         temp_cut_path = Path(output_path).with_suffix('.tmp.mp4')
-        if len(temp_parts) == 1:
-            # 単一セグメントの場合はコピー
-            import shutil
-            shutil.copy(temp_parts[0], temp_cut_path)
-        else:
-            clips = [VideoClip(path=p) for p in temp_parts]
-            # 大容量テスト対応: 多数パートのconcatには長時間必要
-            orig_timeout = 600
-            try:
-                # merge_videosでrun_command内のtimeout=600が足りない場合に対応
-                # run_commandのデフォルトtimeoutを一時的に延長
-                ffmpeg._merge_timeout = 1800  # 30分
-            except (AttributeError, TypeError) as e:
-                logger.debug(f"merge_timeout設定スキップ: {e}")
-            if not ffmpeg.merge_videos(clips, temp_cut_path):
-                logger.error(f"Merge failed ({len(clips)} clips)")
+        # **1回のエンコードで残す区間だけを抜く**（2026-10-06）。パーツに -c copy で
+        # 切って concat すると、キーフレーム・AAC の端数がパーツごとに積み上がり、
+        # 178 パーツで**映像と音声が字幕より 22 秒遅れた**（素材 25 分地点で 15 秒）。
+        exact = len(merged) > 1 and _cut_kept_ranges_exact(ffmpeg, input_path, merged, temp_cut_path)
+        if not exact:
+            if len(merged) > 1:
+                logger.warning("区間の一括抽出に失敗 → パーツを切って結合する従来の方法に戻します（ずれが出ます）")
+        
+            # 動画の長さを取得（境界チェック用）
+            total_duration = ffmpeg.get_duration(input_path)
+            if total_duration is None:
+                logger.warning("Could not determine video duration, proceeding anyway")
+                total_duration = float('inf')
+        
+            for i, (start, end) in enumerate(merged):
+                # 境界チェック
+                s = max(0, min(start, total_duration))
+                e = max(0, min(end, total_duration))
+                if e <= s:
+                    continue
+            
+                temp_path = Path(output_path).parent / f"_smartcut_part_{i:04d}.mp4"
+                if ffmpeg.cut_video(input_path, temp_path, s, e):
+                    temp_parts.append(temp_path)
+                else:
+                    logger.warning(f"Failed to cut segment {i} ({s:.2f}-{e:.2f})")
+        
+            if not temp_parts:
+                logger.error("No valid ranges to keep.")
                 return False
+
+            logger.info(f"SmartCut: {len(temp_parts)} parts to merge")
+
+            # 3. Merge all parts
+            temp_cut_path = Path(output_path).with_suffix('.tmp.mp4')
+            if len(temp_parts) == 1:
+                # 単一セグメントの場合はコピー
+                import shutil
+                shutil.copy(temp_parts[0], temp_cut_path)
+            else:
+                clips = [VideoClip(path=p) for p in temp_parts]
+                # 大容量テスト対応: 多数パートのconcatには長時間必要
+                orig_timeout = 600
+                try:
+                    # merge_videosでrun_command内のtimeout=600が足りない場合に対応
+                    # run_commandのデフォルトtimeoutを一時的に延長
+                    ffmpeg._merge_timeout = 1800  # 30分
+                except (AttributeError, TypeError) as e:
+                    logger.debug(f"merge_timeout設定スキップ: {e}")
+                if not ffmpeg.merge_videos(clips, temp_cut_path):
+                    logger.error(f"Merge failed ({len(clips)} clips)")
+                    return False
         
         # 4. ━━━ BUG-PV02/PV04修正: SRTタイムスタンプをカット後タイムラインに再計算 ━━━
         # merged rangesは元動画の時間軸。カット後の新タイムラインを構築する。

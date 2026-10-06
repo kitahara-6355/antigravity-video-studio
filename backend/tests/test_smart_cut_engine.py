@@ -1321,3 +1321,29 @@ def test_burned_preview_is_yuv420p_so_ordinary_players_show_the_picture(tmp_path
     pix = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt",
                           "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
     assert pix == "yuv420p"
+
+
+def test_kept_ranges_are_cut_without_drift(tmp_path):
+    """パーツを -c copy で切って結合すると、キーフレームと AAC の端数が積み上がって
+    映像と音声が字幕より遅れた（2026-10-06 実測: 178 区間で 22 秒）。
+    一括抽出なら出力の長さは区間の合計に一致する。"""
+    import subprocess
+    from video_editor_engine import FFmpegEditor
+
+    src = tmp_path / "src.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=60:size=160x90:rate=30",
+                    "-f", "lavfi", "-i", "sine=duration=60", "-shortest", "-g", "60", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", str(src)], check=True)
+    ranges = [(t + 0.37, t + 1.71) for t in range(0, 58, 3)]  # 20 区間・キーフレームの間を切る
+    out = tmp_path / "cut.mp4"
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = False
+
+    assert smart_cut_engine._cut_kept_ranges_exact(editor, src, ranges, out) is True
+
+    expected = sum(b - a for a, b in ranges)
+    for stream in ("v:0", "a:0"):
+        dur = float(subprocess.run(["ffprobe", "-v", "error", "-select_streams", stream, "-show_entries",
+                                    "stream=duration", "-of", "csv=p=0", str(out)],
+                                   capture_output=True, text=True).stdout.strip())
+        assert abs(dur - expected) < 0.15, (stream, dur, expected)

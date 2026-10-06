@@ -396,7 +396,8 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
             if label == "素材" and rep.excluded:
                 feedback.append("⚠ 発話が少ない区間（2回起こしても文字が出ない・人が確認）: "
                                 + ", ".join(coverage._mmss(a) for a, _ in rep.excluded[:6]))
-        deductions = 30 if blocking else 0
+        # 点は品質ゲート側で合格点の下に抑える。ここで大きく引くと他の項目の良し悪しが読めなくなる
+        deductions = 10 if blocking else 0
         return {"deductions": deductions, "feedback": feedback, "blocking": blocking,
                 "coverage": reports}
 
