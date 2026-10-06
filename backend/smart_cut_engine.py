@@ -259,6 +259,20 @@ def _display_span(seg: dict) -> tuple[float, float]:
     return src_start, src_end
 
 
+def _align_to_speech(cut_path, segments, cut_points):
+    """カット後の動画の音声で字幕の時刻を合わせる。音声が読めなければそのまま返す。"""
+    try:
+        if not segments or not Path(cut_path).is_file() or Path(cut_path).stat().st_size == 0:
+            return segments
+        from subtitle_engine import sync
+        aligned, _ = sync.align_segments(segments, sync.speech_map(str(cut_path)),
+                                         cut_points, sync.timing_rules())
+        return aligned
+    except Exception as e:  # 合わせられなくても字幕は出す
+        logger.warning(f"字幕の時刻合わせをスキップ: {e}")
+        return segments
+
+
 def _cut_kept_ranges_exact(ffmpeg, input_path, ranges, out_path) -> bool:
     """残す区間（素材の秒）だけを、1回のエンコードで時間ぴったりに抜き出す。
 
@@ -463,6 +477,10 @@ def render_smart_cut(
         recalculated_segments, output_offset, cut_points = retime_segments(segments, merged)
 
         logger.info(f"SRTタイムスタンプ再計算: {len(segments)}seg → {len(recalculated_segments)}seg, 出力尺={output_offset:.1f}s, カットポイント={len(cut_points)}箇所")
+
+        # 字幕の出だし・終わりを、カット後の音声の話し始め・話し終わりに合わせる
+        # （2026-10-06 ユーザー指摘「言葉より先に出すぎる」）。文字起こしの時刻は粗い推定
+        recalculated_segments = _align_to_speech(temp_cut_path, recalculated_segments, cut_points)
 
         # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
         # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）

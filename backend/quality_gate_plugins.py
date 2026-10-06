@@ -320,6 +320,10 @@ class HookCheck(QualityCheckPlugin):
         return {"deductions": deductions, "feedback": feedback}
 
 
+# 間の後の話し始めのうち、字幕が早すぎ・遅すぎの割合の上限。合わせる前の実測は 21.5%、合わせた後は 8.1%
+SYNC_OFF_RATIO_MAX = 0.15
+
+
 class SubtitleCoverageCheck(QualityCheckPlugin):
     """字幕の欠落チェック — 喋っているのに字幕が無い・極端に薄い区間（2026-10-06 ユーザー指摘）。
 
@@ -408,8 +412,28 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                     f"⛔ 字幕の欠落（文字起こし）: 覆われていない発話 {tx.get('uncovered_sec', 0):.0f}秒・"
                     f"文字が薄い区間 " + (", ".join(coverage._mmss(w["start"]) for w in tx.get("sparse", [])[:6]) or "なし"))
         deductions = 10 if blocking else 0
+        # 字幕の出だしが話し始めに合っているか（2026-10-06 ユーザー指摘「言葉より先に出すぎる」）
+        timing = None
+        out = next((c for c in checks if c[0] == "出力"), None)
+        if out is not None:
+            try:
+                try:
+                    from subtitle_engine import sync
+                except ImportError:
+                    from backend.subtitle_engine import sync  # type: ignore[no-redef]
+                skey = ("sync", out[1])
+                if skey not in cache:
+                    cache[skey] = sync.speech_map(out[1])
+                timing = sync.measure_sync(out[2], cache[skey])
+                if timing["off_ratio"] > SYNC_OFF_RATIO_MAX:
+                    deductions += 3
+                    feedback.append(
+                        f"⚠ 字幕の出だしが話し始めとずれている: 間の後 {timing['checked']}か所のうち"
+                        f"早すぎ {timing['early']}・遅すぎ {timing['late']}")
+            except Exception as e:  # 測れなくても欠落の判定は返す
+                logger.warning(f"字幕の出だしのずれを測れません: {e}")
         return {"deductions": deductions, "feedback": feedback, "blocking": blocking,
-                "coverage": reports}
+                "coverage": reports, "timing": timing}
 
 
 class DeadAirCheck(QualityCheckPlugin):
