@@ -703,9 +703,9 @@ def _split_head(prev: str, cur: str, parser) -> int:
         k = next(e for e in ends if e > len(tail)) - len(tail)
         head = cur[:k].rstrip(_HEAD_PUNCT)
         if noun:
-            # 名詞が割れた（56 秒「…久木田デザイン書道塾」「主宰、そして」）。読点までの短い名詞だけ戻す
-            # （「東京」「大阪に行きました」のような、読点の無いつなぎは割れ目と決められない）
-            if not (0 < len(head) <= 4 and k == len(head) + 1 and cur[len(head)] in _LEAD_PUNCT
+            # 名詞が割れた（56 秒「…久木田デザイン書道塾」「主宰、そして」）。読点・句点までの短い名詞だけ戻す
+            # （「東京」「大阪に行きました」のような、区切りの無いつなぎは割れ目と決められない）
+            if not (0 < len(head) <= 4 and k == len(head) + 1 and cur[len(head)] in _HEAD_PUNCT
                     and all(_script(c) in _NOUN_SCRIPTS for c in head)):
                 return 0
             return k if k in _phrase_ends(parser, cur[:24]) else 0

@@ -339,10 +339,12 @@ def test_punctuation_that_will_be_removed_does_not_count_toward_the_line():
 
 
 @pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
-def test_a_title_split_from_the_name_goes_back():
-    # 56 秒の実例: 「…久木田デザイン書道塾」「主宰、そして、一般社団法人…」と割れ、字幕が「主宰」で始まった
+@pytest.mark.parametrize("stop", ["、", "。"])
+def test_a_title_split_from_the_name_goes_back(stop):
+    # 56 秒の実例: 「…久木田デザイン書道塾」「主宰、そして、一般社団法人…」と割れ、字幕が「主宰」で始まった。
+    # 起こしの「ましょう。」を校閲が「主宰。」に直した回は、「主宰」だけの字幕が 0.8 秒出た
     segs = [{"start": 50.0, "end": 60.0, "text": "先生は株式会社アドシアター代表で久木田デザイン書道塾"},
-            {"start": 60.0, "end": 67.0, "text": "主宰、そして、一般社団法人日本デザイン書道作家協会の理事長でいらっしゃいまして、"}]
+            {"start": 60.0, "end": 67.0, "text": f"主宰{stop}そして、一般社団法人日本デザイン書道作家協会の理事長でいらっしゃいまして、"}]
     texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
     assert any("久木田デザイン書道塾主宰" in t for t in texts)
     assert not any(t.startswith("主宰") for t in texts)
