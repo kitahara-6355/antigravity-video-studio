@@ -11,6 +11,14 @@ sys.modules['subtitle_engine.whisper_subprocess'] = MagicMock()
 sys.modules['subtitle_engine.ai_proofreader'] = MagicMock()
 sys.modules['subtitle_engine.speaker_diarizer'] = MagicMock()
 
+from subtitle_engine.text_formatter import strip_punctuation, _strip_punctuation_enabled  # noqa: E402
+
+
+def _shown(text):
+    """字幕に出る形（句読点を出さない設定なら外す）。"""
+    return strip_punctuation(text) if _strip_punctuation_enabled() else text
+
+
 from subtitle_engine.text_formatter import (
     remove_fillers,
     _split_at_boundary,
@@ -90,7 +98,8 @@ def test_format_segments_keeps_the_wrapping_and_splits_time_by_characters():
 
     res = format_segments(segs, 15)
 
-    assert [r["text"] for r in res] == ["先生、どうぞよろしく\nお願いいたします。"]
+    # 句読点を出すかはテンプレートの strip_punctuation が決める（2026-10-06 ユーザー指摘）
+    assert [r["text"] for r in res] == [_shown("先生、どうぞよろしく\nお願いいたします。")]
     assert res[0]["sourceStart"] == 10.0 and res[0]["sourceEnd"] == 14.0
 
 
@@ -226,10 +235,10 @@ def test_format_segments_normal(without_budoux):
     segs = [{"text": "私は今日、プログラミングをします。", "start": 0.0, "end": 4.0}]
     res = format_segments(segs, 15)
     assert len(res) == 2
-    assert res[0]["text"] == "私は今日、プログラミングを"
+    assert res[0]["text"] == _shown("私は今日、プログラミングを")
     assert res[0]["start"] == 0.0
     assert abs(res[0]["end"] - (13 / 17 * 4.0)) < 1e-6
-    assert res[1]["text"] == "します。"
+    assert res[1]["text"] == _shown("します。")
     assert abs(res[1]["start"] - (13 / 17 * 4.0)) < 1e-6
     assert res[1]["end"] == 4.0
 
