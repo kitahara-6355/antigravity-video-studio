@@ -249,6 +249,25 @@ def test_unheard_flash_that_cannot_be_merged_is_dropped():
     assert stats["dropped"] == 1
 
 
+def test_an_unheard_caption_with_no_room_does_not_cut_a_heard_one_short():
+    # 実例（15分26秒）: 重なって話した「ファンが」は認識に無く、前後の聞こえた字幕の間に隙も無い。
+    # それでも時刻を取り合いに加わり、聞こえた「そういう中でね…」を 0.33 秒で消させた
+    sp = _map([(920.3, 924.5), (925.72, 929.04), (929.64, 935.0)], total=940)
+    segs = [{"start": 923.05, "end": 925.93, "text": "言われていますけど\nファンが先生の文字を",
+             "_asr": True, "_asr_first": 923.18},
+            {"start": 925.93, "end": 925.93, "text": "ファンが", "_asr_interp": True},
+            {"start": 925.72, "end": 929.17, "text": "そういう中でね　筆文字を\n見てくれているわけじゃないですか",
+             "_asr": True, "_asr_first": 925.72},
+            {"start": 929.68, "end": 931.57, "text": "おそらくその映画だけじゃなくて",
+             "_asr": True, "_asr_first": 930.2}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    # 1枚としても、隣に足しても出さない
+    assert sum(s["text"].replace("\n", "").count("ファンが") for s in out) == 1
+    shown = [s for s in out if s["text"].startswith("そういう中でね")][0]
+    assert shown["end"] - shown["start"] >= 2.5
+    assert stats["dropped"] == 1
+
+
 def test_recognised_flash_is_kept():
     sp = _map([(570.0, 578.9), (579.2, 584.0)], total=600)
     full = "あ" * 18 + "\n" + "い" * 18

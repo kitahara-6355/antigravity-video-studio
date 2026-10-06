@@ -518,8 +518,9 @@ def interpolate_unaligned(captions: list[dict]) -> int:
             continue
         t0, t1 = float(captions[a]["end"]), float(captions[b]["start"])
         # 狭くても順番どおりに置く（推定の時刻のまま残すと、並べ直しで順番が入れ替わる）。
-        # 出る時間が足りない字幕は、後で隣とまとめる
-        t1 = max(t1, t0)
+        # 出る時間が足りない字幕は、後で隣とまとめる。前後が重なっているときは次の字幕の出だしに
+        # 置く（前の終わりに置くと次の字幕より後ろになる・15分26秒の「ファンが」）
+        t0 = min(t0, t1)
         total = sum(chars(c) for c in run)
         acc = 0.0
         for c in run:

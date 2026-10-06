@@ -487,7 +487,13 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     r = dict(DEFAULT_TIMING)
     r.update(rules or {})
     cut_points = sorted(cut_points or [])
-    items = sorted((dict(s) for s in segments), key=lambda s: float(s.get("start", 0)))
+    # 声が聞こえず、前後の聞こえた字幕の間に入る隙も無い字幕は、時刻の取り合いに加えない。
+    # 出しても一瞬で消えるうえ、聞こえた字幕の時間を削る（15分26秒・重なって話した「ファンが」が
+    # 「そういう中でね…」を 0.33 秒で消させた・2026-10-06 実測）
+    heard_or_roomy = [s for s in segments
+                      if not (_unheard(s) and float(s.get("end", 0)) - float(s.get("start", 0)) < FLASH_SEC)]
+    no_room = len(segments) - len(heard_or_roomy)
+    items = sorted((dict(s) for s in heard_or_roomy), key=lambda s: float(s.get("start", 0)))
     n = len(items)
     snapped_in = snapped_out = 0
 
@@ -571,7 +577,7 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     past_end = _drop_past_end(result, speech.duration)
     merged = _merge_flashes(result, r["min_display_sec"])
     resplit = _resplit_flashes(result, r["min_display_sec"])
-    dropped = _drop_unheard_flashes(result) + past_end
+    dropped = _drop_unheard_flashes(result) + past_end + no_room
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
              "redistributed": redistributed, "merged": merged, "resplit": resplit,
              "dropped": dropped}

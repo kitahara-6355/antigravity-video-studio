@@ -58,6 +58,17 @@ def test_unaligned_captions_are_spread_between_aligned_ones():
     assert caps[0]["end"] <= caps[1]["start"] < caps[1]["end"] <= caps[2]["start"]
 
 
+def test_an_unaligned_caption_between_overlapping_neighbours_keeps_its_place():
+    # 実例（15分26秒）: 前の字幕の終わり（認識に無い語の分を外挿）が次の字幕の出だしより後ろで、
+    # 間の「ファンが」が次の字幕より後ろに置かれ、並べ直しで順番が入れ替わった
+    caps = [{"start": 923.05, "end": 925.93, "text": "言われていますけど", "_asr": True},
+            {"start": 928.3, "end": 929.3, "text": "ファンが"},
+            {"start": 925.72, "end": 929.17, "text": "そういう中でね", "_asr": True}]
+    aligner.interpolate_unaligned(caps)
+    ordered = sorted(caps, key=lambda c: c["start"])
+    assert [c["text"] for c in ordered] == [c["text"] for c in caps]
+
+
 def test_captions_before_the_first_anchor_shift_with_it():
     caps = [{"start": 0.0, "end": 1.0, "text": "ききとれない"},
             {"start": 1.0, "end": 2.0, "text": "あいうえお"}]
