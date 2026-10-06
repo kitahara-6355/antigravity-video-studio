@@ -48,6 +48,10 @@ DEFAULT_TIMING = {
 
 # 隣り合う字幕の出だしの最小の間隔（同じ話し始めに2枚が寄るのを防ぐ）
 MIN_STEP_SEC = 0.4
+# 音声認識で時刻を取った字幕は、近くの話し始めにだけ寄せる。認識の時刻は文字の位置
+# そのものなので、遠くの話し始めは別の句（51 秒で 1.3 秒遅れた・2026-10-06 実測）
+ASR_SNAP_BEFORE_SEC = 0.25
+ASR_SNAP_AFTER_SEC = 0.4
 # 間とみなす長さと、話しているとみなす長さ
 MIN_PAUSE_SEC = 0.15
 MIN_SPEECH_SEC = 0.1
@@ -236,6 +240,10 @@ def _distribute_by_speech(items: list[dict], speech: SpeechMap) -> int:
     発話の途中に間があると後ろの字幕ほど早く出た（2026-10-06 ユーザー指摘 12秒・32〜42秒）。
     """
     def key(s):
+        # 音声認識で時刻が付いた字幕（突き合った字幕と、その間に配った字幕）は配り直さない。
+        # 文字ごとの時刻の方が確かで、配り直すと 38 秒の字幕が声より 1.2 秒早く出た
+        if s.get("_asr") or s.get("_asr_interp"):
+            return (None, None)
         return (s.get("sourceStart"), s.get("sourceEnd"))
 
     done = 0
@@ -319,9 +327,12 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     for s in items:
         a, b = float(s["start"]), float(s["end"])
         floor = onsets[-1] + MIN_STEP_SEC if onsets else -1.0
-        # 文字起こしの時刻は早めに出がち（実測で早すぎ 163 件・遅すぎ 23 件）なので、後ろ側を広く探す
-        on = _nearest_biased([o for o in speech.onsets if o >= floor], a,
-                             r["snap_window_sec"] * 0.6, r["snap_window_sec"] * 1.25)
+        if s.get("_asr"):
+            before, after = ASR_SNAP_BEFORE_SEC, ASR_SNAP_AFTER_SEC
+        else:
+            # 文字起こしの時刻は早めに出がち（実測で早すぎ 163 件・遅すぎ 23 件）なので、後ろ側を広く探す
+            before, after = r["snap_window_sec"] * 0.6, r["snap_window_sec"] * 1.25
+        on = _nearest_biased([o for o in speech.onsets if o >= floor], a, before, after)
         off = _nearest(speech.offsets, b, r["snap_window_sec"])
         snapped_in += on is not None
         snapped_out += off is not None

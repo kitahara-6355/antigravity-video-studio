@@ -55,6 +55,9 @@ MIN_MATCH_RATIO = 0.35
 # 1文字だけの一致（「の」「は」）は数えない。続けてこれだけ一致した所だけ使う
 MIN_BLOCK = 2
 MIN_HITS = 3
+# 認識の時刻は、声の立ち上がり（音の大きさ）より約 0.2 秒早い。2026-10-06 実測:
+# 0.11→0.37、10.25→10.44、28.17→28.47、35.10→35.30、39.60→39.80 秒（5 か所とも 0.19〜0.30）
+LAG_SEC = 0.2
 
 _DIGITS = str.maketrans("0123456789", "〇一二三四五六七八九")
 
@@ -178,17 +181,22 @@ def tokens_for(media: str) -> list[tuple[str, float]] | None:
         if cache.exists():
             data = json.loads(cache.read_text(encoding="utf-8"))
             if data.get("version") == CACHE_VERSION:
-                return [(c, float(t)) for c, t in data["tokens"]]
+                return _lagged(data["tokens"])
         if not available():
             return None
         logger.info(f"🎙️ 字幕の時刻合わせ用に音声認識しています（初回のみ）: {Path(media).name}")
         tokens = recognize(media)
         cache.write_text(json.dumps({"version": CACHE_VERSION, "model": MODEL_NAME,
                                      "tokens": tokens}, ensure_ascii=False), encoding="utf-8")
-        return tokens
+        return _lagged(tokens)
     except Exception as e:  # 認識できなくても字幕は出す
         logger.warning(f"音声認識による時刻合わせをスキップ: {e}")
         return None
+
+
+def _lagged(tokens) -> list[tuple[str, float]]:
+    """キャッシュは認識の時刻のまま持ち、使うときに声の立ち上がりへずらす。"""
+    return [(c, round(float(t) + LAG_SEC, 3)) for c, t in tokens]
 
 
 def to_output(tokens: list[tuple[str, float]], ranges) -> list[tuple[str, float]]:

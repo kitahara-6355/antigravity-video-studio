@@ -180,6 +180,39 @@ def test_measure_sync_ignores_speech_continuing_under_a_caption():
     assert m["late"] == 0
 
 
+def test_recognised_captions_keep_their_times_in_a_split_utterance():
+    # 実例（38.6 秒）: 1つの発話から分けた2枚。後ろの字幕は音声認識で 39.8 秒からと分かっている。
+    # 文字数で配り直していたので、声より 1.2 秒早く出た
+    sp = _map([(35.3, 39.4), (39.8, 41.8)], total=45)
+    src = {"sourceStart": 51.6, "sourceEnd": 60.0}
+    segs = [{"start": 35.3, "end": 39.3, "text": "デザイン書道の\n第一人者久木田博信先生です",
+             "_asr": True, **src},
+            {"start": 39.8, "end": 41.8, "text": "先生どうぞよろしくお願いいたします",
+             "_asr": True, **src}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert stats["redistributed"] == 0
+    assert out[1]["start"] == pytest.approx(39.8, abs=0.05)
+
+
+def test_recognised_caption_is_not_pulled_to_the_next_phrase():
+    # 音声認識で、この字幕の最初の文字は 50.1 秒（話し続けの途中）と分かっている。
+    # 0.8 秒後の息継ぎ明けの話し始めは次の句なので、そこへは寄せない
+    sp = _map([(49.2, 50.6), (50.9, 53.0)], total=60)
+    segs = [{"start": 49.2, "end": 50.0, "text": "はい", "_asr": True},
+            {"start": 50.1, "end": 53.0, "text": "先生はアドシアター代表で", "_asr": True}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(50.1, abs=0.05)
+
+
+def test_recognised_caption_still_snaps_to_a_nearby_onset():
+    # 認識の時刻と声の立ち上がりの小さな差（0.2 秒）は、話し始めに合わせる
+    sp = _map([(1.0, 3.0), (3.8, 6.0)], total=10)
+    segs = [{"start": 1.0, "end": 3.0, "text": "一文目", "_asr": True},
+            {"start": 3.6, "end": 6.0, "text": "二文目", "_asr": True}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(3.8, abs=0.02)
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg が無い")
 def test_speech_map_reads_media(tmp_path):
     media = tmp_path / "tone.wav"

@@ -3,6 +3,7 @@
 認識モデルは重いので、ここではモデルを呼ばずに「認識結果」を直接渡して、
 突き合わせと配り直しの規則だけを確かめる。
 """
+import json
 import sys
 from pathlib import Path
 
@@ -94,3 +95,13 @@ def test_missing_model_is_not_an_error(tmp_path, monkeypatch):
     media = tmp_path / "v.mp4"
     media.write_bytes(b"x")
     assert aligner.tokens_for(str(media)) is None
+
+
+def test_recognised_times_are_moved_to_the_voice_onset(tmp_path):
+    # 認識の時刻は声の立ち上がりより約 0.2 秒早い（2026-10-06 実測 5 か所: 0.19〜0.30 秒）
+    media = tmp_path / "v.mp4"
+    media.write_bytes(b"x")
+    aligner._cache_path(str(media)).write_text(
+        json.dumps({"version": aligner.CACHE_VERSION, "tokens": [["あ", 1.0]]}), encoding="utf-8")
+    assert aligner.tokens_for(str(media)) == [("あ", pytest.approx(1.0 + aligner.LAG_SEC))]
+    assert 0.1 <= aligner.LAG_SEC <= 0.3
