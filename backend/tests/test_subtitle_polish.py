@@ -133,3 +133,39 @@ def test_punctuation_only_caption_is_dropped():
                               {"text": "次です。", "start": 1.0, "end": 2.0}], 15)
     if tf._strip_punctuation_enabled():
         assert [s["text"] for s in out] == ["次です"]
+
+
+def test_flash_caption_is_rewrapped_into_a_two_line_neighbour():
+    # 実例（2分36秒）: 「もう強烈な」が 0.49 秒で消えた。隣は2行なので行として足せなかった。
+    # 2つを続けて1枚（2行・1行18字）に組み直せるなら、そうする
+    from subtitle_engine import sync
+    items = [{"start": 0.0, "end": 0.4, "text": "もう強烈な"},
+             {"start": 0.47, "end": 3.5, "text": "それのが\n良かったんじゃないですか？"}]
+    n = sync._merge_flashes(items, 0.8, max_chars=18, max_lines=2)
+    assert n == 1
+    text = items[1]["text"]
+    assert text.replace("\n", "").replace("\u3000", "") == "もう強烈なそれのが良かったんじゃないですか？"
+    assert text.count("\n") <= 1 and all(len(line) <= 18 for line in text.split("\n"))
+    assert items[1]["start"] == 0.0
+
+
+def test_flash_caption_that_does_not_fit_stays():
+    from subtitle_engine import sync
+    items = [{"start": 0.0, "end": 0.4, "text": "知って初めて書く"},
+             {"start": 0.47, "end": 3.5,
+              "text": "だからもう頭の中は整理できてるから\n書くのは30分か40分か"}]
+    assert sync._merge_flashes(items, 0.8, max_chars=18, max_lines=2) == 0
+
+
+@pytest.mark.parametrize("orig,new,neighbours,ok", [
+    # かなだけの行を漢字に直すのは変換の直し（2026-10-06 実走で「単純」を捨てていた）
+    ("たんじゅ、たんじゅ。", "単純、単純。", (), True),
+    # ただし隣の行の文なら番号ずれ
+    ("います。", "では記念すべき第1回めのゲストは日本デザイン", ("", "では記念すべき第1回目のゲストは日本デザイン"), False),
+    ("たんじゅ、たんじゅ。", "記念すべき第一回目", ("記念すべき第一回目のゲスト", ""), False),
+    # 漢字を含む行を別の文にするのは、これまでどおり捨てる
+    ("新版画賞と、あと 2 日後これ工事って言", "新版画賞と、あと二兎を追う者は一兎をも得", (), False),
+])
+def test_kana_line_may_be_converted_to_kanji(orig, new, neighbours, ok):
+    from subtitle_engine.ai_proofreader import _plausible_correction
+    assert _plausible_correction(orig, new, neighbours) is ok

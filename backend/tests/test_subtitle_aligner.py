@@ -105,3 +105,14 @@ def test_recognised_times_are_moved_to_the_voice_onset(tmp_path):
         json.dumps({"version": aligner.CACHE_VERSION, "tokens": [["あ", 1.0]]}), encoding="utf-8")
     assert aligner.tokens_for(str(media)) == [("あ", pytest.approx(1.0 + aligner.LAG_SEC))]
     assert 0.1 <= aligner.LAG_SEC <= 0.3
+
+
+def test_a_character_glued_across_a_long_gap_is_not_used():
+    # 実例（20分08秒）: 「なるべくね」の「な」が、2.3 秒前の「しれない」の「な」と
+    # ひと続きで突き合い、字幕が 2 秒早く出た
+    caps = [{"start": 0.0, "end": 1.0, "text": "有利かもしれません"},
+            {"start": 1.0, "end": 2.0, "text": "なるべくね細くならない"}]
+    tokens = toks("有利かもしれな", 10.0) + [("る", 13.5)] + toks("べくね細くならない", 13.7)
+    aligner.align_captions(caps, tokens)
+    assert caps[1]["_asr"]
+    assert caps[1]["start"] == pytest.approx(13.5 - aligner.CHAR_SEC, abs=0.05)

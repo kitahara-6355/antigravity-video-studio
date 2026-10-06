@@ -274,11 +274,43 @@ def _distribute_by_speech(items: list[dict], speech: SpeechMap) -> int:
 FLASH_SEC = 0.5
 
 
-def _merge_flashes(items: list[dict], min_display: float) -> int:
-    """出る時間が FLASH_SEC 未満の字幕を、隣の字幕に1行として足す（読めない字幕を作らない）。
+def _caption_limits() -> tuple[int, int]:
+    """1行の文字数と行数（テンプレート。読めなければ 18 字・2 行）。"""
+    try:
+        from template_config import template_config
+        return (int(template_config.get_max_chars_per_line()),
+                int(template_config.get_subtitle_rules().get("max_lines", 2)))
+    except Exception:
+        return 18, 2
 
-    隣が1行で、足しても2行に収まるときだけ。詰まっている側（すき間が短い側）に寄せる。
+
+def _as_one_caption(first: str, second: str, max_chars: int, max_lines: int) -> str | None:
+    """2枚の字幕を続けて1枚（max_lines 行・1行 max_chars 字）に組み直した形。入らなければ None。"""
+    if "\n" not in first and "\n" not in second and max_lines >= 2:
+        return f"{first}\n{second}"
+    flat = f"{first}\u3000{second}".replace("\n", "")
+    try:
+        from subtitle_engine import text_formatter as tf
+        caps = tf.split_into_captions(flat, max_chars, max_lines)
+    except Exception:  # 組み直せなくても字幕は出す
+        caps = []
+    if caps:
+        return caps[0] if len(caps) == 1 else None
+    if len(flat) > max_chars * max_lines:
+        return None
+    return "\n".join(flat[k:k + max_chars] for k in range(0, len(flat), max_chars))
+
+
+def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None = None,
+                   max_lines: int | None = None) -> int:
+    """出る時間が FLASH_SEC 未満の字幕を、隣の字幕とまとめて1枚にする（読めない字幕を作らない）。
+
+    隣が1行なら行として足す。隣が2行でも、続けて1枚に組み直せるならそうする
+    （2分36秒の「もう強烈な」が 0.49 秒で消えた・2026-10-06 実測）。
+    詰まっている側（すき間が短い側）に寄せる。
     """
+    if max_chars is None or max_lines is None:
+        max_chars, max_lines = _caption_limits()
     merged = 0
     for i, s in enumerate(items):
         if s.get("_merged") or s["end"] - s["start"] >= FLASH_SEC:
@@ -287,18 +319,20 @@ def _merge_flashes(items: list[dict], min_display: float) -> int:
         for j in (i - 1, i + 1):
             if 0 <= j < len(items) and not items[j].get("_merged"):
                 o = items[j]
-                if "\n" not in str(o.get("text", "")) and "\n" not in str(s.get("text", "")):
+                pair = (o, s) if j < i else (s, o)
+                text = _as_one_caption(str(pair[0].get("text", "")), str(pair[1].get("text", "")),
+                                       max_chars, max_lines)
+                if text is not None:
                     gap = s["start"] - o["end"] if j < i else o["start"] - s["end"]
-                    cands.append((gap, j))
+                    cands.append((gap, j, text))
         if not cands:
             continue
-        _, j = min(cands)
+        _, j, text = min(cands, key=lambda c: (c[0], c[1]))
         o = items[j]
+        o["text"] = text
         if j < i:
-            o["text"] = f"{o['text']}\n{s['text']}"
             o["end"] = max(o["end"], s["end"])
         else:
-            o["text"] = f"{s['text']}\n{o['text']}"
             o["start"] = min(o["start"], s["start"])
         s["_merged"] = True
         merged += 1

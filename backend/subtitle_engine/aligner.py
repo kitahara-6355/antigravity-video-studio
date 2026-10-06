@@ -55,6 +55,10 @@ MIN_MATCH_RATIO = 0.35
 # 1文字だけの一致（「の」「は」）は数えない。続けてこれだけ一致した所だけ使う
 MIN_BLOCK = 2
 MIN_HITS = 3
+# ひと続きに突き合った文字でも、認識の時刻がこれ以上離れていたらそこで切る。
+# 突き合わせは一致を前後に伸ばすので、間の向こうの1文字がくっつく（20分08秒の
+# 「なるべくね」の「な」が 2.3 秒前の「しれない」の「な」になった・2026-10-06 実測）
+MAX_CHAR_GAP_SEC = 1.0
 # 認識の時刻は、声の立ち上がり（音の大きさ）より約 0.2 秒早い。2026-10-06 実測:
 # 0.11→0.37、10.25→10.44、28.17→28.47、35.10→35.30、39.60→39.80 秒（5 か所とも 0.19〜0.30）
 LAG_SEC = 0.2
@@ -263,11 +267,15 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
     sm = difflib.SequenceMatcher(None, cap_chars, rec_chars, autojunk=False)
     hits: dict[int, list[tuple[int, float]]] = {}
     for blk in sm.get_matching_blocks():
-        if blk.size < MIN_BLOCK:
-            continue
-        for d in range(blk.size):
-            ci = blk.a + d
-            hits.setdefault(owner[ci], []).append((offset_in[ci], rec_times[blk.b + d]))
+        first = 0
+        for d in range(1, blk.size + 1):
+            if d < blk.size and rec_times[blk.b + d] - rec_times[blk.b + d - 1] <= MAX_CHAR_GAP_SEC:
+                continue
+            if d - first >= MIN_BLOCK:
+                for e in range(first, d):
+                    ci = blk.a + e
+                    hits.setdefault(owner[ci], []).append((offset_in[ci], rec_times[blk.b + e]))
+            first = d
     aligned = 0
     for i, cap in enumerate(captions):
         pairs = hits.get(i)

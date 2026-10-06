@@ -70,10 +70,16 @@ MIN_SIMILARITY = 0.5
 SHORT_LINE = 5
 
 
-def _plausible_correction(original: str, corrected: str) -> bool:
+def _has_kanji(text: str) -> bool:
+    return any("\u4e00" <= ch <= "\u9fff" or ch == "々" for ch in text)
+
+
+def _plausible_correction(original: str, corrected: str, neighbours=()) -> bool:
     """校閲の直しが、同じ行の文の直しとして妥当か（番号ずれ・行の入れ替えを弾く）。
 
     句読点と空白を除いて比べる。フィラーを消しただけの短縮は通す（直した文が元の文に含まれる）。
+    neighbours（前後の行の元の文）の方に近い直しは、番号ずれとみなして捨てる。
+    かなだけの行を漢字に直すのは変換の直しなので通す（「たんじゅ」→「単純」）。
     """
     import difflib
 
@@ -85,9 +91,18 @@ def _plausible_correction(original: str, corrected: str) -> bool:
         return True
     if b in a:  # 消しただけ
         return True
+    ratio = difflib.SequenceMatcher(None, a, b).ratio()
+    for other in neighbours or ():
+        m = norm(other)
+        if m and difflib.SequenceMatcher(None, m, b).ratio() > max(ratio, MIN_SIMILARITY):
+            return False
     if max(len(a), len(b)) <= SHORT_LINE:  # 短い行どうしは比べても決まらない
         return True
-    return difflib.SequenceMatcher(None, a, b).ratio() >= MIN_SIMILARITY
+    if ratio >= MIN_SIMILARITY:
+        return True
+    # かなだけの行を漢字に直した。漢字はかなより短く書けるので、長くはならない
+    kana_only = all("\u3041" <= ch <= "\u30ff" for ch in a)
+    return kana_only and _has_kanji(b) and 0.3 * len(a) <= len(b) <= 1.2 * len(a)
 
 
 def proofread_segments(segments, update_callback=None, return_stats=False):
@@ -407,7 +422,10 @@ def proofread_segments(segments, update_callback=None, return_stats=False):
                         # 番号ずれの検知: 元の文とかけ離れた直しは採らない（2026-10-06 実走で、AI が
                         # 短い行「います。」を前に寄せ、以降の文を1つずつ前の行に詰めて返した。
                         # 字幕が前の発話の時刻に出て、0.3 秒ずつに潰れた）
-                        if not _plausible_correction(segments[item_idx]["text"], item["text"]):
+                        neighbours = [segments[k]["text"] for k in (item_idx - 1, item_idx + 1)
+                                      if 0 <= k < len(segments)]
+                        if not _plausible_correction(segments[item_idx]["text"], item["text"],
+                                                     neighbours):
                             stats["rejected_items"] = stats.get("rejected_items", 0) + 1
                             logger.warning(
                                 f"AI Proofreader: 元の文と離れすぎた直しを捨てました [{item_idx}] "
