@@ -724,6 +724,14 @@ _SMALL_KANA = "っゃゅょぁぃぅぇぉゎー"
 _NOUN_SCRIPTS = ("kanji", "katakana")
 _BOUND_N = ("んで", "んだ", "んじゃ", "んす")
 _HEAD_PUNCT = "、,，" + SENTENCE_END
+# 「です・ます」（＋終助詞）だけの頭は文を始められない。前の述語の続き（26回目の 2分55秒
+# 「…もう行かないってなりそう」「ですよね」、締めの「…お越しいただき」「ました。」）。
+# 「ですから」「でしょ」は文を始められるので _FREE_HEADS で先に外れる
+_POLITE_HEAD_STARTS = ("です", "でし", "ます", "まし", "ませ")
+_POLITE_HEAD = re.compile(r"(?:です|でした|でしょう|ます|ました|ません|ましょう)"
+                          r"(?:よね|かね|かな|けど|けども|けれど|けれども|よ|ね|か|な|わ)?")
+# 言い直しとみなす重なりの最短の字数（「いただ」）。2 字の重なり（「その」「この」）は偶然にもある
+_RESTART_MIN_CHARS = 3
 
 
 def _phrase_ends(parser, text: str) -> list[int]:
@@ -748,6 +756,59 @@ def _echo_len(prev: str, cur: str) -> int:
     return 0
 
 
+def _ends_mid_verb(text: str) -> bool:
+    """促音で切れた動詞で終わるか（「…習字入れ入っ」）。後ろの「て・た」と1語なので、そこで割らない。
+
+    「あっ」「えっ」のような感嘆（文の頭か、読点の後ろの「ひらがな1字＋っ」）は除く。
+    """
+    if len(text) < 2 or text[-1] != "っ":
+        return False
+    if _script(text[-2]) == "kanji":
+        return True
+    return _script(text[-2]) == "hiragana" and len(text) >= 3 and text[-3] not in _HEAD_PUNCT + " 　"
+
+
+def _restart_len(prev: str, cur: str) -> int:
+    """cur の頭が、prev の尻で途切れた語の言い直しなら、prev の尻から捨てる字数（無ければ 0）。
+
+    起こしの区切りで語が割れると、前の区切りは語を補って言い切り（「…お越しいただい」）、
+    次の区切りは同じ語を頭から起こす（「いただきました。」・締めの 43分9秒の実例）。
+    重なり（_RESTART_MIN_CHARS 字以上）の後ろに、前の尻だけ1字余っていてもよい（補った字）。
+    前が句読点で終わっていれば言い直しではない（2人が続けて「ありがとうございました。」）。
+    """
+    if not prev or prev[-1] in _HEAD_PUNCT:
+        return 0
+    for m in range(min(8, len(cur)), _RESTART_MIN_CHARS - 1, -1):
+        head = cur[:m]
+        if any(c in _HEAD_PUNCT or c in " 　" for c in head):
+            continue
+        for extra in (0, 1):
+            cut = m + extra
+            # 前に何も残らないなら言い直しとみなさない（同じ語を2人が言った）
+            if len(prev) - cut >= 2 and prev[len(prev) - cut:len(prev) - extra] == head:
+                return cut
+    return 0
+
+
+def _to_stop(cur: str, k: int) -> int:
+    """戻す頭の字数 k を、読点・文末が近ければそこまで、短いセグメントなら全部に広げる。"""
+    stops = [i + 1 for i, c in enumerate(cur) if c in _HEAD_PUNCT]
+    if stops and k <= stops[0] <= _HEAD_MAX_CHARS + 1:
+        return stops[0]
+    if len(cur) <= _HEAD_MAX_CHARS + 1 and not any(c in SENTENCE_END for c in cur[:-1]):
+        return len(cur)
+    return k
+
+
+def _continuation_len(prev: str, cur: str, parser) -> int:
+    """cur の頭の文節（読点・文末が近ければそこまで）を prev に続けるときの字数。prev が句読点で終われば 0。"""
+    if not prev or prev[-1] in _HEAD_PUNCT:
+        return 0
+    tail = prev[-20:]
+    later = [e - len(tail) for e in _phrase_ends(parser, tail + cur[:24]) if e > len(tail)]
+    return _to_stop(cur, later[0] if later else min(len(cur), 24))
+
+
 def _split_head(prev: str, cur: str, parser) -> int:
     """cur の頭のうち、prev の続きとして前に戻す字数（戻さなければ 0）。"""
     if _is_bound(cur):
@@ -760,7 +821,11 @@ def _split_head(prev: str, cur: str, parser) -> int:
         if prev[-1] in _HEAD_PUNCT or cur.startswith(_FREE_HEADS):
             return 0
         noun = _script(prev[-1]) in _NOUN_SCRIPTS and _script(cur[0]) in _NOUN_SCRIPTS
-        if not noun and not cur.startswith(_DEPENDENT_HEADS):
+        # 促音で切れた動詞の続き（「入っ」「てへえ」）と「です・ます」の頭（「なりそう」「ですよね」）は、
+        # 助詞の頭より強いつながり（前の語の一部）。助詞の決まりで止めない
+        verb = _ends_mid_verb(prev) and _script(cur[0]) == "hiragana"
+        polite = cur.startswith(_POLITE_HEAD_STARTS) and not prev.endswith(_POLITE_ENDS)
+        if not noun and not verb and not polite and not cur.startswith(_DEPENDENT_HEADS):
             return 0
         tail = prev[-20:]
         ends = _phrase_ends(parser, tail + cur[:24])
@@ -769,6 +834,8 @@ def _split_head(prev: str, cur: str, parser) -> int:
             return 0
         k = next(e for e in ends if e > len(tail)) - len(tail)
         head = cur[:k].rstrip(_HEAD_PUNCT)
+        if verb or (polite and _POLITE_HEAD.fullmatch(head)):
+            return _to_stop(cur, k)
         if noun:
             # 名詞が割れた（56 秒「…久木田デザイン書道塾」「主宰、そして」）。読点・句点までの短い名詞だけ戻す
             # （「東京」「大阪に行きました」のような、区切りの無いつなぎは割れ目と決められない）
@@ -792,12 +859,7 @@ def _split_head(prev: str, cur: str, parser) -> int:
         if k != len(cur) and k not in _phrase_ends(parser, cur[:24]):
             return 0
     # 読点・文末が近ければそこまで、短いセグメントなら全部を戻す
-    stops = [i + 1 for i, c in enumerate(cur) if c in _HEAD_PUNCT]
-    if stops and k <= stops[0] <= _HEAD_MAX_CHARS + 1:
-        return stops[0]
-    if len(cur) <= _HEAD_MAX_CHARS + 1 and not any(c in SENTENCE_END for c in cur[:-1]):
-        return len(cur)
-    return k
+    return _to_stop(cur, k)
 
 
 def _rejoin_split_heads(segments: list) -> list:
@@ -816,14 +878,21 @@ def _rejoin_split_heads(segments: list) -> list:
                 cur, base = text.strip(), prev.rstrip()
                 # 起こしの窓の重なりで前の尻が繰り返された頭（「…問題はっていう。」「っていう…」）は捨てる
                 echo = _echo_len(base, cur) if _is_bound(cur) else 0
-                n = 0 if echo else _split_head(base, cur, parser)
-                if n and not _is_bound(cur):
+                # 区切りで途切れて言い直された語（「…お越しいただい」「いただきました。」）は、前の尻の
+                # 切れ端を捨て、言い直した語を前に続ける
+                restart = 0 if echo or _is_bound(cur) else _restart_len(base, cur)
+                if restart:
+                    base = base[:-restart].rstrip()
+                    n = _continuation_len(base, cur, parser)
+                else:
+                    n = 0 if echo else _split_head(base, cur, parser)
+                if n and not restart and not _is_bound(cur):
                     # 戻す助詞が前の尻にもう付いている（校閲が「あと」を「あとは」に直し、後ろの
                     # 「は有名な…」が残った。戻すと「あとはは」になる・13 分 43 秒の実例）なら、後ろの頭を捨てる
                     dup = next((m for m in range(min(n, 3), 0, -1) if base.endswith(cur[:m])), 0)
                     if dup:
                         echo, n = dup, 0
-                if echo or n:
+                if echo or n or restart:
                     if n and _is_bound(cur):
                         base = base.rstrip(_HEAD_PUNCT)
                     rest = cur[echo or n:].lstrip(_HEAD_PUNCT + " 　")

@@ -501,3 +501,94 @@ def test_te_followed_by_a_new_verb_may_still_be_split():
     assert tf._break_score("書いて", "送ってくれた") > 0
     assert tf._break_score("お届けして", "まいります。") < 0
 
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("prev,cur,joined,bad_head", [
+    # 26回目の 2分55秒: 「…もう行かないってなりそう」「ですよね/平気でしょね」と字幕が「ですよね」で始まった
+    ("普通だったらもう行かないってなりそう", "ですよね。平気でしょね。", "行かないってなりそうですよね", "ですよね"),
+    # 締め（39分53秒）: 校閲が「お越しいただい」「いただきました。」の重なりを「いただき」「ました。」に直し、
+    # 字幕が「ました　ありがとうございました」で始まった
+    ("本日は久木田博信先生にお越しいただき", "ました。ありがとうございました。",
+     "お越しいただきました", "ました"),
+])
+def test_a_polite_ending_left_at_the_head_goes_back_to_its_verb(prev, cur, joined, bad_head):
+    # 「です・ます」（＋「ね・よ」）は文を始められない。前の述語に戻す
+    segs = [{"start": 0.0, "end": 4.0, "text": prev}, {"start": 4.1, "end": 7.0, "text": cur}]
+    texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
+    assert any(joined in t for t in texts), texts
+    assert not any(t.startswith(bad_head) for t in texts), texts
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("prev,cur", [
+    ("そうなんです", "ですから、私はこう思います"),
+    ("本当に", "ますます良くなりました"),
+])
+def test_words_that_merely_start_like_a_polite_ending_keep_their_place(prev, cur):
+    segs = [{"start": 0.0, "end": 2.0, "text": prev}, {"start": 2.5, "end": 5.0, "text": cur}]
+    texts = [s["text"] for s in tf.format_segments(segs, 18)]
+    assert texts == [tf.strip_punctuation(prev), tf.strip_punctuation(cur)]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_verb_cut_after_its_small_tsu_is_not_split():
+    # 26回目の 1分57秒: 「母親に　僕も習字入れ入っ」「てへえ/言って…」。「っ」で終わる動詞は
+    # 後ろの「て・た」と1語なので、字幕の切れ目にしない
+    segs = [{"start": 127.5, "end": 131.5, "text": "母親に、僕も習字入れ入っ"},
+            {"start": 131.5, "end": 138.5, "text": "てへえ。言って、それが、それが8歳です。"}]
+    texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
+    assert not any(t.endswith("っ") for t in texts), texts
+    assert not any(t.startswith("て") for t in texts), texts
+    assert any("入って" in t for t in texts), texts
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("prev,cur", [
+    ("えっ", "それは本当ですか"),
+    ("あっ", "そうなんですね"),
+])
+def test_an_exclamation_ending_in_small_tsu_keeps_its_own_caption(prev, cur):
+    segs = [{"start": 0.0, "end": 1.0, "text": prev}, {"start": 1.5, "end": 4.0, "text": cur}]
+    assert [s["text"] for s in tf.format_segments(segs, 18)] == [prev, cur]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_word_cut_short_and_said_again_is_shown_once():
+    # 締め（43分9秒・起こしの区切り）: 前の区切りが語を「お越しいただい」と補い、次の区切りが
+    # 「いただきました。」と頭から起こした。字幕は「…お越しいただい」「いただきました…」になる
+    segs = [{"start": 2582.2, "end": 2589.2,
+             "text": "はい、今日はありがとうございました。本日は久木田博信先生にお越しいただい"},
+            {"start": 2589.4, "end": 2591.4, "text": "いただきました。ありがとうございました。"}]
+    texts = [s["text"].replace("\n", "") for s in tf.format_segments(segs, 18)]
+    joined = "".join(texts)
+    assert "お越しいただきました" in joined, texts
+    assert "いただいいただ" not in joined and "いただい" not in joined, texts
+    assert not any(t.startswith("いただき") for t in texts), texts
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_thank_you_said_by_both_after_a_full_stop_is_kept_twice():
+    segs = [{"start": 0.0, "end": 2.0, "text": "ありがとうございました。"},
+            {"start": 2.0, "end": 4.0, "text": "ありがとうございました。"}]
+    assert [s["text"] for s in tf.format_segments(segs, 18)] == ["ありがとうございました"] * 2
+
+
+
+def test_an_unheard_caption_too_fast_to_read_is_not_shown():
+    # 26回目の 3分10秒: 認識に声の無い「何か一番最初のきっかけなんですね」（16 字）が、聞こえた字幕の
+    # 間に 0.55 秒だけ出た。読めず、声も確かめられない。0.5 秒を超えるので消す対象から漏れていた
+    # （全編で 13 枚・締めの最後の「ありがとうございました」0.58 秒も）
+    from subtitle_engine import sync
+    items = [{"start": 188.56, "end": 189.85, "text": "そうですね", "_asr": True},
+             {"start": 190.27, "end": 190.82, "text": "何か一番最初のきっかけなんですね", "_asr_interp": True},
+             {"start": 190.89, "end": 196.29, "text": "ぼくはね　中学校に入ってね\nバスケットボール部に", "_asr": True}]
+    assert sync._drop_unheard_flashes(items, 0.8) == 1
+    assert items[1].get("_merged") and not items[0].get("_merged") and not items[2].get("_merged")
+
+
+def test_an_unheard_word_that_can_be_read_in_time_stays():
+    from subtitle_engine import sync
+    items = [{"start": 10.0, "end": 10.7, "text": "はい", "_asr_interp": True},
+             {"start": 12.0, "end": 12.6, "text": "そうなんですよ", "_asr": True, "_asr_first": 12.0}]
+    assert sync._drop_unheard_flashes(items, 0.8) == 0

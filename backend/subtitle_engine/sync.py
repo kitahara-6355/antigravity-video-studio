@@ -442,15 +442,17 @@ def _unheard(s: dict) -> bool:
     return bool(s.get("_asr_interp") and not s.get("_asr") and not s.get("_asr_heard"))
 
 
-def _drop_unheard_flashes(items: list[dict]) -> int:
-    """隣とまとめられなかった一瞬の字幕のうち、音声認識に声が無いものを出さない。
+def _drop_unheard_flashes(items: list[dict], min_display: float = DEFAULT_TIMING["min_display_sec"]) -> int:
+    """隣とまとめられなかった読めない字幕（`_too_short`）のうち、音声認識に声が無いものを出さない。
 
     カットで声が消えた言葉が、カット点に 0.3 秒だけ残る（9分39秒の「いたんだよね」・
     2026-10-06 実測）。読めず、言葉も聞こえないので出す意味が無い。認識に声がある字幕は残す。
+    0.5 秒を超えても、字数に対して短すぎれば読めない（3分10秒の 16 字「何か一番最初の
+    きっかけなんですね」が 0.55 秒・2026-10-07）。「はい」のように読める短い語は残す。
     """
     dropped = 0
     for s in items:
-        if s.get("_merged") or s["end"] - s["start"] >= FLASH_SEC:
+        if s.get("_merged") or not _too_short(s, min_display):
             continue
         if _unheard(s):
             s["_merged"] = True
@@ -579,7 +581,7 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     past_end = _drop_past_end(result, speech.duration)
     merged = _merge_flashes(result, r["min_display_sec"])
     resplit = _resplit_flashes(result, r["min_display_sec"])
-    dropped = _drop_unheard_flashes(result) + past_end + no_room
+    dropped = _drop_unheard_flashes(result, r["min_display_sec"]) + past_end + no_room
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
              "redistributed": redistributed, "merged": merged, "resplit": resplit,
              "dropped": dropped}
