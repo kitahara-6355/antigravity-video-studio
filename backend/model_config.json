@@ -22,10 +22,10 @@
         "note": "無料枠あり（Flash-Lite 系）。実写素材は文字起こしの処理量が多いので、ここが効く",
         "verified_at": "2026-08-18",
         "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる",
-        "rpm": 30,
-        "rpd": 1500,
-        "limits_confidence": "unverified_secondary",
-        "limits_note": "**二次情報。**一次情報はこの実行環境のプロキシで遮断されている。`free_tier_limits` に載っているのは旧 ID（gemini-3-flash-preview / gemini-2.5-flash / gemini-2.5-flash-lite）で、**いま使っている段の枠は記録されていなかった**（R1.5-C5・2026-08-28）。実キーで 429 を観測したら実測値に差し替える"
+        "rpm": 15,
+        "rpd": 500,
+        "limits_confidence": "observed_429",
+        "limits_note": "**実測**（2026-10-06・avs-prod-free の実キー）。429 の応答が `GenerateRequestsPerDayPerProjectPerModel-FreeTier` = 500 と `GenerateRequestsPerMinutePerProjectPerModel-FreeTier` = 15 を返した（それまでの 30 / 1,500 は二次情報で、どちらも誤り）。1日の切り替わりは米国太平洋時間の 0 時（夏時間の間は日本時間 16 時）。43 分の素材を最初から書き出すと、2回の文字起こし（各 104 回）と校閲（7 回）でおよそ 220 回、枠の半分近くを使う"
       },
       "standard": {
         "model": "gemini-3.6-flash",
@@ -37,9 +37,9 @@
         "verified_at": "2026-08-18",
         "verified_by": "実 API の models.list（法人 avs-prod-free キー・50件）で実在を確認。python -m backend.verify_account で再現できる",
         "rpm": 15,
-        "rpd": 1000,
-        "limits_confidence": "unverified_secondary",
-        "limits_note": "**二次情報。**一次情報はこの実行環境のプロキシで遮断されている。`free_tier_limits` に載っているのは旧 ID（gemini-3-flash-preview / gemini-2.5-flash / gemini-2.5-flash-lite）で、**いま使っている段の枠は記録されていなかった**（R1.5-C5・2026-08-28）。実キーで 429 を観測したら実測値に差し替える"
+        "rpd": 20,
+        "limits_confidence": "observed_429",
+        "limits_note": "**1日の枠だけ実測**（2026-10-05・avs-prod-free の実キー）。429 の応答が `limit: 20` と「11 時間後に再試行」を返した（それまでの 1,000 は二次情報で誤り）。20 回は1本の書き出しの頭で尽きるので、実際の作業はほぼ batch（3.5 Flash-Lite）に落ちて動く。rpm は二次情報のまま"
       },
       "premium": {
         "model": "gemini-3.7-flash",
@@ -182,17 +182,17 @@
       "veo-3.0": null
     }
   },
-  "free_tier_limits_note": "**いま使っている段のモデルがここに載っていなかった**（R1.5-C5 の実測で判明・2026-08-28 に追記）。載っていたのは旧 ID（gemini-3-flash-preview / gemini-2.5-*）だけで、tracker.py の _get_rpd() は未知のモデルに既定 1000 を返すので、batch の 1500 が効いていなかった。数値は text_generation.tiers の rpm/rpd と同じ二次情報。実キーで 429 を観測したら差し替える。**2.5 系の行は 2026-08-28 に削除した** — 本番のどこからも引かれなくなったため（R1.5-C6）",
+  "free_tier_limits_note": "**いま使っている段のモデルがここに載っていなかった**（R1.5-C5 の実測で判明・2026-08-28 に追記）。載っていたのは旧 ID（gemini-3-flash-preview / gemini-2.5-*）だけで、tracker.py の _get_rpd() は未知のモデルに既定 1000 を返すので、batch の 1500 が効いていなかった。数値は text_generation.tiers の rpm/rpd と同じ二次情報。実キーで 429 を観測したら差し替える（**gemini-3.5-flash-lite の 15 / 500 と gemini-3.6-flash の rpd 20 は 429 の実測で差し替えた**・2026-10-07）。**2.5 系の行は 2026-08-28 に削除した** — 本番のどこからも引かれなくなったため（R1.5-C6）",
   "free_tier_limits": {
     "gemini-3.5-flash-lite": {
-      "rpm": 30,
-      "rpd": 1500,
+      "rpm": 15,
+      "rpd": 500,
       "tpm": 250000,
       "tier": "batch"
     },
     "gemini-3.6-flash": {
       "rpm": 15,
-      "rpd": 1000,
+      "rpd": 20,
       "tpm": 250000,
       "tier": "standard"
     },
