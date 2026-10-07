@@ -418,7 +418,7 @@ def test_gemini_engine_fills_segments_and_names_the_engine(tmp_path, monkeypatch
     from subtitle_engine import gemini_transcriber
     monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
     segs = [{"start": 0.0, "end": 1.0, "text": "あ" * 300, "sourceStart": 0.0, "sourceEnd": 1.0, "words": []}]
-    monkeypatch.setattr(gemini_transcriber, "transcribe", lambda path: gemini_transcriber.TranscribeResult(
+    monkeypatch.setattr(gemini_transcriber, "transcribe", lambda path, **kw: gemini_transcriber.TranscribeResult(
         segments=segs, model="gemini-3.6-flash", chunks=1, models_used=["gemini-3.6-flash"]))
     ctx = PipelineContext(video_path=str(_video(tmp_path)))
 
@@ -434,7 +434,7 @@ def test_a_failed_gemini_switches_to_whisper_and_says_so(tmp_path, monkeypatch):
     from subtitle_engine import gemini_transcriber
     monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
 
-    def boom(path):
+    def boom(path, **kw):
         raise gemini_transcriber.TranscriptionError("チャンク 2/3 を起こせません")
     monkeypatch.setattr(gemini_transcriber, "transcribe", boom)
     worker = TranscribeWorker()

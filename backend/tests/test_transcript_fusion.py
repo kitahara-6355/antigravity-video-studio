@@ -254,3 +254,26 @@ def test_without_the_recogniser_there_is_no_second_pass(tmp_path, monkeypatch):
     result = asyncio.run(TranscribeWorker().execute(ctx))
 
     assert result.success and calls == [None]
+
+
+def test_each_pass_keeps_chunk_notes_beside_its_cache_until_the_cache_is_written(tmp_path, monkeypatch):
+    """1回目・2回目とも、途中で落ちたら続きから起こせるようにチャンクごとの控えを渡す。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import gemini_transcriber as gt
+
+    _setup_two_passes(tmp_path, monkeypatch)
+    fake = gt.transcribe
+    journals = []
+
+    def noting(path, **kw):
+        journals.append(Path(kw["journal"]))
+        Path(kw["journal"]).write_text("{}\n", encoding="utf-8")  # 起こしている途中の控え
+        return fake(path, **kw)
+    monkeypatch.setattr(gt, "transcribe", noting)
+
+    asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+
+    assert [j.parent for j in journals] == [tmp_path, tmp_path]
+    assert len(set(journals)) == 2, "1回目と2回目で控えを分ける"
+    assert not any(j.exists() for j in journals), "キャッシュを書いたら控えは要らない"

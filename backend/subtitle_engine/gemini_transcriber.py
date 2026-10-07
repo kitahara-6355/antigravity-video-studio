@@ -48,6 +48,7 @@ import logging
 import re
 import subprocess
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -399,10 +400,14 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                chunk_sec: int = CHUNK_SEC, parallel: int = PARALLEL,
                call: Callable[..., tuple[str, str]] | None = None,
                attempts: int = 4, backoff: float = 3.0,
-               first_chunk_sec: float | None = None) -> TranscribeResult:
+               first_chunk_sec: float | None = None,
+               journal: str | Path | None = None) -> TranscribeResult:
     """動画の音声を Gemini で起こす。1チャンクでも起こせなければ `TranscriptionError`。
 
     first_chunk_sec は最初のチャンクの長さ（2回目の起こしで区切りをずらす）。
+    journal はチャンクごとの控え（`journal_path`）。起こせたチャンクから書き足し、次の実行では
+    控えにあるチャンク（頭と長さが同じもの）を呼び直さない。無料枠の1日の上限で途中で落ちても、
+    枠が戻った後は続きから起こせる（2026-10-07: 104 本中 71 本目で落ち、70 本分が消えた）。
     """
     model = model or _resolve_model()
     client = client if client is not None else _default_client()
@@ -415,14 +420,22 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
         logger.info(f"🎤 Gemini 文字起こし: {len(chunks)} チャンク（長くても{chunk_sec}秒・"
                     f"{'話の切れ目' if quiet_map is not None else '機械的'}に区切る）model={model}")
 
+        done = read_journal(journal)
+        lock = threading.Lock()
+
         def one(args: tuple[int, tuple[Path, float, float]]) -> tuple[list[dict], str]:
             i, (path, offset, dur) = args
+            if _journal_key(offset, dur) in done:
+                segs, used = done[_journal_key(offset, dur)]
+                logger.info(f"  ♻️ チャンク {i + 1}/{len(chunks)}: 前回起こした分を使います ({used})")
+                return segs, used
             last: BaseException | None = None
             for attempt in range(attempts):
                 try:
                     text, used = call(client, model, path, dur)
                     segs = parse_segments(text, offset, dur)
                     logger.info(f"  ✅ チャンク {i + 1}/{len(chunks)}: {len(segs)} セグメント ({used})")
+                    _append_journal(journal, lock, offset, dur, segs, used)
                     return segs, used
                 except _retryable() as e:
                     last = e
@@ -519,6 +532,51 @@ def _retranscribe_halves(path: Path, offset: float, dur: float, work: Path, idx:
         text, used = call_one(sub, offset + a, b - a)
         segs.extend(parse_segments(text, offset + a, b - a))
     return segs, used
+
+
+def journal_path(checkpoint: str | Path) -> Path:
+    """チャンクごとの控えの置き場所（キャッシュの隣）。キャッシュを書いたら消してよい。"""
+    p = Path(checkpoint)
+    return p.with_name(p.stem + ".chunks.journal")
+
+
+def _journal_key(offset: float, dur: float) -> tuple[float, float]:
+    return round(float(offset), 3), round(float(dur), 3)
+
+
+def read_journal(journal: str | Path | None) -> dict[tuple[float, float], tuple[list[dict], str]]:
+    """控えを読む: (チャンクの頭, 長さ) → (行, モデル)。
+
+    読めない行は飛ばす（書き込み中に止められると、最後の行が途中で切れる）。
+    """
+    done: dict[tuple[float, float], tuple[list[dict], str]] = {}
+    if journal is None:
+        return done
+    try:
+        lines = Path(journal).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return done
+    for line in lines:
+        try:
+            rec = json.loads(line)
+            done[_journal_key(rec["offset"], rec["duration"])] = (list(rec["segments"]),
+                                                                  str(rec.get("model") or ""))
+        except (ValueError, KeyError, TypeError):
+            continue
+    return done
+
+
+def _append_journal(journal: str | Path | None, lock: threading.Lock, offset: float, dur: float,
+                    segs: list[dict], used: str) -> None:
+    if journal is None:
+        return
+    line = json.dumps({"offset": round(offset, 3), "duration": round(dur, 3), "model": used,
+                       "segments": segs}, ensure_ascii=False)
+    try:
+        with lock, open(journal, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError as e:  # 控えが書けなくても起こしは続ける（落ちたときに続きから起こせないだけ）
+        logger.warning(f"チャンクの控えを書けません: {e}")
 
 
 def write_checkpoint(segments: list[dict], path: str | Path,

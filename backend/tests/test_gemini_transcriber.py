@@ -149,3 +149,69 @@ def test_a_budget_stop_is_not_retried(clip):
     with pytest.raises(CostLimitExceeded):
         gt.transcribe(clip, client=object(), model="m", chunk_sec=10, parallel=1, call=call, backoff=0)
     assert calls["n"] == 1
+
+
+# --- 途中で落ちたら、起こし終えたチャンクから続ける（2026-10-07）----------------------
+# 2回目の起こしが 104 本中 71 本目で無料枠の1日の上限（500回）に当たり、起こし終えた
+# 70 本分が消えた。枠は翌日まで戻らないので、やり直すたびに同じ所で落ちうる。
+
+
+def _named(client, model, audio, duration):
+    return json.dumps([{"start": 0, "end": 1, "text": audio.stem}]), model
+
+
+@needs_ffmpeg
+def test_a_transcription_cut_short_resumes_from_the_chunks_already_done(clip, tmp_path):
+    journal = tmp_path / "tx.chunks.journal"
+    seen = []
+
+    def quota_out(client, model, audio, duration):
+        seen.append(audio.name)
+        if audio.name == "chunk_001.mp3":
+            raise OSError("429 RESOURCE_EXHAUSTED")
+        return _named(client, model, audio, duration)
+
+    with pytest.raises(gt.TranscriptionError):
+        gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=quota_out,
+                      backoff=0, journal=journal)
+    seen.clear()
+
+    def ok(client, model, audio, duration):
+        seen.append(audio.name)
+        return _named(client, model, audio, duration)
+
+    result = gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=ok,
+                           backoff=0, journal=journal)
+
+    assert seen == ["chunk_001.mp3"], "起こし終えた1本目と3本目は呼び直さない"
+    assert [s["text"] for s in result.segments] == ["chunk_000", "chunk_001", "chunk_002"]
+
+
+@needs_ffmpeg
+def test_chunks_from_a_different_cut_are_not_reused(clip, tmp_path):
+    journal = tmp_path / "tx.chunks.journal"
+    gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=_named,
+                  backoff=0, journal=journal)
+    seen = []
+
+    def ok(client, model, audio, duration):
+        seen.append(audio.name)
+        return _named(client, model, audio, duration)
+
+    gt.transcribe(clip, client=object(), model="m", chunk_sec=2, parallel=1, call=ok,
+                  backoff=0, journal=journal, first_chunk_sec=1)
+
+    # 区切りが 1秒・3秒になる。頭のチャンクの長さが違うので使い回さない
+    assert "chunk_000.mp3" in seen
+
+
+def test_a_torn_last_line_of_the_chunk_notes_is_ignored(tmp_path):
+    """控えの書き込み中に止められると、最後の行が途中で切れる。"""
+    journal = tmp_path / "tx.chunks.journal"
+    journal.write_text(json.dumps({"offset": 0.0, "duration": 2.0, "model": "m",
+                                   "segments": [{"start": 0.0, "end": 1.0, "text": "a"}]},
+                                  ensure_ascii=False) + "\n" + '{"offset": 2.0, "dur', encoding="utf-8")
+
+    done = gt.read_journal(journal)
+
+    assert list(done) == [(0.0, 2.0)]

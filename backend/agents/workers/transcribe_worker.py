@@ -286,11 +286,14 @@ class TranscribeWorker(PipelineStageWorker):
         try:
             from subtitle_engine import gemini_transcriber
             loop = asyncio.get_running_loop()
-            tx = await loop.run_in_executor(None, gemini_transcriber.transcribe, ctx.video_path)
+            journal = gemini_transcriber.journal_path(checkpoint)
+            tx = await loop.run_in_executor(None, functools.partial(
+                gemini_transcriber.transcribe, ctx.video_path, journal=journal))
             gemini_transcriber.write_checkpoint(
                 tx.segments, checkpoint,
                 meta={"quiet": tx.quiet, "coverage": tx.coverage, "rechecked": tx.rechecked,
                       "cuts": tx.cuts})
+            journal.unlink(missing_ok=True)
         except Exception as e:  # noqa: BLE001 — 主経路の失敗は従経路へ。理由は残す
             logger.warning(f"⚠️ Gemini 文字起こしに失敗 → Whisper に切り替えます: {e}")
             ctx.warnings.append(f"文字起こし: Gemini が失敗したため Whisper に切り替えました（{e}）")
@@ -334,10 +337,12 @@ class TranscribeWorker(PipelineStageWorker):
             second = self._read_gemini_checkpoint(checkpoint)
         else:
             try:
+                journal = gemini_transcriber.journal_path(checkpoint)
                 tx = await loop.run_in_executor(None, functools.partial(
                     gemini_transcriber.transcribe, ctx.video_path,
-                    first_chunk_sec=gemini_transcriber.SECOND_PASS_FIRST_SEC))
+                    first_chunk_sec=gemini_transcriber.SECOND_PASS_FIRST_SEC, journal=journal))
                 gemini_transcriber.write_checkpoint(tx.segments, checkpoint, meta={"cuts": tx.cuts})
+                journal.unlink(missing_ok=True)
                 second = tx.segments
             except Exception as e:  # noqa: BLE001 — 2回目は直すためだけ。落ちても1回目で進む
                 logger.warning(f"⚠️ 文字起こしの2回目に失敗 → 1回目のまま進みます: {e}")
