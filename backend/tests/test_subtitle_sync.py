@@ -236,6 +236,29 @@ def test_unrecognised_head_starts_at_the_onset_before_the_first_recognised_word(
     assert out[1]["start"] == pytest.approx(35.3, abs=0.02)
 
 
+def test_a_long_unheard_head_is_given_time_to_be_said():
+    # 実例（17分58秒・28回目）: 「ね あわよくば その98%の人口の中から改めて」の頭 13 字を認識が
+    # 拾えず、最初に拾えた「の中から」の直前の話し始め（文の途中の息継ぎ）で出て、2行が 1.2 秒で消えた
+    sp = _map([(10.0, 17.3), (17.5, 18.1), (18.4, 21.0)], total=25)
+    segs = [{"start": 10.0, "end": 17.3, "text": "筆で文字を書くっていうことの",
+             "_asr": True, "_asr_first": 10.0, "_asr_marks": [(0, 10.0)]},
+            {"start": 17.57, "end": 20.5, "text": "ね　あわよくば\nその98%の人口の中から改めて",
+             "_asr": True, "_asr_first": 18.46, "_asr_marks": [(13, 18.46)]}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(17.5, abs=0.02)
+
+
+def test_a_short_unheard_head_still_starts_at_the_onset_before_the_first_recognised_word():
+    # 認識の字の時刻は早めに出るので、短い頭（「デザイン」4字）は今までどおり直前の話し始め
+    sp = _map([(28.5, 34.9), (35.3, 39.4)], total=45)
+    segs = [{"start": 28.5, "end": 34.7, "text": "記念すべき", "_asr": True, "_asr_first": 28.5,
+             "_asr_marks": [(0, 28.5)]},
+            {"start": 34.78, "end": 39.4, "text": "デザイン書道の", "_asr": True, "_asr_first": 35.3,
+             "_asr_marks": [(4, 35.3)]}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(35.3, abs=0.02)
+
+
 def test_unheard_flash_that_cannot_be_merged_is_dropped():
     # 実例（9分39秒）: カットで声が消えた「いたんだよね」が、カット点に 0.3 秒だけ出た。
     # 認識にも無く、隣ともまとめられない一瞬の字幕は出さない

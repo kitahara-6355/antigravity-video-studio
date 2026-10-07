@@ -1051,6 +1051,10 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
     if trim:
         for seg in formatted:
             if isinstance(seg, dict) and isinstance(seg.get("text"), str):
+                # 句読点の跡だった所だけ印を付ける（無ければ鍵を足さない）
+                for key, hit in zip(("_break_punct", "_ends_punct"), punctuation_breaks(seg["text"])):
+                    if hit:
+                        seg[key] = True
                 seg["text"] = strip_punctuation(seg["text"])
         formatted = [s for s in formatted if not isinstance(s, dict) or s.get("text") != ""]
 
@@ -1063,6 +1067,8 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
 
 
 _PUNCT = "、。，．,"
+# 数字に挟まれたときは桁区切り・小数点（句読点ではない）
+_NUMERIC_MARKS = ",，．"
 
 
 def _strip_punctuation_enabled() -> bool:
@@ -1073,19 +1079,36 @@ def _strip_punctuation_enabled() -> bool:
         return False
 
 
+def punctuation_breaks(text: str) -> tuple[bool, bool]:
+    """句読点を外す前の字幕の (1行目が句読点で終わるか, 字幕が句読点で終わるか)。
+
+    外すと、改行や字幕の終わりが句読点の跡（語の切れ目）だったかが分からなくなる。後で字幕を
+    組み直すとき（`sync` で短すぎる字幕をまとめる・移す）に、そこを詰めずに空けるために覚えておく
+    （15分59秒の「見てるでしょ。そう、」が「見てるでしょそうすごく」に詰まった・28回目）。
+    """
+    def ends(line: str) -> bool:
+        line = line.rstrip(" 　")
+        return bool(line) and line[-1] in _PUNCT
+    lines = text.split("\n") if isinstance(text, str) else []
+    return (len(lines) > 1 and ends(lines[0]), bool(lines) and ends(lines[-1]))
+
+
 def strip_punctuation(text: str) -> str:
     """字幕から句読点（、。）を外す（2026-10-06 ユーザー指摘「句読点は不要」）。
 
     行末の句読点は消す。行の途中の句読点は全角スペースにして、語の切れ目を残す
     （「はい、いえいえ。」→「はい　いえいえ」）。「！」「？」は語気なので残す。
+    数字に挟まれた「,」「．」は桁区切り・小数点なので残す（「1,000」が「1　000」になった・27分03秒）。
     """
     if not isinstance(text, str):
         return text
     lines = []
     for line in text.split("\n"):
         out = []
-        for ch in line:
-            if ch in _PUNCT:
+        for k, ch in enumerate(line):
+            if ch in _NUMERIC_MARKS and 0 < k < len(line) - 1 and line[k - 1].isdigit() and line[k + 1].isdigit():
+                out.append(ch)
+            elif ch in _PUNCT:
                 if out and out[-1] != "　":
                     out.append("　")
             else:

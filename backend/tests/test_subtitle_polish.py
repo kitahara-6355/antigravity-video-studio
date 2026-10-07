@@ -22,9 +22,35 @@ from subtitle_engine import text_formatter as tf  # noqa: E402
     ("こんにちは、\n書家の北原美麗です。", "こんにちは\n書家の北原美麗です"),
     ("本当ですか？", "本当ですか？"),
     ("。", ""),
+    # 数字の桁区切り・小数点は句読点ではない（27分03秒の「1,000、1,500人」が「1　000　1　500人」になった）
+    ("1,000、1,500人教えた", "1,000　1,500人教えた"),
+    ("２，０００円です。", "２，０００円です"),
+    ("1．5倍", "1．5倍"),
 ])
 def test_strip_punctuation(text, expected):
     assert tf.strip_punctuation(text) == expected
+
+
+def test_captions_remember_where_punctuation_was_taken_out():
+    # 句読点を外すと、改行や字幕の終わりが句読点の跡だったかが分からなくなる。後で字幕を組み直すとき
+    # （短すぎる字幕をまとめる・移す）に語が詰まらないよう、外す前に覚えておく（15分59秒・28回目）
+    assert tf._strip_punctuation_enabled()
+    [comma] = tf.format_segments([{"text": "そうなんですよ、すごく人気だと思いますよ。", "start": 0.0, "end": 3.0}], 18)
+    assert comma["text"] == "そうなんですよ\nすごく人気だと思いますよ"
+    assert comma["_break_punct"] is True and comma["_ends_punct"] is True
+    [plain] = tf.format_segments([{"text": "筆文字がいいところに出てくる機会が多いですよね", "start": 0.0, "end": 3.0}], 18)
+    assert "\n" in plain["text"]
+    assert not plain.get("_break_punct") and not plain.get("_ends_punct")
+
+
+def test_a_sentence_head_ne_is_not_shown():
+    # 実例（17分58秒・33分48秒）: 「ね、あわよくば…」「ね、いくらおいしいものを…」の文頭の「ね」が
+    # 字幕の頭に残った。話題に触れない言葉なので外す（2026-10-06 ユーザー方針）
+    text = "ね、あわよくば、その98%の人口の中から改めて古典書道学ぼうっていう人も出てくるかもしれない。"
+    out = tf.format_segments([{"text": text, "start": 0.0, "end": 6.0}], 18)
+    assert out and not out[0]["text"].startswith("ね")
+    # 「、」が続かない「ね」（語の頭・文末）は残す
+    assert tf.strip_lead_words("ねじを回すんですね。") == "ねじを回すんですね。"
 
 
 def test_bare_lead_word_is_removed_without_comma():
@@ -227,8 +253,33 @@ def test_words_moved_from_another_utterance_are_spaced():
              {"start": 1483.19, "end": 1483.99, "text": "座右の銘じゃなくてもいいんです", "_asr": True,
               "sourceStart": 1703.5}]
     assert sync._resplit_flashes(items, 0.8, max_chars=18, max_lines=2) == 1
-    assert "\u3000座右の銘じゃなくても" in items[1]["text"].replace("\n", "")
+    # 空けた所は、行の途中なら全角スペース、行の境なら改行で残る
+    assert "\u3000座右の銘じゃなくても" in sync._flat(items[1])
     assert items[1]["end"] - items[1]["start"] >= 0.8
+
+
+def test_a_moved_phrase_keeps_the_sentence_breaks_it_had():
+    # 実例（15分59秒・28回目）: 「…みんな見てるでしょ。」の「見てるでしょ」を、次の「そう、すごく人気だと
+    # 思います」（2行）の頭に移したら、外した句読点の跡がどちらも詰まり「見てるでしょそうすごく人気だと」になった
+    from subtitle_engine import sync
+    prev = "ドラマというかそのアニメのテレビの\n方でもおそらってみんな見てるでしょ"
+    items = [{"start": 955.25, "end": 959.6, "text": prev, "_asr": True, "sourceStart": 1006.0,
+              "_ends_punct": True, "_asr_marks": _marks(prev, 955.3, 0.12)},
+             {"start": 959.67, "end": 960.4, "text": "そう\nすごく人気だと思います", "_asr": True,
+              "sourceStart": 1006.0, "_break_punct": True}]
+    assert sync._resplit_flashes(items, 0.8, max_chars=18, max_lines=2) == 1
+    assert sync._flat(items[1]) == "見てるでしょ　そう　すごく人気だと思います"
+    # 外した句読点の所で折る（「…すごく人気だと|思います」と折らない）
+    assert items[1]["text"].split("\n")[-1] != "思います"
+
+
+def test_a_merged_two_line_caption_keeps_its_sentence_break():
+    # 2行の字幕と組み直すときも、句読点を外した跡の改行は語の切れ目として残す
+    from subtitle_engine import sync
+    items = [{"start": 0.0, "end": 2.5, "text": "見てるでしょ\nすごく人気だと思います", "_break_punct": True},
+             {"start": 2.57, "end": 2.9, "text": "だから"}]
+    assert sync._merge_flashes(items, 0.8, max_chars=18, max_lines=2) == 1
+    assert sync._flat(items[0]) == "見てるでしょ　すごく人気だと思います　だから"
 
 
 def test_an_unheard_flash_is_not_resplit():

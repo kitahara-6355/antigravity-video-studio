@@ -63,6 +63,12 @@ MAX_CHAR_GAP_SEC = 1.0
 # 25分44秒で「偉そう」の「う」とはぐれた「書」が「もうこう書き直して」に突き合い、
 # 字幕が 3.5 秒早く出て前の2枚と順番まで入れ替わった（2026-10-06 実測）
 MIN_CLUSTER = 3
+# 字幕の頭の小さな塊（MIN_CLUSTER 文字未満）が、残りの字からこれ以上離れて聞こえたら、隣の発話の
+# 字かもしれない。同じ言葉を続けて言うと、認識は2つを1つにまとめる（2分32秒の「デビュー」・
+# 「デ」「ビ」「ュー」が 0.8・0.9 秒ずつ離れた。1つの語の中の字は 0.6 秒も離れない・2026-10-07 実測）
+STRAY_HEAD_GAP_SEC = 0.6
+# 合った字幕どうしの継ぎ目で、聞こえなかった字を話す時間がこれ以上足りなければ、合わせ方を疑う
+JOINT_TOLERANCE_SEC = 0.3
 # 認識の時刻は、声の立ち上がり（音の大きさ）より約 0.2 秒早い。2026-10-06 実測:
 # 0.11→0.37、10.25→10.44、28.17→28.47、35.10→35.30、39.60→39.80 秒（5 か所とも 0.19〜0.30）
 LAG_SEC = 0.2
@@ -478,7 +484,53 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         # 拾えた文字ごとの (字幕の何文字目か, 時刻)。短すぎる字幕の切れ目を動かすときに使う
         cap["_asr_marks"] = [(c, round(t, 3)) for c, t in pairs]
         aligned += 1
+    _drop_stray_heads(captions)
     return aligned
+
+
+def _drop_stray_heads(captions: list[dict]) -> int:
+    """合った字幕の頭の、はぐれた小さな塊の時刻を捨てる（前の字幕を話す時間が残らないときだけ）。
+
+    実例（2分32秒・28回目）: ゲストの「…僕のデビューなんですよ」に聞き手が「デビューですか？」と
+    返す所で、認識は2つの「デビュー」を1つにまとめ、頭の「デ」「ビ」をゲスト側の時刻で出した。
+    聞き手の字幕が 1.5 秒早く出て、ゲストの2行（28字）が 1.7 秒で消えた。
+
+    前の合った字幕で最後に聞こえた字から、この字幕で最初に聞こえた字までに、聞こえなかった字
+    （前の字幕の尻・間の字幕・この字幕の頭）を MAX_CPS で話せないなら、この字幕の頭の小さな塊
+    （残りから STRAY_HEAD_GAP_SEC より離れたもの）を捨て、残りの最初の字から出だしを外挿し直す。
+    話し始めの1文字は認識の時刻が早めに出ることが多いので（28回目で90枚）、前の字幕を話す時間が
+    あるときは動かさない。捨て直した枚数を返す。
+    """
+    idx = [i for i, c in enumerate(captions) if c.get("_asr")]
+    dropped = 0
+    for a, b in zip(idx, idx[1:]):
+        p, c = captions[a], captions[b]
+        before, marks = p.get("_asr_marks") or [], list(c.get("_asr_marks") or [])
+        if not before or not marks:
+            continue
+        p_last_c, p_last_t = before[-1]
+        unheard = (len(_norm_text(p.get("text"))) - 1 - p_last_c
+                   + sum(len(_norm_text(x.get("text"))) for x in captions[a + 1:b]))
+        if (unheard + marks[0][0]) / MAX_CPS - (marks[0][1] - p_last_t) <= JOINT_TOLERANCE_SEC:
+            continue
+        cut = 0
+        while True:
+            k = cut + 1
+            while k < len(marks) and marks[k][1] - marks[k - 1][1] <= STRAY_HEAD_GAP_SEC:
+                k += 1
+            if k - cut >= MIN_CLUSTER or len(marks) - k < MIN_HITS:
+                break
+            cut = k
+        if not cut:
+            continue
+        marks = marks[cut:]
+        c0, t0 = marks[0]
+        start = t0 - c0 * CHAR_SEC
+        if start < p_last_t + 0.05:  # 前の字幕の言葉より前に戻らない
+            start = min(t0, p_last_t + 0.05)
+        c["start"], c["_asr_first"], c["_asr_marks"] = round(start, 3), round(t0, 3), marks
+        dropped += 1
+    return dropped
 
 
 def _main_pairs(pairs: list[tuple[int, float]]) -> list[tuple[int, float]]:

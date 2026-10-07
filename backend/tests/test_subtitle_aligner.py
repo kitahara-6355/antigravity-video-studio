@@ -185,6 +185,44 @@ def test_recognised_starts_never_go_back_before_the_previous_caption():
     assert caps[1]["start"] >= 10.4
 
 
+def _guest_then_echo():
+    # 実例（2分32秒・28回目）: ゲストの「…僕のデビューなんですよ」に聞き手が「デビューですか？」と
+    # 返す。認識は2つの「デビュー」を1つにまとめ、頭の「デ」「ビ」をゲスト側の時刻で出した
+    caps = [{"start": 151.5, "end": 155.6, "text": "それで泣きながら帰ったっていうのが\n僕のデビューなんですよ"},
+            {"start": 155.6, "end": 156.7, "text": "デビューですか？"}]
+    tokens = (toks("それで泣きながら帰った", 152.0, 0.13)
+              + [("デ", 153.9), ("ビ", 154.7)] + toks("ューですか", 155.6, 0.12))
+    return caps, tokens
+
+
+def test_a_stray_head_that_leaves_the_caption_before_unspeakable_is_not_used():
+    caps, tokens = _guest_then_echo()
+    aligner.align_captions(caps, tokens)
+    guest, echo = caps
+    assert echo["_asr"] and echo["_asr_first"] == pytest.approx(155.6)
+    # 拾えなかった頭の「デビ」の2文字ぶんだけ、さかのぼる
+    assert echo["start"] == pytest.approx(155.6 - 2 * aligner.CHAR_SEC, abs=0.01)
+    # ゲストの字幕の聞こえなかった尻（17字）を話せる時間が残る
+    assert echo["start"] - guest["start"] >= 28 / aligner.MAX_CPS
+
+
+def test_a_stray_head_is_kept_when_the_caption_before_has_time():
+    # 前の字幕を全部聞き取れていれば、頭の1文字が離れていても動かさない
+    # （話し始めの1文字は、認識の時刻が早めに出ることが多い・28回目で90枚）
+    caps = [{"start": 0.0, "end": 1.0, "text": "あいうえお"},
+            {"start": 1.0, "end": 2.0, "text": "かきくけこ"}]
+    aligner.align_captions(caps, toks("あいうえお", 10.0, 0.1) + [("か", 11.0)] + toks("きくけこ", 11.8, 0.1))
+    assert caps[1]["start"] == pytest.approx(11.0)
+
+
+def test_a_head_heard_as_a_whole_phrase_is_kept_even_if_the_caption_before_runs_out():
+    # 頭が3文字以上のひと続きで聞こえていれば、前の字幕の側が誤り（28回目の 35分40秒）
+    caps = [{"start": 0.0, "end": 3.0, "text": "今は30本ぐらいしか作れないとかその原毛の質まで悪くなっちゃって"},
+            {"start": 3.0, "end": 5.0, "text": "イタチにおいてはもう入ってこないのね"}]
+    aligner.align_captions(caps, toks("今は三十本ぐらいしか作れないと", 10.0, 0.13) + toks("タチにおいては", 12.6, 0.15))
+    assert caps[1]["_asr_first"] == pytest.approx(12.6)
+
+
 def test_unaligned_captions_keep_their_order_when_there_is_no_room():
     caps = [{"start": 0.0, "end": 1.0, "text": "あいうえお"},
             {"start": 50.0, "end": 51.0, "text": "ききとれない"},

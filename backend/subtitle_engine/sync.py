@@ -52,6 +52,12 @@ MIN_STEP_SEC = 0.4
 # そのものなので、遠くの話し始めは別の句（51 秒で 1.3 秒遅れた・2026-10-06 実測）
 ASR_SNAP_BEFORE_SEC = 0.25
 ASR_SNAP_AFTER_SEC = 0.4
+# 人が話せる速さの上限（字/秒）。認識が拾えなかった字幕の頭を話す時間の見積もりに使う
+# （`aligner.MAX_CPS` と同じ値）
+HEAD_MAX_CPS = 12.0
+# 認識の字の時刻が、実際の声より早く出る幅。35 秒の「デザイン書道の」は、間の後の話し始め
+# （35.41 秒）と同じ時刻に「書」が出た。「デザイン」を話す分、0.4 秒ほど早い（2026-10-07 実測）
+HEAD_EARLY_SEC = 0.4
 # 間とみなす長さと、話しているとみなす長さ
 MIN_PAUSE_SEC = 0.15
 MIN_SPEECH_SEC = 0.1
@@ -296,14 +302,35 @@ def _caption_limits() -> tuple[int, int]:
         return 18, 2
 
 
-def _as_one_caption(first: str, second: str, max_chars: int, max_lines: int) -> str | None:
-    """2枚の字幕を続けて1枚（max_lines 行・1行 max_chars 字）に組み直した形。入らなければ None。"""
+def _flat(s: dict) -> str:
+    """字幕を1行に戻した文。句読点を外した跡の改行（`_break_punct`）は全角スペースにして、語の切れ目を残す。"""
+    lines = str(s.get("text") or "").split("\n")
+    if len(lines) == 2 and s.get("_break_punct"):
+        return f"{lines[0]}\u3000{lines[1]}"
+    return "".join(lines)
+
+
+def _breaks_at_space(flat: str, text: str | None) -> bool:
+    """1行の文 flat を組んだ text の改行が、flat の空白（句読点を外した跡）の所か。"""
+    if not text or text.count("\n") != 1:
+        return False
+    first = text.split("\n")[0]
+    return flat.startswith(first) and flat[len(first):len(first) + 1] in ("\u3000", " ")
+
+
+def _as_one_caption(first: str, second: str, max_chars: int, max_lines: int,
+                    first_flat: str | None = None, second_flat: str | None = None) -> str | None:
+    """2枚の字幕を続けて1枚（max_lines 行・1行 max_chars 字）に組み直した形。入らなければ None。
+
+    first_flat / second_flat は1行に戻した文（`_flat`）。無ければ改行を詰める。
+    """
     if "\n" not in first and "\n" not in second and max_lines >= 2:
         return f"{first}\n{second}"
-    flat = f"{first}\u3000{second}".replace("\n", "")
+    a = first.replace("\n", "") if first_flat is None else first_flat
+    b = second.replace("\n", "") if second_flat is None else second_flat
+    flat = f"{a}\u3000{b}"
     try:
-        from subtitle_engine import text_formatter as tf
-        caps = tf.split_into_captions(flat, max_chars, max_lines)
+        caps = _split_flat(flat, max_chars, max_lines)
     except Exception:  # 組み直せなくても字幕は出す
         caps = []
     if caps:
@@ -336,18 +363,22 @@ def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None 
             if 0 <= j < len(items) and not items[j].get("_merged"):
                 o = items[j]
                 pair = (o, s) if j < i else (s, o)
-                text = _as_one_caption(str(pair[0].get("text", "")), str(pair[1].get("text", "")),
-                                       max_chars, max_lines)
+                first, second = str(pair[0].get("text", "")), str(pair[1].get("text", ""))
+                text = _as_one_caption(first, second, max_chars, max_lines, _flat(pair[0]), _flat(pair[1]))
                 if text is not None:
                     gap = s["start"] - o["end"] if j < i else o["start"] - s["end"]
-                    cands.append((gap, j, text))
+                    # 2枚の継ぎ目は語の切れ目（組み直すときも全角スペースを置く）
+                    joint = text == f"{first}\n{second}" or _breaks_at_space(
+                        f"{_flat(pair[0])}\u3000{_flat(pair[1])}", text)
+                    cands.append((gap, j, text, joint))
         if not cands:
             continue
-        _, j, text = min(cands, key=lambda c: (c[0], c[1]))
+        _, j, text, joint = min(cands, key=lambda c: (c[0], c[1]))
         o = items[j]
-        o["text"] = text
+        o["text"], o["_break_punct"] = text, joint
         if j < i:
             o["end"] = max(o["end"], s["end"])
+            o["_ends_punct"] = s.get("_ends_punct", False)
         else:
             o["start"] = min(o["start"], s["start"])
         s["_merged"] = True
@@ -355,11 +386,24 @@ def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None 
     return merged
 
 
+def _split_flat(flat: str, max_chars: int, max_lines: int) -> list[str]:
+    """1行の文を字幕（1枚 max_lines 行・1行 max_chars 字）に組む。
+
+    句読点を出さないとき、文の中の全角スペースは外した句読点の跡（か2枚の継ぎ目）なので、「、」に
+    戻して折り目の手掛かりにし、組んだ後でまた外す。空白のまま組むと、句読点の所を切れ目と見ずに
+    「…すごく人気だと|思います」と折った（15分59秒・28回目）。
+    """
+    from subtitle_engine import text_formatter as tf
+    if not tf._strip_punctuation_enabled():
+        return tf.split_into_captions(flat, max_chars, max_lines)
+    caps = tf.split_into_captions(flat.replace("\u3000", "、"), max_chars, max_lines, True)
+    return [c for c in (tf.strip_punctuation(c) for c in caps) if c]
+
+
 def _wrap_one(text: str, max_chars: int, max_lines: int) -> str | None:
     """1枚（max_lines 行・1行 max_chars 字）に組んだ形。入らなければ None。"""
     try:
-        from subtitle_engine import text_formatter as tf
-        caps = tf.split_into_captions(text, max_chars, max_lines)
+        caps = _split_flat(text, max_chars, max_lines)
     except Exception:  # 組めなければ動かさない
         return None
     if len(caps) != 1:
@@ -378,7 +422,7 @@ def _cut_times(s: dict) -> list[tuple[int, int, float]]:
         parser = tf._phrase_parser()
     except Exception:  # 文節が読めなければ動かさない
         return []
-    flat = str(s.get("text") or "").replace("\n", "")
+    flat = _flat(s)
     if parser is None or not flat:
         return []
     out = []
@@ -409,18 +453,23 @@ def _resplit_flashes(items: list[dict], min_display: float, max_chars: int | Non
         p = live[i - 1]
         if float(s["start"]) - float(p["end"]) > RESPLIT_MAX_GAP_SEC:
             continue
-        text = str(s.get("text") or "").replace("\n", "")
-        flat = str(p.get("text") or "").replace("\n", "")
+        text, flat = _flat(s), _flat(p)
         a, b = p.get("sourceStart"), s.get("sourceStart")
-        sep = "\u3000" if a is not None and b is not None and a != b else ""
+        # 別の発話から移すとき・前の字幕が句読点で終わっていたとき（「…見てるでしょ。」）は1字空ける
+        sep = "\u3000" if (a is not None and b is not None and a != b) or p.get("_ends_punct") else ""
         for k, n, t in reversed(_cut_times(p)):
             if t - 2 * VIDEO_FRAME - float(p["start"]) < min_display or float(s["end"]) - t < min_display:
                 continue
-            head = _wrap_one(flat[:k].rstrip("\u3000 "), max_chars, max_lines)
-            tail = _wrap_one(flat[k:].strip("\u3000 ") + sep + text, max_chars, max_lines)
+            head_flat = flat[:k].rstrip("\u3000 ")
+            tail_flat = flat[k:].strip("\u3000 ") + sep + text
+            head = _wrap_one(head_flat, max_chars, max_lines)
+            tail = _wrap_one(tail_flat, max_chars, max_lines)
             if head and tail:
                 p["text"], p["end"] = head, round(t - 2 * VIDEO_FRAME, 3)
                 s["text"], s["start"] = tail, round(t, 3)
+                p["_break_punct"] = _breaks_at_space(head_flat, head)
+                s["_break_punct"] = _breaks_at_space(tail_flat, tail)
+                p["_ends_punct"] = head_flat != flat[:k] or flat[k:k + 1] in ("\u3000", " ")
                 _move_marks(p, s, n, flat[k:])
                 moved += 1
                 break
@@ -516,9 +565,14 @@ def align_segments(segments: list[dict], speech: SpeechMap,
         first = float(s.get("_asr_first", a)) if s.get("_asr") else a
         if s.get("_asr") and first - a > 0.05:
             # 頭の何文字かを認識が拾えず、出だしを外挿している。拾えた最初の文字の直前の
-            # 話し始めが出だし（35 秒の「デザイン書道の」が前の文の終わりの 34.8 秒に出た）
+            # 話し始めが出だし（35 秒の「デザイン書道の」が前の文の終わりの 34.8 秒に出た）。
+            # ただし拾えなかった頭を話せる時間は残す。頭が長いと、直前の話し始めは文の途中
+            # （17分58秒の「ね あわよくば その98%の」13字を飛ばして「の中から」で出た・2026-10-07）。
+            # 認識の字の時刻は早めに出ることがあるので、その分は待つ（短い頭は今までどおり）
+            head = (s.get("_asr_marks") or [(0, first)])[0][0]
+            latest = first + 0.05 - max(0.0, head / HEAD_MAX_CPS - HEAD_EARLY_SEC)
             near = [o for o in speech.onsets
-                    if o >= floor and a - ASR_SNAP_BEFORE_SEC <= o <= first + 0.05]
+                    if o >= floor and a - ASR_SNAP_BEFORE_SEC <= o <= latest]
             on = max(near) if near else None
         elif s.get("_asr"):
             on = _nearest_biased([o for o in speech.onsets if o >= floor], a,
