@@ -358,6 +358,21 @@ def test_proofreader_does_not_rewrite_a_short_kana_interjection(orig, new, want)
     assert keep_short_kana_phrases(orig, new) == want
 
 
+@pytest.mark.parametrize("text,want", [
+    # 実例（1分50秒・28回目）: 「駄菓子屋かなんか」の「なんか」を消して「駄菓子屋か行ってる」になった
+    ("駄菓子屋かなんか行ってる場合じゃないや", "駄菓子屋かなんか行ってる場合じゃないや"),
+    ("15万枚中国なんかな", "15万枚中国なんかな"),
+    # 「もうちょっと」「ちょっと待って」の「ちょっと」は中身（「もうチョイスが」・「待って」になった）
+    ("もうちょっとチョイスが多い", "もうちょっとチョイスが多い"),
+    ("ちょっと待って", "ちょっと待って"),
+    # 伸ばす言いよどみは今までどおり外す
+    ("えーと先生がこれから", "先生がこれから"),
+    ("あのー僕気づいた", "僕気づいた"),
+])
+def test_filler_removal_keeps_words_that_carry_meaning(text, want):
+    assert tf.remove_fillers(text) == want
+
+
 def test_lead_word_at_the_head_of_a_later_caption_is_removed():
     # 実例（39分17秒）: 「…思ってるところで、じゃあ筆が本当に入ってこなかったら…」を
     # 分けた2枚目が「じゃあ筆が」で始まった

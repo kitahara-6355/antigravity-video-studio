@@ -130,7 +130,8 @@ def test_without_budoux_captions_fall_back_to_the_old_split(without_budoux):
 
 def test_remove_fillers():
     assert remove_fillers("えーと、本日は晴天です。") == "、本日は晴天です。"
-    assert remove_fillers("あのー、なんかそうそうそう") == "、"
+    # 「なんか」は「、」を見て外す規則に任せる（どこでも消すと「駄菓子屋かなんか」が欠ける）
+    assert remove_fillers("あのー、なんかそうそうそう") == "、なんか"
     assert remove_fillers("普通のテキスト") == "普通のテキスト"
 
 def test_split_at_boundary():
