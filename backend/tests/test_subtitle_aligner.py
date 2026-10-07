@@ -266,3 +266,96 @@ def test_nothing_is_trimmed_where_the_recogniser_heard_nothing():
     ref = aligner.referee_from_tokens(toks("まったく別の話", 300.0))
     seg = {"start": 70.0, "end": 76.0, "text": "最初に書に出会った"}
     assert ref.trim(seg, "最初にな書に出会った") == "最初にな書に出会った"
+
+
+# --- 間の字幕を話す時間が残らない合わせ方は外す（2026-10-07）------------------------------
+# 動画の最後で、締めの「ありがとうございました」が4回あり、認識が拾った1回を最初の
+# 「はい 今日はありがとうございました」に合わせた。後ろの3枚（54字）を話す時間が残らず
+# （動画の終わりまで 0 秒）、「本日は…」が 0.6 秒だけ出て、残りは動画の外に出て消えた。
+
+
+def _closing():
+    return [{"start": 0.0, "end": 3.0, "text": "これからもどうぞよろしく"},
+            {"start": 3.0, "end": 6.5, "text": "はい今日はありがとうございました"},
+            {"start": 6.5, "end": 10.0, "text": "本日は先生にお越しいただきました"},
+            {"start": 10.0, "end": 12.0, "text": "ありがとうございました"},
+            {"start": 12.0, "end": 13.0, "text": "ありがとうございました"}]
+
+
+def test_a_match_that_leaves_no_time_for_the_captions_after_it_is_released():
+    caps = _closing()
+    aligner.align_captions(caps, toks("これからもどうぞよろしく", 3.3, 0.13) + toks("ありがとうござ", 11.0))
+    assert caps[1].get("_asr"), "前提: 同じ言葉の最初の字幕に合ってしまう"
+
+    released = aligner.release_implausible(caps, end=13.3)
+    aligner.interpolate_unaligned(caps, end=13.3)
+
+    assert released == 1 and not caps[1].get("_asr")
+    assert [c["start"] for c in caps] == sorted(c["start"] for c in caps)
+    assert all(c["end"] <= 13.3 + 1e-6 for c in caps), "動画の外に出さない"
+    assert caps[1]["start"] < 8.0, "前の字幕の後ろに続けて出す（認識の「ありがとう」まで待たない）"
+
+
+def test_a_backchannel_over_the_other_speaker_does_not_release_anything():
+    # 相づち（「はい」「うん」）は相手の話に重なるので、間に収まらないのはふつう
+    caps = [{"start": 0.0, "end": 2.0, "text": "駄菓子屋の隣に引き戸が"},
+            {"start": 2.0, "end": 2.5, "text": "はい"},
+            {"start": 2.5, "end": 4.0, "text": "あってそこを開けると"}]
+    aligner.align_captions(caps, toks("駄菓子屋の隣に引き戸が", 10.0) + toks("あってそこを開けると", 12.2))
+
+    assert aligner.release_implausible(caps, end=20.0) == 0
+    assert caps[0]["_asr"] and caps[2]["_asr"]
+
+
+def test_of_two_matches_that_leave_no_room_the_one_out_of_step_with_its_neighbours_goes():
+    def anchored(start, end, est, text):
+        return {"start": start, "end": end, "_est_start": est, "_est_end": est + (end - start),
+                "text": text, "_asr": True}
+    caps = [anchored(10.0, 12.0, 10.0, "あいうえおかきくけこ"),
+            anchored(18.0, 20.0, 12.0, "ありがとうございました"),  # 6 秒先の同じ言葉に合った
+            {"start": 14.0, "end": 17.0, "text": "さしすせそたちつてとなにぬねのはひふへほまみむめも"},
+            anchored(17.0, 19.0, 17.0, "やゆよらりるれろ"),
+            anchored(19.5, 21.0, 19.5, "わをんがぎぐげご")]
+
+    assert aligner.release_implausible(caps, end=30.0) == 1
+    assert not caps[1].get("_asr") and caps[3]["_asr"]
+    assert caps[1]["start"] == 12.0, "外した字幕は推定の時刻に戻す"
+
+
+def test_captions_after_the_last_match_are_kept_inside_the_media():
+    caps = [{"start": 0.0, "end": 1.0, "text": "あいうえお"},
+            {"start": 1.0, "end": 3.0, "text": "ききとれない"},
+            {"start": 3.0, "end": 5.0, "text": "これもききとれない"}]
+    aligner.align_captions(caps, toks("あいうえお", 3.0))  # 3 秒遅らせると最後が 8 秒まで出る
+
+    aligner.interpolate_unaligned(caps, end=6.5)
+
+    assert caps[-1]["end"] <= 6.5
+    assert caps[0]["end"] <= caps[1]["start"] < caps[2]["start"]
+
+
+def test_captions_before_the_first_match_never_start_before_zero():
+    caps = [{"start": 1.0, "end": 2.0, "text": "ききとれない"},
+            {"start": 2.0, "end": 3.0, "text": "あいうえお"}]
+    aligner.align_captions(caps, toks("あいうえお", 0.5))  # 1.5 秒早めると頭が -0.5 秒になる
+
+    aligner.interpolate_unaligned(caps)
+
+    assert 0.0 <= caps[0]["start"] < caps[0]["end"] <= caps[1]["start"]
+
+
+def test_the_cut_step_keeps_the_closing_captions_inside_the_cut(tmp_path, monkeypatch):
+    import smart_cut_engine
+    from subtitle_engine import sync
+
+    cut = tmp_path / "cut.mp4"
+    cut.write_bytes(b"\x00" * 2048)
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: toks("これからもどうぞよろしく", 3.3, 0.13)
+                        + toks("ありがとうござ", 11.0))
+    monkeypatch.setattr(sync, "speech_map", lambda path: None)
+    monkeypatch.setattr(sync, "align_segments", lambda segs, *a, **k: (segs, None))
+
+    out = smart_cut_engine._align_to_speech(cut, _closing(), [], source_path="src.mp4", ranges=[(0.0, 13.3)])
+
+    assert all(c["end"] <= 13.3 + 1e-6 for c in out), "残した区間の合計（動画の長さ）の外に出さない"
+    assert out[1]["start"] < 8.0

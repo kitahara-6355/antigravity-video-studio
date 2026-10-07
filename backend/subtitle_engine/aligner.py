@@ -66,6 +66,13 @@ MIN_CLUSTER = 3
 # 認識の時刻は、声の立ち上がり（音の大きさ）より約 0.2 秒早い。2026-10-06 実測:
 # 0.11→0.37、10.25→10.44、28.17→28.47、35.10→35.30、39.60→39.80 秒（5 か所とも 0.19〜0.30）
 LAG_SEC = 0.2
+# 人が話せる速さの上限（字/秒）。43 分の素材で合った字幕の速さは中央 5.1・99% 点 9.8・
+# 最大 10.9 字/秒（2026-10-07 実測）
+MAX_CPS = 12.0
+# 合った字幕どうしの間に、合わなかった字幕がこの秒数を超えてはみ出すなら、どちらかの合わせ方が誤り。
+# 相づち（「はい」「うん」）は相手の話に重なるので、1 秒前後のはみ出しはふつうに起きる
+# （同じ素材で 17 か所・最大 1.3 秒。誤って合わせた最後の字幕は 4.7 秒）
+MAX_OVERRUN_SEC = 2.0
 
 _DIGITS = str.maketrans("0123456789", "〇一二三四五六七八九")
 
@@ -463,7 +470,7 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         if end <= start:
             continue
         prev_last = t1
-        cap["_est_start"] = float(cap["start"])
+        cap["_est_start"], cap["_est_end"] = float(cap["start"]), float(cap["end"])
         cap["start"], cap["end"] = round(start, 3), round(end, 3)
         cap["_asr"] = True
         # 最初に拾えた文字の時刻。頭の文字を拾えなかったときは start は外挿になる
@@ -497,20 +504,89 @@ def _main_pairs(pairs: list[tuple[int, float]]) -> list[tuple[int, float]]:
     return [p for g in groups[first:last + 1] for p in g]
 
 
-def interpolate_unaligned(captions: list[dict]) -> int:
+def _chars(c: dict) -> int:
+    return max(1, len(_norm_text(c.get("text"))))
+
+
+def _spread(run: list[dict], t0: float, t1: float) -> None:
+    """字幕を t0〜t1 に文字数で配る。"""
+    total = sum(_chars(c) for c in run)
+    acc = 0.0
+    for c in run:
+        c["start"] = round(t0 + (t1 - t0) * acc, 3)
+        acc += _chars(c) / total
+        c["end"] = round(t0 + (t1 - t0) * acc, 3)
+        c["_asr_interp"] = True
+
+
+def release_implausible(captions: list[dict], end: float | None = None) -> int:
+    """合った字幕どうしの間に、合わなかった字幕が話せる速さで収まらなければ、どちらかの合わせ方を外す。
+
+    同じ言葉が何度も出る所（締めの「ありがとうございました」が4回）では、認識が拾った1回を
+    別の回の字幕に合わせてしまう（全体の突き合わせは、同じ長さの一致なら字幕の早い方を採る）。
+    すると間の字幕を話す時間が残らない（2026-10-07: 動画の最後で「はい 今日はありがとう
+    ございました」が 7 秒遅れ、後ろの3枚は動画の外に出て消えた）。
+
+    外すのは、反対側の隣の合った字幕とずれ方（推定からの移動）が大きく違う方。動画の頭（0 秒）と
+    終わり（end）は動かない杭として扱う。外した字幕は推定の時刻に戻し、後で
+    `interpolate_unaligned` が前後の間に配り直す。外した枚数を返す。
+    """
+    released = 0
+    while True:
+        idx = [i for i, c in enumerate(captions) if c.get("_asr")]
+        if not idx:
+            return released
+        worst = None
+        for a, b in [(None, idx[0]), *zip(idx, idx[1:]), (idx[-1], None)]:
+            run = captions[(0 if a is None else a + 1):(len(captions) if b is None else b)]
+            if not run or (b is None and end is None):
+                continue
+            t0 = 0.0 if a is None else float(captions[a]["end"])
+            t1 = float(end) if b is None else float(captions[b]["start"])
+            overrun = sum(_chars(c) for c in run) / MAX_CPS - (t1 - t0)
+            if overrun > MAX_OVERRUN_SEC and (worst is None or overrun > worst[0]):
+                worst = (overrun, a, b)
+        if worst is None:
+            return released
+        _, a, b = worst
+        victim = b if a is None else a if b is None else _out_of_step(captions, idx, a, b)
+        logger.info(f"話す時間が残らない合わせ方を外しました: {captions[victim].get('text')!r} "
+                    f"（はみ出し {worst[0]:.1f} 秒）")
+        _release(captions[victim])
+        released += 1
+
+
+def _out_of_step(captions: list[dict], idx: list[int], a: int, b: int) -> int:
+    """隣り合う合った字幕 a・b のうち、反対側の隣とずれ方が大きく違う方。"""
+    def shift(i):
+        c = captions[i]
+        return float(c["start"]) - float(c.get("_est_start", c["start"]))
+    k = idx.index(a)
+    before = shift(idx[k - 1]) if k > 0 else shift(b)
+    after = shift(idx[k + 2]) if k + 2 < len(idx) else shift(a)
+    return a if abs(shift(a) - before) >= abs(shift(b) - after) else b
+
+
+def _release(c: dict) -> None:
+    c["start"] = round(float(c.get("_est_start", c["start"])), 3)
+    c["end"] = round(float(c.get("_est_end", c["end"])), 3)
+    for k in ("_asr", "_asr_first", "_asr_marks", "_asr_heard"):
+        c.pop(k, None)
+    c["_asr_released"] = True
+
+
+def interpolate_unaligned(captions: list[dict], end: float | None = None) -> int:
     """合わせられなかった字幕を、前後の「合った字幕」の間に文字数で配る。
 
     認識が落とした所をそのままにすると、推定の時刻（ずれたまま）が残って、
     合った字幕とぶつかる。合った字幕を杭にして、その間を配り直す。
-    端（最初の杭より前・最後の杭より後ろ）は、杭と同じだけずらす。
+    端（最初の杭より前・最後の杭より後ろ）は、杭と同じだけずらす。ずらすと動画の外
+    （0 秒より前・end より後ろ）にはみ出すなら、杭と動画の端の間に配る。
     """
     idx = [i for i, c in enumerate(captions) if c.get("_asr")]
     if not idx:
         return 0
     moved = 0
-
-    def chars(c):
-        return max(1, len(_norm_text(c.get("text"))))
 
     for a, b in zip(idx, idx[1:]):
         run = captions[a + 1:b]
@@ -520,28 +596,29 @@ def interpolate_unaligned(captions: list[dict]) -> int:
         # 狭くても順番どおりに置く（推定の時刻のまま残すと、並べ直しで順番が入れ替わる）。
         # 出る時間が足りない字幕は、後で隣とまとめる。前後が重なっているときは次の字幕の出だしに
         # 置く（前の終わりに置くと次の字幕より後ろになる・15分26秒の「ファンが」）
-        t0 = min(t0, t1)
-        total = sum(chars(c) for c in run)
-        acc = 0.0
-        for c in run:
-            w = chars(c) / total
-            c["start"] = round(t0 + (t1 - t0) * acc, 3)
-            acc += w
-            c["end"] = round(t0 + (t1 - t0) * acc, 3)
-            c["_asr_interp"] = True
-            moved += 1
-    for side, anchor in ((captions[:idx[0]], idx[0]), (captions[idx[-1] + 1:], idx[-1])):
+        _spread(run, min(t0, t1), t1)
+        moved += len(run)
+    for head, side, anchor in ((True, captions[:idx[0]], idx[0]), (False, captions[idx[-1] + 1:], idx[-1])):
         if not side:
             continue
         est = float(captions[anchor].get("_est_start", captions[anchor]["start"]))
         delta = float(captions[anchor]["start"]) - est
-        if abs(delta) < 0.05:
-            continue
-        for c in side:
-            c["start"] = round(float(c["start"]) + delta, 3)
-            c["end"] = round(float(c["end"]) + delta, 3)
-            c["_asr_interp"] = True
-            moved += 1
+        changed = abs(delta) >= 0.05
+        if changed:
+            for c in side:
+                c["start"] = round(float(c["start"]) + delta, 3)
+                c["end"] = round(float(c["end"]) + delta, 3)
+                c["_asr_interp"] = True
+        if head:
+            lo, hi, spills = 0.0, float(captions[anchor]["start"]), float(side[0]["start"]) < 0.0
+        else:
+            lo, hi = float(captions[anchor]["end"]), end
+            spills = end is not None and float(side[-1]["end"]) > end
+        if spills and hi > lo:
+            _spread(side, lo, hi)
+            changed = True
+        if changed:
+            moved += len(side)
     return moved
 
 
