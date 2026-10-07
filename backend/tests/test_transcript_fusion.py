@@ -82,6 +82,27 @@ def test_rows_and_times_come_from_the_first_pass():
     assert stats["adopted"] == 2
 
 
+def test_only_the_head_of_an_addition_that_the_recogniser_also_heard_is_taken():
+    # 実例（1分39秒・28回目）: 1回目は「出会いな」で切れ、2回目は「出会いなんですて」、
+    # 認識は「出会いなんですね」。「んです」までは2回目と認識が同じ字を聞いている（2対1）
+    first = [_row(10.0, 12.5, "へえ、そういう出会いな。")]
+    second = [_row(10.0, 12.5, "へえ、そういう出会いなんですて。")]
+
+    out, stats = tfu.fuse(first, second, _heard("へえそういう出会いなんですねしかも僕が", start=10.0))
+
+    assert out[0]["text"] == "へえ、そういう出会いなんです。"
+    assert stats["adopted"] == 1
+
+
+def test_the_head_of_an_addition_is_not_taken_where_the_first_pass_was_heard():
+    first = [_row(10.0, 12.5, "へえ、そういう出会いな。しかも")]
+    second = [_row(10.0, 12.5, "へえ、そういう出会いなんですて。しかも")]
+
+    out, _ = tfu.fuse(first, second, _heard("へえそういう出会いなしかもなんですね", start=10.0))
+
+    assert out[0]["text"] == first[0]["text"]
+
+
 def test_more_than_one_character_of_the_first_pass_is_never_dropped():
     # 認識は早口や言い直しを落とす。認識に無いことだけでは 1回目の字を消さない
     first = [_row(0.0, 3.0, "それがね、それがね八歳のときです。")]

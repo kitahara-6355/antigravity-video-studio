@@ -12,6 +12,8 @@
 - 1回目を骨組みにする。行の分け方と時刻は1回目のまま、字だけを直す
 - 食い違いごとに、2回目の字（前後の字を2字まで付けて3字以上）が認識に聞こえていて、
   1回目の字が聞こえていないときだけ2回目の字にする
+- 2回目だけが足した字は、全部は聞こえなくても、前の字と続けて認識に聞こえる頭の部分は足す
+  （「出会いな」→「出会いなんです」。2回目は「なんですて」・認識は「なんですね」）
 - 決めない所: 1回目の字を2字以上消す（認識は早口・言い直し・重なりを落とすので、聞こえない
   ことは弱い証拠）、言いよどみ（後で外す）、数字（認識は漢数字で書く）、近くに確かな
   手がかり（2回とも同じで認識とも3字以上続けて合う字）が無い所
@@ -44,6 +46,9 @@ WINDOW_PAD = 3
 MAX_SPAN = 80
 # 1回目の字を消してよい字数
 MAX_DROP = 1
+# 2回目が足した字の頭だけを採るとき（`_heard_head`）: 採る字数の下限と、探す長さの下限
+HEAD_MIN = 2
+HEAD_MIN_PROBE = 4
 # 決めない語（後で外す言いよどみ・相づち。どちらで書いても字幕に出ない）
 FILLERS = frozenset({
     "あ", "あの", "え", "えっと", "ま", "まあ", "うん", "うう", "ね", "ねえ", "なんか", "その",
@@ -85,6 +90,22 @@ def _heard(window: str, left: str, word: str, right: str) -> bool:
     else:  # 素材の頭
         probes = [word + right[:m] for m in range(1, CONTEXT + 1)]
     return any(len(p) >= MIN_PROBE and p in window for p in probes)
+
+
+def _heard_head(window: str, left: str, word: str) -> int:
+    """2回目が足した字 word のうち、前の字と続けて認識に聞こえる頭の字数（無ければ 0）。
+
+    word 全部は聞こえなくても、頭の部分は2回目と認識が同じ字を聞いている（2対1）ことがある
+    （1分39秒: 1回目「出会いな」・2回目「出会いなんですて」・認識「出会いなんですね」）。
+    """
+    for n in range(len(word) - 1, HEAD_MIN - 1, -1):
+        head = word[:n]
+        if _guarded("", head):
+            continue
+        if any(len(p) >= HEAD_MIN_PROBE and p in window
+               for p in (left[-k:] + head for k in range(1, CONTEXT + 1))):
+            return n
+    return 0
 
 
 def _guarded(a: str, b: str) -> bool:
@@ -132,6 +153,11 @@ def fuse(primary: list[dict], secondary: list[dict],
         left, right = xa[max(0, i1 - CONTEXT):i1], xa[i2:i2 + CONTEXT]
         if _heard(window, left, b, right) and not _heard(window, left, a, right):
             chosen.append((i1, i2, j1, j2))
+        elif not a and left and not _heard(window, left, a, right):
+            # 2回目が足した字は、認識にも聞こえる頭の部分だけ足す
+            n = _heard_head(window, left, b)
+            if n:
+                chosen.append((i1, i2, j1, j1 + n))
 
     texts = [list(str(s.get("text") or "")) for s in primary]
     btexts = [str(s.get("text") or "") for s in secondary]
