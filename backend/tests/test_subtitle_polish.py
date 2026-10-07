@@ -342,6 +342,22 @@ def test_shifted_line_is_never_rescued_by_the_referee():
     assert _correction_verdict("もう初会ね", "もう初回ね", []) == "ok"
 
 
+@pytest.mark.parametrize("orig,new,want", [
+    # 実例（2分37秒・28回目）: 校閲は声を聞いていないのに、相づちの字を書き換えた
+    ("ああ、強烈な。", "あお、強烈な。", "ああ、強烈な。"),
+    ("ええ、そうです。", "はい、そうです。", "ええ、そうです。"),
+    # 消す（フィラーを外す）・漢字にする・句の外を直すのは残す
+    ("ああ、強烈な。", "強烈な。", "強烈な。"),
+    ("すし、おいしい", "寿司、おいしい", "寿司、おいしい"),
+    ("うん、もう初会ね", "うん、もう初回ね", "うん、もう初回ね"),
+    # 長い句の中の1字（助詞など）は文脈で決まることがあるので触らない
+    ("わたしがいくよ", "わたしはいくよ", "わたしはいくよ"),
+])
+def test_proofreader_does_not_rewrite_a_short_kana_interjection(orig, new, want):
+    from subtitle_engine.ai_proofreader import keep_short_kana_phrases
+    assert keep_short_kana_phrases(orig, new) == want
+
+
 def test_lead_word_at_the_head_of_a_later_caption_is_removed():
     # 実例（39分17秒）: 「…思ってるところで、じゃあ筆が本当に入ってこなかったら…」を
     # 分けた2枚目が「じゃあ筆が」で始まった

@@ -342,6 +342,14 @@ class TestProofreadSegmentsResponseValidation:
         # 「宣言どおり」の記録になり、提案がそのモデルの出力ではないことが見えない
         assert stats["failed_batches"] == 1
 
+    def test_相づちを別のかなに書き換えた直しは戻す(self):
+        # 実例（2分37秒・28回目）: 「ああ、強烈な。」が「あお、強烈な。」になった
+        segments = [{"text": "ああ、強烈な。"}, {"text": "もう初会ね。"}]
+        result, stats = self._run_with_response_text(
+            '[{"index": 0, "text": "あお、強烈な。"}, {"index": 1, "text": "もう初回ね。"}]', segments)
+        assert [s["text"] for s in result] == ["ああ、強烈な。", "もう初回ね。"]
+        assert stats["kept_short_phrases"] == 1
+
     def test_採用できた項目がゼロのバッチは失敗に数える(self):
         """リスト形でも中身を全部捨てたら失敗（R2-C5 検証4周目の R4-1）。
         バッチ内の番号で答えた（index が範囲外）・鍵が違う・dict でない・空リスト、のどれも

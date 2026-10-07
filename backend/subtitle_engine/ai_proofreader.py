@@ -122,6 +122,49 @@ def _correction_verdict(original: str, corrected: str, neighbours=()) -> str:
     return "dissimilar"
 
 
+# 句読点で区切られた、この字数以下のかなだけの句は相づち・感動詞（「ああ」「うん」「へえ」）
+SHORT_KANA_PHRASE = 3
+_PHRASE_BREAKS = "、。，．,！？!?…「」『』（）()\n"
+
+
+def _is_kana(ch: str) -> bool:
+    return "\u3041" <= ch <= "\u30ff"
+
+
+def keep_short_kana_phrases(original: str, corrected: str) -> str:
+    """句読点で区切られた短いかなだけの句（相づち・感動詞）を、別のかなに書き換えた直しを戻す。
+
+    校閲は声を聞いていない。「ああ」か「あお」かは前後の文からは決まらないので、書き換えは
+    当て推量になる（2分37秒「ああ、強烈な」→「あお、強烈な」・28回目）。消す（フィラーを外す）・
+    漢字にする・句の外を直すのは残す。長い句の中の1字（助詞など）は文脈で決まることがあるので
+    ここでは見ない（音声認識での裏付けは `aligner.drop_unheard_edits`）。
+    """
+    import difflib
+
+    if not original or not corrected:
+        return corrected
+    base = "".join(ch for ch in str(original) if ch not in " 　")
+    short = [False] * len(base)
+    head = 0
+    for k in range(len(base) + 1):
+        if k == len(base) or base[k] in _PHRASE_BREAKS:
+            phrase = base[head:k]
+            if phrase and len(phrase) <= SHORT_KANA_PHRASE and all(map(_is_kana, phrase)):
+                short[head:k] = [True] * (k - head)
+            head = k + 1
+    if not any(short):
+        return corrected
+    out, kept = [], False
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, base, corrected, autojunk=False).get_opcodes():
+        new = corrected[j1:j2]
+        if op == "replace" and all(short[i1:i2]) and all(map(_is_kana, new)):
+            out.append(base[i1:i2])
+            kept = True
+        else:
+            out.append(new)
+    return "".join(out) if kept else corrected
+
+
 def proofread_segments(segments, update_callback=None, return_stats=False, referee=None):
     """
     Gemini APIを使用して字幕セグメントを校閲
@@ -477,6 +520,12 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                                     text = trimmed
                             except Exception as e:  # 確かめられなくても校閲は続ける
                                 logger.debug(f"音声認識での足しの確認をスキップ: {e}")
+                        kept = keep_short_kana_phrases(segments[item_idx]["text"], text)
+                        if kept != text:
+                            stats["kept_short_phrases"] = stats.get("kept_short_phrases", 0) + 1
+                            logger.info(f"AI Proofreader: 相づちの書き換えを戻しました [{item_idx}] "
+                                        f"{text[:24]!r} → {kept[:24]!r}")
+                            text = kept
                         batch_correction_map[item_idx] = text
                 else:
                     # **応答を丸ごと捨てたバッチは失敗に数える**（R2-C5 検証3周目の P1）。黙って無視すると
