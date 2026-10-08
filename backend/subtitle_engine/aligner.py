@@ -69,6 +69,10 @@ MIN_CLUSTER = 3
 STRAY_HEAD_GAP_SEC = 0.6
 # 合った字幕どうしの継ぎ目で、聞こえなかった字を話す時間がこれ以上足りなければ、合わせ方を疑う
 JOINT_TOLERANCE_SEC = 0.3
+# 同じ文の字幕（「そうですね」「はい」）が前後この枚数の中に並ぶとき、認識が拾った1回を、推定時刻が
+# この秒数以上近い方へ移す（3分04秒・31回目）
+REPEAT_WINDOW = 3
+REPEAT_MARGIN_SEC = 1.0
 # 認識の時刻は、声の立ち上がり（音の大きさ）より約 0.2 秒早い。2026-10-06 実測:
 # 0.11→0.37、10.25→10.44、28.17→28.47、35.10→35.30、39.60→39.80 秒（5 か所とも 0.19〜0.30）
 LAG_SEC = 0.2
@@ -456,6 +460,7 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
                     ci = blk.a + e
                     hits.setdefault(owner[ci], []).append((offset_in[ci], rec_times[blk.b + e]))
             first = d
+    _move_repeated_matches(captions, hits)
     aligned = 0
     prev_last = None  # 前の字幕で最後に突き合った文字の時刻
     for i, cap in enumerate(captions):
@@ -486,6 +491,42 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         aligned += 1
     _drop_stray_heads(captions)
     return aligned
+
+
+def _move_repeated_matches(captions: list[dict], hits: dict[int, list[tuple[int, float]]]) -> int:
+    """同じ文の字幕が近くに並ぶとき、認識が拾った1回を、推定時刻（文字起こし）の近い方の字幕に移す。
+
+    全体の突き合わせは、同じ長さの一致なら早い方を採る。実例（3分04秒・31回目）: ゲストの「そうですね」→
+    聞き手の「何か一番最初のきっかけなんですね」→ ゲストの「そうですね」で、認識は2つ目だけを拾った
+    （188.5 秒）。1つ目の「そうですね」（推定 183.5 秒）がその時刻を取り、間の質問は2つの「そうですね」の
+    間の 1 秒に詰まって出なかった。2つ目の推定は 188.5 秒で、認識の時刻と合う。
+
+    移す先は、前後 REPEAT_WINDOW 枚の中で文が同じで、まだ何も突き合っていない字幕。推定時刻が
+    REPEAT_MARGIN_SEC 以上近いときだけ移し、間の字幕の一致と順番が入れ替わるなら移さない。移した数を返す。
+    """
+    texts = [_norm_text(c.get("text")) for c in captions]
+    moved = 0
+    for i in sorted(hits):
+        pairs = _main_pairs(hits.get(i) or [])
+        if not pairs or len(texts[i]) < 2:
+            continue
+        first, last = pairs[0][1], pairs[-1][1]
+        own = abs(first - float(captions[i].get("start", first)))
+        best = None
+        for j in range(max(0, i - REPEAT_WINDOW), min(len(captions), i + REPEAT_WINDOW + 1)):
+            if j == i or texts[j] != texts[i] or hits.get(j):
+                continue
+            d = abs(first - float(captions[j].get("start", first)))
+            if d + REPEAT_MARGIN_SEC > own or (best is not None and d >= best[0]):
+                continue
+            between = [t for k in range(min(i, j) + 1, max(i, j)) for _, t in _main_pairs(hits.get(k) or [])]
+            if (j > i and any(t > first for t in between)) or (j < i and any(t < last for t in between)):
+                continue
+            best = (d, j)
+        if best is not None:
+            hits[best[1]] = hits.pop(i)
+            moved += 1
+    return moved
 
 
 def _drop_stray_heads(captions: list[dict]) -> int:

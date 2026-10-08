@@ -397,3 +397,36 @@ def test_the_cut_step_keeps_the_closing_captions_inside_the_cut(tmp_path, monkey
 
     assert all(c["end"] <= 13.3 + 1e-6 for c in out), "残した区間の合計（動画の長さ）の外に出さない"
     assert out[1]["start"] < 8.0
+
+
+def test_a_repeated_reply_takes_the_recognised_time_nearest_its_own_estimate():
+    # 実例（3分04秒・31回目）: ゲストの「そうですね」→ 聞き手の「何か一番最初のきっかけなんですね」→
+    # ゲストの「そうですね」。認識は2つ目の「そうですね」だけを拾った。全体の突き合わせは同じ長さなら
+    # 早い方を採るので、1つ目が2つ目の時刻になり、間の質問は 1 秒に詰まって出なかった
+    caps = [{"start": 179.75, "end": 183.52, "text": "その経験が今の活動の原点に？"},
+            {"start": 183.52, "end": 184.82, "text": "そうですね"},
+            {"start": 184.82, "end": 188.52, "text": "何か一番最初のきっかけなんですね"},
+            {"start": 188.52, "end": 189.78, "text": "そうですね"},
+            {"start": 189.78, "end": 194.59, "text": "ぼくはね　中学校入ってね"}]
+    rec = toks("その経験が今の活動の原点で", 180.0) + toks("そうですね", 188.5) + toks("僕はね中学校入ってね", 190.3)
+    aligner.align_captions(caps, rec)
+    assert not caps[1].get("_asr")
+    assert caps[3].get("_asr") and caps[3]["start"] == pytest.approx(188.5, abs=0.1)
+
+
+def test_a_repeated_reply_keeps_its_match_when_its_own_estimate_is_nearer():
+    caps = [{"start": 183.52, "end": 184.82, "text": "そうですね"},
+            {"start": 184.82, "end": 188.52, "text": "何か一番最初のきっかけなんですね"},
+            {"start": 188.52, "end": 189.78, "text": "そうですね"}]
+    aligner.align_captions(caps, toks("そうですね", 183.6) + toks("僕はね中学校入ってね", 190.3))
+    assert caps[0].get("_asr") and caps[0]["start"] == pytest.approx(183.6, abs=0.1)
+    assert not caps[2].get("_asr")
+
+
+def test_a_repeated_reply_does_not_jump_over_a_caption_heard_later():
+    # 間の字幕がもっと後ろで聞こえているなら、移すと順番が入れ替わるので移さない
+    caps = [{"start": 10.0, "end": 11.0, "text": "そうですね"},
+            {"start": 11.0, "end": 14.0, "text": "何か一番最初のきっかけ"},
+            {"start": 14.0, "end": 15.0, "text": "そうですね"}]
+    aligner.align_captions(caps, toks("そうですね", 14.0) + toks("何か一番最初のきっかけ", 16.0))
+    assert caps[0].get("_asr") and not caps[2].get("_asr")
