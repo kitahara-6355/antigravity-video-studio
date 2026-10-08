@@ -441,6 +441,105 @@ class TestProofreadSegmentsResponseValidation:
         assert config["seed"] == ai_proofreader.SEED
 
 
+class TestProofreadMemo:
+    """同じ行には、次の書き出しでも同じ直しを使う（2026-10-08）。
+
+    温度 0・seed 固定でも、29回目は冒頭の100行の直しが28回目と違った（「しかも」「初日ね」が
+    戻らず、「主宰」が「主催」になった）。一度直した行は控えておき、次からはそれを使う。
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_api_key(self):
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "fake_key"}):
+            yield
+
+    @staticmethod
+    def _run(response_text, lines, memo, rows=(), served=None):
+        client = MagicMock()
+        client.models.generate_content.return_value = MagicMock(text=response_text, model_version=served)
+        with patch.dict("sys.modules", {"model_governance": MagicMock(get_governed_client=lambda x: client)}), \
+                patch("subtitle_engine.ai_proofreader._get_current_model", return_value="gemini-3.6-flash"), \
+                patch("subtitle_engine.ai_proofreader._declared_model", return_value="gemini-3.6-flash"), \
+                patch("subtitle_engine.ai_proofreader._dictionary_rows", return_value=list(rows)):
+            out, stats = ai_proofreader.proofread_segments([{"text": t} for t in lines],
+                                                           return_stats=True, memo=memo)
+        return [s["text"] for s in out], stats, client.models.generate_content.call_count
+
+    @staticmethod
+    def _reply(*texts):
+        return json.dumps([{"index": k, "text": t} for k, t in enumerate(texts)], ensure_ascii=False)
+
+    def test_同じ行は次の書き出しでも同じ直しを使う(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["もう初会ね。", "読んでいただいて。", "光栄です。"]
+        out, _, calls = self._run(self._reply("もう初回ね。", "呼んでいただいて。", "光栄です。"),
+                                  lines, ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。", "呼んでいただいて。", "光栄です。"] and calls == 1
+        # 次の書き出しで AI が違う直しを返しても、控えの直しを使う（全部控えにあれば呼ばない）
+        out, stats, calls = self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。", "呼んでいただいて。", "光栄です。"]
+        assert calls == 0 and stats["memo_hits"] == 3
+
+    def test_変わった行だけ校閲し直す(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("もう初回ね。", "呼んでいただいて。"),
+                  ["もう初会ね。", "読んでいただいて。"], ai_proofreader.ProofreadMemo(path))
+        # 2行目の起こしが変わった。AI は1行目を直さずに返したが、1行目は控えの直しのまま
+        out, stats, calls = self._run(self._reply("もう初会ね。", "呼んでいただきまして。"),
+                                      ["もう初会ね。", "読んでいただきまして。"],
+                                      ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。", "呼んでいただきまして。"]
+        assert calls == 1 and stats["memo_hits"] == 1
+
+    def test_辞書に足した語を含む行は校閲し直す(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["カドシアター代表で", "光栄です。"]
+        self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        rows = [("カドシアター", "アドシアター", "organization", "")]
+        out, stats, calls = self._run(self._reply("アドシアター代表で", "光栄ですね。"), lines,
+                                      ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["アドシアター代表で", "光栄です。"]
+        assert calls == 1 and stats["memo_hits"] == 1
+
+    def test_捨てた直しは控えない(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["います。", "では記念すべき第1回目のゲストは日本デザイン"]
+        # 番号ずれ（1行目に2行目の文）は捨てる。控えにも残さない
+        self._run(self._reply("では記念すべき第1回目のゲストは日本デザイン", lines[1]), lines,
+                  ai_proofreader.ProofreadMemo(path))
+        out, stats, calls = self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        assert out == lines and calls == 1 and stats["memo_hits"] == 1
+
+    def test_指示文や求めるモデルが変われば控えは使わない(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(path))
+        with patch("subtitle_engine.ai_proofreader.MEMO_VERSION", 999):
+            _, stats, calls = self._run(self._reply("もう初回ね。"), ["もう初会ね。"],
+                                        ai_proofreader.ProofreadMemo(path))
+        assert calls == 1 and stats.get("memo_hits", 0) == 0
+
+    def test_控えから使った直しも出したモデルが分かる(self, tmp_path):
+        # 枠切れで宣言と違うモデルが答えることがある（28・29回目は全部 flash-lite）。控えには
+        # 実際に答えたモデルを残し、控えから使った回にもそれを出す（モデルの見える化）
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(path),
+                  served="gemini-3.5-flash-lite")
+        _, stats, calls = self._run(self._reply("もう初会ね。"), ["もう初会ね。"],
+                                    ai_proofreader.ProofreadMemo(path))
+        assert calls == 0 and stats["memo_models"] == ["gemini-3.5-flash-lite"]
+        # 応答にモデルが書かれていなければ、求めたモデルを残す
+        other = tmp_path / "_proofread_y.json"
+        self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(other))
+        _, stats, _ = self._run(self._reply("もう初会ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(other))
+        assert stats["memo_models"] == ["gemini-3.6-flash"]
+
+    def test_控えが壊れていても校閲は続ける(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        path.write_text("{not json", encoding="utf-8")
+        out, _, calls = self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。"] and calls == 1
+
+
 class TestProofreadSegmentsRetryAndBackoff:
     """proofread_segments() 関数のリトライおよび指数バックオフ、致命的エラーハンドリングのテスト"""
 

@@ -6,8 +6,10 @@ Gemini 3.0による字幕校閲（フィラー除去、文法修正）
 import os
 import sys
 import json
+import hashlib
 import traceback
 import logging
+from pathlib import Path
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
@@ -165,7 +167,126 @@ def keep_short_kana_phrases(original: str, corrected: str) -> str:
     return "".join(out) if kept else corrected
 
 
-def proofread_segments(segments, update_callback=None, return_stats=False, referee=None):
+def _proofread_prompt(proper_noun_context: str, batch_text: str) -> str:
+    """Gemini校閲プロンプト（Phase E: 汎用化済み）。"""
+    return f"""あなたはプロの動画字幕編集者です。以下の日本語字幕テキストを校閲および修正してください。
+
+文脈を維持しつつ、以下の点を重点的に改善してください：
+1. **固有名詞の修正**: 下記の固有名詞辞書を参考に、音声認識の誤変換を正しく修正してください。
+2. **フィラーの削除**: 「えー」「あの」「えっと」「あー」などの不要な言葉を削除してください。
+3. **自然な日本語**: 文末が不自然な助詞で終わっている場合、自然な言い切りや継続する形に修正してください。
+4. **読みやすさ**: 意味を変えずに、字幕として読みやすい長さに調整してください。
+5. **同音異義語の誤変換**: 音は合っているが文脈に合わない漢字を、前後の流れから正してください
+   （例: ゲストを招いた場面の「読んでいただいて」→「呼んでいただいて」、「もう初会ね」→「もう初回ね」）。
+   辞書の「文脈で判断」の項目も同じ扱いです。誤りでない語は言い換えないでください。
+6. **行の対応を崩さない**: 各行は同じ index の行だけを直してください。行をまとめたり、
+   別の行の文を移したりしないでください。直す所が無い行も、そのままの文で返してください。
+
+{proper_noun_context}
+
+**出力形式**:
+必ず以下のJSON形式**のみ**を出力してください。Markdownのコードブロックは不要です。
+[
+  {{"index": 0, "text": "修正後のテキスト"}},
+  {{"index": 1, "text": "修正後のテキスト"}}
+]
+
+**入力データ**:
+""" + batch_text
+
+
+# 校閲の控え（`ProofreadMemo`）の形式。控えの鍵に入るので、直しの決め方を変えたら上げる
+MEMO_VERSION = 1
+
+
+def _declared_model() -> str:
+    """校閲に宣言されたモデル（段から引く。枠の残りでは変わらない）。控えの鍵に使う。"""
+    try:
+        from model_governance import model_governance
+        return str(model_governance._resolve_declared("proofreader"))
+    except Exception:  # 引けなくても校閲はする
+        return ""
+
+
+def _dictionary_rows() -> list:
+    """辞書の (誤, 正, 種類, 説明) の組。控えの鍵には、行に掛かる組だけを入れる。"""
+    try:
+        from proper_noun_dict import proper_noun_dict
+        return sorted({(str(e.get("incorrect") or ""), str(e.get("correct") or ""),
+                        str(e.get("type") or ""), str(e.get("context_hint") or ""))
+                       for e in proper_noun_dict.get_all_entries() if e.get("incorrect")})
+    except Exception:  # 辞書が読めなくても校閲はする
+        return []
+
+
+class ProofreadMemo:
+    """行ごとの校閲の控え（JSON・素材ごとに1つ）。
+
+    温度 0・seed 固定でも、同じ100行の直しが書き出しごとに変わった（29回目は冒頭の「しかも」
+    「初日ね」が戻らず、「主宰」が「主催」になった・2026-10-08）。一度採った直しは控えておき、
+    同じ行には次からも同じ直しを使う。鍵は (控えの形式・指示文・宣言モデル・行に掛かる辞書の組・行)
+    なので、指示文・モデル指定・その行に掛かる辞書が変われば、その行は校閲し直す。
+    控えるのは AI の出力そのもの。番号ずれや音声認識での確かめは毎回やり直す。
+    """
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.rows: dict = {}
+        self._dirty = False
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                self.rows = data
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError) as e:  # 壊れた控えは使わない（校閲し直す）
+            logger.warning(f"AI Proofreader: 校閲の控えが読めないので使いません: {e}")
+
+    @staticmethod
+    def key(salt: str, text: str, rows) -> str:
+        related = [list(r) for r in rows if r[0] and r[0] in text]
+        raw = json.dumps([salt, related, text], ensure_ascii=False)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+    def get(self, key: str):
+        row = self.rows.get(key)
+        return row.get("text") if isinstance(row, dict) and isinstance(row.get("text"), str) else None
+
+    def model_of(self, key: str) -> str:
+        row = self.rows.get(key)
+        return str(row.get("model") or "") if isinstance(row, dict) else ""
+
+    def put(self, key: str, text: str, model: str) -> None:
+        self.rows[key] = {"text": text, "model": model}
+        self._dirty = True
+
+    def save(self) -> None:
+        if not self._dirty:
+            return
+        try:
+            tmp = self.path.with_name(self.path.name + ".tmp")
+            tmp.write_text(json.dumps(self.rows, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(self.path)
+            self._dirty = False
+        except OSError as e:  # 書けなくても校閲の結果は返す
+            logger.warning(f"AI Proofreader: 校閲の控えを書けませんでした: {e}")
+
+
+class _MemoReply:
+    """控えから組んだ応答（API の応答と同じく .text に JSON を持つ）。"""
+
+    def __init__(self, text: str):
+        self.text = text
+
+
+def _as_index(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def proofread_segments(segments, update_callback=None, return_stats=False, referee=None, memo=None):
     """
     Gemini APIを使用して字幕セグメントを校閲
 
@@ -276,6 +397,16 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
 
         logger.info(f"AI Proofreader: Processing {total_segments} segments in batches of {CHUNK_SIZE}...")
 
+        # 校閲の控え: 鍵は校閲する前の行の文で決める（バッチを直すと次のバッチの前後が変わるため）
+        keys = []
+        if memo is not None:
+            template = hashlib.sha256(_proofread_prompt("", "").encode("utf-8")).hexdigest()
+            salt = json.dumps([MEMO_VERSION, template, _declared_model()])
+            rows = _dictionary_rows()
+            keys = [ProofreadMemo.key(salt, str(s.get("text") or ""), rows) for s in segments]
+            stats["memo_hits"] = 0
+        memo_models = set()
+
         for i in range(0, total_segments, CHUNK_SIZE):
             batch = segments[i:i + CHUNK_SIZE]
             batch_text = ""
@@ -288,31 +419,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
             # 固有名詞辞書をプロンプトに注入（Phase E: 汎用化）
             proper_noun_context = _build_proper_noun_context()
 
-            # Gemini校閲プロンプト（Phase E: 汎用化済み）
-            prompt = f"""あなたはプロの動画字幕編集者です。以下の日本語字幕テキストを校閲および修正してください。
-
-文脈を維持しつつ、以下の点を重点的に改善してください：
-1. **固有名詞の修正**: 下記の固有名詞辞書を参考に、音声認識の誤変換を正しく修正してください。
-2. **フィラーの削除**: 「えー」「あの」「えっと」「あー」などの不要な言葉を削除してください。
-3. **自然な日本語**: 文末が不自然な助詞で終わっている場合、自然な言い切りや継続する形に修正してください。
-4. **読みやすさ**: 意味を変えずに、字幕として読みやすい長さに調整してください。
-5. **同音異義語の誤変換**: 音は合っているが文脈に合わない漢字を、前後の流れから正してください
-   （例: ゲストを招いた場面の「読んでいただいて」→「呼んでいただいて」、「もう初会ね」→「もう初回ね」）。
-   辞書の「文脈で判断」の項目も同じ扱いです。誤りでない語は言い換えないでください。
-6. **行の対応を崩さない**: 各行は同じ index の行だけを直してください。行をまとめたり、
-   別の行の文を移したりしないでください。直す所が無い行も、そのままの文で返してください。
-
-{proper_noun_context}
-
-**出力形式**:
-必ず以下のJSON形式**のみ**を出力してください。Markdownのコードブロックは不要です。
-[
-  {{"index": 0, "text": "修正後のテキスト"}},
-  {{"index": 1, "text": "修正後のテキスト"}}
-]
-
-**入力データ**:
-""" + batch_text
+            prompt = _proofread_prompt(proper_noun_context, batch_text)
 
             # 進捗表示
             current_batch_num = i // CHUNK_SIZE + 1
@@ -331,7 +438,19 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
             batch_succeeded = False
             response = None
 
-            for retry in range(MAX_RETRIES + 1):
+            # 控えにある行は控えの直しを使う。全部あれば呼ばない
+            remembered = {}
+            for idx in range(len(batch) if memo is not None else 0):
+                hit = memo.get(keys[i + idx])
+                if hit is not None:
+                    remembered[i + idx] = hit
+            from_memo = memo is not None and len(remembered) == len(batch)
+            if from_memo:
+                response = _MemoReply("[]")
+                batch_succeeded = True
+                logger.info(f"AI Proofreader: batch {current_batch_num} は全行が校閲の控えにあるので呼びません")
+
+            for retry in range(0 if from_memo else MAX_RETRIES + 1):
                 try:
                     # Gemini API呼び出し（動的解決モデル使用）
                     response = client.models.generate_content(
@@ -432,10 +551,14 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                     break
 
             if batch_succeeded and response is not None:
-                # API使用量を記録
+                # 実際に答えたモデル（枠切れで宣言と違うモデルに落ちることがある）。控えに残す
+                served = getattr(response, "model_version", None)
+                served_model = served if isinstance(served, str) and served else model_name
+                # API使用量を記録（控えから組んだ応答は呼んでいない）
                 try:
-                    from usage_tracker.api_usage_tracker import record_api_call
-                    record_api_call(1, "ai_proofreader")
+                    if not from_memo:
+                        from usage_tracker.api_usage_tracker import record_api_call
+                        record_api_call(1, "ai_proofreader")
                 except (ImportError, ModuleNotFoundError) as e:
                     logger.debug(f"API使用量トラッカーが見つかりません。スキップします: {e}")
                 except OSError as e:
@@ -452,6 +575,12 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                     stats["failed_batches"] += 1
                     stats["failed_ranges"].append([i, i + len(batch)])
                     continue
+
+                if remembered and isinstance(corrected_data, list):
+                    # 控えにある行は、この回に AI が返した直しではなく控えの直しを使う
+                    corrected_data = [it for it in corrected_data
+                                      if not (isinstance(it, dict) and _as_index(it.get("index")) in remembered)]
+                    corrected_data += [{"index": k, "text": v, "_memo": True} for k, v in remembered.items()]
 
                 batch_correction_map = {}
                 if isinstance(corrected_data, list):
@@ -506,6 +635,11 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                                 f"AI Proofreader: 元の文と離れすぎた直しを捨てました [{item_idx}] "
                                 f"{segments[item_idx]['text'][:20]!r} → {item['text'][:20]!r}")
                             continue
+                        if item.get("_memo"):
+                            stats["memo_hits"] += 1
+                            memo_models.add(memo.model_of(keys[item_idx]) or "不明")
+                        elif memo is not None:
+                            memo.put(keys[item_idx], item["text"], served_model)
                         text = item["text"]
                         # 校閲が足した字のうち、音声認識が「足さない形」で聞いているものは戻す
                         # （「最初 に 書 に」→「最初にな書に」・2026-10-06 実走）
@@ -560,6 +694,11 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                 stats["failed_batches"] += 1
                 stats["failed_ranges"].append([i, i + len(batch)])
 
+        if memo is not None:
+            memo.save()
+            stats["memo_models"] = sorted(memo_models)
+            logger.info(f"AI Proofreader: 校閲の控えから {stats['memo_hits']} 行を使いました"
+                        f"（{'・'.join(stats['memo_models']) or 'なし'}）")
         stats["proofread_count"] = proofread_count
         logger.info(f"AI Proofreader: Successfully corrected {proofread_count} segments total."
                      f" (retries={stats['total_retries']}, failed_batches={stats['failed_batches']}/{total_batches})")

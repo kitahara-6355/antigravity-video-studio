@@ -66,6 +66,8 @@ class ProofreadWorker(PipelineStageWorker):
 
         dict_corrections = 0
         ai_corrections = 0
+        # 控えから使った直しの行数と、その直しを出したモデル（この回には呼んでいない）
+        memo_hits, memo_models = 0, []
 
         try:
             from proper_noun_dict import apply_dictionary
@@ -87,6 +89,10 @@ class ProofreadWorker(PipelineStageWorker):
             # 元の文から遠い直しを、音声認識の文字で裁く（認識が使えなければ裁かない）
             referee = await loop.run_in_executor(None, lambda: _referee_for(ctx.video_path))
             extra = {"referee": referee} if referee else {}
+            # 一度採った直しは素材ごとに控えて次の書き出しでも使う（同じ入力でも校閲が揺れる・29回目）
+            memo = _memo_for(ctx.video_path)
+            if memo is not None:
+                extra["memo"] = memo
 
             def proofread(segs, return_stats=True):
                 return proofread_segments(segs, return_stats=return_stats, **extra)
@@ -101,6 +107,8 @@ class ProofreadWorker(PipelineStageWorker):
             for i, seg in enumerate(ctx.segments):
                 if i < len(original) and seg.get("text", "") != original[i]:
                     ai_corrections += 1
+            memo_hits = int(retry_stats.get("memo_hits", 0) or 0)
+            memo_models = list(retry_stats.get("memo_models") or [])
             # P-02: リトライ統計の可視化
             if retry_stats.get("total_retries", 0) > 0:
                 logger.info(f"🔄 AI校閲リトライ発生: {retry_stats['total_retries']}回 "
@@ -173,6 +181,7 @@ class ProofreadWorker(PipelineStageWorker):
             logger.warning(f"テキスト整形スキップ: {e}")
 
         total = dict_corrections + ai_corrections
+        memo_note = f" / 校閲の控え{memo_hits}行（{'・'.join(memo_models) or '不明'}）" if memo_hits else ""
         # 使用モデルを取得（UI可視化用）
         try:
             from subtitle_engine.ai_proofreader import _get_current_model
@@ -202,8 +211,9 @@ class ProofreadWorker(PipelineStageWorker):
         logger.info(f"📊 [T-014] ProofreadWorker出口: ctx.segments={len(ctx.segments)}件")
         return StageResult(
             stage_name=self.name, success=True,
-            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{format_stats}{skip_warn}",
-            data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used},
+            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{format_stats}{skip_warn}",
+            data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
+                  "memo_hits": memo_hits, "memo_models": memo_models},
             duration_seconds=round(time.time() - start, 1),
         )
 
@@ -219,6 +229,24 @@ def _referee_for(video_path):
         return aligner.referee_for(str(video_path)) if video_path else None
     except Exception as e:  # 認識が無くても校閲はする
         logger.debug(f"音声認識での裏付けを使いません: {e}")
+        return None
+
+
+def _memo_for(video_path):
+    """素材ごとの校閲の控え（素材と同じ場所の `_proofread_<鍵>.json`）。作れなければ None。
+
+    鍵は素材の場所・大きさ・更新時刻（音声認識のキャッシュと同じ決め方）。素材が変われば別の控え。
+    """
+    try:
+        import hashlib
+        from pathlib import Path
+        from subtitle_engine.ai_proofreader import ProofreadMemo
+        p = Path(str(video_path))
+        st = p.stat()
+        key = hashlib.sha1(f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
+        return ProofreadMemo(p.with_name(f"_proofread_{key}.json"))
+    except Exception as e:  # 控えが無くても校閲はする
+        logger.debug(f"校閲の控えを使いません: {e}")
         return None
 
 

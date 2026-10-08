@@ -119,6 +119,40 @@ def test_unrepaired_batches_stay_failed():
     assert stats["failed_batches"] > 0
 
 
+def test_the_proofreading_memo_lives_next_to_the_source_and_follows_it(tmp_path):
+    # 一度採った校閲の直しは素材ごとに控えて、次の書き出しでも使う（29回目で冒頭の直しが揺れた）
+    from agents.workers.proofread_worker import _memo_for
+    media = tmp_path / "raw.mp4"
+    media.write_bytes(b"x")
+    memo = _memo_for(media)
+    assert memo is not None and memo.path.parent == tmp_path and memo.path.name.startswith("_proofread_")
+    assert _memo_for(media).path == memo.path
+    media.write_bytes(b"xy")  # 素材が変われば別の控え
+    assert _memo_for(media).path != memo.path
+    assert _memo_for(tmp_path / "missing.mp4") is None
+
+
+def test_the_stage_says_which_model_made_the_corrections_taken_from_the_memo(monkeypatch):
+    # 控えから使った直しは、この回にはどのモデルも呼んでいない。工程の結果に、控えから何行・
+    # どのモデルの直しを使ったかを出す（モデルの見える化）
+    import asyncio
+    from agents.workers import proofread_worker
+    from subtitle_engine import ai_proofreader
+    from tests.fixtures.mock_pipeline import create_mock_ctx
+
+    def fake(segs, return_stats=True, **kwargs):
+        return segs, {"total_batches": 1, "failed_batches": 0, "total_retries": 0,
+                      "accepted_items": len(segs), "failed_ranges": [],
+                      "memo_hits": len(segs), "memo_models": ["gemini-3.5-flash-lite"]}
+
+    monkeypatch.setattr(ai_proofreader, "proofread_segments", fake)
+    monkeypatch.setattr(proofread_worker, "_referee_for", lambda path: None)
+    monkeypatch.setattr(proofread_worker, "_memo_for", lambda path: None)
+    res = asyncio.run(proofread_worker.ProofreadWorker().execute(create_mock_ctx(segments=3)))
+    assert "校閲の控え3行（gemini-3.5-flash-lite）" in res.detail
+    assert res.data["memo_hits"] == 3 and res.data["memo_models"] == ["gemini-3.5-flash-lite"]
+
+
 def test_quality_gate_blocks_unproofread_subtitles(tmp_path, monkeypatch):
     from quality_gate_plugins import SubtitleCoverageCheck
     from subtitle_engine import coverage
