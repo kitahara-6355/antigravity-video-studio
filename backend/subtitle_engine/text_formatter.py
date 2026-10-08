@@ -165,6 +165,40 @@ def strip_interjections(text: str, words: list[str] | None = None) -> str:
     return out if out.strip(_FILLER_LEFT + _FILLER_END) else text
 
 
+def strip_context_fillers(text: str, words: list[str] | None = None) -> str:
+    """言いよどみの「なんか」を、「、」で挟まれていなくても文のどこでも外す。
+
+    名詞（漢字・カタカナ・英数字）や「か」のすぐ後ろ（「駄菓子屋かなんか」「中国なんか」
+    「広報担当なんかが」）は「〜など・〜か何か」の意味なので残す。それ以外（文頭・句読点や空白の
+    後ろ・ひらがなの後ろ）は言いよどみとして外し、すぐ後ろの「、」も外す（30回目で「すごくなんか
+    真剣さが」「立場だからなんか先生って」など約20か所が字幕に出た・2026-10-08）。
+    外して残りが1字以下のひらがなだけ（「なんかさ、」→「さ」）なら元のまま返す（相づちだけの
+    字幕の規則に任せる）。
+    """
+    if not isinstance(text, str) or not text:
+        return text
+    words = _omit_words("omit_fillers_unless_after_noun") if words is None else words
+    if not words:
+        return text
+    out, i, n = [], 0, len(text)
+    while i < n:
+        hit = next((w for w in words if text.startswith(w, i)), None)
+        if hit:
+            prev = out[-1] if out else ""
+            if not prev or prev in _FILLER_LEFT or (_script(prev) == "hiragana" and prev != "か"):
+                i += len(hit)
+                if i < n and text[i] in _FILLER_COMMA:
+                    i += 1
+                continue
+        out.append(text[i])
+        i += 1
+    result = "".join(out).strip()
+    body = result.strip(_FILLER_LEFT + _FILLER_END)
+    if len(body) <= 1 and all(_script(ch) == "hiragana" for ch in body):
+        return text
+    return result
+
+
 def is_standalone_omittable(text: str, words: list[str] | None = None) -> bool:
     """相づちだけの字幕か（「はい。」「うん、なるほど。」）。音声は残し、字幕だけ出さない。"""
     if not isinstance(text, str):
@@ -950,6 +984,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
     lead_words = _omit_words("omit_lead_words")
     bare_words = _omit_words("omit_lead_words_bare")
     mid_fillers = _omit_words("omit_interjections")
+    context_fillers = _omit_words("omit_fillers_unless_after_noun")
     formatted = []
     split_count = 0
     semantic_count = 0
@@ -966,9 +1001,11 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
                 continue
             text = text.strip()
 
-            # Step 1: フィラー除去・「、」で挟まれた言いよどみと文頭の聞き流し語（さて、それから、）を外す
-            cleaned = strip_lead_words(strip_interjections(remove_fillers(text), mid_fillers),
-                                       lead_words, bare_words)
+            # Step 1: フィラー除去・言いよどみの「なんか」・「、」で挟まれた言いよどみと
+            # 文頭の聞き流し語（さて、それから、）を外す
+            cleaned = strip_lead_words(
+                strip_interjections(strip_context_fillers(remove_fillers(text), context_fillers), mid_fillers),
+                lead_words, bare_words)
             if cleaned != text:
                 filler_count += 1
 
