@@ -274,13 +274,17 @@ def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=No
                 from subtitle_engine import aligner
                 tokens = aligner.tokens_for(str(source_path))
                 if tokens:
-                    n = aligner.align_captions(segments, aligner.to_output(tokens, ranges or []))
+                    heard = aligner.to_output(tokens, ranges or [])
+                    # 認識が書き起こさなかった言いよどみ（「こう」「あの」「え」）を先に外す
+                    f = aligner.drop_unheard_fillers(segments, heard)
+                    n = aligner.align_captions(segments, heard)
                     # 動画の長さ（残した区間の合計）。字幕をこの外に出さない
                     end = sum(float(b) - float(a) for a, b in ranges) if ranges else None
                     r = aligner.release_implausible(segments, end=end)
                     m = aligner.interpolate_unaligned(segments, end=end)
                     logger.info(f"🎯 音声認識で時刻を合わせた字幕: {n - r}枚（間に配り直し {m}枚・"
-                                f"話す時間が残らず外した {r}枚）/ 全 {len(segments)}枚")
+                                f"話す時間が残らず外した {r}枚）/ 全 {len(segments)}枚・"
+                                f"認識に無い言いよどみを {f}語外した")
             except Exception as e:
                 logger.warning(f"音声認識による時刻合わせをスキップ: {e}")
         from subtitle_engine import sync

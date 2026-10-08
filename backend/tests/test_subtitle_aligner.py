@@ -430,3 +430,118 @@ def test_a_repeated_reply_does_not_jump_over_a_caption_heard_later():
             {"start": 14.0, "end": 15.0, "text": "そうですね"}]
     aligner.align_captions(caps, toks("そうですね", 14.0) + toks("何か一番最初のきっかけ", 16.0))
     assert caps[0].get("_asr") and not caps[2].get("_asr")
+
+
+# 言いよどみにも指示語にもなる語（「こう」「あの」「その」）は文字だけでは決められない。
+# 認識（ReazonSpeech）は放送の字幕で学習していて言いよどみを書き起こさないので、前後を続けて
+# 聞いていて間の語だけが無いときに外す（31回目: 「小さいこうモニター」「層の幅をえ広げる」）
+FILLERS = ["あのね", "あの", "こう", "その", "うん", "ええ", "え"]
+
+
+def test_a_filler_the_recogniser_skipped_is_removed_from_the_caption():
+    caps = [{"start": 0.0, "end": 3.0, "text": "小さいこうモニターを見ながら"}]
+    assert aligner.drop_unheard_fillers(caps, toks("小さいモニターを見ながら", 10.0), FILLERS) == 1
+    assert caps[0]["text"] == "小さいモニターを見ながら"
+
+
+def test_a_filler_the_recogniser_heard_is_kept():
+    # 「こうやって」「隣にこう引き戸が」のように認識が書き起こしたものは外さない
+    caps = [{"start": 0.0, "end": 3.0, "text": "隣にこう引き戸が"}]
+    assert aligner.drop_unheard_fillers(caps, toks("隣にこう引き戸が", 10.0), FILLERS) == 0
+    assert caps[0]["text"] == "隣にこう引き戸が"
+
+
+def test_a_filler_is_kept_where_the_recogniser_did_not_hear_both_sides():
+    caps = [{"start": 0.0, "end": 3.0, "text": "その名前を出さない"}]
+    assert aligner.drop_unheard_fillers(caps, toks("名前を出さない", 10.0), FILLERS) == 0
+    caps = [{"start": 0.0, "end": 3.0, "text": "書道のこう世界"}]
+    assert aligner.drop_unheard_fillers(caps, toks("書道の", 10.0) + toks("世界", 13.0), FILLERS) == 0
+
+
+def test_a_one_character_filler_goes_only_before_a_break():
+    caps = [{"start": 0.0, "end": 3.0, "text": "層の幅をえ\n広げる意味で"},
+            {"start": 3.0, "end": 5.0, "text": "お考えです"}]
+    rec = toks("層の幅を広げる意味で", 10.0) + toks("お考です", 13.0)
+    assert aligner.drop_unheard_fillers(caps, rec, FILLERS) == 1
+    assert caps[0]["text"] == "層の幅を\n広げる意味で"
+    assert caps[1]["text"] == "お考えです"
+
+
+def test_the_space_next_to_a_removed_filler_goes_with_it():
+    caps = [{"start": 0.0, "end": 3.0, "text": "皆さん　あのね　視聴者の皆さん"},
+            {"start": 3.0, "end": 6.0, "text": "一番大きいので　うん"},
+            {"start": 6.0, "end": 9.0, "text": "下手なことは"}]
+    rec = toks("皆さん視聴者の皆さん", 10.0) + toks("一番大きいので下手なことは", 13.0)
+    assert aligner.drop_unheard_fillers(caps, rec, FILLERS) == 2
+    assert caps[0]["text"] == "皆さん　視聴者の皆さん"
+    assert caps[1]["text"] == "一番大きいので"
+
+
+def test_fillers_in_a_row_go_together():
+    caps = [{"start": 0.0, "end": 3.0, "text": "先生　あのその縁っていう"}]
+    assert aligner.drop_unheard_fillers(caps, toks("先生縁っていう", 10.0), FILLERS) == 2
+    assert caps[0]["text"] == "先生　縁っていう"
+
+
+def test_a_caption_that_is_only_a_filler_is_left_to_the_backchannel_rule():
+    caps = [{"start": 0.0, "end": 2.0, "text": "書いてくれた"},
+            {"start": 2.0, "end": 3.0, "text": "うん"},
+            {"start": 3.0, "end": 5.0, "text": "それでね"}]
+    assert aligner.drop_unheard_fillers(caps, toks("書いてくれたそれでね", 10.0), FILLERS) == 0
+    assert caps[1]["text"] == "うん"
+
+
+def test_the_fillers_to_check_live_in_the_template_rules():
+    from template_config import template_config
+
+    words = template_config.get_subtitle_rules()["omit_unheard_fillers"]
+    assert {"こう", "あの", "その", "え"} <= set(words)
+    assert "この" not in words, "「このチャンネル」の「この」は認識が落としても中身"
+
+
+def test_the_cut_step_drops_fillers_the_recogniser_skipped(tmp_path, monkeypatch):
+    import smart_cut_engine
+    from subtitle_engine import sync
+
+    cut = tmp_path / "cut.mp4"
+    cut.write_bytes(b"\x00" * 2048)
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: toks("小さいモニターを見ながら", 1.0))
+    monkeypatch.setattr(sync, "speech_map", lambda path: None)
+    monkeypatch.setattr(sync, "align_segments", lambda segs, *a, **k: (segs, None))
+
+    caps = [{"start": 1.0, "end": 4.0, "text": "小さいこうモニターを見ながら"}]
+    out = smart_cut_engine._align_to_speech(cut, caps, [], source_path="src.mp4", ranges=[(0.0, 10.0)])
+
+    assert out[0]["text"] == "小さいモニターを見ながら"
+
+
+def test_a_drawn_out_filler_is_removed_but_not_across_a_long_silence():
+    # 実例（31分01秒・31回目）: 「毎回そのえ、課題が」の「え」は伸ばして1.2秒。認識は「その」「課題」だけ
+    caps = [{"start": 0.0, "end": 3.0, "text": "毎回そのえ　課題があるので"}]
+    rec = toks("毎回その", 10.0) + toks("課題があるので", 11.8)
+    assert aligner.drop_unheard_fillers(caps, rec, FILLERS) == 1
+    assert caps[0]["text"] == "毎回その課題があるので"
+    caps = [{"start": 0.0, "end": 3.0, "text": "毎回そのえ　課題があるので"}]
+    rec = toks("毎回その", 10.0) + toks("課題があるので", 15.0)
+    assert aligner.drop_unheard_fillers(caps, rec, FILLERS) == 0
+
+
+def test_a_lead_word_left_behind_a_removed_filler_goes_too():
+    # 実例（7分29秒・31回目）: 「書いたんですようんで、ここ」の「うん」だけ外すと「書いたんですよで」と出る。
+    # 「で、」は文頭の聞き流し語（omit_lead_words）
+    caps = [{"start": 0.0, "end": 3.0, "text": "書いたんですようんで\nここ\u3000でっかいカメラが"}]
+    rec = toks("書いたんですよでここでっかいカメラが", 10.0)
+    assert aligner.drop_unheard_fillers(caps, rec, FILLERS, leads=["で"]) == 2
+    assert caps[0]["text"] == "書いたんですよ\nここ\u3000でっかいカメラが"
+    caps = [{"start": 0.0, "end": 3.0, "text": "書いたんですよ\u3000うん\u3000で\u3000ここ"}]
+    assert aligner.drop_unheard_fillers(caps, rec, FILLERS, leads=["で"]) == 2
+    assert caps[0]["text"] == "書いたんですよ\u3000ここ"
+    caps = [{"start": 0.0, "end": 3.0, "text": "先生あのでも本当に"}]
+    assert aligner.drop_unheard_fillers(caps, toks("先生でも本当に", 10.0), FILLERS, leads=["で"]) == 1
+    assert caps[0]["text"] == "先生でも本当に", "「でも」の「で」は文頭の「で、」ではない"
+
+
+def test_removing_a_filler_keeps_the_other_spaces_as_they_were():
+    caps = [{"start": 0.0, "end": 3.0, "text": "LINE こう やり取り"}]
+    assert aligner.drop_unheard_fillers(caps, toks("LINEやり取り", 10.0), FILLERS) == 1
+    assert caps[0]["text"] == "LINE やり取り"

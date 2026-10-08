@@ -21,6 +21,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -419,6 +420,127 @@ def norm_char(ch: str) -> str:
 
 def _norm_text(text: str) -> str:
     return "".join(norm_char(c) for c in str(text or ""))
+
+
+# 言いよどみを外すとき、間に何も聞いていない前後の文字がこれだけ離れていてもよい
+# （伸ばした「えー」は1秒を超える。31分01秒の「その、え、課題が」は1.2秒）
+FILLER_MAX_GAP_SEC = 2.0
+# 言いよどみの語を外したあとに残る区切り（句読点の跡の空白）と、1文字の語の後ろに要る区切り
+_SPACES = " \u3000"
+_BREAKS = _SPACES + "\n、,，。！？!?"
+
+
+def _rule_words(words, key: str, norm: bool = True) -> list[str]:
+    if words is None:
+        try:
+            from template_config import template_config
+            words = template_config.get_subtitle_rules().get(key)
+        except Exception:  # テンプレートが読めなければ外さない
+            return []
+    if not isinstance(words, list):
+        return []
+    out = {(_norm_text(w) if norm else w) for w in words if isinstance(w, str) and _norm_text(w)}
+    return sorted(out, key=len, reverse=True)
+
+
+def _split_fillers(span: str, words: list[str]) -> list[int] | None:
+    """span が言いよどみの語だけでできていれば、頭から順に各語の長さを返す。"""
+    out, i = [], 0
+    while i < len(span):
+        w = next((w for w in words if span.startswith(w, i)), None)
+        if w is None:
+            return None
+        out.append(len(w))
+        i += len(w)
+    return out
+
+
+def _cut_spans(text: str, spans: list[tuple[int, int]]) -> str:
+    """text から spans（[k0, k1)）を外す。すぐ後ろの空白（句読点の跡）も一緒に外す。"""
+    keep = [True] * len(text)
+    for k0, k1 in spans:
+        for k in range(k0, k1):
+            keep[k] = False
+        if k1 < len(text) and text[k1] in _SPACES:
+            keep[k1] = False
+    out = "".join(ch for ch, ok in zip(text, keep) if ok)
+    lines = [re.sub(f"([{_SPACES}])[{_SPACES}]+", r"\1", line).strip(_SPACES) for line in out.split("\n")]
+    return "\n".join(line for line in lines if line)
+
+
+def drop_unheard_fillers(captions: list[dict], tokens: list[tuple[str, float]], words=None,
+                         leads=None) -> int:
+    """「こう」「あの」「その」「え」を、音声認識が書き起こさなかったときだけ字幕から外す。外した語の数を返す。
+
+    言いよどみにも指示語にもなる語は、文字だけでは決められない（「こうやって」「その思い」は中身）。
+    認識（ReazonSpeech）は放送の字幕で学習していて、言いよどみを書き起こさない。**前後の言葉を
+    続けて聞いているのに、間の語だけが無ければ**言いよどみとみなす（31回目で「小さいこうモニター」
+    「層の幅をえ広げる」「先生あのちょっと」など約30か所。どれも言いよどみだった）。
+    認識が書き起こした語、前後を聞き取れていない所の語は残す。1文字の語（「え」）は後ろが
+    区切り（句読点の跡・改行・字幕の終わり）のときだけ外す。外すと空になる字幕（「うん」だけ）は
+    触らない（相づちだけの字幕の規則が扱う）。語の一覧はテンプレートの omit_unheard_fillers。
+    外した語のすぐ後ろの文頭の聞き流し語（omit_lead_words の「で」）も、後ろが区切りなら外す
+    （「書いたんですようんで、ここ」の「うん」だけ外すと「書いたんですよで」と出る）。
+    """
+    words = _rule_words(words, "omit_unheard_fillers")
+    leads = _rule_words(leads, "omit_lead_words", norm=False)
+    if not words or not tokens or not captions:
+        return 0
+    rec_chars, rec_times = [], []
+    for ch, t in tokens:
+        for c in norm_char(ch):
+            rec_chars.append(c)
+            rec_times.append(float(t))
+    cap_chars, where = [], []  # where: (何枚目の字幕か, その字幕の文字列の何文字目か)
+    for i, cap in enumerate(captions):
+        for k, ch in enumerate(str(cap.get("text") or "")):
+            for c in norm_char(ch):
+                cap_chars.append(c)
+                where.append((i, k))
+    if not cap_chars or not rec_chars:
+        return 0
+    sm = difflib.SequenceMatcher(None, cap_chars, rec_chars, autojunk=False)
+    blocks = [b for b in sm.get_matching_blocks() if b.size >= MIN_BLOCK]
+    drops: dict[int, list[tuple[int, int]]] = {}
+    for b1, b2 in zip(blocks, blocks[1:]):
+        a0, a1 = b1.a + b1.size, b2.a
+        # 字幕の側にだけ語があり、認識の側は前後の文字が続いている（間に何も聞いていない）
+        if a1 <= a0 or b1.b + b1.size != b2.b:
+            continue
+        if rec_times[b2.b] - rec_times[b2.b - 1] > FILLER_MAX_GAP_SEC:
+            continue
+        i = where[a0][0]
+        lens = _split_fillers("".join(cap_chars[a0:a1]), words)
+        if where[a1 - 1][0] != i or not lens:
+            continue
+        text = str(captions[i].get("text") or "")
+        spans, pos = [], a0
+        for n in lens:
+            k0, k1 = where[pos][1], where[pos + n - 1][1] + 1
+            if n == 1 and k1 < len(text) and text[k1] not in _BREAKS:
+                spans = []
+                break
+            spans.append((k0, k1))
+            pos += n
+        if spans:
+            k = spans[-1][1]
+            while k < len(text) and text[k] in _SPACES:
+                k += 1
+            lead = next((w for w in leads if text.startswith(w, k)
+                         and (k + len(w) == len(text) or text[k + len(w)] in _BREAKS)), None)
+            if lead:
+                spans.append((k, k + len(lead)))
+        drops.setdefault(i, []).extend(spans)
+    dropped = 0
+    for i, spans in drops.items():
+        if not spans:
+            continue
+        text = _cut_spans(str(captions[i].get("text") or ""), spans)
+        if not _norm_text(text):
+            continue
+        captions[i]["text"] = text
+        dropped += len(spans)
+    return dropped
 
 
 def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int:
