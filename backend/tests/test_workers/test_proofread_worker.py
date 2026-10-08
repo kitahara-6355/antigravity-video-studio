@@ -84,6 +84,15 @@ def _mock_genai_and_sleep(monkeypatch):
     import time as _time_mod
     monkeypatch.setattr(_time_mod, "sleep", lambda *a, **kw: None)
 
+    # 校閲の控え（素材の隣の _proofread_<鍵>.json）は使わない。既定の素材
+    # （test_videos/tv01_real_clip.mp4）は test_preview_worker のフィクスチャが作ることがあり、
+    # あると控えが渡されて、引数を固定した偽の校閲が落ちる（2026-10-08 の CI・実行順で決まる）
+    try:
+        from agents.workers import proofread_worker as _proofread_worker
+        monkeypatch.setattr(_proofread_worker, "_memo_for", lambda video_path: None)
+    except (ImportError, AttributeError):
+        pass
+
     yield
 
 
