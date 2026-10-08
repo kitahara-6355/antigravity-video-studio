@@ -133,6 +133,8 @@ def strip_lead_words(text: str, words: list[str] | None = None,
 
 _FILLER_LEFT = "、,，。！？!? 　\n"
 _FILLER_COMMA = "、,，"
+# 言いよどみの後ろに付いて、ひとまとまりになる助詞（「なんかね、」「なんかさ、」）
+_FILLER_TAIL = "ねさ"
 _FILLER_END = "。！？!?"
 
 
@@ -172,7 +174,9 @@ def strip_context_fillers(text: str, words: list[str] | None = None) -> str:
     「広報担当なんかが」）は「〜など・〜か何か」の意味なので残す。それ以外（文頭・句読点や空白の
     後ろ・ひらがなの後ろ）は言いよどみとして外し、すぐ後ろの「、」も外す（30回目で「すごくなんか
     真剣さが」「立場だからなんか先生って」など約20か所が字幕に出た・2026-10-08）。
-    外して残りが1字以下のひらがなだけ（「なんかさ、」→「さ」）なら元のまま返す（相づちだけの
+    すぐ後ろの「ね」「さ」が句読点の前なら一緒に外す（「いや、なんかね、やっぱり」の「ね」だけが
+    「いや ね」と残った・31回目の 28分52秒）。
+    外して残りが1字以下のひらがなだけ（「なんかさ」→「さ」）なら元のまま返す（相づちだけの
     字幕の規則に任せる）。
     """
     if not isinstance(text, str) or not text:
@@ -187,6 +191,9 @@ def strip_context_fillers(text: str, words: list[str] | None = None) -> str:
             prev = out[-1] if out else ""
             if not prev or prev in _FILLER_LEFT or (_script(prev) == "hiragana" and prev != "か"):
                 i += len(hit)
+                # 「なんかね、」「なんかさ、」はひとまとまり。「ね」だけ残すと「いや ね」と出る
+                if i < n and text[i] in _FILLER_TAIL and (i + 1 == n or text[i + 1] in _FILLER_LEFT):
+                    i += 1
                 if i < n and text[i] in _FILLER_COMMA:
                     i += 1
                 continue
