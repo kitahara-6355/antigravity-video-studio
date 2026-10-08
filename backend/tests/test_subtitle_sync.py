@@ -259,6 +259,32 @@ def test_a_short_unheard_head_still_starts_at_the_onset_before_the_first_recogni
     assert out[1]["start"] == pytest.approx(35.3, abs=0.02)
 
 
+def test_an_unheard_head_starts_where_speech_resumes_after_the_caption_before():
+    # 実例（28分40秒・31回目）: 「私から見ると 書いてるところずっと…」の頭 7 字を認識が拾えず、
+    # 最初に拾えた「いてる」の直前の話し始め（1721.65 秒）に出た。7 字を 0.2 秒で言うことになり、
+    # 前の「はい ありがとうございます」が「私から見ると」の間も出ていた。前の字幕の声の後ろの
+    # 話し始めまで探し、頭を言える所が無ければそのうち早い方
+    sp = _map([(1717.67, 1719.16), (1719.46, 1720.42), (1720.81, 1721.08), (1721.65, 1726.0)], total=1730)
+    segs = [{"start": 1718.33, "end": 1719.88, "text": "はい\u3000ありがとうございます", "_asr": True,
+             "_asr_first": 1718.59, "_asr_marks": [(2, 1718.59), (11, 1719.75)]},
+            {"start": 1720.94, "end": 1725.7, "text": "私から見ると\u3000書いてるところずっと\n見てたんです",
+             "_asr": True, "_asr_first": 1721.85, "_asr_marks": [(7, 1721.85), (8, 1721.93), (9, 1722.05)]}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(1720.81, abs=0.02)
+
+
+def test_an_unheard_head_does_not_take_speech_right_after_the_caption_before():
+    # 実例（32分52秒）: 前の字幕の最後に聞こえた字（「僕」）は話し始めより早めに出る。その直後の
+    # 話し始めは前の字幕の声なので、次の字幕の頭（「だから」）には使わない
+    sp = _map([(1971.39, 1972.49), (1972.69, 1972.85), (1973.73, 1974.1), (1974.34, 1976.0)], total=1980)
+    segs = [{"start": 1971.39, "end": 1972.6, "text": "三浦半島にね\u3000僕よく行くんですよ", "_asr": True,
+             "_asr_first": 1971.28, "_asr_marks": [(0, 1971.28), (7, 1972.52)]},
+            {"start": 1973.2, "end": 1976.0, "text": "だから\u3000自宅からね\n40分回ればいけるんで", "_asr": True,
+             "_asr_first": 1973.62, "_asr_marks": [(3, 1973.62), (4, 1973.86), (5, 1974.06)]}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(1973.73, abs=0.02)
+
+
 def test_unheard_flash_that_cannot_be_merged_is_dropped():
     # 実例（9分39秒）: カットで声が消えた「いたんだよね」が、カット点に 0.3 秒だけ出た。
     # 認識にも無く、隣ともまとめられない一瞬の字幕は出さない

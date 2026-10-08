@@ -58,6 +58,13 @@ HEAD_MAX_CPS = 12.0
 # 認識の字の時刻が、実際の声より早く出る幅。35 秒の「デザイン書道の」は、間の後の話し始め
 # （35.41 秒）と同じ時刻に「書」が出た。「デザイン」を話す分、0.4 秒ほど早い（2026-10-07 実測）
 HEAD_EARLY_SEC = 0.4
+# 頭を認識が拾えなかった字幕（この字数以上）は、前の字幕で最後に聞こえた字の後ろまで話し始めを探す。
+# 遠くても、拾えなかった字を毎秒 HEAD_MIN_CPS 字で話せる所まで（28分40秒「私から見ると 書いてる…」は
+# 31回目で頭の 7 字を 0.2 秒で言わせる所に出て、前の字幕が「私から見ると」の間も出ていた）。
+# 前の字幕の最後に聞こえた字も早めに出るので、その後ろ HEAD_EARLY_SEC は前の字幕の声とみなす
+HEAD_LOOKBACK_MIN_CHARS = 3
+HEAD_MIN_CPS = 3.0
+HEAD_AFTER_PREV_SEC = HEAD_EARLY_SEC
 # 間とみなす長さと、話しているとみなす長さ
 MIN_PAUSE_SEC = 0.15
 MIN_SPEECH_SEC = 0.1
@@ -229,6 +236,17 @@ def _active(speech: SpeechMap, a: float, b: float) -> list[tuple[float, float]]:
         if hi > lo:
             out.append((lo, hi))
     return out
+
+
+def _speaking_time(speech: SpeechMap, a: float, b: float) -> float:
+    """a〜b 秒のうち、声がある（話している）長さ。"""
+    return sum(hi - lo for lo, hi in _active(speech, a, b))
+
+
+def _last_heard(s: dict) -> float | None:
+    """字幕で最後に聞こえた（認識と突き合った）字の時刻。無ければ None。"""
+    marks = s.get("_asr_marks") or ()
+    return float(marks[-1][1]) if s.get("_asr") and marks else None
 
 
 def _clock(active: list[tuple[float, float]], x: float) -> float:
@@ -571,9 +589,17 @@ def align_segments(segments: list[dict], speech: SpeechMap,
             # 認識の字の時刻は早めに出ることがあるので、その分は待つ（短い頭は今までどおり）
             head = (s.get("_asr_marks") or [(0, first)])[0][0]
             latest = first + 0.05 - max(0.0, head / HEAD_MAX_CPS - HEAD_EARLY_SEC)
-            near = [o for o in speech.onsets
-                    if o >= floor and a - ASR_SNAP_BEFORE_SEC <= o <= latest]
-            on = max(near) if near else None
+            lo = a - ASR_SNAP_BEFORE_SEC
+            prev_heard = _last_heard(items[k - 1]) if k > 0 else None
+            if head >= HEAD_LOOKBACK_MIN_CHARS and prev_heard is not None:
+                lo = min(lo, max(prev_heard + HEAD_AFTER_PREV_SEC, first - head / HEAD_MIN_CPS))
+            near = [o for o in speech.onsets if o >= floor and lo <= o <= latest]
+            on = None
+            if near:
+                # 頭を毎秒 HEAD_MAX_CPS 字で話せる、いちばん遅い話し始め。どこからでも足りなければ、
+                # 前の字幕の声の後ろでいちばん早い話し始め（28分40秒・31回目）
+                roomy = [o for o in near if _speaking_time(speech, o, first) >= head / HEAD_MAX_CPS]
+                on = max(roomy) if roomy else min(near)
         elif s.get("_asr"):
             on = _nearest_biased([o for o in speech.onsets if o >= floor], a,
                                  ASR_SNAP_BEFORE_SEC, ASR_SNAP_AFTER_SEC)
