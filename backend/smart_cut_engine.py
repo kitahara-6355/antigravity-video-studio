@@ -9,6 +9,7 @@ Phase D 変更:
   - video_editor_engine.FFmpegEditor を利用
 """
 
+import json
 import os
 import sys
 import logging
@@ -73,12 +74,22 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
         logger.warning(f"入力動画duration取得失敗: {e}")
     
     # SRT ファイルを一時生成
+    # 相づちだけの字幕（「はい。」）は出さない。音声とカットはそのまま（2026-10-06 ユーザー指摘）
+    try:
+        from subtitle_engine.text_formatter import is_standalone_omittable, _omit_words
+        standalone = _omit_words("omit_standalone_words")
+    except ImportError:
+        is_standalone_omittable, standalone = None, []
     srt_lines = []
+    hidden = 0
     for i, s in enumerate(segments, 1):
         start = s.get("start", 0)
         end = s.get("end", 0)
         text = s.get("text", "").strip()
         if not text:
+            continue
+        if standalone and is_standalone_omittable(text, standalone):
+            hidden += 1
             continue
         
         def _fmt_srt(sec):
@@ -96,7 +107,7 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
     # BUG-PV02: SRT末尾のタイムスタンプをログ出力
     if srt_lines:
         max_end = max((s.get("end", 0) for s in segments), default=0)
-        logger.info(f"SRT生成: {len([l for l in srt_lines if l.strip() and '-->' in l])}エントリ, max(end)={max_end:.1f}s")
+        logger.info(f"SRT生成: {len([l for l in srt_lines if l.strip() and '-->' in l])}エントリ, max(end)={max_end:.1f}s, 相づちで非表示={hidden}件")
         if video_duration and max_end > video_duration + 5:
             logger.warning(f"⚠️ SRT max(end)={max_end:.1f}s > 動画尺{video_duration:.1f}s — 動画膨張リスク!")
     
@@ -225,6 +236,172 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
 
 
 
+CUT_SUBTITLE_BUFFER = 0.5  # A-3: カット直後の字幕バッファ（秒）
+
+
+def _display_span(seg: dict) -> tuple[float, float]:
+    """字幕の行を**表示する**時刻（元の動画の時間軸）。
+
+    校閲の整形は1つの発話を数行に分け、各行の start/end を発話の中で按分する。
+    sourceStart/sourceEnd は発話全体の区間のまま（切る区間を決めるため）。
+    以前は表示にも sourceStart/sourceEnd を使っていて、**同じ発話の全行が同時に
+    出て下から逆順に積み上がっていた**（2026-10-05 raw 4本の実走）。
+    行の start/end が発話の区間に収まっていればそれを使う。
+    """
+    src_start = float(seg.get("sourceStart", seg.get("start", 0)))
+    src_end = float(seg.get("sourceEnd", seg.get("end", 0)))
+    start = seg.get("start")
+    end = seg.get("end")
+    if start is not None and end is not None:
+        start, end = float(start), float(end)
+        if src_start - 0.01 <= start < end <= src_end + 0.5:
+            return start, end
+    return src_start, src_end
+
+
+def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=None):
+    """字幕の時刻を音声に合わせる。音声が読めなければそのまま返す。
+
+    1. 素材を音声認識して**文字ごとの時刻**を取り、字幕の文字と突き合わせる
+       （モデルが無ければ飛ばす）
+    2. 残り（突き合わなかった字幕）を、声の切れ目と見せ方の規則で整える
+    """
+    try:
+        if not segments or not Path(cut_path).is_file() or Path(cut_path).stat().st_size == 0:
+            return segments
+        if source_path:
+            try:
+                from subtitle_engine import aligner
+                tokens = aligner.tokens_for(str(source_path))
+                if tokens:
+                    heard = aligner.to_output(tokens, ranges or [])
+                    # 認識が書き起こさなかった言いよどみ（「こう」「あの」「え」）を先に外す
+                    f = aligner.drop_unheard_fillers(segments, heard)
+                    n = aligner.align_captions(segments, heard)
+                    # 動画の長さ（残した区間の合計）。字幕をこの外に出さない
+                    end = sum(float(b) - float(a) for a, b in ranges) if ranges else None
+                    r = aligner.release_implausible(segments, end=end)
+                    m = aligner.interpolate_unaligned(segments, end=end)
+                    logger.info(f"🎯 音声認識で時刻を合わせた字幕: {n - r}枚（間に配り直し {m}枚・"
+                                f"話す時間が残らず外した {r}枚）/ 全 {len(segments)}枚・"
+                                f"認識に無い言いよどみを {f}語外した")
+            except Exception as e:
+                logger.warning(f"音声認識による時刻合わせをスキップ: {e}")
+        from subtitle_engine import sync
+        aligned, _ = sync.align_segments(segments, sync.speech_map(str(cut_path)),
+                                         cut_points, sync.timing_rules())
+        return aligned
+    except Exception as e:  # 合わせられなくても字幕は出す
+        logger.warning(f"字幕の時刻合わせをスキップ: {e}")
+        return segments
+
+
+def _cut_kept_ranges_exact(ffmpeg, input_path, ranges, out_path) -> bool:
+    """残す区間（素材の秒）だけを、1回のエンコードで時間ぴったりに抜き出す。
+
+    select / aselect で区間内のフレームだけを通し、時刻を詰め直す。出力の長さは
+    区間の合計とほぼ一致し（1区間あたり ±1 フレーム・±10ms・偏りなし）、字幕の時刻
+    （`retime_segments`）とずれが積み上がらない。
+    """
+    if not ranges or not hasattr(ffmpeg, "run_command"):
+        return False
+    # 終わりは含めない（gte・lt）。between は両端を含むので、区間ごとに1フレーム余分に
+    # 入り、179 区間で映像が音声より 3 秒長くなった（2026-10-06 実測）
+    expr = "+".join(f"gte(t,{a:.3f})*lt(t,{b:.3f})" for a, b in ranges)
+    graph = (f"[0:v]select='{expr}',setpts=N/FRAME_RATE/TB[v];"
+             f"[0:a]asetnsamples=n=480:p=0,aselect='{expr}',asetpts=N/SR/TB[a]")
+    script = Path(out_path).with_suffix(".filter.txt")
+    try:
+        script.write_text(graph, encoding="utf-8")
+        try:
+            enc = [a for a in ffmpeg._get_encode_args() if a not in ("-c:a", "aac")]
+        except (AttributeError, TypeError):
+            enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p"]
+        args = ["-y", "-i", str(input_path), "-filter_complex_script", str(script),
+                "-map", "[v]", "-map", "[a]", *enc, "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart", str(out_path)]
+        ok, _ = ffmpeg.run_command(args, timeout=7200)
+        return bool(ok) and Path(out_path).exists() and Path(out_path).stat().st_size > 1024
+    except (OSError, TypeError, ValueError) as e:
+        logger.warning(f"区間の一括抽出に失敗: {e}")
+        return False
+    finally:
+        try:
+            script.unlink()
+        except OSError:
+            pass
+
+
+def subtitle_sidecar_path(video_path) -> Path:
+    """出力動画の時間軸の字幕（JSON）の置き場所。"""
+    p = Path(video_path)
+    return p.with_name(p.stem + ".subtitles.json")
+
+
+def _sidecar_rows(segments) -> list[dict]:
+    return [{"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
+             "text": s.get("text", "")} for s in segments]
+
+
+def write_subtitle_sidecar(video_path, segments, ranges=None, path=None, estimated=None,
+                           cut_points=None) -> None:
+    """出力の時間軸の字幕と、素材のどの区間を残したか（`ranges`）を書く。
+
+    `estimated`（時刻合わせの前の推定）と `cut_points` もあれば残す。合わせ方の不具合を、
+    書き出し直さずに同じ入力で再現できるようにするため。
+    """
+    try:
+        data = {"segments": _sidecar_rows(segments),
+                "ranges": [[round(float(a), 3), round(float(b), 3)] for a, b in (ranges or [])]}
+        if estimated is not None:
+            data["estimated"] = _sidecar_rows(estimated)
+        if cut_points is not None:
+            data["cut_points"] = [round(float(c), 3) for c in cut_points]
+        (path or subtitle_sidecar_path(video_path)).write_text(
+            json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except (OSError, TypeError, ValueError) as e:
+        logger.warning(f"字幕の横置き JSON を書けませんでした: {e}")
+
+
+def retime_segments(segments, merged):
+    """BUG-PV02/PV04: 字幕の時刻をカット後の時間軸に直す。
+
+    merged は元の動画の時間軸で残す区間。merged[0]=(s0,e0) は出力の 0〜(e0-s0) 秒、
+    merged[1]=(s1,e1) は (e0-s0)〜(e0-s0)+(e1-s1) 秒に並ぶ。
+    どの区間に属するかは発話の区間（sourceStart/sourceEnd）で、表示の時刻は
+    `_display_span` で決める。返り値は (直した字幕, 出力の尺, カット点)。
+    """
+    recalculated_segments = []
+    output_offset = 0.0
+    cut_points = []  # カットポイントの出力タイムライン位置を記録
+    for ri, (range_start, range_end) in enumerate(merged):
+        if ri > 0:
+            cut_points.append(output_offset)
+        for seg in segments:
+            seg_start = seg.get("sourceStart", seg.get("start", 0))
+            seg_end = seg.get("sourceEnd", seg.get("end", 0))
+            # セグメントがこのrangeに含まれるか判定
+            if seg_start >= range_start and seg_end <= range_end + 0.5:
+                show_start, show_end = _display_span(seg)
+                new_seg = dict(seg)
+                new_start = output_offset + (show_start - range_start)
+                new_end = output_offset + (min(show_end, range_end) - range_start)
+
+                # A-3: カットポイント直後の字幕バッファ
+                # カット直後0.5秒以内に始まる字幕は開始を遅らせる
+                for cp in cut_points:
+                    if cp <= new_start < cp + CUT_SUBTITLE_BUFFER:
+                        new_start = cp + CUT_SUBTITLE_BUFFER
+                        break
+
+                if new_end > new_start:  # バッファ適用後も有効な場合のみ追加
+                    new_seg["start"] = new_start
+                    new_seg["end"] = new_end
+                    recalculated_segments.append(new_seg)
+        output_offset += (range_end - range_start)
+    return recalculated_segments, output_offset, cut_points
+
+
 def render_smart_cut(
     segments,
     original_video_path,
@@ -272,86 +449,83 @@ def render_smart_cut(
     try:
         ffmpeg = video_editor.ffmpeg
         input_path = Path(original_video_path)
-        
+        temp_cut_path = Path(output_path).with_suffix('.tmp.mp4')
+        # **1回のエンコードで残す区間だけを抜く**（2026-10-06）。パーツに -c copy で
+        # 切って concat すると、キーフレーム・AAC の端数がパーツごとに積み上がり、
+        # 178 パーツで**映像と音声が字幕より 22 秒遅れた**（素材 25 分地点で 15 秒）。
         # 動画の長さを取得（境界チェック用）
         total_duration = ffmpeg.get_duration(input_path)
         if total_duration is None:
             logger.warning("Could not determine video duration, proceeding anyway")
             total_duration = float('inf')
+        clamped = [(max(0, min(a, total_duration)), max(0, min(b, total_duration))) for a, b in merged]
+        clamped = [(a, b) for a, b in clamped if b > a]
+        exact = (len(clamped) > 1
+                 and getattr(ffmpeg, "supports_exact_range_cut", False) is True
+                 and _cut_kept_ranges_exact(ffmpeg, input_path, clamped, temp_cut_path))
+        if not exact:
+            if len(clamped) > 1 and getattr(ffmpeg, "supports_exact_range_cut", False) is True:
+                logger.warning("区間の一括抽出に失敗 → パーツを切って結合する従来の方法に戻します（ずれが出ます）")
         
-        for i, (start, end) in enumerate(merged):
-            # 境界チェック
-            s = max(0, min(start, total_duration))
-            e = max(0, min(end, total_duration))
-            if e <= s:
-                continue
+            for i, (start, end) in enumerate(merged):
+                # 境界チェック
+                s = max(0, min(start, total_duration))
+                e = max(0, min(end, total_duration))
+                if e <= s:
+                    continue
             
-            temp_path = Path(output_path).parent / f"_smartcut_part_{i:04d}.mp4"
-            if ffmpeg.cut_video(input_path, temp_path, s, e):
-                temp_parts.append(temp_path)
-            else:
-                logger.warning(f"Failed to cut segment {i} ({s:.2f}-{e:.2f})")
+                temp_path = Path(output_path).parent / f"_smartcut_part_{i:04d}.mp4"
+                if ffmpeg.cut_video(input_path, temp_path, s, e):
+                    temp_parts.append(temp_path)
+                else:
+                    logger.warning(f"Failed to cut segment {i} ({s:.2f}-{e:.2f})")
         
-        if not temp_parts:
-            logger.error("No valid ranges to keep.")
-            return False
-
-        logger.info(f"SmartCut: {len(temp_parts)} parts to merge")
-
-        # 3. Merge all parts
-        temp_cut_path = Path(output_path).with_suffix('.tmp.mp4')
-        if len(temp_parts) == 1:
-            # 単一セグメントの場合はコピー
-            import shutil
-            shutil.copy(temp_parts[0], temp_cut_path)
-        else:
-            clips = [VideoClip(path=p) for p in temp_parts]
-            # 大容量テスト対応: 多数パートのconcatには長時間必要
-            orig_timeout = 600
-            try:
-                # merge_videosでrun_command内のtimeout=600が足りない場合に対応
-                # run_commandのデフォルトtimeoutを一時的に延長
-                ffmpeg._merge_timeout = 1800  # 30分
-            except (AttributeError, TypeError) as e:
-                logger.debug(f"merge_timeout設定スキップ: {e}")
-            if not ffmpeg.merge_videos(clips, temp_cut_path):
-                logger.error(f"Merge failed ({len(clips)} clips)")
+            if not temp_parts:
+                logger.error("No valid ranges to keep.")
                 return False
+
+            logger.info(f"SmartCut: {len(temp_parts)} parts to merge")
+
+            # 3. Merge all parts
+            if len(temp_parts) == 1:
+                # 単一セグメントの場合はコピー
+                import shutil
+                shutil.copy(temp_parts[0], temp_cut_path)
+            else:
+                clips = [VideoClip(path=p) for p in temp_parts]
+                # 大容量テスト対応: 多数パートのconcatには長時間必要
+                orig_timeout = 600
+                try:
+                    # merge_videosでrun_command内のtimeout=600が足りない場合に対応
+                    # run_commandのデフォルトtimeoutを一時的に延長
+                    ffmpeg._merge_timeout = 1800  # 30分
+                except (AttributeError, TypeError) as e:
+                    logger.debug(f"merge_timeout設定スキップ: {e}")
+                if not ffmpeg.merge_videos(clips, temp_cut_path):
+                    logger.error(f"Merge failed ({len(clips)} clips)")
+                    return False
         
         # 4. ━━━ BUG-PV02/PV04修正: SRTタイムスタンプをカット後タイムラインに再計算 ━━━
         # merged rangesは元動画の時間軸。カット後の新タイムラインを構築する。
         # merged[0]=(s0,e0) → 出力0〜(e0-s0)秒
         # merged[1]=(s1,e1) → 出力(e0-s0)〜(e0-s0)+(e1-s1)秒
-        CUT_SUBTITLE_BUFFER = 0.5  # A-3: カット直後の字幕バッファ（秒）
-        recalculated_segments = []
-        output_offset = 0.0
-        cut_points = []  # カットポイントの出力タイムライン位置を記録
-        for ri, (range_start, range_end) in enumerate(merged):
-            if ri > 0:
-                cut_points.append(output_offset)
-            for seg in segments:
-                seg_start = seg.get("sourceStart", seg.get("start", 0))
-                seg_end = seg.get("sourceEnd", seg.get("end", 0))
-                # セグメントがこのrangeに含まれるか判定
-                if seg_start >= range_start and seg_end <= range_end + 0.5:
-                    new_seg = dict(seg)
-                    new_start = output_offset + (seg_start - range_start)
-                    new_end = output_offset + (seg_end - range_start)
-
-                    # A-3: カットポイント直後の字幕バッファ
-                    # カット直後0.5秒以内に始まる字幕は開始を遅らせる
-                    for cp in cut_points:
-                        if cp <= new_start < cp + CUT_SUBTITLE_BUFFER:
-                            new_start = cp + CUT_SUBTITLE_BUFFER
-                            break
-
-                    if new_end > new_start:  # バッファ適用後も有効な場合のみ追加
-                        new_seg["start"] = new_start
-                        new_seg["end"] = new_end
-                        recalculated_segments.append(new_seg)
-            output_offset += (range_end - range_start)
+        recalculated_segments, output_offset, cut_points = retime_segments(segments, merged)
 
         logger.info(f"SRTタイムスタンプ再計算: {len(segments)}seg → {len(recalculated_segments)}seg, 出力尺={output_offset:.1f}s, カットポイント={len(cut_points)}箇所")
+
+        # 字幕の出だし・終わりを、カット後の音声の話し始め・話し終わりに合わせる
+        # （2026-10-06 ユーザー指摘「言葉より先に出すぎる」）。文字起こしの時刻は粗い推定
+        estimated_segments = [dict(s) for s in recalculated_segments]
+        recalculated_segments = _align_to_speech(temp_cut_path, recalculated_segments, cut_points,
+                                                 source_path=input_path, ranges=merged)
+
+        # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
+        # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）
+        # 置き場所は temp_cut_path（<出力>.tmp.mp4）の隣。出力と同じ名前で .subtitles.json
+        write_subtitle_sidecar(None, recalculated_segments, merged, estimated=estimated_segments,
+                               cut_points=cut_points,
+                               path=temp_cut_path.with_name(
+                                   temp_cut_path.name[:-len(".tmp.mp4")] + ".subtitles.json"))
 
         # 5. Overlay Subtitles via FFmpeg (Phase D: MoviePy 完全脱却)
         burn_result = _burn_subtitles_ffmpeg(str(temp_cut_path), recalculated_segments, output_path, ffmpeg)

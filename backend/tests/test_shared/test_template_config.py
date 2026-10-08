@@ -1,4 +1,5 @@
 import pytest
+from template_constants import _DEFAULT_SUBTITLE_RULES  # noqa: E402
 from template_config import TemplateConfigProvider, template_config
 
 def test_template_config_provider_default():
@@ -11,7 +12,7 @@ def test_template_config_provider_default():
     # Default rules
     sub_rules = provider.get_subtitle_rules()
     assert sub_rules["chars_per_second"] == 4
-    assert provider.get_max_chars_per_line() == 15
+    assert provider.get_max_chars_per_line() == _DEFAULT_SUBTITLE_RULES["max_chars_per_line"]
     assert provider.get_chars_per_second() == 4
     assert provider.get_min_display_seconds() == 1.2
 
@@ -257,7 +258,7 @@ def test_template_config_coverage_gap():
         "chars_per_second": object(),
         "min_display_seconds": object()
     }
-    assert provider.get_max_chars_per_line() == 15
+    assert provider.get_max_chars_per_line() == _DEFAULT_SUBTITLE_RULES["max_chars_per_line"]
     assert provider.get_chars_per_second() == 4.0
     assert provider.get_min_display_seconds() == 1.2
     

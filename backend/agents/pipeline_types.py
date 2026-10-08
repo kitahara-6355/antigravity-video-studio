@@ -111,6 +111,17 @@ class PipelineContext:
     """パイプライン全体で共有するコンテキスト"""
     video_path: str
     target_minutes: int = 20
+    # **目標尺が素材の尺から決まったか**（CLI の既定）。そのとき目標尺は「素材の長さ」で
+    # あって「出来上がりの長さ」ではない — 無音を詰めれば必ず短くなる
+    target_auto: bool = False
+    # SmartCut が残すと決めた区間の合計（秒）。レンダリングと同じ規則で結合した値
+    planned_output_sec: Optional[float] = None
+    # 文字起こしで「音はあるが発話ではない」と確認した区間（素材の秒）。品質ゲートの欠落検知が除外する
+    verified_quiet: list = field(default_factory=list)
+    # 文字起こしの段階で測った欠落（coverage.CoverageReport.to_dict()）。文字の薄さはここでだけ測る
+    transcript_coverage: Optional[dict] = None
+    # 校閲（AI）が分けて再実行しても失敗した字幕の範囲 [開始, 終了)。品質ゲートが合格させない
+    proofread_failed_ranges: list = field(default_factory=list)
     session_id: str = ""
     started_at: str = ""
     segments: List[Segment] = field(default_factory=list)

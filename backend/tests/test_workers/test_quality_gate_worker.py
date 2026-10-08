@@ -3683,3 +3683,62 @@ class TestQualityGateWorkerAdditionalCoverage:
         assert ctx.quality_score == 100
 
 
+
+
+# ============================================================
+# 目標尺が素材から決まったときは計画尺と照らす（2026-10-05 raw 4本の実走）
+# ============================================================
+
+
+def _ffprobe_says(duration_sec: float):
+    import json
+    res = MagicMock()
+    res.returncode = 0
+    res.stdout = json.dumps({"format": {"duration": str(duration_sec), "size": str(300 * 1024 * 1024)},
+                             "streams": [{"codec_type": "video"}, {"codec_type": "audio"}]})
+    return res
+
+
+def _physical(ctx, duration_sec):
+    with patch("subprocess.run", return_value=_ffprobe_says(duration_sec)), \
+         patch("pathlib.Path.exists", return_value=True):
+        return QualityGateWorker()._ffprobe_physical_check(ctx)
+
+
+class TestAutoTargetUsesThePlan:
+    @pytest.fixture(autouse=True)
+    def mock_ffprobe_physical_check(self):
+        """物理検証を本物で走らせる（グローバルの差し替えを外す）"""
+        yield
+
+    def test_auto_target_compares_with_the_smartcut_plan_not_the_raw_length(self):
+        """43分の素材から無音を詰めて37分を残すのは正しい。素材の長さを目標にして -50 にしない。"""
+        ctx = PipelineContext(video_path="raw.mp4", target_minutes=43, target_auto=True,
+                              planned_output_sec=37 * 60)
+        ctx.preview_path = "p.mp4"
+
+        result = _physical(ctx, 36.9 * 60)
+
+        assert not any("出力尺異常" in f["message"] for f in result["failures"])
+
+
+    def test_auto_target_still_catches_an_output_far_from_the_plan(self):
+        """計画の半分しか出てこなければ、それは異常（分割字幕の二重計上で 19分になった実走）。"""
+        ctx = PipelineContext(video_path="raw.mp4", target_minutes=43, target_auto=True,
+                              planned_output_sec=37 * 60)
+        ctx.preview_path = "p.mp4"
+
+        result = _physical(ctx, 19.2 * 60)
+
+        assert any("出力尺異常" in f["message"] and "計画" in f["message"] for f in result["failures"])
+
+
+    def test_an_explicit_target_is_still_the_yardstick(self):
+        """人が --target-minutes で決めた尺は、計画尺に置き換えない。"""
+        ctx = PipelineContext(video_path="raw.mp4", target_minutes=20, target_auto=False,
+                              planned_output_sec=37 * 60)
+        ctx.preview_path = "p.mp4"
+
+        result = _physical(ctx, 37 * 60)
+
+        assert any("出力尺異常" in f["message"] for f in result["failures"])

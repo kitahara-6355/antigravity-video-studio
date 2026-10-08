@@ -11,6 +11,14 @@ sys.modules['subtitle_engine.whisper_subprocess'] = MagicMock()
 sys.modules['subtitle_engine.ai_proofreader'] = MagicMock()
 sys.modules['subtitle_engine.speaker_diarizer'] = MagicMock()
 
+from subtitle_engine.text_formatter import strip_punctuation, _strip_punctuation_enabled  # noqa: E402
+
+
+def _shown(text):
+    """字幕に出る形（句読点を出さない設定なら外す）。"""
+    return strip_punctuation(text) if _strip_punctuation_enabled() else text
+
+
 from subtitle_engine.text_formatter import (
     remove_fillers,
     _split_at_boundary,
@@ -21,10 +29,109 @@ from subtitle_engine.text_formatter import (
     get_max_chars_from_template,
     get_chars_per_second_from_template,
 )
+from subtitle_engine import text_formatter as tf
+
+
+@pytest.fixture
+def without_budoux(monkeypatch):
+    """BudouX が無い環境の従来経路（助詞の文字で切る）を固定して検証する。"""
+    monkeypatch.setattr(tf, "_phrase_parser", lambda: None)
+
+
+needs_budoux = pytest.mark.skipif(tf._phrase_parser() is None, reason="budoux が無い")
+
+
+# ------------------------------------------------------------
+# 意味の塊での字幕分割（2026-10-05 ユーザー指摘:「字幕の切れ目が意味の塊になっていない」）
+# ------------------------------------------------------------
+
+@needs_budoux
+def test_captions_do_not_split_a_word_or_a_noun_phrase():
+    """「書を|通して」「その|思いを」のように塊を割らない。1枚は2行まで。"""
+    caps = tf.split_into_captions("このチャンネルでは書を通して人々の心に触れ、その思いを深くお聞きしていきます。")
+
+    assert caps == ["このチャンネルでは\n書を通して人々の心に触れ、", "その思いを\n深くお聞きしていきます。"]
+
+
+@needs_budoux
+def test_captions_always_break_at_sentence_end():
+    caps = tf.split_into_captions("はい。ありがとうございます。")
+
+    assert caps == ["はい。", "ありがとうございます。"]
+
+
+@needs_budoux
+def test_long_compound_noun_is_cut_at_a_word_boundary_not_leaving_a_bare_particle():
+    """「…理事長\nで、」のように助詞と句読点だけの行を作らない。"""
+    caps = tf.split_into_captions("日本デザイン書道作家協会理事長で、")
+
+    assert caps == ["日本デザイン\n書道作家協会理事長で、"]
+
+
+@needs_budoux
+def test_long_phrase_is_not_cut_inside_okurigana():
+    """「教|えた」で割らず「教えた|のかも」で割る。"""
+    assert tf._split_long_phrase("1500人教えたのかもしれないけど、", 15) == ["1500人教えた", "のかもしれないけど、"]
+
+
+@needs_budoux
+def test_opening_bracket_moves_to_the_next_line():
+    phrases = tf._phrases("お客さん「ありがとうございます」みたいな", 15)
+
+    assert not any(ph.endswith("「") for ph in phrases)
+
+
+@needs_budoux
+def test_every_caption_fits_two_lines_of_max_chars():
+    text = ("では、記念すべき第1回目のゲストは、日本デザイン書道作家協会理事長で、"
+            "デザイン書道の第一人者久木田博信先生です。")
+    for cap in tf.split_into_captions(text, 15, 2):
+        lines = cap.split("\n")
+        assert len(lines) <= 2 and all(len(line) <= 15 for line in lines)
+        assert lines[-1] not in ("で、", "は", "の")
+
+
+@needs_budoux
+def test_format_segments_keeps_the_wrapping_and_splits_time_by_characters():
+    segs = [{"text": "先生、どうぞよろしくお願いいたします。", "start": 0.0, "end": 4.0,
+             "sourceStart": 10.0, "sourceEnd": 14.0}]
+
+    res = format_segments(segs, 15)
+
+    # 句読点を出すかはテンプレートの strip_punctuation が決める（2026-10-06 ユーザー指摘）
+    assert [r["text"] for r in res] == [_shown("先生、どうぞよろしく\nお願いいたします。")]
+    assert res[0]["sourceStart"] == 10.0 and res[0]["sourceEnd"] == 14.0
+
+
+@needs_budoux
+def test_format_segments_times_each_caption_in_proportion_to_its_characters():
+    segs = [{"text": "このチャンネルでは書を通して人々の心に触れ、その思いを深くお聞きしていきます。",
+             "start": 0.0, "end": 8.0, "sourceStart": 0.0, "sourceEnd": 8.0}]
+
+    res = format_segments(segs, 15)
+
+    assert len(res) == 2
+    first = len("このチャンネルでは書を通して人々の心に触れ、")
+    total = first + len("その思いを深くお聞きしていきます。")
+    assert abs(res[0]["end"] - 8.0 * first / total) < 1e-6
+    assert res[1]["start"] == res[0]["end"] and res[1]["end"] == 8.0
+
+
+@needs_budoux
+def test_speed_adjust_does_not_break_a_short_line_inside_a_word():
+    """速すぎる短い字幕でも「なんで|すか」のように語の途中で折らない。"""
+    res = adjust_segment_speeds([{"text": "数年前なんですか。", "start": 0.0, "end": 0.4}])
+
+    assert res[0]["text"] == "数年前なんですか。"
+
+
+def test_without_budoux_captions_fall_back_to_the_old_split(without_budoux):
+    assert tf.split_into_captions("私は今日、プログラミングをします。") == []
 
 def test_remove_fillers():
     assert remove_fillers("えーと、本日は晴天です。") == "、本日は晴天です。"
-    assert remove_fillers("あのー、なんかそうそうそう") == "、"
+    # 「なんか」は「、」を見て外す規則に任せる（どこでも消すと「駄菓子屋かなんか」が欠ける）
+    assert remove_fillers("あのー、なんかそうそうそう") == "、なんか"
     assert remove_fillers("普通のテキスト") == "普通のテキスト"
 
 def test_split_at_boundary():
@@ -114,7 +221,7 @@ def test_split_by_word_timing():
 def test_format_segments_empty():
     assert format_segments([]) == []
 
-def test_format_segments_normal():
+def test_format_segments_normal(without_budoux):
     # cleanedが空になるケースのカバー
     segs_empty = [{"text": "えーとあのー", "start": 0.0, "end": 1.0}]
     assert format_segments(segs_empty, 15) == []
@@ -129,10 +236,10 @@ def test_format_segments_normal():
     segs = [{"text": "私は今日、プログラミングをします。", "start": 0.0, "end": 4.0}]
     res = format_segments(segs, 15)
     assert len(res) == 2
-    assert res[0]["text"] == "私は今日、プログラミングを"
+    assert res[0]["text"] == _shown("私は今日、プログラミングを")
     assert res[0]["start"] == 0.0
     assert abs(res[0]["end"] - (13 / 17 * 4.0)) < 1e-6
-    assert res[1]["text"] == "します。"
+    assert res[1]["text"] == _shown("します。")
     assert abs(res[1]["start"] - (13 / 17 * 4.0)) < 1e-6
     assert res[1]["end"] == 4.0
 
@@ -163,7 +270,7 @@ def test_format_segments_normal():
         # max_chars=10なので、最後にenforce_line_lengthで改行が入る
         assert res_fallback[0]["text"] == "あいうえおかきくけこ\nさしすせそ"
 
-def test_adjust_segment_speeds():
+def test_adjust_segment_speeds(without_budoux):
     # segmentsが空
     assert adjust_segment_speeds([]) == []
 
@@ -299,7 +406,7 @@ def test_exceptional_fallbacks_and_boundaries():
 
 
 
-def test_coverage_branch_gaps():
+def test_coverage_branch_gaps(without_budoux):
     # 1. _split_at_boundary の 75->82 (breakせずに正常終了するforループ)
     res_no_break = _split_at_boundary("私は今日プログラミングをaaaaaaaaa", 15)
     assert res_no_break == ["私は今日プログラミングを", "aaaaaaaaa"]
@@ -487,7 +594,7 @@ def test_remove_fillers_invalid_input():
     assert remove_fillers(None) == ""
     assert remove_fillers(12345) == ""
 
-def test_tf_invalid_max_chars_coverage():
+def test_tf_invalid_max_chars_coverage(without_budoux):
     # max_chars の変換で ValueError を発生させるテスト
     assert enforce_line_length("私は今日、プログラミングをします。", "invalid_max") == "私は今日、プログラミングをしま\nす。"
     # format_segments で max_chars 変換で ValueError を発生させデフォルトにフォールバック

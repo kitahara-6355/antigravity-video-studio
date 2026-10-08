@@ -16,7 +16,8 @@ from subtitle_engine.text_formatter import (
 def test_remove_fillers():
     # フィラーが正しく除去されること
     assert remove_fillers("えーと、今日はいい天気です。") == "、今日はいい天気です。"
-    assert remove_fillers("あのー、ちょっと待ってください。") == "、待ってください。"
+    # 「ちょっと」は中身なので残す（「ちょっと待って」が「待って」になっていた）
+    assert remove_fillers("あのー、ちょっと待ってください。") == "、ちょっと待ってください。"
     # フィラーがない場合はそのまま
     assert remove_fillers("こんにちは。") == "こんにちは。"
     # 空文字や前後の空白処理

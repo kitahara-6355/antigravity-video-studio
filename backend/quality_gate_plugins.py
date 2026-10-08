@@ -270,7 +270,13 @@ class SubtitleLineCheck(QualityCheckPlugin):
             max_cpl = template_config.get_subtitle_rules().get("max_chars_per_line", 15)
         else:
             tmpl_id = "業界標準"
-            max_cpl = 15  # テレビ放送標準: 15文字/行
+            # 字幕の整形と同じ既定値で測る（1行 18 字・2026-10-06 ユーザー了承）。放送の 15 字の
+            # ままだと、整形どおりの字幕が毎回「長い行」として 5 点引かれる
+            try:
+                from template_constants import _DEFAULT_SUBTITLE_RULES
+                max_cpl = int(_DEFAULT_SUBTITLE_RULES["max_chars_per_line"])
+            except (ImportError, KeyError, TypeError, ValueError):
+                max_cpl = 15  # テレビ放送標準: 15文字/行
         long_lines = 0
         
         for seg in ctx.segments:
@@ -318,6 +324,145 @@ class HookCheck(QualityCheckPlugin):
                 f"{first_start:.1f}秒目（基準: {hook_window}秒以内）")
         
         return {"deductions": deductions, "feedback": feedback}
+
+
+# 間の後の話し始めのうち、字幕が早すぎ・遅すぎの割合の上限。合わせる前の実測は 21.5%、合わせた後は 8.1%
+SYNC_OFF_RATIO_MAX = 0.15
+# これより短く出る字幕は読めない
+FLASH_SEC = 0.5
+
+
+class SubtitleCoverageCheck(QualityCheckPlugin):
+    """字幕の欠落チェック — 喋っているのに字幕が無い・極端に薄い区間（2026-10-06 ユーザー指摘）。
+
+    Gemini の起こしが約 30 秒の発話を落とし、字幕の無い区間を SmartCut が
+    動画から消していた。それでも 86 点が出た（欠落を数える項目が無かった）。
+
+    2つの時間軸で見る:
+    - **素材**（`ctx.video_path` と字幕の `sourceStart/sourceEnd`）— 起こし漏れ。
+      漏れた発話はカットで消えるので、出力だけ見ても分からない
+    - **出力**（`ctx.preview_path` と横置きの字幕 JSON）— 焼き込んだ字幕の抜け
+
+    欠落があれば `blocking` を立てる。**点数に関わらず合格させない**（quality_gate_worker）。
+    """
+    name = "subtitle_coverage_check"
+    category = "core"
+
+    def analyze(self, ctx, template_config=None):
+        try:
+            from subtitle_engine import coverage
+        except ImportError:
+            from backend.subtitle_engine import coverage  # type: ignore[no-redef]
+
+        checks = []
+        # 文字起こしで「音はあるが発話ではない」と確認した区間（書いている場面・BGM）
+        quiet = [tuple(q) for q in (getattr(ctx, "verified_quiet", None) or [])]
+        segments = getattr(ctx, "segments", None) or []
+        video = getattr(ctx, "video_path", None)
+        if segments and video and Path(str(video)).exists():
+            checks.append(("素材", str(video), segments, "sourceStart", "sourceEnd", quiet))
+        preview = getattr(ctx, "preview_path", None)
+        if preview and Path(str(preview)).exists():
+            try:
+                from smart_cut_engine import subtitle_sidecar_path
+            except ImportError:
+                from backend.smart_cut_engine import subtitle_sidecar_path  # type: ignore[no-redef]
+            side = subtitle_sidecar_path(preview)
+            if side.exists():
+                try:
+                    data = json.loads(side.read_text(encoding="utf-8"))
+                    rows = data.get("segments", []) if isinstance(data, dict) else data
+                    ranges = data.get("ranges", []) if isinstance(data, dict) else []
+                    checks.append(("出力", str(preview), rows, "start", "end",
+                                   coverage.map_to_output(quiet, ranges)))
+                except (OSError, ValueError) as e:
+                    logger.warning(f"字幕の横置き JSON を読めません: {e}")
+        if not checks:
+            return {"deductions": 0, "feedback": [], "checked": False,
+                    "skip_reason": "素材・出力と字幕の組が揃いません"}
+
+        cache = getattr(ctx, "_coverage_cache", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            try:
+                ctx._coverage_cache = cache
+            except AttributeError:
+                pass
+        feedback, reports, blocking = [], {}, False
+        for label, media, segs, sk, ek, exclude in checks:
+            key = (label, media, len(segs), len(exclude))
+            try:
+                if key not in cache:
+                    keyed = [s if s.get(sk) is not None else {**s, sk: s.get("start"), ek: s.get("end")}
+                             for s in segs if isinstance(s, dict)]
+                    # 文字の薄さは見ない（整形でフィラー・相づちを外すと減るのが正しい）。
+                    # 薄さは文字起こしの段階の測定（ctx.transcript_coverage）で見る
+                    cache[key] = coverage.check_media(media, keyed, start_key=sk, end_key=ek,
+                                                      exclude=exclude, check_sparse=False)
+                rep = cache[key]
+            except Exception as e:  # ffmpeg が無い・読めない
+                return {"deductions": 0, "feedback": [], "checked": False,
+                        "skip_reason": f"発話区間を測れません: {e}"}
+            reports[label] = rep.to_dict()
+            if rep.has_gaps:
+                blocking = True
+                feedback.append(f"⛔ 字幕の欠落（{label}）: {rep.summary()}")
+            if label == "素材" and rep.excluded:
+                feedback.append("⚠ 発話が少ない区間（2回起こしても文字が出ない・人が確認）: "
+                                + ", ".join(coverage._mmss(a) for a, _ in rep.excluded[:6]))
+        # 点は品質ゲート側で合格点の下に抑える。ここで大きく引くと他の項目の良し悪しが読めなくなる
+        tx = getattr(ctx, "transcript_coverage", None)
+        if isinstance(tx, dict):
+            reports["文字起こし"] = tx
+            if tx.get("has_gaps"):
+                blocking = True
+                feedback.append(
+                    f"⛔ 字幕の欠落（文字起こし）: 覆われていない発話 {tx.get('uncovered_sec', 0):.0f}秒・"
+                    f"文字が薄い区間 " + (", ".join(coverage._mmss(w["start"]) for w in tx.get("sparse", [])[:6]) or "なし"))
+        # 校閲（AI）が落ちた字幕は誤変換が残る（2026-10-06「読んで」「初会」）。合格させない
+        unproofed = getattr(ctx, "proofread_failed_ranges", None) or []
+        if unproofed:
+            blocking = True
+            feedback.append(f"⛔ 未校閲の字幕あり: AI校閲の失敗 {len(unproofed)}か所"
+                            f"（{sum(b - a for a, b in unproofed)}行）")
+        deductions = 10 if blocking else 0
+        # 字幕の出だしが話し始めに合っているか（2026-10-06 ユーザー指摘「言葉より先に出すぎる」）
+        timing = None
+        out = next((c for c in checks if c[0] == "出力"), None)
+        if out is not None:
+            try:
+                try:
+                    from subtitle_engine import sync
+                except ImportError:
+                    from backend.subtitle_engine import sync  # type: ignore[no-redef]
+                skey = ("sync", out[1])
+                if skey not in cache:
+                    cache[skey] = sync.speech_map(out[1])
+                timing = sync.measure_sync(out[2], cache[skey])
+                # 一瞬で消える字幕（読めない）。校閲の行ずれ・時刻の潰れで出る（2026-10-06 実走）
+                try:
+                    from subtitle_engine.text_formatter import is_standalone_omittable, _omit_words
+                    aizuchi = _omit_words("omit_standalone_words")
+                except ImportError:
+                    is_standalone_omittable, aizuchi = None, []
+                # 相づちだけの字幕は焼き込まないので数えない
+                flashes = [r for r in out[2] if isinstance(r, dict) and r.get("text")
+                           and float(r.get("end", 0)) - float(r.get("start", 0)) < FLASH_SEC
+                           and not (aizuchi and is_standalone_omittable(r["text"], aizuchi))]
+                timing["flash"] = len(flashes)
+                if flashes:
+                    deductions += 3
+                    feedback.append(f"⚠ 一瞬で消える字幕（{FLASH_SEC}秒未満）: {len(flashes)}枚 — "
+                                    + ", ".join(coverage._mmss(float(r['start'])) for r in flashes[:6]))
+                if timing["off_ratio"] > SYNC_OFF_RATIO_MAX:
+                    deductions += 3
+                    feedback.append(
+                        f"⚠ 字幕の出だしが話し始めとずれている: 間の後 {timing['checked']}か所のうち"
+                        f"早すぎ {timing['early']}・遅すぎ {timing['late']}")
+            except Exception as e:  # 測れなくても欠落の判定は返す
+                logger.warning(f"字幕の出だしのずれを測れません: {e}")
+        return {"deductions": deductions, "feedback": feedback, "blocking": blocking,
+                "coverage": reports, "timing": timing}
 
 
 class DeadAirCheck(QualityCheckPlugin):
@@ -1196,6 +1341,7 @@ PLUGIN_REGISTRY: List[QualityCheckPlugin] = [
     AIRuleCheck(),
     AudioPresenceCheck(),
     DurationSanityCheck(),
+    SubtitleCoverageCheck(),
     # テンプレート基準
     SubtitleSpeedCheck(),
     SubtitleLineCheck(),
@@ -1421,5 +1567,8 @@ def run_all_plugins(ctx: Any, template_config: Any = None,
         # 減点 0 として点に効いてしまう。値ではなくこの2つで表す。
         "failed_plugins": failed_plugins,
         "all_plugins_ran": not failed_plugins,
+        # **点数に関わらず合格させない欠陥**（字幕の欠落など）。名前の一覧
+        "blocking": [n for n, r in plugin_results.items()
+                     if isinstance(r, dict) and r.get("blocking")],
     }
 

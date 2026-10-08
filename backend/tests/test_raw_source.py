@@ -159,3 +159,85 @@ def test_a_drive_error_is_reported_not_raised(monkeypatch, capsys):
 
     assert raw_source.run_list({raw_source.FOLDER_ENV: FOLDER}) == 1
     assert "Drive から読めません" in capsys.readouterr().err
+
+
+# --- 3. 取得（--fetch）------------------------------------------------------------
+
+
+def _fake_download(payloads):
+    """`_download` の差し替え。名前ごとの中身を書き、呼ばれた ID を記録する。"""
+    calls = []
+
+    def download(service, file_id, dest):
+        calls.append(file_id)
+        dest.write_bytes(payloads[file_id])
+
+    return download, calls
+
+
+def test_fetch_writes_each_video_and_checks_its_size(tmp_path):
+    files = [{"id": "i1", "name": "a.mp4", "size": "3"},
+             {"id": "i2", "name": "b.mp4", "size": "2"}]
+    download, calls = _fake_download({"i1": b"abc", "i2": b"de"})
+
+    paths = raw_source.fetch_videos(MagicMock(), files, tmp_path, download=download)
+
+    assert [p.name for p in paths] == ["a.mp4", "b.mp4"]
+    assert (tmp_path / "a.mp4").read_bytes() == b"abc"
+    assert calls == ["i1", "i2"]
+    assert not list(tmp_path.glob("*.part"))
+
+
+def test_fetch_skips_a_video_already_there_with_the_same_size(tmp_path):
+    (tmp_path / "a.mp4").write_bytes(b"abc")
+    download, calls = _fake_download({"i1": b"xyz"})
+
+    raw_source.fetch_videos(MagicMock(), [{"id": "i1", "name": "a.mp4", "size": "3"}],
+                            tmp_path, download=download)
+
+    assert calls == []
+    assert (tmp_path / "a.mp4").read_bytes() == b"abc"
+
+
+def test_fetch_refuses_a_short_download_and_leaves_nothing(tmp_path):
+    """途中で切れた取得を素材として残さない（大きさが Drive と違えば失敗）。"""
+    download, _ = _fake_download({"i1": b"ab"})
+
+    with pytest.raises(raw_source.FetchError):
+        raw_source.fetch_videos(MagicMock(), [{"id": "i1", "name": "a.mp4", "size": "3"}],
+                                tmp_path, download=download)
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_fetch_never_writes_outside_the_destination(tmp_path):
+    """Drive 上の名前にパスが混ざっていても、取得先の外には書かない。"""
+    download, _ = _fake_download({"i1": b"abc"})
+
+    paths = raw_source.fetch_videos(
+        MagicMock(), [{"id": "i1", "name": "../../evil.mp4", "size": "3"}],
+        tmp_path / "dest", download=download)
+
+    assert paths[0].parent == tmp_path / "dest"
+    assert not (tmp_path / "evil.mp4").exists()
+
+
+def test_run_fetch_checks_the_scope_before_touching_the_api(monkeypatch, tmp_path):
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, _token([FULL]))
+    build = MagicMock()
+    monkeypatch.setattr(raw_source, "_build_drive", build)
+
+    assert raw_source.run_fetch({raw_source.FOLDER_ENV: FOLDER}, tmp_path) == 1
+    build.assert_not_called()
+
+
+def test_run_fetch_downloads_the_listed_videos(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, _token([READONLY]))
+    monkeypatch.setattr(raw_source, "_build_drive",
+                        lambda: _drive([{"files": [{"id": "i1", "name": "a.mp4", "size": "3"}]}]))
+    download, _ = _fake_download({"i1": b"abc"})
+    monkeypatch.setattr(raw_source, "_download", download)
+
+    assert raw_source.run_fetch({raw_source.FOLDER_ENV: FOLDER}, tmp_path) == 0
+    assert (tmp_path / "a.mp4").exists()
+    assert FOLDER not in capsys.readouterr().out

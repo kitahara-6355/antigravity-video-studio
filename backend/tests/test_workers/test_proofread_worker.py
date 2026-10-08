@@ -84,6 +84,15 @@ def _mock_genai_and_sleep(monkeypatch):
     import time as _time_mod
     monkeypatch.setattr(_time_mod, "sleep", lambda *a, **kw: None)
 
+    # 校閲の控え（素材の隣の _proofread_<鍵>.json）は使わない。既定の素材
+    # （test_videos/tv01_real_clip.mp4）は test_preview_worker のフィクスチャが作ることがあり、
+    # あると控えが渡されて、引数を固定した偽の校閲が落ちる（2026-10-08 の CI・実行順で決まる）
+    try:
+        from agents.workers import proofread_worker as _proofread_worker
+        monkeypatch.setattr(_proofread_worker, "_memo_for", lambda video_path: None)
+    except (ImportError, AttributeError):
+        pass
+
     yield
 
 
@@ -476,7 +485,9 @@ class TestC2CoreLogic:
         assert result.success is True
         # 分割後のセグメントが18文字以下であることを確認（≥1件）
         for seg in ctx.segments:
-            assert len(seg.get("text", "")) <= 20  # 実装が18文字基準（余裕±2で検証）
+            # 1枚2行まで・1行ずつ18文字基準（余裕±2で検証）
+            lines = seg.get("text", "").split("\n")
+            assert len(lines) <= 2 and all(len(line) <= 20 for line in lines)
 
     @pytest.mark.asyncio
     async def test_c2_06_get_max_chars_from_template(self):
@@ -1541,7 +1552,8 @@ class TestTextFormatterBranches:
         result = format_segments(segs)
         # 分割されて複数セグメントになること
         for seg in result:
-            assert len(seg["text"]) <= 22  # 18+余裕
+            lines = seg["text"].split("\n")
+            assert len(lines) <= 2 and all(len(line) <= 22 for line in lines)  # 18+余裕
 
     def test_tf_03_filler_removal(self):
         """フィラー除去 — えー、あのー が消える"""

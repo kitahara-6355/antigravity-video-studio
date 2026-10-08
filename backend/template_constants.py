@@ -14,7 +14,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["ドキュメンタリー", "教育", "解説", "インタビュー"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            "max_chars_per_line": 15,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 2,
             "lead_frames": 3,
             "trail_frames": 5,
@@ -48,7 +48,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["エンタメ", "チャレンジ", "企画", "バラエティ"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            "max_chars_per_line": 15,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 2,
             "lead_frames": 2,
             "trail_frames": 3,
@@ -84,7 +84,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["Vlog", "トーク", "商品レビュー", "日常"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            "max_chars_per_line": 15,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 2,
             "lead_frames": 3,
             "trail_frames": 5,
@@ -119,7 +119,7 @@ PRODUCTION_TEMPLATES = {
         "target_genre": ["ASMR", "リラクゼーション", "睡眠", "環境音"],
         "subtitle_rules": {
             "chars_per_second": 4,
-            "max_chars_per_line": 15,
+            "max_chars_per_line": 18,  # 15→18（理由は _DEFAULT_SUBTITLE_RULES の注記）
             "max_lines": 1,
             "lead_frames": 4,
             "trail_frames": 8,
@@ -255,7 +255,9 @@ RECOMMENDED_COMBOS = {
 
 _DEFAULT_SUBTITLE_RULES = {
     "chars_per_second": 4,
-    "max_chars_per_line": 15,
+    # 1行の文字数。日本語の放送・配信は 13〜15 が目安だが、1280px の画面では 20 でも収まる。
+    # 15 だと意味の塊を割りやすかったので 18 にした（2026-10-06 ユーザー了承）
+    "max_chars_per_line": 18,
     "max_lines": 2,
     "lead_frames": 3,
     "trail_frames": 5,
@@ -265,6 +267,37 @@ _DEFAULT_SUBTITLE_RULES = {
     "outline_required": True,
     "border_style": 4,
     "alignment": 2,
+    # 聞くだけで足りる言葉（2026-10-06 ユーザー指摘）。字幕から外す。
+    # 文頭（文・字幕の頭）で「、」が続くときだけ外す。「それから3年後」のように
+    # 内容に掛かる用法は残る
+    "omit_lead_words": ["さて", "それから", "それで", "で", "まあ", "まぁ", "じゃあ", "じゃ",
+                        "ところで", "あの", "なんか", "えー", "え", "あ", "うん", "ええ",
+                        "では", "それでは",
+                        # 文頭の「ね、」（呼びかけ・念押し。17分58秒「ね、あわよくば」・2026-10-07）
+                        "ね"],
+    # 「、」が無くても外す文頭語（話題に掛からない接続の言葉）。後ろにひらがなが続くときは残す
+    "omit_lead_words_bare": ["さて", "では", "それでは", "ところで", "じゃあ"],
+    # 「、」で挟まれた言いよどみは文の途中でも外す（「時に、ま、お習字を」の「ま」・2026-10-06）。
+    # 文末の「〜けども、あの。」も外す。「あの人」「まあまあ」のように語の一部なら残る
+    # 「ちょっと」は「、」で挟まれたとき・言い差し（「考えると、なんかちょっと、」）だけ外れる
+    "omit_interjections": ["え", "ま", "まあ", "まぁ", "あ", "あの", "あのー", "その", "そのー",
+                           "えー", "えっと", "えーと", "あー", "うーん", "なんか", "ちょっと"],
+    # 「、」が無くても外す言いよどみ。ただし名詞や「か」のすぐ後ろ（「駄菓子屋かなんか」
+    # 「中国なんか」＝〜など・〜か何か）は残す（30回目で文中の「なんか」が約20か所出た・2026-10-08）
+    "omit_fillers_unless_after_noun": ["なんか"],
+    # 言いよどみにも指示語にもなる語。音声認識が書き起こさなかったとき（前後は続けて聞いて
+    # いるのに間の語だけが無いとき）だけ外す。認識は言いよどみを書き起こさない（31回目で
+    # 「小さいこうモニター」「層の幅をえ広げる」など約30か所・2026-10-08）。
+    # 「この」は入れない（「このチャンネル」を認識が落としたことがある。落としても中身）
+    "omit_unheard_fillers": ["あのね", "あの", "あのー", "こう", "その", "そのー", "まあ", "まぁ",
+                             "うん", "ええ", "えー", "え", "ま", "あ", "なんか"],
+    # 句読点（、。）を字幕に出さない（2026-10-06 ユーザー指摘）。行の途中は全角スペースにする
+    "strip_punctuation": True,
+    # これだけの字幕は出さない（相づち・言いよどみ）。音声は残す（カットしない）
+    "omit_standalone_words": ["はい", "うん", "ええ", "へえ", "へー", "ああ", "あー", "ほう",
+                              "なるほど", "そうですね", "そうそう", "そう", "ね", "ねえ", "おお",
+                              "はあ", "わかる", "そうですよね",
+                              "あの", "あのー", "えー", "えっと", "えーと", "まあ"],
 }
 
 _DEFAULT_ENGAGEMENT_RULES = {

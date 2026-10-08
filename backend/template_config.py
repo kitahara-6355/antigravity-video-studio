@@ -95,7 +95,7 @@ def _standardize_by_schema(
 # スキーマ定義の定数化（計算効率向上と関数分割の準備）
 _SUBTITLE_PACING_SCHEMA = {
     "chars_per_second": (4, _coerce_to_positive_numeric),
-    "max_chars_per_line": (15, _coerce_to_positive_int),
+    "max_chars_per_line": (18, _coerce_to_positive_int),
     "max_lines": (2, _coerce_to_positive_int),
     "lead_frames": (3, _coerce_to_positive_int),
     "trail_frames": (5, _coerce_to_positive_int),
@@ -273,7 +273,7 @@ class TemplateConfigProvider:
 
     def get_max_chars_per_line(self) -> int:
         """1行あたりの最大文字数"""
-        return self._get_rule_value(self.get_subtitle_rules(), "max_chars_per_line", 15, int)
+        return self._get_rule_value(self.get_subtitle_rules(), "max_chars_per_line", 18, int)
 
     def get_chars_per_second(self) -> float:
         """1秒あたりの文字数上限"""

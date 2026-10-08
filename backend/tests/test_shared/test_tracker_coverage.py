@@ -222,7 +222,10 @@ def test_can_make_request():
     assert tracker.can_make_request("gemini-3.6-flash") is False
 
 def test_get_remaining_requests():
-    tracker = UsageTracker()
+    # 本物の model_config.json の枠は実測で変わる（3.6-flash は 1000 → 20・2026-10-07）ので、引き算だけを見る
+    mock_config = {"free_tier_limits": {"gemini-3.6-flash": {"rpd": 1000, "tier": "free"}}}
+    with patch("usage_tracker.tracker._load_model_config", return_value=mock_config):
+        tracker = UsageTracker()
     tracker._daily_usage = DailyUsage(date=date.today().isoformat())
     tracker._daily_usage.models["gemini-3.6-flash"] = {"requests": 350, "tokens_in": 0, "tokens_out": 0}
     assert tracker.get_remaining_requests("gemini-3.6-flash") == 650

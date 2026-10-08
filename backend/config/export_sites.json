@@ -403,6 +403,16 @@
       ]
     },
     {
+      "id": "backend/smart_cut_engine.py::_cut_kept_ranges_exact",
+      "file": "backend/smart_cut_engine.py",
+      "symbol": "_cut_kept_ranges_exact",
+      "status": "intermediate",
+      "reason": "残す区間だけを1回のエンコードで抜き出した一時ファイル（`*.tmp.mp4`）を作る中間工程。`render_smart_cut` の内部から呼ばれ、字幕の焼き込みの入力になる",
+      "tools": [
+        "run_command"
+      ]
+    },
+    {
       "id": "backend/smart_cut_engine.py::render_smart_cut",
       "file": "backend/smart_cut_engine.py",
       "symbol": "render_smart_cut",

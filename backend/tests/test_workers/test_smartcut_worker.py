@@ -1432,3 +1432,58 @@ class TestC6PerformanceEvolution:
         runs = worker._group_continuous_runs([])
         assert runs == []
 
+
+
+# --- 校閲の整形で分割された字幕（2026-10-05 raw 4本の実走）------------------------
+
+
+def _split_pieces(n_sources: int, pieces: int, span: float = 10.0):
+    """1つの発話（同じ sourceStart/sourceEnd）を `pieces` 行に分けた字幕を作る。"""
+    segs = []
+    for k in range(n_sources):
+        s, e = k * (span + 1.0), k * (span + 1.0) + span
+        for p in range(pieces):
+            segs.append({"start": s + p, "end": s + p + 1, "text": "あ" * (5 + k % 7),
+                         "sourceStart": s, "sourceEnd": e})
+    return segs
+
+
+def test_split_lines_are_not_counted_twice_toward_the_target():
+    """分割された行は同じ元の区間を指す。尺を行の数だけ数えると目標に早く届き、
+    話している区間の半分を捨てていた（38分の発話が 19分のプレビューになった）。"""
+    segs = _split_pieces(n_sources=20, pieces=3)  # 発話 20×10秒 = 200秒、総尺 219秒
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=3)  # 180秒 < 219秒 → カットの経路
+    ctx.segments = segs
+
+    result = asyncio.run(SmartCutWorker().execute(ctx))
+
+    kept = {(s["sourceStart"], s["sourceEnd"]) for s in ctx.selected_segments}
+    assert result.success
+    assert sum(e - s for s, e in kept) >= 180, "目標尺ぶんの発話を残す"
+    assert result.data["duration"] == pytest.approx(sum(e - s for s, e in kept))
+
+
+def test_a_selected_line_brings_its_siblings():
+    """元の区間が残るなら、その区間の字幕の行も全部残す（音はあるのに字幕が欠けない）。"""
+    segs = _split_pieces(n_sources=20, pieces=3)
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=1)
+    ctx.segments = segs
+
+    asyncio.run(SmartCutWorker().execute(ctx))
+
+    from collections import Counter
+    per_source = Counter((s["sourceStart"], s["sourceEnd"]) for s in ctx.selected_segments)
+    assert per_source and set(per_source.values()) == {3}
+
+
+def test_smartcut_leaves_the_planned_output_length_for_the_quality_gate():
+    """計画尺はレンダリングと同じ規則（隙間 0.3秒以内はつなぐ）で数える。"""
+    segs = [{"start": 0, "end": 2, "text": "あいう", "sourceStart": 0.0, "sourceEnd": 2.0},
+            {"start": 2.2, "end": 4, "text": "えお", "sourceStart": 2.2, "sourceEnd": 4.0},
+            {"start": 10, "end": 12, "text": "かき", "sourceStart": 10.0, "sourceEnd": 12.0}]
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=60)
+    ctx.segments = segs
+
+    asyncio.run(SmartCutWorker().execute(ctx))
+
+    assert ctx.planned_output_sec == pytest.approx(6.0)
