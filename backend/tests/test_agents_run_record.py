@@ -666,6 +666,25 @@ def test_AIの出力を一部だけ捨てた工程は一部スタブとして記
 
 
 
+def test_控えから使った校閲の直しは行数とモデルが記録に残る(tmp_path):
+    """校閲の控え（2026-10-08）: 控えから使った直しはこの回に呼んでいないので台帳に出ない。
+    どのモデルの直しかを記録で追えるよう、行数とモデルを工程の記録に残す。"""
+    c = _coordinator(tmp_path)
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _memo(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="控え",
+                                   data={"memo_hits": 3, "memo_models": ["gemini-3.5-flash-lite"]})
+            w.execute = _memo
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["memo"] == {"rows": 3, "models": ["gemini-3.5-flash-lite"]}
+    assert "memo" not in st["youtube_opt"]
+
+
 def test_採用したAIの出力の件数が記録に残りゼロならスタブ(tmp_path):
     """**「宣言どおり」は断定ではなく証拠で決める**（2026-09-26 ユーザー決定・作りの変更）。
     工程が採用した AI の出力の件数を記録に残し、ゼロなら経路に依らず stub。"""

@@ -323,6 +323,12 @@ class PipelineCoordinator:
                 採用 = (getattr(ctx, "ai_accepted", None) or {}).get(印) if 印 else None
                 if 採用 is not None:
                     entry["ai_accepted"] = int(採用)
+                # 控えから使った直し（校閲・2026-10-08）はこの回に呼んでいないので台帳に出ない。
+                # どのモデルの直しかを記録で追えるよう、行数とモデルを残す
+                data = getattr(result, "data", None) or {}
+                if isinstance(data, dict) and int(data.get("memo_hits") or 0) > 0:
+                    entry["memo"] = {"rows": int(data["memo_hits"]),
+                                     "models": list(data.get("memo_models") or [])}
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
                 elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):
