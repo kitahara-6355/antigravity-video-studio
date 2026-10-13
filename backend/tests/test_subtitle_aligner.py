@@ -622,3 +622,131 @@ def test_removing_a_filler_keeps_the_other_spaces_as_they_were():
     caps = [{"start": 0.0, "end": 3.0, "text": "LINE こう やり取り"}]
     assert aligner.drop_unheard_fillers(caps, toks("LINEやり取り", 10.0), FILLERS) == 1
     assert caps[0]["text"] == "LINE やり取り"
+
+
+def _filler_after_a_sentence():
+    # 1分33秒（35回目）: 整形が「それで興味があったんで、こう」の「こう」を外した。認識は「こう」を聞いていて、
+    # 次の「引いたらそこが書道教室だった」はほとんど聞き取れていない。前後の合った字幕の間に配ると、
+    # 次の字幕が「こう」の声の所に 1.4 秒早く出た（33回目は「こう」が前の字幕にあって合っていた）
+    caps = [{"start": 93.1, "end": 95.2, "text": "それで興味があったんで"},
+            {"start": 97.1, "end": 98.8, "text": "引いたらそこが書道教室だった"},
+            {"start": 99.5, "end": 101.5, "text": "へえ　そういう出会いなんです"}]
+    heard = (toks("それで興味があったんで", 93.26, 0.18) + [("こ", 95.7), ("う", 96.62), ("へ", 97.12)]
+             + toks("えそういう出会いなんです", 99.64, 0.14))
+    return caps, heard
+
+
+def test_a_filler_heard_right_after_a_caption_counts_as_its_voice():
+    caps, heard = _filler_after_a_sentence()
+    aligner.align_captions(caps, heard)
+    assert caps[0]["_asr"] and not caps[1].get("_asr") and caps[2]["_asr"]
+    assert aligner.mark_filler_tails(caps, heard, words=["こう", "あの"]) == 1
+    assert caps[0]["_asr_tail"] == pytest.approx(96.62)
+
+
+def test_an_unaligned_caption_is_not_put_on_a_filler_taken_out_of_the_caption_before():
+    caps, heard = _filler_after_a_sentence()
+    aligner.align_captions(caps, heard)
+    aligner.mark_filler_tails(caps, heard, words=["こう"])
+    aligner.interpolate_unaligned(caps)
+    assert caps[1]["start"] == pytest.approx(96.62 + aligner.TAIL_SEC, abs=0.01)
+    assert caps[1]["end"] <= caps[2]["start"]
+
+
+def test_a_filler_that_starts_the_next_caption_is_left_to_it():
+    caps, heard = _filler_after_a_sentence()
+    caps[1]["text"] = "こう引いたらそこが書道教室だった"
+    aligner.align_captions(caps, heard)
+    assert aligner.mark_filler_tails(caps, heard, words=["こう"]) == 0
+
+
+def test_a_word_said_straight_on_is_not_taken_for_a_filler():
+    # 「こうやって」のように続けて話した語の頭は、言いよどみとして切り離さない
+    caps, heard = _filler_after_a_sentence()
+    heard = [(c, t) for c, t in heard if not 95.5 < t < 97.5] + toks("こうやって", 95.7, 0.12)
+    heard.sort(key=lambda x: x[1])
+    aligner.align_captions(caps, heard)
+    assert aligner.mark_filler_tails(caps, heard, words=["こう"]) == 0
+
+
+def test_a_filler_long_after_the_caption_is_not_its_voice():
+    # 前の字幕の声から離れた言いよどみは、間の（聞き取れなかった）字幕の後ろで言ったのかもしれない
+    caps, heard = _filler_after_a_sentence()
+    heard = [(c, t + (1.5 if 95.5 < t < 97.5 else 0.0)) for c, t in heard]
+    aligner.align_captions(caps, heard)
+    assert aligner.mark_filler_tails(caps, heard, words=["こう"]) == 0
+
+
+def test_the_fillers_after_a_caption_come_from_the_template_rules(monkeypatch):
+    caps, heard = _filler_after_a_sentence()
+    aligner.align_captions(caps, heard)
+    rules = {"omit_unheard_fillers": ["あの"], "omit_interjections": ["こう"]}
+    from template_config import template_config
+    monkeypatch.setattr(template_config, "get_subtitle_rules", lambda: rules)
+    assert aligner.mark_filler_tails(caps, heard) == 1
+
+
+def test_the_cut_step_keeps_unaligned_captions_off_a_removed_filler(tmp_path, monkeypatch):
+    caps, heard = _filler_after_a_sentence()
+    cut = tmp_path / "cut.mp4"
+    cut.write_bytes(b"x")
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: heard)
+    from subtitle_engine import sync
+    seen = {}
+
+    def fake_align(segments, speech, cut_points, rules):
+        seen.update({c["text"]: c for c in segments})
+        return segments, {}
+
+    monkeypatch.setattr(sync, "speech_map", lambda media: None)
+    monkeypatch.setattr(sync, "align_segments", fake_align)
+    import smart_cut_engine
+    smart_cut_engine._align_to_speech(str(cut), caps, [], source_path=str(cut), ranges=[(0.0, 200.0)])
+    assert seen["それで興味があったんで"].get("_asr_tail") == pytest.approx(96.62)
+    assert seen["引いたらそこが書道教室だった"]["start"] >= 97.0
+
+
+def test_a_filler_is_not_taken_from_the_head_of_the_next_caption():
+    # 12分25秒（35回目の試し）: 聞き手の「ああ」を認識は「あ」「の」と聞いた。「あの」として前の字幕の声に
+    # すると、「ああ」が 1.8 秒遅れた。聞いた最初の字が次の字幕の最初の字なら、次の字幕の声かもしれない
+    caps = [{"start": 742.0, "end": 745.2, "text": "強いなと思ったのは"},
+            {"start": 745.9, "end": 746.8, "text": "ああ"},
+            {"start": 747.8, "end": 750.0, "text": "テンポじゃないですか"}]
+    heard = (toks("強いなと思ったのは", 743.5, 0.2) + [("あ", 745.9), ("の", 746.66)]
+             + toks("テンポじゃないですか", 747.82, 0.15))
+    aligner.align_captions(caps, heard)
+    assert aligner.mark_filler_tails(caps, heard, words=["あの"]) == 0
+
+
+def test_a_one_character_filler_is_not_taken_for_one():
+    # 21分01秒（35回目の試し）: 認識が「縮小しても」の頭を「あ」と聞いた。1文字の言いよどみ（「あ」「え」）は
+    # 聞き違いと見分けられないので、前の字幕の声にはしない
+    caps, heard = _filler_after_a_sentence()
+    heard = [(c, t) for c, t in heard if not 95.5 < t < 97.5] + [("あ", 95.7), ("へ", 97.12)]
+    heard.sort(key=lambda x: x[1])
+    aligner.align_captions(caps, heard)
+    assert aligner.mark_filler_tails(caps, heard, words=["あ", "こう"]) == 0
+
+
+def test_the_characters_of_a_filler_must_be_said_together():
+    # 30分37秒（35回目の試し）: 「ま」と 3.2 秒後の「あ」を「まあ」とみなし、間の「ものだったんですけど」の
+    # 字幕が 3.4 秒遅れた
+    caps, heard = _filler_after_a_sentence()
+    heard = [(c, t) for c, t in heard if not 95.5 < t < 97.5] + [("ま", 95.7), ("あ", 98.9)]
+    heard.sort(key=lambda x: x[1])
+    aligner.align_captions(caps, heard)
+    assert aligner.mark_filler_tails(caps, heard, words=["まあ"]) == 0
+
+
+def test_a_filler_is_not_taken_from_a_backchannel_caption_further_on():
+    # 17分45秒（35回目の試し）: 認識が聞いた聞き手の「ええ」には「ええ」の字幕がある（間の「うん」の後ろ）。
+    # 前の字幕の声にすると「うん」「ええ」が後ろへ押し出された
+    caps = [{"start": 1058.6, "end": 1064.5, "text": "逆にその98%の人を相手にしたいわけ"},
+            {"start": 1064.5, "end": 1065.3, "text": "うん"},
+            {"start": 1065.3, "end": 1065.9, "text": "ええ"},
+            {"start": 1065.9, "end": 1070.0, "text": "普段筆を持たない人"}]
+    heard = (toks("逆にその九十八の人を相手にしたいわけ", 1059.07, 0.33) + [("え", 1065.47), ("え", 1065.67)]
+             + toks("普段筆を持たない人", 1066.15, 0.2))
+    aligner.align_captions(caps, heard)
+    assert caps[0]["_asr"] and caps[3]["_asr"]
+    assert aligner.mark_filler_tails(caps, heard, words=["ええ"]) == 0

@@ -244,9 +244,15 @@ def _speaking_time(speech: SpeechMap, a: float, b: float) -> float:
 
 
 def _last_heard(s: dict) -> float | None:
-    """字幕で最後に聞こえた（認識と突き合った）字の時刻。無ければ None。"""
+    """字幕で最後に聞こえた（認識と突き合った）字の時刻。無ければ None。
+
+    字幕から外した言いよどみを認識が聞いていれば（`aligner.mark_filler_tails` の `_asr_tail`）、
+    その声も前の字幕のものとみなす（1分35秒の「こう」・35回目）
+    """
     marks = s.get("_asr_marks") or ()
-    return float(marks[-1][1]) if s.get("_asr") and marks else None
+    if not (s.get("_asr") and marks):
+        return None
+    return max(float(marks[-1][1]), float(s.get("_asr_tail") or 0.0))
 
 
 def _clock(active: list[tuple[float, float]], x: float) -> float:

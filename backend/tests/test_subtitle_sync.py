@@ -370,3 +370,15 @@ def test_captions_past_the_end_of_the_video_are_not_shown():
     assert [s["text"] for s in out] == ["本日は", "どうもありがとうございました"]
     assert out[-1]["end"] <= sp.duration
     assert stats["dropped"] == 1
+
+
+def test_an_unheard_head_does_not_start_on_a_filler_taken_out_of_the_caption_before():
+    # 1分35秒（35回目）の形: 前の字幕から外した「こう」は、認識が聞いている（`_asr_tail`）。その
+    # 話し始めは前の字幕の声なので、頭を聞き取れなかった次の字幕の話し始めにはしない
+    sp = _map([(93.2, 95.3), (95.7, 96.7), (97.13, 99.0)], total=110)
+    segs = [{"start": 93.13, "end": 95.19, "text": "それで興味があったんで", "_asr": True,
+             "_asr_first": 93.26, "_asr_marks": [(1, 93.26), (10, 95.06)], "_asr_tail": 96.62},
+            {"start": 96.9, "end": 99.0, "text": "引いたらそこが書道教室だった", "_asr": True,
+             "_asr_first": 97.6, "_asr_marks": [(10, 97.6), (11, 97.75), (12, 97.9)]}]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert out[1]["start"] == pytest.approx(97.13, abs=0.02)

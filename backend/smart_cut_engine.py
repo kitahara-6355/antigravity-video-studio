@@ -283,10 +283,13 @@ def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=No
                     # 動画の長さ（残した区間の合計）。字幕をこの外に出さない
                     end = sum(float(b) - float(a) for a, b in ranges) if ranges else None
                     r = aligner.release_implausible(segments, end=end)
+                    # 字幕から外した言いよどみ（認識は聞いている「こう」）の声は、前の字幕の声とみなす
+                    t = aligner.mark_filler_tails(segments, heard)
                     m = aligner.interpolate_unaligned(segments, end=end)
                     logger.info(f"🎯 音声認識で時刻を合わせた字幕: {n - r}枚（間に配り直し {m}枚・"
                                 f"話す時間が残らず外した {r}枚）/ 全 {len(segments)}枚・"
-                                f"認識に無い言いよどみを {f}語外した")
+                                f"認識に無い言いよどみを {f}語外した・"
+                                f"字幕から外した言いよどみの声を前の字幕に付けた {t}枚")
             except Exception as e:
                 logger.warning(f"音声認識による時刻合わせをスキップ: {e}")
         from subtitle_engine import sync

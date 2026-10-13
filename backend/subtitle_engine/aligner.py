@@ -16,6 +16,7 @@ Gemini の文字起こしは発話ごとの粗い時刻しか返さない（1発
 """
 from __future__ import annotations
 
+import bisect
 import difflib
 import hashlib
 import json
@@ -84,6 +85,14 @@ MAX_CPS = 12.0
 # 相づち（「はい」「うん」）は相手の話に重なるので、1 秒前後のはみ出しはふつうに起きる
 # （同じ素材で 17 か所・最大 1.3 秒。誤って合わせた最後の字幕は 4.7 秒）
 MAX_OVERRUN_SEC = 2.0
+# 合った字幕のすぐ後ろで認識が聞いた言いよどみ（字幕から外した「こう」）を、その字幕の声とみなす条件。
+# 前の字幕の最後の字からこの秒数以内に言い始め、後ろにこれだけ間がある（続けて話した「こうやって」は
+# 字の間が 0.1〜0.2 秒）。1分35秒の「こう、引いたら」は 0.64 秒後に言い始め、後ろが 0.5 秒あいていた
+FILLER_TAIL_MAX_GAP_SEC = 1.0
+FILLER_TAIL_PAUSE_SEC = 0.3
+# 認識の字の時刻は声より早めに出る（`sync.HEAD_EARLY_SEC` と同じ）。言いよどみの最後の字から
+# この秒数までは、言いよどみの声とみなす
+TAIL_SEC = 0.4
 
 _DIGITS = str.maketrans("0123456789", "〇一二三四五六七八九")
 
@@ -725,6 +734,61 @@ def align_heard_forms(captions: list[dict], tokens: list[tuple[str, float]], ter
     return aligned
 
 
+def mark_filler_tails(captions: list[dict], tokens: list[tuple[str, float]], words=None) -> int:
+    """合った字幕のすぐ後ろで認識が聞いた言いよどみ（どの字幕にも当たらない「こう」）を、その字幕の声として覚える。
+
+    整形が字幕から言いよどみを外すと（1分33秒「それで興味があったんで、こう」）、認識が聞いたその声は
+    誰の字幕でもなくなる。次の字幕を認識が聞き取れていないと、前後の合った字幕の間に文字数で配られて、
+    言いよどみの声の所に出た（35回目の「引いたらそこが書道教室だった」が 1.4 秒早い。33回目は「こう」が
+    前の字幕に残っていて合っていた）。覚えた時刻（`_asr_tail`）は、間に配るとき（`interpolate_unaligned`）と、
+    頭を聞き取れなかった次の字幕の話し始めを探すとき（`sync`）に、前の字幕の声の終わりとして使う。
+
+    言いよどみとみなすのは、前の字幕の最後の字のすぐ後ろ（FILLER_TAIL_MAX_GAP_SEC）で言い始め、続けて言い
+    （字の間が MAX_CHAR_GAP_SEC 以内）、後ろに間がある（FILLER_TAIL_PAUSE_SEC）2字以上の語だけ。1文字の語
+    （「あ」）は聞き違いと見分けられない（21分01秒の「縮小しても」の頭が「あ」）。聞いた最初の字が後ろの字幕
+    （次に合った字幕まで）のどれかの最初の字なら、その字幕の声かもしれないので触らない（12分25秒の聞き手の
+    「ああ」を認識は「あ」「の」と聞いた。17分45秒の「ええ」には、「うん」の後ろに「ええ」の字幕がある）。
+    語の一覧はテンプレートの omit_unheard_fillers と omit_interjections。印を付けた枚数を返す。
+    """
+    if words is None:
+        words = sorted({*_rule_words(None, "omit_unheard_fillers"), *_rule_words(None, "omit_interjections")},
+                       key=len, reverse=True)
+    else:
+        words = _rule_words(words, "omit_unheard_fillers")
+    if not words or not tokens:
+        return 0
+    rec = [(c, float(t)) for ch, t in tokens for c in norm_char(ch)]
+    times = [t for _, t in rec]
+    taken = {float(t) for c in captions if c.get("_asr") for _, t in c.get("_asr_marks") or ()}
+    idx = [i for i, c in enumerate(captions) if c.get("_asr") and c.get("_asr_marks")]
+    marked = 0
+    for a, b in zip(idx, idx[1:] + [None]):
+        last = float(captions[a]["_asr_marks"][-1][1])
+        stop = float(captions[b].get("_asr_first", captions[b]["start"])) if b is not None else float("inf")
+        j = bisect.bisect_right(times, last)
+        if j >= len(rec) or rec[j][1] - last > FILLER_TAIL_MAX_GAP_SEC:
+            continue
+        k = j
+        while k < len(rec) and rec[k][1] < stop and rec[k][1] not in taken:
+            k += 1
+        free = "".join(c for c, _ in rec[j:k])
+        # 後ろの字幕（次に合った字幕まで）の頭の字。聞いた最初の字がどれかの頭なら、その字幕の声かもしれない
+        heads = {_norm_text(c.get("text"))[:1] for c in captions[a + 1:None if b is None else b + 1]}
+        if not free or free[:1] in heads:
+            continue
+        for n in range(len(free), 1, -1):
+            if not _split_fillers(free[:n], words):
+                continue
+            if any(rec[j + i + 1][1] - rec[j + i][1] > MAX_CHAR_GAP_SEC for i in range(n - 1)):
+                continue
+            if j + n < len(rec) and rec[j + n][1] - rec[j + n - 1][1] < FILLER_TAIL_PAUSE_SEC:
+                continue
+            captions[a]["_asr_tail"] = rec[j + n - 1][1]
+            marked += 1
+            break
+    return marked
+
+
 def _move_repeated_matches(captions: list[dict], hits: dict[int, list[tuple[int, float]]]) -> int:
     """同じ文の字幕が近くに並ぶとき、認識が拾った1回を、推定時刻（文字起こし）の近い方の字幕に移す。
 
@@ -918,6 +982,10 @@ def interpolate_unaligned(captions: list[dict], end: float | None = None) -> int
         if not run:
             continue
         t0, t1 = float(captions[a]["end"]), float(captions[b]["start"])
+        tail = captions[a].get("_asr_tail")
+        if tail is not None and t1 - (float(tail) + TAIL_SEC) >= sum(_chars(c) for c in run) / MAX_CPS:
+            # 前の字幕から外した言いよどみ（認識は聞いている）の声には置かない。話せる時間が残るときだけ
+            t0 = max(t0, float(tail) + TAIL_SEC)
         # 狭くても順番どおりに置く（推定の時刻のまま残すと、並べ直しで順番が入れ替わる）。
         # 出る時間が足りない字幕は、後で隣とまとめる。前後が重なっているときは次の字幕の出だしに
         # 置く（前の終わりに置くと次の字幕より後ろになる・15分26秒の「ファンが」）
