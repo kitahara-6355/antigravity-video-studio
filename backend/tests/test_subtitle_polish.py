@@ -434,6 +434,42 @@ def test_filler_nanka_is_removed_unless_it_follows_a_noun(text, want):
     assert tf.strip_context_fillers(text, ["なんか"]) == want
 
 
+PHRASE_HEAD_FILLERS = ["あのね", "あの", "あのー", "こう", "その", "そのー", "まあ", "うん", "ええ", "え", "あ"]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,want", [
+    # 33回目: 文節の頭で「、」が続く言いよどみが、助詞の後ろだと外れず字幕に出た（15か所）
+    ("家持って帰って自分でこう、なんとかっていう場所で", "家持って帰って自分でなんとかっていう場所で"),
+    ("舗じゃなくても、やっぱりこう、ネットで売れて", "舗じゃなくても、やっぱりネットで売れて"),
+    ("だからその、やっぱユニクロが", "だからやっぱユニクロが"),
+    ("筆文字は私もうね、すごくあの、こだわっているんですけど", "筆文字は私もうね、すごくこだわっているんですけど"),
+    ("ある程度その、これで書ける", "ある程度これで書ける"),
+    # 「、」が続かなければ中身（「その思い」「こうやって」）。語の一部（「そのまま」）も残す
+    ("その思いを深くお聞きしていきます", "その思いを深くお聞きしていきます"),
+    ("だから、こうやって、こういう紙が", "だから、こうやって、こういう紙が"),
+    ("そのまま、書いて", "そのまま、書いて"),
+    # 1字の語は文節の切れ目を誤ることがある（「はあ、」が「は｜あ、」に分かれる）ので見ない
+    ("料理ですかね。はあ、素晴らしいと思います", "料理ですかね。はあ、素晴らしいと思います"),
+    # 言いよどみだけになるときは触らない（相づちだけの字幕の規則が扱う）
+    ("あの、", "あの、"),
+])
+def test_a_filler_heading_its_own_phrase_before_a_comma_is_removed(text, want):
+    assert tf.strip_phrase_head_fillers(text, PHRASE_HEAD_FILLERS) == want
+
+
+def test_the_phrase_head_fillers_come_from_the_template():
+    out = tf.format_segments([{"text": "家持って帰って自分でこう、なんとかっていう場所で書く。",
+                               "start": 0.0, "end": 3.0}], 18)
+    assert "こう" not in "".join(s["text"] for s in out)
+
+
+def test_a_caption_does_not_end_with_a_trailing_kou():
+    # 33回目の 1分33秒: 「それで興味があったんで、こう」で字幕が終わり、次が「引いたら…」だった
+    [out] = tf.format_segments([{"text": "それで興味があったんで、こう", "start": 0.0, "end": 3.0}], 18)
+    assert out["text"] == "それで興味があったんで"
+
+
 def test_trailing_filler_words_do_not_stay_at_the_end_of_a_caption():
     # 30回目の 37分49秒: 「…考えると、なんかちょっと、」の言い差しが「…考えると\nなんかちょっと」で出た
     out = tf.format_segments([{"text": "ああ、筆に頼るっていうことを考えると、なんかちょっと、",
