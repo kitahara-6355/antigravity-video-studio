@@ -43,6 +43,17 @@ def test_captions_remember_where_punctuation_was_taken_out():
     assert not plain.get("_break_punct") and not plain.get("_ends_punct")
 
 
+def test_captions_remember_where_a_sentence_ended():
+    # 冒頭（あいさつ・紹介）の終わりを「最初の質問の文の頭」で決める（`cut_plan.opening_end`）。
+    # 句読点を外すと「、」で続く字幕と「。」で終わった字幕を見分けられないので、文末だった印を残す
+    [comma] = tf.format_segments([{"text": "まず先生が、", "start": 0.0, "end": 1.7}], 18)
+    [stop] = tf.format_segments([{"text": "書籍が多数おありだということです。", "start": 0.0, "end": 6.5}], 18)
+    [ask] = tf.format_segments([{"text": "何かありますでしょうか？", "start": 0.0, "end": 2.0}], 18)
+    assert comma["text"] == "まず先生が" and not comma.get("_ends_sentence")
+    assert stop["_ends_sentence"] is True and "。" not in stop["text"]
+    assert ask["_ends_sentence"] is True
+
+
 def test_a_sentence_head_ne_is_not_shown():
     # 実例（17分58秒・33分48秒）: 「ね、あわよくば…」「ね、いくらおいしいものを…」の文頭の「ね」が
     # 字幕の頭に残った。話題に触れない言葉なので外す（2026-10-06 ユーザー方針）

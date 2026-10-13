@@ -116,6 +116,9 @@ class PipelineContext:
     target_auto: bool = False
     # SmartCut が残すと決めた区間の合計（秒）。レンダリングと同じ規則で結合した値
     planned_output_sec: Optional[float] = None
+    # SmartCut が残すと決めた区間（素材の秒・`cut_plan`）。切る所は声の切れ目に寄せてあり、
+    # 冒頭のあいさつ・紹介はつないである。プレビューはこの区間で切る（空なら字幕の区間から決める）
+    cut_ranges: list = field(default_factory=list)
     # 文字起こしで「音はあるが発話ではない」と確認した区間（素材の秒）。品質ゲートの欠落検知が除外する
     verified_quiet: list = field(default_factory=list)
     # 文字起こしの段階で測った欠落（coverage.CoverageReport.to_dict()）。文字の薄さはここでだけ測る

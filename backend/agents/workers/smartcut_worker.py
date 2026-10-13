@@ -1,8 +1,10 @@
 """
 SmartCutWorker — SmartCut構成ステージ
 
-テキスト密度 × 位置重みに基づくセグメント選定。
-目標尺に合わせた自動カットポイント決定。
+発話が目標尺に収まるなら中身は削らず、発話と発話の間だけを切る。
+収まらないときは、テキスト密度 × 位置重みで発話を選ぶ。
+どこで切るか（声の切れ目・冒頭のあいさつはノーカット）と、収録の段取りの声（「ちょっと切ります」
+「撮った？」）を外すのは `cut_plan` が決める。
 """
 
 import logging
@@ -41,6 +43,10 @@ def _unique_duration(segments) -> float:
 
 
 MERGE_TOLERANCE_SEC = 0.3  # smart_cut_engine.render_smart_cut と同じ結合の許容
+
+
+def _clock(sec: float) -> str:
+    return f"{int(sec // 60)}:{int(sec % 60):02d}"
 
 
 def planned_output_seconds(segments) -> float:
@@ -207,6 +213,41 @@ class SmartCutWorker(PipelineStageWorker):
             logger.info(f"A-5: 安全弁発動 — フィルタ無効 (除去後{filtered_duration:.1f}s < 目標{target_seconds*0.5:.1f}s)")
             return selected_indices
 
+    def _drop_production_talk(self, segments: list, rules: dict) -> tuple[list, list, str]:
+        """収録の段取りの声（「ちょっと切ります」「撮った？」）を外す（`cut_plan.production_talk`）。
+        返り値は (残す字幕, 外した発話の区間, 結果の説明に足す文)。"""
+        from cut_plan import production_talk
+        drop = production_talk(segments, rules) if rules.get("drop_production_talk") else set()
+        kept = [seg for i, seg in enumerate(segments) if i not in drop]
+        if not drop or not kept:
+            return segments, [], ""
+        spans = sorted({_source_key(segments[i]) for i in drop})
+        first = min(drop, key=lambda i: (_source_key(segments[i]), i))
+        text = str(_get_segment_field(segments[first], "text", "") or "").replace("\n", "")
+        note = (f"収録の段取りの声 {len(spans)}発話（素材の {_clock(spans[0][0])}「{text}」ほか）は"
+                f"外した")
+        logger.info("✂️ " + note)
+        return kept, spans, f" / {note}"
+
+    def _plan_cuts(self, ctx: PipelineContext, segments: list, keep_all: bool,
+                   rules: dict | None = None, exclude=()) -> str:
+        """残す区間を決めて ctx に置く（`cut_plan`）。返り値は結果の説明に足す文。"""
+        from cut_plan import plan
+        ranges, info = plan(segments, getattr(ctx, "video_path", None), keep_all=keep_all,
+                            rules=rules, exclude=exclude)
+        ctx.cut_ranges = ranges
+        ctx.planned_output_sec = sum(max(b - a, 0.0) for a, b in ranges)
+        notes = []
+        if "opening_until" in info and ranges:
+            notes.append(f"冒頭（素材の {_clock(ranges[0][0])}〜{_clock(info['opening_until'])}）はノーカット")
+        if info.get("gaps"):
+            notes.append(f"切れ目{info['gaps']}か所のうち声の途中で終わる{info['extended_end']}か所・"
+                         f"途中から始まる{info['pulled_start']}か所を声の切れ目まで動かし、"
+                         f"声が続く{info['joined']}か所はつないだ")
+        if notes:
+            logger.info("✂️ " + " / ".join(notes))
+        return "".join(f" / {n}" for n in notes)
+
     async def execute(self, ctx: PipelineContext) -> StageResult:
         """SmartCut構成を実行
 
@@ -215,6 +256,8 @@ class SmartCutWorker(PipelineStageWorker):
             ctx.target_minutes: int — 必須。目標尺（分）
         出力契約:
             ctx.selected_segments: list[dict] — 選定されたセグメント（⊆ segments）
+            ctx.cut_ranges: list[tuple] — 残す区間（素材の秒）。レンダリングはこの区間で切る
+            ctx.planned_output_sec: float — 残す区間の合計（品質ゲートが出力の尺と照らす）
         """
         start_time = time.time()
         segments = ctx.segments if ctx.segments else []
@@ -231,13 +274,26 @@ class SmartCutWorker(PipelineStageWorker):
         target_seconds = ctx.target_minutes * 60.0
         total_duration = self._calculate_total_duration(segments)
 
-        if total_duration <= target_seconds:
-            # 目標尺以下 → カット不要
+        # 収録の段取りの声（カメラを止める前後のやりとり）は中身ではない。選ぶ前に外す
+        from cut_plan import cut_rules
+        rules = cut_rules()
+        segments, talk_spans, talk_note = self._drop_production_talk(segments, rules)
+        speech_seconds = planned_output_seconds(segments)
+
+        # **発話が目標尺に収まるなら中身は削らない。削るのは間だけ。**（2026-10-13）
+        # 以前は素材の尺（無音を含む）と比べていた。目標尺を素材から決めると 43分16秒 → 43分に
+        # 丸まって素材の方が長くなり、発話を選ぶ経路に入って1秒未満の発話を全部落としていた
+        # （37回目で33行。34分08秒「これ、ただいま発売」の後ろの「です。」、31分41秒「欲しい方は」、
+        # 3分35秒のゲストの話「休んじゃいけないって先輩から言われて」）。相づちの声も
+        # 「音声は残す（カットしない）」と決めていた（template_constants の omit_standalone_words）
+        if getattr(ctx, "target_auto", False) or speech_seconds <= target_seconds:
             ctx.selected_segments = segments
-            ctx.planned_output_sec = planned_output_seconds(segments)
+            note = self._plan_cuts(ctx, segments, keep_all=True, rules=rules, exclude=talk_spans)
+            reason = ("目標尺は素材の長さ" if getattr(ctx, "target_auto", False)
+                      else f"発話{speech_seconds/60:.1f}分 ≤ 目標{ctx.target_minutes}分")
             return StageResult(
                 stage_name=self.name, success=True,
-                detail=f"カット不要 — 元尺{total_duration/60:.1f}分 ≤ 目標{ctx.target_minutes}分",
+                detail=f"カット不要（中身は削らず間だけ詰める） — {reason}{talk_note}{note}",
                 data={"segments": len(segments), "duration": total_duration},
                 duration_seconds=round(time.time() - start_time, 1),
             )
@@ -254,14 +310,17 @@ class SmartCutWorker(PipelineStageWorker):
 
         selected_segments = [segments[index] for index in sorted(selected_indices)]
         ctx.selected_segments = selected_segments
-        ctx.planned_output_sec = planned_output_seconds(selected_segments)
+        # 冒頭の発話も選ばれないことがあるので、冒頭のすき間はつながない（選ばなかった発話の
+        # 声が字幕無しで入る）
+        note = self._plan_cuts(ctx, selected_segments, keep_all=False, rules=rules,
+                               exclude=talk_spans)
 
         estimated_duration = _unique_duration(selected_segments)
         cut_percent = (1.0 - len(selected_segments) / len(segments)) * 100.0
 
         return StageResult(
             stage_name=self.name, success=True,
-            detail=f"{len(selected_segments)}セグメント選定 / 推定{estimated_duration/60:.1f}分 (カット率{cut_percent:.0f}%)",
+            detail=f"{len(selected_segments)}セグメント選定 / 推定{estimated_duration/60:.1f}分 (カット率{cut_percent:.0f}%){talk_note}{note}",
             data={"segments": len(selected_segments), "duration": estimated_duration, "cut_percent": round(cut_percent, 1)},
             duration_seconds=round(time.time() - start_time, 1),
         )

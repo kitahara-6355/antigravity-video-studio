@@ -1348,3 +1348,36 @@ def test_kept_ranges_are_cut_without_drift(tmp_path):
                                     "stream=duration", "-of", "csv=p=0", str(out)],
                                    capture_output=True, text=True).stdout.strip())
         assert abs(dur - expected) < 0.1, (stream, dur, expected)
+
+
+@patch("subprocess.run")
+def test_render_cuts_the_ranges_it_is_given(mock_run, dummy_video, tmp_path):
+    """SmartCut が声の切れ目に寄せた区間で切る。字幕の区間から決め直すと、26秒の「ます」の
+    ように発話の区間より長く続く声の尻が切れる（2026-10-13 ユーザー指摘）。"""
+    output_path = tmp_path / "output_planned.mp4"
+    mock_run.return_value = MagicMock(stdout='{"format": {"duration": "20.0"}}')
+    mock_editor = MagicMock()
+    mock_editor.ffmpeg.get_duration.return_value = 20.0
+    mock_editor.ffmpeg.supports_exact_range_cut = False
+    cuts = []
+
+    def mock_cut(input_p, temp_p, start, end):
+        cuts.append((start, end))
+        temp_p.write_bytes(b"cut part")
+        return True
+    mock_editor.ffmpeg.cut_video.side_effect = mock_cut
+    mock_editor.ffmpeg.merge_videos.side_effect = lambda clips, p: p.write_bytes(b"merged") or True
+    mock_editor.ffmpeg.run_command.return_value = (False, "Error")
+    mock_editor.ffmpeg._get_encode_args.return_value = []
+    segments = [{"sourceStart": 1.0, "sourceEnd": 4.0, "start": 1.0, "end": 4.0, "text": "お届けしてまいります"},
+                {"sourceStart": 6.0, "sourceEnd": 9.0, "start": 6.0, "end": 9.0, "text": "記念すべき第1回目"}]
+
+    with patch.dict(sys.modules, {"video_editor_engine": MagicMock(video_editor=mock_editor)}):
+        result = smart_cut_engine.render_smart_cut(segments, str(dummy_video), str(output_path),
+                                                   ranges=[(0.85, 4.55), (6.0, 9.3)])
+
+    assert result is True
+    assert cuts == [(0.85, 4.55), (6.0, 9.3)]
+    import json
+    side = json.loads(output_path.with_name("output_planned.subtitles.json").read_text(encoding="utf-8"))
+    assert side["ranges"] == [[0.85, 4.55], [6.0, 9.3]]

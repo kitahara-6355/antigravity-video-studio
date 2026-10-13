@@ -284,6 +284,19 @@ class TemplateConfigProvider:
         return self._get_rule_value(self.get_subtitle_rules(), "min_display_seconds", 1.2, float)
 
     # ================================================================
+    # カットの規則（既定値と読み方は cut_plan.cut_rules）
+    # ================================================================
+
+    def get_cut_rules(self) -> Dict:
+        """テンプレートの cut_rules →オーバーライドの順で上書きした値（無ければ空）。"""
+        rules: Dict[str, Any] = {}
+        if isinstance(self._active_template, dict):
+            custom = self._active_template.get("cut_rules")
+            if isinstance(custom, dict):
+                rules.update(custom)
+        return self._merge_overrides(rules, "cut_rules")
+
+    # ================================================================
     # エンゲージメント基準
     # ================================================================
 

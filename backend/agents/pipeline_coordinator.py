@@ -1759,8 +1759,9 @@ def _auto_target_minutes(duration_sec: Optional[float]) -> Optional[int]:
     QV-01 が「出力尺異常（目標20分, 差19.6分）」で満額 -50 を打ち、
     スコアが 2/100 に張り付いていた。**目標尺を素材に合わせるだけで 52点。**
 
-    `target_minutes` は SmartCut では使われておらず、**品質ゲートが
-    「出来上がりはこれくらいのはず」と照らす期待値**としてだけ効く。
+    このとき `target_minutes` は**素材の長さ**であって出来上がりの長さではない
+    （`ctx.target_auto`）。SmartCut は中身を削らず間だけを切り（2026-10-13）、品質ゲートは
+    SmartCut の計画尺と照らす。
     """
     if duration_sec is None or duration_sec <= 0:
         return None

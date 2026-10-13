@@ -1138,6 +1138,11 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
                 for key, hit in zip(("_break_punct", "_ends_punct"), punctuation_breaks(seg["text"])):
                     if hit:
                         seg[key] = True
+                # 文末で終わった字幕にも印を付ける。「、」で続く字幕と見分けて、冒頭のあいさつの
+                # 終わり（最初の質問の文の頭）を探すため（`cut_plan.opening_end`・2026-10-13）
+                tail = seg["text"].rstrip(" 　\n")
+                if tail and tail[-1] in SENTENCE_END:
+                    seg["_ends_sentence"] = True
                 seg["text"] = strip_punctuation(seg["text"])
         formatted = [s for s in formatted if not isinstance(s, dict) or s.get("text") != ""]
 

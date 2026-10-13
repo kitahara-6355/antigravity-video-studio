@@ -413,39 +413,46 @@ def render_smart_cut(
     output_path,
     generate_thumbnail: bool = False,
     thumbnail_path: str | None = None,
-    thumbnail_time: float = 0.5
+    thumbnail_time: float = 0.5,
+    ranges=None,
 ):
     """
     Cuts the original video based on 'sourceStart' and 'sourceEnd' of segments,
     concatenates the kept parts, and then overlays the subtitles.
-    
+
+    `ranges`（素材の秒）を渡されたらその区間で切る。SmartCut が声の切れ目に寄せ、冒頭の
+    あいさつをつないだ区間（`cut_plan`）。無ければ字幕の区間から決める（従来）。
+
     Phase D: MoviePy to FFmpeg + GPU (NVENC) migration complete.
     """
     from video_editor_engine import video_editor, VideoClip
 
     logger.info("--- Starting Smart Cut Render (FFmpeg + GPU) ---")
-    
-    # 1. Extract and Merge Source Ranges
-    keep_ranges = []
-    for s in segments:
-        start = s.get("sourceStart", s["start"])
-        end = s.get("sourceEnd", s["end"])
-        keep_ranges.append((float(start), float(end)))
-    
-    keep_ranges.sort()
-    
-    merged = []
-    if keep_ranges:
-        curr_start, curr_end = keep_ranges[0]
-        for start, end in keep_ranges[1:]:
-            # Merge if adjacent (within 0.3s tolerance to catch floating point gaps)
-            if start <= curr_end + 0.3:
-                curr_end = max(curr_end, end)
-            else:
-                merged.append((curr_start, curr_end))
-                curr_start, curr_end = start, end
-        merged.append((curr_start, curr_end))
-    
+
+    if ranges:
+        merged = sorted((float(a), float(b)) for a, b in ranges)
+    else:
+        # 1. Extract and Merge Source Ranges
+        keep_ranges = []
+        for s in segments:
+            start = s.get("sourceStart", s["start"])
+            end = s.get("sourceEnd", s["end"])
+            keep_ranges.append((float(start), float(end)))
+
+        keep_ranges.sort()
+
+        merged = []
+        if keep_ranges:
+            curr_start, curr_end = keep_ranges[0]
+            for start, end in keep_ranges[1:]:
+                # Merge if adjacent (within 0.3s tolerance to catch floating point gaps)
+                if start <= curr_end + 0.3:
+                    curr_end = max(curr_end, end)
+                else:
+                    merged.append((curr_start, curr_end))
+                    curr_start, curr_end = start, end
+            merged.append((curr_start, curr_end))
+
     logger.info(f"Merged Cut Ranges: {merged}")
 
     # 2. Process Video Slicing with FFmpeg (GPU accelerated)
