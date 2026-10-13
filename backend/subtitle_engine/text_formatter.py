@@ -447,8 +447,10 @@ def _break_score(phrase: str, nxt: str = "") -> int:
         return 5
     if p[-1] in "、,…":
         return 4
-    if p in _ADNOMINALS or p.endswith("の"):
-        return -3  # 「この|チャンネル」「人々の|心に」は割らない
+    if p.endswith(_ADNOMINALS) or p.endswith("の"):
+        # 「この|チャンネル」「人々の|心に」は割らない。BudouX は連体詞を前の語に付けることがある
+        # （「普段どんな|人なんだろう」で字幕が割れた・34回目の 31分48秒）
+        return -3
     if _binds_to_next(p, nxt):
         # 「お届けして|まいります」「きっかけって|いうのは」は割らない。「の」の後ろ（「協会の|理事長で
         # いらっしゃいまして」）より悪い

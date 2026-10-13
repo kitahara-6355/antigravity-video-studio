@@ -685,6 +685,17 @@ def test_the_quoting_tte_stays_with_iu():
 
 
 @pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_an_adnominal_at_the_end_of_a_phrase_stays_with_its_noun():
+    # 34回目の 31分48秒: BudouX が「普段どんな」を1つの文節に読み、字幕が「…普段どんな」/「人なんだろう
+    # って…」と割れた（文節の尻の「な」を、語尾の「な」と同じく切ってよい所に数えていた）
+    text = "皆さん、視聴者の皆さん、久木田先生って普段どんな人なんだろうって、私もちょっと興味あるんですが、"
+    caps = tf.split_into_captions(text, 18, 2, trim=True)
+    assert not any(a.endswith("どんな") for a, _ in _junctions(caps)), caps
+    assert tf._break_score("普段どんな", "人なんだろうって") < 0
+    assert tf._break_score("こんな", "感じで") < 0
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
 def test_te_followed_by_a_new_verb_may_still_be_split():
     # 補助の動詞でなければ「て」の後ろは切ってよい所のまま（「書いて、/送ってくれた」）
     assert tf._break_score("書いて", "送ってくれた") > 0
