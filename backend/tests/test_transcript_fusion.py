@@ -9,7 +9,8 @@
 1. 2回目と手元の音声認識が同じ字を聞き、1回目だけが違う所は 2回目の字にする（2対1）
 2. 認識が1回目と同じ・どちらとも違う所は 1回目のまま
 3. 行の分け方と時刻は 1回目のまま（字だけ直す）
-4. 1回目の字を2字以上消さない・言いよどみと数字は触らない（認識が落としやすい所）
+4. 1回目の字を2字以上消すのは、2回目にも無く、認識が前後の字を言う間もなく続けて聞いた所だけ（3字まで）。
+   言いよどみと数字は触らない（認識が落としやすい所）
 5. 2回目は区切りの位置をずらして起こす（1回目の区切りの前後が2回目では区切りの中ほどになる）
 6. 認識が使えない・2回目が落ちたら 1回目のまま進む
 """
@@ -103,7 +104,7 @@ def test_the_head_of_an_addition_is_not_taken_where_the_first_pass_was_heard():
     assert out[0]["text"] == first[0]["text"]
 
 
-def test_more_than_one_character_of_the_first_pass_is_never_dropped():
+def test_more_than_three_characters_of_the_first_pass_are_never_dropped():
     # 認識は早口や言い直しを落とす。認識に無いことだけでは 1回目の字を消さない
     first = [_row(0.0, 3.0, "それがね、それがね八歳のときです。")]
     second = [_row(0.0, 3.0, "それがね八歳のときです。")]
@@ -120,6 +121,73 @@ def test_a_single_extra_character_heard_by_no_one_else_is_dropped():
     out, _ = tfu.fuse(first, second, _heard("書を通して人々の心に触れ"))
 
     assert out[0]["text"] == "書を通して人々の心に触れ。"
+
+
+def _heard_with_pause(before: str, after: str, pause: float, start: float = 0.0,
+                      step: float = 0.12) -> list[tuple[str, float]]:
+    """before と after の間で pause 秒あけて聞いた認識（字の間は step 秒）。"""
+    head = _heard(before, start, step)
+    return head + _heard(after, head[-1][1] + pause, step)
+
+
+def test_two_or_three_characters_the_recogniser_had_no_time_for_are_dropped():
+    # 実例（2分49秒・35回目）: 1回目だけが「そう」を挟み、2回目と認識は「しようという」。
+    # 認識は「と」と「い」を 0.2 秒で続けて聞いていて、「そう」を言う間は無かった
+    first = [_row(0.0, 3.0, "あの克服しようとそういう感じですか？")]
+    second = [_row(0.0, 3.0, "あの、克服しようという感じですか？")]
+
+    out, stats = tfu.fuse(first, second, _heard("克服しようという感じで"))
+
+    assert out[0]["text"] == "あの克服しようという感じですか？"
+    assert stats["adopted"] == 1
+
+
+def test_characters_are_kept_where_the_recogniser_left_time_to_say_them():
+    # 前後の字の間が「そう」を言えるほどあいていれば、認識が落としただけかもしれない
+    first = [_row(0.0, 3.0, "あの克服しようとそういう感じですか？")]
+    second = [_row(0.0, 3.0, "あの、克服しようという感じですか？")]
+
+    out, _ = tfu.fuse(first, second, _heard_with_pause("克服しようと", "いう感じで", pause=0.5))
+
+    assert out[0]["text"] == first[0]["text"]
+
+
+@pytest.mark.parametrize("first_text,second_text,heard", [
+    ("それで、あの、ここで書きました。", "それで、ここで書きました。", "それでここで書きました"),
+    ("生徒さんは百二十人です。", "生徒さんは百人です。", "生徒さんは百人です"),
+])
+def test_dropping_two_characters_leaves_fillers_and_numbers_alone(first_text, second_text, heard):
+    out, _ = tfu.fuse([_row(0.0, 3.0, first_text)], [_row(0.0, 3.0, second_text)], _heard(heard))
+
+    assert out[0]["text"] == first_text
+
+
+def test_a_difference_that_runs_into_a_row_of_only_a_filler_is_still_decided():
+    # 実例（2分46秒・35回目）: 1回目は「…ないよね。」の次の行が相づちの「ううん。」だけ。2回目と
+    # 認識は「ないので」。食い違いが「よね＋ううん」と「ので」の1つにまとまり、1回目の行を
+    # またぐので決めていなかった。言いよどみ（後で外す）だけの行の分は、食い違いに数えない
+    first = [_row(172.1, 177.2, "行かなくなったってことはないよね。"),
+             _row(177.2, 180.5, "ううん。あの克服しようという感じですか？")]
+    second = [_row(172.9, 180.7, "行かなくなったってことはないので。あの、克服しようという感じですか？")]
+    heard = _heard("行かなくなったってことはないので克服しようという感じで", start=172.5)
+
+    out, stats = tfu.fuse(first, second, heard)
+
+    assert [s["text"] for s in out] == ["行かなくなったってことはないので。",
+                                       "ううん。あの克服しようという感じですか？"]
+    assert stats["adopted"] == 1
+
+
+def test_a_difference_across_rows_with_words_on_both_sides_is_left_alone():
+    # 両方の行に言いよどみでない字があれば、どちらの行の字に当てるか決められない
+    first = [_row(0.0, 2.0, "行かなくなったってことはないよね。"),
+             _row(2.0, 4.0, "それで克服しようという感じですか？")]
+    second = [_row(0.0, 4.0, "行かなくなったってことはないので克服しようという感じですか？")]
+    heard = _heard("行かなくなったってことはないので克服しようという感じで")
+
+    out, _ = tfu.fuse(first, second, heard)
+
+    assert [s["text"] for s in out] == [s["text"] for s in first]
 
 
 @pytest.mark.parametrize("first_text,second_text,heard", [
