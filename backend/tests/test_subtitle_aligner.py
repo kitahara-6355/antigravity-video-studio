@@ -399,6 +399,83 @@ def test_the_cut_step_keeps_the_closing_captions_inside_the_cut(tmp_path, monkey
     assert out[1]["start"] < 8.0
 
 
+def _brush_question():
+    # 2分19秒（34回目）: 校閲が辞書どおりに「もういつですか？」を「もう毛筆ですか？」に直した。認識は
+    # 「もういつです」と聞いているので、直した字幕は突き合わず、声より 2.3 秒早く出た（33回目は合っていた）
+    caps = [{"start": 0.0, "end": 8.0, "text": "文鎮置かないで帰ってきたんですよ"},
+            {"start": 8.0, "end": 10.0, "text": "もう毛筆ですか？"},
+            {"start": 10.0, "end": 12.0, "text": "「3」って書いたの覚えてるんですけど"}]
+    heard = (toks("文鎮置かないで帰ってきたんですよ", 1.0) + [("も", 7.8)] + toks("ういつです", 11.9, 0.12)
+             + toks("三って書いたの覚えてるんですけど", 15.0))
+    return caps, heard
+
+
+def test_a_caption_the_dictionary_corrected_takes_the_time_of_what_was_heard():
+    caps, heard = _brush_question()
+    aligner.align_captions(caps, heard)
+    assert caps[0]["_asr"] and caps[2]["_asr"] and not caps[1].get("_asr")
+    n = aligner.align_heard_forms(caps, heard, terms=(("もういつですか", "もう毛筆ですか"),))
+    assert n == 1 and caps[1]["_asr"]
+    assert caps[1]["start"] == pytest.approx(11.9 - aligner.CHAR_SEC, abs=0.05)
+    assert caps[1]["text"] == "もう毛筆ですか？"  # 字幕の文はそのまま
+    assert all(0 <= c < len("もう毛筆ですか") for c, _ in caps[1]["_asr_marks"])
+
+
+def test_a_corrected_caption_stays_unaligned_when_its_old_form_was_not_heard_either():
+    caps, heard = _brush_question()
+    caps[1]["text"] = "あっもう、毛筆。"
+    aligner.align_captions(caps, heard)
+    assert aligner.align_heard_forms(caps, heard, terms=(("湿布", "毛筆"),)) == 0
+    assert not caps[1].get("_asr")
+
+
+def test_only_the_recognition_between_the_matched_neighbours_is_used():
+    # 直す前の形が、前後の合った字幕の外（別の所）で聞こえていても使わない
+    caps, heard = _brush_question()
+    heard = [(c, t) for c, t in heard if t < 7.0 or t >= 15.0] + toks("もういつですか", 30.0)
+    aligner.align_captions(caps, heard)
+    assert aligner.align_heard_forms(caps, heard, terms=(("もういつですか", "もう毛筆ですか"),)) == 0
+
+
+def test_a_caption_matched_as_written_is_not_touched():
+    caps = [{"start": 0.0, "end": 2.0, "text": "もう毛筆ですか？"}]
+    heard = toks("もう毛筆ですか", 5.0)
+    aligner.align_captions(caps, heard)
+    before = dict(caps[0])
+    assert aligner.align_heard_forms(caps, heard, terms=(("もういつですか", "もう毛筆ですか"),)) == 0
+    assert caps[0] == before
+
+
+def test_the_old_form_may_be_longer_than_the_correction():
+    # 「角シアター」→「アドシアター」のように長さが変わっても、字幕の何文字目かは字幕の文で数える
+    caps = [{"start": 0.0, "end": 1.0, "text": "そうです"},
+            {"start": 1.0, "end": 2.0, "text": "久木田です"},
+            {"start": 2.0, "end": 3.0, "text": "よろしくお願いします"}]
+    heard = toks("そうです", 1.0) + toks("くきたさんです", 4.0) + toks("よろしくお願いします", 8.0)
+    aligner.align_captions(caps, heard)
+    assert not caps[1].get("_asr")
+    assert aligner.align_heard_forms(caps, heard, terms=(("くきたさん", "久木田"),)) == 1
+    assert all(0 <= c < len("久木田です") for c, _ in caps[1]["_asr_marks"])
+    assert caps[1]["start"] == pytest.approx(4.0, abs=0.05)
+
+
+def test_the_cut_step_matches_dictionary_corrections_by_what_was_heard(tmp_path, monkeypatch):
+    import smart_cut_engine
+    from subtitle_engine import sync
+
+    cut = tmp_path / "cut.mp4"
+    cut.write_bytes(b"\x00" * 2048)
+    caps, heard = _brush_question()
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: heard)
+    monkeypatch.setattr(aligner, "_dictionary_terms", lambda: (("もういつですか", "もう毛筆ですか"),))
+    monkeypatch.setattr(sync, "speech_map", lambda path: None)
+    monkeypatch.setattr(sync, "align_segments", lambda segs, *a, **k: (segs, None))
+
+    out = smart_cut_engine._align_to_speech(cut, caps, [], source_path="src.mp4", ranges=[(0.0, 40.0)])
+
+    assert out[1]["start"] == pytest.approx(11.9 - aligner.CHAR_SEC, abs=0.05)
+
+
 def test_a_repeated_reply_takes_the_recognised_time_nearest_its_own_estimate():
     # 実例（3分04秒・31回目）: ゲストの「そうですね」→ 聞き手の「何か一番最初のきっかけなんですね」→
     # ゲストの「そうですね」。認識は2つ目の「そうですね」だけを拾った。全体の突き合わせは同じ長さなら

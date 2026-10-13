@@ -278,6 +278,8 @@ def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=No
                     # 認識が書き起こさなかった言いよどみ（「こう」「あの」「え」）を先に外す
                     f = aligner.drop_unheard_fillers(segments, heard)
                     n = aligner.align_captions(segments, heard)
+                    # 辞書で直した字幕（「もう毛筆ですか」）は、認識が聞いた直す前の形で合わせ直す
+                    n += aligner.align_heard_forms(segments, heard)
                     # 動画の長さ（残した区間の合計）。字幕をこの外に出さない
                     end = sum(float(b) - float(a) for a, b in ranges) if ranges else None
                     r = aligner.release_implausible(segments, end=end)

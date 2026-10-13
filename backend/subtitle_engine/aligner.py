@@ -615,6 +615,116 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
     return aligned
 
 
+def _heard_form(text: str, swaps) -> tuple[str, list[int]] | None:
+    """辞書で直した語を直す前の形に戻した文と、その1字ずつが字幕の何文字目に当たるか。
+
+    text と swaps は `_norm_text` 済み。swaps は (直した語, 直す前の形)。戻す所が無ければ None。
+    """
+    out, where, k, changed = [], [], 0, False
+    while k < len(text):
+        for term, old in swaps:
+            if text.startswith(term, k):
+                out.extend(old)
+                # 長さが違えば、直す前の形の字を直した語の字に按分して当てる
+                where.extend(k + j * len(term) // len(old) for j in range(len(old)))
+                k += len(term)
+                changed = True
+                break
+        else:
+            out.append(text[k])
+            where.append(k)
+            k += 1
+    return ("".join(out), where) if changed else None
+
+
+def align_heard_forms(captions: list[dict], tokens: list[tuple[str, float]], terms=None) -> int:
+    """合わなかった字幕を、辞書で直す前の形（認識が聞いた形）で合わせ直す。合わせた枚数を返す。
+
+    辞書の直し（「もういつですか」→「もう毛筆ですか」）は声を変えない。認識は直す前の形で聞いて
+    いるので、直した字幕は `align_captions` で突き合わない（34回目の 2分19秒: 「もう毛筆ですか？」が
+    声より 2.3 秒早く出た。直す前の 33回目は合っていた）。前後の合った字幕の間で聞いた文字だけを
+    相手に、直した語を直す前の形に戻して突き合わせる。合わせ方の決まりは `align_captions` と同じ。
+    terms は辞書の (誤, 正) の組（None なら辞書から読む）。
+    """
+    if not tokens or not captions:
+        return 0
+    if terms is None:
+        terms = _dictionary_terms()
+    swaps = sorted({(_norm_text(right), _norm_text(wrong)) for wrong, right in terms or ()
+                    if _norm_text(wrong) and _norm_text(right) and _norm_text(wrong) != _norm_text(right)},
+                   key=lambda p: -len(p[0]))
+    if not swaps:
+        return 0
+    rec_chars, rec_times = [], []
+    for ch, t in tokens:
+        for c in norm_char(ch):
+            rec_chars.append(c)
+            rec_times.append(float(t))
+    anchors = [i for i, c in enumerate(captions) if c.get("_asr")]
+    aligned = 0
+    for a, b in zip([None, *anchors], [*anchors, None]):
+        run = range(0 if a is None else a + 1, len(captions) if b is None else b)
+        forms = {i: _heard_form(_norm_text(captions[i].get("text")), swaps) for i in run}
+        forms = {i: f for i, f in forms.items() if f}
+        if not forms:
+            continue
+        lo = (captions[a].get("_asr_marks") or [(0, float(captions[a]["end"]))])[-1][1] if a is not None else None
+        hi = float(captions[b].get("_asr_first", captions[b]["start"])) if b is not None else None
+        window = [k for k, t in enumerate(rec_times) if (lo is None or t > lo) and (hi is None or t < hi)]
+        if not window:
+            continue
+        # 字幕側: 戻した形の文字と、字幕の番号・何文字目か
+        cap_chars, owner, offset_in = [], [], []
+        for i in run:
+            text = _norm_text(captions[i].get("text"))
+            chars, where = forms.get(i) or (text, list(range(len(text))))
+            cap_chars.extend(chars)
+            owner.extend([i] * len(chars))
+            offset_in.extend(where)
+        sm = difflib.SequenceMatcher(None, cap_chars, [rec_chars[k] for k in window], autojunk=False)
+        hits: dict[int, list[tuple[int, float]]] = {}
+        for blk in sm.get_matching_blocks():
+            first = 0
+            for d in range(1, blk.size + 1):
+                t_prev, t_next = rec_times[window[blk.b + d - 1]], rec_times[window[min(blk.b + d, len(window) - 1)]]
+                if d < blk.size and t_next - t_prev <= MAX_CHAR_GAP_SEC:
+                    continue
+                if d - first >= MIN_BLOCK:
+                    for e in range(first, d):
+                        ci = blk.a + e
+                        hits.setdefault(owner[ci], []).append((offset_in[ci], rec_times[window[blk.b + e]]))
+                first = d
+        prev_last = lo
+        for i in run:
+            if i not in forms:
+                if captions[i].get("_asr"):
+                    prev_last = captions[i]["_asr_marks"][-1][1]
+                continue
+            pairs = _main_pairs(sorted(set(hits.get(i) or [])))
+            heard_len = len(forms[i][0])
+            if not pairs or len(pairs) < max(MIN_HITS, MIN_MATCH_RATIO * heard_len):
+                continue
+            length = len(_norm_text(captions[i].get("text")))
+            (c0, t0), (c1, t1) = pairs[0], pairs[-1]
+            start = t0 - c0 * CHAR_SEC
+            if prev_last is not None and start < prev_last + 0.05:
+                start = min(t0, prev_last + 0.05)
+            end = t1 + (length - 1 - c1) * CHAR_SEC + CHAR_SEC
+            if end <= start:
+                continue
+            prev_last = t1
+            cap = captions[i]
+            cap["_est_start"], cap["_est_end"] = float(cap["start"]), float(cap["end"])
+            cap["start"], cap["end"] = round(start, 3), round(end, 3)
+            cap["_asr"], cap["_asr_heard"], cap["_asr_first"] = True, len(pairs), round(t0, 3)
+            cap["_asr_marks"] = [(c, round(t, 3)) for c, t in pairs]
+            cap["_asr_heard_form"] = True
+            aligned += 1
+    if aligned:
+        logger.info(f"辞書で直す前の形で時刻を合わせた字幕: {aligned}枚")
+    return aligned
+
+
 def _move_repeated_matches(captions: list[dict], hits: dict[int, list[tuple[int, float]]]) -> int:
     """同じ文の字幕が近くに並ぶとき、認識が拾った1回を、推定時刻（文字起こし）の近い方の字幕に移す。
 
