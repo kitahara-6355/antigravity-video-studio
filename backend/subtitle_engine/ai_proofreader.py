@@ -219,6 +219,33 @@ def _dictionary_rows() -> list:
         return []
 
 
+def keep_term_edits(base: str, corrected: str, terms) -> str:
+    """corrected の直しのうち、terms（辞書の正しい語）に掛かるものだけを base に足す。
+
+    terms に掛からない所は base のまま。terms が corrected に無ければ base を返す。
+    """
+    import difflib
+
+    spans = []
+    for term in terms or ():
+        k = corrected.find(term) if term else -1
+        while k != -1:
+            spans.append((k, k + len(term)))
+            k = corrected.find(term, k + 1)
+    if not spans:
+        return base
+    out = []
+    sm = difflib.SequenceMatcher(None, base, corrected, autojunk=False)
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            out.append(base[i1:i2])
+        elif any((j1 < b and a < j2) if j2 > j1 else a <= j1 <= b for a, b in spans):
+            out.append(corrected[j1:j2])  # 語に掛かる直し（語に接する削除も含む）
+        else:
+            out.append(base[i1:i2])
+    return "".join(out)
+
+
 class ProofreadMemo:
     """行ごとの校閲の控え（JSON・素材ごとに1つ）。
 
@@ -226,7 +253,8 @@ class ProofreadMemo:
     「初日ね」が戻らず、「主宰」が「主催」になった・2026-10-08）。一度採った直しは控えておき、
     同じ行には次からも同じ直しを使う。鍵は (控えの形式・指示文・宣言モデル・行に掛かる辞書の組・行)
     なので、指示文・モデル指定・その行に掛かる辞書が変われば、その行は校閲し直す。
-    控えるのは AI の出力そのもの。番号ずれや音声認識での確かめは毎回やり直す。
+    控えるのは AI の出力そのもの（文脈の項目を足して校閲し直した行は、前の控えに項目の語の直しだけを
+    足したもの。`earlier`）。番号ずれや音声認識での確かめは毎回やり直す。
     """
 
     def __init__(self, path):
@@ -247,6 +275,25 @@ class ProofreadMemo:
         related = [list(r) for r in rows if r[0] and r[0] in text]
         raw = json.dumps([salt, related, text], ensure_ascii=False)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+    def earlier(self, salt: str, text: str, rows):
+        """文脈で判断する項目（hint）を足す前の、同じ行の控えと、足した項目の正しい語。
+
+        項目を足すと行の鍵が変わって校閲し直すが、AI は項目と関係ない所まで直し直す
+        （2分11秒: 前の回に外した「それで行っと」を「それで行って」と書いて戻した・2026-10-13）。
+        控えが見つからなければ (None, ())。
+        """
+        import itertools
+
+        related = [r for r in rows if r[0] and r[0] in text]
+        hints = [r for r in related if len(r) > 2 and r[2] == "hint"]
+        for size in range(len(hints) - 1, -1, -1):
+            for kept in itertools.combinations(hints, size):
+                subset = [r for r in related if r not in hints or r in kept]
+                hit = self.get(self.key(salt, text, subset))
+                if hit is not None:
+                    return hit, tuple(str(r[1]) for r in hints if r not in kept)
+        return None, ()
 
     def get(self, key: str):
         row = self.rows.get(key)
@@ -403,7 +450,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
             template = hashlib.sha256(_proofread_prompt("", "").encode("utf-8")).hexdigest()
             salt = json.dumps([MEMO_VERSION, template, _declared_model()])
             rows = _dictionary_rows()
-            keys = [ProofreadMemo.key(salt, str(s.get("text") or ""), rows) for s in segments]
+            texts = [str(s.get("text") or "") for s in segments]
+            keys = [ProofreadMemo.key(salt, t, rows) for t in texts]
             stats["memo_hits"] = 0
         memo_models = set()
 
@@ -635,12 +683,21 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                                 f"AI Proofreader: 元の文と離れすぎた直しを捨てました [{item_idx}] "
                                 f"{segments[item_idx]['text'][:20]!r} → {item['text'][:20]!r}")
                             continue
+                        text = item["text"]
                         if item.get("_memo"):
                             stats["memo_hits"] += 1
                             memo_models.add(memo.model_of(keys[item_idx]) or "不明")
                         elif memo is not None:
-                            memo.put(keys[item_idx], item["text"], served_model)
-                        text = item["text"]
+                            # 文脈の項目を足して校閲し直した行は、前の控えに項目の語の直しだけを足す
+                            base, terms = memo.earlier(salt, texts[item_idx], rows)
+                            if base is not None:
+                                merged = keep_term_edits(base, text, terms)
+                                if merged != text:
+                                    stats["hint_only_items"] = stats.get("hint_only_items", 0) + 1
+                                    logger.info(f"AI Proofreader: 辞書の項目に掛かる直しだけを採りました [{item_idx}] "
+                                                f"{text[:24]!r} → {merged[:24]!r}")
+                                text = merged
+                            memo.put(keys[item_idx], text, served_model)
                         # 校閲が足した字のうち、音声認識が「足さない形」で聞いているものは戻す
                         # （「最初 に 書 に」→「最初にな書に」・2026-10-06 実走）
                         trim = getattr(referee, "trim", None)

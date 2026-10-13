@@ -393,6 +393,26 @@
       "confirmed": true,
       "usage_count": 0,
       "created_at": "2026-10-06T14:00:00Z"
+    },
+    {
+      "id": "pn_201",
+      "incorrect": "湿布",
+      "correct": "毛筆",
+      "type": "hint",
+      "context_hint": "書道の筆の話（「もう毛筆ですか」）。体に貼る湿布の話なら直さない（4回の起こしが「湿布」「1つ」「一室」「毛室」と聞いた・2026-10-13）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-13T08:00:00Z"
+    },
+    {
+      "id": "pn_202",
+      "incorrect": "もういつですか",
+      "correct": "もう毛筆ですか",
+      "type": "hint",
+      "context_hint": "書道の筆の話で、直後に「あっもう毛筆」「毛筆です」と答える質問（pn_201）。1回目の起こしと音声認識は「もういつですか」、2回目の起こしは「もう1つですか」と聞いた（2026-10-13）。時期を尋ねる「いつ」なら直さない",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-13T09:00:00Z"
     }
   ],
   "pending_confirmations": []

@@ -501,6 +501,51 @@ class TestProofreadMemo:
         assert out == ["アドシアター代表で", "光栄です。"]
         assert calls == 1 and stats["memo_hits"] == 1
 
+    def test_文脈で判断する項目を足した行は項目の語の直しだけを取り込む(self, tmp_path):
+        # 2分21秒の「もういつですか？」「あっもう、湿布。」は「毛筆」の聞き違い（2026-10-13）。
+        # 項目を足して校閲し直すと、AI は項目と関係ない所まで直し直した（前の回に外した
+        # 「それで行っと」を「それで行って」と書いて戻した）。前の控えに、項目の語の直しだけを足す
+        path = tmp_path / "_proofread_x.json"
+        lines = ["それで行っと初日に行ったら、ああ。もういつですか？", "あっもう、湿布。", "笑われて"]
+        self._run(self._reply("初日に行ったら。もういつですか？", "あっもう、初日ね。", "笑われて"), lines,
+                  ai_proofreader.ProofreadMemo(path))
+        rows = [("もういつですか", "もう毛筆ですか", "hint", "書道の筆"), ("湿布", "毛筆", "hint", "書道の筆")]
+        out, stats, calls = self._run(
+            self._reply("それで行って初日に行ったら。もう毛筆ですか？", "あっもう、毛筆。", "笑われてね"),
+            lines, ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["初日に行ったら。もう毛筆ですか？", "あっもう、毛筆。", "笑われて"]
+        assert calls == 1 and stats["memo_hits"] == 1
+        # 取り込んだ結果を控える。次の書き出しも同じ字幕になる
+        out, _, calls = self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["初日に行ったら。もう毛筆ですか？", "あっもう、毛筆。", "笑われて"] and calls == 0
+
+    def test_文脈で判断する項目を採らなかった行は前の控えのまま(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["それで行っと初日に行ったら、ああ。もういつですか？"]
+        self._run(self._reply("初日に行ったら。もういつですか？"), lines, ai_proofreader.ProofreadMemo(path))
+        rows = [("もういつですか", "もう毛筆ですか", "hint", "時期を尋ねる「いつ」なら直さない")]
+        out, _, calls = self._run(self._reply("それで行って初日に行ったら。もういつですか？"), lines,
+                                  ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["初日に行ったら。もういつですか？"] and calls == 1
+
+    def test_項目を足す前の控えが無ければ_AI_の直しをそのまま使う(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        rows = [("湿布", "毛筆", "hint", "書道の筆")]
+        out, _, _ = self._run(self._reply("あっ、もう毛筆。"), ["あっもう、湿布。"],
+                              ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["あっ、もう毛筆。"]
+
+    def test_前後の行は文脈の項目を足しても控えのまま(self, tmp_path):
+        # 前後の行まで校閲し直すと、関係ない行の直しが揺れた（2分11秒の「って言って」が
+        # 「てって言って」になった・2026-10-13 の試し）
+        path = tmp_path / "_proofread_x.json"
+        lines = ["って言って、それが8歳です。", "もういつですか？"]
+        self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        rows = [("もういつですか", "もう毛筆ですか", "hint", "書道の筆")]
+        out, stats, _ = self._run(self._reply("てって言って、それが8歳です。", "もう毛筆ですか？"), lines,
+                                  ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["って言って、それが8歳です。", "もう毛筆ですか？"] and stats["memo_hits"] == 1
+
     def test_捨てた直しは控えない(self, tmp_path):
         path = tmp_path / "_proofread_x.json"
         lines = ["います。", "では記念すべき第1回目のゲストは日本デザイン"]
