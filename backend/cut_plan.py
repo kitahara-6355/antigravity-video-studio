@@ -37,8 +37,10 @@ import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +274,9 @@ def read_audio(path, rate: int = 16000) -> SourceAudio | None:
             capture_output=True, timeout=1800)
         if proc.returncode != 0 or not isinstance(proc.stdout, bytes) or not proc.stdout:
             return None
-        # 音が読めてから読み込む（subtitle_engine は読み込みが重く、読めない素材では要らない）
+        # 音が読めてから読み込む（subtitle_engine・numpy は読み込みが重く、読めない素材では要らない。
+        # 字幕だけで切る経路は numpy を読まない）
+        import numpy as np
         from subtitle_engine import sync
         levels = sync.frame_levels_db(np.frombuffer(proc.stdout, dtype=np.int16), rate)
         if len(levels) == 0:
@@ -311,6 +315,7 @@ def _voice_start(speech, t: float) -> float | None:
 
 def _quietest(levels: np.ndarray, lo: float, hi: float) -> float:
     """lo〜hi 秒で一番静かな所（0.1 秒の平均で見る）。"""
+    import numpy as np
     a = max(0, int(round(lo / FRAME_SEC)))
     b = min(len(levels), int(round(hi / FRAME_SEC)))
     if b - a <= 0:
