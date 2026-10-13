@@ -57,6 +57,19 @@ def test_the_same_letters_inside_another_word_are_left_alone():
                              "30分とか40分かな", "40分からスタート"]
 
 
+def test_a_spelling_that_would_glue_the_word_to_the_phrase_before_is_left_alone():
+    # 実例（34回目の 22分23秒）: 「みたいにね綺麗な文字が」を「きれい」にそろえると、BudouX が
+    # 「ねきれいな」を1つの文節に読み、行の折り目が「…みたいにねきれいな｜文字が」に動いた。
+    # そろえるより読みやすさを採る（その1か所は元の書き方のまま）
+    groups = [{"forms": ["きれい", "綺麗"], "after": "なだでにじさ", "noun": True}]
+    ss = segs("きれいな花ですね", "僕はね美麗さんみたいにね綺麗な文字が書けないから")
+    assert notation.unify_notation(ss, groups) == {}
+    assert texts(ss)[1] == "僕はね美麗さんみたいにね綺麗な文字が書けないから"
+    # 区切りの後ろなら、そろえても文節は崩れない
+    ss = segs("きれいな花ですね", "僕はね、綺麗な文字が書けないから")
+    assert notation.unify_notation(ss, groups) == {"綺麗→きれい": 1}
+
+
 def test_a_different_word_with_the_same_head_is_left_alone():
     # 「わかれば」は数えない（「別れ」と分けられない）。「若い」「わかめ」は別の語
     ss = segs("分かります", "分かった", "わかれば", "若い人が", "わかめ")

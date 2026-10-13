@@ -12,6 +12,7 @@
 語の頭だけを見る。語の頭は、文節（BudouX）の頭か、区切り・開き括弧の直後。数字の直後
 （「40分から」）は見ない。後ろには組ごとに決めた字（活用語尾・助詞）しか続けない。
 「わかれば」（別れ）「わかい」（若い）のような別の語は、続く字で外れる。
+そろえると語が前の文節にくっつく（文節の切れ目が消える）所は、そろえずに残す。
 """
 from __future__ import annotations
 
@@ -109,7 +110,12 @@ def unify_notation(segments: list[dict], groups=None) -> dict[str, int]:
             for i, form in sorted(places, reverse=True):
                 if i + len(form) > limit:
                     continue
-                text = text[:i] + target + text[i + len(form):]
+                new = text[:i] + target + text[i + len(form):]
+                # そろえた語が前の文節にくっつくなら、その1か所はそろえない（「みたいにね綺麗な」を
+                # 「きれい」にすると「ねきれいな」が1つの文節になり、行の折り目が動いた・34回目の 22分23秒）
+                if i not in _word_starts(new):
+                    continue
+                text = new
                 limit = i
                 key = f"{form}→{target}"
                 changed[key] = changed.get(key, 0) + 1
