@@ -134,6 +134,15 @@ class ProofreadWorker(PipelineStageWorker):
             ctx.skipped_features.append("AI校閲(Gemini)")
             ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}), "AI校閲": 0}
 
+        # 同じ語の書き分け（「僕」と「ぼく」）を動画の中で多い方にそろえる。校閲は100行ずつ
+        # 見るので、動画全体の書き方まではそろわない（33回目・2026-10-13）
+        notation = {}
+        try:
+            from subtitle_engine.notation import unify_notation
+            notation = unify_notation(ctx.segments)
+        except Exception as e:
+            logger.warning(f"表記の統一スキップ: {e}")
+
         # ━━━ FIX-3A: テキスト整形（旧 src/clean_linguistic.py 復元） ━━━
         # 長文を18文字/行に分割し、字幕の画面はみ出しを防止
         format_stats = ""
@@ -182,6 +191,7 @@ class ProofreadWorker(PipelineStageWorker):
 
         total = dict_corrections + ai_corrections
         memo_note = f" / 校閲の控え{memo_hits}行（{'・'.join(memo_models) or '不明'}）" if memo_hits else ""
+        notation_note = f" / 表記{sum(notation.values())}件" if notation else ""
         # 使用モデルを取得（UI可視化用）
         try:
             from subtitle_engine.ai_proofreader import _get_current_model
@@ -211,9 +221,10 @@ class ProofreadWorker(PipelineStageWorker):
         logger.info(f"📊 [T-014] ProofreadWorker出口: ctx.segments={len(ctx.segments)}件")
         return StageResult(
             stage_name=self.name, success=True,
-            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{format_stats}{skip_warn}",
+            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{notation_note}"
+                   f"{format_stats}{skip_warn}",
             data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
-                  "memo_hits": memo_hits, "memo_models": memo_models},
+                  "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation},
             duration_seconds=round(time.time() - start, 1),
         )
 
