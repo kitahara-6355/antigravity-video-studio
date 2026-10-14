@@ -44,6 +44,9 @@ DEFAULT_TIMING = {
     "snap_window_sec": 0.8,
     # カットの直前・直後この秒数では字幕を出し入れしない（カット点に揃える）
     "cut_zone_sec": 0.25,
+    # 1枚の字幕を出し続けてよい最長。Netflix の字幕の基準（Timed Text Style Guide）も 7 秒。
+    # 2行の字幕がこれより長く出るときは、2行目を話し始めた所で2枚に分ける（`_split_long`）。0 なら分けない
+    "max_display_sec": 7.0,
 }
 
 # 隣り合う字幕の出だしの最小の間隔（同じ話し始めに2枚が寄るのを防ぐ）
@@ -321,6 +324,16 @@ FLASH_SEC = 0.5
 FAST_CPS = 8.0
 # 切れ目を動かすのは、2枚の字幕のすき間がこれ以内のとき（続けて話している）
 RESPLIT_MAX_GAP_SEC = 0.3
+# 長く出続ける字幕を分けるとき（`_split_long`）: 2行目の頭の字をこの字数まで認識が拾えなくても、
+# 次に拾えた字から話し始めを見積もる。分けた1枚がこれより短くなるなら分けない
+SPLIT_HEAD_SKIP = 2
+SPLIT_MIN_PART_SEC = 1.5
+# 1行目を話し終えてから2行目を話し始めるまでに、これより長く話している（字幕に無い言葉がある）なら
+# 分けない。分けるとその声に字幕が出ない（40回目の 36分03秒: 起こしが「…タッパーに移したら
+# おいしくなりますね／紙皿だったらおいしくない…」を1文にまとめ、間の 2 秒の声が字幕に無かった）
+SPLIT_MAX_UNSAID_SEC = 1.0
+# 認識の1字を話す長さ（`aligner.CHAR_SEC` と同じ値。拾えなかった字の時刻の見積もりに使う）
+SPLIT_CHAR_SEC = 0.13
 
 
 def _too_short(s: dict, min_display: float) -> bool:
@@ -576,23 +589,96 @@ def _drop_past_end(items: list[dict], end: float) -> int:
     return dropped
 
 
+def _split_at_line(s: dict, speech: SpeechMap) -> list[dict] | None:
+    """2行の字幕を、2行目の頭を話した時刻（音声認識）で2枚に分けた形（合わせる前の時刻）。分けられなければ None。
+
+    1枚目は1行目の最後の字を話し終わるまで、2枚目は2行目の頭の字を話し始めた所から。2行目の頭の字を
+    認識が拾えなくても SPLIT_HEAD_SKIP 字までなら、次に拾えた字から1字 SPLIT_CHAR_SEC 秒でさかのぼる
+    （頭を拾えなかった字幕と同じく、後で拾えた字の前の話し始めに寄る）。1行目と2行目の間に字幕に無い
+    声がある（SPLIT_MAX_UNSAID_SEC 超え）・分けた1枚が読めないほど短いときは分けない。
+    """
+    from subtitle_engine import aligner
+    lines = str(s.get("text") or "").split("\n")
+    if len(lines) != 2 or not s.get("_asr"):
+        return None
+    n = len(aligner._norm_text(lines[0]))
+    marks = [(int(c), float(t)) for c, t in s.get("_asr_marks") or ()]
+    head = [(c, t) for c, t in marks if c < n]
+    tail = [(c, t) for c, t in marks if c >= n]
+    if not head or not tail or tail[0][0] - n > SPLIT_HEAD_SKIP:
+        return None
+    c2, t2 = tail[0]
+    second_on = t2 - (c2 - n) * SPLIT_CHAR_SEC
+    first_off = min(head[-1][1] + (n - head[-1][0]) * SPLIT_CHAR_SEC, second_on)
+    if (first_off - float(s["start"]) < SPLIT_MIN_PART_SEC
+            or float(s["end"]) - second_on < SPLIT_MIN_PART_SEC
+            or _speaking_time(speech, first_off, second_on) > SPLIT_MAX_UNSAID_SEC):
+        return None
+    first = dict(s, text=lines[0], end=round(first_off, 3), _asr_marks=head, _asr_heard=len(head),
+                 _break_punct=False, _ends_punct=bool(s.get("_break_punct")))
+    # 字幕から外した言いよどみの声（`_asr_tail`）は字幕の尻のものなので、2枚目に残す
+    first.pop("_asr_tail", None)
+    second = dict(s, text=lines[1], start=round(second_on, 3), _asr_first=round(t2, 3),
+                  _asr_marks=[(c - n, t) for c, t in tail], _asr_heard=len(tail), _break_punct=False)
+    return [first, second]
+
+
+def _split_long(segments: list[dict], result: list[dict], max_sec: float,
+                speech: SpeechMap) -> tuple[list[dict], int]:
+    """合わせた結果で max_sec より長く出る2行の字幕を、合わせる前の字幕（segments）の方で2枚に分ける。
+
+    40回目の 1分22秒: 「私 小学校3年生の時に お習字を/スタートしたんですけど その当時僕が」が
+    10.2 秒出て、2行目は話す 6 秒前から見えていた（全編で 7 秒を超える字幕が 22 枚）。
+    隣とまとめた・切れ目を動かした字幕（文が変わったもの）は分けない。返り値は (字幕, 分けた枚数)。
+    """
+    if not max_sec or max_sec <= 0:
+        return segments, 0
+    long = {s["_sync_index"] for s in result
+            if float(s["end"]) - float(s["start"]) > max_sec
+            and s.get("text") == segments[s["_sync_index"]].get("text")}
+    out, split = [], 0
+    for k, s in enumerate(segments):
+        parts = _split_at_line(s, speech) if k in long else None
+        if parts:
+            out.extend(parts)
+            split += 1
+        else:
+            out.append(s)
+    return out, split
+
+
 def align_segments(segments: list[dict], speech: SpeechMap,
                    cut_points: list[float] | None = None,
                    rules: dict | None = None) -> tuple[list[dict], dict]:
     """字幕（出力の時間軸の start/end）を話し始め・話し終わりに合わせる。
 
-    返り値は (直した字幕, 集計)。字幕の順番・文字は変えない。
+    返り値は (直した字幕, 集計)。字幕の順番は変えない。読めないほど短い字幕は隣とまとめ、
+    長く出続ける2行の字幕（`max_display_sec` 超え）は2行目を話し始めた所で2枚に分けて合わせ直す。
     """
     r = dict(DEFAULT_TIMING)
     r.update(rules or {})
+    result, stats = _align_once(segments, speech, cut_points, r)
+    segments, split = _split_long(segments, result, r.get("max_display_sec", 0.0), speech)
+    if split:
+        result, stats = _align_once(segments, speech, cut_points, r)
+        logger.info(f"✂️ {r['max_display_sec']:g}秒より長く出る2行の字幕を、2行目を話し始めた所で分けました: {split}枚")
+    stats["split_long"] = split
+    for s in result:
+        s.pop("_sync_index", None)
+    return result, stats
+
+
+def _align_once(segments: list[dict], speech: SpeechMap, cut_points: list[float] | None,
+                r: dict) -> tuple[list[dict], dict]:
+    """`align_segments` の1回分。返す字幕には、元の字幕の番号（`_sync_index`）を付けておく。"""
     cut_points = sorted(cut_points or [])
     # 声が聞こえず、前後の聞こえた字幕の間に入る隙も無い字幕は、時刻の取り合いに加えない。
     # 出しても一瞬で消えるうえ、聞こえた字幕の時間を削る（15分26秒・重なって話した「ファンが」が
     # 「そういう中でね…」を 0.33 秒で消させた・2026-10-06 実測）
-    heard_or_roomy = [s for s in segments
+    heard_or_roomy = [dict(s, _sync_index=k) for k, s in enumerate(segments)
                       if not (_unheard(s) and float(s.get("end", 0)) - float(s.get("start", 0)) < FLASH_SEC)]
     no_room = len(segments) - len(heard_or_roomy)
-    items = sorted((dict(s) for s in heard_or_roomy), key=lambda s: float(s.get("start", 0)))
+    items = sorted(heard_or_roomy, key=lambda s: float(s.get("start", 0)))
     n = len(items)
     snapped_in = snapped_out = 0
 

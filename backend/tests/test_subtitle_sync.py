@@ -440,3 +440,91 @@ def test_a_caption_with_no_room_in_its_scene_is_dropped_without_delaying_the_nex
     assert stats["dropped"] == 1
     assert out[-1]["start"] == pytest.approx(3.2, abs=0.02)
     assert _inside_zones(out)
+
+
+# --- 長く出続ける2行の字幕を、2行目を話し始めた所で分ける（40回目の 1分22秒ほか・2026-10-14）-------
+
+LONG = "あ" * 12 + "\n" + "い" * 12
+
+
+def _long_caption(marks, **extra):
+    return {"start": 1.0, "end": 9.6, "text": LONG, "_asr": True, "_asr_first": marks[0][1],
+            "_asr_marks": marks, **extra}
+
+
+def test_a_two_line_caption_shown_too_long_is_split_where_the_second_line_is_said():
+    # 40回目の 1分22秒: 「私 小学校3年生の時に お習字を/スタートしたんですけど その当時僕が」が
+    # 10.2 秒出て、2行目は話す 6 秒前から見えていた。2行目の頭を話した時刻（認識）で2枚に分ける
+    sp = _map([(1.0, 5.2), (6.0, 9.6)], total=12)
+    segs = [_long_caption([(0, 1.0), (11, 5.0), (12, 6.0), (23, 9.5)])]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["あ" * 12, "い" * 12]
+    assert out[0]["start"] == pytest.approx(1.0, abs=0.02)
+    assert out[0]["end"] == pytest.approx(5.7, abs=0.02)   # 話し終わり + 余韻 0.5 秒
+    assert out[1]["start"] == pytest.approx(6.0, abs=0.02)
+    assert stats["split_long"] == 1
+    # 分けた字幕の文字ごとの時刻は、それぞれの行の字の番号で付け直す
+    assert out[1]["_asr_marks"][0] == (0, 6.0)
+
+
+def test_a_two_line_caption_within_the_limit_is_left_alone():
+    sp = _map([(1.0, 3.2), (3.6, 6.0)], total=10)
+    segs = [{"start": 1.0, "end": 6.0, "text": LONG, "_asr": True, "_asr_first": 1.0,
+             "_asr_marks": [(0, 1.0), (12, 3.6), (23, 5.9)]}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == [LONG]
+    assert stats["split_long"] == 0
+
+
+def test_a_second_line_whose_head_was_barely_heard_starts_where_speech_resumes():
+    # 2行目の頭の 2 字を認識が拾えなくても、次に拾えた字の前の話し始めで分ける
+    sp = _map([(1.0, 5.2), (6.0, 9.6)], total=12)
+    segs = [_long_caption([(0, 1.0), (11, 5.0), (14, 6.3), (23, 9.5)])]
+    out, _ = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["あ" * 12, "い" * 12]
+    assert out[1]["start"] == pytest.approx(6.0, abs=0.02)
+
+
+def test_a_second_line_the_recogniser_did_not_hear_is_not_split():
+    # 2行目を話した時刻が分からない（頭の 3 字以上を拾えない）なら分けない
+    sp = _map([(1.0, 5.2), (6.0, 9.6)], total=12)
+    segs = [_long_caption([(0, 1.0), (11, 5.0), (16, 7.0), (23, 9.5)])]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == [LONG]
+    assert stats["split_long"] == 0
+
+
+def test_a_caption_is_not_split_where_it_would_leave_speech_without_a_caption():
+    # 40回目の 36分03秒: 起こしが2つの文を1枚にまとめ、1行目と2行目の間の 2 秒の声（「移したら
+    # おいしくなりますね」）は字幕に無かった。分けるとその声の間に字幕が出なくなる
+    sp = _map([(1.0, 5.2), (5.5, 7.4), (7.6, 9.6)], total=12)
+    segs = [_long_caption([(0, 1.0), (11, 5.0), (12, 7.6), (23, 9.5)])]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == [LONG]
+    assert stats["split_long"] == 0
+
+
+def test_a_split_that_would_leave_a_part_too_short_to_read_is_not_made():
+    # 2行目を話し始めたのが字幕の終わり間際なら、分けても2枚目が読めない
+    sp = _map([(1.0, 9.0), (9.2, 9.6)], total=12)
+    segs = [_long_caption([(0, 1.0), (11, 8.9), (12, 9.2), (23, 9.5)])]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == [LONG]
+    assert stats["split_long"] == 0
+
+
+def test_the_longest_display_can_be_changed_in_the_template():
+    sp = _map([(1.0, 5.2), (6.0, 9.6)], total=12)
+    segs = [_long_caption([(0, 1.0), (11, 5.0), (12, 6.0), (23, 9.5)])]
+    out, stats = sync.align_segments(segs, sp, [], dict(RULES, max_display_sec=12.0))
+    assert [s["text"] for s in out] == [LONG]
+    out, stats = sync.align_segments(segs, sp, [], dict(RULES, max_display_sec=0.0))
+    assert [s["text"] for s in out] == [LONG]   # 0 なら分けない
+
+
+def test_split_parts_stay_in_the_scene_of_the_caption():
+    sp = _map([(1.0, 5.2), (6.0, 9.6)], total=12)
+    segs = [_long_caption([(0, 1.0), (11, 5.0), (12, 6.0), (23, 9.5)], _zone=(0.5, 10.0))]
+    out, _ = sync.align_segments(segs, sp, [10.0], RULES)
+    assert len(out) == 2 and _inside_zones(out)
+    assert all(s["_zone"] == (0.5, 10.0) for s in out)
