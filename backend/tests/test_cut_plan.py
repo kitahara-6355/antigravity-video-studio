@@ -419,3 +419,59 @@ def test_dropped_talk_blocks_only_where_its_words_were_heard(monkeypatch):
 def test_the_recogniser_is_read_only_for_a_real_file(tmp_path):
     assert cut_plan.read_heard(None) is None
     assert cut_plan.read_heard(str(tmp_path / "missing.mp4")) is None
+
+
+# --- だれも話さない場面（2026-10-14 字を書く場面）--------------------------------------------
+
+WRITING = [_seg(1789.76, 1794.46, "先生に　今から書いていただきます"),
+           _seg(1821.38, 1826.78, "はい"),
+           _seg(1853.30, 1860.10, "はい　今ね　先生に素敵な字を書いていただいたので")]
+SCENE_RULES = dict(RULES, keep_scenes=True, scene_min_sec=10.0)
+
+
+def test_a_long_stretch_where_nobody_speaks_is_kept_as_a_scene():
+    # 先生が字を書く約1分。間を詰めると、書き始めと「はい」の前後の約10秒だけになっていた
+    ranges, info = cut_plan.plan(WRITING, None, keep_all=True, rules=SCENE_RULES)
+    assert ranges == [(1789.76, 1860.10)]
+    assert info["scenes"] == [(1794.46, 1821.38), (1826.78, 1853.30)]
+
+
+def test_the_production_talk_inside_a_scene_is_still_cut():
+    # 書く場面の終わりの「はい。取ります。はい。」（段取りの声）は外したまま。そこから後ろの
+    # 3 秒は場面にならない
+    ranges, info = cut_plan.plan(WRITING, None, keep_all=True, rules=SCENE_RULES,
+                                 exclude=[(1849.50, 1850.30)])
+    assert ranges == [(1789.76, pytest.approx(1849.50 - RULES["pad_before_sec"])), (1853.30, 1860.10)]
+    assert info["scenes"] == [(1794.46, 1821.38), (1826.78, 1849.50)]
+
+
+def test_a_run_of_production_talk_is_not_a_scene():
+    # 37分38〜47秒の形: 段取りの声が続く 10 秒は、1つ1つのすき間が短いので場面ではない
+    segs = [_seg(2250.0, 2257.38, "前の話です"), _seg(2267.84, 2270.0, "先生が")]
+    talk = [(2258.04, 2259.24), (2259.94, 2260.54), (2260.94, 2261.44), (2262.94, 2264.84),
+            (2266.04, 2266.54), (2266.94, 2267.44)]
+    ranges, info = cut_plan.plan(segs, None, keep_all=True, rules=SCENE_RULES, exclude=talk)
+    assert ranges == [(2250.0, 2257.38), (2267.84, 2270.0)]
+    assert "scenes" not in info
+
+
+def test_a_pause_shorter_than_a_scene_is_still_cut():
+    segs = [_seg(0.0, 5.0, "一"), _seg(14.0, 20.0, "二")]
+    ranges, _ = cut_plan.plan(segs, None, keep_all=True, rules=SCENE_RULES)
+    assert ranges == [(0.0, 5.0), (14.0, 20.0)]
+
+
+def test_scenes_are_not_kept_when_content_is_selected():
+    # 中身を選んで削るときの長いすき間は、選ばなかった発話の所（場面ではない）
+    ranges, info = cut_plan.plan(WRITING, None, keep_all=False, rules=SCENE_RULES)
+    assert len(ranges) == 3
+    assert "scenes" not in info
+
+
+def test_keeping_scenes_can_be_turned_off_in_the_template(monkeypatch):
+    from template_config import template_config
+    monkeypatch.setattr(template_config, "get_cut_rules", lambda: {"keep_scenes": False})
+    rules = cut_plan.cut_rules()
+    assert rules["keep_scenes"] is False
+    ranges, _ = cut_plan.plan(WRITING, None, keep_all=True, rules=rules)
+    assert len(ranges) == 3

@@ -40,7 +40,12 @@
 収録の段取りの声（カメラを止める前後の「ちょっと切ります」「撮った？」「止めた？」）は中身では
 ないので残さない（`production_talk`）。外した発話の声は、前後の区間を延ばしても入れない（`exclude`）。
 
-数字・冒頭・段取りの言葉はテンプレートの `cut_rules` で変えられる（`cut_rules()`）。
+だれも話さない長い所（`scene_min_sec` 以上）は、会話の間ではなく動作の場面なので切らない
+（`find_scenes`・`join_scenes`。2026-10-14）。間を詰める規則では、先生が字を書く約1分（素材の
+29分54秒〜30分53秒）が書き始めと「はい」の前後の約10秒になっていた。場面の中の段取りの声
+（30分49秒「はい。取ります。はい。」）は外したまま。
+
+数字・冒頭・場面・段取りの言葉はテンプレートの `cut_rules` で変えられる（`cut_rules()`）。
 """
 from __future__ import annotations
 
@@ -80,6 +85,12 @@ DEFAULT_CUT_RULES = {
     "keep_opening": True,
     # 最初の質問がこの秒数までに無ければ冒頭は守らない（見つけ損ねて本題まで守らないように）
     "opening_max_sec": 180.0,
+    # だれも話さない長い所は、動作の場面（字を書く・作品を見せる）なので切らない。会話の間では
+    # ない。中身を全部残すときだけ（`join_scenes`）
+    "keep_scenes": True,
+    # 発話と発話（外した段取りの声も含む）のすき間がこれ以上なら場面。会話の間は長くても数秒で、
+    # raw 4本（43分）で 6 秒以上のすき間は、字を書く場面の2つ（27 秒・23 秒）だけだった
+    "scene_min_sec": 10.0,
     # 収録の段取りの声は残さない。中身を全部残すようにしたら、37分38秒〜47秒（3本目の素材の
     # 終わり）の「ちょっと切ります」「撮った？」「切、止めた？」が字幕付きで出るようになった
     "drop_production_talk": True,
@@ -212,6 +223,42 @@ def join_opening(ranges, until: float, walls=()) -> list[tuple[float, float]]:
         else:
             out.append((start, end))
     return out
+
+
+# ------------------------------------------------------------------
+# だれも話さない場面（字を書く・作品を見せる）
+# ------------------------------------------------------------------
+
+def find_scenes(spans, min_sec: float) -> list[tuple[float, float]]:
+    """発話の区間 spans（素材の秒）のすき間のうち、min_sec 秒以上のもの。
+
+    spans には外した発話（段取りの声）も入れる。段取りの声が続く所（37分38〜47秒）は、
+    1つ1つのすき間が短いので場面にならない。最初の発話の前・最後の発話の後ろは場面にしない。
+    """
+    scenes: list[tuple[float, float]] = []
+    end = None
+    for a, b in sorted((float(a), float(b)) for a, b in spans):
+        if end is not None and a - end >= min_sec:
+            scenes.append((end, a))
+        end = b if end is None else max(end, b)
+    return scenes
+
+
+def join_scenes(ranges, scenes, gap_sec: float, before_sec: float = 0.0) -> list[tuple[float, float]]:
+    """場面（`find_scenes`）を残す区間に足してつなぐ。
+
+    場面の終わりは次の発話の始まりなので、before_sec 手前で止める（次が外した発話なら、
+    その声を入れない。残す発話ならつながる）。
+    """
+    spans = sorted([(float(a), float(b)) for a, b in ranges]
+                   + [(a, max(a, b - before_sec)) for a, b in scenes])
+    merged: list[tuple[float, float]] = []
+    for start, end in spans:
+        if merged and start <= merged[-1][1] + gap_sec:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
 
 
 # ------------------------------------------------------------------
@@ -547,9 +594,10 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
          rules: dict | None = None, exclude=()) -> tuple[list[tuple[float, float]], dict]:
     """残す区間（素材の秒）と、決め方の記録を返す。
 
-    keep_all: 中身（発話）を全部残すとき True。冒頭（最初の質問の文の前まで）は切らず、
-    声の中でも切らない。中身を選んで削るときは False（冒頭も選ばれない発話があり、つなぐと
-    その声が字幕無しで入る。長く続く声は一番静かな所で切る）。
+    keep_all: 中身（発話）を全部残すとき True。冒頭（最初の質問の文の前まで）とだれも話さない
+    場面は切らず、声の中でも切らない。中身を選んで削るときは False（冒頭も選ばれない発話があり、
+    つなぐとその声が字幕無しで入る。選ばなかった発話の所も長いすき間になる。長く続く声は一番
+    静かな所で切る）。
     exclude: 外した発話（収録の段取りの声）。字幕か区間（素材の秒）で渡す。前後の区間を
     延ばしても入れない。
     素材の音声認識が読めれば、発話の言葉が聞こえた所まで区間を広げ（`heard_spans`）、
@@ -570,6 +618,12 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
         if until is not None:
             ranges = join_opening(ranges, until, walls)
             info["opening_until"] = until
+    if keep_all and rules.get("keep_scenes"):
+        spans = [_widened(_span(s), widen) for s in segments] + walls
+        scenes = find_scenes(spans, rules.get("scene_min_sec", DEFAULT_CUT_RULES["scene_min_sec"]))
+        if scenes:
+            ranges = join_scenes(ranges, scenes, rules["min_cut_sec"], rules["pad_before_sec"])
+            info["scenes"] = scenes
     audio = read_audio(source_path)
     if audio is not None and tokens:
         audio.heard = sorted(float(t) for _, t in tokens)

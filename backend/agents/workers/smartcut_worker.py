@@ -241,6 +241,11 @@ class SmartCutWorker(PipelineStageWorker):
         notes = []
         if "opening_until" in info and ranges:
             notes.append(f"冒頭（素材の {_clock(ranges[0][0])}〜{_clock(info['opening_until'])}）はノーカット")
+        if info.get("scenes"):
+            first = info["scenes"][0]
+            more = f"ほか{len(info['scenes']) - 1}か所" if len(info["scenes"]) > 1 else ""
+            notes.append(f"だれも話さない場面（素材の {_clock(first[0])}〜{_clock(first[1])}{more}）は"
+                         f"動作の場面として切らずに残した")
         if info.get("heard_widened"):
             notes.append(f"文字起こしの区間の外でも言葉が聞こえた{info['heard_widened']}発話は、"
                          f"聞こえた所まで残した")
