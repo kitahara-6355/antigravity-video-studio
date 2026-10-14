@@ -64,6 +64,35 @@ def test_a_sentence_head_ne_is_not_shown():
     assert tf.strip_lead_words("ねじを回すんですね。") == "ねじを回すんですね。"
 
 
+def test_a_sentence_head_n_is_not_shown():
+    # 40回目の 29分02秒: 「ん、あの、ま、僕が思った言葉ですけど」の「あの」「ま」は外れ、
+    # 頭の「ん」だけが「ん　僕が思った言葉ですけど」と残った（「うん、」と同じ相づち）
+    text = "ん、あの、ま、僕が思った言葉ですけど、あの、もし欲しい人がいたら、差しあげるので、あの"
+    out = tf.format_segments([{"text": text, "start": 0.0, "end": 6.0}], 18)
+    assert out and out[0]["text"].startswith("僕が"), out
+    # 「、」が続かない「ん」（「んで、」）は別の語
+    assert tf.strip_lead_words("んで、行ったんですよ。") == "んで、行ったんですよ。"
+
+
+@pytest.mark.parametrize("text,want", [
+    # 40回目の 7分26秒: 校閲が「B オリジナルって」を「「オリジナル」と」に直し、聞こえた「って」を戻す
+    # 規則が「」と」の所だけを戻したので、開きの「だけが残った
+    ("僕が持って「オリジナルって書くんです。", "僕が持ってオリジナルって書くんです。"),
+    ("それで終わり」って言われた。", "それで終わりって言われた。"),
+    ("「3」って書いたの覚えてるんですけど", "「3」って書いたの覚えてるんですけど"),
+    ("『墨』という雑誌の「特集」です", "『墨』という雑誌の「特集」です"),
+    ("「「はい」って言った", "「はい」って言った"),
+])
+def test_a_bracket_without_its_pair_is_dropped(text, want):
+    assert tf.drop_unpaired_brackets(text) == want
+
+
+def test_captions_do_not_show_a_bracket_without_its_pair():
+    text = "100年前のシャーペンのレプリカを僕が持って「オリジナルって書くんです。"
+    out = tf.format_segments([{"text": text, "start": 0.0, "end": 7.0}], 18)
+    assert out and not any("「" in s["text"] for s in out), out
+
+
 def test_bare_lead_word_is_removed_without_comma():
     assert tf.strip_lead_words("では記念すべき第1回目", [], ["では"]) == "記念すべき第1回目"
     assert tf.strip_lead_words("では\n記念すべき", [], ["では"]) == "記念すべき"
@@ -704,6 +733,33 @@ def test_an_adnominal_at_the_end_of_a_phrase_stays_with_its_noun():
     assert not any(a.endswith("どんな") for a, _ in _junctions(caps)), caps
     assert tf._break_score("普段どんな", "人なんだろうって") < 0
     assert tf._break_score("こんな", "感じで") < 0
+
+
+@pytest.mark.parametrize("phrase,nxt", [
+    # 40回目: 24分31秒「いつも字をいろんな/お仕事とか」・14分53秒「ちょっと有名な/フォントが」・
+    # 20分51秒「分かるっていうような」|「内容の方が」。「〜な」は後ろの名詞に掛かる
+    ("いろんな", "お仕事とか"), ("有名な", "フォントが"), ("ような", "内容の"), ("大切な", "言葉を"),
+])
+def test_a_phrase_ending_in_na_stays_with_the_noun_it_describes(phrase, nxt):
+    assert tf._break_score(phrase, nxt) < 0
+
+
+@pytest.mark.parametrize("phrase,nxt", [
+    ("10時ぐらいかな", "絶望の中で"), ("すごいよな", "それで"), ("みんな", "「わあ！」って"),
+])
+def test_a_sentence_ending_na_is_still_a_place_to_break(phrase, nxt):
+    assert tf._break_score(phrase, nxt) >= 0
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_ka_nanka_stays_together():
+    # 40回目の 1分58秒: BudouX が「駄菓子屋か」「なんか」と分け、字幕が「…駄菓子屋か/なんか行ってる…」と
+    # 折れた。「〜かなんか」（〜か何か）は前の語とひと塊。名詞の後ろの「なんか」は BudouX が前に付ける
+    caps = tf.split_into_captions("びっくりしちゃって駄菓子屋かなんか行ってる場合じゃないやって", 18, 2, trim=True)
+    assert not any(a.endswith("か") and b.startswith("なんか") for a, b in _junctions(caps)), caps
+    assert tf._break_score("お茶か", "なんか飲みますか") < 0
+    # 「か」の後ろでも、「なんか」でなければ切ってよい所のまま
+    assert tf._break_score("行くか", "どうか") >= 0
 
 
 @pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")

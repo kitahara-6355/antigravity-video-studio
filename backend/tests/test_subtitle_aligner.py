@@ -540,7 +540,8 @@ def test_a_one_character_filler_goes_only_before_a_break():
             {"start": 3.0, "end": 5.0, "text": "お考えです"}]
     rec = toks("層の幅を広げる意味で", 10.0) + toks("お考です", 13.0)
     assert aligner.drop_unheard_fillers(caps, rec, FILLERS) == 1
-    assert caps[0]["text"] == "層の幅を\n広げる意味で"
+    # 外して1行に入るなら1行に組み直す（`_rewrap`）
+    assert caps[0]["text"] == "層の幅を広げる意味で"
     assert caps[1]["text"] == "お考えです"
 
 
@@ -552,6 +553,15 @@ def test_the_space_next_to_a_removed_filler_goes_with_it():
     assert aligner.drop_unheard_fillers(caps, rec, FILLERS) == 2
     assert caps[0]["text"] == "皆さん　視聴者の皆さん"
     assert caps[1]["text"] == "一番大きいので"
+
+
+def test_a_caption_is_rewrapped_after_a_filler_is_taken_out():
+    # 40回目の 16分39秒: 「その」があると「方でも」までが1行に入らず「テレビの/方でも」と折っていた。
+    # 「その」を外した後も、その折り目のまま出た
+    caps = [{"start": 0.0, "end": 4.0, "text": "ドラマというかそのアニメのテレビの\n方でもおそらってみんな見てるでしょ"}]
+    rec = toks("ドラマというかアニメのテレビの方でもおそらってみんな見てるでしょ", 10.0)
+    assert aligner.drop_unheard_fillers(caps, rec, FILLERS) == 1
+    assert caps[0]["text"] == "ドラマというかアニメのテレビの方でも\nおそらってみんな見てるでしょ"
 
 
 def test_fillers_in_a_row_go_together():
@@ -606,7 +616,9 @@ def test_a_drawn_out_filler_is_removed_but_not_across_a_long_silence():
 def test_a_lead_word_left_behind_a_removed_filler_goes_too():
     # 実例（7分29秒・31回目）: 「書いたんですようんで、ここ」の「うん」だけ外すと「書いたんですよで」と出る。
     # 「で、」は文頭の聞き流し語（omit_lead_words）
-    caps = [{"start": 0.0, "end": 3.0, "text": "書いたんですようんで\nここ\u3000でっかいカメラが"}]
+    # 整形は句読点の跡の折り目に印（`_break_punct`）を付ける（「…うんで、/ここ、」）
+    caps = [{"start": 0.0, "end": 3.0, "text": "書いたんですようんで\nここ\u3000でっかいカメラが",
+             "_break_punct": True}]
     rec = toks("書いたんですよでここでっかいカメラが", 10.0)
     assert aligner.drop_unheard_fillers(caps, rec, FILLERS, leads=["で"]) == 2
     assert caps[0]["text"] == "書いたんですよ\nここ\u3000でっかいカメラが"

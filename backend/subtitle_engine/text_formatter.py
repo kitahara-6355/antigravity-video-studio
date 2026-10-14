@@ -131,6 +131,36 @@ def strip_lead_words(text: str, words: list[str] | None = None,
     return result if result else text
 
 
+_BRACKET_PAIRS = (("「", "」"), ("『", "』"))
+
+
+def drop_unpaired_brackets(text: str) -> str:
+    """対になっていない鉤括弧を外す（片方だけの括弧は字幕で浮き、折り方も括弧の中とみなして崩れる）。
+
+    40回目の 7分26秒: 校閲が「B オリジナルって」を「「オリジナル」と」に直し、聞こえた「って」を戻す
+    規則（`aligner.drop_unheard_edits`）が「」と」の所だけを戻したので、「僕が持って「オリジナルって
+    書くんです」と開きだけが残った。どこから来た片割れでも、行の中で対にならなければ外す。
+    """
+    if not isinstance(text, str):
+        return text
+    for opening, closing in _BRACKET_PAIRS:
+        if opening not in text and closing not in text:
+            continue
+        open_at, drop = [], set()
+        for i, ch in enumerate(text):
+            if ch == opening:
+                open_at.append(i)
+            elif ch == closing:
+                if open_at:
+                    open_at.pop()
+                else:
+                    drop.add(i)
+        drop.update(open_at)
+        if drop:
+            text = "".join(ch for i, ch in enumerate(text) if i not in drop)
+    return text
+
+
 _FILLER_LEFT = "、,，。！？!? 　\n"
 _FILLER_COMMA = "、,，"
 # 言いよどみの後ろに付いて、ひとまとまりになる助詞（「なんかね、」「なんかさ、」）
@@ -390,6 +420,9 @@ SENTENCE_END = "。！？!?"
 _LEADING_PUNCT = "、。，．,.！？!?」』）)…ー〜"
 _OPENING = "「『（(“"
 _ADNOMINALS = ("この", "その", "あの", "どの", "こんな", "そんな", "あんな", "どんな")
+# 「な」で終わっても後ろの語に掛からないもの（文末の「かな」「よな」「だな」・「みんな」）。
+# ほかの「〜な」（「いろんな」「有名な」「ような」）は後ろの名詞に掛かる
+_FREE_NA = ("かな", "よな", "だな", "みんな")
 # 後ろで切ってよい語尾。強いほど先に並べる（2点）
 _GOOD_TAILS = ("から", "けど", "ので", "のに", "ため", "って", "では", "には", "とは",
                "は", "て", "で", "し", "ね", "よ", "な")
@@ -424,11 +457,14 @@ def _phrase_parser():
 
 
 def _binds_to_next(p: str, nxt: str) -> bool:
-    """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」）か。"""
+    """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」・「〜かなんか」）か。"""
     nxt = nxt.lstrip()
     if not nxt:
         return False
     if p.endswith(_QUOTE_TAILS) and nxt.startswith(_QUOTE_HEADS):
+        return True
+    # 「〜かなんか」（〜か何か）。BudouX は「駄菓子屋か|なんか」と分ける（40回目の 1分58秒）
+    if p.endswith("か") and nxt.startswith("なんか"):
         return True
     # 動詞の「て・で」（書いて・読んで・泳いで）と、名詞の後ろの「で」で、付くものが違う
     if p.endswith("て") or p.endswith(("んで", "いで")):
@@ -447,9 +483,10 @@ def _break_score(phrase: str, nxt: str = "") -> int:
         return 5
     if p[-1] in "、,…":
         return 4
-    if p.endswith(_ADNOMINALS) or p.endswith("の"):
+    if p.endswith(_ADNOMINALS) or p.endswith("の") or (p.endswith("な") and not p.endswith(_FREE_NA)):
         # 「この|チャンネル」「人々の|心に」は割らない。BudouX は連体詞を前の語に付けることがある
-        # （「普段どんな|人なんだろう」で字幕が割れた・34回目の 31分48秒）
+        # （「普段どんな|人なんだろう」で字幕が割れた・34回目の 31分48秒）。「〜な」も同じ
+        # （40回目の「いつも字をいろんな|お仕事とか」「ちょっと有名な|フォントが」）
         return -3
     if _binds_to_next(p, nxt):
         # 「お届けして|まいります」「きっかけって|いうのは」は割らない。「の」の後ろ（「協会の|理事長で
@@ -1048,6 +1085,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
             # 「、」が続く言いよどみと、文頭の聞き流し語（さて、それから、）を外す
             cleaned = strip_interjections(strip_context_fillers(remove_fillers(text), context_fillers), mid_fillers)
             cleaned = strip_lead_words(strip_phrase_head_fillers(cleaned, head_fillers), lead_words, bare_words)
+            cleaned = drop_unpaired_brackets(cleaned)
             if cleaned != text:
                 filler_count += 1
 

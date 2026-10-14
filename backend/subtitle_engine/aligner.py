@@ -481,6 +481,35 @@ def _cut_spans(text: str, spans: list[tuple[int, int]]) -> str:
     return "\n".join(line for line in lines if line)
 
 
+def _rewrap(cap: dict, text: str) -> str:
+    """言いよどみを外して短くなった字幕を、整形と同じ折り方で組み直した形（組めなければ text のまま）。
+
+    外す前の長さで決めた折り目は、外した後はもう一番良い所ではない（40回目の 16分39秒: 「ドラマというか
+    そのアニメのテレビの/方でも…」は「その」を入れると「方でも」までが1行に入らず「の」の後ろで
+    折っていた。「その」を外した後も「テレビの/方でも」のまま出た）。
+    """
+    from subtitle_engine import sync
+    from subtitle_engine import text_formatter as tf
+    if text.count("\n") != 1:
+        return text
+    flat = sync._flat(dict(cap, text=text))
+    max_chars, max_lines = sync._caption_limits()
+    new = sync._wrap_one(flat, max_chars, max_lines)
+    if not new or new == text:
+        return text
+    punct = sync._breaks_at_space(flat, new)
+
+    def score(t: str, at_punct: bool) -> int:
+        head, tail = t.split("\n")
+        return tf._break_score(head + ("、" if at_punct else ""), tail)
+
+    # 1行に入るなら1行に。2行のままなら、折り目が良くなるときだけ組み直す（句読点の跡の折り目は残る）
+    if "\n" in new and score(new, punct) <= score(text, bool(cap.get("_break_punct"))):
+        return text
+    cap["_break_punct"] = punct
+    return new
+
+
 def drop_unheard_fillers(captions: list[dict], tokens: list[tuple[str, float]], words=None,
                          leads=None) -> int:
     """「こう」「あの」「その」「え」を、音声認識が書き起こさなかったときだけ字幕から外す。外した語の数を返す。
@@ -494,6 +523,7 @@ def drop_unheard_fillers(captions: list[dict], tokens: list[tuple[str, float]], 
     触らない（相づちだけの字幕の規則が扱う）。語の一覧はテンプレートの omit_unheard_fillers。
     外した語のすぐ後ろの文頭の聞き流し語（omit_lead_words の「で」）も、後ろが区切りなら外す
     （「書いたんですようんで、ここ」の「うん」だけ外すと「書いたんですよで」と出る）。
+    外した後の2行の字幕は、整形と同じ折り方で組み直す（`_rewrap`）。
     """
     words = _rule_words(words, "omit_unheard_fillers")
     leads = _rule_words(leads, "omit_lead_words", norm=False)
@@ -551,7 +581,7 @@ def drop_unheard_fillers(captions: list[dict], tokens: list[tuple[str, float]], 
         text = _cut_spans(str(captions[i].get("text") or ""), spans)
         if not _norm_text(text):
             continue
-        captions[i]["text"] = text
+        captions[i]["text"] = _rewrap(captions[i], text)
         dropped += len(spans)
     return dropped
 
