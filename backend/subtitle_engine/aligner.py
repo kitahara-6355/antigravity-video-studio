@@ -338,12 +338,15 @@ def _contradicted(base, corrected, i1, i2, j1, j2, heard, keep) -> bool:
 
 
 def _dictionary_terms() -> tuple:
-    """辞書の (誤, 正) の組（校閲が辞書どおりに直した語は、認識が違って聞いても戻さない）。"""
+    """辞書の (誤, 正) の組（校閲が辞書どおりに直した語は、認識が違って聞いても戻さない）。
+
+    未確認（confirmed: false）の項目は入れない（校閲にも渡さない・`proper_noun_dict.apply_corrections`）。
+    """
     try:
         from proper_noun_dict import proper_noun_dict
         return tuple(sorted({(str(e.get("incorrect") or ""), str(e.get("correct") or ""))
                              for e in proper_noun_dict.get_all_entries()
-                             if e.get("incorrect") and e.get("correct")}))
+                             if e.get("incorrect") and e.get("correct") and e.get("confirmed", True) is not False}))
     except Exception:  # 辞書が読めなくても裁く
         return ()
 

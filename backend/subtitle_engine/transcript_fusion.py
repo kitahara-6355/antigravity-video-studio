@@ -20,7 +20,7 @@
 - 1回目の行をまたぐ食い違いは、言いよどみだけの行の分を外して決める（2分46秒の「ないよね。
   ／ううん。」と2回目の「ないので。」。まとめて1つの食い違いになり、行をまたぐので決めていなかった）
 - 食い違いと句読点で隔てたすぐ外側の言いよどみ（2字以上）は、前後の字から外しても探す（認識は
-  言いよどみを書かない。43回目の 42分05秒: 1回目「機械をねあの、足て」・2回目「絶やして」・認識
+  言いよどみを書かない。素材の 42分05秒（43回目の 41分30秒）: 1回目「機械をねあの、足て」・2回目「絶やして」・認識
   「機会をね絶やして」。全編で変わるのはここと「なんだろう→何だろう」の2か所）
 - 決めない所: 1回目の字を4字以上消す・前後に間がある所で2字以上消す（認識は早口・言い直し・
   重なりを落とすので、聞こえないことは弱い証拠）、言いよどみ（後で外す）、数字（認識は
@@ -67,6 +67,16 @@
 「浩信」と書く）ので、3回目が認識と同じ字を書いたときだけ直す（2対2 だが、2回の起こしは同じモデルで
 似た区間を聞いているので、区間を変えた3回目と別のモデルの認識がそろう方を採る）。かなと漢字の書き分け・
 2字以下のかなどうし（助詞）・辞書の語は見ない。43分の素材で候補 22 か所（書き分けを除く前は 75 か所）。
+44回目で直したのは3か所（「広報担当→広告担当」・「太文字→筆文字」・「え、古文字文化→え、筆文字文化」）、
+13か所は3回目も2回と同じ字（42分03秒「去年」も）、6か所は決まらない。
+
+2回が食い違い、どちらの字も認識に聞こえない所（`look_spots` の "neither"）: 突き合わせは1回目のままに
+するので、1回目の聞き違いが残る（44回目の 9分18秒: 1回目「怒んないように」・2回目「怒れないように」・
+認識「折れないように」、13分55秒: 1回目「今生田川で」・2回目「今バレたから」・認識「今治タオルとか」）。
+"swap" と同じく、3回目が認識と同じ字を書いたときだけ直す（4つの読みのうち2つがそろい、残る2つは
+それぞれ別の字）。3回目が2回目と同じ字を書いた所は決めない（認識はどの起こしとも食い違ったまま）。
+43分の素材で候補 6 か所。行をまたぐ所（10分16秒: 1回目「当時でん｜チーフの人たち」・2回目「当時、デン｜
+の人たち」・認識「当時電通の人たち」）は、ほかの候補と同じく直さない。
 """
 from __future__ import annotations
 
@@ -329,7 +339,7 @@ def fuse(primary: list[dict], secondary: list[dict],
 LOOK_EXTRA = 3
 # (a)(c) その食い違いの前後で、文と認識が続けて合う字数の下限（確かな所に挟まれていること）
 LOOK_ANCHOR = 4
-# (c) 2回とも同じ字を書き、認識だけが別の字を聞いた所の字数の上限（文と認識のどちらも）
+# (c) 認識だけが別の字を聞いた所の字数の上限（文と認識のどちらも）
 SWAP_MAX = 8
 # (c) かなと漢字の書き分け（norm_char でカタカナはひらがなにそろう）
 _KANA = re.compile(r"[ぁ-ゖー]+")
@@ -404,7 +414,9 @@ def look_spots(fused: list[dict], secondary: list[dict],
     (c) "swap": 2回とも同じ字を書き、認識だけが別の字（SWAP_MAX 字まで）を聞いた所。挟まれ方と
         言いよどみ・数字・英字は (a) と同じ。かなと漢字の書き分けや2字以下のかなどうし（助詞）
         だけの違いと、辞書の語（protect。名前は認識が別の字を書きやすい）の中は見ない
-        （42分03秒: 2回とも「先生、あの、去年初めての」・認識「今日ね初めての」）
+        （42分03秒: 2回とも「先生、あの、去年初めての」・認識「今日ね初めての」）。
+        2回が食い違い、突き合わせでどちらの字も認識に聞こえなかった所は "neither"（見る所は "swap"
+        と同じ。9分18秒: 1回目「怒んないように」・2回目「怒れないように」・認識「折れないように」）
 
     返り値は {"kind", "row", "c0", "c1", "cur", "want", "left", "right"} の並び。
     row・c0・c1 は fused の行と、その文の直す範囲（`_span`）。cur・want・left・right は
@@ -428,7 +440,7 @@ def look_spots(fused: list[dict], secondary: list[dict],
         spots.append({"kind": kind, "row": row, "c0": c0, "c1": c1, "cur": xf[i1:i2], "want": want,
                       "left": xf[max(0, i1 - SETTLE_CONTEXT):i1], "right": xf[i2:i2 + SETTLE_CONTEXT]})
 
-    # (a) 2回とも落とした所・(c) 2回とも同じ字を書き、認識だけが別の字を聞いた所
+    # (a) 2回とも落とした所・(c) 認識だけが別の字を聞いた所（2回とも同じ字か、2回が食い違ったか）
     xs = "".join(c for c, _, _ in _flatten(secondary)) if secondary else ""
     same = {i1 + k for op, i1, i2, _j1, _j2 in difflib.SequenceMatcher(None, xf, xs, autojunk=False).get_opcodes()
             if op == "equal" for k in range(i2 - i1)}
@@ -446,8 +458,8 @@ def look_spots(fused: list[dict], secondary: list[dict],
             add("omit", i1, i2, extra)
         elif (op == "replace" and len(cur) <= SWAP_MAX and len(extra) <= SWAP_MAX
               and not _only_fillers(cur) and not _spelling_only(cur, extra)
-              and all(i in same and i not in protected for i in range(i1, i2))):
-            add("swap", i1, i2, extra)
+              and not any(i in protected for i in range(i1, i2))):
+            add("swap" if all(i in same for i in range(i1, i2)) else "neither", i1, i2, extra)
 
     # (b) 2回目が1字消し、認識が片側でだけ消した側に寄る所
     if secondary:
@@ -481,8 +493,8 @@ def judge(fused: list[dict], third: list[dict], spot: dict) -> tuple[str, str]:
       （3回目も消した: 2回目・3回目・認識の3つがそろう）、その字を消す。(c) 間の字が、いまの字の頭と
       尻の間を認識の字（want）に入れ替えた形なら、間の字を置く。いまの字を（入れ替えた字数より）
       2字以上減らす形は決めない（42分03秒: 3回目「先生、あの、今日ね、」は置き、「今日ね、」だけなら
-      「先生、あの、」を落とすので置かない）
-    - "keep": 3回目も2回の起こしと同じ字（いまのまま）
+      「先生、あの、」を落とすので置かない）。"neither" も (c) と同じ
+    - "keep": 3回目も2回の起こしと同じ字（いまのまま。"neither" は1回目と同じ字）
     - "open": 前後の字が見つからない・どちらでもない字・置く所が2行にまたがる（決まらない）
     """
     row = fused[spot["row"]]
@@ -507,7 +519,7 @@ def judge(fused: list[dict], third: list[dict], spot: dict) -> tuple[str, str]:
                 pre = next(n for n in range(k, -1, -1) if gap[k - n:k] in cur)
                 post = next(n for n in range(rest, -1, -1) if gap[k + len(want):k + len(want) + n] in cur)
                 a, q = a + k - pre, a + k + len(want) + post
-            elif spot["kind"] == "swap" and want in gap:
+            elif spot["kind"] in ("swap", "neither") and want in gap:
                 head, tail = gap[:gap.find(want)], gap[gap.find(want) + len(want):]
                 if (not cur.startswith(head) or not cur.endswith(tail) or len(head) + len(tail) > len(cur)
                         or len(cur) - len(head) - len(tail) - len(want) > MAX_DROP):

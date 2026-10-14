@@ -366,8 +366,9 @@ class TranscribeWorker(PipelineStageWorker):
         候補は `transcript_fusion.look_spots`、裁きは `transcript_fusion.judge`。3回目で決まらない所は
         区間の前後の余白を広げて読み直す（`gemini_transcriber.LOOK_PADS`。区間の長さで聞き取りが変わる）。
         区間ごとの控えがキャッシュで、候補が変わらなければ2回目以降の実行は呼ばない。
-        認識だけが別の字を聞いた所（"swap"）は、ほかの候補と別の区間で読む（同じ区間にまとめると、
-        ほかの候補の区間が変わって控えが使えず、直っていた所を読み直すことになる）。辞書の語は候補にしない。
+        認識だけが別の字を聞いた所（2回とも同じ字の "swap"、2回が食い違ってどちらも聞こえない "neither"）は、
+        種類ごとに別の区間で読む（同じ区間にまとめると、先にあった候補の区間が変わって控えが使えず、
+        直っていた所を読み直すことになる）。辞書の語は候補にしない。
         落ちたら、それまでに決まった所だけを直して進む（3回目は直すためだけに使う）。
         """
         from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
@@ -385,7 +386,7 @@ class TranscribeWorker(PipelineStageWorker):
         try:
             quiet = await loop.run_in_executor(None, gemini_transcriber.QuietMap.from_media, str(ctx.video_path))
             journal = gemini_transcriber.journal_path(_gemini_checkpoint(whisper_checkpoint, third=True))
-            for kinds in (("omit", "drop"), ("swap",)):
+            for kinds in (("omit", "drop"), ("swap",), ("neither",)):
                 for pad in gemini_transcriber.LOOK_PADS:
                     pending = [i for i, (verdict, _) in enumerate(verdicts)
                                if verdict == "open" and spots[i]["kind"] in kinds]

@@ -36,6 +36,11 @@ def _get_current_model() -> str:
 logger = logging.getLogger(__name__)
 
 
+def _confirmed(entry: dict) -> bool:
+    """確認済みの辞書の項目か（confirmed が無い項目は確認済みとみなす）。未確認の項目は校閲に渡さない。"""
+    return entry.get("confirmed", True) is not False
+
+
 def _build_proper_noun_context() -> str:
     """固有名詞辞書からプロンプト用コンテキストを生成（Phase E）"""
     try:
@@ -47,6 +52,8 @@ def _build_proper_noun_context() -> str:
         lines = ["## 固有名詞辞書", "以下の固有名詞が出現する可能性があります。音声認識の誤変換を修正してください："]
         seen = set()
         for entry in entries:
+            if not _confirmed(entry):
+                continue
             incorrect = entry.get("incorrect", "")
             correct = entry.get("correct", "")
             # 同じ組は1行だけ（テストが残した同じ組が 161 件、指示の大半を占めていた・2026-10-06）
@@ -214,7 +221,7 @@ def _dictionary_rows() -> list:
         from proper_noun_dict import proper_noun_dict
         return sorted({(str(e.get("incorrect") or ""), str(e.get("correct") or ""),
                         str(e.get("type") or ""), str(e.get("context_hint") or ""))
-                       for e in proper_noun_dict.get_all_entries() if e.get("incorrect")})
+                       for e in proper_noun_dict.get_all_entries() if e.get("incorrect") and _confirmed(e)})
     except Exception:  # 辞書が読めなくても校閲はする
         return []
 

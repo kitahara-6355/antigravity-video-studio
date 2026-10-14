@@ -286,6 +286,17 @@ def test_a_dictionary_fix_is_kept_even_if_the_recogniser_heard_it_wrong():
     assert ref.trim(seg, "株式会社アドシアター代表で") == "株式会社アドシアター代表で"
 
 
+def test_an_unconfirmed_dictionary_entry_is_not_kept_against_the_recogniser(monkeypatch):
+    """未確認（confirmed: false）の項目は辞書の語として扱わない（2026-10-14: 「選出→撰出」）。"""
+    from unittest.mock import MagicMock
+    mock_module = MagicMock()
+    mock_module.proper_noun_dict.get_all_entries.return_value = [
+        {"incorrect": "選出", "correct": "撰出", "confirmed": False}, {"incorrect": "初会", "correct": "初回"}]
+    monkeypatch.setitem(sys.modules, "proper_noun_dict", mock_module)
+
+    assert aligner._dictionary_terms() == (("初会", "初回"),)
+
+
 def test_making_a_dictionary_word_without_its_wrong_form_is_still_judged():
     # 実例（37分16秒）: 辞書に「初会」→「初回」があるが、元の文は「第1回め」。辞書どおりの直しではない
     ref = aligner.referee_from_tokens(toks("はい第一回目のゲストとして", 10.0),

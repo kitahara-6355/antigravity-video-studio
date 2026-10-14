@@ -124,8 +124,10 @@ class ProperNounDictionary:
         corrected_text = text
         
         for entry in self.entries:
-            # hint は校閲（AI）に文脈で判断させる項目。機械的には置き換えない
-            if entry.type == "hint":
+            # hint は校閲（AI）に文脈で判断させる項目。機械的には置き換えない。
+            # 未確認（confirmed: false）の項目は確認されるまで使わない（2026-10-14: 未確認の
+            # 「選出→撰出」が 25分11秒の「選出」を書き換えていた。音声認識は「線質」と聞いた）
+            if entry.type == "hint" or not entry.confirmed:
                 continue
             if entry.incorrect in corrected_text:
                 corrected_text = corrected_text.replace(entry.incorrect, entry.correct)

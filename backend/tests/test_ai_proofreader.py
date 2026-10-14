@@ -102,6 +102,21 @@ class TestBuildProperNounContext:
         assert context.count("「テスト誤」→「テスト正」") == 1
         assert "「初会」→「初回」" in context
 
+    def test_未確認の項目は載せない(self):
+        """2026-10-14: 未確認（confirmed: false）の「選出→撰出」を校閲に渡していた（25分11秒は「線質」）。
+        確認されるまで指示にも控えの鍵にも入れない。confirmed が無い項目は確認済みとみなす。"""
+        mock_module = MagicMock()
+        mock_module.proper_noun_dict.get_all_entries.return_value = [
+            {"incorrect": "選出", "correct": "撰出", "confirmed": False},
+            {"incorrect": "初会", "correct": "初回", "confirmed": True},
+            {"incorrect": "久北", "correct": "久木田"}]
+        with patch.dict("sys.modules", {"proper_noun_dict": mock_module}):
+            context = ai_proofreader._build_proper_noun_context()
+            rows = ai_proofreader._dictionary_rows()
+        assert "撰出" not in context
+        assert "「初会」→「初回」" in context and "「久北」→「久木田」" in context
+        assert [r[0] for r in rows] == ["久北", "初会"]
+
     def test_build_context_empty(self):
         """辞書データが空工程のケース"""
         mock_module = MagicMock()
