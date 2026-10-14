@@ -37,6 +37,9 @@
 2026-10-06: 区切りをずらしてもう1回起こし、食い違いを手元の音声認識で決める
 （`transcript_fusion`・文字起こしの工程が呼ぶ）。区切りを変えると聞き違いが別の所に出るため。
 
+2026-10-14: 2回でも決めきれない所（`transcript_fusion.look_spots`）だけ、その所が真ん中に
+来るように区切ってもう1回起こす（`look_windows`・`transcribe_windows`）。
+
 **1チャンクでも落ちたら全体を失敗にする。** 後段の SmartCut は字幕のある範囲だけを
 残すので、黙って抜けたチャンクはそのまま動画から消える。
 """
@@ -78,6 +81,12 @@ CUT_TAG = "q"
 SECOND_PASS = True
 SECOND_PASS_FIRST_SEC = CHUNK_SEC / 2
 SECOND_PASS_TAG = "b"
+# 3回目の起こし（2回でも決めきれない所だけ）。区間は候補の行の前後 LOOK_PAD_SEC 秒を
+# 一番静かな所で区切り、重なる区間は LOOK_MAX_SEC 秒までなら1つにまとめる
+THIRD_LOOK = True
+THIRD_LOOK_TAG = "c"
+LOOK_PAD_SEC = 8.0
+LOOK_MAX_SEC = 45.0
 
 PROMPT = """この音声は日本語の会話（{duration:.0f}秒）です。発話をすべて文字起こししてください。
 
@@ -493,6 +502,73 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
     return TranscribeResult(segments=segments, model=model, chunks=len(chunks), models_used=used,
                             rechecked=rechecked, coverage=report,
                             quiet=quiet if speech is not None else [], cuts=cuts)
+
+
+def look_windows(spans: list[tuple[float, float]], quiet: QuietMap | None = None,
+                 total: float | None = None) -> list[tuple[float, float]]:
+    """3回目に起こす区間の (開始, 長さ)。spans は候補の行の (頭, 尻)（素材の秒）。
+
+    行の前後 LOOK_PAD_SEC 秒の所を、その前後2秒で一番静かな所にずらして区切る（行が区間の
+    真ん中に来る）。重なる区間は、まとめても LOOK_MAX_SEC 秒以内なら1つにする。
+    同じ候補からは同じ区間になる（控えの鍵になる）。
+    """
+    out: list[list[float]] = []
+    end_of = float(total) if total else float("inf")
+    for s, e in sorted((float(a), float(b)) for a, b in spans):
+        lo, hi = max(0.0, s - LOOK_PAD_SEC), min(end_of, e + LOOK_PAD_SEC)
+        if quiet is not None:
+            lo = quiet.quietest(max(0.0, lo - 2), lo + 2, lo)
+            hi = quiet.quietest(hi - 2, min(end_of, hi + 2), hi)
+        if out and lo <= out[-1][1] and max(hi, out[-1][1]) - out[-1][0] <= LOOK_MAX_SEC:
+            out[-1][1] = max(out[-1][1], hi)
+        else:
+            out.append([lo, hi])
+    return [(round(a, 3), round(b - a, 3)) for a, b in out if b > a]
+
+
+def transcribe_windows(video_path: str | Path, windows: list[tuple[float, float]], *,
+                       client: Any = None, model: str | None = None,
+                       call: Callable[..., tuple[str, str]] | None = None,
+                       attempts: int = 4, backoff: float = 3.0,
+                       journal: str | Path | None = None) -> tuple[list[dict], list[str]]:
+    """決まった区間 (開始, 長さ) だけを起こす（3回目の起こし）。返り値は (行, 応答したモデル)。
+
+    控え journal（`journal_path`）にある区間は呼び直さない。3回目の控えは消さずにキャッシュとして
+    使う（候補が変わらなければ区間も同じなので、2回目以降の実行では呼び出しが無い）。
+    1区間でも起こせなければ `TranscriptionError`。
+    """
+    done = read_journal(journal)
+    todo = [w for w in windows if _journal_key(*w) not in done]
+    if todo:
+        model = model or _resolve_model()
+        client = client if client is not None else _default_client()
+        call = call or _call
+        lock = threading.Lock()
+        with tempfile.TemporaryDirectory(prefix="gemini_look_") as tmp:
+            for path, offset, dur in split_audio(video_path, tmp, plan=todo):
+                last: BaseException | None = None
+                for attempt in range(attempts):
+                    try:
+                        text, used = call(client, model, path, dur)
+                        segs = parse_segments(text, offset, dur)
+                        break
+                    except _retryable() as e:
+                        last = e
+                        logger.warning(f"  ⚠️ 3回目の起こし（{offset:.0f}秒〜）試行 {attempt + 1}: {e}")
+                        if attempt + 1 < attempts and backoff > 0:
+                            time.sleep(backoff * (2 ** attempt))
+                else:
+                    raise TranscriptionError(f"3回目の起こし（{offset:.0f}秒〜）ができません: {last}")
+                logger.info(f"  ✅ 3回目の起こし {offset:.0f}〜{offset + dur:.0f}秒: {len(segs)} セグメント ({used})")
+                _append_journal(journal, lock, offset, dur, segs, used)
+                done[_journal_key(offset, dur)] = (segs, used)
+    segments: list[dict] = []
+    used_models: set[str] = set()
+    for w in windows:
+        segs, used = done[_journal_key(*w)]
+        segments.extend(join_spaced_words(segs))
+        used_models.add(used)
+    return sorted(segments, key=lambda s: float(s.get("start") or 0)), sorted(u for u in used_models if u)
 
 
 def _chars(segs: list[dict]) -> int:

@@ -37,7 +37,22 @@
 - 校閲（AI）に認識の聞き取りを行ごとに添える → 直りと崩れが半々（「主宰→主催」など）
 - 消す側を、前後の字を片側に寄せた4字（1字＋3字など）でも探す（2026-10-14）→ 2分59秒「そう何にか」
   →「何か」は直るが（認識は「そう」を「感じで」と聞いた）、「でもしょうがない→もしょうがない」
-  「あまり→あま」「高評価→高評」が崩れた（全編で直る所 105→113 か所のうち、良いのは1か所）
+  「あまり→あま」が崩れた。このとき「高評価→高評」「奈良筆でも→奈良筆も」も崩れたと数えたが、
+  後で3回目と古い起こしを並べると直す側が正しかった（審査の「講評」、「豊橋筆も、奈良筆も」）。
+  1回目を正解とみなして数えていた。2対1 で決めるには根拠が弱いので、3回目の候補の見つけ方に回した
+
+3回目の起こし（2026-10-14）: 2回の起こしが同じ所で聞き違えると、突き合わせても直らない
+（3分03秒「普通泣いて帰ったら」が、1回目「普通だったら」・2回目「普通泣いてがったら」）。
+区切りが変われば聞き違える所も変わる（区切りの違う古い2回の起こしは、どちらも正しかった）。
+そこで、認識が疑わしいと示す所（`look_spots`）だけを、その所が真ん中に来るように区切って
+もう1回起こし（`gemini_transcriber.transcribe_windows`）、3回目が認識に沿う字を書いたときだけ
+直す（`settle`）。上の「片側4字」の案は、ここでは3回目が決めるための候補の見つけ方として使う。
+43分の素材で候補 12 か所・10 区間（呼び出し 10 回。1回目と2回目は 104 回ずつ）。3回目
+（gemini-3.5-flash-lite）で「奈良筆でも→奈良筆も」「書道で→書で」「高評価→高評」「最後の最後に→
+最後の最後」の4か所が直った。3分03秒は3回目も「普通ナイデがったら」と聞き違えて直らなかった。
+正しかった古い2回の起こし（120秒ごと・30秒ごとの機械的な区切り）も同じ flash-lite で、区間の
+長さを 40・60・120 秒に変えて起こすと「嫌だったら」「泣いて帰ったら」「ないてかったら」と毎回違った。
+この所は区切り方より、モデルの聞き取りの揺れで決まっている。
 """
 from __future__ import annotations
 
@@ -258,5 +273,182 @@ def fuse(primary: list[dict], secondary: list[dict],
         examples.append({"start": primary[row].get("start"), "before": before, "after": new})
     for seg, chars in zip(out, texts):
         seg["text"] = "".join(chars)
+    stats["examples"] = examples[::-1][:MAX_EXAMPLES]
+    return out, stats
+
+
+# ─────────────────────────── 3回目の起こし ───────────────────────────
+
+# (a) 突き合わせた後の文より、認識がこの字数以上多く聞いた所を「2回とも落とした」とみなす
+LOOK_EXTRA = 3
+# (a) その食い違いの前後で、文と認識が続けて合う字数の下限（確かな所に挟まれていること）
+LOOK_ANCHOR = 4
+# 候補の前後に付けて覚えておく字数。3回目の文の中でこの字を探し、間の字を比べる
+SETTLE_CONTEXT = 3
+# 3回目の文で前後の字を探すとき、間がこの字数より長ければ別の所とみなす（直す字数への上乗せ）
+SETTLE_SLACK = 6
+# 3回目の文のうち、候補の行の前後この秒数に起こされた行だけを見る
+SETTLE_MARGIN_SEC = 5.0
+# 行の頭・尻に置く3回目の字から外す句読点と空白
+_EDGE_PUNCT = "、。，．,.!?！？ 　"
+
+
+def _span(flat: list[tuple[str, int, int]], i1: int, i2: int) -> tuple[int, int, int] | None:
+    """そろえた字の i1〜i2（前後の字 i1-1・i2 は含まない）の元の文の範囲: (行, 頭, 尻)。
+
+    前の字のすぐ後ろから後ろの字の手前まで（間の句読点も含む）。前の字か後ろの字が隣の行に
+    あれば、そちら側は間の字の端まで（行の頭の「で、」・4分46秒）。間の字が2つの行に
+    またがる・足す所（間の字が無い）の前後が別の行なら None（直さない）。
+    """
+    if i1 <= 0 or i2 >= len(flat):
+        return None
+    inner = {flat[k][1] for k in range(i1, i2)}
+    lrow, rrow = flat[i1 - 1][1], flat[i2][1]
+    if not inner:
+        return (lrow, flat[i1 - 1][2] + 1, flat[i2][2]) if lrow == rrow else None
+    if len(inner) > 1:
+        return None
+    row = inner.pop()
+    return (row, flat[i1 - 1][2] + 1 if lrow == row else flat[i1][2],
+            flat[i2][2] if rrow == row else flat[i2 - 1][2] + 1)
+
+
+def _local_window(a2r: dict[int, int], anchors: list[int], i1: int, i2: int, heard: str) -> str:
+    """xa の i1〜i2 の食い違いの周りの認識（両側の杭の間＋余白）。杭が無ければ空。"""
+    p = bisect.bisect_left(anchors, i1) - 1
+    q = bisect.bisect_left(anchors, i2)
+    if p < 0 or q >= len(anchors) or anchors[q] - anchors[p] > MAX_SPAN:
+        return ""
+    return heard[max(0, a2r[anchors[p]] - WINDOW_PAD):a2r[anchors[q]] + WINDOW_PAD + 1]
+
+
+def look_spots(fused: list[dict], secondary: list[dict],
+               tokens: list[tuple[str, float]] | None) -> list[dict]:
+    """3回目を起こしたい所。2回の突き合わせ（`fuse`）の後の行 fused で見る。
+
+    (a) "omit": fused より認識が LOOK_EXTRA 字以上多く聞いた所。前後 LOOK_ANCHOR 字以上が
+        fused と認識で続けて合う所に挟まれ、言いよどみ・数字・英字ではないこと
+        （3分03秒: fused「普通だったら」・認識「普通泣いて帰ったら」）
+    (b) "drop": 2回目が1字消し、認識にもその字が無いのに、前後2字ずつでは確かめられなかった所。
+        前1字＋後ろ3字か前3字＋後ろ1字となら続けて聞こえていること
+        （2分59秒: fused「そう何にか」・2回目「そう何か」・認識「感じで何か」）
+
+    返り値は {"kind", "row", "c0", "c1", "cur", "want", "left", "right"} の並び。
+    row・c0・c1 は fused の行と、その文の直す範囲（`_span`）。cur・want・left・right は
+    そろえた字（`norm_char`）で、いまの字・認識に沿う字（(b) は空）・前後の字。
+    """
+    if not tokens or not fused:
+        return []
+    ff = _flatten(fused)
+    xf = "".join(c for c, _, _ in ff)
+    rec = [(c, float(t)) for ch, t in tokens for c in norm_char(ch)]
+    heard = "".join(c for c, _ in rec)
+    spots: list[dict] = []
+    taken: set[tuple[int, int, int]] = set()
+
+    def add(kind: str, i1: int, i2: int, want: str) -> None:
+        span = _span(ff, i1, i2)
+        if span is None or span in taken:
+            return
+        taken.add(span)
+        row, c0, c1 = span
+        spots.append({"kind": kind, "row": row, "c0": c0, "c1": c1, "cur": xf[i1:i2], "want": want,
+                      "left": xf[max(0, i1 - SETTLE_CONTEXT):i1], "right": xf[i2:i2 + SETTLE_CONTEXT]})
+
+    # (a) 2回とも落とした所
+    ops = difflib.SequenceMatcher(None, xf, heard, autojunk=False).get_opcodes()
+    for k in range(1, len(ops) - 1):
+        op, i1, i2, j1, j2 = ops[k]
+        # 食い違いの両隣は一致の塊（SequenceMatcher は食い違いを続けて出さない）
+        if op == "equal" or min(ops[k - 1][2] - ops[k - 1][1], ops[k + 1][2] - ops[k + 1][1]) < LOOK_ANCHOR:
+            continue
+        cur, extra = xf[i1:i2], heard[j1:j2]
+        if (len(extra) - len(cur) < LOOK_EXTRA or _only_fillers(extra)
+                or any(ch in _NUMERALS or ch.isascii() for ch in cur + extra)):
+            continue
+        add("omit", i1, i2, extra)
+
+    # (b) 2回目が1字消し、認識が片側でだけ消した側に寄る所
+    if secondary:
+        xs = "".join(c for c, _, _ in _flatten(secondary))
+        a2r = _matches(xf, heard, ANCHOR_BLOCK)
+        anchors = sorted(a2r)
+        for op, i1, i2, _j1, _j2 in difflib.SequenceMatcher(None, xf, xs, autojunk=False).get_opcodes():
+            if op != "delete" or i2 - i1 != 1:
+                continue
+            cur = xf[i1:i2]
+            left, right = xf[max(0, i1 - SETTLE_CONTEXT):i1], xf[i2:i2 + SETTLE_CONTEXT]
+            if (len(left) < SETTLE_CONTEXT or len(right) < SETTLE_CONTEXT or not cur.strip("ー")
+                    or _guarded(cur, "")):
+                continue
+            window = _local_window(a2r, anchors, i1, i2, heard)
+            if not window or _heard(window, left, cur, right):
+                continue
+            if any(p in window for p in (left[-1:] + right, left + right[:1])):
+                add("drop", i1, i2, "")
+    return sorted(spots, key=lambda s: (s["row"], s["c0"]))
+
+
+def settle(fused: list[dict], third: list[dict], spots: list[dict]) -> tuple[list[dict], dict]:
+    """3回目の起こし third で、spots（`look_spots`）の所を決める。返り値は (行, 集計)。
+
+    3回目の文（その行の前後 SETTLE_MARGIN_SEC 秒に起こされた行）の中で候補の前後の字を探し、
+    間の字を比べる。
+    - (a) 間の字に認識が多く聞いた字（want）が入っていて、いまの字と違えば、3回目の字にする
+      （元の文の範囲ごと置き換えるので、間の句読点も3回目のもの）
+    - (b) 間に字が無ければ（3回目も消した: 2回目・3回目・認識の3つがそろう）、その字を消す
+    3回目が前後の字を書いていない・いまの字と同じ・どちらでもない字なら、そのまま。
+    集計は {"adopted", "examples": [{"start", "before", "after"}]}。
+    """
+    out = [dict(s) for s in fused]
+    stats: dict = {"adopted": 0, "examples": []}
+    if not third or not spots:
+        return out, stats
+    third = sorted(third, key=lambda s: float(s.get("start") or 0))
+    edits: list[tuple[int, int, int, str]] = []
+    for spot in spots:
+        row = fused[spot["row"]]
+        lo = float(row.get("start") or 0) - SETTLE_MARGIN_SEC
+        hi = float(row.get("end") or row.get("start") or 0) + SETTLE_MARGIN_SEC
+        near = [s for s in third if float(s.get("end") or s.get("start") or 0) >= lo
+                and float(s.get("start") or 0) <= hi]
+        f3 = _flatten(near)
+        x3 = "".join(c for c, _, _ in f3)
+        left, right, cur, want = spot["left"], spot["right"], spot["cur"], spot["want"]
+        limit = max(len(cur), len(want)) + SETTLE_SLACK
+        p = x3.find(left)
+        while p >= 0:
+            a = p + len(left)
+            q = x3.find(right, a, a + limit + len(right))
+            if q >= 0:
+                gap = x3[a:q]
+                if (spot["kind"] == "omit" and want in gap and gap != cur) or (
+                        spot["kind"] == "drop" and not gap):
+                    span = _span(f3, a, q)
+                    if span is not None:
+                        r3, d0, d1 = span
+                        edits.append((spot["row"], spot["c0"], spot["c1"],
+                                      str(near[r3].get("text") or "")[d0:d1]))
+                break
+            p = x3.find(left, p + 1)
+
+    texts = [str(s.get("text") or "") for s in out]
+    examples = []
+    last: tuple[int, int] | None = None
+    for row, c0, c1, new in sorted(edits, reverse=True):
+        if last is not None and last[0] == row and c1 > last[1]:
+            continue  # 後ろの直しと重なる（同じ所を2回直さない）
+        # 行の頭・尻に置くときは、3回目の文の前の文・次の文との間の句読点を持ち込まない
+        if c0 == 0:
+            new = new.lstrip(_EDGE_PUNCT)
+        if c1 >= len(texts[row]):
+            new = new.rstrip(_EDGE_PUNCT)
+        before = texts[row][c0:c1]
+        texts[row] = texts[row][:c0] + new + texts[row][c1:]
+        last = (row, c0)
+        stats["adopted"] += 1
+        examples.append({"start": out[row].get("start"), "before": before, "after": new})
+    for seg, text in zip(out, texts):
+        seg["text"] = text
     stats["examples"] = examples[::-1][:MAX_EXAMPLES]
     return out, stats

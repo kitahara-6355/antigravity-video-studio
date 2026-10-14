@@ -13,6 +13,9 @@
    言いよどみと数字は触らない（認識が落としやすい所）
 5. 2回目は区切りの位置をずらして起こす（1回目の区切りの前後が2回目では区切りの中ほどになる）
 6. 認識が使えない・2回目が落ちたら 1回目のまま進む
+7. 2回でも決めきれない所（2回とも落とした・認識が片側でしか確かめられない）だけ、そこが真ん中に来る
+   区間をもう1回起こし、3回目が認識に沿う字を書いたときだけ直す（2026-10-14・3分03秒
+   「普通だったら」→「普通泣いて帰ったら」）。区間ごとの控えがキャッシュ。落ちたら2回の突き合わせのまま
 """
 from __future__ import annotations
 
@@ -366,3 +369,236 @@ def test_each_pass_keeps_chunk_notes_beside_its_cache_until_the_cache_is_written
     assert [j.parent for j in journals] == [tmp_path, tmp_path]
     assert len(set(journals)) == 2, "1回目と2回目で控えを分ける"
     assert not any(j.exists() for j in journals), "キャッシュを書いたら控えは要らない"
+
+
+# ------------------------------------------------------------
+# 7. 3回目の起こし（2回でも決めきれない所だけ）
+# ------------------------------------------------------------
+
+OMIT_ROW = "そう何かやっぱり好きだったから普通だったらもう行かないって平気でした。"
+OMIT_HEARD = "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないって平気でした"
+
+
+def test_a_spot_both_passes_dropped_is_found_where_the_recogniser_heard_more():
+    fused = [_row(180.8, 186.8, OMIT_ROW)]
+
+    spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
+
+    assert [(s["kind"], s["cur"], s["want"]) for s in spots] == [("omit", "だ", "泣いて帰")]
+    assert fused[0]["text"][spots[0]["c0"]:spots[0]["c1"]] == "だ"
+
+
+@pytest.mark.parametrize("row, heard", [
+    # 認識が多く聞いたのが2字だけ
+    ("今日は普通にもう行かないって平気でした。", "今日は普通ににもう行かないって平気でした"),
+    # 言いよどみ・数字・英字（認識はローマ字で書く）
+    ("今日は普通にもう行かないって平気でした。", "今日は普通にあのあのあのもう行かないって平気でした"),
+    ("今日は普通にもう行かないって平気でした。", "今日は普通に千五百もう行かないって平気でした"),
+    ("一回目の未来チャンネルのゲストとして", "一回目のmillaychanelのゲストとして"),
+    # 前後で合う字が短い（確かな所に挟まれていない）
+    ("今日は普通だったら行かない。", "今日は普通泣いて帰ったら来ない"),
+])
+def test_a_spot_is_not_looked_at_again_without_strong_evidence(row, heard):
+    fused = [_row(0.0, 5.0, row)]
+
+    assert tfu.look_spots(fused, fused, _heard(heard)) == []
+
+
+DROP_FIRST = "という感じで。そう何にかやっぱり好きだったから"
+DROP_SECOND = "という感じで。そう何かやっぱり好きだったから"
+DROP_HEARD = "という感じで何かやっぱり好きだったから"  # 認識は「そう」を落とした
+
+
+def test_a_character_the_second_pass_dropped_is_looked_at_where_only_one_side_confirms_it():
+    fused = [_row(176.0, 182.0, DROP_FIRST)]
+
+    # 2対1 の決め方では、前後2字ずつ（「う何かや」）が認識に無いので決められない
+    out, _ = tfu.fuse(fused, [_row(176.0, 182.0, DROP_SECOND)], _heard(DROP_HEARD, 176.0))
+    assert out[0]["text"] == DROP_FIRST
+
+    spots = tfu.look_spots(fused, [_row(176.0, 182.0, DROP_SECOND)], _heard(DROP_HEARD, 176.0))
+
+    assert [(s["kind"], s["cur"], s["want"]) for s in spots] == [("drop", "に", "")]
+
+
+def test_a_character_the_recogniser_heard_is_not_looked_at_again():
+    fused = [_row(176.0, 182.0, DROP_FIRST)]
+
+    spots = tfu.look_spots(fused, [_row(176.0, 182.0, DROP_SECOND)],
+                           _heard("という感じでそう何にかやっぱり好きだったから", 176.0))
+
+    assert spots == []
+
+
+def test_the_third_reading_fills_in_what_both_passes_dropped():
+    fused = [_row(180.8, 186.8, OMIT_ROW)]
+    spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
+    third = [_row(175.0, 190.0, "そう、何かやっぱり好きだったから、普通泣いて帰ったら、もう行かないって平気でした。")]
+
+    out, stats = tfu.settle(fused, third, spots)
+
+    assert out[0]["text"] == "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないって平気でした。"
+    assert stats["adopted"] == 1
+    assert stats["examples"] == [{"start": 180.8, "before": "だ", "after": "泣いて帰"}]
+    assert out[0]["start"] == 180.8 and fused[0]["text"] == OMIT_ROW, "時刻は変えず、渡した行も書き換えない"
+
+
+def test_the_third_reading_drops_a_character_only_when_it_also_leaves_it_out():
+    fused = [_row(176.0, 182.0, DROP_FIRST)]
+    spots = tfu.look_spots(fused, [_row(176.0, 182.0, DROP_SECOND)], _heard(DROP_HEARD, 176.0))
+
+    dropped, _ = tfu.settle(fused, [_row(170.0, 190.0, "という感じで、そう、何かやっぱり好きだったから")], spots)
+    kept, stats = tfu.settle(fused, [_row(170.0, 190.0, "という感じで、そう何にかやっぱり好きだったから")], spots)
+
+    assert dropped[0]["text"] == "という感じで。そう何かやっぱり好きだったから"
+    assert kept[0]["text"] == DROP_FIRST and stats["adopted"] == 0
+
+
+@pytest.mark.parametrize("third_text", [
+    "そう何かやっぱり好きだったから普通だったらもう行かないって平気でした。",   # 3回目も同じ
+    "そう何かやっぱり好きだったから普通泣いてがったらもう行かないって平気でした。",  # 認識とも違う
+    "全然違う話をしています。",                                                  # 前後の字が無い
+])
+def test_the_row_stays_unless_the_third_reading_agrees_with_the_recogniser(third_text):
+    fused = [_row(180.8, 186.8, OMIT_ROW)]
+    spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
+
+    out, stats = tfu.settle(fused, [_row(175.0, 190.0, third_text)], spots)
+
+    assert out[0]["text"] == OMIT_ROW and stats["adopted"] == 0
+
+
+def test_the_third_reading_far_from_the_row_is_not_used():
+    fused = [_row(180.8, 186.8, OMIT_ROW)]
+    spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
+    far = [_row(600.0, 610.0, "そう、何かやっぱり好きだったから、普通泣いて帰ったら、もう行かないって平気でした。")]
+
+    out, _ = tfu.settle(fused, far, spots)
+
+    assert out[0]["text"] == OMIT_ROW
+
+
+def test_a_spot_at_the_head_of_a_row_takes_no_punctuation_from_the_sentence_before():
+    """4分46秒: 2回とも「で、一番盛ん」、認識は「やっぱり一番盛ん」（行の頭の「で」を認識は落とす）。"""
+    fused = [_row(284.0, 285.8, "そうですかね。"), _row(285.8, 295.8, "で、一番盛んになったのが")]
+    spots = tfu.look_spots(fused, fused, _heard("そうですかねやっぱり一番盛んになったのが", 284.0, 0.3))
+    assert [(s["row"], s["cur"], s["want"]) for s in spots] == [(1, "で", "やっぱり")]
+
+    out, _ = tfu.settle(fused, [_row(280.0, 300.0, "そうですかね。で、やっぱり一番盛んになったのが")], spots)
+
+    assert [s["text"] for s in out] == ["そうですかね。", "で、やっぱり一番盛んになったのが"]
+
+
+def test_windows_put_each_spot_in_the_middle_and_merge_close_ones():
+    from subtitle_engine import gemini_transcriber as gt
+
+    assert gt.look_windows([(100.0, 106.0)]) == [(92.0, 22.0)]
+    # 重なる区間は 45 秒以内なら1つに
+    assert gt.look_windows([(110.0, 115.0), (100.0, 106.0)]) == [(92.0, 31.0)]
+    # まとめると長すぎるなら別々（重なってよい）
+    assert gt.look_windows([(100.0, 120.0), (125.0, 150.0)]) == [(92.0, 36.0), (117.0, 41.0)]
+
+    class Quiet:  # 一番静かな所は狙いの1秒後ろ
+        def quietest(self, lo, hi, target):
+            return min(hi, target + 1.0)
+
+    assert gt.look_windows([(100.0, 106.0)], Quiet()) == [(93.0, 22.0)]
+
+
+def _fake_split(seen):
+    def split(video, work, plan=None, **kw):
+        seen.append(list(plan))
+        return [(Path(work) / f"c{i}.mp3", o, d) for i, (o, d) in enumerate(plan)]
+    return split
+
+
+def test_windows_are_transcribed_once_and_read_from_their_notes_after(tmp_path, monkeypatch):
+    from subtitle_engine import gemini_transcriber as gt
+
+    seen, calls = [], []
+    monkeypatch.setattr(gt, "split_audio", _fake_split(seen))
+
+    def call(client, model, path, dur):
+        calls.append(path.name)
+        return json.dumps([{"start": 1.0, "end": 3.0, "text": "区間 です"}]), "m-used"
+
+    journal = tmp_path / "_gemini_c30qc_x.chunks.journal"
+    windows = [(92.0, 22.0), (300.0, 20.0)]
+    segs, models = gt.transcribe_windows(tmp_path / "v.mp4", windows, client=object(), model="m",
+                                         call=call, journal=journal)
+    again, _ = gt.transcribe_windows(tmp_path / "v.mp4", windows, client=object(), model="m",
+                                     call=call, journal=journal)
+
+    assert calls == ["c0.mp3", "c1.mp3"], "2回目の実行では控えを使い、呼ばない"
+    assert [s["start"] for s in segs] == [93.0, 301.0] and models == ["m-used"]
+    assert segs[0]["text"] == "区間です", "日本語の間の空白は詰める"
+    assert again == segs
+
+
+def test_a_window_that_cannot_be_transcribed_fails_the_third_reading(tmp_path, monkeypatch):
+    from subtitle_engine import gemini_transcriber as gt
+
+    monkeypatch.setattr(gt, "split_audio", _fake_split([]))
+
+    def call(client, model, path, dur):
+        raise ValueError("JSON を読めません")
+
+    with pytest.raises(gt.TranscriptionError):
+        gt.transcribe_windows(tmp_path / "v.mp4", [(92.0, 22.0)], client=object(), model="m",
+                              call=call, attempts=2, backoff=0, journal=tmp_path / "j")
+
+
+def _setup_third_look(tmp_path, monkeypatch, fails=False):
+    """1回目・2回目とも「普通だったら」、認識は「普通泣いて帰ったら」。"""
+    from subtitle_engine import aligner, gemini_transcriber as gt
+
+    monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
+    pad = "あいうえおかきくけこ" * 30
+
+    def fake_transcribe(path, **kw):
+        return gt.TranscribeResult(segments=[_row(0.4, 6.0, OMIT_ROW), _row(6.0, 30.0, pad)], model="m",
+                                   chunks=1, models_used=["m"], cuts=[15.0] if kw.get("first_chunk_sec") else [30.0])
+    monkeypatch.setattr(gt, "transcribe", fake_transcribe)
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: _heard(OMIT_HEARD + pad, 0.4, 0.08))
+    monkeypatch.setattr(gt.QuietMap, "from_media", classmethod(lambda cls, media: None))
+    looked = []
+
+    def fake_windows(path, windows, **kw):
+        looked.append((list(windows), Path(kw["journal"]).name))
+        if fails:
+            raise gt.TranscriptionError("3回目の起こし（0秒〜）ができません")
+        return [_row(0.0, 14.0, "そう、何かやっぱり好きだったから、普通泣いて帰ったら、もう行かないって平気でした。")], ["m3"]
+    monkeypatch.setattr(gt, "transcribe_windows", fake_windows)
+    return looked
+
+
+def test_the_stage_reads_the_undecided_spots_a_third_time(tmp_path, monkeypatch):
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+
+    looked = _setup_third_look(tmp_path, monkeypatch)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success
+    assert ctx.segments[0]["text"] == "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないって平気でした。"
+    look = result.data["second_pass"]["third_look"]
+    assert (look["spots"], look["windows"], look["adopted"], look["models"]) == (1, 1, 1, ["m3"])
+    (windows, journal), = looked
+    assert windows == [(0.0, 14.0)]  # 行の前後 8 秒（素材の頭で切れる）
+    assert journal.startswith("_gemini_c30qc_") and journal.endswith(".chunks.journal"), "3回目は別の控え"
+
+
+def test_a_failed_third_reading_keeps_the_two_pass_result_and_says_so(tmp_path, monkeypatch):
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+
+    _setup_third_look(tmp_path, monkeypatch, fails=True)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success
+    assert ctx.segments[0]["text"] == OMIT_ROW
+    assert any("3回目" in w for w in ctx.warnings)
