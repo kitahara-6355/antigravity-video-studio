@@ -4352,6 +4352,17 @@
    "fingerprint": []
   },
   {
+   "id": "backend/subtitle_engine/sync.py::_split_in_two",
+   "file": "backend/subtitle_engine/sync.py",
+   "symbol": "_split_in_two",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "長く出続ける2行の字幕を2枚に分ける所を選ぶだけの関数。中の score は分ける候補ごとの切れ目の良さ（text_formatter._break_score）で、候補どうしを比べる局所の値。返すのは分けた2枚の字幕（文と時刻）。`or` の既定値は字幕の文・認識の時刻が無いときの空で、4カテゴリの数字・判定を作らず、どこにも残さない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": [
+    "or_default"
+   ]
+  },
+  {
    "id": "backend/subtitle_engine/whisper_subprocess.py::main",
    "file": "backend/subtitle_engine/whisper_subprocess.py",
    "symbol": "main",

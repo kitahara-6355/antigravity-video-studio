@@ -442,7 +442,7 @@ def test_a_caption_with_no_room_in_its_scene_is_dropped_without_delaying_the_nex
     assert _inside_zones(out)
 
 
-# --- 長く出続ける2行の字幕を、2行目を話し始めた所で分ける（40回目の 1分22秒ほか・2026-10-14）-------
+# --- 長く出続ける2行の字幕を、話の切れ目で2枚に分ける（40回目の 1分22秒ほか・2026-10-14）-------
 
 LONG = "あ" * 12 + "\n" + "い" * 12
 
@@ -528,3 +528,36 @@ def test_split_parts_stay_in_the_scene_of_the_caption():
     out, _ = sync.align_segments(segs, sp, [10.0], RULES)
     assert len(out) == 2 and _inside_zones(out)
     assert all(s["_zone"] == (0.5, 10.0) for s in out)
+
+
+# 42回目の 1分22秒。改行は「お習字を」の後ろ（「を」の後ろ）にある
+SCHOOL = "私\u3000小学校3年生の時に\u3000お習字を\nスタートしたんですけど\u3000その当時僕が"
+
+
+def _school_caption():
+    # 認識の字の番号は句読点の跡を除いた字の順（私0 … 時8 に9 お10 習11 字12 … ど24 そ25 … が30）。
+    # 「に」は 3.6 秒に言い始めて 4.2 秒まで伸び、4.4〜4.75 秒に字幕に無い短い声、「お習」は拾えず
+    # 5.0 秒から話し始めている
+    marks = [(0, 1.0), (5, 2.4), (9, 3.6), (12, 5.6), (18, 6.6), (24, 7.8), (25, 8.4), (30, 9.5)]
+    return {"start": 1.0, "end": 9.6, "text": SCHOOL, "_asr": True, "_asr_first": 1.0, "_asr_marks": marks}
+
+
+def test_a_long_caption_is_split_at_the_best_break_rather_than_at_the_line_break():
+    # 改行で分けると「…時に お習字を」|「スタートしたんですけど…」と、「お習字を｜スタートした」が別の字幕になる。
+    # 「、」の跡で分け、話している時間の真ん中に近い方（「時に」の後ろ）を取る。2枚目は話し始めから出る
+    sp = _map([(1.0, 4.2), (4.4, 4.75), (5.0, 8.0), (8.4, 9.6)], total=12)
+    out, stats = sync.align_segments([_school_caption()], sp, [], RULES)
+    assert [s["text"] for s in out] == ["私\u3000小学校3年生の時に", "お習字をスタートしたんですけど\nその当時僕が"]
+    assert stats["split_long"] == 1
+    assert out[1]["start"] == pytest.approx(5.0, abs=0.02)
+    assert out[1]["_asr_marks"][0] == (2, 5.6)
+
+
+def test_speech_left_without_a_caption_is_measured_from_where_the_words_end():
+    # 「に」の伸びた声（0.47 秒）と、拾えなかった「お習」の声（0.34 秒）は字幕の言葉の声。字幕に無い声は
+    # 間の 0.35 秒だけなので分けてよい。間の声が長ければ（1.2 秒）分けない
+    sp = _map([(1.0, 4.2), (4.4, 4.75), (5.0, 8.0), (8.4, 9.6)], total=12)
+    assert sync._word_edges(sp, 3.73, 5.34) == pytest.approx((4.2, 5.0), abs=0.02)
+    sp = _map([(1.0, 4.2), (4.3, 5.5), (5.6, 8.0), (8.4, 9.6)], total=12)
+    out, _ = sync.align_segments([_school_caption()], sp, [], RULES)
+    assert "私\u3000小学校3年生の時に" not in [s["text"] for s in out]

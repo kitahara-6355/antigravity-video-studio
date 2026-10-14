@@ -45,7 +45,7 @@ DEFAULT_TIMING = {
     # カットの直前・直後この秒数では字幕を出し入れしない（カット点に揃える）
     "cut_zone_sec": 0.25,
     # 1枚の字幕を出し続けてよい最長。Netflix の字幕の基準（Timed Text Style Guide）も 7 秒。
-    # 2行の字幕がこれより長く出るときは、2行目を話し始めた所で2枚に分ける（`_split_long`）。0 なら分けない
+    # 2行の字幕がこれより長く出るときは、話の切れ目で2枚に分ける（`_split_long`）。0 なら分けない
     "max_display_sec": 7.0,
 }
 
@@ -334,6 +334,10 @@ SPLIT_MIN_PART_SEC = 1.5
 SPLIT_MAX_UNSAID_SEC = 1.0
 # 認識の1字を話す長さ（`aligner.CHAR_SEC` と同じ値。拾えなかった字の時刻の見積もりに使う）
 SPLIT_CHAR_SEC = 0.13
+# 分けた所の手前の字の後ろ・後ろの頭の字の前に続く声は、この長さまでその字の声とみなす（字の時刻は
+# 言い始めの時刻。42回目の 1分22秒は「時に」の「に」が 0.6 秒伸び、拾えなかった「お習」の声と合わせて、
+# 字幕に無い声を 1.1 秒と数えていた。実際は間の 0.3 秒だけ）
+SPLIT_WORD_EDGE_SEC = 0.5
 
 
 def _too_short(s: dict, min_display: float) -> bool:
@@ -589,37 +593,95 @@ def _drop_past_end(items: list[dict], end: float) -> int:
     return dropped
 
 
-def _split_at_line(s: dict, speech: SpeechMap) -> list[dict] | None:
-    """2行の字幕を、2行目の頭を話した時刻（音声認識）で2枚に分けた形（合わせる前の時刻）。分けられなければ None。
+def _word_edges(speech: SpeechMap, a: float, b: float) -> tuple[float, float]:
+    """分けた所の手前の字を話し終えた見積もり a と、後ろの頭の字を話し始めた見積もり b を、声の切れ目まで広げる。
 
-    1枚目は1行目の最後の字を話し終わるまで、2枚目は2行目の頭の字を話し始めた所から。2行目の頭の字を
+    a の後ろ・b の前に続く声が SPLIT_WORD_EDGE_SEC 以内に切れる・始まるなら、そこまではその字の声。
+    a と b が同じ声の中（息継ぎ無しに続けて話した所）なら動かさない。
+    """
+    pairs = list(zip(speech.onsets, speech.offsets))
+    at_a = next(((on, off) for on, off in pairs if on <= a < off), None)
+    at_b = next(((on, off) for on, off in pairs if on < b <= off), None)
+    if at_a is not None and at_a == at_b:
+        return a, b
+    if at_a is not None and at_a[1] - a <= SPLIT_WORD_EDGE_SEC:
+        a = at_a[1]
+    if at_b is not None and b - at_b[0] <= SPLIT_WORD_EDGE_SEC:
+        b = at_b[0]
+    return a, b
+
+
+def _split_in_two(s: dict, speech: SpeechMap) -> list[dict] | None:
+    """2行の字幕を、話した時刻（音声認識）で2枚に分けた形（合わせる前の時刻）。分けられなければ None。
+
+    分ける所は改行か、改行より切れ目の良い（`text_formatter._break_score` が高い）文節の切れ目。改行が
+    「を」の後ろでも「、」や節の終わりで分ける（42回目の 1分22秒: 改行で分けて「私 小学校3年生の時に
+    お習字を」|「スタートしたんですけど その当時僕が」と、「お習字を｜スタートした」が別の字幕になった）。
+    改行以外は「て・は・たら」くらい良い所（2点以上）だけ。同点なら改行、次に話している時間の真ん中に
+    近い所。分けた2枚は整形と同じ折り方で組み直す（2行のこともある）。
+    1枚目は分けた所の手前の字を話し終わるまで、2枚目は後ろの頭の字を話し始めた所から。後ろの頭の字を
     認識が拾えなくても SPLIT_HEAD_SKIP 字までなら、次に拾えた字から1字 SPLIT_CHAR_SEC 秒でさかのぼる
-    （頭を拾えなかった字幕と同じく、後で拾えた字の前の話し始めに寄る）。1行目と2行目の間に字幕に無い
-    声がある（SPLIT_MAX_UNSAID_SEC 超え）・分けた1枚が読めないほど短いときは分けない。
+    （頭を拾えなかった字幕と同じく、後で拾えた字の前の話し始めに寄る）。2枚の間に字幕に無い声がある
+    （SPLIT_MAX_UNSAID_SEC 超え）・分けた1枚が読めないほど短い・2字以下になる所では分けない。
     """
     from subtitle_engine import aligner
+    from subtitle_engine import text_formatter as tf
     lines = str(s.get("text") or "").split("\n")
     if len(lines) != 2 or not s.get("_asr"):
         return None
-    n = len(aligner._norm_text(lines[0]))
     marks = [(int(c), float(t)) for c, t in s.get("_asr_marks") or ()]
-    head = [(c, t) for c, t in marks if c < n]
-    tail = [(c, t) for c, t in marks if c >= n]
-    if not head or not tail or tail[0][0] - n > SPLIT_HEAD_SKIP:
+    max_chars, max_lines = _caption_limits()
+    flat = _flat(s)
+    marked = flat.replace("\u3000", "、")  # 句読点を外した跡を「、」に戻して切れ目の良さを測る
+    line_pos = len(flat) - len(lines[1])
+    # 分けてよい所と、そこで切る良さ（文節の切れ目は前後の文節で測る）
+    cuts, acc = {line_pos: tf._break_score(marked[:line_pos], marked[line_pos:])}, 0
+    phrases = tf._phrases(marked, max_chars)
+    for i, ph in enumerate(phrases[:-1], start=1):
+        acc += len(ph)
+        score = tf._break_score(ph, phrases[i])
+        if acc == line_pos or score >= 2:
+            cuts[acc] = score
+    mid = (float(s["start"]) + float(s["end"])) / 2
+    best = None
+    for pos, score in sorted(cuts.items()):
+        head_text, tail_text = flat[:pos].rstrip("\u3000 "), flat[pos:].lstrip("\u3000 ")
+        if min(len(head_text.replace("\u3000", "")), len(tail_text.replace("\u3000", ""))) <= 2:
+            continue
+        n = len(aligner._norm_text(flat[:pos]))
+        head = [(c, t) for c, t in marks if c < n]
+        tail = [(c, t) for c, t in marks if c >= n]
+        if not head or not tail or tail[0][0] - n > SPLIT_HEAD_SKIP:
+            continue
+        c2, t2 = tail[0]
+        second_on = t2 - (c2 - n) * SPLIT_CHAR_SEC
+        first_off = min(head[-1][1] + (n - head[-1][0]) * SPLIT_CHAR_SEC, second_on)
+        first_off, second_on = _word_edges(speech, first_off, second_on)
+        if (first_off - float(s["start"]) < SPLIT_MIN_PART_SEC
+                or float(s["end"]) - second_on < SPLIT_MIN_PART_SEC
+                or _speaking_time(speech, first_off, second_on) > SPLIT_MAX_UNSAID_SEC):
+            continue
+        if pos == line_pos:
+            first_text, second_text = lines
+        else:
+            first_text = _wrap_one(head_text, max_chars, max_lines)
+            second_text = _wrap_one(tail_text, max_chars, max_lines)
+            if not first_text or not second_text:
+                continue
+        key = (score, pos == line_pos, -abs((first_off + second_on) / 2 - mid))
+        if best is None or key > best[0]:
+            best = (key, pos, n, head, tail, first_off, second_on, first_text, second_text)
+    if best is None:
         return None
-    c2, t2 = tail[0]
-    second_on = t2 - (c2 - n) * SPLIT_CHAR_SEC
-    first_off = min(head[-1][1] + (n - head[-1][0]) * SPLIT_CHAR_SEC, second_on)
-    if (first_off - float(s["start"]) < SPLIT_MIN_PART_SEC
-            or float(s["end"]) - second_on < SPLIT_MIN_PART_SEC
-            or _speaking_time(speech, first_off, second_on) > SPLIT_MAX_UNSAID_SEC):
-        return None
-    first = dict(s, text=lines[0], end=round(first_off, 3), _asr_marks=head, _asr_heard=len(head),
-                 _break_punct=False, _ends_punct=bool(s.get("_break_punct")))
+    _, pos, n, head, tail, first_off, second_on, first_text, second_text = best
+    first = dict(s, text=first_text, end=round(first_off, 3), _asr_marks=head, _asr_heard=len(head),
+                 _break_punct=_breaks_at_space(flat[:pos].rstrip("\u3000 "), first_text),
+                 _ends_punct=flat[pos - 1] in "\u3000 ")
     # 字幕から外した言いよどみの声（`_asr_tail`）は字幕の尻のものなので、2枚目に残す
     first.pop("_asr_tail", None)
-    second = dict(s, text=lines[1], start=round(second_on, 3), _asr_first=round(t2, 3),
-                  _asr_marks=[(c - n, t) for c, t in tail], _asr_heard=len(tail), _break_punct=False)
+    second = dict(s, text=second_text, start=round(second_on, 3), _asr_first=round(tail[0][1], 3),
+                  _asr_marks=[(c - n, t) for c, t in tail], _asr_heard=len(tail),
+                  _break_punct=_breaks_at_space(flat[pos:].lstrip("\u3000 "), second_text))
     return [first, second]
 
 
@@ -638,7 +700,7 @@ def _split_long(segments: list[dict], result: list[dict], max_sec: float,
             and s.get("text") == segments[s["_sync_index"]].get("text")}
     out, split = [], 0
     for k, s in enumerate(segments):
-        parts = _split_at_line(s, speech) if k in long else None
+        parts = _split_in_two(s, speech) if k in long else None
         if parts:
             out.extend(parts)
             split += 1
@@ -653,7 +715,7 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     """字幕（出力の時間軸の start/end）を話し始め・話し終わりに合わせる。
 
     返り値は (直した字幕, 集計)。字幕の順番は変えない。読めないほど短い字幕は隣とまとめ、
-    長く出続ける2行の字幕（`max_display_sec` 超え）は2行目を話し始めた所で2枚に分けて合わせ直す。
+    長く出続ける2行の字幕（`max_display_sec` 超え）は話の切れ目で2枚に分けて合わせ直す。
     """
     r = dict(DEFAULT_TIMING)
     r.update(rules or {})
@@ -661,7 +723,7 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     segments, split = _split_long(segments, result, r.get("max_display_sec", 0.0), speech)
     if split:
         result, stats = _align_once(segments, speech, cut_points, r)
-        logger.info(f"✂️ {r['max_display_sec']:g}秒より長く出る2行の字幕を、2行目を話し始めた所で分けました: {split}枚")
+        logger.info(f"✂️ {r['max_display_sec']:g}秒より長く出る2行の字幕を、話の切れ目で分けました: {split}枚")
     stats["split_long"] = split
     for s in result:
         s.pop("_sync_index", None)
