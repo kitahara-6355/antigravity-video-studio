@@ -366,12 +366,15 @@ class TranscribeWorker(PipelineStageWorker):
         候補は `transcript_fusion.look_spots`、裁きは `transcript_fusion.judge`。3回目で決まらない所は
         区間の前後の余白を広げて読み直す（`gemini_transcriber.LOOK_PADS`。区間の長さで聞き取りが変わる）。
         区間ごとの控えがキャッシュで、候補が変わらなければ2回目以降の実行は呼ばない。
+        認識だけが別の字を聞いた所（"swap"）は、ほかの候補と別の区間で読む（同じ区間にまとめると、
+        ほかの候補の区間が変わって控えが使えず、直っていた所を読み直すことになる）。辞書の語は候補にしない。
         落ちたら、それまでに決まった所だけを直して進む（3回目は直すためだけに使う）。
         """
-        from subtitle_engine import gemini_transcriber, transcript_fusion
+        from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
         if not gemini_transcriber.THIRD_LOOK:
             return fused, None
-        spots = transcript_fusion.look_spots(fused, second, tokens)
+        spots = transcript_fusion.look_spots(fused, second, tokens,
+                                             protect=[correct for _, correct in aligner._dictionary_terms()])
         if not spots:
             return fused, {"spots": 0, "windows": 0, "adopted": 0, "examples": []}
         loop = asyncio.get_running_loop()
@@ -382,19 +385,21 @@ class TranscribeWorker(PipelineStageWorker):
         try:
             quiet = await loop.run_in_executor(None, gemini_transcriber.QuietMap.from_media, str(ctx.video_path))
             journal = gemini_transcriber.journal_path(_gemini_checkpoint(whisper_checkpoint, third=True))
-            for pad in gemini_transcriber.LOOK_PADS:
-                pending = [i for i, (verdict, _) in enumerate(verdicts) if verdict == "open"]
-                if not pending:
-                    break
-                for w in gemini_transcriber.look_windows([spans[i] for i in pending], quiet, pad=pad):
-                    third, used = await loop.run_in_executor(None, functools.partial(
-                        gemini_transcriber.transcribe_windows, ctx.video_path, [w], journal=journal))
-                    windows += 1
-                    models.update(used)
-                    # 行の真ん中が入る区間の起こしだけで裁く（重なる区間の起こしを混ぜない）
-                    for i in pending:
-                        if verdicts[i][0] == "open" and w[0] <= sum(spans[i]) / 2 <= w[0] + w[1]:
-                            verdicts[i] = transcript_fusion.judge(fused, third, spots[i])
+            for kinds in (("omit", "drop"), ("swap",)):
+                for pad in gemini_transcriber.LOOK_PADS:
+                    pending = [i for i, (verdict, _) in enumerate(verdicts)
+                               if verdict == "open" and spots[i]["kind"] in kinds]
+                    if not pending:
+                        break
+                    for w in gemini_transcriber.look_windows([spans[i] for i in pending], quiet, pad=pad):
+                        third, used = await loop.run_in_executor(None, functools.partial(
+                            gemini_transcriber.transcribe_windows, ctx.video_path, [w], journal=journal))
+                        windows += 1
+                        models.update(used)
+                        # 行の真ん中が入る区間の起こしだけで裁く（重なる区間の起こしを混ぜない）
+                        for i in pending:
+                            if verdicts[i][0] == "open" and w[0] <= sum(spans[i]) / 2 <= w[0] + w[1]:
+                                verdicts[i] = transcript_fusion.judge(fused, third, spots[i])
         except Exception as e:  # noqa: BLE001 — 3回目は直すためだけ。落ちても決まった所だけ直して進む
             error = str(e)
             logger.warning(f"⚠️ 文字起こしの3回目に失敗 → 決まった所だけ直して進みます: {e}")

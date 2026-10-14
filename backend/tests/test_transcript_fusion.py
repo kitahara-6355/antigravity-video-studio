@@ -127,6 +127,34 @@ def test_a_single_extra_character_heard_by_no_one_else_is_dropped():
     assert out[0]["text"] == "書を通して人々の心に触れ。"
 
 
+def test_a_filler_next_to_the_difference_is_not_looked_for_in_the_recogniser():
+    """42分05秒（43回目）: 1回目「機械をねあの、足てはいけない」・2回目「絶やして」・認識「機会をね絶やして」。
+
+    認識は言いよどみを書かないので、前の字「の」（「あの」）を付けて探すと、2回目の字も聞こえない。
+    """
+    first = [_row(0.0, 6.0, "筆で文字を書くという機械をねあの、足てはいけないかなと。")]
+    second = [_row(0.0, 6.0, "筆で文字を書くという機械をねあの、絶やしてはいけないかなと。")]
+
+    out, stats = tfu.fuse(first, second, _heard("筆で文字を書くという機会をね絶やしてはいけないかなと"))
+
+    assert out[0]["text"] == "筆で文字を書くという機械をねあの、絶やしてはいけないかなと。"
+    assert stats["adopted"] == 1
+
+
+@pytest.mark.parametrize("first_text, second_text, heard", [
+    # 句読点で隔てていない言いよどみは外さない（1分27秒: 「が」は認識にも2回目にも無いが、消さない）
+    ("その当時僕があの駄菓子屋によく行ってましたね。", "その当時僕あの駄菓子屋によく行ってましたね。",
+     "その当時僕駄菓子屋によく行ってましたね"),
+    # 1字の言いよどみは語の尻と見分けられない（5分44秒「そう。」の「う」）
+    ("しーちきんだった。そう。しーちきんの雑誌広告で", "しーちきんだった。うん。しーちきんの雑誌広告で",
+     "しーちきんだったしーちきんの雑誌広告で"),
+])
+def test_only_a_whole_filler_set_off_by_punctuation_is_left_out_of_the_context(first_text, second_text, heard):
+    out, _ = tfu.fuse([_row(0.0, 6.0, first_text)], [_row(0.0, 6.0, second_text)], _heard(heard))
+
+    assert out[0]["text"] == first_text
+
+
 def _heard_with_pause(before: str, after: str, pause: float, start: float = 0.0,
                       step: float = 0.12) -> list[tuple[str, float]]:
     """before と after の間で pause 秒あけて聞いた認識（字の間は step 秒）。"""
@@ -431,6 +459,75 @@ def test_a_character_the_recogniser_heard_is_not_looked_at_again():
     assert spots == []
 
 
+SWAP_ROWS = ["はい、わかりました。", "先生、あの、去年初めての初めてですね。"]
+SWAP_HEARD = "はいわかりました今日ね初めての初めてはい"  # 認識は「先生、あの、」を落とした
+
+
+def _swap_rows():
+    return [_row(2562.3, 2564.6, SWAP_ROWS[0]), _row(2564.6, 2569.1, SWAP_ROWS[1])]
+
+
+def test_a_spot_both_passes_misheard_alike_is_found_where_the_recogniser_heard_other_words():
+    """42分03秒（43回目）: 2回とも「去年初めての初めてですね」、認識は「今日ね初めての初めて」。"""
+    fused = _swap_rows()
+
+    spots = tfu.look_spots(fused, fused, _heard(SWAP_HEARD, 2562.3, 0.25))
+
+    assert [(s["kind"], s["cur"], s["want"]) for s in spots] == [("swap", "先生あの去年", "今日ね")]
+    assert fused[1]["text"][spots[0]["c0"]:spots[0]["c1"]] == "先生、あの、去年"
+
+
+@pytest.mark.parametrize("row, heard", [
+    # かなと漢字の書き分けだけ（「いただき」と「頂き」）
+    ("大切にされている言葉を書いていただきますね。", "大切にされている言葉を書いて頂きますね"),
+    # 2字以下のかなどうし（助詞の違い）
+    ("それがその経験が今の活動の原点にそうですね。", "それがその経験が今の活動の原点でそうですね"),
+    # 数字（認識は漢数字で書く）
+    ("自宅からね40分回ればいけるんで。", "自宅からね四十分もあればいけるんで"),
+])
+def test_a_spot_that_differs_only_in_spelling_or_particles_is_not_read_again(row, heard):
+    fused = [_row(0.0, 5.0, row)]
+
+    assert tfu.look_spots(fused, fused, _heard(heard)) == []
+
+
+def test_a_word_in_the_dictionary_is_not_read_again():
+    """名前は認識が別の字を書きやすい（31秒: 2回とも「久木田博信」、認識は「久木田浩信」）。"""
+    fused = [_row(31.0, 42.0, "デザイン書道の第一人者久木田博信先生です。")]
+    heard = _heard("デザイン書道の第一人者久木田浩信先生です", 31.0)
+
+    assert [s["cur"] for s in tfu.look_spots(fused, fused, heard)] == ["博"]
+    assert tfu.look_spots(fused, fused, heard, protect=("久木田博信",)) == []
+
+
+def test_a_spot_the_two_passes_wrote_differently_is_left_to_the_two_pass_decision():
+    fused = _swap_rows()
+    second = [_row(2562.3, 2564.6, SWAP_ROWS[0]), _row(2564.6, 2569.1, "先生、あの、今年初めての初めてですね。")]
+
+    assert tfu.look_spots(fused, second, _heard(SWAP_HEARD, 2562.3, 0.25)) == []
+
+
+@pytest.mark.parametrize("third_text, verdict, row", [
+    # 3回目が認識に沿う字を書いた（2回の起こしの「先生、あの、」は残す）
+    ("はい、わかりました。先生、あの、今日ね、初めての初めてですね。", "adopt", "先生、あの、今日ね、初めての初めてですね。"),
+    # 3回目も2回の起こしと同じ
+    ("はい、わかりました。先生、あの、去年初めての初めてですね。", "keep", SWAP_ROWS[1]),
+    # 認識の字は書いたが、2回の起こしの字を2字以上落とした（「先生、あの、」）
+    ("はい、わかりました。今日ね、初めての初めてですね。", "open", SWAP_ROWS[1]),
+    # どちらでもない字
+    ("はい、わかりました。先生、あの、今日は初めての初めてですね。", "open", SWAP_ROWS[1]),
+])
+def test_the_third_reading_decides_a_spot_both_passes_misheard_alike(third_text, verdict, row):
+    fused = _swap_rows()
+    spots = tfu.look_spots(fused, fused, _heard(SWAP_HEARD, 2562.3, 0.25))
+    third = [_row(2556.0, 2575.0, third_text)]
+
+    out, _ = _settle(fused, third, spots)
+
+    assert tfu.judge(fused, third, spots[0])[0] == verdict
+    assert [s["text"] for s in out] == [SWAP_ROWS[0], row]
+
+
 def _settle(fused, third, spots):
     return tfu.settle(fused, spots, [tfu.judge(fused, third, s) for s in spots])
 
@@ -657,6 +754,68 @@ def test_a_spot_the_third_reading_does_not_decide_is_read_again_with_a_wider_win
     assert len({journal for _, journal in looked}) == 1
     look = result.data["second_pass"]["third_look"]
     assert look["windows"] == len(windows)
+
+
+SWAP_ROW = "はい、わかりました。先生、あの、去年初めての初めてですね。"
+SWAP_FIXED = "はい、わかりました。先生、あの、今日ね、初めての初めてですね。"
+
+
+def _setup_swap(monkeypatch, rows, heard, readings):
+    from subtitle_engine import aligner, gemini_transcriber as gt
+
+    monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
+    pad = "あいうえおかきくけこ" * 30
+
+    def fake_transcribe(path, **kw):
+        return gt.TranscribeResult(segments=[*rows, _row(20.0, 50.0, pad)], model="m", chunks=1,
+                                   models_used=["m"], cuts=[15.0] if kw.get("first_chunk_sec") else [30.0])
+    monkeypatch.setattr(gt, "transcribe", fake_transcribe)
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: _heard(heard + pad, 0.4, 0.08))
+    monkeypatch.setattr(gt.QuietMap, "from_media", classmethod(lambda cls, media: None))
+    looked = []
+
+    def fake_windows(path, windows, **kw):
+        looked.append(list(windows))
+        return [_row(0.0, 20.0, readings)], ["m3"]
+    monkeypatch.setattr(gt, "transcribe_windows", fake_windows)
+    return looked
+
+
+def test_spots_where_only_the_recogniser_heard_other_words_are_read_in_their_own_windows(tmp_path, monkeypatch):
+    """(c) の候補を (a)(b) の候補と同じ区間にまとめると、(a)(b) の区間が変わって控えが使えなくなり、
+    直っていた所（3分03秒）を読み直すことになる。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+
+    looked = _setup_swap(monkeypatch, [_row(0.4, 6.0, OMIT_ROW), _row(10.0, 14.0, SWAP_ROW)],
+                         OMIT_HEARD + "はいわかりました今日ね初めての初めてですね", FIXED + SWAP_FIXED)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success
+    assert looked == [[(0.0, 14.0)], [(2.0, 20.0)]], "(a)(b) の区間は (c) が無いときと同じ"
+    assert [s["text"] for s in ctx.segments[:2]] == [
+        "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないって平気でした。",
+        "はい、わかりました。先生、あの、今日ね、初めての初めてですね。"]
+    look = result.data["second_pass"]["third_look"]
+    assert (look["spots"], look["windows"], look["adopted"]) == (2, 2, 2)
+
+
+def test_a_name_in_the_dictionary_is_not_read_a_third_time(tmp_path, monkeypatch):
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import aligner
+
+    monkeypatch.setattr(aligner, "_dictionary_terms", lambda: (("久保田博信", "久木田博信"),))
+    looked = _setup_swap(monkeypatch, [_row(0.4, 6.0, "デザイン書道の第一人者久木田博信先生です。")],
+                         "デザイン書道の第一人者久木田浩信先生です", "デザイン書道の第一人者久木田浩信先生です。")
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success and looked == []
+    assert ctx.segments[0]["text"] == "デザイン書道の第一人者久木田博信先生です。"
 
 
 def test_a_failed_reading_again_leaves_the_spot_and_says_so(tmp_path, monkeypatch):

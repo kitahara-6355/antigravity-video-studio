@@ -19,6 +19,9 @@
   そういう」→「しようという」。認識は「と」と「い」を 0.2 秒で聞いた）
 - 1回目の行をまたぐ食い違いは、言いよどみだけの行の分を外して決める（2分46秒の「ないよね。
   ／ううん。」と2回目の「ないので。」。まとめて1つの食い違いになり、行をまたぐので決めていなかった）
+- 食い違いと句読点で隔てたすぐ外側の言いよどみ（2字以上）は、前後の字から外しても探す（認識は
+  言いよどみを書かない。43回目の 42分05秒: 1回目「機械をねあの、足て」・2回目「絶やして」・認識
+  「機会をね絶やして」。全編で変わるのはここと「なんだろう→何だろう」の2か所）
 - 決めない所: 1回目の字を4字以上消す・前後に間がある所で2字以上消す（認識は早口・言い直し・
   重なりを落とすので、聞こえないことは弱い証拠）、言いよどみ（後で外す）、数字（認識は
   漢数字で書く）、近くに確かな手がかり（2回とも同じで認識とも3字以上続けて合う字）が無い所
@@ -57,11 +60,19 @@
 普通泣いて帰ったら」（3分03秒）・「明け暮れてたんですけれど→ですけど」の3か所が直った（呼び出しは
 計 21 回・すべて gemini-3.5-flash-lite）。4分46秒「やっぱり」は余白 8 秒の読みが2回の起こしと同じ字を
 書いたのでそのまま。残る4か所は3回読んでも決まらない。
+
+2回とも同じ字を書き、認識だけが別の字を聞いた所（2026-10-14・`look_spots` の (c)）: 2回の起こしが
+同じ聞き違いをすると、(a)(b) の見つけ方では拾えない（43回目の締め 42分03秒: 2回とも「先生、あの、
+去年初めての」・認識「今日ね初めての」）。認識が正しいとは限らない（31秒「久木田博信」を認識は
+「浩信」と書く）ので、3回目が認識と同じ字を書いたときだけ直す（2対2 だが、2回の起こしは同じモデルで
+似た区間を聞いているので、区間を変えた3回目と別のモデルの認識がそろう方を採る）。かなと漢字の書き分け・
+2字以下のかなどうし（助詞）・辞書の語は見ない。43分の素材で候補 22 か所（書き分けを除く前は 75 か所）。
 """
 from __future__ import annotations
 
 import bisect
 import difflib
+import re
 
 from subtitle_engine.aligner import MAX_CPS, norm_char
 
@@ -86,6 +97,10 @@ FILLERS = frozenset({
     "あ", "あの", "え", "えっと", "ま", "まあ", "うん", "うう", "ね", "ねえ", "なんか", "その",
     "はい", "ええ", "へえ", "おお", "ああ", "ん", "う", "うんうん", "はいはい",
 })
+# 食い違いのすぐ外側にあれば外して前後の字を取る言いよどみ（2字以上。1字の「え」「う」は
+# 「考え」「そう」の尻と見分けられない）と、そのために外側に余分に見る字数
+_SKIPPABLE = sorted((w for w in FILLERS if len(w) >= 2), key=lambda w: (-len(w), w))
+FILLER_SKIP = len(_SKIPPABLE[0])
 # 数字（norm_char が算用数字を漢数字にそろえる。認識は漢数字で書くので桁が食い違う）
 _NUMERALS = frozenset("〇一二三四五六七八九十百千万億")
 # 集計に載せる直しの例の数
@@ -110,6 +125,30 @@ def _matches(x: str, y: str, min_block: int) -> dict[int, int]:
             for k in range(blk.size):
                 m[blk.a + k] = blk.b + k
     return m
+
+
+def _breaks(flat: list[tuple[str, int, int]]) -> set[int]:
+    """そろえた字の位置 k のうち、元の文で k-1 字目と k 字目の間に句読点・空白（そろえると消える字）か
+    行の切れ目がある所。"""
+    return {k for k in range(1, len(flat))
+            if flat[k - 1][1] != flat[k][1] or flat[k][2] - flat[k - 1][2] > 1}
+
+
+def _contexts(x: str, i1: int, i2: int, breaks: set[int]) -> list[tuple[str, str]]:
+    """食い違い x[i1:i2] の前後の字（CONTEXT 字ずつ）。
+
+    食い違いと句読点で隔てたすぐ外側に言いよどみの語があれば、それを外した前後の字も返す。認識は
+    言いよどみを書かないので、前後の字に言いよどみが入ると、どちらの字も聞こえなくなる（42分05秒:
+    1回目「機械をねあの、足て」・2回目「絶やして」・認識「機会をね絶やして」）。句読点で隔てていない
+    語は外さない（「僕があの駄菓子屋」の「が」を、言いよどみの向こうの字だけで消してしまう）。
+    """
+    left, right = x[max(0, i1 - CONTEXT - FILLER_SKIP):i1], x[i2:i2 + CONTEXT + FILLER_SKIP]
+    out = [(left[-CONTEXT:], right[:CONTEXT])]
+    lw = next((w for w in _SKIPPABLE if left.endswith(w)), "") if i1 in breaks else ""
+    rw = next((w for w in _SKIPPABLE if right.startswith(w)), "") if i2 in breaks else ""
+    if lw or rw:
+        out.append((left[:len(left) - len(lw)][-CONTEXT:], right[len(rw):][:CONTEXT]))
+    return out
 
 
 def _heard(window: str, left: str, word: str, right: str) -> bool:
@@ -217,6 +256,7 @@ def fuse(primary: list[dict], secondary: list[dict],
     a2b = {i1 + k: j1 + k for op, i1, i2, j1, j2 in ops if op == "equal" for k in range(i2 - i1)}
     ops = _drop_filler_rows(ops, fa)
     anchors = sorted(k for k in a2b if k in a2r)
+    breaks = _breaks(fa)
 
     chosen = []
     for op, i1, i2, j1, j2 in ops:
@@ -244,7 +284,9 @@ def fuse(primary: list[dict], secondary: list[dict],
                     and not _heard(window, left, a, right)):
                 chosen.append((i1, i2, j1, j2))
             continue
-        if _heard(window, left, b, right) and not _heard(window, left, a, right):
+        ctxs = _contexts(xa, i1, i2, breaks)
+        if (any(_heard(window, lc, b, rc) for lc, rc in ctxs)
+                and not any(_heard(window, lc, a, rc) for lc, rc in ctxs)):
             chosen.append((i1, i2, j1, j2))
         elif not a and left and not _heard(window, left, a, right):
             # 2回目が足した字は、認識にも聞こえる頭の部分だけ足す
@@ -285,8 +327,13 @@ def fuse(primary: list[dict], secondary: list[dict],
 
 # (a) 突き合わせた後の文より、認識がこの字数以上多く聞いた所を「2回とも落とした」とみなす
 LOOK_EXTRA = 3
-# (a) その食い違いの前後で、文と認識が続けて合う字数の下限（確かな所に挟まれていること）
+# (a)(c) その食い違いの前後で、文と認識が続けて合う字数の下限（確かな所に挟まれていること）
 LOOK_ANCHOR = 4
+# (c) 2回とも同じ字を書き、認識だけが別の字を聞いた所の字数の上限（文と認識のどちらも）
+SWAP_MAX = 8
+# (c) かなと漢字の書き分け（norm_char でカタカナはひらがなにそろう）
+_KANA = re.compile(r"[ぁ-ゖー]+")
+_KANJI = re.compile(r"[一-鿿々〆]+")
 # 候補の前後に付けて覚えておく字数。3回目の文の中でこの字を探し、間の字を比べる
 SETTLE_CONTEXT = 3
 # 3回目の文で前後の字を探すとき、間がこの字数より長ければ別の所とみなす（直す字数への上乗せ）
@@ -326,8 +373,26 @@ def _local_window(a2r: dict[int, int], anchors: list[int], i1: int, i2: int, hea
     return heard[max(0, a2r[anchors[p]] - WINDOW_PAD):a2r[anchors[q]] + WINDOW_PAD + 1]
 
 
+def _spelling_only(cur: str, want: str) -> bool:
+    """かなと漢字の書き分け（「いただき」と「頂き」）か、2字以下のかなどうし（助詞の違い）だけか。"""
+    kana, kanji = (_KANA.fullmatch(cur), _KANA.fullmatch(want)), (_KANJI.fullmatch(cur), _KANJI.fullmatch(want))
+    return bool((kana[0] and kanji[1]) or (kanji[0] and kana[1])
+                or (all(kana) and max(len(cur), len(want)) <= 2))
+
+
+def _covered(x: str, words) -> set[int]:
+    """x の中で words（そろえる前の語）のどれかが占める位置。"""
+    out: set[int] = set()
+    for w in {"".join(norm_char(c) for c in str(w)) for w in words}:
+        k = x.find(w) if w else -1
+        while k >= 0:
+            out.update(range(k, k + len(w)))
+            k = x.find(w, k + 1)
+    return out
+
+
 def look_spots(fused: list[dict], secondary: list[dict],
-               tokens: list[tuple[str, float]] | None) -> list[dict]:
+               tokens: list[tuple[str, float]] | None, protect=()) -> list[dict]:
     """3回目を起こしたい所。2回の突き合わせ（`fuse`）の後の行 fused で見る。
 
     (a) "omit": fused より認識が LOOK_EXTRA 字以上多く聞いた所。前後 LOOK_ANCHOR 字以上が
@@ -336,6 +401,10 @@ def look_spots(fused: list[dict], secondary: list[dict],
     (b) "drop": 2回目が1字消し、認識にもその字が無いのに、前後2字ずつでは確かめられなかった所。
         前1字＋後ろ3字か前3字＋後ろ1字となら続けて聞こえていること
         （2分59秒: fused「そう何にか」・2回目「そう何か」・認識「感じで何か」）
+    (c) "swap": 2回とも同じ字を書き、認識だけが別の字（SWAP_MAX 字まで）を聞いた所。挟まれ方と
+        言いよどみ・数字・英字は (a) と同じ。かなと漢字の書き分けや2字以下のかなどうし（助詞）
+        だけの違いと、辞書の語（protect。名前は認識が別の字を書きやすい）の中は見ない
+        （42分03秒: 2回とも「先生、あの、去年初めての」・認識「今日ね初めての」）
 
     返り値は {"kind", "row", "c0", "c1", "cur", "want", "left", "right"} の並び。
     row・c0・c1 は fused の行と、その文の直す範囲（`_span`）。cur・want・left・right は
@@ -359,7 +428,11 @@ def look_spots(fused: list[dict], secondary: list[dict],
         spots.append({"kind": kind, "row": row, "c0": c0, "c1": c1, "cur": xf[i1:i2], "want": want,
                       "left": xf[max(0, i1 - SETTLE_CONTEXT):i1], "right": xf[i2:i2 + SETTLE_CONTEXT]})
 
-    # (a) 2回とも落とした所
+    # (a) 2回とも落とした所・(c) 2回とも同じ字を書き、認識だけが別の字を聞いた所
+    xs = "".join(c for c, _, _ in _flatten(secondary)) if secondary else ""
+    same = {i1 + k for op, i1, i2, _j1, _j2 in difflib.SequenceMatcher(None, xf, xs, autojunk=False).get_opcodes()
+            if op == "equal" for k in range(i2 - i1)}
+    protected = _covered(xf, protect)
     ops = difflib.SequenceMatcher(None, xf, heard, autojunk=False).get_opcodes()
     for k in range(1, len(ops) - 1):
         op, i1, i2, j1, j2 = ops[k]
@@ -367,14 +440,17 @@ def look_spots(fused: list[dict], secondary: list[dict],
         if op == "equal" or min(ops[k - 1][2] - ops[k - 1][1], ops[k + 1][2] - ops[k + 1][1]) < LOOK_ANCHOR:
             continue
         cur, extra = xf[i1:i2], heard[j1:j2]
-        if (len(extra) - len(cur) < LOOK_EXTRA or _only_fillers(extra)
-                or any(ch in _NUMERALS or ch.isascii() for ch in cur + extra)):
+        if _only_fillers(extra) or any(ch in _NUMERALS or ch.isascii() for ch in cur + extra):
             continue
-        add("omit", i1, i2, extra)
+        if len(extra) - len(cur) >= LOOK_EXTRA:
+            add("omit", i1, i2, extra)
+        elif (op == "replace" and len(cur) <= SWAP_MAX and len(extra) <= SWAP_MAX
+              and not _only_fillers(cur) and not _spelling_only(cur, extra)
+              and all(i in same and i not in protected for i in range(i1, i2))):
+            add("swap", i1, i2, extra)
 
     # (b) 2回目が1字消し、認識が片側でだけ消した側に寄る所
     if secondary:
-        xs = "".join(c for c, _, _ in _flatten(secondary))
         a2r = _matches(xf, heard, ANCHOR_BLOCK)
         anchors = sorted(a2r)
         for op, i1, i2, _j1, _j2 in difflib.SequenceMatcher(None, xf, xs, autojunk=False).get_opcodes():
@@ -402,7 +478,10 @@ def judge(fused: list[dict], third: list[dict], spot: dict) -> tuple[str, str]:
       その字と、その前後で2回の起こしも書いた字を置く（元の文の字と、間の句読点。2回とも行の頭に
       「で、」、3回目が「で、やっぱり」なら「で、」も残す）。3回目だけが足した字は置かない（3分03秒の
       3回目「普通に泣いて帰ったら」の「に」は、認識も2回の起こしも書いていない）。(b) 間に字が無ければ
-      （3回目も消した: 2回目・3回目・認識の3つがそろう）、その字を消す
+      （3回目も消した: 2回目・3回目・認識の3つがそろう）、その字を消す。(c) 間の字が、いまの字の頭と
+      尻の間を認識の字（want）に入れ替えた形なら、間の字を置く。いまの字を（入れ替えた字数より）
+      2字以上減らす形は決めない（42分03秒: 3回目「先生、あの、今日ね、」は置き、「今日ね、」だけなら
+      「先生、あの、」を落とすので置かない）
     - "keep": 3回目も2回の起こしと同じ字（いまのまま）
     - "open": 前後の字が見つからない・どちらでもない字・置く所が2行にまたがる（決まらない）
     """
@@ -428,6 +507,11 @@ def judge(fused: list[dict], third: list[dict], spot: dict) -> tuple[str, str]:
                 pre = next(n for n in range(k, -1, -1) if gap[k - n:k] in cur)
                 post = next(n for n in range(rest, -1, -1) if gap[k + len(want):k + len(want) + n] in cur)
                 a, q = a + k - pre, a + k + len(want) + post
+            elif spot["kind"] == "swap" and want in gap:
+                head, tail = gap[:gap.find(want)], gap[gap.find(want) + len(want):]
+                if (not cur.startswith(head) or not cur.endswith(tail) or len(head) + len(tail) > len(cur)
+                        or len(cur) - len(head) - len(tail) - len(want) > MAX_DROP):
+                    return "open", ""
             elif spot["kind"] != "drop" or gap:
                 return "open", ""
             span = _span(f3, a, q)
