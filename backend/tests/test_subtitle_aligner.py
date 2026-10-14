@@ -828,3 +828,32 @@ def test_the_old_form_the_recogniser_heard_is_used_whatever_the_dictionary_order
         assert not cs[1].get("_asr")
         assert aligner.align_heard_forms(cs, heard, terms=order) == 1
         assert cs[1]["start"] == pytest.approx(4.0, abs=0.05)
+
+
+def test_an_unheard_caption_is_not_spread_over_a_scene_where_nobody_speaks():
+    # 40回目の 29分38秒〜30分32秒（先生が字を書く場面・54秒）: 合わなかった「はい」（2字）を前後の合った
+    # 字幕の間に文字数で配ったら、場面全体の 52 秒に出た。推定の時刻の所に、ゆっくり話す長さで置く
+    caps = [{"start": 0.0, "end": 2.0, "text": "今から書いていただきます", "_asr": True},
+            {"start": 26.0, "end": 31.0, "text": "はい"},
+            {"start": 54.0, "end": 57.0, "text": "素敵な字を書いていただいたので", "_asr": True}]
+    aligner.interpolate_unaligned(caps)
+    assert caps[1]["start"] == pytest.approx(26.0)
+    assert caps[1]["end"] == pytest.approx(26.0 + 2 / aligner.SLOW_CPS, abs=1e-3)
+
+
+def test_a_pause_in_the_talk_still_gets_the_caption_spread_over_it():
+    # 6分36秒の形: 12字に 7.4 秒。ゆっくり話せば埋まる（言いよどみ・間）ので、今までどおり間に配る
+    caps = [{"start": 0.0, "end": 2.0, "text": "前の話です", "_asr": True},
+            {"start": 2.5, "end": 4.0, "text": "私　拝見したことがあります"},
+            {"start": 9.4, "end": 11.0, "text": "次の話です", "_asr": True}]
+    aligner.interpolate_unaligned(caps)
+    assert (caps[1]["start"], caps[1]["end"]) == (2.0, 9.4)
+
+
+def test_an_unheard_caption_estimated_past_the_scene_stays_before_the_next_anchor():
+    caps = [{"start": 0.0, "end": 2.0, "text": "今から書いていただきます", "_asr": True},
+            {"start": 60.0, "end": 61.0, "text": "はい"},
+            {"start": 54.0, "end": 57.0, "text": "素敵な字を書いていただいたので", "_asr": True}]
+    aligner.interpolate_unaligned(caps)
+    assert caps[1]["end"] == pytest.approx(54.0)
+    assert caps[1]["start"] == pytest.approx(54.0 - 2 / aligner.SLOW_CPS, abs=1e-3)

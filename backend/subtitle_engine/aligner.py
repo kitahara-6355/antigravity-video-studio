@@ -81,6 +81,10 @@ LAG_SEC = 0.2
 # 人が話せる速さの上限（字/秒）。43 分の素材で合った字幕の速さは中央 5.1・99% 点 9.8・
 # 最大 10.9 字/秒（2026-10-07 実測）
 MAX_CPS = 12.0
+# 合わなかった字幕を配るすき間が、ゆっくり（毎秒 SLOW_CPS 字）話しても SCENE_SLACK_SEC 秒以上余るなら、
+# そのすき間にはだれも話さない場面（`cut_plan.find_scenes`・字を書く場面）がある。場面の上には配らない
+SLOW_CPS = 3.0
+SCENE_SLACK_SEC = 10.0
 # 合った字幕どうしの間に、合わなかった字幕がこの秒数を超えてはみ出すなら、どちらかの合わせ方が誤り。
 # 相づち（「はい」「うん」）は相手の話に重なるので、1 秒前後のはみ出しはふつうに起きる
 # （同じ素材で 17 か所・最大 1.3 秒。誤って合わせた最後の字幕は 4.7 秒）
@@ -1050,6 +1054,8 @@ def interpolate_unaligned(captions: list[dict], end: float | None = None) -> int
     （0 秒より前・end より後ろ）にはみ出すなら、杭と動画の端の間に配る。
     区間（`_zone`・`keep_in_zones`）のある字幕は、その区間の中だけに配る。杭が別の区間に
     あっても、カットの向こう（別の場面の声）には出さない。
+    杭の間がゆっくり話しても余るほど長ければ（だれも話さない場面を含む）、間全体には配らず、
+    推定の時刻の所にゆっくり話す長さで置く。
     """
     idx = [i for i, c in enumerate(captions) if c.get("_asr")]
     if not idx:
@@ -1065,6 +1071,12 @@ def interpolate_unaligned(captions: list[dict], end: float | None = None) -> int
         if tail is not None and t1 - (float(tail) + TAIL_SEC) >= sum(_chars(c) for c in run) / MAX_CPS:
             # 前の字幕から外した言いよどみ（認識は聞いている）の声には置かない。話せる時間が残るときだけ
             t0 = max(t0, float(tail) + TAIL_SEC)
+        need = sum(_chars(c) for c in run) / SLOW_CPS
+        if t1 - t0 - need >= SCENE_SLACK_SEC:
+            # すき間に場面がある。推定の時刻（文字起こし）の所に、ゆっくり話す長さで置く（40回目の
+            # 字を書く場面で、合わなかった「はい」を前後の合った字幕の間に配ったら 52 秒出ていた）
+            t0 = min(max(float(run[0]["start"]), t0), t1 - need)
+            t1 = t0 + need
         # 狭くても順番どおりに置く（推定の時刻のまま残すと、並べ直しで順番が入れ替わる）。
         # 出る時間が足りない字幕は、後で隣とまとめる。前後が重なっているときは次の字幕の出だしに
         # 置く（前の終わりに置くと次の字幕より後ろになる・15分26秒の「ファンが」）
