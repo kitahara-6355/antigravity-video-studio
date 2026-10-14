@@ -750,3 +750,81 @@ def test_a_filler_is_not_taken_from_a_backchannel_caption_further_on():
     aligner.align_captions(caps, heard)
     assert caps[0]["_asr"] and caps[3]["_asr"]
     assert aligner.mark_filler_tails(caps, heard, words=["ええ"]) == 0
+
+
+# --- 字幕は、その言葉が残った区間（カットとカットの間）の中に出す（2026-10-14） ---------------
+
+def test_an_unheard_caption_stays_before_the_cut():
+    # 38回目の 36分03秒「私も」: 認識は「分かりました」と聞いて合わず、前後の合った字幕の間に配ったら、
+    # カットの向こうの次の質問の区間に出た
+    caps = [{"start": 0.0, "end": 2.0, "text": "あやかりたいと思います", "_zone": (0.0, 3.0)},
+            {"start": 2.0, "end": 2.6, "text": "私も", "_zone": (0.0, 3.0)},
+            {"start": 3.5, "end": 6.0, "text": "先生がこれからやってみたいことは", "_zone": (3.0, 8.0)}]
+    heard = toks("あやかりたいと思います", 0.2, 0.15) + toks("先生がこれからやってみたいことは", 4.4, 0.15)
+    aligner.align_captions(caps, heard)
+    assert caps[0]["_asr"] and caps[2]["_asr"] and not caps[1].get("_asr")
+    aligner.interpolate_unaligned(caps, end=8.0)
+    assert caps[0]["end"] <= caps[1]["start"] < caps[1]["end"] <= 3.0
+
+
+def test_without_zones_unheard_captions_are_spread_as_before():
+    caps = [{"start": 0.0, "end": 2.0, "text": "あやかりたいと思います"},
+            {"start": 2.0, "end": 2.6, "text": "私も"},
+            {"start": 3.5, "end": 6.0, "text": "先生がこれからやってみたいことは"}]
+    heard = toks("あやかりたいと思います", 0.2, 0.15) + toks("先生がこれからやってみたいことは", 4.4, 0.15)
+    aligner.align_captions(caps, heard)
+    aligner.interpolate_unaligned(caps, end=8.0)
+    assert caps[1]["start"] == pytest.approx(caps[0]["end"]) and caps[1]["end"] == pytest.approx(4.4)
+
+
+def test_a_caption_with_no_room_left_in_its_zone_gets_none():
+    caps = [{"start": 0.0, "end": 2.9, "text": "あやかりたいと思います", "_zone": (0.0, 3.0)},
+            {"start": 2.9, "end": 3.0, "text": "私も", "_zone": (0.0, 3.0)},
+            {"start": 3.5, "end": 6.0, "text": "先生がこれからやってみたいことは", "_zone": (3.0, 8.0)}]
+    heard = toks("あやかりたいと思います", 1.4, 0.15) + toks("先生がこれからやってみたいことは", 4.4, 0.15)
+    aligner.align_captions(caps, heard)
+    aligner.keep_in_zones(caps, [3.0])
+    aligner.interpolate_unaligned(caps, end=8.0)
+    assert caps[1]["start"] == caps[1]["end"] == pytest.approx(3.0)
+
+
+def test_an_unheard_tail_does_not_run_past_the_cut():
+    # 素材の 38分44秒: 認識が聞かなかった尻の「悪くなっちゃって」を 1 字 CHAR_SEC で外挿すると、
+    # 区間の外に 0.9 秒出た
+    caps = [{"start": 0.0, "end": 4.0, "text": "作れないとか原毛の質まで悪くなっちゃって", "_zone": (0.0, 3.6)}]
+    heard = toks("作れないとか原毛の質まで", 1.0, 0.2)
+    aligner.align_captions(caps, heard)
+    assert caps[0]["end"] > 3.6
+    assert aligner.keep_in_zones(caps, [3.6]) == 1
+    assert caps[0]["start"] == pytest.approx(1.0) and caps[0]["end"] == pytest.approx(3.6)
+
+
+def test_a_caption_heard_on_both_sides_of_a_cut_keeps_its_words():
+    # 発話が間（カットで詰めた）をまたいで話されたら、言葉が聞こえた区間まで出してよい
+    caps = [{"start": 0.0, "end": 2.5, "text": "スタートしたんですけどその当時僕が", "_zone": (0.0, 2.5)}]
+    heard = toks("スタートしたんですけど", 0.5, 0.15) + toks("その当時僕が", 2.6, 0.15)
+    aligner.align_captions(caps, heard)
+    aligner.keep_in_zones(caps, [2.5, 6.0])
+    assert caps[0]["_zone"] == (0.0, 6.0)
+    assert caps[0]["end"] == pytest.approx(2.6 + 5 * 0.15 + aligner.CHAR_SEC)
+
+
+def test_captions_without_a_zone_are_left_alone():
+    caps = [{"start": 0.0, "end": 9.0, "text": "どこでもいい"}]
+    assert aligner.keep_in_zones(caps, [3.0]) == 0 and caps[0]["end"] == 9.0
+
+
+def test_the_old_form_the_recogniser_heard_is_used_whatever_the_dictionary_order():
+    # 辞書に直す前の形がいくつもあると（「書字」は「周知」「周辞」）、以前は集合の並びで1つ選び、
+    # 同じ入力でも起動ごとに合わせ方が変わった（31分05秒の「これあの　アドシアターのね」）
+    caps = [{"start": 0.0, "end": 1.0, "text": "そうです"},
+            {"start": 1.0, "end": 2.0, "text": "書字の"},
+            {"start": 2.0, "end": 3.0, "text": "よろしくお願いします"}]
+    heard = toks("そうです", 1.0) + toks("周辞の", 4.0) + toks("よろしくお願いします", 8.0)
+    terms = (("周知", "書字"), ("周辞", "書字"))
+    for order in (terms, terms[::-1]):
+        cs = [dict(c) for c in caps]
+        aligner.align_captions(cs, heard)
+        assert not cs[1].get("_asr")
+        assert aligner.align_heard_forms(cs, heard, terms=order) == 1
+        assert cs[1]["start"] == pytest.approx(4.0, abs=0.05)

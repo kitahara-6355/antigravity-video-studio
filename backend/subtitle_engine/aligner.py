@@ -624,21 +624,33 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
     return aligned
 
 
-def _heard_form(text: str, swaps) -> tuple[str, list[int]] | None:
+def _shared(a: str, b: str) -> int:
+    """a と b に共通する一番長い連続した文字の数。"""
+    if not a or not b:
+        return 0
+    return difflib.SequenceMatcher(None, a, b, autojunk=False).find_longest_match(0, len(a), 0, len(b)).size
+
+
+def _heard_form(text: str, swaps, heard: str = "") -> tuple[str, list[int]] | None:
     """辞書で直した語を直す前の形に戻した文と、その1字ずつが字幕の何文字目に当たるか。
 
     text と swaps は `_norm_text` 済み。swaps は (直した語, 直す前の形)。戻す所が無ければ None。
+    1つの語に直す前の形がいくつもあれば（「アドシアター」は「アドシアタ」「バドシアター」
+    「角シアター」）、認識が聞いた文 heard と一番長く重なる形を使う。並びは辞書を読む順に
+    よらない（以前は集合の並びで選んでいて、同じ入力でも起動ごとに合わせ方が変わった）。
     """
     out, where, k, changed = [], [], 0, False
     while k < len(text):
-        for term, old in swaps:
-            if text.startswith(term, k):
-                out.extend(old)
-                # 長さが違えば、直す前の形の字を直した語の字に按分して当てる
-                where.extend(k + j * len(term) // len(old) for j in range(len(old)))
-                k += len(term)
-                changed = True
-                break
+        cands = [(term, old) for term, old in swaps if text.startswith(term, k)]
+        if cands:
+            longest = max(len(term) for term, _ in cands)
+            term, old = max((c for c in cands if len(c[0]) == longest),
+                            key=lambda c: (_shared(c[1], heard), c[1]))
+            out.extend(old)
+            # 長さが違えば、直す前の形の字を直した語の字に按分して当てる
+            where.extend(k + j * len(term) // len(old) for j in range(len(old)))
+            k += len(term)
+            changed = True
         else:
             out.append(text[k])
             where.append(k)
@@ -661,7 +673,7 @@ def align_heard_forms(captions: list[dict], tokens: list[tuple[str, float]], ter
         terms = _dictionary_terms()
     swaps = sorted({(_norm_text(right), _norm_text(wrong)) for wrong, right in terms or ()
                     if _norm_text(wrong) and _norm_text(right) and _norm_text(wrong) != _norm_text(right)},
-                   key=lambda p: -len(p[0]))
+                   key=lambda p: (-len(p[0]), p))
     if not swaps:
         return 0
     rec_chars, rec_times = [], []
@@ -673,15 +685,16 @@ def align_heard_forms(captions: list[dict], tokens: list[tuple[str, float]], ter
     aligned = 0
     for a, b in zip([None, *anchors], [*anchors, None]):
         run = range(0 if a is None else a + 1, len(captions) if b is None else b)
-        forms = {i: _heard_form(_norm_text(captions[i].get("text")), swaps) for i in run}
-        forms = {i: f for i, f in forms.items() if f}
-        if not forms:
+        if not any(_heard_form(_norm_text(captions[i].get("text")), swaps) for i in run):
             continue
         lo = (captions[a].get("_asr_marks") or [(0, float(captions[a]["end"]))])[-1][1] if a is not None else None
         hi = float(captions[b].get("_asr_first", captions[b]["start"])) if b is not None else None
         window = [k for k, t in enumerate(rec_times) if (lo is None or t > lo) and (hi is None or t < hi)]
         if not window:
             continue
+        heard = "".join(rec_chars[k] for k in window)
+        forms = {i: _heard_form(_norm_text(captions[i].get("text")), swaps, heard) for i in run}
+        forms = {i: f for i, f in forms.items() if f}
         # 字幕側: 戻した形の文字と、字幕の番号・何文字目か
         cap_chars, owner, offset_in = [], [], []
         for i in run:
@@ -908,6 +921,70 @@ def _spread(run: list[dict], t0: float, t1: float) -> None:
         c["_asr_interp"] = True
 
 
+def _zone(c: dict) -> tuple[float, float] | None:
+    z = c.get("_zone")
+    return (float(z[0]), float(z[1])) if z else None
+
+
+def _outside_zone(c: dict) -> bool:
+    z = _zone(c)
+    return z is not None and (float(c["start"]) < z[0] - 1e-6 or float(c["end"]) > z[1] + 1e-6)
+
+
+def _spread_in_zones(run: list[dict], t0: float, t1: float) -> None:
+    """字幕を t0〜t1 に文字数で配る。区間（`_zone`）のある字幕は、その区間と t0〜t1 の重なりの
+    中だけに配る（区間ごとに続く字幕をまとめて配る）。重なりが無ければ区間の端に長さ 0 で置く。"""
+    k = 0
+    while k < len(run):
+        z = _zone(run[k])
+        m = k + 1
+        while m < len(run) and _zone(run[m]) == z:
+            m += 1
+        lo, hi = t0, t1
+        if z is not None:
+            lo = min(max(t0, z[0]), z[1])
+            hi = max(min(t1, z[1]), lo)
+        _spread(run[k:m], lo, hi)
+        k = m
+
+
+def keep_in_zones(captions: list[dict], cut_points=()) -> int:
+    """字幕を、その言葉が残った区間（`_zone`・出力の秒。カットとカットの間）の中に収める。
+
+    区間の外は別の場面の声で、そこに出ると字幕が言葉と合わない。38回目の 36分03秒「私も」は、
+    認識が「分かりました」と聞いて合わず、前後の合った字幕の間に配ったら次の質問の区間に出た。
+    合った字幕も、聞こえなかった尻の字を 1 字 CHAR_SEC で外挿すると区間の外に出る（素材の
+    38分44秒「…原毛の質まで悪くなっちゃって」が 0.9 秒）。
+
+    認識が区間の外で字を聞いた字幕（発話がカットをまたいで話された）は、その字を聞いた区間まで
+    `_zone` を広げる。直した枚数を返す。`_zone` の無い字幕は動かさない。
+    """
+    cps = sorted(float(c) for c in cut_points or ())
+    moved = 0
+    for c in captions:
+        z = _zone(c)
+        if z is None:
+            continue
+        z0, z1 = z
+        marks = (c.get("_asr_marks") or ()) if c.get("_asr") else ()
+        if marks:
+            first, last = float(marks[0][1]), float(marks[-1][1])
+            if first < z0:
+                k = bisect.bisect_right(cps, first)
+                z0 = cps[k - 1] if k > 0 else 0.0
+            if last > z1:
+                k = bisect.bisect_right(cps, last)
+                z1 = cps[k] if k < len(cps) else max(z1, last + CHAR_SEC)
+            c["_zone"] = (z0, z1)
+        a, b = float(c["start"]), float(c["end"])
+        na = min(max(a, z0), z1)
+        nb = max(min(b, z1), na)
+        if (na, nb) != (a, b):
+            c["start"], c["end"] = round(na, 3), round(nb, 3)
+            moved += 1
+    return moved
+
+
 def release_implausible(captions: list[dict], end: float | None = None) -> int:
     """合った字幕どうしの間に、合わなかった字幕が話せる速さで収まらなければ、どちらかの合わせ方を外す。
 
@@ -971,6 +1048,8 @@ def interpolate_unaligned(captions: list[dict], end: float | None = None) -> int
     合った字幕とぶつかる。合った字幕を杭にして、その間を配り直す。
     端（最初の杭より前・最後の杭より後ろ）は、杭と同じだけずらす。ずらすと動画の外
     （0 秒より前・end より後ろ）にはみ出すなら、杭と動画の端の間に配る。
+    区間（`_zone`・`keep_in_zones`）のある字幕は、その区間の中だけに配る。杭が別の区間に
+    あっても、カットの向こう（別の場面の声）には出さない。
     """
     idx = [i for i, c in enumerate(captions) if c.get("_asr")]
     if not idx:
@@ -989,7 +1068,7 @@ def interpolate_unaligned(captions: list[dict], end: float | None = None) -> int
         # 狭くても順番どおりに置く（推定の時刻のまま残すと、並べ直しで順番が入れ替わる）。
         # 出る時間が足りない字幕は、後で隣とまとめる。前後が重なっているときは次の字幕の出だしに
         # 置く（前の終わりに置くと次の字幕より後ろになる・15分26秒の「ファンが」）
-        _spread(run, min(t0, t1), t1)
+        _spread_in_zones(run, min(t0, t1), t1)
         moved += len(run)
     for head, side, anchor in ((True, captions[:idx[0]], idx[0]), (False, captions[idx[-1] + 1:], idx[-1])):
         if not side:
@@ -1009,6 +1088,9 @@ def interpolate_unaligned(captions: list[dict], end: float | None = None) -> int
             spills = end is not None and float(side[-1]["end"]) > end
         if spills and hi > lo:
             _spread(side, lo, hi)
+            changed = True
+        if hi is not None and hi > lo and any(_outside_zone(c) for c in side):
+            _spread_in_zones(side, lo, hi)
             changed = True
         if changed:
             moved += len(side)

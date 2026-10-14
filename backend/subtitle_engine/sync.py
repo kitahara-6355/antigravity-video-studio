@@ -225,6 +225,19 @@ def _in_cut_zone(t: float, cut_points: list[float], zone: float) -> float | None
     return None
 
 
+def _zone(seg: dict) -> tuple[float, float]:
+    """字幕を出してよい区間（出力の秒・`aligner.keep_in_zones`）。無ければ全体。"""
+    z = seg.get("_zone")
+    return (float(z[0]), float(z[1])) if z else (float("-inf"), float("inf"))
+
+
+def _within(points: list[float], zone: tuple[float, float]) -> list[float]:
+    """points（昇順）のうち zone の中の点。"""
+    lo = int(np.searchsorted(points, zone[0], side="left"))
+    hi = int(np.searchsorted(points, zone[1], side="right"))
+    return points[lo:hi]
+
+
 def _chars(seg: dict) -> int:
     return max(1, len("".join(str(seg.get("text") or "").split())))
 
@@ -384,7 +397,8 @@ def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None 
             continue
         cands = []
         for j in (i - 1, i + 1):
-            if 0 <= j < len(items) and not items[j].get("_merged"):
+            # カットの向こうの字幕とはまとめない（まとめた字幕がカットをまたいで出る）
+            if 0 <= j < len(items) and not items[j].get("_merged") and _zone(items[j]) == _zone(s):
                 o = items[j]
                 pair = (o, s) if j < i else (s, o)
                 first, second = str(pair[0].get("text", "")), str(pair[1].get("text", ""))
@@ -475,7 +489,7 @@ def _resplit_flashes(items: list[dict], min_display: float, max_chars: int | Non
         if i == 0 or _unheard(s) or not _too_short(s, min_display):
             continue
         p = live[i - 1]
-        if float(s["start"]) - float(p["end"]) > RESPLIT_MAX_GAP_SEC:
+        if float(s["start"]) - float(p["end"]) > RESPLIT_MAX_GAP_SEC or _zone(p) != _zone(s):
             continue
         text, flat = _flat(s), _flat(p)
         a, b = p.get("sourceStart"), s.get("sourceStart")
@@ -533,6 +547,16 @@ def _drop_unheard_flashes(items: list[dict], min_display: float = DEFAULT_TIMING
     return dropped
 
 
+def _drop_squeezed(items: list[dict]) -> int:
+    """区間（`_zone`）に入る隙が無く、1フレームも出ない字幕は出さない（隣ともまとめられなかった）。"""
+    dropped = 0
+    for s in items:
+        if not s.get("_merged") and float(s["end"]) - float(s["start"]) < VIDEO_FRAME:
+            s["_merged"] = True
+            dropped += 1
+    return dropped
+
+
 def _drop_past_end(items: list[dict], end: float) -> int:
     """映像の終わりより後ろの字幕は出さず、終わりをまたぐ字幕は終わりで切る。
 
@@ -585,7 +609,11 @@ def align_segments(segments: list[dict], speech: SpeechMap,
     onsets, offsets = [], []
     for k, s in enumerate(items):
         a, b = float(s["start"]), float(s["end"])
-        floor = onsets[-1] + MIN_STEP_SEC if onsets else -1.0
+        # 話し始め・話し終わりは、字幕の言葉が残った区間の中から選ぶ（カットの向こうは別の場面の声）
+        zone = _zone(s)
+        zone_onsets = _within(speech.onsets, zone)
+        # 前の字幕との間を空けるのは同じ区間のときだけ。カットの手前の字幕は区間の終わりまでしか出ない
+        floor = onsets[-1] + MIN_STEP_SEC if onsets and _zone(items[k - 1]) == zone else -1.0
         first = float(s.get("_asr_first", a)) if s.get("_asr") else a
         if s.get("_asr") and first - a > 0.05:
             # 頭の何文字かを認識が拾えず、出だしを外挿している。拾えた最初の文字の直前の
@@ -599,7 +627,7 @@ def align_segments(segments: list[dict], speech: SpeechMap,
             prev_heard = _last_heard(items[k - 1]) if k > 0 else None
             if head >= HEAD_LOOKBACK_MIN_CHARS and prev_heard is not None:
                 lo = min(lo, max(prev_heard + HEAD_AFTER_PREV_SEC, first - head / HEAD_MIN_CPS))
-            near = [o for o in speech.onsets if o >= floor and lo <= o <= latest]
+            near = [o for o in zone_onsets if o >= floor and lo <= o <= latest]
             on = None
             if near:
                 # 頭を毎秒 HEAD_MAX_CPS 字で話せる、いちばん遅い話し始め。どこからでも足りなければ、
@@ -607,13 +635,13 @@ def align_segments(segments: list[dict], speech: SpeechMap,
                 roomy = [o for o in near if _speaking_time(speech, o, first) >= head / HEAD_MAX_CPS]
                 on = max(roomy) if roomy else min(near)
         elif s.get("_asr"):
-            on = _nearest_biased([o for o in speech.onsets if o >= floor], a,
+            on = _nearest_biased([o for o in zone_onsets if o >= floor], a,
                                  ASR_SNAP_BEFORE_SEC, ASR_SNAP_AFTER_SEC)
         else:
             # 文字起こしの時刻は早めに出がち（実測で早すぎ 163 件・遅すぎ 23 件）なので、後ろ側を広く探す
-            on = _nearest_biased([o for o in speech.onsets if floor <= o < claimed[k + 1]], a,
+            on = _nearest_biased([o for o in zone_onsets if floor <= o < claimed[k + 1]], a,
                                  r["snap_window_sec"] * 0.6, r["snap_window_sec"] * 1.25)
-        off = _nearest(speech.offsets, b, r["snap_window_sec"])
+        off = _nearest(_within(speech.offsets, zone), b, r["snap_window_sec"])
         snapped_in += on is not None
         snapped_out += off is not None
         on = max(a, floor) if on is None else on
@@ -634,15 +662,17 @@ def align_segments(segments: list[dict], speech: SpeechMap,
         # ただし間の後ろの話し始めが次の（認識で時刻を取った）字幕のものなら送らない。送ると次の字幕と
         # ぶつかって一瞬で消え、次の字幕も遅れる（21分28秒の「ふうに思ってますね」・後ろ半分はカットで消えた）
         resume = _pause_end(t, speech)
-        if resume is not None and resume < claimed[i + 1]:
+        z0, z1 = _zone(items[i])
+        if resume is not None and resume < claimed[i + 1] and resume < z1:
             onsets[i] = resume
             t = resume + r["lead_in_sec"]
         cp = _in_cut_zone(t, cut_points, r["cut_zone_sec"])
         if cp is not None:
             t = cp if t < cp else t
-        if ins and t < ins[-1] + MIN_STEP_SEC:
+        if ins and t < ins[-1] + MIN_STEP_SEC and _zone(items[i - 1]) == (z0, z1):
             t = ins[-1] + MIN_STEP_SEC
-        ins.append(t)
+        # 区間の外には出さない。入る隙が無ければ区間の終わりに置き、後で隣とまとめるか外す
+        ins.append(min(max(t, z0), z1))
     outs = []
     for i in range(n):
         out = offsets[i] + r["linger_sec"]
@@ -658,16 +688,18 @@ def align_segments(segments: list[dict], speech: SpeechMap,
         cp = _in_cut_zone(out, cut_points, r["cut_zone_sec"])
         if cp is not None and cp > ins[i] + 0.3:
             out = cp
-        outs.append(out)
+        # 話し終わりの後の余韻も、カットの向こう（次の場面）には残さない
+        outs.append(min(out, _zone(items[i])[1]))
 
     result = []
     for s, a, b in zip(items, ins, outs):
-        s["start"], s["end"] = round(a, 3), round(max(b, a + 0.2), 3)
+        s["start"], s["end"] = round(a, 3), round(min(max(b, a + 0.2), max(_zone(s)[1], a)), 3)
         result.append(s)
     past_end = _drop_past_end(result, speech.duration)
     merged = _merge_flashes(result, r["min_display_sec"])
     resplit = _resplit_flashes(result, r["min_display_sec"])
-    dropped = _drop_unheard_flashes(result, r["min_display_sec"]) + past_end + no_room
+    dropped = (_drop_unheard_flashes(result, r["min_display_sec"]) + _drop_squeezed(result)
+               + past_end + no_room)
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
              "redistributed": redistributed, "merged": merged, "resplit": resplit,
              "dropped": dropped}

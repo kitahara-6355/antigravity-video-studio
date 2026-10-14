@@ -1297,6 +1297,16 @@ def test_retime_shifts_later_ranges_and_marks_cut_points():
     assert total == 4.0
 
 
+def test_retime_marks_the_output_span_each_caption_was_kept_in():
+    """字幕を出してよい区間（出力の秒）。時刻を音声に合わせるとき、カットの向こうに出さない。"""
+    segs = [{"start": 0.0, "end": 2.0, "text": "a", "sourceStart": 0.0, "sourceEnd": 2.0},
+            {"start": 11.0, "end": 12.0, "text": "b", "sourceStart": 10.0, "sourceEnd": 12.0}]
+
+    out, _, _ = smart_cut_engine.retime_segments(segs, [(0.0, 2.0), (10.0, 12.0)])
+
+    assert [s["_zone"] for s in out] == [(0.0, 2.0), (2.0, 4.0)]
+
+
 # --- 書き出しの画素形式（2026-10-05 ユーザー報告: 音だけで映像が出ない）--------------
 
 

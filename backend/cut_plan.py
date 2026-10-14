@@ -19,8 +19,20 @@
 3. 切る所を声の切れ目に寄せる（`snap_to_pauses`）。素材の音量で見た声が切れ目をまたいで
    続いていれば切らない。区間の終わりが声の中なら声が終わるまで延ばし、話し終わりの後ろに
    `pad_after_sec` を残す。始まりも同じく、話し始めの前に `pad_before_sec` を残す。延ばして
-   残ったすき間が `min_cut_sec` 未満なら切らない。中身を全部残すときは、文字起こしに無い声
-   （笑い声・起こし漏れ）がすき間にあっても切らずに残す
+   残ったすき間が `min_cut_sec` 未満なら切らない。中身を全部残すときは、区間の端から続く声は
+   どれだけ長くても（文字起こしに無い笑い声・起こし漏れでも）終わるまで残す
+
+声は素材の音量と音声認識（`subtitle_engine.aligner`・ローカル）の両方で見る（2026-10-14）。
+38回目の書き出しを認識で数えると、残した区間のすき間に認識の字が 91 字あった。
+
+- 音量だけでは弱い語尾を声とみなさない。「書くんですよ」の「よ」、「あるんでしょうか」の「うか」、
+  締めの「ありがとうございました」の「た」が、声の区間の終わりの 0.1〜0.3 秒後に聞こえていて
+  切れていた。認識が続けて聞いた字（字の手前の間が切れる長さ未満）も声とみなす
+  （`_speech_end`・`_speech_start`）
+- 文字起こしの発話の区間は、言葉の後ろを落としていることがある。素材の 17分52秒の「その数字って
+  日本の人口の2%だよね」は区間が手前の「言われている」で終わり、「日本の人口の2%だよね」の
+  4 秒を切って字幕だけ出ていた。字幕の文字を認識の字と突き合わせ、その発話の言葉が聞こえた所
+  まで区間を広げる（`heard_spans`）
 
 区間は延ばすだけで縮めない。字幕は発話の区間（sourceStart/sourceEnd）で残す区間に割り当てる
 （`smart_cut_engine.retime_segments`）ので、縮めると字幕が落ちる。
@@ -35,7 +47,7 @@ from __future__ import annotations
 import bisect
 import logging
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,6 +57,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 FRAME_SEC = 0.01
+# 音声認識の字1つが声として続く長さ。字の時刻はその字の立ち上がり（`aligner.CHAR_SEC` と同じ）
+HEARD_CHAR_SEC = 0.13
+# 発話の区間からこれより離れて聞こえた字は、その発話の言葉とみなさない（別の所の同じ言葉）。
+# 字幕の時刻合わせが認識の字を探す範囲（`aligner.SEARCH_AFTER_SEC`）と同じ
+HEARD_WINDOW_SEC = 5.0
 
 DEFAULT_CUT_RULES = {
     # 話し終わりの後ろに残す余白。文末の「す」は声が弱く、音量で見た話し終わりより少し続く
@@ -123,9 +140,17 @@ def _span(seg) -> tuple[float, float]:
             float(end if end is not None else _field(seg, "end", 0) or 0))
 
 
-def merge_ranges(segments, gap_sec: float) -> list[tuple[float, float]]:
-    """発話の区間を並べ、すき間が gap_sec 以下ならつなぐ（従来のレンダリングの規則）。"""
-    spans = sorted(_span(s) for s in segments)
+def _widened(span: tuple[float, float], heard: dict | None) -> tuple[float, float]:
+    h = (heard or {}).get(span)
+    return (min(span[0], h[0]), max(span[1], h[1])) if h else span
+
+
+def merge_ranges(segments, gap_sec: float, heard: dict | None = None) -> list[tuple[float, float]]:
+    """発話の区間を並べ、すき間が gap_sec 以下ならつなぐ（従来のレンダリングの規則）。
+
+    heard（`heard_spans`）があれば、発話の区間をその言葉が聞こえた所まで広げてから並べる。
+    """
+    spans = sorted(_widened(_span(s), heard) for s in segments)
     merged: list[tuple[float, float]] = []
     for start, end in spans:
         if merged and start <= merged[-1][1] + gap_sec:
@@ -258,9 +283,13 @@ def production_talk(segments, rules: dict) -> set[int]:
 
 @dataclass
 class SourceAudio:
-    """素材の音。10ms ごとの音量（dBFS）と、声の区間（`sync.SpeechMap`）。"""
+    """素材の音。10ms ごとの音量（dBFS）と、声の区間（`sync.SpeechMap`）。
+
+    heard は音声認識が字を聞いた時刻（素材の秒・昇順）。無ければ音量だけで声を見る。
+    """
     levels: np.ndarray
     speech: object
+    heard: list = field(default_factory=list)
 
 
 def read_audio(path, rate: int = 16000) -> SourceAudio | None:
@@ -287,6 +316,77 @@ def read_audio(path, rate: int = 16000) -> SourceAudio | None:
         return None
 
 
+def read_heard(path) -> list[tuple[str, float]] | None:
+    """素材の音声認識の字と時刻（`aligner.tokens_for`・ローカル・キャッシュあり）。使えなければ None。
+
+    字幕の時刻合わせ（`smart_cut_engine._align_to_speech`）と同じ結果を使う。
+    """
+    try:
+        if not path or not Path(path).is_file():
+            return None
+        from subtitle_engine import aligner
+        return aligner.tokens_for(str(path)) or None
+    except Exception as e:  # 認識が無くても切る（声は音量だけで見る）
+        logger.warning(f"素材の音声認識を読めないので、声は音量だけで見ます: {e}")
+        return None
+
+
+def heard_spans(segments, tokens, window: float = HEARD_WINDOW_SEC) -> dict:
+    """発話（`_span`）ごとに、その字幕の言葉を音声認識が聞いた区間（素材の秒）。
+
+    字幕の文字を認識の字と突き合わせる（`aligner.align_captions`。字幕の時刻合わせと同じ全体の
+    突き合わせ）。発話の区間から window 秒より離れた字（別の所の同じ言葉）は使わない。
+    """
+    from subtitle_engine import aligner
+    order = sorted(range(len(segments)), key=lambda i: (_span(segments[i])[0], i))
+    caps = []
+    for i in order:
+        lo, hi = _span(segments[i])
+        start, end = _field(segments[i], "start"), _field(segments[i], "end")
+        caps.append({"text": str(_field(segments[i], "text", "") or ""),
+                     "start": float(lo if start is None else start),
+                     "end": float(hi if end is None else end)})
+    aligner.align_captions(caps, tokens)
+    out: dict = {}
+    for i, cap in zip(order, caps):
+        key = _span(segments[i])
+        lo, hi = key
+        for _, t in cap.get("_asr_marks") or ():
+            t = float(t)
+            if lo - window <= t and t + HEARD_CHAR_SEC <= hi + window:
+                a, b = out.get(key, (t, t + HEARD_CHAR_SEC))
+                out[key] = (min(a, t), max(b, t + HEARD_CHAR_SEC))
+    return out
+
+
+def _is_span(item) -> bool:
+    return (isinstance(item, (tuple, list)) and len(item) == 2
+            and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in item))
+
+
+def _walls_and_widening(segments, exclude, heard: dict) -> tuple[list, dict]:
+    """外した発話の区間（walls）と、残す発話を広げる区間。
+
+    外した発話が字幕で渡されたら、その言葉が聞こえた区間を walls にする（文字起こしの区間は粗く、
+    素材の 37分47秒で段取りの声の区間が次の質問の「先生が」の「先」まで掛かっていた）。聞こえた字が
+    無ければ文字起こしの区間のまま。残す発話は、walls の向こうまでは広げない。
+    """
+    walls = [(float(a), float(b)) for a, b in (x for x in exclude if _is_span(x))]
+    walls += [heard.get(_span(x)) or _span(x) for x in exclude if not _is_span(x)]
+    walls.sort()
+    widen: dict = {}
+    for key in {_span(s) for s in segments}:
+        h = heard.get(key)
+        if not h:
+            continue
+        lo, hi = key
+        floor = max([h[0]] + [b for a, b in walls if b <= lo + 1e-6])
+        ceil = min([h[1]] + [a for a, b in walls if a >= hi - 1e-6])
+        if floor < ceil:
+            widen[key] = (floor, ceil)
+    return walls, widen
+
+
 def _run_at(speech, t: float) -> int | None:
     """t を含む声の区間の番号（onset <= t < offset）。"""
     i = bisect.bisect_right(speech.onsets, t) - 1
@@ -311,6 +411,43 @@ def _voice_start(speech, t: float) -> float | None:
         return speech.onsets[i]
     i = bisect.bisect_left(speech.onsets, t)
     return speech.onsets[i] if i < len(speech.onsets) else None
+
+
+def _speech_end(audio: SourceAudio, t: float, chain_gap: float) -> float | None:
+    """t の直前までの声が終わる時刻（`_voice_end`）に、音声認識が続けて聞いた字を足したもの。
+
+    音量で見た声の区間は、弱い語尾で早く終わる（「書くんですよ」の「よ」が声の区間の終わりの
+    0.21 秒後に聞こえていた）。字の手前の間が chain_gap 未満なら声が続いているとみなし、その字の
+    後ろ（字を含む声の区間があればその終わり）まで延ばす。
+    """
+    speech, heard = audio.speech, audio.heard
+    end = _voice_end(speech, t)
+    if end is None or not heard:
+        return end
+    k = bisect.bisect_right(heard, end - HEARD_CHAR_SEC)
+    while k < len(heard) and heard[k] - end < chain_gap:
+        end = max(end, heard[k] + HEARD_CHAR_SEC)
+        i = _run_at(speech, heard[k])
+        if i is not None:
+            end = max(end, speech.offsets[i])
+        k += 1
+    return end
+
+
+def _speech_start(audio: SourceAudio, t: float, chain_gap: float) -> float | None:
+    """t からの声が始まる時刻（`_voice_start`）を、音声認識が続けて聞いた字の所まで戻したもの。"""
+    speech, heard = audio.speech, audio.heard
+    start = _voice_start(speech, t)
+    if start is None or not heard:
+        return start
+    k = bisect.bisect_left(heard, start) - 1
+    while k >= 0 and start - (heard[k] + HEARD_CHAR_SEC) < chain_gap:
+        start = min(start, heard[k])
+        i = _run_at(speech, heard[k])
+        if i is not None:
+            start = min(start, speech.onsets[i])
+        k -= 1
+    return start
 
 
 def _quietest(levels: np.ndarray, lo: float, hi: float) -> float:
@@ -343,12 +480,14 @@ def snap_to_pauses(ranges, audio: SourceAudio | None, rules: dict,
     pad_before = rules["pad_before_sec"]
     pad_after = rules["pad_after_sec"]
     max_shift = rules["max_shift_sec"] if cut_through_voice else float("inf")
+    # 認識の字の手前の間がこれ未満なら、声が続いている（余白を残して切れる長さに足りない）
+    chain_gap = pad_after + rules["min_cut_sec"] + pad_before
     duration = len(audio.levels) * FRAME_SEC
     walls = sorted((float(a), float(b)) for a, b in walls)
     info = {"gaps": 0, "extended_end": 0, "pulled_start": 0, "joined": 0, "quiet": 0}
 
     def end_at(t: float) -> tuple[float, str]:
-        voice = _voice_end(speech, t)
+        voice = _speech_end(audio, t, chain_gap)
         if voice is None or voice + pad_after <= t:
             return t, ""
         reach = max_shift
@@ -362,7 +501,7 @@ def snap_to_pauses(ranges, audio: SourceAudio | None, rules: dict,
         return min(voice + pad_after, duration), "moved"
 
     def start_at(t: float) -> tuple[float, str]:
-        voice = _voice_start(speech, t)
+        voice = _speech_start(audio, t, chain_gap)
         if voice is None or voice - pad_before >= t:
             return t, ""
         reach = max_shift
@@ -411,17 +550,30 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
     keep_all: 中身（発話）を全部残すとき True。冒頭（最初の質問の文の前まで）は切らず、
     声の中でも切らない。中身を選んで削るときは False（冒頭も選ばれない発話があり、つなぐと
     その声が字幕無しで入る。長く続く声は一番静かな所で切る）。
-    exclude: 外した発話の区間（収録の段取りの声）。前後の区間を延ばしても入れない。
+    exclude: 外した発話（収録の段取りの声）。字幕か区間（素材の秒）で渡す。前後の区間を
+    延ばしても入れない。
+    素材の音声認識が読めれば、発話の言葉が聞こえた所まで区間を広げ（`heard_spans`）、
+    認識が続けて聞いた字も声とみなす（`_speech_end`・`_speech_start`）。
     """
     rules = rules or cut_rules()
-    ranges = merge_ranges(segments, rules["min_cut_sec"])
     info: dict = {}
+    exclude = list(exclude)
+    tokens = read_heard(source_path)
+    dropped = [x for x in exclude if not _is_span(x)]
+    heard = heard_spans(list(segments) + dropped, tokens) if tokens else {}
+    walls, widen = _walls_and_widening(segments, exclude, heard)
+    if widen:
+        info["heard_widened"] = sum(1 for span, w in widen.items() if _widened(span, widen) != span)
+    ranges = merge_ranges(segments, rules["min_cut_sec"], widen)
     if keep_all and rules["keep_opening"]:
         until = opening_end(segments, rules["opening_max_sec"])
         if until is not None:
-            ranges = join_opening(ranges, until, exclude)
+            ranges = join_opening(ranges, until, walls)
             info["opening_until"] = until
-    snapped, moved = snap_to_pauses(ranges, read_audio(source_path), rules,
-                                    cut_through_voice=not keep_all, walls=exclude)
+    audio = read_audio(source_path)
+    if audio is not None and tokens:
+        audio.heard = sorted(float(t) for _, t in tokens)
+    snapped, moved = snap_to_pauses(ranges, audio, rules,
+                                    cut_through_voice=not keep_all, walls=walls)
     info.update(moved)
     return snapped, info

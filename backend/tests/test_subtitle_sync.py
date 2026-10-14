@@ -382,3 +382,61 @@ def test_an_unheard_head_does_not_start_on_a_filler_taken_out_of_the_caption_bef
              "_asr_first": 97.6, "_asr_marks": [(10, 97.6), (11, 97.75), (12, 97.9)]}]
     out, _ = sync.align_segments(segs, sp, [], RULES)
     assert out[1]["start"] == pytest.approx(97.13, abs=0.02)
+
+
+# --- カットの向こうに出さない（`_zone`・2026-10-13 38回目の 36分03秒「私も」ほか）-----------------
+
+FULL = "あ" * 18 + "\n" + "い" * 18
+
+
+def _inside_zones(out):
+    return all(s["_zone"][0] - 1e-6 <= s["start"] <= s["end"] <= s["_zone"][1] + 1e-6 for s in out)
+
+
+def test_a_caption_does_not_linger_past_the_cut():
+    # 話し終わり 2.45 秒 + 余韻 0.5 秒 = 2.95 秒は、2.6 秒のカットの向こう（次の場面）
+    sp = _map([(1.0, 2.45), (3.5, 6.0)], total=10)
+    segs = [{"start": 1.0, "end": 2.45, "text": "一", "_zone": (0.0, 2.6)},
+            {"start": 3.5, "end": 6.0, "text": "二", "_zone": (2.6, 10.0)}]
+    out, _ = sync.align_segments(segs, sp, [2.6], RULES)
+    assert out[0]["end"] == pytest.approx(2.6, abs=0.01)
+    assert _inside_zones(out)
+
+
+def test_a_caption_is_not_snapped_to_speech_in_the_next_scene():
+    # 36分03秒（38回目）の形: 「私も」の推定時刻はカットの直後で、近い話し始めは次の質問のもの。
+    # そこに寄せると、カットの手前で言った言葉が次の質問に出る
+    sp = _map([(1.0, 2.0), (2.5, 2.8), (3.3, 6.0)], total=10)
+    segs = [{"start": 1.0, "end": 2.0, "text": "前の話", "_zone": (0.0, 2.9)},
+            {"start": 2.95, "end": 3.4, "text": "私も", "_zone": (0.0, 2.9)},
+            {"start": 3.3, "end": 6.0, "text": "次の質問です", "_zone": (2.9, 10.0)}]
+    out, _ = sync.align_segments(segs, sp, [2.9], RULES)
+    nxt = [s for s in out if "次の質問です" in s["text"]][0]
+    assert "私も" not in nxt["text"]
+    assert nxt["start"] == pytest.approx(3.3, abs=0.02)
+    assert _inside_zones(out)
+
+
+def test_a_flash_is_not_merged_with_a_caption_across_the_cut():
+    sp = _map([(1.0, 2.9), (3.05, 3.35), (3.45, 6.0)], total=10)
+    segs = [{"start": 1.0, "end": 2.9, "text": "前の話です", "_asr": True, "_zone": (0.0, 3.0)},
+            {"start": 3.05, "end": 3.35, "text": "そうですね", "_asr": True, "_zone": (3.0, 10.0)},
+            {"start": 3.45, "end": 6.0, "text": FULL, "_asr": True, "_zone": (3.0, 10.0)}]
+    out, stats = sync.align_segments(segs, sp, [3.0], RULES)
+    assert [s["text"] for s in out][:2] == ["前の話です", "そうですね"]
+    assert stats["merged"] == 0
+    assert _inside_zones(out)
+
+
+def test_a_caption_with_no_room_in_its_scene_is_dropped_without_delaying_the_next():
+    # 「そうですね」はカットの手前で言ったが、前の字幕で区間が埋まっていて入る隙が無い。
+    # カットの向こうに出さずに外し、次の場面の字幕は自分の話し始めに出す
+    sp = _map([(1.0, 2.9), (3.2, 6.0)], total=10)
+    segs = [{"start": 1.0, "end": 2.9, "text": FULL, "_asr": True, "_zone": (0.0, 3.0)},
+            {"start": 2.95, "end": 3.0, "text": "そうですね", "_asr": True, "_zone": (0.0, 3.0)},
+            {"start": 3.2, "end": 6.0, "text": "次の話", "_asr": True, "_zone": (3.0, 10.0)}]
+    out, stats = sync.align_segments(segs, sp, [3.0], RULES)
+    assert all("そうですね" not in s["text"] for s in out)
+    assert stats["dropped"] == 1
+    assert out[-1]["start"] == pytest.approx(3.2, abs=0.02)
+    assert _inside_zones(out)

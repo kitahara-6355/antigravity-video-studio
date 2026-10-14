@@ -280,6 +280,8 @@ def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=No
                     n = aligner.align_captions(segments, heard)
                     # 辞書で直した字幕（「もう毛筆ですか」）は、認識が聞いた直す前の形で合わせ直す
                     n += aligner.align_heard_forms(segments, heard)
+                    # 字幕は、その言葉が残った区間（カットとカットの間）の外に出さない
+                    z = aligner.keep_in_zones(segments, cut_points)
                     # 動画の長さ（残した区間の合計）。字幕をこの外に出さない
                     end = sum(float(b) - float(a) for a, b in ranges) if ranges else None
                     r = aligner.release_implausible(segments, end=end)
@@ -289,7 +291,8 @@ def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=No
                     logger.info(f"🎯 音声認識で時刻を合わせた字幕: {n - r}枚（間に配り直し {m}枚・"
                                 f"話す時間が残らず外した {r}枚）/ 全 {len(segments)}枚・"
                                 f"認識に無い言いよどみを {f}語外した・"
-                                f"字幕から外した言いよどみの声を前の字幕に付けた {t}枚")
+                                f"字幕から外した言いよどみの声を前の字幕に付けた {t}枚・"
+                                f"区間の外に出ていたのを収めた {z}枚")
             except Exception as e:
                 logger.warning(f"音声認識による時刻合わせをスキップ: {e}")
         from subtitle_engine import sync
@@ -375,6 +378,8 @@ def retime_segments(segments, merged):
     merged[1]=(s1,e1) は (e0-s0)〜(e0-s0)+(e1-s1) 秒に並ぶ。
     どの区間に属するかは発話の区間（sourceStart/sourceEnd）で、表示の時刻は
     `_display_span` で決める。返り値は (直した字幕, 出力の尺, カット点)。
+    字幕には、その発話を残した区間の出力の秒（`_zone`）を付ける。時刻を音声に合わせるとき、
+    字幕をこの外（カットの向こうの別の場面）に出さない（`aligner.keep_in_zones`）。
     """
     recalculated_segments = []
     output_offset = 0.0
@@ -402,6 +407,7 @@ def retime_segments(segments, merged):
                 if new_end > new_start:  # バッファ適用後も有効な場合のみ追加
                     new_seg["start"] = new_start
                     new_seg["end"] = new_end
+                    new_seg["_zone"] = (output_offset, output_offset + (range_end - range_start))
                     recalculated_segments.append(new_seg)
         output_offset += (range_end - range_start)
     return recalculated_segments, output_offset, cut_points

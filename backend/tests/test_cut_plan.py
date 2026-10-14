@@ -319,3 +319,103 @@ def test_the_production_talk_rules_come_from_the_template(monkeypatch):
     assert rules["production_ok_words"] == DEFAULT["production_ok_words"]
     rules["production_ok_words"].append("x")
     assert "x" not in DEFAULT["production_ok_words"]
+
+
+# ------------------------------------------------------------------
+# 声は音量と音声認識の両方で見る（2026-10-14・38回目の書き出しで、すき間に認識の字が 91 字）
+# ------------------------------------------------------------------
+
+LIVE = {"pad_before_sec": 0.10, "pad_after_sec": 0.15}  # 既定の余白（切れる間は 0.55 秒から）
+
+
+def _toks(text, start, step=0.15):
+    return [(c, round(start + i * step, 3)) for i, c in enumerate(text)]
+
+
+def test_a_soft_ending_the_recogniser_heard_is_kept():
+    """素材の 7分38秒: 音量で見た声は「書くんです」の 458.0 秒で終わり、458.21 秒の「よ」が切れた。"""
+    audio = _audio([(456.49, 458.0), (458.95, 459.5)], duration=470.0)
+    assert _snap([(449.0, 458.0), (459.0, 465.0)], audio, **LIVE)[0][1] == pytest.approx(458.15)
+    audio.heard = [457.85, 457.97, 458.09, 458.21, 458.95]
+    out = _snap([(449.0, 458.0), (459.0, 465.0)], audio, **LIVE)
+    assert out[0][1] == pytest.approx(458.21 + cut_plan.HEARD_CHAR_SEC + 0.15)
+    # 次の発話（458.95 秒の「で」）の手前の間は切れる長さがあるので、つながない
+    assert out[1][0] == pytest.approx(458.95 - 0.10)
+
+
+def test_a_soft_start_the_recogniser_heard_is_kept():
+    audio = _audio([(10.0, 12.0), (14.4, 16.0)])
+    audio.heard = [10.5, 11.8, 14.0, 14.5]  # 14.0 秒の字は立ち上がりが弱く、音量では声の外
+    out = _snap([(9.0, 12.0), (14.4, 20.0)], audio, **LIVE)
+    assert out[1][0] == pytest.approx(14.0 - 0.10)
+
+
+def test_a_far_recognised_character_does_not_join_a_pause():
+    """認識の字でも、手前の間が切れる長さ（余白＋min_cut）あれば、声が続いているとはみなさない。"""
+    audio = _audio([(10.0, 12.0), (14.4, 16.0)])
+    audio.heard = [11.8, 12.8]  # 12.8 秒の字は 12.0 秒の声の終わりから 0.67 秒あと
+    out = _snap([(9.0, 12.0), (14.4, 20.0)], audio, **LIVE)
+    assert out[0][1] == pytest.approx(12.15)
+
+
+ZONE20 = [  # 素材の 17分42秒〜18分01秒（38回目）
+    dict(start=1061.58, end=1064.84, text="書道人口って　この10年で半減して",
+         sourceStart=1061.58, sourceEnd=1072.08),
+    dict(start=1064.84, end=1068.82, text="220万人とか何とか\n言われているんだけどさ",
+         sourceStart=1061.58, sourceEnd=1072.08),
+    dict(start=1068.82, end=1072.08, text="その数字って日本の人口の2%だよね",
+         sourceStart=1061.58, sourceEnd=1072.08),
+    dict(start=1076.58, end=1081.58, text="書道界って　それ2%の人しか相手に\nしてこなかったのよ",
+         sourceStart=1076.58, sourceEnd=1081.58),
+]
+ZONE20_HEARD = (_toks("書道人口ってこの十年で半減して", 1062.0) + _toks("二百二十万人とか何か言われている", 1068.6)
+                + _toks("はい", 1073.24, 0.48) + _toks("日本の人口の二％だよね", 1074.0, 0.212)
+                + _toks("書道界ってそれ二％の人しか相手にしてこなかったのよ", 1076.7, 0.15))
+
+
+def test_an_utterance_is_kept_until_its_words_were_heard(monkeypatch):
+    """素材の 17分52秒: 文字起こしの発話の区間は「言われている」で終わり、「日本の人口の2%だよね」の
+    4 秒を切って、字幕だけが声無しで出ていた。"""
+    monkeypatch.setattr(cut_plan, "read_audio", lambda path: None)
+    monkeypatch.setattr(cut_plan, "read_heard", lambda path: None)
+    assert cut_plan.plan(ZONE20, "raw.mp4", keep_all=True, rules=RULES)[0][0] == (1061.58, 1072.08)
+    monkeypatch.setattr(cut_plan, "read_heard", lambda path: ZONE20_HEARD)
+    ranges, info = cut_plan.plan(ZONE20, "raw.mp4", keep_all=True, rules=RULES)
+    last = [t for c, t in ZONE20_HEARD if c == "ね"][0]
+    assert ranges[0] == (1061.58, pytest.approx(last + cut_plan.HEARD_CHAR_SEC))
+    assert info["heard_widened"] == 1  # 次の発話は区間の中で聞こえているので広げない
+
+
+def test_words_heard_far_from_the_utterance_are_not_its_words(monkeypatch):
+    """同じ言葉が別の所で聞こえても（突き合わせが取り違えても）、発話の区間から 5 秒より先は使わない。"""
+    segs = [dict(start=10.0, end=11.0, text="こんにちは", sourceStart=10.0, sourceEnd=11.0)]
+    monkeypatch.setattr(cut_plan, "read_audio", lambda path: None)
+    monkeypatch.setattr(cut_plan, "read_heard", lambda path: _toks("こんにちは", 20.0))
+    ranges, info = cut_plan.plan(segs, "raw.mp4", keep_all=True, rules=RULES)
+    assert ranges == [(10.0, 11.0)] and "heard_widened" not in info
+
+
+def _talk_then_question():
+    """素材の 37分38秒〜（38回目）: 段取りの声のあと、次の質問の頭が段取りの声の区間の中で聞こえる。"""
+    talk = dict(start=50.0, end=53.0, text="ちょっと切ります", sourceStart=50.0, sourceEnd=53.0)
+    kept = [dict(start=40.0, end=48.0, text="あやかりたいと思います", sourceStart=40.0, sourceEnd=48.0),
+            dict(start=53.5, end=56.0, text="先生がこれからやってみたいことは", sourceStart=53.5, sourceEnd=56.0)]
+    heard = (_toks("あやかりたいと思います", 46.0) + _toks("ちょっと切ります", 50.2, 0.12)
+             + _toks("先生がこれからやってみたいことは", 52.0))
+    return talk, kept, heard
+
+
+def test_dropped_talk_blocks_only_where_its_words_were_heard(monkeypatch):
+    talk, kept, heard = _talk_then_question()
+    monkeypatch.setattr(cut_plan, "read_audio", lambda path: None)
+    monkeypatch.setattr(cut_plan, "read_heard", lambda path: heard)
+    ranges, _ = cut_plan.plan(kept, "raw.mp4", keep_all=False, rules=RULES, exclude=[talk])
+    assert ranges[1][0] == pytest.approx(52.0)
+    # 区間だけ渡されたら（言葉が分からない）、その区間の向こうまでは広げない
+    ranges, _ = cut_plan.plan(kept, "raw.mp4", keep_all=False, rules=RULES, exclude=[(50.0, 53.0)])
+    assert ranges[1][0] == pytest.approx(53.0)
+
+
+def test_the_recogniser_is_read_only_for_a_real_file(tmp_path):
+    assert cut_plan.read_heard(None) is None
+    assert cut_plan.read_heard(str(tmp_path / "missing.mp4")) is None
