@@ -11,7 +11,9 @@
 3. 行の分け方と時刻は 1回目のまま（字だけ直す）
 4. 1回目の字を2字以上消すのは、2回目にも無く、認識が前後の字を言う間もなく続けて聞いた所だけ（3字まで）。
    言いよどみと数字は触らない（認識が落としやすい所）
-5. 2回目は区切りの位置をずらして起こす（1回目の区切りの前後が2回目では区切りの中ほどになる）
+5. 2回目は区切りの位置をずらして起こす（1回目の区切りの前後が2回目では区切りの中ほどになる）。
+   2回目の区切りは1回目の区切りから離す（静かな所に引き寄せられて同じ所に戻らない）。
+   区切り方を変えても、頭と長さが変わらないチャンクは前の起こしから写す
 6. 認識が使えない・2回目が落ちたら 1回目のまま進む
 7. 2回でも決めきれない所（2回とも落とした・認識が片側でしか確かめられない）だけ、そこが真ん中に来る
    区間をもう1回起こし、3回目が認識に沿う字を書いたときだけ直す（2026-10-14・3分03秒
@@ -284,6 +286,115 @@ def test_transcribe_passes_the_shifted_first_cut_to_the_plan(tmp_path, monkeypat
     assert tx.cuts == [15.0, 45.0]
 
 
+def _loud_but_at(total, pauses, frame=0.02):
+    """pauses の秒の前後 0.2 秒だけ静かな、音の大きさの並び（フレームごと）。"""
+    e = [1.0] * int(round(total / frame))
+    for t in pauses:
+        for i in range(int(round((t - 0.2) / frame)), int(round((t + 0.2) / frame))):
+            e[i] = 0.001
+    return e
+
+
+def test_the_second_pass_keeps_its_cuts_away_from_the_first_pass_cuts():
+    """一番静かな所を選ぶだけだと、2回目の区切りが静かな間に引き寄せられて1回目と同じ所に戻る
+    （2026-10-14: 43 分の素材で 9 分以降は 103 か所中 83 か所が同じ所。10分16秒の「電通」を
+    2回とも同じ所で割り、2回とも「チーフ」と聞き違えた）。"""
+    from subtitle_engine import gemini_transcriber as gt
+    quiet = gt.QuietMap(_loud_but_at(120, [25, 50, 75, 100]))
+    first = [o for o, _ in gt.plan_chunks(120, 30, quiet)][1:]
+
+    drifted = [o for o, _ in gt.plan_chunks(120, 30, quiet, first=15)][1:]
+    second = gt.plan_chunks(120, 30, quiet, first=15, avoid=first)
+
+    assert [round(c) for c in first] == [25, 50, 75, 100]
+    assert {75, 100} <= {round(c) for c in drifted}, "離さないと 75 秒から先は同じ所で切る"
+    cuts = [o for o, _ in second][1:]
+    assert all(abs(c - f) >= gt.SECOND_PASS_GAP_SEC - 1e-6 for c in cuts for f in first)
+    # チャンクの長さの決まり（2/3〜1 倍）は守る。隙間も重なりもなく終わりまで続く
+    assert all(20 - 1e-6 <= d <= 30 + 1e-6 for _, d in second[1:-1])
+    assert all(abs(o + d - n) < 1e-6 for (o, d), (n, _) in zip(second, second[1:]))
+    assert abs(second[-1][0] + second[-1][1] - 120) < 1e-6
+
+
+def test_a_cut_that_cannot_keep_away_is_still_made_at_the_quietest_point():
+    """離せる所が無ければ離さない（チャンクの長さの決まりが先）。"""
+    from subtitle_engine import gemini_transcriber as gt
+    quiet = gt.QuietMap(_loud_but_at(60, [25]))
+
+    assert abs(quiet.quietest(20, 30, target=30, avoid=[25.0], gap=6.0) - 25) < 0.1
+
+
+def test_transcribe_keeps_the_cuts_away_from_the_cuts_it_is_given(tmp_path, monkeypatch):
+    from subtitle_engine import gemini_transcriber as gt
+
+    seen = []
+    monkeypatch.setattr(gt.QuietMap, "from_media",
+                        classmethod(lambda cls, media: gt.QuietMap(_loud_but_at(120, [25, 50, 75, 100]))))
+    monkeypatch.setattr(gt, "_probe_duration", lambda path: 120.0)
+    monkeypatch.setattr(gt, "split_audio", _fake_split(seen))
+    monkeypatch.setattr(gt, "_speech_or_none", lambda path: None)
+
+    def call(client, model, path, dur):
+        return json.dumps([{"start": 0.0, "end": min(2.0, dur), "text": f"起こし{path.stem}"}]), "m"
+
+    tx = gt.transcribe(tmp_path / "v.mp4", client=object(), model="m", call=call, first_chunk_sec=15,
+                       avoid_cuts=[25.0, 50.0, 75.0, 100.0])
+
+    assert len(tx.cuts) >= 3
+    assert all(abs(c - f) >= gt.SECOND_PASS_GAP_SEC - 1e-6 for c in tx.cuts for f in (25, 50, 75, 100))
+
+
+def test_chunks_whose_cut_did_not_change_are_taken_from_the_earlier_cutting(tmp_path, monkeypatch):
+    """区切り方を変えても、頭と長さが変わらないチャンクは呼び直さない（確かめ済みの所の字が変わらない）。"""
+    from subtitle_engine import gemini_transcriber as gt
+
+    seen = []
+    monkeypatch.setattr(gt.QuietMap, "from_media", classmethod(lambda cls, media: None))
+    monkeypatch.setattr(gt, "_probe_duration", lambda path: 70.0)
+    monkeypatch.setattr(gt, "split_audio", _fake_split(seen))
+    monkeypatch.setattr(gt, "_speech_or_none", lambda path: None)
+    earlier = tmp_path / "_gemini_earlier.jsonl"
+    # 前の区切りは 15・40 秒、今の区切りは 15・45 秒。同じなのは頭の (0, 15) だけ
+    gt.write_checkpoint([_row(1.0, 3.0, "前の起こし一本目"), _row(16.0, 18.0, "前の起こし二本目"),
+                         _row(41.0, 43.0, "前の起こし三本目")],
+                        earlier, meta={"cuts": [15.0, 40.0], "models_used": ["old-model"]})
+    called = []
+
+    def call(client, model, path, dur):
+        called.append(path.stem)
+        return json.dumps([{"start": 0.0, "end": min(2.0, dur), "text": f"起こし{path.stem}"}]), "m"
+
+    tx = gt.transcribe(tmp_path / "v.mp4", client=object(), model="m", call=call, first_chunk_sec=15,
+                       earlier=[earlier])
+
+    assert called == ["c1", "c2"]
+    assert [s["text"] for s in tx.segments] == ["前の起こし一本目", "起こしc1", "起こしc2"]
+    assert tx.carried == 1
+    assert tx.models_used == ["m", "old-model"]
+
+
+def test_an_earlier_transcription_without_its_cuts_is_not_taken(tmp_path, monkeypatch):
+    """区切りを記録していないキャッシュは、どこがどのチャンクか分からないので写さない。"""
+    from subtitle_engine import gemini_transcriber as gt
+
+    monkeypatch.setattr(gt.QuietMap, "from_media", classmethod(lambda cls, media: None))
+    monkeypatch.setattr(gt, "_probe_duration", lambda path: 40.0)
+    monkeypatch.setattr(gt, "split_audio", _fake_split([]))
+    monkeypatch.setattr(gt, "_speech_or_none", lambda path: None)
+    earlier = tmp_path / "_gemini_earlier.jsonl"
+    gt.write_checkpoint([_row(1.0, 3.0, "前の起こし")], earlier)
+    called = []
+
+    def call(client, model, path, dur):
+        called.append(path.stem)
+        return json.dumps([{"start": 0.0, "end": min(2.0, dur), "text": f"起こし{path.stem}"}]), "m"
+
+    tx = gt.transcribe(tmp_path / "v.mp4", client=object(), model="m", call=call, first_chunk_sec=15,
+                       earlier=[earlier])
+
+    assert called == ["c0", "c1"] and tx.carried == 0
+
+
 # ------------------------------------------------------------
 # 6. 文字起こしの工程（2回目はキャッシュし、落ちたら 1回目のまま）
 # ------------------------------------------------------------
@@ -347,6 +458,56 @@ def test_the_second_pass_is_read_from_its_cache(tmp_path, monkeypatch):
 
     assert calls == [None, 15]  # 2回目の実行では起こさない
     assert ctx.segments[0]["text"].startswith("こんにちは、書家の北原美麗です。")
+
+
+def test_the_second_pass_is_told_where_the_first_pass_cut(tmp_path, monkeypatch):
+    """1回目の区切りを2回目に渡す（そこから離して切る）。1回目をキャッシュから読むときは付帯情報の区切り。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import gemini_transcriber as gt
+
+    _setup_two_passes(tmp_path, monkeypatch)
+    fake = gt.transcribe
+    avoid = []
+
+    def noting(path, **kw):
+        avoid.append(list(kw.get("avoid_cuts") or []))
+        return fake(path, **kw)
+    monkeypatch.setattr(gt, "transcribe", noting)
+
+    result = asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+    for p in tmp_path.glob(f"_gemini_*{gt.CUT_TAG}{gt.SECOND_PASS_TAG}_*"):
+        p.unlink()
+    asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+
+    assert avoid == [[], [30.0], [30.0]]
+    assert result.data["second_pass"]["models"] == ["m"], "2回目のモデルも実行記録に残す"
+
+
+def test_a_second_pass_cut_the_earlier_way_is_made_again_from_its_unchanged_chunks(tmp_path, monkeypatch):
+    """2回目の区切り方を変えたら起こし直す。前の区切り方の2回目は、区切りが同じチャンクを写す元にする。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import gemini_transcriber as gt
+
+    calls = _setup_two_passes(tmp_path, monkeypatch)
+    asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+    now = gt.CUT_TAG + gt.SECOND_PASS_TAG + "_"
+    before = gt.CUT_TAG + gt.SECOND_PASS_EARLIER_TAGS[-1] + "_"
+    for p in tmp_path.glob(f"_gemini_*{now}*"):
+        p.rename(p.with_name(p.name.replace(now, before)))
+    fake = gt.transcribe
+    earlier = []
+
+    def noting(path, **kw):
+        earlier.append([Path(e).name for e in kw.get("earlier") or []])
+        return fake(path, **kw)
+    monkeypatch.setattr(gt, "transcribe", noting)
+
+    asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+
+    assert calls == [None, 15, 15], "前の区切り方の2回目をそのままは使わない"
+    assert len(earlier) == 1 and earlier[0] and all(before in name for name in earlier[0])
 
 
 def test_a_failed_second_pass_keeps_the_first_and_says_so(tmp_path, monkeypatch):

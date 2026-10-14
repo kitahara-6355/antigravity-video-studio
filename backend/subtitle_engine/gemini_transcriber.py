@@ -41,6 +41,10 @@
 来るように区切ってもう1回起こす（`look_windows`・`transcribe_windows`）。それでも決まらない所は
 区間の前後の余白を広げて読み直す（`LOOK_PADS`）。
 
+2026-10-14: 2回目の区切りを1回目の区切りから離す（`SECOND_PASS_GAP_SEC`）。ずらして始めても
+9 分以降は区切りの8割が1回目と同じ所に戻り、そこで割れた語は2回とも同じに聞き違えていた。
+区切り方を変えても、頭と長さが変わらないチャンクは前の起こしから写す（`transcribe` の earlier）。
+
 **1チャンクでも落ちたら全体を失敗にする。** 後段の SmartCut は字幕のある範囲だけを
 残すので、黙って抜けたチャンクはそのまま動画から消える。
 """
@@ -57,7 +61,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +85,14 @@ CUT_TAG = "q"
 # 1回目の区切りの前後の語が、2回目ではチャンクの真ん中に来る
 SECOND_PASS = True
 SECOND_PASS_FIRST_SEC = CHUNK_SEC / 2
-SECOND_PASS_TAG = "b"
+# 2回目の区切りは1回目の区切りからこれだけ離す。ずらして始めても、一番静かな所を選ぶうちに同じ間に
+# 引き寄せられて1回目と同じ所に戻る（2026-10-14: 43 分の素材で 9 分以降は 103 か所中 83 か所が同じ所。
+# 10分16秒の「電通」を2回とも同じ所で割り、2回とも「チーフ」と聞き違えた）。0〜8 秒を比べ、5 秒で
+# 同じ所 0・1回目の区切りから中央値 9 秒。8 秒では音の大きい所で切り始める（区切りの音の p90 が 5 秒の 1.7 倍）
+SECOND_PASS_GAP_SEC = 5.0
+SECOND_PASS_TAG = "b2"
+# 前の区切り方の2回目のキャッシュの印。頭と長さが変わらないチャンクはそこから写して呼び直さない
+SECOND_PASS_EARLIER_TAGS = ("b",)
 # 3回目の起こし（2回でも決めきれない所だけ）。区間は候補の行の前後に余白を足して一番静かな所で
 # 区切り、重なる区間は LOOK_MAX_SEC 秒までなら1つにまとめる（余白を広げた分だけ延ばす）。
 # 3回目で決まらなかった所は、次の余白の区間で読み直す（区間の長さで聞き取りが変わる）
@@ -117,6 +128,8 @@ class TranscribeResult:
     quiet: list[tuple[float, float]] = field(default_factory=list)
     # チャンクの区切り（素材の秒・先頭の 0 は含まない）。境目の繰り返しを探す所
     cuts: list[float] = field(default_factory=list)
+    # 前の区切り方の起こし（earlier）から写したチャンクの数
+    carried: int = 0
 
 
 def _extract_json_array(text: str) -> list:
@@ -223,8 +236,13 @@ class QuietMap:
             return None
         return cls((x[:n * hop].reshape(n, hop) ** 2).mean(axis=1))
 
-    def quietest(self, lo: float, hi: float, target: float) -> float:
-        """lo〜hi 秒で一番静かな所。同じくらい静かな所が並ぶなら target に近い方。"""
+    def quietest(self, lo: float, hi: float, target: float,
+                 avoid: Sequence[float] = (), gap: float = SECOND_PASS_GAP_SEC) -> float:
+        """lo〜hi 秒で一番静かな所。同じくらい静かな所が並ぶなら target に近い方。
+
+        avoid（素材の秒）から gap 秒以内は選ばない。lo〜hi のどこも近ければ avoid を見ない
+        （チャンクの長さの決まりが先）。
+        """
         import numpy as np
 
         f = self.frame_sec
@@ -233,6 +251,11 @@ class QuietMap:
         if i1 <= i0:  # 地図の外（音声が映像より短いなど）
             return target
         window = self._smooth[i0:i1]
+        if len(avoid):
+            t = np.arange(i0, i1) * f
+            far = np.abs(t[:, None] - np.asarray(avoid, dtype=np.float64)[None, :]).min(axis=1) >= gap
+            if far.any():
+                window = np.where(far, window, np.inf)
         floor = float(window.min())
         near = np.flatnonzero(window <= floor * (1 + QUIET_TIE) + 1e-12) + i0
         best = int(near[np.argmin(np.abs(near * f - target))])
@@ -240,12 +263,15 @@ class QuietMap:
 
 
 def plan_chunks(total: float, chunk_sec: float = CHUNK_SEC,
-                quiet: QuietMap | None = None, first: float | None = None) -> list[tuple[float, float]]:
+                quiet: QuietMap | None = None, first: float | None = None,
+                avoid: Sequence[float] = ()) -> list[tuple[float, float]]:
     """チャンクの (開始, 長さ) の並び。
 
     区切りは前の区切りから chunk_sec の 2/3〜1 倍の間で一番静かな所（同じくらい静かなら
     長い方）。音の地図が無ければ chunk_sec 秒ごと（従来どおり）。
     first は最初のチャンクの長さ（2回目の起こしで区切りをずらす: `SECOND_PASS_FIRST_SEC`）。
+    avoid は離しておく区切り（2回目の起こしでは1回目の区切り。`SECOND_PASS_GAP_SEC` 秒離す）。
+    音の地図が無いときは first で半分ずれるので見ない。
     """
     out: list[tuple[float, float]] = []
     offset = 0.0
@@ -255,7 +281,7 @@ def plan_chunks(total: float, chunk_sec: float = CHUNK_SEC,
         if end >= total - 0.05:
             out.append((offset, total - offset))
             break
-        cut = (quiet.quietest(offset + length * MIN_CHUNK_RATIO, end, target=end)
+        cut = (quiet.quietest(offset + length * MIN_CHUNK_RATIO, end, target=end, avoid=avoid)
                if quiet is not None else end)
         out.append((offset, cut - offset))
         offset = cut
@@ -412,13 +438,18 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                call: Callable[..., tuple[str, str]] | None = None,
                attempts: int = 4, backoff: float = 3.0,
                first_chunk_sec: float | None = None,
-               journal: str | Path | None = None) -> TranscribeResult:
+               avoid_cuts: Sequence[float] = (),
+               journal: str | Path | None = None,
+               earlier: Sequence[str | Path] = ()) -> TranscribeResult:
     """動画の音声を Gemini で起こす。1チャンクでも起こせなければ `TranscriptionError`。
 
     first_chunk_sec は最初のチャンクの長さ（2回目の起こしで区切りをずらす）。
+    avoid_cuts は離しておく区切り（2回目の起こしに1回目の区切りを渡す。`plan_chunks` の avoid）。
     journal はチャンクごとの控え（`journal_path`）。起こせたチャンクから書き足し、次の実行では
     控えにあるチャンク（頭と長さが同じもの）を呼び直さない。無料枠の1日の上限で途中で落ちても、
     枠が戻った後は続きから起こせる（2026-10-07: 104 本中 71 本目で落ち、70 本分が消えた）。
+    earlier は前の区切り方の起こし（キャッシュ）。頭と長さが同じチャンクは呼び直さずにそこから写す
+    （`chunks_of`。区切り方を変えても、区切りが変わらない所の字は変わらない）。
     """
     model = model or _resolve_model()
     client = client if client is not None else _default_client()
@@ -426,12 +457,22 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
 
     with tempfile.TemporaryDirectory(prefix="gemini_tx_") as tmp:
         quiet_map = QuietMap.from_media(video_path)
-        plan = plan_chunks(_probe_duration(video_path), chunk_sec, quiet_map, first=first_chunk_sec)
+        total = _probe_duration(video_path)
+        plan = plan_chunks(total, chunk_sec, quiet_map, first=first_chunk_sec, avoid=avoid_cuts)
         chunks = split_audio(video_path, tmp, plan=plan)
         logger.info(f"🎤 Gemini 文字起こし: {len(chunks)} チャンク（長くても{chunk_sec}秒・"
                     f"{'話の切れ目' if quiet_map is not None else '機械的'}に区切る）model={model}")
 
         done = read_journal(journal)
+        wanted = {_journal_key(offset, dur) for _, offset, dur in chunks}
+        carried = 0
+        for path in earlier:
+            for key, entry in chunks_of(path, total).items():
+                if key in wanted and key not in done:
+                    done[key] = entry
+                    carried += 1
+        if carried:
+            logger.info(f"  ♻️ 前の区切り方の起こしから、区切りが変わらない {carried} チャンクを写します")
         lock = threading.Lock()
 
         def one(args: tuple[int, tuple[Path, float, float]]) -> tuple[list[dict], str]:
@@ -493,7 +534,7 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                                     chunk_sec, cuts=cuts)
     if not segments:
         raise TranscriptionError("発話が1件も起こせませんでした")
-    used = sorted({u for _, u in results})
+    used = sorted({u for _, u in results if u})
     report = None
     if speech is not None:
         from subtitle_engine import coverage
@@ -503,7 +544,7 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                            f"薄い区間 {len(report['sparse'])}件")
     return TranscribeResult(segments=segments, model=model, chunks=len(chunks), models_used=used,
                             rechecked=rechecked, coverage=report,
-                            quiet=quiet if speech is not None else [], cuts=cuts)
+                            quiet=quiet if speech is not None else [], cuts=cuts, carried=carried)
 
 
 def look_windows(spans: list[tuple[float, float]], quiet: QuietMap | None = None,
@@ -643,6 +684,30 @@ def read_journal(journal: str | Path | None) -> dict[tuple[float, float], tuple[
         except (ValueError, KeyError, TypeError):
             continue
     return done
+
+
+def chunks_of(checkpoint: str | Path, total: float) -> dict[tuple[float, float], tuple[list[dict], str]]:
+    """起こしのキャッシュをチャンクごとに分ける: (チャンクの頭, 長さ) → (行, モデル)（控えと同じ形）。
+
+    区切りは付帯情報の cuts、行は頭の時刻でチャンクに振り分ける。区切りを記録していない・読めない
+    キャッシュは空（どこがどのチャンクか分からない）。モデルは付帯情報の models_used が1つなら
+    それ、分からなければ空文字（`TranscribeResult.models_used` には載せない）。
+    """
+    meta = read_meta(checkpoint)
+    cuts = meta.get("cuts")
+    if not cuts:
+        return {}
+    try:
+        rows = [json.loads(line) for line in
+                Path(checkpoint).read_text(encoding="utf-8").splitlines() if line.strip()]
+        starts = [float(r.get("start") or 0) for r in rows]
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {}
+    models = [m for m in meta.get("models_used") or [] if m]
+    model = models[0] if len(models) == 1 else ""
+    edges = [0.0] + sorted(float(c) for c in cuts) + [float(total)]
+    return {_journal_key(a, b - a): ([r for r, s in zip(rows, starts) if a <= s < b], model)
+            for a, b in zip(edges, edges[1:]) if b > a}
 
 
 def _append_journal(journal: str | Path | None, lock: threading.Lock, offset: float, dur: float,

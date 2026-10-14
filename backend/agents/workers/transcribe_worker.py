@@ -38,17 +38,18 @@ def transcribe_engine() -> str:
     return engine
 
 
-def _gemini_checkpoint(whisper_checkpoint: str, second: bool = False, third: bool = False) -> str:
+def _gemini_checkpoint(whisper_checkpoint: str, second: bool = False, third: bool = False,
+                       second_tag: str | None = None) -> str:
     """Gemini の起こしのキャッシュ。**刻み方が変わったら別のキャッシュにする**
     （120 秒チャンクで欠落した起こしを、30 秒に変えた後も使い回さないため。
     30 秒ごとの機械的な区切りの起こしを、話の切れ目で区切るようにした後も使い回さないため）。
-    second なら2回目の起こし（区切りをずらしたもの）、third なら3回目の起こし（決めきれない所
-    だけ。区間ごとの控えがそのままキャッシュ）のキャッシュ。"""
+    second なら2回目の起こし（区切りをずらしたもの。second_tag を渡すと前の区切り方のもの）、
+    third なら3回目の起こし（決めきれない所だけ。区間ごとの控えがそのままキャッシュ）のキャッシュ。"""
     from subtitle_engine.gemini_transcriber import (
         CHUNK_SEC, CUT_TAG, SECOND_PASS_TAG, THIRD_LOOK_TAG)
     p = Path(whisper_checkpoint)
     name = p.name.replace("_whisper_", "_gemini_", 1)
-    tag = CUT_TAG + (SECOND_PASS_TAG if second else THIRD_LOOK_TAG if third else "")
+    tag = CUT_TAG + ((second_tag or SECOND_PASS_TAG) if second else THIRD_LOOK_TAG if third else "")
     if CHUNK_SEC != 120 or second or third:  # 120 秒時代のキャッシュ名はそのまま読めるようにしておく
         name = name.replace("_gemini_", f"_gemini_c{CHUNK_SEC}{tag}_", 1)
     return str(p.with_name(name))
@@ -274,7 +275,8 @@ class TranscribeWorker(PipelineStageWorker):
             from subtitle_engine import gemini_transcriber
             segments = self._read_gemini_checkpoint(checkpoint)
             meta = gemini_transcriber.read_meta(checkpoint)
-            segments, fusion = await self._second_pass(ctx, whisper_checkpoint, segments)
+            segments, fusion = await self._second_pass(ctx, whisper_checkpoint, segments,
+                                                       meta.get("cuts") or ())
             ctx.segments = segments
             ctx.verified_quiet = [tuple(q) for q in meta.get("quiet", [])]
             ctx.transcript_coverage = meta.get("coverage")
@@ -300,7 +302,7 @@ class TranscribeWorker(PipelineStageWorker):
             logger.warning(f"⚠️ Gemini 文字起こしに失敗 → Whisper に切り替えます: {e}")
             ctx.warnings.append(f"文字起こし: Gemini が失敗したため Whisper に切り替えました（{e}）")
             return None
-        segments, fusion = await self._second_pass(ctx, whisper_checkpoint, tx.segments)
+        segments, fusion = await self._second_pass(ctx, whisper_checkpoint, tx.segments, tx.cuts)
         ctx.segments = segments
         ctx.verified_quiet = list(tx.quiet)
         ctx.transcript_coverage = tx.coverage
@@ -320,11 +322,14 @@ class TranscribeWorker(PipelineStageWorker):
             self._load_segments_from_checkpoint(checkpoint)), cuts=meta.get("cuts"))
 
     async def _second_pass(self, ctx: PipelineContext, whisper_checkpoint: str,
-                           segments: list[dict]) -> tuple[list[dict], dict | None]:
+                           segments: list[dict],
+                           cuts: list[float] | tuple = ()) -> tuple[list[dict], dict | None]:
         """区切りをずらしてもう1回起こし、食い違いを手元の音声認識で決める（`transcript_fusion`）。
 
-        区切りを変えると Gemini の聞き違いが別の所に出る（2026-10-06 実測）。認識が使えない・
-        2回目が落ちたら1回目のまま進む（2回目は直すためだけに使う）。返り値は (行, 集計)。
+        区切りを変えると Gemini の聞き違いが別の所に出る（2026-10-06 実測）。cuts は1回目の区切りで、
+        2回目はそこから離して切る（`gemini_transcriber.SECOND_PASS_GAP_SEC`）。前の区切り方の2回目の
+        キャッシュは、区切りが変わらないチャンクを写す元にする。認識が使えない・2回目が落ちたら
+        1回目のまま進む（2回目は直すためだけに使う）。返り値は (行, 集計)。
         """
         from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
         if not gemini_transcriber.SECOND_PASS:
@@ -337,13 +342,19 @@ class TranscribeWorker(PipelineStageWorker):
         checkpoint = _gemini_checkpoint(whisper_checkpoint, second=True)
         if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
             second = self._read_gemini_checkpoint(checkpoint)
+            made = gemini_transcriber.read_meta(checkpoint)
         else:
             try:
                 journal = gemini_transcriber.journal_path(checkpoint)
+                earlier = [c for c in (_gemini_checkpoint(whisper_checkpoint, second=True, second_tag=t)
+                                       for t in gemini_transcriber.SECOND_PASS_EARLIER_TAGS)
+                           if Path(c).exists()]
                 tx = await loop.run_in_executor(None, functools.partial(
                     gemini_transcriber.transcribe, ctx.video_path,
-                    first_chunk_sec=gemini_transcriber.SECOND_PASS_FIRST_SEC, journal=journal))
-                gemini_transcriber.write_checkpoint(tx.segments, checkpoint, meta={"cuts": tx.cuts})
+                    first_chunk_sec=gemini_transcriber.SECOND_PASS_FIRST_SEC, avoid_cuts=list(cuts),
+                    journal=journal, earlier=earlier))
+                made = {"cuts": tx.cuts, "models_used": tx.models_used, "carried": tx.carried}
+                gemini_transcriber.write_checkpoint(tx.segments, checkpoint, meta=made)
                 journal.unlink(missing_ok=True)
                 second = tx.segments
             except Exception as e:  # noqa: BLE001 — 2回目は直すためだけ。落ちても1回目で進む
@@ -351,6 +362,8 @@ class TranscribeWorker(PipelineStageWorker):
                 ctx.warnings.append(f"文字起こし: 2回目（聞き違いの突き合わせ）に失敗したため1回目のまま進みました（{e}）")
                 return segments, None
         fused, stats = transcript_fusion.fuse(segments, second, tokens)
+        # 2回目のモデルも実行記録に残す（前の区切り方から写したチャンクはモデルを記録していないことがある）
+        stats = dict(stats, models=list(made.get("models_used") or []), carried=int(made.get("carried") or 0))
         logger.info(f"🗳️ 文字起こしの2回目と突き合わせ: 食い違い {stats['differences']} か所のうち "
                     f"{stats['adopted']} か所を、2回目と手元の音声認識が同じ字に直しました")
         fused, look = await self._third_look(ctx, whisper_checkpoint, fused, second, tokens)
