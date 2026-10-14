@@ -4334,6 +4334,24 @@
    ]
   },
   {
+   "id": "backend/subtitle_engine/aligner.py::_rewrap",
+   "file": "backend/subtitle_engine/aligner.py",
+   "symbol": "_rewrap",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "言いよどみを外した後の2行の字幕を、整形と同じ折り方で組み直すだけの関数。中の score は折り目の候補2つの良し悪し（text_formatter._break_score）を比べる局所の比較で、返すのは字幕の文。4カテゴリの数字・判定を作らず、どこにも残さない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/aligner.py::_rewrap.<locals>.score",
+   "file": "backend/subtitle_engine/aligner.py",
+   "symbol": "_rewrap.<locals>.score",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "_rewrap の中で、折った2行の1行目と2行目の継ぎ目に text_formatter._break_score の点を付けるだけの局所関数。点は2つの折り方を比べる場でしか使わず、品質スコア・投稿・統計・retention のどれにも出ない",
+   "fingerprint": []
+  },
+  {
    "id": "backend/subtitle_engine/whisper_subprocess.py::main",
    "file": "backend/subtitle_engine/whisper_subprocess.py",
    "symbol": "main",
