@@ -15,7 +15,8 @@
 6. 認識が使えない・2回目が落ちたら 1回目のまま進む
 7. 2回でも決めきれない所（2回とも落とした・認識が片側でしか確かめられない）だけ、そこが真ん中に来る
    区間をもう1回起こし、3回目が認識に沿う字を書いたときだけ直す（2026-10-14・3分03秒
-   「普通だったら」→「普通泣いて帰ったら」）。区間ごとの控えがキャッシュ。落ちたら2回の突き合わせのまま
+   「普通だったら」→「普通泣いて帰ったら」）。3回目が決めない所は区間を広げて読み直す（3回まで）。
+   区間ごとの控えがキャッシュ。落ちたらそれまでに決まった所だけ直して進む
 """
 from __future__ import annotations
 
@@ -430,12 +431,16 @@ def test_a_character_the_recogniser_heard_is_not_looked_at_again():
     assert spots == []
 
 
+def _settle(fused, third, spots):
+    return tfu.settle(fused, spots, [tfu.judge(fused, third, s) for s in spots])
+
+
 def test_the_third_reading_fills_in_what_both_passes_dropped():
     fused = [_row(180.8, 186.8, OMIT_ROW)]
     spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
     third = [_row(175.0, 190.0, "そう、何かやっぱり好きだったから、普通泣いて帰ったら、もう行かないって平気でした。")]
 
-    out, stats = tfu.settle(fused, third, spots)
+    out, stats = _settle(fused, third, spots)
 
     assert out[0]["text"] == "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないって平気でした。"
     assert stats["adopted"] == 1
@@ -447,25 +452,40 @@ def test_the_third_reading_drops_a_character_only_when_it_also_leaves_it_out():
     fused = [_row(176.0, 182.0, DROP_FIRST)]
     spots = tfu.look_spots(fused, [_row(176.0, 182.0, DROP_SECOND)], _heard(DROP_HEARD, 176.0))
 
-    dropped, _ = tfu.settle(fused, [_row(170.0, 190.0, "という感じで、そう、何かやっぱり好きだったから")], spots)
-    kept, stats = tfu.settle(fused, [_row(170.0, 190.0, "という感じで、そう何にかやっぱり好きだったから")], spots)
+    dropped, _ = _settle(fused, [_row(170.0, 190.0, "という感じで、そう、何かやっぱり好きだったから")], spots)
+    kept, stats = _settle(fused, [_row(170.0, 190.0, "という感じで、そう何にかやっぱり好きだったから")], spots)
 
     assert dropped[0]["text"] == "という感じで。そう何かやっぱり好きだったから"
-    assert kept[0]["text"] == DROP_FIRST and stats["adopted"] == 0
+    assert kept[0]["text"] == DROP_FIRST and (stats["adopted"], stats["kept"]) == (0, 1)
 
 
-@pytest.mark.parametrize("third_text", [
-    "そう何かやっぱり好きだったから普通だったらもう行かないって平気でした。",   # 3回目も同じ
-    "そう何かやっぱり好きだったから普通泣いてがったらもう行かないって平気でした。",  # 認識とも違う
-    "全然違う話をしています。",                                                  # 前後の字が無い
-])
-def test_the_row_stays_unless_the_third_reading_agrees_with_the_recogniser(third_text):
+def test_only_what_the_recogniser_also_heard_is_put_in():
+    """3回目だけが足した字は置かない（3分03秒・余白 28 秒の読み「普通に泣いて帰ったら」の「に」）。"""
     fused = [_row(180.8, 186.8, OMIT_ROW)]
     spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
+    third = [_row(175.0, 190.0, "そう何かやっぱり好きだったから普通に泣いて帰ったらもう行かないって平気でした。")]
 
-    out, stats = tfu.settle(fused, [_row(175.0, 190.0, third_text)], spots)
+    out, _ = _settle(fused, third, spots)
+
+    assert out[0]["text"] == "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないって平気でした。"
+
+
+@pytest.mark.parametrize("third_text, verdict", [
+    # 3回目も同じ（2回の起こしにそろう: そのまま）
+    ("そう何かやっぱり好きだったから普通だったらもう行かないって平気でした。", "keep"),
+    # 認識とも違う・前後の字が無い（決まらない: 区間を変えて読み直す）
+    ("そう何かやっぱり好きだったから普通泣いてがったらもう行かないって平気でした。", "open"),
+    ("全然違う話をしています。", "open"),
+])
+def test_the_row_stays_unless_the_third_reading_agrees_with_the_recogniser(third_text, verdict):
+    fused = [_row(180.8, 186.8, OMIT_ROW)]
+    spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
+    third = [_row(175.0, 190.0, third_text)]
+
+    out, stats = _settle(fused, third, spots)
 
     assert out[0]["text"] == OMIT_ROW and stats["adopted"] == 0
+    assert tfu.judge(fused, third, spots[0]) == (verdict, "")
 
 
 def test_the_third_reading_far_from_the_row_is_not_used():
@@ -473,7 +493,7 @@ def test_the_third_reading_far_from_the_row_is_not_used():
     spots = tfu.look_spots(fused, fused, _heard(OMIT_HEARD, 180.8, 0.15))
     far = [_row(600.0, 610.0, "そう、何かやっぱり好きだったから、普通泣いて帰ったら、もう行かないって平気でした。")]
 
-    out, _ = tfu.settle(fused, far, spots)
+    out, _ = _settle(fused, far, spots)
 
     assert out[0]["text"] == OMIT_ROW
 
@@ -484,7 +504,7 @@ def test_a_spot_at_the_head_of_a_row_takes_no_punctuation_from_the_sentence_befo
     spots = tfu.look_spots(fused, fused, _heard("そうですかねやっぱり一番盛んになったのが", 284.0, 0.3))
     assert [(s["row"], s["cur"], s["want"]) for s in spots] == [(1, "で", "やっぱり")]
 
-    out, _ = tfu.settle(fused, [_row(280.0, 300.0, "そうですかね。で、やっぱり一番盛んになったのが")], spots)
+    out, _ = _settle(fused, [_row(280.0, 300.0, "そうですかね。で、やっぱり一番盛んになったのが")], spots)
 
     assert [s["text"] for s in out] == ["そうですかね。", "で、やっぱり一番盛んになったのが"]
 
@@ -503,6 +523,9 @@ def test_windows_put_each_spot_in_the_middle_and_merge_close_ones():
             return min(hi, target + 1.0)
 
     assert gt.look_windows([(100.0, 106.0)], Quiet()) == [(93.0, 22.0)]
+    # 読み直しは余白を広げる。まとめてよい長さも広げた分だけ延びる（45→65 秒）
+    assert gt.look_windows([(100.0, 106.0)], pad=18.0) == [(82.0, 42.0)]
+    assert gt.look_windows([(100.0, 106.0), (120.0, 126.0)], pad=18.0) == [(82.0, 62.0)]
 
 
 def _fake_split(seen):
@@ -548,8 +571,14 @@ def test_a_window_that_cannot_be_transcribed_fails_the_third_reading(tmp_path, m
                               call=call, attempts=2, backoff=0, journal=tmp_path / "j")
 
 
-def _setup_third_look(tmp_path, monkeypatch, fails=False):
-    """1回目・2回目とも「普通だったら」、認識は「普通泣いて帰ったら」。"""
+FIXED = "そう、何かやっぱり好きだったから、普通泣いて帰ったら、もう行かないって平気でした。"
+MISHEARD = "そう、何かやっぱり好きだったから、普通ナイデがったら、もう行かないって平気でした。"
+
+
+def _setup_third_look(tmp_path, monkeypatch, readings=(FIXED,)):
+    """1回目・2回目とも「普通だったら」、認識は「普通泣いて帰ったら」。
+
+    readings は3回目以降の起こしの文（呼ばれた順・足りなければ最後のもの。None なら落ちる）。"""
     from subtitle_engine import aligner, gemini_transcriber as gt
 
     monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
@@ -565,9 +594,10 @@ def _setup_third_look(tmp_path, monkeypatch, fails=False):
 
     def fake_windows(path, windows, **kw):
         looked.append((list(windows), Path(kw["journal"]).name))
-        if fails:
+        text = readings[min(len(looked), len(readings)) - 1]
+        if text is None:
             raise gt.TranscriptionError("3回目の起こし（0秒〜）ができません")
-        return [_row(0.0, 14.0, "そう、何かやっぱり好きだったから、普通泣いて帰ったら、もう行かないって平気でした。")], ["m3"]
+        return [_row(0.0, 14.0, text)], ["m3"]
     monkeypatch.setattr(gt, "transcribe_windows", fake_windows)
     return looked
 
@@ -594,11 +624,52 @@ def test_a_failed_third_reading_keeps_the_two_pass_result_and_says_so(tmp_path, 
     from agents.pipeline_types import PipelineContext
     from agents.workers.transcribe_worker import TranscribeWorker
 
-    _setup_third_look(tmp_path, monkeypatch, fails=True)
+    _setup_third_look(tmp_path, monkeypatch, readings=(None,))
     ctx = PipelineContext(video_path=str(_video(tmp_path)))
 
     result = asyncio.run(TranscribeWorker().execute(ctx))
 
     assert result.success
     assert ctx.segments[0]["text"] == OMIT_ROW
+    assert any("3回目" in w for w in ctx.warnings)
+
+
+@pytest.mark.parametrize("readings, windows, text", [
+    # 決まらない（認識とも違う）→ 余白 18 秒の区間で読み直して直る
+    ((MISHEARD, FIXED), [(0.0, 14.0), (0.0, 24.0)], "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないって平気でした。"),
+    # 2回の起こしと同じ字 → そのまま（読み直さない）
+    ((OMIT_ROW,), [(0.0, 14.0)], OMIT_ROW),
+    # 3回読んでも決まらない → そのまま
+    ((MISHEARD,), [(0.0, 14.0), (0.0, 24.0), (0.0, 34.0)], OMIT_ROW),
+])
+def test_a_spot_the_third_reading_does_not_decide_is_read_again_with_a_wider_window(
+        tmp_path, monkeypatch, readings, windows, text):
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+
+    looked = _setup_third_look(tmp_path, monkeypatch, readings=readings)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success and ctx.segments[0]["text"] == text
+    assert [w for (w,), _ in looked] == windows, "余白 8→18→28 秒。同じ控えに書き足す"
+    assert len({journal for _, journal in looked}) == 1
+    look = result.data["second_pass"]["third_look"]
+    assert look["windows"] == len(windows)
+
+
+def test_a_failed_reading_again_leaves_the_spot_and_says_so(tmp_path, monkeypatch):
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+
+    looked = _setup_third_look(tmp_path, monkeypatch, readings=(MISHEARD, None))
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success and ctx.segments[0]["text"] == OMIT_ROW
+    assert [w for (w,), _ in looked] == [(0.0, 14.0), (0.0, 24.0)]
+    look = result.data["second_pass"]["third_look"]
+    assert (look["windows"], look["open"]) == (1, 1) and "できません" in look["error"]
     assert any("3回目" in w for w in ctx.warnings)

@@ -38,7 +38,8 @@
 （`transcript_fusion`・文字起こしの工程が呼ぶ）。区切りを変えると聞き違いが別の所に出るため。
 
 2026-10-14: 2回でも決めきれない所（`transcript_fusion.look_spots`）だけ、その所が真ん中に
-来るように区切ってもう1回起こす（`look_windows`・`transcribe_windows`）。
+来るように区切ってもう1回起こす（`look_windows`・`transcribe_windows`）。それでも決まらない所は
+区間の前後の余白を広げて読み直す（`LOOK_PADS`）。
 
 **1チャンクでも落ちたら全体を失敗にする。** 後段の SmartCut は字幕のある範囲だけを
 残すので、黙って抜けたチャンクはそのまま動画から消える。
@@ -81,11 +82,12 @@ CUT_TAG = "q"
 SECOND_PASS = True
 SECOND_PASS_FIRST_SEC = CHUNK_SEC / 2
 SECOND_PASS_TAG = "b"
-# 3回目の起こし（2回でも決めきれない所だけ）。区間は候補の行の前後 LOOK_PAD_SEC 秒を
-# 一番静かな所で区切り、重なる区間は LOOK_MAX_SEC 秒までなら1つにまとめる
+# 3回目の起こし（2回でも決めきれない所だけ）。区間は候補の行の前後に余白を足して一番静かな所で
+# 区切り、重なる区間は LOOK_MAX_SEC 秒までなら1つにまとめる（余白を広げた分だけ延ばす）。
+# 3回目で決まらなかった所は、次の余白の区間で読み直す（区間の長さで聞き取りが変わる）
 THIRD_LOOK = True
 THIRD_LOOK_TAG = "c"
-LOOK_PAD_SEC = 8.0
+LOOK_PADS = (8.0, 18.0, 28.0)
 LOOK_MAX_SEC = 45.0
 
 PROMPT = """この音声は日本語の会話（{duration:.0f}秒）です。発話をすべて文字起こししてください。
@@ -505,21 +507,22 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
 
 
 def look_windows(spans: list[tuple[float, float]], quiet: QuietMap | None = None,
-                 total: float | None = None) -> list[tuple[float, float]]:
+                 total: float | None = None, pad: float = LOOK_PADS[0]) -> list[tuple[float, float]]:
     """3回目に起こす区間の (開始, 長さ)。spans は候補の行の (頭, 尻)（素材の秒）。
 
-    行の前後 LOOK_PAD_SEC 秒の所を、その前後2秒で一番静かな所にずらして区切る（行が区間の
-    真ん中に来る）。重なる区間は、まとめても LOOK_MAX_SEC 秒以内なら1つにする。
-    同じ候補からは同じ区間になる（控えの鍵になる）。
+    行の前後 pad 秒の所を、その前後2秒で一番静かな所にずらして区切る（行が区間の
+    真ん中に来る）。重なる区間は、まとめても LOOK_MAX_SEC 秒（余白を LOOK_PADS[0] 秒より
+    広げた分だけ延ばす）以内なら1つにする。同じ候補からは同じ区間になる（控えの鍵になる）。
     """
     out: list[list[float]] = []
     end_of = float(total) if total else float("inf")
+    max_sec = LOOK_MAX_SEC + 2 * (pad - LOOK_PADS[0])
     for s, e in sorted((float(a), float(b)) for a, b in spans):
-        lo, hi = max(0.0, s - LOOK_PAD_SEC), min(end_of, e + LOOK_PAD_SEC)
+        lo, hi = max(0.0, s - pad), min(end_of, e + pad)
         if quiet is not None:
             lo = quiet.quietest(max(0.0, lo - 2), lo + 2, lo)
             hi = quiet.quietest(hi - 2, min(end_of, hi + 2), hi)
-        if out and lo <= out[-1][1] and max(hi, out[-1][1]) - out[-1][0] <= LOOK_MAX_SEC:
+        if out and lo <= out[-1][1] and max(hi, out[-1][1]) - out[-1][0] <= max_sec:
             out[-1][1] = max(out[-1][1], hi)
         else:
             out.append([lo, hi])

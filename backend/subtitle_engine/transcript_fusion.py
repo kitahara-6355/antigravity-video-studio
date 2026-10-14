@@ -46,13 +46,17 @@
 区切りが変われば聞き違える所も変わる（区切りの違う古い2回の起こしは、どちらも正しかった）。
 そこで、認識が疑わしいと示す所（`look_spots`）だけを、その所が真ん中に来るように区切って
 もう1回起こし（`gemini_transcriber.transcribe_windows`）、3回目が認識に沿う字を書いたときだけ
-直す（`settle`）。上の「片側4字」の案は、ここでは3回目が決めるための候補の見つけ方として使う。
-43分の素材で候補 12 か所・10 区間（呼び出し 10 回。1回目と2回目は 104 回ずつ）。3回目
-（gemini-3.5-flash-lite）で「奈良筆でも→奈良筆も」「書道で→書で」「高評価→高評」「最後の最後に→
-最後の最後」の4か所が直った。3分03秒は3回目も「普通ナイデがったら」と聞き違えて直らなかった。
-正しかった古い2回の起こし（120秒ごと・30秒ごとの機械的な区切り）も同じ flash-lite で、区間の
-長さを 40・60・120 秒に変えて起こすと「嫌だったら」「泣いて帰ったら」「ないてかったら」と毎回違った。
-この所は区切り方より、モデルの聞き取りの揺れで決まっている。
+直す（`judge`・`settle`）。上の「片側4字」の案は、ここでは3回目が決めるための候補の見つけ方として使う。
+3回目が前後の字を書かない・どちらでもない字を書いた所は決まらないので、区間の前後の余白を広げて
+読み直す（`gemini_transcriber.LOOK_PADS`）。同じモデルでも区間の長さで聞き取りが変わる（3分03秒を
+21・40・60・120 秒の区間で起こすと「普通ナイデがったら」「嫌だったら」「泣いて帰ったら」「ないてかったら」。
+正しかった古い2回の起こしも同じ gemini-3.5-flash-lite）。
+43分の素材で候補 12 か所（1回目と2回目の呼び出しは 104 回ずつ）。余白 8 秒の 10 区間で「奈良筆でも→
+奈良筆も」「書道で→書で」「高評価→高評」「最後の最後に→最後の最後」の4か所が直り、決まらなかった
+7か所を余白 18 秒の6区間・28 秒の5区間で読み直すと「何にか→何か」（2分59秒）・「普通だったら→
+普通泣いて帰ったら」（3分03秒）・「明け暮れてたんですけれど→ですけど」の3か所が直った（呼び出しは
+計 21 回・すべて gemini-3.5-flash-lite）。4分46秒「やっぱり」は余白 8 秒の読みが2回の起こしと同じ字を
+書いたのでそのまま。残る4か所は3回読んでも決まらない。
 """
 from __future__ import annotations
 
@@ -389,49 +393,62 @@ def look_spots(fused: list[dict], secondary: list[dict],
     return sorted(spots, key=lambda s: (s["row"], s["c0"]))
 
 
-def settle(fused: list[dict], third: list[dict], spots: list[dict]) -> tuple[list[dict], dict]:
-    """3回目の起こし third で、spots（`look_spots`）の所を決める。返り値は (行, 集計)。
+def judge(fused: list[dict], third: list[dict], spot: dict) -> tuple[str, str]:
+    """3回目の起こし third で、候補 spot（`look_spots`）の1か所を裁く。返り値は (裁き, 置く字)。
 
-    3回目の文（その行の前後 SETTLE_MARGIN_SEC 秒に起こされた行）の中で候補の前後の字を探し、
+    3回目の文（候補の行の前後 SETTLE_MARGIN_SEC 秒に起こされた行）の中で候補の前後の字を探し、
     間の字を比べる。
-    - (a) 間の字に認識が多く聞いた字（want）が入っていて、いまの字と違えば、3回目の字にする
-      （元の文の範囲ごと置き換えるので、間の句読点も3回目のもの）
-    - (b) 間に字が無ければ（3回目も消した: 2回目・3回目・認識の3つがそろう）、その字を消す
-    3回目が前後の字を書いていない・いまの字と同じ・どちらでもない字なら、そのまま。
-    集計は {"adopted", "examples": [{"start", "before", "after"}]}。
+    - "adopt": 3回目が認識に沿う字を書いた。(a) 間の字に認識が多く聞いた字（want）が入っていれば、
+      その字と、その前後で2回の起こしも書いた字を置く（元の文の字と、間の句読点。2回とも行の頭に
+      「で、」、3回目が「で、やっぱり」なら「で、」も残す）。3回目だけが足した字は置かない（3分03秒の
+      3回目「普通に泣いて帰ったら」の「に」は、認識も2回の起こしも書いていない）。(b) 間に字が無ければ
+      （3回目も消した: 2回目・3回目・認識の3つがそろう）、その字を消す
+    - "keep": 3回目も2回の起こしと同じ字（いまのまま）
+    - "open": 前後の字が見つからない・どちらでもない字・置く所が2行にまたがる（決まらない）
+    """
+    row = fused[spot["row"]]
+    lo = float(row.get("start") or 0) - SETTLE_MARGIN_SEC
+    hi = float(row.get("end") or row.get("start") or 0) + SETTLE_MARGIN_SEC
+    near = [s for s in sorted(third, key=lambda s: float(s.get("start") or 0))
+            if float(s.get("end") or s.get("start") or 0) >= lo and float(s.get("start") or 0) <= hi]
+    f3 = _flatten(near)
+    x3 = "".join(c for c, _, _ in f3)
+    left, right, cur, want = spot["left"], spot["right"], spot["cur"], spot["want"]
+    limit = max(len(cur), len(want)) + SETTLE_SLACK
+    p = x3.find(left)
+    while p >= 0:
+        a = p + len(left)
+        q = x3.find(right, a, a + limit + len(right))
+        if q >= 0:
+            gap = x3[a:q]
+            if gap == cur:
+                return "keep", ""
+            if spot["kind"] == "omit" and want in gap:
+                k, rest = gap.find(want), len(gap) - gap.find(want) - len(want)
+                pre = next(n for n in range(k, -1, -1) if gap[k - n:k] in cur)
+                post = next(n for n in range(rest, -1, -1) if gap[k + len(want):k + len(want) + n] in cur)
+                a, q = a + k - pre, a + k + len(want) + post
+            elif spot["kind"] != "drop" or gap:
+                return "open", ""
+            span = _span(f3, a, q)
+            if span is None:
+                return "open", ""
+            r3, d0, d1 = span
+            return "adopt", str(near[r3].get("text") or "")[d0:d1]
+        p = x3.find(left, p + 1)
+    return "open", ""
+
+
+def settle(fused: list[dict], spots: list[dict], verdicts: list[tuple[str, str]]) -> tuple[list[dict], dict]:
+    """裁き verdicts（spots と同じ並び・`judge`）のうち "adopt" の字を fused に置く。返り値は (行, 集計)。
+
+    時刻と行の分け方は変えない。集計は {"adopted", "kept", "open", "examples": [{"start", "before", "after"}]}。
     """
     out = [dict(s) for s in fused]
-    stats: dict = {"adopted": 0, "examples": []}
-    if not third or not spots:
-        return out, stats
-    third = sorted(third, key=lambda s: float(s.get("start") or 0))
-    edits: list[tuple[int, int, int, str]] = []
-    for spot in spots:
-        row = fused[spot["row"]]
-        lo = float(row.get("start") or 0) - SETTLE_MARGIN_SEC
-        hi = float(row.get("end") or row.get("start") or 0) + SETTLE_MARGIN_SEC
-        near = [s for s in third if float(s.get("end") or s.get("start") or 0) >= lo
-                and float(s.get("start") or 0) <= hi]
-        f3 = _flatten(near)
-        x3 = "".join(c for c, _, _ in f3)
-        left, right, cur, want = spot["left"], spot["right"], spot["cur"], spot["want"]
-        limit = max(len(cur), len(want)) + SETTLE_SLACK
-        p = x3.find(left)
-        while p >= 0:
-            a = p + len(left)
-            q = x3.find(right, a, a + limit + len(right))
-            if q >= 0:
-                gap = x3[a:q]
-                if (spot["kind"] == "omit" and want in gap and gap != cur) or (
-                        spot["kind"] == "drop" and not gap):
-                    span = _span(f3, a, q)
-                    if span is not None:
-                        r3, d0, d1 = span
-                        edits.append((spot["row"], spot["c0"], spot["c1"],
-                                      str(near[r3].get("text") or "")[d0:d1]))
-                break
-            p = x3.find(left, p + 1)
-
+    stats: dict = {"adopted": 0, "kept": sum(v == "keep" for v, _ in verdicts),
+                   "open": sum(v == "open" for v, _ in verdicts), "examples": []}
+    edits = [(spot["row"], spot["c0"], spot["c1"], new)
+             for spot, (verdict, new) in zip(spots, verdicts) if verdict == "adopt"]
     texts = [str(s.get("text") or "") for s in out]
     examples = []
     last: tuple[int, int] | None = None

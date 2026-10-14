@@ -363,9 +363,10 @@ class TranscribeWorker(PipelineStageWorker):
         """2回でも決めきれない所だけ、そこが真ん中に来るように区切ってもう1回起こして決める。
 
         2回の起こしが同じ所で聞き違えると突き合わせても直らない（3分03秒「普通泣いて帰ったら」）。
-        候補は `transcript_fusion.look_spots`、決め方は `transcript_fusion.settle`。
+        候補は `transcript_fusion.look_spots`、裁きは `transcript_fusion.judge`。3回目で決まらない所は
+        区間の前後の余白を広げて読み直す（`gemini_transcriber.LOOK_PADS`。区間の長さで聞き取りが変わる）。
         区間ごとの控えがキャッシュで、候補が変わらなければ2回目以降の実行は呼ばない。
-        落ちたら突き合わせた後の行のまま進む（3回目は直すためだけに使う）。
+        落ちたら、それまでに決まった所だけを直して進む（3回目は直すためだけに使う）。
         """
         from subtitle_engine import gemini_transcriber, transcript_fusion
         if not gemini_transcriber.THIRD_LOOK:
@@ -376,21 +377,35 @@ class TranscribeWorker(PipelineStageWorker):
         loop = asyncio.get_running_loop()
         rows = [fused[s["row"]] for s in spots]
         spans = [(float(r.get("start") or 0), float(r.get("end") or r.get("start") or 0)) for r in rows]
+        verdicts = [("open", "")] * len(spots)
+        windows, models, error = 0, set(), None
         try:
             quiet = await loop.run_in_executor(None, gemini_transcriber.QuietMap.from_media, str(ctx.video_path))
-            windows = gemini_transcriber.look_windows(spans, quiet)
             journal = gemini_transcriber.journal_path(_gemini_checkpoint(whisper_checkpoint, third=True))
-            third, models = await loop.run_in_executor(None, functools.partial(
-                gemini_transcriber.transcribe_windows, ctx.video_path, windows, journal=journal))
-        except Exception as e:  # noqa: BLE001 — 3回目は直すためだけ。落ちても突き合わせた後の行で進む
-            logger.warning(f"⚠️ 文字起こしの3回目に失敗 → 2回の突き合わせのまま進みます: {e}")
+            for pad in gemini_transcriber.LOOK_PADS:
+                pending = [i for i, (verdict, _) in enumerate(verdicts) if verdict == "open"]
+                if not pending:
+                    break
+                for w in gemini_transcriber.look_windows([spans[i] for i in pending], quiet, pad=pad):
+                    third, used = await loop.run_in_executor(None, functools.partial(
+                        gemini_transcriber.transcribe_windows, ctx.video_path, [w], journal=journal))
+                    windows += 1
+                    models.update(used)
+                    # 行の真ん中が入る区間の起こしだけで裁く（重なる区間の起こしを混ぜない）
+                    for i in pending:
+                        if verdicts[i][0] == "open" and w[0] <= sum(spans[i]) / 2 <= w[0] + w[1]:
+                            verdicts[i] = transcript_fusion.judge(fused, third, spots[i])
+        except Exception as e:  # noqa: BLE001 — 3回目は直すためだけ。落ちても決まった所だけ直して進む
+            error = str(e)
+            logger.warning(f"⚠️ 文字起こしの3回目に失敗 → 決まった所だけ直して進みます: {e}")
             ctx.warnings.append(f"文字起こし: 3回目（決めきれない所の起こし直し）に失敗したため、"
-                                f"2回の突き合わせのまま進みました（{e}）")
-            return fused, {"spots": len(spots), "windows": 0, "adopted": 0, "examples": [], "error": str(e)}
-        settled, look = transcript_fusion.settle(fused, third, spots)
-        look.update(spots=len(spots), windows=len(windows), models=models)
-        logger.info(f"🔍 決めきれない {len(spots)} か所を {len(windows)} 区間だけ起こし直し、"
-                    f"{look['adopted']} か所を3回目と手元の音声認識がそろう字に直しました")
+                                f"それまでに決まった所だけを直して進みました（{e}）")
+        settled, look = transcript_fusion.settle(fused, spots, verdicts)
+        look.update(spots=len(spots), windows=windows, models=sorted(models))
+        if error is not None:
+            look["error"] = error
+        logger.info(f"🔍 決めきれない {len(spots)} か所を {windows} 区間で起こし直し、{look['adopted']} か所を"
+                    f"3回目と手元の音声認識がそろう字に直しました（そのまま {look['kept']}・決まらない {look['open']}）")
         return settled, look
 
     def verify(self, result: StageResult) -> bool:
