@@ -414,6 +414,7 @@ def enforce_line_length(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> str:
 # ここでは BudouX（Google の日本語の文節区切り）で文節に分け、
 # 1) 文末（。！？）では必ず区切る 2) 1枚の字幕は max_lines 行まで詰める
 # 3) 区切り・改行は「、」や助詞の後を選び、連体詞や「の」の直後は避ける。
+# 切れ目の強さは 文末 > 「、」 > 節の終わり（から・けど） > 「て・は・たら」など > 格助詞（を・に）。
 # BudouX が無ければ従来の分割に戻る。
 
 SENTENCE_END = "。！？!?"
@@ -423,9 +424,24 @@ _ADNOMINALS = ("この", "その", "あの", "どの", "こんな", "そんな",
 # 「な」で終わっても後ろの語に掛からないもの（文末の「かな」「よな」「だな」・「みんな」）。
 # ほかの「〜な」（「いろんな」「有名な」「ような」）は後ろの名詞に掛かる
 _FREE_NA = ("かな", "よな", "だな", "みんな")
-# 後ろで切ってよい語尾。強いほど先に並べる（2点）
+# 節の終わり（3点）。理由の「から」・逆接の「けど・けども・けれど・ですが」の前は、それだけで文に近いまとまり。
+# 「て」は「泣いて帰る」のように次の動詞とひと塊のことがあるので、それより強い切れ目にする
+# （42回目の 2分59秒: 「から」と「て」が同点で長い方を取り、「…好きだったから/普通泣いて」|「帰ったら…」と割れた）
+_CLAUSE_TAILS = ("から", "けれども", "けれど", "けども", "けど", "ですが", "ますが", "でしたが", "ましたが")
+# 「から」は述語の後ろ（行く・ない・好きだ・た・です・ません）のときだけ節の終わり。名詞の後ろ
+# （「次の週から」「周りから」「こっから」）は後ろの動詞に掛かる
+_PREDICATE_ENDS = tuple("うくぐすつぬぶむるいただん")
+# 前が「だ・です」だけなら文頭の接続詞（「だから」「ですから」「だけど」「ですが」）
+_CONJUNCTION_STEMS = ("", "だ", "です")
+# 後ろで切ってよい語尾（2点）。条件の「たら・ば・なら」も「て」と同じ強さ
 _GOOD_TAILS = ("から", "けど", "ので", "のに", "ため", "って", "では", "には", "とは",
-               "は", "て", "で", "し", "ね", "よ", "な")
+               "たら", "だら", "なら", "ば", "は", "て", "で", "し", "ね", "よ", "な")
+# 「ば・たら」で終わっても条件の節ではなく、後ろに掛かる副詞（「例えば|天ぷら書こうが」で折らない）
+_ADVERB_TAILS = ("例えば", "たとえば", "いわば", "言わば", "あわよくば", "もしかしたら")
+# 条件と、後ろの「いい・いけない・ならない・どう」はひと塊（「来ていただいたら|いいんですけれども」
+# 「書かなければ|いけない」「やってみたら|どうですか」）
+_CONDITIONAL_TAILS = ("たら", "だら", "ば")
+_CONDITIONAL_HEADS = ("いい", "良い", "よかっ", "良かっ", "いけ", "なら", "だめ", "ダメ", "どう")
 # 格助詞の直後は、次の動詞とひと塊のことが多い（「書を|通して」）ので弱め（1点）
 _WEAK_TAILS = ("を", "に", "が", "と", "へ", "も", "や")
 # 「て」の後ろに付く補助の動詞。前の動詞とひと塊なので、その手前では割らない
@@ -457,7 +473,7 @@ def _phrase_parser():
 
 
 def _binds_to_next(p: str, nxt: str) -> bool:
-    """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」・「〜かなんか」）か。"""
+    """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」・「〜かなんか」・「〜たらいい」）か。"""
     nxt = nxt.lstrip()
     if not nxt:
         return False
@@ -466,10 +482,23 @@ def _binds_to_next(p: str, nxt: str) -> bool:
     # 「〜かなんか」（〜か何か）。BudouX は「駄菓子屋か|なんか」と分ける（40回目の 1分58秒）
     if p.endswith("か") and nxt.startswith("なんか"):
         return True
+    if p.endswith(_CONDITIONAL_TAILS) and nxt.startswith(_CONDITIONAL_HEADS):
+        return True
     # 動詞の「て・で」（書いて・読んで・泳いで）と、名詞の後ろの「で」で、付くものが違う
     if p.endswith("て") or p.endswith(("んで", "いで")):
         return nxt.startswith(_HELPERS_AFTER_TE)
     return p.endswith("で") and nxt.startswith(_HELPERS_AFTER_DE)
+
+
+def _ends_clause(p: str) -> bool:
+    """文節 p が節の終わり（述語＋「から・けど・けども・けれど・ですが」）か。"""
+    for tail in _CLAUSE_TAILS:
+        if p.endswith(tail):
+            stem = p[:-len(tail)]
+            if tail == "から" and not stem.endswith(_PREDICATE_ENDS):
+                return False
+            return stem not in _CONJUNCTION_STEMS
+    return False
 
 
 def _break_score(phrase: str, nxt: str = "") -> int:
@@ -492,6 +521,10 @@ def _break_score(phrase: str, nxt: str = "") -> int:
         # 「お届けして|まいります」「きっかけって|いうのは」は割らない。「の」の後ろ（「協会の|理事長で
         # いらっしゃいまして」）より悪い
         return -4
+    if _ends_clause(p):
+        return 3
+    if p.endswith(_ADVERB_TAILS):
+        return 0
     if p.endswith(_GOOD_TAILS):
         return 2
     if p.endswith(_WEAK_TAILS):

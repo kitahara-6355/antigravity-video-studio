@@ -769,6 +769,52 @@ def test_te_followed_by_a_new_verb_may_still_be_split():
     assert tf._break_score("お届けして", "まいります。") < 0
 
 
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_the_end_of_a_clause_is_a_stronger_break_than_te():
+    # 42回目の 2分59秒: 「から」と「て」を同じ強さに数え、長い方の「…好きだったから/普通泣いて」|
+    # 「帰ったらもう/行かない…」と割れた。「泣いて帰ったら」はひと続き
+    text = "そう何かやっぱり好きだったから普通泣いて帰ったらもう行かないってなりそうですよね。"
+    caps = [tf.strip_punctuation(c) for c in tf.split_into_captions(text, 18, 2, trim=True)]
+    assert caps == ["そう何かやっぱり好きだったから", "普通泣いて帰ったら\nもう行かないってなりそうですよね"]
+    assert tf._break_score("好きだったから", "普通") > tf._break_score("普通泣いて", "帰ったら")
+    assert tf._break_score("なんですけど", "それで") > tf._break_score("書いて", "送ってくれた")
+    # 18分56秒「書道人口は下がったけども/書道参加率ってのはね」の「けども」も「けど」と同じ
+    assert tf._break_score("下がったけども", "書道") == tf._break_score("なんですけど", "それで")
+
+
+@pytest.mark.parametrize("phrase", ["次の週から", "周りから", "こっから", "だから", "ですから", "それから", "だけど", "ですが"])
+def test_from_after_a_noun_or_a_conjunction_is_not_the_end_of_a_clause(phrase):
+    # 名詞の後ろの「から」（「次の週から|行かなくなった」）は後ろの動詞に掛かる。文頭の接続詞
+    # （「だから」「だけど」）も、後ろの文に掛かる。どちらも節の終わりより弱い
+    assert tf._break_score(phrase, "次") < tf._break_score("好きだったから", "次")
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,want", [
+    # 42回目の 23分44秒: 「…思ってる人も丁寧に」|「書けばものすごく…」と、条件の「書けば」が割れた
+    ("例えば下手だったって思ってる人も丁寧に書けばものすごく美しく見えるわけですよ。",
+     ["例えば下手だったって\n思ってる人も丁寧に書けば", "ものすごく美しく見えるわけですよ"]),
+    # 42回目の 28分55秒: 「書き終わったら皆さんに/どうしたらいいですか」と、「皆さんに」が後ろから離れた
+    ("書き終わったら皆さんにどうしたらいいですか？", ["書き終わったら\n皆さんにどうしたらいいですか？"]),
+])
+def test_a_condition_ending_in_tara_or_ba_is_a_place_to_break(text, want):
+    assert [tf.strip_punctuation(c) for c in tf.split_into_captions(text, 18, 2, trim=True)] == want
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,head,tail", [
+    # 「〜たらいい」「〜なければいけない」はひと塊。「たら」を切れ目に数えると、41分12秒の
+    # 「うちも/来ていただいたらいいんですけれども」が「…来ていただいたら/いいんですけれども」に折れる
+    ("うちも来ていただいたらいいんですけれども。", "いただいたら", "いい"),
+    ("毎日少しずつでも書かなければいけないと思っています。", "なければ", "いけない"),
+    # 「例えば」は後ろに掛かる副詞。「ば」を切れ目に数えると、12分15秒が「いうことで例えば/天ぷら…」に折れる
+    ("というわけで、例えば天ぷら書こうが何書こうが。", "例えば", "天ぷら"),
+])
+def test_a_condition_stays_with_its_ii_and_tatoeba_stays_with_what_follows(text, head, tail):
+    caps = tf.split_into_captions(text, 18, 2, trim=True)
+    assert not any(a.endswith(head) and b.startswith(tail) for a, b in _junctions(caps)), caps
+
+
 
 @pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
 @pytest.mark.parametrize("prev,cur,joined,bad_head", [
