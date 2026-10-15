@@ -1320,7 +1320,8 @@ def test_both_second_passes_give_a_spot_each_when_they_wrote_different_words():
 def test_a_one_letter_filler_at_the_edge_of_the_second_reading_is_not_put_in():
     """11分59秒（48回目）: 1回目「最終ね、エピソード」・2回目「っていうね、え、エピソード」・認識「いうね」。
     2回目の「え」まで置くと、後ろの句読点が無いので「っていうね、えエピソード」と出る。句読点で隔てた
-    端の言いよどみは、1字でも外してから置く。"""
+    端の言いよどみは、1字でも外してから置く。外した語との間の句読点は残す（49回目は「っていうね」だけを
+    置いて「っていうねエピソードなんですか？」と続き、後ろの問いまで前の字幕につながった）。"""
     rows = [_row(714.5, 719.0, "俺は泣きそうになるわ。"), _row(719.06, 721.66, "最終のエピソードなんですか？"),
             _row(721.66, 729.96, "ああ、なるほど。すごいですね。")]
     readings = [[_row(714.5, 721.36, "俺は泣きそうになるわっていうね、え、エピソードなんです。"),
@@ -1328,9 +1329,21 @@ def test_a_one_letter_filler_at_the_edge_of_the_second_reading_is_not_put_in():
 
     spots = tfu.split_spots(rows, readings, _heard("俺は泣きそうになるいうねなるほどすごいですね", 714.5, 0.3))
 
-    assert [(s["cur"], s["heard"]) for s in spots] == [("最終の", "っていうね")]
+    assert [(s["cur"], s["heard"]) for s in spots] == [("最終の", "っていうね、")]
     hints = tfu.heard_hints(rows, spots, [("open", "")])
-    assert [(h["incorrect"], h["correct"]) for h in hints] == [("最終のエピソ", "っていうねエピソ")]
+    assert [(h["incorrect"], h["correct"]) for h in hints] == [("最終のエピソ", "っていうね、エピソ")]
+
+
+@pytest.mark.parametrize("row, reading, put", [
+    # 頭の言いよどみ: 外した語との間の句読点を頭に残す
+    ("それはだから最終のエピソードなんです。", "それはだから、え、っていうねエピソードなんです。", "、っていうね"),
+    # 本文のその端にもう句読点があれば足さない（「、、」にしない）
+    ("それはだから最終の、エピソードなんです。", "それはだからっていうね、え、エピソードなんです。", "っていうね"),
+])
+def test_the_punctuation_beside_a_trimmed_filler_is_put_in_only_where_the_row_has_none(row, reading, put):
+    spots = tfu.split_spots([_row(0.0, 5.0, row)], [[_row(0.0, 5.0, reading)]], _heard("あいうえお", 30.0))
+
+    assert [s["heard"] for s in spots] == [put]
 
 
 def test_a_spot_the_recogniser_heard_as_written_is_not_split():

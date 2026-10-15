@@ -805,7 +805,8 @@ def split_spots(rows: list[dict], readings, tokens: list[tuple[str, float]] | No
             if op != "replace" or min(ops[k - 1][2] - ops[k - 1][1], ops[k + 1][2] - ops[k + 1][1]) < LOOK_ANCHOR:
                 continue
             i1, i2 = _trim_fillers(xr, i1, i2, breaks)
-            j1, j2 = _trim_fillers(xs, j1, j2, reading_breaks)
+            t1, t2 = _trim_fillers(xs, j1, j2, reading_breaks)
+            j1, j2, cut_head, cut_tail = t1, t2, t1 > j1, t2 < j2
             cur, alt = xr[i1:i2], xs[j1:j2]
             if (_only_fillers(cur) or _only_fillers(alt) or len(cur) > SWAP_MAX or len(alt) > SWAP_MAX
                     or any(ch in _NUMERALS or ch.isascii() for ch in cur + alt)
@@ -823,7 +824,16 @@ def split_spots(rows: list[dict], readings, tokens: list[tuple[str, float]] | No
                         or _leans(cur, alt, heard[lo + 1:hi])):
                     continue
             row, c0, c1 = span
-            text = str(reading[fs[j1][1]].get("text") or "")[fs[j1][2]:fs[j2 - 1][2] + 1]
+            raw = str(reading[fs[j1][1]].get("text") or "")
+            a, b = fs[j1][2], fs[j2 - 1][2] + 1
+            # 外した言いよどみとの間の句読点は残す（rows のその端に句読点が無いとき）。2回目「っていうね、え、
+            # エピソード」から「っていうね」だけを置くと、句読点が消えて「っていうねエピソード」と続き、
+            # 整形が後ろの問いまで前の字幕につないで「泣きそうになる|わっていうね…」と折った（49回目の 11分49秒）
+            if cut_tail and i2 not in breaks and fs[j2][1] == fs[j2 - 1][1]:
+                b = fs[j2][2]
+            if cut_head and i1 not in breaks and fs[j1 - 1][1] == fs[j1][1]:
+                a = fs[j1 - 1][2] + 1
+            text = raw[a:b]
             if (row, c0, c1, text) in taken:
                 continue
             taken.add((row, c0, c1, text))
