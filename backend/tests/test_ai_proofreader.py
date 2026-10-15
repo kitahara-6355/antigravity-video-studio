@@ -755,6 +755,53 @@ class TestJudgeHeardHints:
             chosen, stats, calls = self._run([], [self.ZAYU])
         assert chosen == [] and calls == 0 and stats["skipped"]
 
+    def test_多い所は分けて聞く(self, monkeypatch):
+        """割れた所は 70 か所を超える（48回目）。並べすぎると番号を飛ばして答えるので JUDGE_BATCH か所ずつ聞く。"""
+        monkeypatch.setattr(ai_proofreader, "JUDGE_BATCH", 1)
+        prompts = []
+        chosen, stats, calls = self._run([self._choices("2"), self._choices("1"), self._choices("1"), self._choices("2")],
+                                         [self.ZAYU, self.SHUSAI], prompts=prompts)
+        assert calls == 4 and chosen == [self.ZAYU]
+        assert all("[1]" in t and "[2]" not in t for t in prompts)
+        assert [t.split("候補1: ")[1].split("\n")[0] for t in prompts] == [
+            self.LINES[1], self.LINES[2], "なので偉そうな座右の銘はなくって、僕はだからご縁なので", "先生が主宰されている言葉大賞っていうのがね"]
+        assert [s["choices"] for s in stats["spots"]] == [["heard", "heard"], ["body", "body"]]
+
+    def test_途中で呼べなくなったら_残りは聞かずに採らない(self, monkeypatch):
+        monkeypatch.setattr(ai_proofreader, "JUDGE_BATCH", 1)
+        chosen, stats, calls = self._run([self._choices("2"), RuntimeError("boom")], [self.ZAYU, self.SHUSAI])
+        assert chosen == [] and stats["failed"] and calls == 2
+
+
+class TestApplyHints:
+    """校閲の後の文で選んだ所（2回目の起こしが割れた所）は、校閲に渡し直さずに字を置く（2026-10-15）。"""
+
+    def test_選んだ所の字を置く(self):
+        segs = [{"text": "僕はね、生活をできるように鳴ってるのは、やっぱりご縁ですよ。"},
+                {"text": "いや、だから僕全部脱いで、羽毛になって"}]
+        applied = ai_proofreader.apply_hints(segs, [{"incorrect": "ように鳴ってる", "correct": "ようになってる"},
+                                                    {"incorrect": "羽毛になっ", "correct": "肌着になっ"}])
+        assert applied == 2
+        assert [s["text"] for s in segs] == ["僕はね、生活をできるようになってるのは、やっぱりご縁ですよ。",
+                                             "いや、だから僕全部脱いで、肌着になって"]
+
+    def test_1か所に決まらない所と_同じ所に別の字を置く項目は置かない(self):
+        segs = [{"text": "隔月なので、角付きなのでね"}, {"text": "羽毛になって、羽毛になって"}]
+        applied = ai_proofreader.apply_hints(segs, [
+            # 2回目と前の2回目が別の字を書き、両方とも選ばれた（32分12秒）
+            {"incorrect": "角付きなので", "correct": "各月なので"}, {"incorrect": "角付きな", "correct": "各付きな"},
+            # 2か所ある
+            {"incorrect": "羽毛になっ", "correct": "肌着になっ"}])
+        assert applied == 0
+        assert [s["text"] for s in segs] == ["隔月なので、角付きなのでね", "羽毛になって、羽毛になって"]
+
+    def test_同じ行の重ならない所はどちらも置く(self):
+        segs = [{"text": "初動人口と初動界の話"}]
+        applied = ai_proofreader.apply_hints(segs, [{"incorrect": "初動人口", "correct": "書道人口"},
+                                                    {"incorrect": "初動界", "correct": "書道界"},
+                                                    {"incorrect": "初動界", "correct": "書道界"}])
+        assert applied == 2 and segs[0]["text"] == "書道人口と書道界の話"
+
 
 class TestProofreadSegmentsRetryAndBackoff:
     """proofread_segments() 関数のリトライおよび指数バックオフ、致命的エラーハンドリングのテスト"""

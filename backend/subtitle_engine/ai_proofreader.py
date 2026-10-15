@@ -265,6 +265,8 @@ def _heard_context(rows, texts) -> str:
 # 選ばせる指示の版。控えの鍵に入るので、指示や決め方を変えたら上げる
 JUDGE_VERSION = 1
 JUDGE_CHOICES = {"1", "2", "either"}
+# 1回の呼び出しで選ばせる所の数（割れた所は 70 か所を超える。並べすぎると番号を飛ばして答える）
+JUDGE_BATCH = 40
 
 
 def _judge_prompt(items, swap: bool) -> str:
@@ -309,6 +311,8 @@ def judge_heard_hints(hints, segments, memo=None):
     hints は `transcript_fusion.heard_hints` の項目（誤 incorrect → 正 correct）。本文（segments）に
     1か所だけある所を、前後の行を付けて「候補1・2」に並べ、本文を先にした回と別の聞き取りを先にした回の
     2回聞く。両方で別の聞き取りを選んだ所だけ採る（並べた順で選ぶ癖・どちらとも言える所は本文のまま）。
+    1回の呼び出しで並べるのは JUDGE_BATCH か所まで。segments は校閲の前の行（認識の字を校閲に渡す所）でも
+    校閲の後の行（2回目の起こしが割れた所。選んだ所は `apply_hints` で置く）でもよい。
     選んだ結果は控え（`ProofreadMemo`）に残し、同じ所（前後の行も同じ）は次から聞かない。
     呼べない・答えが読めないときは、その回の所を採らない（本文のまま）。
 
@@ -354,9 +358,11 @@ def judge_heard_hints(hints, segments, memo=None):
             stats["skipped"] = True
             pending = {False: [], True: []}
     client = None
-    for swap in (False, True):
-        if not pending[swap] or stats["failed"]:
-            continue
+    batches = [(swap, pending[swap][k:k + JUDGE_BATCH]) for swap in (False, True)
+               for k in range(0, len(pending[swap]), JUDGE_BATCH)]
+    for swap, batch in batches:
+        if stats["failed"]:
+            break
         try:
             if client is None:
                 try:
@@ -368,7 +374,7 @@ def judge_heard_hints(hints, segments, memo=None):
             model_name = _get_current_model()
             response = client.models.generate_content(
                 model=model_name,
-                contents=_judge_prompt([items[n] for n in pending[swap]], swap),
+                contents=_judge_prompt([items[n] for n in batch], swap),
                 config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0, seed=SEED),
             )
             stats["calls"] += 1
@@ -388,9 +394,9 @@ def judge_heard_hints(hints, segments, memo=None):
                 continue
             n = _as_index(a.get("id"))
             side = _as_side(a.get("choice"), swap)
-            if n is None or not 1 <= n <= len(pending[swap]) or side is None:
+            if n is None or not 1 <= n <= len(batch) or side is None:
                 continue
-            n = pending[swap][n - 1]
+            n = batch[n - 1]
             sides[swap][n] = side
             if memo is not None:
                 memo.put(keys[swap, n], str(a.get("choice")).strip(), served_model)
@@ -411,6 +417,37 @@ def judge_heard_hints(hints, segments, memo=None):
     logger.info(f"AI Proofreader: 別の聞き取り {len(items)} か所を本文と並べて選ばせ、{len(chosen)} か所を校閲に渡します"
                 f"（呼び出し {stats['calls']} 回・控え {stats['memo_hits']}）")
     return chosen, stats
+
+
+def apply_hints(segments, hints) -> int:
+    """選んだ別の聞き取り（incorrect → correct）を segments の字に直接置く。置いた数を返す。
+
+    校閲の後の文で選ばせた所（`transcript_fusion.split_spots`）に使う。校閲に渡し直すと、校閲は控えの無い
+    行を直し直す（同じ文でも直しが2〜3通りに揺れる）。incorrect が全行の中で1か所だけの所に置き、同じ行で
+    重なる所に別の字を置く項目が2つ以上あれば（2回目と前の2回目が別の字を書き、両方とも選ばれた: 32分12秒
+    「角付き」→「各月」「各付き」）、どれも置かない。
+    """
+    texts = [str(s.get("text") or "") if isinstance(s, dict) else "" for s in segments or ()]
+    places = []
+    for h in hints or ():
+        wrong, right = str(h.get("incorrect") or ""), str(h.get("correct") or "")
+        rows = [k for k, t in enumerate(texts) if wrong and wrong in t]
+        if not right or wrong == right or len(rows) != 1 or texts[rows[0]].count(wrong) != 1:
+            continue
+        k = rows[0]
+        a = texts[k].find(wrong)
+        if (k, a, a + len(wrong), right) not in places:
+            places.append((k, a, a + len(wrong), right))
+    clash = {i for i, p in enumerate(places) for j, q in enumerate(places)
+             if i != j and p[0] == q[0] and p[1] < q[2] and q[1] < p[2]}
+    applied = 0
+    for i, (k, a, b, right) in sorted(enumerate(places), key=lambda z: (z[1][0], -z[1][1])):
+        if i in clash:
+            continue
+        texts[k] = texts[k][:a] + right + texts[k][b:]
+        segments[k]["text"] = texts[k]
+        applied += 1
+    return applied
 
 
 def _record_call() -> None:

@@ -128,6 +128,9 @@ class PipelineContext:
     # 文字起こしで3回目でも決まらなかった食い違い（`transcript_fusion.heard_hints`）。校閲（AI）に
     # 「別の音声認識の聞き取り」として渡し、前後の流れで決めさせる
     heard_hints: list = field(default_factory=list)
+    # 文字起こしの2回目（いまの区切り方・前の区切り方）の行。校閲の後に、2回目が別の字を書いた所を
+    # 本文と並べて選び直す（`transcript_fusion.split_spots`）
+    second_readings: list = field(default_factory=list)
     session_id: str = ""
     started_at: str = ""
     segments: List[Segment] = field(default_factory=list)

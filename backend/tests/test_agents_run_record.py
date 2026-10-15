@@ -707,6 +707,28 @@ def test_別の聞き取りをどう選び校閲がいくつ採ったかが記�
     assert "heard" not in st["youtube_opt"]
 
 
+def test_2回目の起こしが割れた所をどう選びいくつ字を置いたかが記録に残る(tmp_path):
+    """割れた聞き取り（2026-10-15）: 校閲の後の文と並べて選ばせた結果と選んだモデル、字を置いた数を
+    工程の記録に残す（校閲の後に置いた字がどこから来たかを追える）。来た所が無ければ残さない。"""
+    c = _coordinator(tmp_path)
+    split = {"given": 2, "chosen": 1, "applied": 1, "models": ["gemini-3.5-flash-lite"],
+             "spots": [{"incorrect": "ように鳴ってる", "choices": ["heard", "heard"], "chosen": True},
+                       {"incorrect": "そこが書道教室", "choices": ["body", "body"], "chosen": False}]}
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _split(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="割れた聞き取り",
+                                   data={"split": split, "heard": {"given": 0, "chosen": 0, "adopted": 0}})
+            w.execute = _split
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["split"] == split
+    assert "heard" not in st["proofread"]
+
+
 def test_採用したAIの出力の件数が記録に残りゼロならスタブ(tmp_path):
     """**「宣言どおり」は断定ではなく証拠で決める**（2026-09-26 ユーザー決定・作りの変更）。
     工程が採用した AI の出力の件数を記録に残し、ゼロなら経路に依らず stub。"""

@@ -100,6 +100,16 @@
 直り（固唾・座右の銘・線質・仕上がり）を上回った（47回目）。校閲に渡す前に、本文と並べて文として選ばせ、
 本文を先にした回と認識を先にした回の両方で認識を選んだ所だけを渡す（`ai_proofreader.judge_heard_hints`・
 28 か所中 8 か所。どちらの回も同じ番号を選ぶ癖が 5 か所に出た）。
+
+2回目の起こしが割れた所（2026-10-15・`split_spots`）: 認識が黙っている所・認識も聞き違えた所は、2対1 でも
+3回目でも決まらず1回目の字が残る（48回目の 27分05秒「鳴ってる」は2回目と前の2回目が「なってる」・認識は
+この5秒を書いていない。8分15秒「羽毛」は2回目「肌着」）。2回目の字を本文と並べて文として選ばせ、両順で2回目を
+選んだ所だけ字を置く。並べるのは校閲の後の文（校閲の前に選ばせると、校閲がもう直した「書道教室」「書道人口」
+まで2回目の「初動教室」「初動人口」に戻すおそれがあった）。48回目の素材で 72 か所を並べ、選んだのは7か所
+（「肌着」「なってる」「僕のシーン」「変わりばえ」など。崩れは見当たらない）。認識がかなで書いた本文の字
+（9分01秒「お腹」・認識「おなか」）を「真夜中」に変えないよう、認識の字が本文の側に寄る所は並べない。
+食い違いの端の言いよどみ（句読点で隔てた「うん」など）は外して比べる（26分56秒「うん、ぶっちゃけもう」は
+9字で3回目の候補から外れていた）。
 """
 from __future__ import annotations
 
@@ -185,6 +195,28 @@ def _contexts(x: str, i1: int, i2: int, breaks: set[int]) -> list[tuple[str, str
     if lw or rw:
         out.append((left[:len(left) - len(lw)][-CONTEXT:], right[len(rw):][:CONTEXT]))
     return out
+
+
+def _trim_fillers(x: str, i1: int, i2: int, breaks: set[int]) -> tuple[int, int]:
+    """x[i1:i2] の頭と尻から、前後とも句読点で隔てた言いよどみの語（2字以上）を外した範囲。
+
+    認識は言いよどみを書かないので、食い違いの端に言いよどみが入ると字数が増えて候補から外れる
+    （48回目の 26分56秒: 「そうやって、うん、ぶっちゃけもう書きながら」と認識「そうやって筆文字を
+    書きながら」の食い違いは「うんぶっちゃけもう」の9字）。句読点で隔てていない語（「その」「なんか」）は
+    語の一部のことがあるので外さない。少なくとも1字は残す。
+    """
+    trimmed = True
+    while trimmed:
+        trimmed = False
+        for w in _SKIPPABLE:
+            n = len(w)
+            if i2 - i1 > n and x.startswith(w, i1) and i1 in breaks and i1 + n in breaks:
+                i1, trimmed = i1 + n, True
+                break
+            if i2 - i1 > n and x.endswith(w, i1, i2) and i2 - n in breaks and i2 in breaks:
+                i2, trimmed = i2 - n, True
+                break
+    return i1, i2
 
 
 def _heard(window: str, left: str, word: str, right: str) -> bool:
@@ -530,6 +562,7 @@ def look_spots(fused: list[dict], secondary: list[dict],
     same = {i1 + k for op, i1, i2, _j1, _j2 in difflib.SequenceMatcher(None, xf, xs, autojunk=False).get_opcodes()
             if op == "equal" for k in range(i2 - i1)}
     protected = _covered(xf, protect)
+    breaks = _breaks(ff)
     ops = difflib.SequenceMatcher(None, xf, heard, autojunk=False).get_opcodes()
     for k in range(1, len(ops) - 1):
         op, i1, i2, j1, j2 = ops[k]
@@ -541,9 +574,14 @@ def look_spots(fused: list[dict], secondary: list[dict],
             continue
         if len(extra) - len(cur) >= LOOK_EXTRA:
             add("omit", i1, i2, extra, j1, j2)
-        elif (op == "replace" and len(cur) <= SWAP_MAX and len(extra) <= SWAP_MAX
-              and not _only_fillers(cur) and not _spelling_only(cur, extra)
-              and not any(i in protected for i in range(i1, i2))):
+            continue
+        # 端の言いよどみは外して比べる（認識は書かない。48回目の 26分56秒「そうやって、うん、
+        # ぶっちゃけもう書きながら」・認識「筆文字を書きながら」は「うん」まで入れると9字で候補から外れた）
+        i1, i2 = _trim_fillers(xf, i1, i2, breaks)
+        cur = xf[i1:i2]
+        if (op == "replace" and len(cur) <= SWAP_MAX and len(extra) <= SWAP_MAX
+                and not _only_fillers(cur) and not _spelling_only(cur, extra)
+                and not any(i in protected for i in range(i1, i2))):
             add("swap" if all(i in same for i in range(i1, i2)) else "neither", i1, i2, extra, j1, j2)
 
     # (b) 2回目が1字消し、認識が片側でだけ消した側に寄る所
@@ -654,8 +692,9 @@ def settle(fused: list[dict], spots: list[dict], verdicts: list[tuple[str, str]]
 
 # ─────────────────────── 3回目でも決まらない所 ───────────────────────
 
-# 校閲に渡す種類。(b) "drop"（認識に無い1字）は字を消すかどうかなので、文脈では決まらない
-HINT_KINDS = ("swap", "neither", "omit")
+# 「誤→正」の並びにする種類。(b) "drop"（認識に無い1字）は字を消すかどうかなので、文脈では決まらない。
+# "split" は2回目の起こしが別の字を書いた所（`split_spots`。校閲の後の文で選ばせる）
+HINT_KINDS = ("swap", "neither", "omit", "split")
 # 直す所の前後に付ける字数（句読点の手前まで）。全行の中で1か所に決まるまで HINT_CONTEXT_MAX まで広げる
 HINT_CONTEXT = 3
 HINT_CONTEXT_MAX = 8
@@ -706,3 +745,85 @@ def heard_hints(fused: list[dict], spots: list[dict], verdicts: list[tuple[str, 
         out.append({"incorrect": wrong, "correct": left + heard + right, "term": heard,
                     "kind": spot["kind"], "verdict": verdict, "start": fused[spot["row"]].get("start")})
     return out
+
+
+# ─────────────────────── 2回目の起こしが割れた所 ───────────────────────
+
+
+def _leans(cur: str, alt: str, inner: str) -> bool:
+    """杭の間の認識の字 inner が、alt より cur の字を多く含むか（それぞれの字数に対する割合）。
+
+    認識はかなで書く語がある（「おなか」）ので、字の並びでは聞こえたことにならなくても、
+    cur の字の方が多く入っていれば認識は cur の側に寄っている。
+    """
+    if not inner or not cur or not alt:
+        return False
+    return (sum(ch in inner for ch in cur) / len(cur)) > (sum(ch in inner for ch in alt) / len(alt))
+
+
+def split_spots(rows: list[dict], readings, tokens: list[tuple[str, float]] | None,
+                protect=()) -> list[dict]:
+    """2回目の起こし（readings）が rows と別の字を書き、認識がどちらの字も聞いていない所。
+
+    rows は校閲の後の行でよい（行の分け方は文字起こしと同じ）。認識が黙っている所や認識も聞き違えた所は、
+    2対1 で決める（`fuse`）ことも、3回目と認識をそろえて決める（`judge`）こともできず、1回目の字が残る
+    （48回目の 27分05秒: 1回目「生活をできるように鳴ってるのは」・2回目と前の2回目「ようになってるのは」・
+    認識はこの5秒を書いていない。8分15秒: 1回目「全部脱いで羽毛になって」・2回目「肌着」・前の2回目「褌」・
+    認識「はや着」）。返り値は `look_spots` と同じ形（kind は "split"、want は2回目のそろえた字、heard は
+    2回目が書いた字のまま）。`heard_hints` で「誤→正」の並びにして、本文と並べて文として選ばせる
+    （`ai_proofreader.judge_heard_hints`。両順で2回目の字を選んだ所だけ置き換える）。
+
+    候補にしない所: 前後 LOOK_ANCHOR 字以上が rows と2回目で続けて合う所に挟まれていない・行をまたぐ・
+    言いよどみ・数字・英字・SWAP_MAX 字を超える・辞書の語（protect。誤りの字も正しい字も渡す）・
+    かなを漢字にするだけや2字以下のかなどうし（書き分けと助詞。漢字をかなにするのは残す:「鳴って→なって」）・
+    認識が rows の字を聞いた所・認識の字が rows の字の方に多く入っている所（`_leans`。9分01秒: rows
+    「12時お腹の12時」・2回目「真夜中」・認識「おなかの十二時」）。端の言いよどみは外して比べる。
+    """
+    if not tokens or not rows:
+        return []
+    fr = _flatten(rows)
+    xr = "".join(c for c, _, _ in fr)
+    heard = "".join(c for ch, _t in tokens for c in norm_char(ch))
+    a2r = _matches(xr, heard, ANCHOR_BLOCK)
+    breaks = _breaks(fr)
+    protected = _covered(xr, protect)
+    spots: list[dict] = []
+    taken: set[tuple[int, int, int, str]] = set()
+    for reading in readings or ():
+        fs = _flatten(reading)
+        xs = "".join(c for c, _, _ in fs)
+        reading_breaks = _breaks(fs)
+        ops = difflib.SequenceMatcher(None, xr, xs, autojunk=False).get_opcodes()
+        same = {i1 + k for op, i1, i2, _j1, _j2 in ops if op == "equal" for k in range(i2 - i1)}
+        anchors = sorted(k for k in a2r if k in same)
+        for k in range(1, len(ops) - 1):
+            op, i1, i2, j1, j2 = ops[k]
+            if op != "replace" or min(ops[k - 1][2] - ops[k - 1][1], ops[k + 1][2] - ops[k + 1][1]) < LOOK_ANCHOR:
+                continue
+            i1, i2 = _trim_fillers(xr, i1, i2, breaks)
+            j1, j2 = _trim_fillers(xs, j1, j2, reading_breaks)
+            cur, alt = xr[i1:i2], xs[j1:j2]
+            if (_only_fillers(cur) or _only_fillers(alt) or len(cur) > SWAP_MAX or len(alt) > SWAP_MAX
+                    or any(ch in _NUMERALS or ch.isascii() for ch in cur + alt)
+                    or any(i in protected for i in range(i1, i2))
+                    or (_spelling_only(cur, alt) and not (_KANJI.fullmatch(cur) and _KANA.fullmatch(alt)))):
+                continue
+            span = _span(fr, i1, i2)
+            if span is None or fs[j1][1] != fs[j2 - 1][1]:
+                continue
+            p, q = bisect.bisect_left(anchors, i1) - 1, bisect.bisect_left(anchors, i2)
+            if p >= 0 and q < len(anchors) and anchors[q] - anchors[p] <= MAX_SPAN:
+                lo, hi = a2r[anchors[p]], a2r[anchors[q]]
+                window = heard[max(0, lo - WINDOW_PAD):hi + WINDOW_PAD + 1]
+                if (any(_heard(window, lc, cur, rc) for lc, rc in _contexts(xr, i1, i2, breaks))
+                        or _leans(cur, alt, heard[lo + 1:hi])):
+                    continue
+            row, c0, c1 = span
+            text = str(reading[fs[j1][1]].get("text") or "")[fs[j1][2]:fs[j2 - 1][2] + 1]
+            if (row, c0, c1, text) in taken:
+                continue
+            taken.add((row, c0, c1, text))
+            spots.append({"kind": "split", "row": row, "c0": c0, "c1": c1, "cur": cur, "want": alt,
+                          "left": xr[max(0, i1 - SETTLE_CONTEXT):i1], "right": xr[i2:i2 + SETTLE_CONTEXT],
+                          "heard": text})
+    return sorted(spots, key=lambda s: (s["row"], s["c0"]))

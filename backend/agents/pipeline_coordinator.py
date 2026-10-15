@@ -333,6 +333,9 @@ class PipelineCoordinator:
                 # 校閲がいくつ採ったか。どの直しが認識の字から来たかを記録で追えるようにする
                 if isinstance(data, dict) and isinstance(data.get("heard"), dict) and data["heard"].get("given"):
                     entry["heard"] = data["heard"]
+                # 2回目の起こしが割れた所（2026-10-15）: 校閲の後の文と並べてどう選び、いくつ字を置いたか
+                if isinstance(data, dict) and isinstance(data.get("split"), dict) and data["split"].get("given"):
+                    entry["split"] = data["split"]
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
                 elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):

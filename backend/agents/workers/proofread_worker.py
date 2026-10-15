@@ -72,6 +72,9 @@ class ProofreadWorker(PipelineStageWorker):
         retried, unproofed = 0, 0
         # 別の音声認識の聞き取り: 文字起こしから来た所・本文と並べて選んだ所・校閲が採った行
         heard = {"given": 0, "chosen": 0, "adopted": 0}
+        # 2回目の起こしが割れた所: 候補・本文と並べて選んだ所・字を置いた所
+        split = {"given": 0, "chosen": 0, "applied": 0}
+        memo = None
 
         try:
             from proper_noun_dict import apply_dictionary
@@ -161,6 +164,17 @@ class ProofreadWorker(PipelineStageWorker):
             ctx.skipped_features.append("AI校閲(Gemini)")
             ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}), "AI校閲": 0}
 
+        # 2回目の起こしが別の字を書き、認識も決め手にならない所（割れた所）は、校閲の後の文と並べて
+        # 両順で選ばせ、選んだ所だけ字を置く（48回目の 27分05秒「鳴ってる→なってる」・8分15秒「羽毛→肌着」）。
+        # 校閲の前に渡すと、校閲がもう直した所（1分45秒「書道教室」・17分41秒「書道人口」）まで2回目の字
+        # （「初動教室」「初動人口」）に戻すおそれがある。校閲が効いていなければ選ばない
+        if getattr(ctx, "second_readings", None) and "AI校閲(Gemini)" not in ctx.skipped_features:
+            try:
+                split = await asyncio.get_running_loop().run_in_executor(
+                    None, lambda: _choose_split_readings(ctx, memo))
+            except Exception as e:  # noqa: BLE001 — 選べなくても字幕は校閲したもので進む
+                logger.warning(f"割れた聞き取りの選び直しをスキップ: {e}")
+
         # 同じ語の書き分け（「僕」と「ぼく」）を動画の中で多い方にそろえる。校閲は100行ずつ
         # 見るので、動画全体の書き方まではそろわない（33回目・2026-10-13）
         notation = {}
@@ -223,6 +237,8 @@ class ProofreadWorker(PipelineStageWorker):
         notation_note = f" / 表記{sum(notation.values())}件" if notation else ""
         heard_note = (f" / 別の聞き取り{heard['given']}か所中 選んだ{heard['chosen']}・採った{heard['adopted']}"
                       if heard["given"] else "")
+        split_note = (f" / 割れた聞き取り{split['given']}か所中 選んだ{split['chosen']}・置いた{split['applied']}"
+                      if split["given"] else "")
         # 使用モデルを取得（UI可視化用）
         try:
             from subtitle_engine.ai_proofreader import _get_current_model
@@ -253,15 +269,41 @@ class ProofreadWorker(PipelineStageWorker):
         return StageResult(
             stage_name=self.name, success=True,
             detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{retry_note}"
-                   f"{heard_note}{notation_note}{format_stats}{skip_warn}",
+                   f"{heard_note}{split_note}{notation_note}{format_stats}{skip_warn}",
             data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
-                  "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation, "heard": heard},
+                  "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation, "heard": heard,
+                  "split": split},
             duration_seconds=round(time.time() - start, 1),
         )
 
 
 # 失敗したバッチを半分ずつに分けて校閲し直す回数
 REPAIR_ROUNDS = 2
+
+
+def _choose_split_readings(ctx, memo) -> dict:
+    """2回目の起こしが割れた所を、校閲の後の文（ctx.segments）と並べて選ばせ、選んだ所の字を置く。
+
+    返り値は記録に残す集計（given・chosen・applied・models・spots）。候補は
+    `transcript_fusion.split_spots`（辞書の語は誤りの字も正しい字も候補にしない）。
+    """
+    from subtitle_engine import aligner, transcript_fusion
+    from subtitle_engine.ai_proofreader import apply_hints, judge_heard_hints
+    tokens = aligner.tokens_for(str(ctx.video_path))
+    protect = [w for pair in aligner._dictionary_terms() for w in pair]
+    spots = transcript_fusion.split_spots(ctx.segments, ctx.second_readings, tokens, protect=protect)
+    hints = transcript_fusion.heard_hints(ctx.segments, spots, [("open", "")] * len(spots))
+    split = {"given": len(hints), "chosen": 0, "applied": 0}
+    if not hints:
+        return split
+    chosen, judged = judge_heard_hints(hints, ctx.segments, memo=memo)
+    split.update(chosen=len(chosen), applied=apply_hints(ctx.segments, chosen),
+                 models=judged.get("models") or [], spots=judged.get("spots") or [])
+    if judged.get("failed"):
+        ctx.warnings.append("割れた聞き取り: 選べなかった所は、校閲のままにしました")
+    logger.info(f"🗳️ 2回目の起こしが割れた {len(hints)} か所を校閲の後の文と並べて選ばせ、"
+                f"{split['applied']} か所の字を置きました（選んだ {len(chosen)}）")
+    return split
 
 
 def _referee_for(video_path):

@@ -356,6 +356,75 @@ def test_the_stage_hands_no_other_hearing_when_none_was_chosen(monkeypatch):
     assert given == [False] and "別の聞き取り1か所中 選んだ0・採った0" in res.detail
     assert any("別の聞き取り" in w for w in ctx.warnings) and not any("AI校閲" in w for w in ctx.warnings)
 
+SPLIT_ROWS = ["うん、それで来年は。", "僕はね、生活をできるように鳴ってるのは、やっぱりご縁ですよ。", "引いたらそこが初等局だった。"]
+SPLIT_SECOND = ["うん、それで来年は。", "僕はね生活をできるようになってるのは、やっぱりご縁ですよ。", "引いたらそこが初動教室だった。"]
+
+
+def _split_ctx(monkeypatch, proofread_ok=True):
+    from agents.workers import proofread_worker
+    from subtitle_engine import ai_proofreader, aligner
+    from tests.fixtures.mock_pipeline import create_mock_ctx
+
+    def fake(segs, return_stats=True, **kwargs):
+        for s in segs:  # 校閲は「初等局」を「書道教室」に直した
+            s["text"] = s["text"].replace("初等局", "書道教室")
+        return segs, {"total_batches": 1, "failed_batches": 0 if proofread_ok else 1,
+                      "accepted_items": len(segs), "rejected_rows": []}
+
+    monkeypatch.setattr(ai_proofreader, "proofread_segments", fake)
+    monkeypatch.setattr(proofread_worker, "_referee_for", lambda path: None)
+    monkeypatch.setattr(proofread_worker, "_memo_for", lambda path: None)
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: [(ch, 0.1 * k) for k, ch in enumerate("うんそれで来年は")])
+    monkeypatch.setattr(aligner, "_dictionary_terms", lambda: ())
+    ctx = create_mock_ctx(segments=3)
+    ctx.segments = [{"start": 2.0 * k, "end": 2.0 * k + 2.0, "text": t} for k, t in enumerate(SPLIT_ROWS)]
+    ctx.second_readings = [[{"start": 2.0 * k, "end": 2.0 * k + 2.0, "text": t} for k, t in enumerate(SPLIT_SECOND)]]
+    return ctx
+
+
+def test_the_stage_chooses_split_readings_against_the_proofread_text_and_puts_the_chosen_words(monkeypatch):
+    """2回目の起こしが別の字を書いたまま決まらない所は、校閲の後の文と並べて選ばせ、選んだ所だけ字を置く
+    （48回目の 27分05秒「鳴ってる→なってる」）。校閲がもう直した所（「書道教室」）は校閲の後の文で並べるので、
+    2回目の字（「初動教室」）に戻すかどうかも校閲の後の文で決める。"""
+    import asyncio
+
+    from agents.workers import proofread_worker
+    from subtitle_engine import ai_proofreader
+    seen = []
+
+    def judge(hints, segs, memo=None):
+        seen.append(([h["incorrect"] for h in hints], [s["text"] for s in segs]))
+        chosen = [h for h in hints if "なってる" in h["correct"]]
+        return chosen, {"judged": len(hints), "chosen": len(chosen), "failed": False,
+                        "models": ["gemini-3.5-flash-lite"],
+                        "spots": [{"incorrect": h["incorrect"], "chosen": h in chosen} for h in hints]}
+
+    monkeypatch.setattr(ai_proofreader, "judge_heard_hints", judge)
+    ctx = _split_ctx(monkeypatch)
+    res = asyncio.run(proofread_worker.ProofreadWorker().execute(ctx))
+
+    (hints, texts), = seen
+    assert texts[2] == "引いたらそこが書道教室だった。" and len(hints) == 2
+    whole = "".join(s["text"] for s in ctx.segments)  # 整形で行は分かれる
+    assert "なってる" in whole and "鳴" not in whole and "書道教室" in whole
+    assert "割れた聞き取り2か所中 選んだ1・置いた1" in res.detail
+    split = res.data["split"]
+    assert (split["given"], split["chosen"], split["applied"]) == (2, 1, 1)
+    assert split["models"] == ["gemini-3.5-flash-lite"] and len(split["spots"]) == 2
+
+
+def test_split_readings_are_not_chosen_when_the_proofreader_did_not_take(monkeypatch):
+    import asyncio
+
+    from agents.workers import proofread_worker
+    from subtitle_engine import ai_proofreader
+    seen = []
+    monkeypatch.setattr(ai_proofreader, "judge_heard_hints", lambda hints, segs, memo=None: seen.append(1))
+    ctx = _split_ctx(monkeypatch, proofread_ok=False)
+    res = asyncio.run(proofread_worker.ProofreadWorker().execute(ctx))
+    assert seen == [] and res.data["split"]["given"] == 0 and "鳴ってる" in "".join(s["text"] for s in ctx.segments)
+
+
 def test_quality_gate_blocks_unproofread_subtitles(tmp_path, monkeypatch):
     from quality_gate_plugins import SubtitleCoverageCheck
     from subtitle_engine import coverage

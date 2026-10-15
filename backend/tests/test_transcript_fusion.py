@@ -19,6 +19,8 @@
    区間をもう1回起こし、3回目が認識に沿う字を書いたときだけ直す（2026-10-14・3分03秒
    「普通だったら」→「普通泣いて帰ったら」）。3回目が決めない所は区間を広げて読み直す（3回まで）。
    区間ごとの控えがキャッシュ。落ちたらそれまでに決まった所だけ直して進む
+8. 2回目の起こしが別の字を書き、認識も決め手にならない所（割れた所）は、校閲の後の文で選ばせる候補にする。
+   認識が本文の字を聞いた・本文の側に寄る所、書き分け・助詞・数字・辞書の語は候補にしない
 """
 from __future__ import annotations
 
@@ -1258,3 +1260,116 @@ def test_the_stage_hands_the_spots_it_could_not_settle_on_to_the_proofreader(tmp
         ("先生、あの、去年初めて", "今日ね初めて", "今日ね")]
     look = result.data["second_pass"]["third_look"]
     assert (look["kept"], look["hints"]) == (1, 1)
+
+
+def test_a_filler_at_the_edge_of_a_spot_is_left_out_before_it_is_counted():
+    """26分56秒（48回目）: 1回目「そうやって、うん、ぶっちゃけもう書きながら」・2回目「手本文字を」・認識
+    「筆文字を」。認識は言いよどみを書かないので食い違いは「うんぶっちゃけもう」の9字になり、SWAP_MAX を
+    超えて3回目の候補から外れていた。句読点で隔てた端の言いよどみを外して比べる。"""
+    row = "だから、そうやって、うん、ぶっちゃけもう書きながら、各、お客さんがいて"
+    fused = [_row(1625.7, 1629.8, row)]
+    second = [_row(1625.9, 1630.0, "だから、そうやって手本文字を書きながら、各お客さんがいて")]
+
+    spots = tfu.look_spots(fused, second, _heard("だからそうやって筆文字を書きながら各お客さんがいて", 1625.7, 0.15))
+
+    assert [(s["kind"], s["cur"], s["want"]) for s in spots] == [("neither", "ぶっちゃけもう", "筆文字を")]
+    assert row[spots[0]["c0"]:spots[0]["c1"]] == "、ぶっちゃけもう"
+
+
+def test_a_filler_inside_a_word_is_not_left_out():
+    """句読点で隔てていない「その」は語の一部のことがあるので外さない（候補の字数はそのまま）。"""
+    x = "ほかのそのぶっちゃけもう書き"
+    breaks = {3, 5}
+    assert tfu._trim_fillers(x, 3, 12, breaks) == (5, 12)  # 「その」の前後に句読点がある
+    assert tfu._trim_fillers(x, 3, 12, {3}) == (3, 12)     # 「その」の後ろに句読点が無い
+
+
+# ------------------------------------------------------------
+# 8. 2回目の起こしが割れた所（校閲の後の文で選ばせる）
+# ------------------------------------------------------------
+
+NARU_ROW = "僕はね、生活をできるように鳴ってるのは、やっぱりご縁ですよ。"
+NARU_SECOND = "あのー僕がね、生活をできるようになっているのは、やっぱりご縁ですよ。"
+NARU_EARLIER = "僕はね生活をできるようになってるのは、やっぱりご縁ですよ。"
+
+
+def test_a_spot_the_second_pass_wrote_differently_and_the_recogniser_did_not_hear_is_split():
+    """27分05秒（48回目）: 認識はこの5秒を書いていない（「僕はね生活を」の後は「うん」「なので」）ので、
+    2対1 でも3回目でも決まらず「鳴ってる」が残った。前の2回目の「なってる」を候補にする。"""
+    rows = [_row(1638.6, 1645.6, NARU_ROW)]
+    heard = _heard("いやいや素晴らしいことですね僕はね生活をうんなので偉そうな", 1630.0, 0.5)
+
+    spots = tfu.split_spots(rows, [[_row(1636.5, 1645.2, NARU_EARLIER)]], heard)
+
+    assert [(s["kind"], s["cur"], s["heard"]) for s in spots] == [("split", "鳴", "な")]
+    hints = tfu.heard_hints(rows, spots, [("open", "")])
+    assert [(h["incorrect"], h["correct"]) for h in hints] == [("ように鳴ってる", "ようになってる")]
+
+
+def test_both_second_passes_give_a_spot_each_when_they_wrote_different_words():
+    """8分15秒（48回目）: 1回目「羽毛」・2回目「肌着」・前の2回目「褌」・認識「はや着」。"""
+    rows = [_row(495.6, 499.0, "いや、だから僕全部脱いで、羽毛になって、そうなんですか？")]
+    readings = [[_row(495.4, 499.2, "いや、だから僕全部脱いで、肌着になって、そうなんですか？")],
+                [_row(495.6, 499.0, "いや、だから僕全部脱いで、褌になって、そうなんですか？")]]
+
+    spots = tfu.split_spots(rows, readings, _heard("いやだから僕全部脱いではや着になってそうなんですか", 495.6, 0.15))
+
+    assert [(s["cur"], s["heard"]) for s in spots] == [("羽毛", "肌着"), ("羽毛", "褌")]
+
+
+def test_a_spot_the_recogniser_heard_as_written_is_not_split():
+    rows = [_row(495.6, 499.0, "いや、だから僕全部脱いで、羽毛になって、そうなんですか？")]
+    readings = [[_row(495.4, 499.2, "いや、だから僕全部脱いで、肌着になって、そうなんですか？")]]
+
+    assert tfu.split_spots(rows, readings, _heard("いやだから僕全部脱いで羽毛になってそうなんですか", 495.6, 0.15)) == []
+
+
+def test_a_spot_the_recogniser_leans_to_is_not_split():
+    """9分01秒（48回目）: 本文「12時、お腹の12時」・2回目「真夜中」・認識「おなかの十二時」。認識はかなで
+    書くので字の並びでは聞こえたことにならないが、本文の字の方に寄っている。文として通る別の字に変えない
+    （並べて選ばせると両順で「真夜中」を選んだ）。"""
+    rows = [_row(540.0, 546.0, "てっぺんだよね。12時、お腹の12時。その前にね")]
+    readings = [[_row(540.0, 546.0, "てっぺんだよね。12時、真夜中の12時。その前にね")]]
+
+    assert tfu.split_spots(rows, readings, _heard("てっぺんだよね十二時おなかの十二時その前にね", 540.0, 0.2)) == []
+    # 認識が黙っていれば候補にする
+    assert [s["heard"] for s in tfu.split_spots(rows, readings, _heard("てっぺんだよねその前にね", 540.0, 0.5))] \
+        == ["真夜中"]
+
+
+@pytest.mark.parametrize("row, reading, kept", [
+    # かなを漢字にするだけ（書き分け）・2字以下のかなどうし（助詞）は候補にしない
+    ("大切にされている言葉を書いていただきますね。", "大切にされている言葉を書いて頂きますね。", False),
+    ("それがその経験が今の活動の原点にそうですね。", "それがその経験が今の活動の原点でそうですね。", False),
+    # 漢字をかなにするのは残す（本文の漢字が同じ音の別の語のことがある）
+    ("生活をできるように鳴ってるのは、やっぱり", "生活をできるようになってるのは、やっぱり", True),
+    # 数字・言いよどみ
+    ("自宅からね40分回ればいけるんですよね。", "自宅からね45分回ればいけるんですよね。", False),
+])
+def test_spelling_particles_and_numbers_are_not_split(row, reading, kept):
+    spots = tfu.split_spots([_row(0.0, 5.0, row)], [[_row(0.0, 5.0, reading)]], _heard("あいうえお", 30.0))
+
+    assert bool(spots) is kept
+
+
+def test_a_word_in_the_dictionary_is_not_split():
+    """辞書の語は誤りの字も正しい字も候補にしない（52秒: 本文「久喜田」・2回目「釘本」。辞書が「久木田」に直す）。"""
+    rows = [_row(52.8, 60.0, "先生は株式会社アドシアター代表で、久喜田デザイン書道塾主宰")]
+    readings = [[_row(52.8, 60.0, "先生は株式会社アドシアター代表で、釘本デザイン書道塾主宰")]]
+    heard = _heard("あいうえお", 100.0)
+
+    assert [s["cur"] for s in tfu.split_spots(rows, readings, heard)] == ["久喜田"]
+    assert tfu.split_spots(rows, readings, heard, protect=("久喜田", "久木田")) == []
+
+
+def test_the_stage_keeps_the_second_readings_for_choosing_after_proofreading(tmp_path, monkeypatch):
+    """校閲の後に割れた所を選び直す（`ProofreadWorker`）ために、2回目の起こしの行を残す。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+
+    _setup_two_passes(tmp_path, monkeypatch)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    assert asyncio.run(TranscribeWorker().execute(ctx)).success
+    assert len(ctx.second_readings) == 1
+    assert ctx.second_readings[0][0]["text"].startswith("こんにちは、書家の北原美麗です。")

@@ -378,6 +378,8 @@ class TranscribeWorker(PipelineStageWorker):
             stats["earlier"].append({"tag": tag, "differences": more["differences"], "adopted": more["adopted"]})
             logger.info(f"🗳️ 前の区切り方の2回目（{tag}）とも突き合わせ: 食い違い {more['differences']} か所のうち "
                         f"{more['adopted']} か所を直しました")
+        # 校閲の後に、2回目が別の字を書いたまま決まらない所を選び直すために残す（`ProofreadWorker`）
+        ctx.second_readings = readings
         fused, look = await self._third_look(ctx, whisper_checkpoint, fused, readings, tokens)
         if look is not None:
             stats = dict(stats, third_look=look)
