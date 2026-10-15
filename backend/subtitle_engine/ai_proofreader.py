@@ -257,6 +257,171 @@ def _heard_context(rows, texts) -> str:
             + "\n".join(lines))
 
 
+# 別の聞き取りを校閲に渡す前に、本文と並べて文として選ばせる（2026-10-15）。
+# 「本文が聞き違えていれば直す」と渡すだけでは、校閲は28か所中18か所で認識の字を採った。直りは4か所
+# （固唾・座右の銘・線質・仕上がり）で、崩れが10か所出た（47回目）。崩れは、同じ音で字だけ違う所
+# （主催→主宰・引ける→弾ける。認識の字の選び方は聞き取りの証拠にならない）と、認識の方が聞き違えた所
+# （細いほど→細いわな・関係なく→考え・機会をね→機会がです）。どちらも本文のままで文が通る。
+# 選ばせる指示の版。控えの鍵に入るので、指示や決め方を変えたら上げる
+JUDGE_VERSION = 1
+JUDGE_CHOICES = {"1", "2", "either"}
+
+
+def _judge_prompt(items, swap: bool) -> str:
+    """本文と別の聞き取りを候補1・2に並べる。swap なら別の聞き取りを候補1にする（並べた順で選ぶ癖を消す）。"""
+    head = """あなたは日本語の話し言葉の書き起こしを確かめる編集者です。
+次の各項目は、同じ発話の書き起こしに2通りの候補がある所です。前後の行も付けています。
+前後の行と話の流れから、日本語として意味が通り、話の筋に合う方を選んでください。
+
+- 片方が意味の通らない語・不自然な言い回しになっていれば、もう片方を選ぶ
+- 字が違うだけで同じ音の語なら、話の中身に合う字の方を選ぶ
+- 両方とも意味が通るとき・決められないとき（人名・数など）は "either"
+
+出力は JSON の配列だけにしてください（説明は不要）:
+[{"id": 1, "choice": "1"}, {"id": 2, "choice": "either"}]
+choice は "1"・"2"・"either" のどれかです。
+"""
+    out = [head]
+    for n, it in enumerate(items, 1):
+        first, second = (it["heard"], it["body"]) if swap else (it["body"], it["heard"])
+        out.append(f"\n[{n}]\n前の行: {it['prev']}\n候補1: {first}\n候補2: {second}\n次の行: {it['next']}")
+    return "\n".join(out)
+
+
+def _judge_key(salt: str, item: dict, swap: bool) -> str:
+    raw = json.dumps([salt, swap, item["prev"], item["body"], item["heard"], item["next"]], ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+
+def _as_side(choice, swap: bool):
+    """候補の番号を、本文（body）・別の聞き取り（heard）・どちらとも（either）に戻す。読めなければ None。"""
+    choice = str(choice).strip() if choice is not None else ""
+    if choice not in JUDGE_CHOICES:
+        return None
+    if choice == "either":
+        return "either"
+    return "heard" if (choice == "1") == swap else "body"
+
+
+def judge_heard_hints(hints, segments, memo=None):
+    """別の聞き取りを本文と並べて文として選ばせ、両順で別の聞き取りを選んだ所だけを返す。
+
+    hints は `transcript_fusion.heard_hints` の項目（誤 incorrect → 正 correct）。本文（segments）に
+    1か所だけある所を、前後の行を付けて「候補1・2」に並べ、本文を先にした回と別の聞き取りを先にした回の
+    2回聞く。両方で別の聞き取りを選んだ所だけ採る（並べた順で選ぶ癖・どちらとも言える所は本文のまま）。
+    選んだ結果は控え（`ProofreadMemo`）に残し、同じ所（前後の行も同じ）は次から聞かない。
+    呼べない・答えが読めないときは、その回の所を採らない（本文のまま）。
+
+    Returns:
+        (採る項目のリスト, stats)。stats の spots に所ごとの選び方（両順）を残す。
+    """
+    stats = {"judged": 0, "chosen": 0, "calls": 0, "memo_hits": 0, "failed": False, "skipped": False,
+             "models": [], "spots": []}
+    texts = [str(s.get("text") or "") if isinstance(s, dict) else "" for s in segments or ()]
+    items = []
+    for h in hints or ():
+        wrong, right = str(h.get("incorrect") or ""), str(h.get("correct") or "")
+        rows = [k for k, t in enumerate(texts) if wrong and wrong in t]
+        if not right or wrong == right or len(rows) != 1 or texts[rows[0]].count(wrong) != 1:
+            continue
+        k = rows[0]
+        items.append({"hint": h, "prev": texts[k - 1] if k else "", "body": texts[k],
+                      "heard": texts[k].replace(wrong, right, 1), "next": texts[k + 1] if k + 1 < len(texts) else ""})
+    stats["judged"] = len(items)
+    if not items:
+        return [], stats
+
+    sides = {False: {}, True: {}}
+    models = set()
+    keys = {}
+    if memo is not None:
+        template = hashlib.sha256(_judge_prompt([], False).encode("utf-8")).hexdigest()
+        salt = json.dumps([JUDGE_VERSION, template, _declared_model()])
+        for swap in (False, True):
+            for n, it in enumerate(items):
+                keys[swap, n] = _judge_key(salt, it, swap)
+                hit = memo.get(keys[swap, n])
+                if hit is not None and _as_side(hit, swap) is not None:
+                    sides[swap][n] = _as_side(hit, swap)
+                    stats["memo_hits"] += 1
+                    models.add(memo.model_of(keys[swap, n]) or "不明")
+
+    pending = {swap: [n for n in range(len(items)) if n not in sides[swap]] for swap in (False, True)}
+    if pending[False] or pending[True]:
+        api_key = os.getenv("GOOGLE_GENERATIVE_AI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            logger.warning("AI Proofreader: No API Key found. 別の聞き取りは選ばずに本文のままにします")
+            stats["skipped"] = True
+            pending = {False: [], True: []}
+    client = None
+    for swap in (False, True):
+        if not pending[swap] or stats["failed"]:
+            continue
+        try:
+            if client is None:
+                try:
+                    from model_governance import get_governed_client
+                    client = get_governed_client("ai_proofreader")
+                except ImportError:
+                    from gemini_client_factory import get_gemini_client
+                    client = get_gemini_client()
+            model_name = _get_current_model()
+            response = client.models.generate_content(
+                model=model_name,
+                contents=_judge_prompt([items[n] for n in pending[swap]], swap),
+                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0, seed=SEED),
+            )
+            stats["calls"] += 1
+            _record_call()
+            served = getattr(response, "model_version", None)
+            served_model = served if isinstance(served, str) and served else model_name
+            answers = json.loads(response.text)
+            if not isinstance(answers, list):
+                raise ValueError("答えが配列ではありません")
+        except Exception as e:  # 選べなければ採らない（本文のまま）
+            logger.warning(f"AI Proofreader: 別の聞き取りを選べませんでした（本文のままにします）: {e}")
+            stats["failed"] = True
+            continue
+        models.add(served_model)
+        for a in answers:
+            if not isinstance(a, dict):
+                continue
+            n = _as_index(a.get("id"))
+            side = _as_side(a.get("choice"), swap)
+            if n is None or not 1 <= n <= len(pending[swap]) or side is None:
+                continue
+            n = pending[swap][n - 1]
+            sides[swap][n] = side
+            if memo is not None:
+                memo.put(keys[swap, n], str(a.get("choice")).strip(), served_model)
+    if memo is not None:
+        memo.save()
+
+    chosen = []
+    for n, it in enumerate(items):
+        pair = [sides[False].get(n), sides[True].get(n)]
+        take = pair == ["heard", "heard"]
+        if take:
+            chosen.append(it["hint"])
+        h = it["hint"]
+        stats["spots"].append({"start": h.get("start"), "incorrect": h.get("incorrect"),
+                               "correct": h.get("correct"), "choices": pair, "chosen": take})
+    stats["chosen"] = len(chosen)
+    stats["models"] = sorted(models)
+    logger.info(f"AI Proofreader: 別の聞き取り {len(items)} か所を本文と並べて選ばせ、{len(chosen)} か所を校閲に渡します"
+                f"（呼び出し {stats['calls']} 回・控え {stats['memo_hits']}）")
+    return chosen, stats
+
+
+def _record_call() -> None:
+    """API 使用量を記録する（記録できなくても校閲は続ける）。"""
+    try:
+        from usage_tracker.api_usage_tracker import record_api_call
+        record_api_call(1, "ai_proofreader")
+    except Exception as e:
+        logger.debug(f"API使用量の記録をスキップ: {e}")
+
+
 def keep_term_edits(base: str, corrected: str, terms) -> str:
     """corrected の直しのうち、terms（辞書の正しい語）に掛かるものだけを base に足す。
 

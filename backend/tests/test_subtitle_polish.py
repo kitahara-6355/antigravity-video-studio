@@ -299,7 +299,43 @@ def test_the_stage_asks_again_for_rows_whose_corrections_were_thrown_away(monkey
 
 
 def test_the_stage_hands_the_other_hearing_to_the_proofreader(monkeypatch):
-    """文字起こしで3回目でも決まらなかった所（`ctx.heard_hints`）を校閲に渡し、採った数を工程の結果に出す。"""
+    """文字起こしで3回目でも決まらなかった所（`ctx.heard_hints`）は、本文と並べて文として選ばせ、
+    選んだ所だけを校閲に渡す。来た所・選んだ所・採った行の数を工程の結果に出す。"""
+    import asyncio
+    from agents.workers import proofread_worker
+    from subtitle_engine import ai_proofreader
+    from tests.fixtures.mock_pipeline import create_mock_ctx
+    given, judged = [], []
+    zayu = {"incorrect": "座右の目はなく", "correct": "座右の銘はなく", "term": "銘"}
+    shusai = {"incorrect": "主催されて", "correct": "主宰されて", "term": "宰"}
+
+    def judge(hints, segs, memo=None):
+        judged.append(list(hints))
+        return [zayu], {"judged": 2, "chosen": 1, "failed": False, "models": ["gemini-3.5-flash-lite"],
+                        "spots": [{"incorrect": "座右の目はなく", "choices": ["heard", "heard"], "chosen": True},
+                                  {"incorrect": "主催されて", "choices": ["body", "body"], "chosen": False}]}
+
+    def fake(segs, return_stats=True, **kwargs):
+        given.append(kwargs.get("hints"))
+        return segs, {"total_batches": 1, "failed_batches": 0, "accepted_items": len(segs), "rejected_rows": [],
+                      "heard_hints": 1, "heard_adopted": 1}
+
+    monkeypatch.setattr(ai_proofreader, "judge_heard_hints", judge)
+    monkeypatch.setattr(ai_proofreader, "proofread_segments", fake)
+    monkeypatch.setattr(proofread_worker, "_referee_for", lambda path: None)
+    monkeypatch.setattr(proofread_worker, "_memo_for", lambda path: None)
+    ctx = create_mock_ctx(segments=3)
+    ctx.heard_hints = [zayu, shusai]
+    res = asyncio.run(proofread_worker.ProofreadWorker().execute(ctx))
+    assert judged == [[zayu, shusai]] and given == [[zayu]]
+    assert "別の聞き取り2か所中 選んだ1・採った1" in res.detail
+    heard = res.data["heard"]
+    assert (heard["given"], heard["chosen"], heard["adopted"]) == (2, 1, 1)
+    assert heard["models"] == ["gemini-3.5-flash-lite"] and [s["chosen"] for s in heard["spots"]] == [True, False]
+
+
+def test_the_stage_hands_no_other_hearing_when_none_was_chosen(monkeypatch):
+    """選んだ所が無ければ校閲には渡さない（指示も控えの鍵も変わらない）。選べなかったときは警告に出す。"""
     import asyncio
     from agents.workers import proofread_worker
     from subtitle_engine import ai_proofreader
@@ -307,19 +343,18 @@ def test_the_stage_hands_the_other_hearing_to_the_proofreader(monkeypatch):
     given = []
 
     def fake(segs, return_stats=True, **kwargs):
-        given.append(kwargs.get("hints"))
-        return segs, {"total_batches": 1, "failed_batches": 0, "accepted_items": len(segs), "rejected_rows": [],
-                      "heard_hints": 1, "heard_adopted": 1}
+        given.append("hints" in kwargs)
+        return segs, {"total_batches": 1, "failed_batches": 0, "accepted_items": len(segs), "rejected_rows": []}
 
+    monkeypatch.setattr(ai_proofreader, "judge_heard_hints", lambda hints, segs, memo=None: ([], {"failed": True}))
     monkeypatch.setattr(ai_proofreader, "proofread_segments", fake)
     monkeypatch.setattr(proofread_worker, "_referee_for", lambda path: None)
     monkeypatch.setattr(proofread_worker, "_memo_for", lambda path: None)
     ctx = create_mock_ctx(segments=3)
-    ctx.heard_hints = [{"incorrect": "座右の目はなく", "correct": "座右の銘はなく", "term": "銘"}]
+    ctx.heard_hints = [{"incorrect": "主催されて", "correct": "主宰されて", "term": "宰"}]
     res = asyncio.run(proofread_worker.ProofreadWorker().execute(ctx))
-    assert given == [ctx.heard_hints]
-    assert "別の聞き取り1/1か所" in res.detail and res.data["heard"] == {"given": 1, "adopted": 1}
-
+    assert given == [False] and "別の聞き取り1か所中 選んだ0・採った0" in res.detail
+    assert any("別の聞き取り" in w for w in ctx.warnings) and not any("AI校閲" in w for w in ctx.warnings)
 
 def test_quality_gate_blocks_unproofread_subtitles(tmp_path, monkeypatch):
     from quality_gate_plugins import SubtitleCoverageCheck

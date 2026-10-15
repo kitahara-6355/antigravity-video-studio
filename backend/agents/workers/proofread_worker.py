@@ -70,8 +70,8 @@ class ProofreadWorker(PipelineStageWorker):
         memo_hits, memo_models = 0, []
         # 番号ずれなどで直しを捨てて聞き直した行のうち、採れた行数と、採れずに残った行数
         retried, unproofed = 0, 0
-        # 別の音声認識の聞き取りを渡した行と、その語を採った行
-        heard = {"given": 0, "adopted": 0}
+        # 別の音声認識の聞き取り: 文字起こしから来た所・本文と並べて選んだ所・校閲が採った行
+        heard = {"given": 0, "chosen": 0, "adopted": 0}
 
         try:
             from proper_noun_dict import apply_dictionary
@@ -84,7 +84,7 @@ class ProofreadWorker(PipelineStageWorker):
             logger.debug(f"固有名詞辞書適用スキップ: {e}")
 
         try:
-            from subtitle_engine.ai_proofreader import proofread_segments
+            from subtitle_engine.ai_proofreader import judge_heard_hints, proofread_segments
             original = [s.get("text", "") for s in ctx.segments]
             # UX-01: 同期AI呼び出しをスレッドプールにオフロード
             # → ステータスAPIの応答性を確保し、フロントエンドのタイムアウトを防止
@@ -97,17 +97,25 @@ class ProofreadWorker(PipelineStageWorker):
             memo = _memo_for(ctx.video_path)
             if memo is not None:
                 extra["memo"] = memo
-            # 文字起こしで3回目でも決まらなかった所は、認識の字を渡して文脈で決めさせる（46回目の「座右の目」）
+            # 文字起こしで3回目でも決まらなかった所は、認識の字を渡して文脈で決めさせる（46回目の「座右の目」）。
+            # 渡すのは、本文と並べて文として選ばせ、両順で認識の字を選んだ所だけ（47回目: そのまま渡すと
+            # 「主催→主宰」「細いほど→細いわな」など、本文で通る所まで認識の字にした）
             if getattr(ctx, "heard_hints", None):
-                extra["hints"] = ctx.heard_hints
+                chosen, judged = await loop.run_in_executor(
+                    None, lambda: judge_heard_hints(ctx.heard_hints, ctx.segments, memo=memo))
+                heard.update(given=len(ctx.heard_hints), chosen=len(chosen), models=judged.get("models") or [],
+                             spots=judged.get("spots") or [])
+                if judged.get("failed"):  # 字幕は校閲したものなので「AI校閲」の印は付けない（一部未校閲ではない）
+                    ctx.warnings.append("別の聞き取り: 選べなかった所は、文字起こしのままにしました")
+                if chosen:
+                    extra["hints"] = chosen
 
             def proofread(segs, return_stats=True):
                 return proofread_segments(segs, return_stats=return_stats, **extra)
 
             result = await loop.run_in_executor(None, lambda: proofread(ctx.segments))
             ctx.segments, retry_stats = result
-            heard = {"given": int(retry_stats.get("heard_hints", 0) or 0),
-                     "adopted": int(retry_stats.get("heard_adopted", 0) or 0)}
+            heard["adopted"] = int(retry_stats.get("heard_adopted", 0) or 0)
             # 失敗したバッチは小さく分けて校閲し直す（2026-10-06: 1/7 バッチが落ち、
             # 「呼んで→読んで」「初回→初会」が未校閲のまま字幕に出た）
             if retry_stats.get("failed_ranges"):
@@ -211,7 +219,8 @@ class ProofreadWorker(PipelineStageWorker):
         retry_note = (f" / 番号ずれの聞き直し{retried}行" if retried else "") + \
             (f"（未校閲{unproofed}行）" if unproofed else "")
         notation_note = f" / 表記{sum(notation.values())}件" if notation else ""
-        heard_note = f" / 別の聞き取り{heard['adopted']}/{heard['given']}か所" if heard["given"] else ""
+        heard_note = (f" / 別の聞き取り{heard['given']}か所中 選んだ{heard['chosen']}・採った{heard['adopted']}"
+                      if heard["given"] else "")
         # 使用モデルを取得（UI可視化用）
         try:
             from subtitle_engine.ai_proofreader import _get_current_model

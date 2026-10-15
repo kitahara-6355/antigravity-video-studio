@@ -329,6 +329,10 @@ class PipelineCoordinator:
                 if isinstance(data, dict) and int(data.get("memo_hits") or 0) > 0:
                     entry["memo"] = {"rows": int(data["memo_hits"]),
                                      "models": list(data.get("memo_models") or [])}
+                # 別の聞き取り（2026-10-15）: 文字起こしで決まらなかった所を本文と並べてどう選び、
+                # 校閲がいくつ採ったか。どの直しが認識の字から来たかを記録で追えるようにする
+                if isinstance(data, dict) and isinstance(data.get("heard"), dict) and data["heard"].get("given"):
+                    entry["heard"] = data["heard"]
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
                 elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):

@@ -685,6 +685,28 @@ def test_控えから使った校閲の直しは行数とモデルが記録に�
     assert "memo" not in st["youtube_opt"]
 
 
+def test_別の聞き取りをどう選び校閲がいくつ採ったかが記録に残る(tmp_path):
+    """別の聞き取り（2026-10-15）: 文字起こしで決まらなかった所を、本文と並べて選ばせた結果と
+    選んだモデル、校閲が採った行の数を工程の記録に残す（どの直しがどこから来たかを追える）。"""
+    c = _coordinator(tmp_path)
+    heard = {"given": 2, "chosen": 1, "adopted": 1, "models": ["gemini-3.5-flash-lite"],
+             "spots": [{"incorrect": "座右の目はなく", "choices": ["heard", "heard"], "chosen": True},
+                       {"incorrect": "主催されて", "choices": ["body", "body"], "chosen": False}]}
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _heard(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="別の聞き取り",
+                                   data={"heard": heard})
+            w.execute = _heard
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["heard"] == heard
+    assert "heard" not in st["youtube_opt"]
+
+
 def test_採用したAIの出力の件数が記録に残りゼロならスタブ(tmp_path):
     """**「宣言どおり」は断定ではなく証拠で決める**（2026-09-26 ユーザー決定・作りの変更）。
     工程が採用した AI の出力の件数を記録に残し、ゼロなら経路に依らず stub。"""
