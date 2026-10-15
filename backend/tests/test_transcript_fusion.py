@@ -1317,6 +1317,22 @@ def test_both_second_passes_give_a_spot_each_when_they_wrote_different_words():
     assert [(s["cur"], s["heard"]) for s in spots] == [("羽毛", "肌着"), ("羽毛", "褌")]
 
 
+def test_a_one_letter_filler_at_the_edge_of_the_second_reading_is_not_put_in():
+    """11分59秒（48回目）: 1回目「最終ね、エピソード」・2回目「っていうね、え、エピソード」・認識「いうね」。
+    2回目の「え」まで置くと、後ろの句読点が無いので「っていうね、えエピソード」と出る。句読点で隔てた
+    端の言いよどみは、1字でも外してから置く。"""
+    rows = [_row(714.5, 719.0, "俺は泣きそうになるわ。"), _row(719.06, 721.66, "最終のエピソードなんですか？"),
+            _row(721.66, 729.96, "ああ、なるほど。すごいですね。")]
+    readings = [[_row(714.5, 721.36, "俺は泣きそうになるわっていうね、え、エピソードなんです。"),
+                 _row(721.46, 730.26, "ああ、なるほど。すごいですね。")]]
+
+    spots = tfu.split_spots(rows, readings, _heard("俺は泣きそうになるいうねなるほどすごいですね", 714.5, 0.3))
+
+    assert [(s["cur"], s["heard"]) for s in spots] == [("最終の", "っていうね")]
+    hints = tfu.heard_hints(rows, spots, [("open", "")])
+    assert [(h["incorrect"], h["correct"]) for h in hints] == [("最終のエピソ", "っていうねエピソ")]
+
+
 def test_a_spot_the_recogniser_heard_as_written_is_not_split():
     rows = [_row(495.6, 499.0, "いや、だから僕全部脱いで、羽毛になって、そうなんですか？")]
     readings = [[_row(495.4, 499.2, "いや、だから僕全部脱いで、肌着になって、そうなんですか？")]]

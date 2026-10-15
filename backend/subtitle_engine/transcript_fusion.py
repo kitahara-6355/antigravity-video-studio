@@ -143,6 +143,8 @@ FILLERS = frozenset({
 # 食い違いのすぐ外側にあれば外して前後の字を取る言いよどみ（2字以上。1字の「え」「う」は
 # 「考え」「そう」の尻と見分けられない）と、そのために外側に余分に見る字数
 _SKIPPABLE = sorted((w for w in FILLERS if len(w) >= 2), key=lambda w: (-len(w), w))
+# 食い違いの端から外す言いよどみ。前後とも句読点で隔てた語だけを外すので、1字の語（「え」）も入れる
+_EDGE_FILLERS = sorted(FILLERS, key=lambda w: (-len(w), w))
 FILLER_SKIP = len(_SKIPPABLE[0])
 # 数字（norm_char が算用数字を漢数字にそろえる。認識は漢数字で書くので桁が食い違う）
 _NUMERALS = frozenset("〇一二三四五六七八九十百千万億")
@@ -198,17 +200,19 @@ def _contexts(x: str, i1: int, i2: int, breaks: set[int]) -> list[tuple[str, str
 
 
 def _trim_fillers(x: str, i1: int, i2: int, breaks: set[int]) -> tuple[int, int]:
-    """x[i1:i2] の頭と尻から、前後とも句読点で隔てた言いよどみの語（2字以上）を外した範囲。
+    """x[i1:i2] の頭と尻から、前後とも句読点で隔てた言いよどみの語を外した範囲。
 
     認識は言いよどみを書かないので、食い違いの端に言いよどみが入ると字数が増えて候補から外れる
     （48回目の 26分56秒: 「そうやって、うん、ぶっちゃけもう書きながら」と認識「そうやって筆文字を
-    書きながら」の食い違いは「うんぶっちゃけもう」の9字）。句読点で隔てていない語（「その」「なんか」）は
-    語の一部のことがあるので外さない。少なくとも1字は残す。
+    書きながら」の食い違いは「うんぶっちゃけもう」の9字）。2回目の字を置くときも、端の言いよどみまで
+    置くと字幕に残る（11分59秒: 2回目「っていうね、え、エピソード」の「え」まで置くと、後ろの句読点が
+    消えて「えエピソード」と出る）。句読点で隔てていない語（「その」「なんか」）は語の一部のことが
+    あるので外さない。少なくとも1字は残す。
     """
     trimmed = True
     while trimmed:
         trimmed = False
-        for w in _SKIPPABLE:
+        for w in _EDGE_FILLERS:
             n = len(w)
             if i2 - i1 > n and x.startswith(w, i1) and i1 in breaks and i1 + n in breaks:
                 i1, trimmed = i1 + n, True
