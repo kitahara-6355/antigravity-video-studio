@@ -19,11 +19,14 @@
   そういう」→「しようという」。認識は「と」と「い」を 0.2 秒で聞いた）
 - 1回目の行をまたぐ食い違いは、言いよどみだけの行の分を外して決める（2分46秒の「ないよね。
   ／ううん。」と2回目の「ないので。」。まとめて1つの食い違いになり、行をまたぐので決めていなかった）
+- 1回目のチャンクの区切りで割れて2行にまたがった語は、割れた字の多い方の行に置いて決める
+  （2026-10-15・10分16秒: 1回目「当時でん｜チーフの人たち」・2回目と認識「当時電通の人たち」。
+  2回目の区切りは1回目から離してあるので、1回目の区切りで割れた語を2回目は丸ごと聞く）
 - 食い違いと句読点で隔てたすぐ外側の言いよどみ（2字以上）は、前後の字から外しても探す（認識は
   言いよどみを書かない。素材の 42分05秒（43回目の 41分30秒）: 1回目「機械をねあの、足て」・2回目「絶やして」・認識
   「機会をね絶やして」。全編で変わるのはここと「なんだろう→何だろう」の2か所）
 - 決めない所: 1回目の字を4字以上消す・前後に間がある所で2字以上消す（認識は早口・言い直し・
-  重なりを落とすので、聞こえないことは弱い証拠）、言いよどみ（後で外す）、数字（認識は
+  重なりを落とすので、聞こえないことは弱い証拠。漢字は2音に数えた字数でも消える分を見る）、言いよどみ（後で外す）、数字（認識は
   漢数字で書く）、近くに確かな手がかり（2回とも同じで認識とも3字以上続けて合う字）が無い所
 
 43分の素材（25回目と26回目の起こし）で: 食い違い 1,042 か所のうち 118 か所を2回目の字にした。
@@ -77,6 +80,10 @@
 それぞれ別の字）。3回目が2回目と同じ字を書いた所は決めない（認識はどの起こしとも食い違ったまま）。
 43分の素材で候補 6 か所。行をまたぐ所（10分16秒: 1回目「当時でん｜チーフの人たち」・2回目「当時、デン｜
 の人たち」・認識「当時電通の人たち」）は、ほかの候補と同じく直さない。
+
+2回目の区切りを1回目から離す（2026-10-15・`gemini_transcriber.SECOND_PASS_GAP_SEC`）: 上の 10分16秒は
+2回とも同じ所（624.54秒）で区切って「電通」を割っていた（9 分以降は区切りの8割が同じ所）。離した2回目は
+「当時電通の人たち」と丸ごと聞き、突き合わせは区切りで割れた2行に直す（`_split_at_cut`）。
 """
 from __future__ import annotations
 
@@ -115,6 +122,9 @@ FILLER_SKIP = len(_SKIPPABLE[0])
 _NUMERALS = frozenset("〇一二三四五六七八九十百千万億")
 # 集計に載せる直しの例の数
 MAX_EXAMPLES = 50
+# 行の頭の時刻がチャンクの区切りからこれ以内なら、区切りで始まる行とみなす
+# （`gemini_transcriber.drop_boundary_echoes` と同じ幅）
+CUT_SLACK_SEC = 0.3
 
 
 def _flatten(segments: list[dict]) -> list[tuple[str, int, int]]:
@@ -190,8 +200,15 @@ def _heard_head(window: str, left: str, word: str) -> int:
 
 
 def _guarded(a: str, b: str, max_drop: int = MAX_DROP) -> bool:
-    return (len(a) - len(b) > max_drop or a.strip("ー") in FILLERS or b.strip("ー") in FILLERS
+    # 減る字数は、漢字を1字と数えた差と2音と数えた差の小さい方（漢字は1字で2音以上のことが多い。
+    # 区切りで割れた「でんちーふ」を2回目が「電通」と書くと、字数では3字減るが音では1字）
+    return (min(len(a) - len(b), _sounds(a) - _sounds(b)) > max_drop
+            or a.strip("ー") in FILLERS or b.strip("ー") in FILLERS
             or any(ch in _NUMERALS for ch in a + b))
+
+
+def _sounds(s: str) -> int:
+    return len(s) + sum(1 for ch in s if _KANJI.fullmatch(ch))
 
 
 def _no_time_for(heard: str, times: list[float], lo: int, hi: int, left: str, right: str, n: int) -> bool:
@@ -247,9 +264,13 @@ def _drop_filler_rows(ops: list[tuple], fa: list[tuple[str, int, int]]) -> list[
 
 
 def fuse(primary: list[dict], secondary: list[dict],
-         tokens: list[tuple[str, float]] | None) -> tuple[list[dict], dict]:
+         tokens: list[tuple[str, float]] | None,
+         cuts: list[float] | tuple = ()) -> tuple[list[dict], dict]:
     """primary の字を、secondary と認識（tokens: (字, 秒) の並び）の 2対1 で直す。
 
+    cuts は primary を起こしたときのチャンクの区切り（素材の秒）。区切りで割れて隣り合う2行に
+    またがった語は、割れた字の多い方の行に直した字を置く（`_split_at_cut`）。ほかの行をまたぐ
+    食い違いは決めない（どちらの行の字か分からない）。
     返り値は (行, 集計)。行は primary の写し（渡した行は書き換えない）。
     集計は {"differences", "adopted", "examples": [{"start", "before", "after"}]}。
     """
@@ -318,6 +339,15 @@ def fuse(primary: list[dict], secondary: list[dict],
         if i2 > i1:
             (_, row, c0), (_, row_end, c1) = fa[i1], fa[i2 - 1]
             if row != row_end:
+                split = _split_at_cut(fa, i1, i2, primary, texts, cuts)
+                if split is None:
+                    continue
+                (a0, a1), (b0, b1), into = split
+                before = "".join(texts[row][a0:a1 + 1] + texts[row_end][b0:b1 + 1])
+                texts[row_end][b0:b1 + 1] = list(new) if into == row_end else []
+                texts[row][a0:a1 + 1] = list(new) if into == row else []
+                stats["adopted"] += 1
+                examples.append({"start": primary[row].get("start"), "before": before, "after": new})
                 continue
             before = "".join(texts[row][c0:c1 + 1])
             texts[row][c0:c1 + 1] = list(new)
@@ -331,6 +361,42 @@ def fuse(primary: list[dict], secondary: list[dict],
         seg["text"] = "".join(chars)
     stats["examples"] = examples[::-1][:MAX_EXAMPLES]
     return out, stats
+
+
+def _split_at_cut(fa: list[tuple[str, int, int]], i1: int, i2: int, primary: list[dict],
+                  texts: list[list[str]],
+                  cuts: list[float] | tuple) -> tuple[tuple[int, int], tuple[int, int], int] | None:
+    """そろえた字の i1〜i2 が、チャンクの区切りで割れて隣り合う2行にまたがっていれば
+    ((前の行の頭, 尻), (後ろの行の頭, 尻), 直した字を置く行)。そうでなければ None。
+
+    区切りで割れた語は、前の行の尻と後ろの行の頭に分かれる（10分16秒: 区切り 624.54秒で
+    「当時でん｜チーフの人たち」）。区切りは後ろの行の頭の時刻で見る（CUT_SLACK_SEC 秒まで）。
+    直した字は割れた字の多い方の行に置き、もう片方の行に字が残らなくなるなら、その行に置く
+    （どちらの行にも字が残らなければ None）。
+    """
+    row, row_end = fa[i1][1], fa[i2 - 1][1]
+    if row_end != row + 1:
+        return None
+    try:
+        at = float(primary[row_end].get("start"))
+    except (TypeError, ValueError):
+        return None
+    if not any(abs(at - float(c)) < CUT_SLACK_SEC for c in cuts):
+        return None
+    head = [k for k in range(i1, i2) if fa[k][1] == row]
+    tail = [k for k in range(i1, i2) if fa[k][1] == row_end]
+    span = {row: (fa[head[0]][2], fa[head[-1]][2]), row_end: (fa[tail[0]][2], fa[tail[-1]][2])}
+
+    def bare_without(r: int) -> bool:  # 割れた字を除くと、その行に字が残らない
+        lo, hi = span[r]
+        return not "".join(norm_char(ch) for ch in texts[r][:lo] + texts[r][hi + 1:])
+
+    into, other = (row_end, row) if len(tail) >= len(head) else (row, row_end)
+    if bare_without(other):
+        into, other = other, into
+        if bare_without(other):
+            return None
+    return span[row], span[row_end], into
 
 
 # ─────────────────────────── 3回目の起こし ───────────────────────────

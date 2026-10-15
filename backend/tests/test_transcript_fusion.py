@@ -224,6 +224,52 @@ def test_a_difference_across_rows_with_words_on_both_sides_is_left_alone():
     assert [s["text"] for s in out] == [s["text"] for s in first]
 
 
+# 実例（10分16秒・45回目の前）: 1回目の区切り（624.54秒）で「電通」が割れ、「当時でん」「チーフの人たち」の
+# 2行になった。2回目（区切りを1回目から5秒以上離した）と認識は「当時電通の人たち」と丸ごと聞いた
+SPLIT_FIRST = [_row(617.4, 624.5, "そのスタジオの中には、当時でん"),
+               _row(624.5, 635.0, "チーフの人たちとか、ショップの幹部とか。")]
+SPLIT_SECOND = [_row(618.1, 634.4, "そのスタジオの中には当時電通の人たちとか、ショップの幹部とか。")]
+SPLIT_HEARD = "そのスタジオの中には当時電通の人たちとかショップの幹部とか"
+
+
+def test_a_word_split_at_a_chunk_cut_takes_what_the_second_pass_heard_whole():
+    """区切りで割れた語は、隣り合う2行のうち割れた字の多い方の行に、2回目と認識の字を置く。"""
+    out, stats = tfu.fuse(SPLIT_FIRST, SPLIT_SECOND, _heard(SPLIT_HEARD, start=620.0), cuts=[624.54])
+
+    assert [s["text"] for s in out] == ["そのスタジオの中には、当時", "電通の人たちとか、ショップの幹部とか。"]
+    assert [(s["start"], s["end"]) for s in out] == [(617.4, 624.5), (624.5, 635.0)]
+    assert stats["adopted"] == 1
+    assert stats["examples"][0]["before"] == "でんチーフ" and stats["examples"][0]["after"] == "電通"
+
+
+def test_a_word_across_rows_that_do_not_meet_at_a_chunk_cut_is_left_alone():
+    """区切りでない行の切れ目は、話者や文の切れ目。どちらの行の字か決められない。"""
+    out, _ = tfu.fuse(SPLIT_FIRST, SPLIT_SECOND, _heard(SPLIT_HEARD, start=620.0), cuts=[600.0])
+
+    assert [s["text"] for s in out] == [s["text"] for s in SPLIT_FIRST]
+
+
+def test_a_word_split_at_a_cut_goes_to_the_row_that_would_otherwise_be_left_empty():
+    first = [_row(622.0, 624.5, "でん"), _row(624.5, 635.0, "チーフの人たちとか、ショップの幹部とか。")]
+    second = [_row(622.0, 634.4, "電通の人たちとか、ショップの幹部とか。")]
+
+    out, _ = tfu.fuse(first, second, _heard("当時電通の人たちとかショップの幹部とか", start=622.0),
+                      cuts=[624.54])
+
+    assert [s["text"] for s in out] == ["電通", "の人たちとか、ショップの幹部とか。"]
+
+
+def test_kanji_are_counted_as_two_sounds_when_checking_for_dropped_characters():
+    """「でんちーふ→電通」は字数で3字減るが、漢字を2音に数えれば1字。漢字を2音に数えても2字以上
+    減る所は、これまでどおり決めない（認識は早口や言い直しを落とす）。"""
+    first = [_row(0.0, 3.0, "それはいいんじゃないですかね。")]
+    second = [_row(0.0, 3.0, "それは良いですかね。")]
+
+    out, _ = tfu.fuse(first, second, _heard("それは良いですかね"))
+
+    assert out[0]["text"] == first[0]["text"]
+
+
 @pytest.mark.parametrize("first_text,second_text,heard", [
     ("あの、ここで書きました。", "えっと、ここで書きました。", "えっとここで書きました"),
     ("生徒さんは百人くらいです。", "生徒さんは十人くらいです。", "生徒さんは十人くらいです"),

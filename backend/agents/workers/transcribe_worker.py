@@ -361,7 +361,7 @@ class TranscribeWorker(PipelineStageWorker):
                 logger.warning(f"⚠️ 文字起こしの2回目に失敗 → 1回目のまま進みます: {e}")
                 ctx.warnings.append(f"文字起こし: 2回目（聞き違いの突き合わせ）に失敗したため1回目のまま進みました（{e}）")
                 return segments, None
-        fused, stats = transcript_fusion.fuse(segments, second, tokens)
+        fused, stats = transcript_fusion.fuse(segments, second, tokens, cuts=list(cuts))
         # 2回目のモデルも実行記録に残す（前の区切り方から写したチャンクはモデルを記録していないことがある）
         stats = dict(stats, models=list(made.get("models_used") or []), carried=int(made.get("carried") or 0))
         logger.info(f"🗳️ 文字起こしの2回目と突き合わせ: 食い違い {stats['differences']} か所のうち "
