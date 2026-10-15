@@ -328,8 +328,9 @@ class TranscribeWorker(PipelineStageWorker):
 
         区切りを変えると Gemini の聞き違いが別の所に出る（2026-10-06 実測）。cuts は1回目の区切りで、
         2回目はそこから離して切る（`gemini_transcriber.SECOND_PASS_GAP_SEC`）。前の区切り方の2回目の
-        キャッシュは、区切りが変わらないチャンクを写す元にする。認識が使えない・2回目が落ちたら
-        1回目のまま進む（2回目は直すためだけに使う）。返り値は (行, 集計)。
+        キャッシュは、区切りが変わらないチャンクを写す元にし、いまの2回目の後にもう1つの聞き取りとして
+        突き合わせる（集計の `earlier`）。認識が使えない・2回目が落ちたら1回目のまま進む（2回目は
+        直すためだけに使う）。返り値は (行, 集計)。
         """
         from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
         if not gemini_transcriber.SECOND_PASS:
@@ -340,19 +341,19 @@ class TranscribeWorker(PipelineStageWorker):
             logger.info("手元の音声認識が使えないので、文字起こしの2回目は飛ばします")
             return segments, None
         checkpoint = _gemini_checkpoint(whisper_checkpoint, second=True)
+        earlier = [(t, c) for t, c in ((t, _gemini_checkpoint(whisper_checkpoint, second=True, second_tag=t))
+                                       for t in gemini_transcriber.SECOND_PASS_EARLIER_TAGS)
+                   if Path(c).exists() and Path(c).stat().st_size > 1000]
         if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
             second = self._read_gemini_checkpoint(checkpoint)
             made = gemini_transcriber.read_meta(checkpoint)
         else:
             try:
                 journal = gemini_transcriber.journal_path(checkpoint)
-                earlier = [c for c in (_gemini_checkpoint(whisper_checkpoint, second=True, second_tag=t)
-                                       for t in gemini_transcriber.SECOND_PASS_EARLIER_TAGS)
-                           if Path(c).exists()]
                 tx = await loop.run_in_executor(None, functools.partial(
                     gemini_transcriber.transcribe, ctx.video_path,
                     first_chunk_sec=gemini_transcriber.SECOND_PASS_FIRST_SEC, avoid_cuts=list(cuts),
-                    journal=journal, earlier=earlier))
+                    journal=journal, earlier=[c for _, c in earlier]))
                 made = {"cuts": tx.cuts, "models_used": tx.models_used, "carried": tx.carried}
                 gemini_transcriber.write_checkpoint(tx.segments, checkpoint, meta=made)
                 journal.unlink(missing_ok=True)
@@ -366,13 +367,24 @@ class TranscribeWorker(PipelineStageWorker):
         stats = dict(stats, models=list(made.get("models_used") or []), carried=int(made.get("carried") or 0))
         logger.info(f"🗳️ 文字起こしの2回目と突き合わせ: 食い違い {stats['differences']} か所のうち "
                     f"{stats['adopted']} か所を、2回目と手元の音声認識が同じ字に直しました")
-        fused, look = await self._third_look(ctx, whisper_checkpoint, fused, second, tokens)
+        # 前の区切り方の2回目も、もう1つの聞き取りとして突き合わせる。区切りが違えば聞き違える所も
+        # 違うので、捨てると、前の2回目が正しかった所が1回目の字に戻る（45回目: 2回目を起こし直したら
+        # 締めの「絶やして」「増やしていく」や「豊橋筆」「書道家」が戻った。突き合わせると 44 か所を直し、
+        # 変わった 39 行のうち 36 行が認識に近づいた。遠のいたのは「これね」「なんというのか」の2行・2026-10-15）
+        stats["earlier"], readings = [], [second]
+        for tag, path in earlier:
+            readings.append(self._read_gemini_checkpoint(path))
+            fused, more = transcript_fusion.fuse(fused, readings[-1], tokens, cuts=list(cuts))
+            stats["earlier"].append({"tag": tag, "differences": more["differences"], "adopted": more["adopted"]})
+            logger.info(f"🗳️ 前の区切り方の2回目（{tag}）とも突き合わせ: 食い違い {more['differences']} か所のうち "
+                        f"{more['adopted']} か所を直しました")
+        fused, look = await self._third_look(ctx, whisper_checkpoint, fused, readings, tokens)
         if look is not None:
             stats = dict(stats, third_look=look)
         return fused, stats
 
     async def _third_look(self, ctx: PipelineContext, whisper_checkpoint: str, fused: list[dict],
-                          second: list[dict], tokens: list) -> tuple[list[dict], dict | None]:
+                          readings: list[list[dict]], tokens: list) -> tuple[list[dict], dict | None]:
         """2回でも決めきれない所だけ、そこが真ん中に来るように区切ってもう1回起こして決める。
 
         2回の起こしが同じ所で聞き違えると突き合わせても直らない（3分03秒「普通泣いて帰ったら」）。
@@ -383,12 +395,19 @@ class TranscribeWorker(PipelineStageWorker):
         種類ごとに別の区間で読む（同じ区間にまとめると、先にあった候補の区間が変わって控えが使えず、
         直っていた所を読み直すことになる）。辞書の語は候補にしない。
         落ちたら、それまでに決まった所だけを直して進む（3回目は直すためだけに使う）。
+        readings は2回目の起こし（いまの区切り方のもの、前の区切り方のもの）。候補は起こしごとに探して
+        まとめる（前の区切り方の2回目だけが1字消した所も読む。45回目の後に「書道で→書で」などが戻った）。
         """
         from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
         if not gemini_transcriber.THIRD_LOOK:
             return fused, None
-        spots = transcript_fusion.look_spots(fused, second, tokens,
-                                             protect=[correct for _, correct in aligner._dictionary_terms()])
+        protect = [correct for _, correct in aligner._dictionary_terms()]
+        spots, taken = [], set()
+        for reading in readings:
+            for spot in transcript_fusion.look_spots(fused, reading, tokens, protect=protect):
+                if (spot["row"], spot["c0"], spot["c1"]) not in taken:
+                    taken.add((spot["row"], spot["c0"], spot["c1"]))
+                    spots.append(spot)
         if not spots:
             return fused, {"spots": 0, "windows": 0, "adopted": 0, "examples": []}
         loop = asyncio.get_running_loop()

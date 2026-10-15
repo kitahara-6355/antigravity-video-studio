@@ -556,6 +556,36 @@ def test_a_second_pass_cut_the_earlier_way_is_made_again_from_its_unchanged_chun
     assert len(earlier) == 1 and earlier[0] and all(before in name for name in earlier[0])
 
 
+def test_a_second_pass_cut_the_earlier_way_is_also_heard_as_one_more_reading(tmp_path, monkeypatch):
+    """前の区切り方の2回目も、いまの2回目と突き合わせた後にもう1つの聞き取りとして突き合わせる。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import gemini_transcriber as gt
+
+    _setup_two_passes(tmp_path, monkeypatch)
+    asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+    now = gt.CUT_TAG + gt.SECOND_PASS_TAG + "_"
+    before = gt.CUT_TAG + gt.SECOND_PASS_EARLIER_TAGS[-1] + "_"
+    for p in tmp_path.glob(f"_gemini_*{now}*"):
+        p.rename(p.with_name(p.name.replace(now, before)))
+    fake = gt.transcribe
+
+    def mishearing(path, **kw):  # いまの区切り方の2回目は別の所で聞き違える
+        tx = fake(path, **kw)
+        if kw.get("first_chunk_sec"):
+            tx.segments = _pass("こんにちは、初夏の北原美麗です。" + "あ" * 300)
+        return tx
+    monkeypatch.setattr(gt, "transcribe", mishearing)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert ctx.segments[0]["text"].startswith("こんにちは、書家の北原美麗です。")
+    assert result.data["second_pass"]["adopted"] == 0
+    assert [(e["tag"], e["adopted"]) for e in result.data["second_pass"]["earlier"]] == [
+        (gt.SECOND_PASS_EARLIER_TAGS[-1], 1)]
+
+
 def test_a_failed_second_pass_keeps_the_first_and_says_so(tmp_path, monkeypatch):
     from agents.pipeline_types import PipelineContext
     from agents.workers.transcribe_worker import TranscribeWorker
@@ -962,6 +992,44 @@ def test_the_stage_reads_the_undecided_spots_a_third_time(tmp_path, monkeypatch)
     (windows, journal), = looked
     assert windows == [(0.0, 14.0)]  # 行の前後 8 秒（素材の頭で切れる）
     assert journal.startswith("_gemini_c30qc_") and journal.endswith(".chunks.journal"), "3回目は別の控え"
+
+
+def test_the_third_reading_also_looks_where_an_earlier_second_pass_dropped_a_character(tmp_path, monkeypatch):
+    """前の区切り方の2回目だけが1字消した所も3回目で読む（候補は聞き取りごとに探してまとめる）。
+
+    45回目の後: 前の2回目と突き合わせると、いまの2回目とだけ見ていた候補では「書道で→書で」
+    「奈良筆でも→奈良筆も」「最後の最後に→最後の最後」（44回目に前の2回目から3回目で直した所）が戻った。
+    """
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import aligner, gemini_transcriber as gt
+
+    monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
+    pad = "あいうえおかきくけこ" * 30
+    second = [DROP_SECOND]
+
+    def fake_transcribe(path, **kw):
+        text = second[0] if kw.get("first_chunk_sec") else DROP_FIRST
+        return gt.TranscribeResult(segments=[_row(0.4, 6.0, text), _row(6.0, 30.0, pad)], model="m",
+                                   chunks=1, models_used=["m"], cuts=[15.0] if kw.get("first_chunk_sec") else [30.0])
+    monkeypatch.setattr(gt, "transcribe", fake_transcribe)
+    monkeypatch.setattr(aligner, "tokens_for", lambda media: _heard(DROP_HEARD + pad, 0.4, 0.08))
+    monkeypatch.setattr(gt.QuietMap, "from_media", classmethod(lambda cls, media: None))
+    monkeypatch.setattr(gt, "transcribe_windows", lambda path, windows, **kw: (
+        [_row(0.0, 14.0, "という感じで、そう、何かやっぱり好きだったから")], ["m3"]))
+    asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+    now = gt.CUT_TAG + gt.SECOND_PASS_TAG + "_"
+    before = gt.CUT_TAG + gt.SECOND_PASS_EARLIER_TAGS[-1] + "_"
+    for p in tmp_path.glob(f"_gemini_*{now}*"):
+        p.rename(p.with_name(p.name.replace(now, before)))
+    second[0] = DROP_FIRST  # いまの区切り方の2回目は1回目と同じ字を書いた
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert ctx.segments[0]["text"] == DROP_SECOND
+    look = result.data["second_pass"]["third_look"]
+    assert (look["spots"], look["adopted"]) == (1, 1)
 
 
 def test_a_failed_third_reading_keeps_the_two_pass_result_and_says_so(tmp_path, monkeypatch):
