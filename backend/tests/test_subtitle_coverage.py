@@ -423,6 +423,60 @@ def test_sidecar_keeps_what_the_alignment_started_from(tmp_path):
     assert data["cut_points"] == [3.0]
 
 
+def _gone_check(tmp_path, monkeypatch, kept, gone):
+    """字幕 kept と、時刻合わせで外した字幕 gone を横置きにして、欠落の判定を回す（発話の時間は覆われている）。"""
+    from quality_gate_plugins import SubtitleCoverageCheck
+    from smart_cut_engine import write_subtitle_sidecar
+
+    preview = tmp_path / "preview.mp4"
+    preview.write_bytes(b"x")
+    write_subtitle_sidecar(preview, kept, [(0.0, 3000.0)], gone=gone)
+    monkeypatch.setattr(cv, "check_media", lambda media, segs, **kw: cv.measure(segs, [], 3000.0, **kw))
+    return SubtitleCoverageCheck().analyze(SimpleNamespace(segments=[], video_path=None,
+                                                           preview_path=str(preview)))
+
+
+def test_sidecar_lists_the_captions_the_alignment_dropped(tmp_path):
+    from smart_cut_engine import write_subtitle_sidecar
+    preview = tmp_path / "preview.mp4"
+    gone = [{"start": 711.97, "end": 713.28, "text": "エピソードなんですか？", "reason": "unheard_short"}]
+    write_subtitle_sidecar(preview, [{"start": 1.0, "end": 2.0, "text": "a"}], [(0.0, 5.0)], gone=gone)
+    data = json.loads((tmp_path / "preview.subtitles.json").read_text(encoding="utf-8"))
+    assert data["gone"] == gone
+
+
+def test_a_spoken_line_dropped_by_the_alignment_blocks(tmp_path, monkeypatch):
+    # 実例（50回目の 11分52秒）: 時刻合わせが聞き手の「エピソードなんですか？」を読めない長さとして外した。
+    # 声の切れ端が 0.5 秒に満たず、発話区間との突き合わせでは欠落に見えなかった（品質 91 点）
+    kept = [{"start": 709.12, "end": 712.34, "text": "泣きそうになるわっていうね"},
+            {"start": 713.33, "end": 714.52, "text": "ああ　なるほど"}]
+    gone = [{"start": 711.97, "end": 713.28, "text": "エピソードなんですか？", "reason": "unheard_short"}]
+    result = _gone_check(tmp_path, monkeypatch, kept, gone)
+    assert result["blocking"] is True
+    assert any("11:51" in f and "エピソードなんですか" in f for f in result["feedback"])
+
+
+@pytest.mark.parametrize("kept, gone", [
+    # 相づちだけの字幕は焼き込まない
+    ([{"start": 1508.5, "end": 1511.4, "text": "一週間のうち六日間費やす"}],
+     [{"start": 1510.97, "end": 1512.37, "text": "うんうんうん", "reason": "unheard_short"}]),
+    # 隣の字幕の言葉を繰り返しただけ（4分53秒「オリンピック はい」・39分06秒「分からない 分からない」）
+    ([{"start": 291.44, "end": 293.85, "text": "僕生まれた年のオリンピック"}],
+     [{"start": 293.76, "end": 294.52, "text": "オリンピック　はい", "reason": "unheard_short"}]),
+    ([{"start": 2347.18, "end": 2351.58, "text": "分からないけど　ナイロンの筆って\n筆ペンみたいにあるじゃない？"}],
+     [{"start": 2346.73, "end": 2347.14, "text": "分からない　分からない", "reason": "no_room"}]),
+    # 3字までの短い声（「おー」「もうね」）
+    ([], [{"start": 218.39, "end": 218.75, "text": "おー", "reason": "no_room"},
+          {"start": 1181.85, "end": 1181.85, "text": "もうね", "reason": "no_room"}]),
+    # カットで声が消えた言葉（9分39秒「いたんだよね」）
+    ([], [{"start": 578.86, "end": 579.18, "text": "いたんだよね", "reason": "cut"}]),
+])
+def test_dropped_backchannels_echoes_and_short_calls_do_not_block(tmp_path, monkeypatch, kept, gone):
+    result = _gone_check(tmp_path, monkeypatch, kept, gone)
+    assert result["blocking"] is False
+    assert result["coverage"]["外した字幕"] == [dict(g, blocking=False) for g in gone]
+
+
 # ------------------------------------------------------------
 # 7. 文字起こしの区切りは話の切れ目に置く（2026-10-06）
 # ------------------------------------------------------------

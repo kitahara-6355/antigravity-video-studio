@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from dataclasses import dataclass
 
@@ -601,9 +602,94 @@ def _drop_unheard_flashes(items: list[dict], min_display: float = DEFAULT_TIMING
         if s.get("_merged") or not _too_short(s, min_display):
             continue
         if _unheard(s):
-            s["_merged"] = True
+            s["_merged"], s["_gone"] = True, "unheard_short"
             dropped += 1
     return dropped
+
+
+# 外した字幕を欠落と数える字数。これに満たない短い声（「おー」「もうね」）は数えない
+LOST_MIN_CHARS = 4
+# 外した字幕の言葉が、前後この秒数の中の字幕にあれば繰り返し（4分53秒「オリンピック はい」）
+LOST_ECHO_SEC = 5.0
+# カット点からこの秒数の中に配った字幕は、カットで声が消えた言葉とみなして隣に足さない（9分39秒「いたんだよね」）
+LOST_CUT_SEC = 0.3
+# 外した字幕と隣の字幕がこれより離れていたら足さない（離れた所の言葉として出てしまう）
+LOST_JOIN_SEC = 1.0
+
+
+def lost_content(text, near: str) -> str:
+    """外した字幕 text の言葉のうち、相づち（`omit_standalone_words`）でも、近くの字幕の文 near にある言葉
+    （相手の言葉をなぞった「オリンピック はい」）でもないもの。LOST_MIN_CHARS 字以上なら、言った言葉が
+    字幕から消えている（`_join_lost`・品質ゲートの欠落）。"""
+    try:
+        from subtitle_engine.text_formatter import is_standalone_omittable, _omit_words
+        aizuchi = _omit_words("omit_standalone_words")
+    except Exception:  # 一覧が読めなければ相づちも言葉に数える
+        is_standalone_omittable, aizuchi = None, []
+    near = re.sub(r"\s", "", near or "")
+    words = [w for w in re.split(r"[\s、。，．,.！？!?「」『』]+", str(text or "")) if w]
+    return "".join(w for w in words if not (aizuchi and is_standalone_omittable(w, aizuchi)) and w not in near)
+
+
+def _near_text(items: list[dict], a: float, b: float) -> str:
+    """a〜b 秒の前後 LOST_ECHO_SEC の中に出る字幕の文。"""
+    return "".join(str(s.get("text") or "") for s in items
+                   if not s.get("_merged") and float(s["end"]) >= a - LOST_ECHO_SEC
+                   and float(s["start"]) <= b + LOST_ECHO_SEC)
+
+
+def _join_lost(items: list[dict], given: list[dict], lost: list[tuple[int, str]], cut_points: list[float],
+               max_chars: int | None = None, max_lines: int | None = None) -> tuple[list[tuple[int, str]], int]:
+    """外す字幕（lost: given の番号と理由）のうち言葉のあるもの（`lost_content`）を、隣の字幕に行として
+    足す（時刻は動かさない）。返り値は (足せなかった分, 足した数)。
+
+    置き場所の無い字幕は時刻の取り合いに加えずに外すので、認識が拾えない言葉が字幕から消えていた
+    （12分12秒: 聞き手の「黒子ですよ」の声に、次の字幕の頭の字が張り付いた・41分59秒「思います」も同じ形）。
+    相づちだけ・隣の字幕の繰り返し・短い声・映像の後ろの字幕は足さない。声の拾えない字幕をカット点のそばに
+    配ったときは、カットで声が消えた言葉とみなし、理由を `cut` にして残す。足す先は同じ区間で LOST_JOIN_SEC 秒より
+    近い隣の字幕（並びは元の字幕の順）で、1枚（max_lines 行）に収まる方。次の字幕を先に見る: 足した行は次の字幕と
+    一緒に、言った後に出る（前の字幕に足すと、言う前から出る）。
+    """
+    if max_chars is None or max_lines is None:
+        max_chars, max_lines = _caption_limits()
+    live = sorted((s for s in items if not s.get("_merged") and s.get("_sync_index") is not None),
+                  key=lambda s: s["_sync_index"])
+    left, joined = [], 0
+    for k, why in lost:
+        s = given[k]
+        a, b = float(s.get("start", 0)), float(s.get("end", 0))
+        if (why != "past_end" and _unheard(s)
+                and any(a - LOST_CUT_SEC <= c <= b + LOST_CUT_SEC for c in cut_points)):
+            left.append((k, "cut"))
+            continue
+        if why == "past_end" or len(lost_content(s.get("text"), _near_text(live, a, b))) < LOST_MIN_CHARS:
+            left.append((k, why))
+            continue
+        zone = _zone(s)
+        before = [o for o in live if _zone(o) == zone and o["_sync_index"] < k]
+        after = [o for o in live if _zone(o) == zone and o["_sync_index"] > k]
+        cands = ([(after[0], False)] if after and float(after[0]["start"]) - b <= LOST_JOIN_SEC else []) + (
+            [(before[-1], True)] if before and a - float(before[-1]["end"]) <= LOST_JOIN_SEC else [])
+        for o, first in cands:
+            pair = (o, s) if first else (s, o)
+            p0, p1 = str(pair[0].get("text", "")), str(pair[1].get("text", ""))
+            one = _as_one_caption(p0, p1, max_chars, max_lines, _flat(pair[0]), _flat(pair[1]))
+            if one is not None:
+                o["text"], o["_break_punct"] = one, one == f"{p0}\n{p1}" or _breaks_at_space(
+                    f"{_flat(pair[0])}\u3000{_flat(pair[1])}", one)
+                if first:
+                    o["_ends_punct"] = s.get("_ends_punct", False)
+                joined += 1
+                break
+        else:
+            left.append((k, why))
+    return left, joined
+
+
+def _gone(s: dict, reason: str) -> dict:
+    """外した字幕の記録（時刻合わせの前の時刻・本文・理由）。品質ゲートが字幕にしなかった発話として数える。"""
+    return {"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
+            "text": s.get("text", ""), "reason": reason}
 
 
 def _drop_squeezed(items: list[dict]) -> int:
@@ -611,7 +697,7 @@ def _drop_squeezed(items: list[dict]) -> int:
     dropped = 0
     for s in items:
         if not s.get("_merged") and float(s["end"]) - float(s["start"]) < VIDEO_FRAME:
-            s["_merged"] = True
+            s["_merged"], s["_gone"] = True, "squeezed"
             dropped += 1
     return dropped
 
@@ -628,7 +714,7 @@ def _drop_past_end(items: list[dict], end: float) -> int:
         if s.get("_merged"):
             continue
         if s["start"] >= end - MIN_STEP_SEC:
-            s["_merged"] = True
+            s["_merged"], s["_gone"] = True, "past_end"
             dropped += 1
         elif s["end"] > end:
             s["end"] = round(end, 3)
@@ -781,7 +867,9 @@ def _align_once(segments: list[dict], speech: SpeechMap, cut_points: list[float]
     # 「そういう中でね…」を 0.33 秒で消させた・2026-10-06 実測）
     heard_or_roomy = [dict(s, _sync_index=k) for k, s in enumerate(segments)
                       if not (_unheard(s) and float(s.get("end", 0)) - float(s.get("start", 0)) < FLASH_SEC)]
-    no_room = len(segments) - len(heard_or_roomy)
+    kept = {s["_sync_index"] for s in heard_or_roomy}
+    lost = [(k, "no_room") for k in range(len(segments)) if k not in kept]
+    no_room = len(lost)
     items = sorted(heard_or_roomy, key=lambda s: float(s.get("start", 0)))
     n = len(items)
     snapped_in = snapped_out = 0
@@ -891,9 +979,14 @@ def _align_once(segments: list[dict], speech: SpeechMap, cut_points: list[float]
     roomed = _give_unheard_room(result, segments, r["min_display_sec"])
     dropped = (_drop_unheard_flashes(result, r["min_display_sec"]) + _drop_squeezed(result)
                + past_end + no_room)
+    lost += [(s["_sync_index"], s["_gone"]) for s in result if s.get("_gone")]
+    lost, joined = _join_lost(result, segments, lost, cut_points)
+    if joined:
+        logger.info(f"🧷 置き場所の無い字幕を隣の字幕に行として足しました: {joined}枚")
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
              "redistributed": redistributed, "merged": merged, "resplit": resplit,
-             "dropped": dropped, "unheard_roomed": roomed}
+             "dropped": dropped - joined, "unheard_roomed": roomed, "joined": joined,
+             "gone": sorted((_gone(segments[k], why) for k, why in lost), key=lambda g: g["start"])}
     result = [s for s in result if not s.get("_merged")]
     logger.info(f"🎯 字幕の出だし・終わりを音声に合わせました: {n}枚, 話し始めに寄せた {snapped_in}, "
                 f"話し終わりに寄せた {snapped_out}")

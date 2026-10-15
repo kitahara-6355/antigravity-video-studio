@@ -368,6 +368,71 @@ def test_an_unheard_caption_given_too_little_time_is_still_dropped():
     assert all("はい" not in s["text"] for s in out)
     assert stats["dropped"] == 1
     assert out[0]["end"] >= 293.70
+    # 外した字幕は、本文・配った時刻・理由を集計に残す（品質ゲートが字幕にしなかった発話を数える）
+    assert stats["gone"] == [{"start": 293.76, "end": 294.52, "text": "オリンピック　はい",
+                              "reason": "unheard_short"}]
+
+
+def test_every_dropped_caption_is_listed_with_its_reason():
+    # 置き場所が無く時刻の取り合いに加えなかった字幕も、外した字幕として残す
+    sp = _map([(570.0, 578.9), (579.2, 584.0)], total=600)
+    full = "あ" * 18 + "\n" + "い" * 18
+    segs = [{"start": 574.9, "end": 578.86, "text": full, "_asr": True},
+            {"start": 578.86, "end": 579.18, "text": "いたんだよね", "_asr_interp": True},
+            {"start": 579.18, "end": 584.4, "text": full, "_asr": True}]
+    _, stats = sync.align_segments(segs, sp, [578.9], RULES)
+    # 声の拾えない字幕をカット点のそばに配った（カットで声が消えた言葉）ときは、理由を cut にする
+    assert stats["gone"] == [{"start": 578.86, "end": 579.18, "text": "いたんだよね", "reason": "cut"}]
+    # 隣とまとめた字幕は外していない
+    sp = _map([(1.0, 3.0), (3.05, 3.4), (3.5, 6.0)], total=10)
+    segs = [{"start": 1.0, "end": 3.0, "text": "一文目", "_asr": True},
+            {"start": 3.05, "end": 3.4, "text": "はい", "_asr": True},
+            {"start": 3.5, "end": 6.0, "text": "二文目", "_asr": True}]
+    _, stats = sync.align_segments(segs, sp, [], RULES)
+    assert stats["gone"] == []
+
+
+def test_a_spoken_line_with_no_room_is_added_to_the_next_caption_as_a_line():
+    # 実例（12分12秒・51回目）: 聞き手の「黒子ですよ」は認識が書かず、その声（732.52〜733.18 秒）に次の字幕の
+    # 頭の「誰」が張り付いた。前後の聞こえた字幕の間に配った 0.38 秒には置き場所が無く、言った言葉が字幕から
+    # 消えていた。時刻は動かさず、次の字幕に1行として足す（言った後に出る）
+    sp = _map([(730.01, 731.83), (732.52, 733.18), (733.46, 736.02)], total=740)
+    segs = [{"start": 730.43, "end": 731.95, "text": "アーティストじゃないんで", "_asr": True,
+             "_asr_first": 730.43},
+            {"start": 732.0, "end": 732.15, "text": "はい", "_asr_interp": True},
+            {"start": 732.15, "end": 732.53, "text": "黒子ですよ", "_asr_interp": True},
+            {"start": 732.53, "end": 735.54, "text": "誰が書いたか分かんないけどって", "_asr": True,
+             "_asr_first": 732.53}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["アーティストじゃないんで", "黒子ですよ\n誰が書いたか分かんないけどって"]
+    assert out[1]["start"] == pytest.approx(732.52, abs=0.05)
+    assert stats["joined"] == 1 and stats["dropped"] == 1
+    # 相づちだけの「はい」は足さず、外した字幕に残す
+    assert [(g["text"], g["reason"]) for g in stats["gone"]] == [("はい", "no_room")]
+
+
+def test_a_spoken_line_with_no_room_goes_to_the_caption_before_when_the_next_is_far():
+    # 次の字幕が離れていれば（`LOST_JOIN_SEC` 秒より後ろ）、前の字幕に足す
+    sp = _map([(10.0, 12.3), (14.6, 17.0)], total=20)
+    segs = [{"start": 10.0, "end": 12.0, "text": "そういうことに努めていきたいなと", "_asr": True,
+             "_asr_first": 10.0},
+            {"start": 12.0, "end": 12.4, "text": "思います", "_asr_interp": True},
+            {"start": 14.6, "end": 17.0, "text": "はい　分かりました", "_asr": True, "_asr_first": 14.6}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["そういうことに努めていきたいなと\n思います", "はい　分かりました"]
+    assert stats["joined"] == 1 and stats["gone"] == []
+
+
+def test_a_spoken_line_far_from_both_neighbours_is_not_added():
+    # 隣の字幕がどちらも離れていれば足さない（離れた所の言葉として出る）。外した字幕に残し、品質ゲートが数える
+    sp = _map([(1.0, 3.0), (8.0, 10.0)], total=12)
+    segs = [{"start": 1.0, "end": 3.0, "text": "一文目です", "_asr": True, "_asr_first": 1.0},
+            {"start": 5.0, "end": 5.4, "text": "黒子ですよ", "_asr_interp": True},
+            {"start": 8.0, "end": 10.0, "text": "二文目です", "_asr": True, "_asr_first": 8.0}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["一文目です", "二文目です"]
+    assert stats["joined"] == 0
+    assert stats["gone"] == [{"start": 5.0, "end": 5.4, "text": "黒子ですよ", "reason": "no_room"}]
 
 
 def test_an_unheard_caption_with_no_room_does_not_cut_a_heard_one_short():

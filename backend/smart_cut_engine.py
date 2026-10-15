@@ -259,12 +259,14 @@ def _display_span(seg: dict) -> tuple[float, float]:
     return src_start, src_end
 
 
-def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=None):
+def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=None, gone=None):
     """字幕の時刻を音声に合わせる。音声が読めなければそのまま返す。
 
     1. 素材を音声認識して**文字ごとの時刻**を取り、字幕の文字と突き合わせる
        （モデルが無ければ飛ばす）
     2. 残り（突き合わなかった字幕）を、声の切れ目と見せ方の規則で整える
+
+    `gone`（リスト）を渡すと、2 で外した字幕（`sync.align_segments` の集計の `gone`）を足す。
     """
     try:
         if not segments or not Path(cut_path).is_file() or Path(cut_path).stat().st_size == 0:
@@ -296,8 +298,10 @@ def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=No
             except Exception as e:
                 logger.warning(f"音声認識による時刻合わせをスキップ: {e}")
         from subtitle_engine import sync
-        aligned, _ = sync.align_segments(segments, sync.speech_map(str(cut_path)),
-                                         cut_points, sync.timing_rules())
+        aligned, stats = sync.align_segments(segments, sync.speech_map(str(cut_path)),
+                                             cut_points, sync.timing_rules())
+        if gone is not None:
+            gone.extend(stats.get("gone", []))
         return aligned
     except Exception as e:  # 合わせられなくても字幕は出す
         logger.warning(f"字幕の時刻合わせをスキップ: {e}")
@@ -352,11 +356,12 @@ def _sidecar_rows(segments) -> list[dict]:
 
 
 def write_subtitle_sidecar(video_path, segments, ranges=None, path=None, estimated=None,
-                           cut_points=None) -> None:
+                           cut_points=None, gone=None) -> None:
     """出力の時間軸の字幕と、素材のどの区間を残したか（`ranges`）を書く。
 
     `estimated`（時刻合わせの前の推定）と `cut_points` もあれば残す。合わせ方の不具合を、
-    書き出し直さずに同じ入力で再現できるようにするため。
+    書き出し直さずに同じ入力で再現できるようにするため。`gone` は時刻合わせで外した字幕
+    （`sync.align_segments` の集計）。品質ゲートが、字幕にしなかった発話として数える。
     """
     try:
         data = {"segments": _sidecar_rows(segments),
@@ -365,6 +370,8 @@ def write_subtitle_sidecar(video_path, segments, ranges=None, path=None, estimat
             data["estimated"] = _sidecar_rows(estimated)
         if cut_points is not None:
             data["cut_points"] = [round(float(c), 3) for c in cut_points]
+        if gone is not None:
+            data["gone"] = [dict(g) for g in gone]
         (path or subtitle_sidecar_path(video_path)).write_text(
             json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     except (OSError, TypeError, ValueError) as e:
@@ -534,14 +541,15 @@ def render_smart_cut(
         # 字幕の出だし・終わりを、カット後の音声の話し始め・話し終わりに合わせる
         # （2026-10-06 ユーザー指摘「言葉より先に出すぎる」）。文字起こしの時刻は粗い推定
         estimated_segments = [dict(s) for s in recalculated_segments]
+        gone = []
         recalculated_segments = _align_to_speech(temp_cut_path, recalculated_segments, cut_points,
-                                                 source_path=input_path, ranges=merged)
+                                                 source_path=input_path, ranges=merged, gone=gone)
 
         # 出力の時間軸の字幕を横に置く。品質ゲートが「喋っているのに字幕が無い」を
         # 出力の音声と突き合わせて数える（2026-10-06 ユーザー指摘の欠落）
         # 置き場所は temp_cut_path（<出力>.tmp.mp4）の隣。出力と同じ名前で .subtitles.json
         write_subtitle_sidecar(None, recalculated_segments, merged, estimated=estimated_segments,
-                               cut_points=cut_points,
+                               cut_points=cut_points, gone=gone,
                                path=temp_cut_path.with_name(
                                    temp_cut_path.name[:-len(".tmp.mp4")] + ".subtitles.json"))
 

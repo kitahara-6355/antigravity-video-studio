@@ -332,6 +332,29 @@ SYNC_OFF_RATIO_MAX = 0.15
 FLASH_SEC = 0.5
 
 
+def _lost_lines(gone: list, rows: list) -> list:
+    """時刻合わせ（`sync.align_segments`）が外した字幕 `gone` に、欠落として合格させないか（`blocking`）を
+    付ける。相づちだけの字幕（焼き込まない）・前後の字幕の言葉を繰り返しただけの字幕（相手の言葉をなぞった
+    「オリンピック はい」）・4字に満たない短い声（`sync.lost_content`）と、カット点のそばでカットで声が消えた
+    言葉（理由 `cut`）は欠落と数えない。rows は焼き込んだ字幕。
+    """
+    try:
+        from subtitle_engine import sync
+    except ImportError:
+        from backend.subtitle_engine import sync  # type: ignore[no-redef]
+    out = []
+    for g in gone:
+        if not isinstance(g, dict):
+            continue
+        t0, t1 = float(g.get("start", 0)), float(g.get("end", 0))
+        near = "".join(str(r.get("text") or "") for r in rows
+                       if isinstance(r, dict) and float(r.get("end", 0)) >= t0 - sync.LOST_ECHO_SEC
+                       and float(r.get("start", 0)) <= t1 + sync.LOST_ECHO_SEC)
+        out.append(dict(g, blocking=g.get("reason") != "cut"
+                        and len(sync.lost_content(g.get("text"), near)) >= sync.LOST_MIN_CHARS))
+    return out
+
+
 class SubtitleCoverageCheck(QualityCheckPlugin):
     """字幕の欠落チェック — 喋っているのに字幕が無い・極端に薄い区間（2026-10-06 ユーザー指摘）。
 
@@ -354,7 +377,7 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
         except ImportError:
             from backend.subtitle_engine import coverage  # type: ignore[no-redef]
 
-        checks = []
+        checks, gone = [], []
         # 文字起こしで「音はあるが発話ではない」と確認した区間（書いている場面・BGM）
         quiet = [tuple(q) for q in (getattr(ctx, "verified_quiet", None) or [])]
         segments = getattr(ctx, "segments", None) or []
@@ -373,6 +396,7 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                     data = json.loads(side.read_text(encoding="utf-8"))
                     rows = data.get("segments", []) if isinstance(data, dict) else data
                     ranges = data.get("ranges", []) if isinstance(data, dict) else []
+                    gone = (data.get("gone") or []) if isinstance(data, dict) else []
                     checks.append(("出力", str(preview), rows, "start", "end",
                                    coverage.map_to_output(quiet, ranges)))
                 except (OSError, ValueError) as e:
@@ -425,6 +449,18 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
             blocking = True
             feedback.append(f"⛔ 未校閲の字幕あり: AI校閲の失敗 {len(unproofed)}か所"
                             f"（{sum(b - a for a, b in unproofed)}行）")
+        # 時刻合わせが外した字幕（置き場所が無い・読めないほど短い）。声の切れ端が 0.5 秒に満たないと、
+        # 発話区間との突き合わせでは欠落に見えない（50回目の 11分52秒「エピソードなんですか？」で 91 点）
+        if gone:
+            out_rows = next((c[2] for c in checks if c[0] == "出力"), [])
+            lost = _lost_lines(gone, out_rows)
+            reports["外した字幕"] = lost
+            hard = [g for g in lost if g["blocking"]]
+            if hard:
+                blocking = True
+                feedback.append(f"⛔ 字幕にしなかった発話（時刻合わせで外れた）{len(hard)}行: " + "・".join(
+                    f"{coverage._mmss(float(g['start']))}「{str(g['text']).replace(chr(10), '　')}」"
+                    for g in hard[:6]))
         deductions = 10 if blocking else 0
         # 字幕の出だしが話し始めに合っているか（2026-10-06 ユーザー指摘「言葉より先に出すぎる」）
         timing = None
