@@ -298,6 +298,29 @@ def test_the_stage_asks_again_for_rows_whose_corrections_were_thrown_away(monkey
     assert res.data["ai"] == 1 and not any("校閲していません" in w for w in ctx.warnings)
 
 
+def test_the_stage_hands_the_other_hearing_to_the_proofreader(monkeypatch):
+    """文字起こしで3回目でも決まらなかった所（`ctx.heard_hints`）を校閲に渡し、採った数を工程の結果に出す。"""
+    import asyncio
+    from agents.workers import proofread_worker
+    from subtitle_engine import ai_proofreader
+    from tests.fixtures.mock_pipeline import create_mock_ctx
+    given = []
+
+    def fake(segs, return_stats=True, **kwargs):
+        given.append(kwargs.get("hints"))
+        return segs, {"total_batches": 1, "failed_batches": 0, "accepted_items": len(segs), "rejected_rows": [],
+                      "heard_hints": 1, "heard_adopted": 1}
+
+    monkeypatch.setattr(ai_proofreader, "proofread_segments", fake)
+    monkeypatch.setattr(proofread_worker, "_referee_for", lambda path: None)
+    monkeypatch.setattr(proofread_worker, "_memo_for", lambda path: None)
+    ctx = create_mock_ctx(segments=3)
+    ctx.heard_hints = [{"incorrect": "座右の目はなく", "correct": "座右の銘はなく", "term": "銘"}]
+    res = asyncio.run(proofread_worker.ProofreadWorker().execute(ctx))
+    assert given == [ctx.heard_hints]
+    assert "別の聞き取り1/1か所" in res.detail and res.data["heard"] == {"given": 1, "adopted": 1}
+
+
 def test_quality_gate_blocks_unproofread_subtitles(tmp_path, monkeypatch):
     from quality_gate_plugins import SubtitleCoverageCheck
     from subtitle_engine import coverage

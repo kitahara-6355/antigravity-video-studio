@@ -1170,3 +1170,91 @@ def test_a_failed_reading_again_leaves_the_spot_and_says_so(tmp_path, monkeypatc
     look = result.data["second_pass"]["third_look"]
     assert (look["windows"], look["open"]) == (1, 1) and "できません" in look["error"]
     assert any("3回目" in w for w in ctx.warnings)
+
+
+# ------------------------------------------------------------
+# 8. 3回目でも決まらない所は、校閲（AI）に「別の聞き取り」として渡す
+# ------------------------------------------------------------
+
+ZAYU_ROWS = ["座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の目はなくて、僕はだからご縁なので"]
+ZAYU_HEARD = "座右の銘って僕ないんだよ全然なので偉そうな座右の銘はなくて僕はだからご縁なので"
+
+
+def _zayu_rows():
+    return [_row(1640.0, 1646.0, ZAYU_ROWS[0]), _row(1646.0, 1652.0, ZAYU_ROWS[1])]
+
+
+def test_a_spot_the_third_reading_could_not_settle_is_handed_on_as_another_hearing():
+    """27分12秒（46回目）: 3回とも「座右の目」、認識は「座右の銘」。Gemini は何度起こしても同じ字を
+    書くので、文脈で決める校閲に、その所と認識の字を渡す（前の行は「座右の銘って僕ないんだよ」）。"""
+    fused = _zayu_rows()
+    spots = tfu.look_spots(fused, fused, _heard(ZAYU_HEARD, 1640.0, 0.2))
+    assert [(s["kind"], s["cur"], s["want"]) for s in spots] == [("swap", "目", "銘")]
+
+    hints = tfu.heard_hints(fused, spots, [("keep", "")])
+
+    assert [(h["incorrect"], h["correct"], h["term"]) for h in hints] == [("座右の目はなく", "座右の銘はなく", "銘")]
+    assert hints[0]["start"] == 1646.0
+
+
+def test_another_hearing_is_written_as_the_recogniser_wrote_it():
+    """認識の字はそろえた字（カタカナをひらがなに）で比べるが、渡すのは認識が書いた字
+    （13分55秒: 2回とも「今生田川で」、認識は「今治タオルとか」）。"""
+    row = "ちょっと青森リンゴとか今生田川で、それも取っちゃうじゃない？"
+    fused = [_row(830.0, 836.0, row)]
+    spots = tfu.look_spots(fused, fused, _heard("ちょっと青森リンゴとか今治タオルとかそれも取っちゃうじゃない", 830.0, 0.2))
+    assert [(s["kind"], s["want"]) for s in spots] == [("swap", "治たおるとか")]
+
+    hints = tfu.heard_hints(fused, spots, [("open", "")])
+
+    assert [(h["incorrect"], h["correct"], h["term"]) for h in hints] == [
+        ("とか今生田川で", "とか今治タオルとか", "治タオルとか")]
+
+
+def test_spots_the_third_reading_settled_or_that_only_drop_a_character_are_not_handed_on():
+    fused = _zayu_rows()
+    spots = tfu.look_spots(fused, fused, _heard(ZAYU_HEARD, 1640.0, 0.2))
+    assert tfu.heard_hints(fused, spots, [("adopt", "銘")]) == []
+
+    drop = tfu.look_spots([_row(176.0, 182.0, DROP_FIRST)], [_row(176.0, 182.0, DROP_SECOND)],
+                          _heard(DROP_HEARD, 176.0))
+    assert [s["kind"] for s in drop] == ["drop"]
+    assert tfu.heard_hints([_row(176.0, 182.0, DROP_FIRST)], drop, [("open", "")]) == []
+
+
+def test_another_hearing_takes_more_of_the_row_until_it_points_at_one_place():
+    """校閲は渡した字の並びを文の中で探すので、ほかの所にも同じ並びがあれば前後を広げる。"""
+    rows = ["それは座右の目はなく、と書いた。", "なので偉そうな座右の目はなくて、僕はだからご縁なので"]
+    fused = [_row(1640.0, 1646.0, rows[0]), _row(1646.0, 1652.0, rows[1])]
+    heard = _heard("それは座右の目はなくと書いたなので偉そうな座右の銘はなくて僕はだからご縁なので", 1640.0, 0.2)
+    spots = tfu.look_spots(fused, fused, heard)
+    assert [(s["row"], s["cur"]) for s in spots] == [(1, "目")]
+
+    hints = tfu.heard_hints(fused, spots, [("keep", "")])
+
+    assert [(h["incorrect"], h["correct"]) for h in hints] == [("な座右の目はなくて", "な座右の銘はなくて")]
+
+
+def test_another_hearing_is_dropped_when_the_settled_row_no_longer_has_those_words():
+    fused = _zayu_rows()
+    spots = tfu.look_spots(fused, fused, _heard(ZAYU_HEARD, 1640.0, 0.2))
+    settled = [fused[0], dict(fused[1], text="なので偉そうな座右の眼はなくて、僕はだからご縁なので")]
+
+    assert tfu.heard_hints(fused, spots, [("keep", "")], settled) == []
+
+
+def test_the_stage_hands_the_spots_it_could_not_settle_on_to_the_proofreader(tmp_path, monkeypatch):
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+
+    # 3回目も2回と同じ字（「去年」）を書いた → そのまま残し、認識の字（「今日ね」）を渡す
+    _setup_swap(monkeypatch, [_row(10.0, 14.0, SWAP_ROW)], "はいわかりました今日ね初めての初めてですね", SWAP_ROW)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success and ctx.segments[0]["text"] == SWAP_ROW
+    assert [(h["incorrect"], h["correct"], h["term"]) for h in ctx.heard_hints] == [
+        ("先生、あの、去年初めて", "今日ね初めて", "今日ね")]
+    look = result.data["second_pass"]["third_look"]
+    assert (look["kept"], look["hints"]) == (1, 1)

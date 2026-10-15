@@ -125,6 +125,9 @@ class PipelineContext:
     transcript_coverage: Optional[dict] = None
     # 校閲（AI）が分けて再実行しても失敗した字幕の範囲 [開始, 終了)。品質ゲートが合格させない
     proofread_failed_ranges: list = field(default_factory=list)
+    # 文字起こしで3回目でも決まらなかった食い違い（`transcript_fusion.heard_hints`）。校閲（AI）に
+    # 「別の音声認識の聞き取り」として渡し、前後の流れで決めさせる
+    heard_hints: list = field(default_factory=list)
     session_id: str = ""
     started_at: str = ""
     segments: List[Segment] = field(default_factory=list)

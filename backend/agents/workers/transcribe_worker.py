@@ -397,6 +397,8 @@ class TranscribeWorker(PipelineStageWorker):
         落ちたら、それまでに決まった所だけを直して進む（3回目は直すためだけに使う）。
         readings は2回目の起こし（いまの区切り方のもの、前の区切り方のもの）。候補は起こしごとに探して
         まとめる（前の区切り方の2回目だけが1字消した所も読む。45回目の後に「書道で→書で」などが戻った）。
+        3回目でも決まらない所は、校閲に「別の聞き取り」として渡す（`ctx.heard_hints`。Gemini は何度
+        起こしても「座右の目」と書き、認識は「座右の銘」と聞いた・46回目）。
         """
         from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
         if not gemini_transcriber.THIRD_LOOK:
@@ -439,11 +441,13 @@ class TranscribeWorker(PipelineStageWorker):
             ctx.warnings.append(f"文字起こし: 3回目（決めきれない所の起こし直し）に失敗したため、"
                                 f"それまでに決まった所だけを直して進みました（{e}）")
         settled, look = transcript_fusion.settle(fused, spots, verdicts)
-        look.update(spots=len(spots), windows=windows, models=sorted(models))
+        ctx.heard_hints = transcript_fusion.heard_hints(fused, spots, verdicts, settled)
+        look.update(spots=len(spots), windows=windows, models=sorted(models), hints=len(ctx.heard_hints))
         if error is not None:
             look["error"] = error
         logger.info(f"🔍 決めきれない {len(spots)} か所を {windows} 区間で起こし直し、{look['adopted']} か所を"
-                    f"3回目と手元の音声認識がそろう字に直しました（そのまま {look['kept']}・決まらない {look['open']}）")
+                    f"3回目と手元の音声認識がそろう字に直しました（そのまま {look['kept']}・決まらない {look['open']}）。"
+                    f"{len(ctx.heard_hints)} か所は認識の字を校閲に渡します")
         return settled, look
 
     def verify(self, result: StageResult) -> bool:

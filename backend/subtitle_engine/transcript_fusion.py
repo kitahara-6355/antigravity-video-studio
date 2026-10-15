@@ -89,6 +89,13 @@
 起こし直すと、前の2回目が正しかった所（締めの「絶やして」「増やしていく」・「豊橋筆」「書道家」）が
 1回目の字に戻った。いまの2回目と突き合わせた後に、前の2回目とも同じ決め方で突き合わせる（44 か所を直し、
 変わった 39 行のうち 36 行が認識に近づいた）。3回目の候補も起こしごとに探してまとめる。
+
+3回目でも決まらない所は校閲に渡す（2026-10-15・`heard_hints`）: Gemini は何度起こしても同じ字を書く所が
+ある（46回目: 27分12秒は3回とも「座右の目」・認識「座右の銘」、10分38秒「片をのんで」・認識「固唾をのんで」、
+25分12秒「選出」・認識「線質」）。音を聞き直しても決まらないので、その所と認識の字を、辞書の「文脈で判断」の
+項目と同じ形で校閲に渡し、前後の流れで決めさせる。採るのはその語の直しだけ（`ProofreadMemo.earlier`・
+`keep_term_edits`）。上の「行ごとに認識の聞き取りを添える」案とは違い、渡すのは3回読んでも認識と食い違った
+ままの所だけ（43分の素材で 28 か所。認識が聞き違えた所もある: 25分16秒「プロット」を「ラブ」）。
 """
 from __future__ import annotations
 
@@ -489,9 +496,10 @@ def look_spots(fused: list[dict], secondary: list[dict],
         2回が食い違い、突き合わせでどちらの字も認識に聞こえなかった所は "neither"（見る所は "swap"
         と同じ。9分18秒: 1回目「怒んないように」・2回目「怒れないように」・認識「折れないように」）
 
-    返り値は {"kind", "row", "c0", "c1", "cur", "want", "left", "right"} の並び。
+    返り値は {"kind", "row", "c0", "c1", "cur", "want", "left", "right", "heard"} の並び。
     row・c0・c1 は fused の行と、その文の直す範囲（`_span`）。cur・want・left・right は
-    そろえた字（`norm_char`）で、いまの字・認識に沿う字（(b) は空）・前後の字。
+    そろえた字（`norm_char`）で、いまの字・認識に沿う字（(b) は空）・前後の字。heard は want を
+    認識が書いた字のまま（カタカナ・漢数字。(b) は空。`heard_hints` が校閲に渡す）。
     """
     if not tokens or not fused:
         return []
@@ -499,17 +507,19 @@ def look_spots(fused: list[dict], secondary: list[dict],
     xf = "".join(c for c, _, _ in ff)
     rec = [(c, float(t)) for ch, t in tokens for c in norm_char(ch)]
     heard = "".join(c for c, _ in rec)
+    owner = [k for k, (ch, _t) in enumerate(tokens) for _c in norm_char(ch)]  # そろえた字 → 認識の字
     spots: list[dict] = []
     taken: set[tuple[int, int, int]] = set()
 
-    def add(kind: str, i1: int, i2: int, want: str) -> None:
+    def add(kind: str, i1: int, i2: int, want: str, j1: int = 0, j2: int = 0) -> None:
         span = _span(ff, i1, i2)
         if span is None or span in taken:
             return
         taken.add(span)
         row, c0, c1 = span
         spots.append({"kind": kind, "row": row, "c0": c0, "c1": c1, "cur": xf[i1:i2], "want": want,
-                      "left": xf[max(0, i1 - SETTLE_CONTEXT):i1], "right": xf[i2:i2 + SETTLE_CONTEXT]})
+                      "left": xf[max(0, i1 - SETTLE_CONTEXT):i1], "right": xf[i2:i2 + SETTLE_CONTEXT],
+                      "heard": "".join(str(tokens[k][0]) for k in sorted(set(owner[j1:j2])))})
 
     # (a) 2回とも落とした所・(c) 認識だけが別の字を聞いた所（2回とも同じ字か、2回が食い違ったか）
     xs = "".join(c for c, _, _ in _flatten(secondary)) if secondary else ""
@@ -526,11 +536,11 @@ def look_spots(fused: list[dict], secondary: list[dict],
         if _only_fillers(extra) or any(ch in _NUMERALS or ch.isascii() for ch in cur + extra):
             continue
         if len(extra) - len(cur) >= LOOK_EXTRA:
-            add("omit", i1, i2, extra)
+            add("omit", i1, i2, extra, j1, j2)
         elif (op == "replace" and len(cur) <= SWAP_MAX and len(extra) <= SWAP_MAX
               and not _only_fillers(cur) and not _spelling_only(cur, extra)
               and not any(i in protected for i in range(i1, i2))):
-            add("swap" if all(i in same for i in range(i1, i2)) else "neither", i1, i2, extra)
+            add("swap" if all(i in same for i in range(i1, i2)) else "neither", i1, i2, extra, j1, j2)
 
     # (b) 2回目が1字消し、認識が片側でだけ消した側に寄る所
     if secondary:
@@ -636,3 +646,59 @@ def settle(fused: list[dict], spots: list[dict], verdicts: list[tuple[str, str]]
         seg["text"] = text
     stats["examples"] = examples[::-1][:MAX_EXAMPLES]
     return out, stats
+
+
+# ─────────────────────── 3回目でも決まらない所 ───────────────────────
+
+# 校閲に渡す種類。(b) "drop"（認識に無い1字）は字を消すかどうかなので、文脈では決まらない
+HINT_KINDS = ("swap", "neither", "omit")
+# 直す所の前後に付ける字数（句読点の手前まで）。全行の中で1か所に決まるまで HINT_CONTEXT_MAX まで広げる
+HINT_CONTEXT = 3
+HINT_CONTEXT_MAX = 8
+_HINT_BREAKS = "、。，．,.!?！？「」『』 　\n"
+_HINT_BREAK_RE = re.compile(f"[{re.escape(_HINT_BREAKS)}]")
+
+
+def heard_hints(fused: list[dict], spots: list[dict], verdicts: list[tuple[str, str]],
+                settled: list[dict] | None = None) -> list[dict]:
+    """3回目でも決まらなかった食い違いを、校閲（AI）に渡す「別の聞き取り」にする。
+
+    Gemini は何度起こしても同じ字を書くことがある（46回目: 27分12秒は3回とも「座右の目」・認識は
+    「座右の銘」、10分38秒「片をのんで」・認識「固唾をのんで」、25分12秒「選出」・認識「線質」）。
+    音を聞き直しても決まらないので、前後の流れを読む校閲に、その所と認識の字を渡して決めさせる
+    （認識も聞き違える: 25分16秒「プロット」を「らぶ」と聞いた）。fused・spots・verdicts は `settle` に
+    渡したもの、settled はその結果（渡せば、そこにもう無い字の並びは渡さない）。
+
+    返り値は {"incorrect", "correct", "term", "kind", "verdict", "start"} の並び。incorrect は行の字の
+    並び（直す所と前後の字。句読点の手前まで）、correct はその直す所を認識の字（`look_spots` の
+    heard）にしたもの、term は認識の字だけ。incorrect は全行の中で1か所にしかない並びにする
+    （校閲は字の並びで行を探す）。
+    """
+    rows = settled if settled is not None else fused
+    whole = "\n".join(str(r.get("text") or "") for r in rows)
+    out: list[dict] = []
+    for spot, (verdict, _put) in zip(spots, verdicts):
+        heard = str(spot.get("heard") or "")
+        if verdict == "adopt" or spot["kind"] not in HINT_KINDS or not heard:
+            continue
+        text = str(fused[spot["row"]].get("text") or "")
+        c0, c1 = spot["c0"], spot["c1"]
+        while c0 < c1 and text[c0] in _HINT_BREAKS:  # 直す所の端の句読点は直さない
+            c0 += 1
+        while c1 > c0 and text[c1 - 1] in _HINT_BREAKS:
+            c1 -= 1
+        if text[c0:c1] == heard:
+            continue
+        for n in range(HINT_CONTEXT, HINT_CONTEXT_MAX + 1):
+            left = _HINT_BREAK_RE.split(text[max(0, c0 - n):c0])[-1]
+            right = _HINT_BREAK_RE.split(text[c1:c1 + n])[0]
+            wrong = left + text[c0:c1] + right
+            if whole.count(wrong) == 1:
+                break
+        else:
+            continue
+        if wrong not in str(rows[spot["row"]].get("text") or ""):
+            continue
+        out.append({"incorrect": wrong, "correct": left + heard + right, "term": heard,
+                    "kind": spot["kind"], "verdict": verdict, "start": fused[spot["row"]].get("start")})
+    return out

@@ -226,6 +226,37 @@ def _dictionary_rows() -> list:
         return []
 
 
+# 別の音声認識の聞き取り（`transcript_fusion.heard_hints`）の項目の説明。控えの鍵に入るので、渡し方を変えたら変える
+HEARD_NOTE = "別の音声認識の聞き取り"
+
+
+def _heard_rows(hints) -> list:
+    """別の聞き取りを、辞書の「文脈で判断」の項目と同じ形 (誤, 正, "hint", 説明, 採ったかを見る語) にする。
+
+    文字起こしは3回起こしても「座右の目」と書き、認識は「座右の銘」と聞いた（27分12秒・46回目）。
+    文脈で決める校閲に渡す。項目の形にそろえるので、控え（`ProofreadMemo.earlier`）が前の直しに
+    その語の直しだけを足す（AI が関係ない所を直し直さない）。5つ目は認識の字（`keep_term_edits` の語）。
+    """
+    rows = []
+    for h in hints or ():
+        wrong, right = str(h.get("incorrect") or ""), str(h.get("correct") or "")
+        if wrong and right and wrong != right:
+            rows.append((wrong, right, "hint", HEARD_NOTE, str(h.get("term") or "") or right))
+    return rows
+
+
+def _heard_context(rows, texts) -> str:
+    """バッチの行に掛かる別の聞き取りを、指示に足す節にする（掛からなければ空。指示は変わらない）。"""
+    lines = [f"- 「{r[0]}」→「{r[1]}」" for r in rows if any(r[0] in t for t in texts)]
+    if not lines:
+        return ""
+    return ("\n\n## 別の音声認識の聞き取り\n"
+            "次の所は、別の音声認識が違う字で聞いています。本文が聞き違えていて、別の聞き取りの方が前後の流れに"
+            "合うときだけ、その語を直してください。合わないとき・どちらとも言えないとき（人名など）は本文のままに"
+            "してください。別の聞き取りに無い語（呼びかけ・言いよどみ）を消すためには使わないでください。\n"
+            + "\n".join(lines))
+
+
 def keep_term_edits(base: str, corrected: str, terms) -> str:
     """corrected の直しのうち、terms（辞書の正しい語）に掛かるものだけを base に足す。
 
@@ -298,8 +329,8 @@ class ProofreadMemo:
             for kept in itertools.combinations(hints, size):
                 subset = [r for r in related if r not in hints or r in kept]
                 hit = self.get(self.key(salt, text, subset))
-                if hit is not None:
-                    return hit, tuple(str(r[1]) for r in hints if r not in kept)
+                if hit is not None:  # 別の聞き取りの項目（5つ目がある）は認識の字を語にする
+                    return hit, tuple(str(r[4] if len(r) > 4 else r[1]) for r in hints if r not in kept)
         return None, ()
 
     def get(self, key: str):
@@ -340,7 +371,7 @@ def _as_index(value):
         return None
 
 
-def proofread_segments(segments, update_callback=None, return_stats=False, referee=None, memo=None):
+def proofread_segments(segments, update_callback=None, return_stats=False, referee=None, memo=None, hints=None):
     """
     Gemini APIを使用して字幕セグメントを校閲
 
@@ -348,6 +379,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
         segments (list): セグメントリスト（text, start, end等）
         update_callback (callable, optional): 進捗コールバック(status, message, progress)
         return_stats (bool): Trueの場合、(segments, stats_dict) のタプルを返す
+        hints (list, optional): 別の音声認識の聞き取り（`transcript_fusion.heard_hints`）。掛かる行の
+            バッチの指示に足し、採ったら控えの前の直しにその語の直しだけを足す
 
     Returns:
         list: 校閲済みセグメント（return_stats=Falseの場合）
@@ -373,7 +406,11 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
         "accepted_items": 0,
         # 番号ずれなどで直しを捨てた行。校閲されないまま残るので、呼び出し側が小さく分けて聞き直す
         "rejected_rows": [],
+        # 別の音声認識の聞き取りを渡した行と、その語を採った行
+        "heard_hints": 0,
+        "heard_adopted": 0,
     }
+    heard = _heard_rows(hints)
 
     def _return(segs):
         if return_stats:
@@ -446,6 +483,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
             client = get_gemini_client()
         CHUNK_SIZE = 100  # サイクル3ループ2: 200→品質低下(-12%)→100に調整(APIコール18→9)
         total_segments = len(segments)
+        before = [str(s.get("text") or "") for s in segments]
         proofread_count = 0
 
         total_batches = (total_segments + CHUNK_SIZE - 1) // CHUNK_SIZE
@@ -458,7 +496,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
         if memo is not None:
             template = hashlib.sha256(_proofread_prompt("", "").encode("utf-8")).hexdigest()
             salt = json.dumps([MEMO_VERSION, template, _declared_model()])
-            rows = _dictionary_rows()
+            rows = _dictionary_rows() + heard
             texts = [str(s.get("text") or "") for s in segments]
             keys = [ProofreadMemo.key(salt, t, rows) for t in texts]
             stats["memo_hits"] = 0
@@ -473,8 +511,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                 abs_index = i + idx
                 batch_text += f"[{abs_index}] {s['text']}\n"
 
-            # 固有名詞辞書をプロンプトに注入（Phase E: 汎用化）
-            proper_noun_context = _build_proper_noun_context()
+            # 固有名詞辞書をプロンプトに注入（Phase E: 汎用化）。別の聞き取りは掛かる行のあるバッチだけ
+            proper_noun_context = _build_proper_noun_context() + _heard_context(heard, [s["text"] for s in batch])
 
             prompt = _proofread_prompt(proper_noun_context, batch_text)
 
@@ -767,6 +805,14 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
             logger.info(f"AI Proofreader: 校閲の控えから {stats['memo_hits']} 行を使いました"
                         f"（{'・'.join(stats['memo_models']) or 'なし'}）")
         stats["proofread_count"] = proofread_count
+        # 別の聞き取りを渡した行と、その語（認識の字）が増えた行
+        hinted = [(k, r) for k, text in enumerate(before) for r in heard if r[0] in text]
+        stats["heard_hints"] = len({k for k, _ in hinted})
+        stats["heard_adopted"] = len({k for k, r in hinted
+                                      if str(segments[k].get("text") or "").count(r[4]) > before[k].count(r[4])})
+        if hinted:
+            logger.info(f"AI Proofreader: 別の音声認識の聞き取りを {stats['heard_hints']} 行に渡し、"
+                        f"{stats['heard_adopted']} 行で採りました")
         logger.info(f"AI Proofreader: Successfully corrected {proofread_count} segments total."
                      f" (retries={stats['total_retries']}, failed_batches={stats['failed_batches']}/{total_batches})")
         return _return(segments)

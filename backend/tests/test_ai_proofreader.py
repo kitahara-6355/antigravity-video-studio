@@ -481,15 +481,18 @@ class TestProofreadMemo:
             yield
 
     @staticmethod
-    def _run(response_text, lines, memo, rows=(), served=None):
+    def _run(response_text, lines, memo, rows=(), served=None, hints=None, prompts=None):
         client = MagicMock()
         client.models.generate_content.return_value = MagicMock(text=response_text, model_version=served)
+        extra = {"hints": hints} if hints is not None else {}
         with patch.dict("sys.modules", {"model_governance": MagicMock(get_governed_client=lambda x: client)}), \
                 patch("subtitle_engine.ai_proofreader._get_current_model", return_value="gemini-3.6-flash"), \
                 patch("subtitle_engine.ai_proofreader._declared_model", return_value="gemini-3.6-flash"), \
                 patch("subtitle_engine.ai_proofreader._dictionary_rows", return_value=list(rows)):
             out, stats = ai_proofreader.proofread_segments([{"text": t} for t in lines],
-                                                           return_stats=True, memo=memo)
+                                                           return_stats=True, memo=memo, **extra)
+        if prompts is not None:
+            prompts += [c.kwargs.get("contents") for c in client.models.generate_content.call_args_list]
         return [s["text"] for s in out], stats, client.models.generate_content.call_count
 
     @staticmethod
@@ -572,6 +575,50 @@ class TestProofreadMemo:
         out, stats, _ = self._run(self._reply("てって言って、それが8歳です。", "もう毛筆ですか？"), lines,
                                   ai_proofreader.ProofreadMemo(path), rows)
         assert out == ["って言って、それが8歳です。", "もう毛筆ですか？"] and stats["memo_hits"] == 1
+
+    ZAYU = ["座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の目はなくって、僕はだからご縁なので"]
+    ZAYU_HINT = [{"incorrect": "座右の目はなく", "correct": "座右の銘はなく", "term": "銘"}]
+
+    def test_別の音声認識の聞き取りを渡した行は_その語の直しだけを取り込む(self, tmp_path):
+        # 27分12秒（46回目）: 文字起こしは3回とも「座右の目」、認識は「座右の銘」。校閲に認識の字を
+        # 渡して文脈で決めさせる。AI は関係ない所まで直し直す（「なくって」を戻す・読点を足す）ので、
+        # 前の控えに、渡した語の直しだけを足す
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の目はなくて、僕はだからご縁なので"),
+                  self.ZAYU, ai_proofreader.ProofreadMemo(path))
+        prompts = []
+        out, stats, calls = self._run(
+            self._reply("座右の銘って僕ないんだよ。", "なので偉そうな座右の銘はなくって、僕はだから、ご縁なので"),
+            self.ZAYU, ai_proofreader.ProofreadMemo(path), hints=self.ZAYU_HINT, prompts=prompts)
+        assert out == ["座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の銘はなくて、僕はだからご縁なので"]
+        assert calls == 1 and stats["memo_hits"] == 1
+        assert (stats["heard_hints"], stats["heard_adopted"]) == (1, 1)
+        assert "別の音声認識" in prompts[0] and "「座右の目はなく」→「座右の銘はなく」" in prompts[0]
+        # 取り込んだ結果を控える。次の書き出しは呼ばない
+        out, _, calls = self._run(self._reply(*self.ZAYU), self.ZAYU, ai_proofreader.ProofreadMemo(path),
+                                  hints=self.ZAYU_HINT)
+        assert out[1] == "なので偉そうな座右の銘はなくて、僕はだからご縁なので" and calls == 0
+
+    def test_別の聞き取りを採らなかった行は前の控えのまま(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply(self.ZAYU[0], "なので偉そうな座右の目はなくて、僕はだからご縁なので"),
+                  self.ZAYU, ai_proofreader.ProofreadMemo(path))
+        out, stats, calls = self._run(self._reply(self.ZAYU[0], "偉そうな座右の目はなくって、僕はご縁なので"),
+                                      self.ZAYU, ai_proofreader.ProofreadMemo(path), hints=self.ZAYU_HINT)
+        assert out[1] == "なので偉そうな座右の目はなくて、僕はだからご縁なので" and calls == 1
+        assert (stats["heard_hints"], stats["heard_adopted"]) == (1, 0)
+
+    def test_別の聞き取りが掛からない行の控えと指示は変わらない(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply(*self.ZAYU), self.ZAYU, ai_proofreader.ProofreadMemo(path))
+        prompts = []
+        hint = [{"incorrect": "片をのんで", "correct": "固唾をのんで", "term": "固唾"}]
+        _, stats, calls = self._run(self._reply(*self.ZAYU), self.ZAYU, ai_proofreader.ProofreadMemo(path),
+                                    hints=hint, prompts=prompts)
+        assert calls == 0 and stats["memo_hits"] == 2 and stats["heard_hints"] == 0
+        _, _, calls = self._run(self._reply(*self.ZAYU), ["もう一つの行。"], ai_proofreader.ProofreadMemo(path),
+                                hints=hint, prompts=prompts)
+        assert calls == 1 and "別の音声認識" not in prompts[0]
 
     def test_捨てた直しは控えない(self, tmp_path):
         path = tmp_path / "_proofread_x.json"
