@@ -84,7 +84,7 @@ class ProofreadWorker(PipelineStageWorker):
             logger.debug(f"固有名詞辞書適用スキップ: {e}")
 
         try:
-            from subtitle_engine.ai_proofreader import judge_heard_hints, proofread_segments
+            from subtitle_engine.ai_proofreader import proofread_segments
             original = [s.get("text", "") for s in ctx.segments]
             # UX-01: 同期AI呼び出しをスレッドプールにオフロード
             # → ステータスAPIの応答性を確保し、フロントエンドのタイムアウトを防止
@@ -101,6 +101,8 @@ class ProofreadWorker(PipelineStageWorker):
             # 渡すのは、本文と並べて文として選ばせ、両順で認識の字を選んだ所だけ（47回目: そのまま渡すと
             # 「主催→主宰」「細いほど→細いわな」など、本文で通る所まで認識の字にした）
             if getattr(ctx, "heard_hints", None):
+                # 聞き取りが無ければ判定は使わない（校閲だけ差し替える試験の偽物にも判定は無い）
+                from subtitle_engine.ai_proofreader import judge_heard_hints
                 chosen, judged = await loop.run_in_executor(
                     None, lambda: judge_heard_hints(ctx.heard_hints, ctx.segments, memo=memo))
                 heard.update(given=len(ctx.heard_hints), chosen=len(chosen), models=judged.get("models") or [],
