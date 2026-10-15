@@ -68,6 +68,8 @@ class ProofreadWorker(PipelineStageWorker):
         ai_corrections = 0
         # 控えから使った直しの行数と、その直しを出したモデル（この回には呼んでいない）
         memo_hits, memo_models = 0, []
+        # 番号ずれなどで直しを捨てて聞き直した行のうち、採れた行数と、採れずに残った行数
+        retried, unproofed = 0, 0
 
         try:
             from proper_noun_dict import apply_dictionary
@@ -104,6 +106,14 @@ class ProofreadWorker(PipelineStageWorker):
             if retry_stats.get("failed_ranges"):
                 retry_stats = await loop.run_in_executor(
                     None, lambda: _repair_failed_batches(ctx.segments, retry_stats, proofread))
+            # 番号ずれなどで直しを捨てた行は、前後の行を付けた小さいバッチで聞き直す（45回目: 100行の
+            # 途中から AI が1〜2行ずつ前の行の文を返し、10行が校閲されないまま残った）
+            if retry_stats.get("rejected_rows"):
+                retry_stats = await loop.run_in_executor(
+                    None, lambda: _retry_rejected_rows(ctx.segments, original, retry_stats, proofread))
+                retried, unproofed = int(retry_stats.get("retried_rows", 0) or 0), len(retry_stats["rejected_rows"])
+                if unproofed:
+                    ctx.warnings.append(f"AI校閲: {unproofed}行は直しが元の文と離れすぎて採れず、校閲していません")
             for i, seg in enumerate(ctx.segments):
                 if i < len(original) and seg.get("text", "") != original[i]:
                     ai_corrections += 1
@@ -191,6 +201,8 @@ class ProofreadWorker(PipelineStageWorker):
 
         total = dict_corrections + ai_corrections
         memo_note = f" / 校閲の控え{memo_hits}行（{'・'.join(memo_models) or '不明'}）" if memo_hits else ""
+        retry_note = (f" / 番号ずれの聞き直し{retried}行" if retried else "") + \
+            (f"（未校閲{unproofed}行）" if unproofed else "")
         notation_note = f" / 表記{sum(notation.values())}件" if notation else ""
         # 使用モデルを取得（UI可視化用）
         try:
@@ -221,8 +233,8 @@ class ProofreadWorker(PipelineStageWorker):
         logger.info(f"📊 [T-014] ProofreadWorker出口: ctx.segments={len(ctx.segments)}件")
         return StageResult(
             stage_name=self.name, success=True,
-            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{notation_note}"
-                   f"{format_stats}{skip_warn}",
+            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{retry_note}"
+                   f"{notation_note}{format_stats}{skip_warn}",
             data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
                   "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation},
             duration_seconds=round(time.time() - start, 1),
@@ -280,6 +292,8 @@ def _repair_failed_batches(segments, stats, proofread):
                 _, sub = proofread(segments[lo:hi], return_stats=True)
                 stats["total_retries"] = stats.get("total_retries", 0) + 1
                 stats["accepted_items"] = stats.get("accepted_items", 0) + int(sub.get("accepted_items", 0) or 0)
+                stats["rejected_rows"] = list(stats.get("rejected_rows") or []) + [
+                    lo + k for k in sub.get("rejected_rows") or []]
                 if sub.get("failed_batches") or sub.get("skipped"):
                     left.append((lo, hi))
         ranges = left
@@ -289,3 +303,59 @@ def _repair_failed_batches(segments, stats, proofread):
     stats["failed_batches"] = len(ranges)
     stats["repaired_batches"] = max(0, repaired)
     return stats
+
+
+# 番号ずれなどで直しを捨てた行を聞き直すとき、前後に付ける行数と、1バッチの行数の上限
+# （100行のバッチでずれた。前後の数行があれば同音の語を文脈で直せる）
+RETRY_CONTEXT = 4
+RETRY_MAX_ROWS = 30
+
+
+def _retry_windows(rows, n):
+    """聞き直す行を、前後 RETRY_CONTEXT 行を付けた [lo, hi) のまとまりに分ける（RETRY_MAX_ROWS 行まで）。
+
+    返り値は [(lo, hi, そのまとまりで聞き直す行)]。
+    """
+    windows = []
+    for r in sorted(set(rows)):
+        lo, hi = max(0, r - RETRY_CONTEXT), min(n, r + RETRY_CONTEXT + 1)
+        if windows and lo <= windows[-1][1] and hi - windows[-1][0] <= RETRY_MAX_ROWS:
+            windows[-1] = (windows[-1][0], hi, windows[-1][2] + [r])
+        else:
+            windows.append((lo, hi, [r]))
+    return windows
+
+
+def _retry_rejected_rows(segments, original, stats, proofread):
+    """番号ずれなどで直しを捨てた行を、前後の行を付けた小さいバッチで校閲し直す。stats を更新して返す。
+
+    渡すのは校閲の前の文（original）。直すのは捨てた行だけで、前後の行は文脈（1回目の直しのまま）。
+    失敗したバッチの再実行で直った行は聞き直さない。聞き直しても捨てた行は stats["rejected_rows"] に残す。
+    proofread は渡したリストの字幕（dict）をその場で直す。
+    """
+    stats = dict(stats)
+    rows = [r for r in sorted(set(stats.get("rejected_rows") or []))
+            if r < len(segments) and segments[r].get("text", "") == original[r]]
+    left, retried = [], 0
+    for lo, hi, targets in _retry_windows(rows, len(segments)):
+        part = [dict(segments[k], text=original[k]) for k in range(lo, hi)]
+        _, sub = proofread(part, return_stats=True)
+        stats["total_retries"] = stats.get("total_retries", 0) + 1
+        if sub.get("failed_batches") or sub.get("skipped"):
+            left.extend(targets)
+            continue
+        again = {lo + k for k in sub.get("rejected_rows") or []}
+        for r in targets:
+            if r in again:
+                left.append(r)
+            else:
+                segments[r]["text"] = part[r - lo]["text"]
+                retried += 1
+    if rows:
+        logger.info(f"🔁 AI校閲で直しを捨てた {len(rows)} 行を小さいバッチで聞き直し: "
+                    f"{retried} 行を採り、{len(left)} 行は校閲せずに残しました")
+    stats["accepted_items"] = stats.get("accepted_items", 0) + retried
+    stats["retried_rows"] = retried
+    stats["rejected_rows"] = left
+    return stats
+

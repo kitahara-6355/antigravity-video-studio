@@ -371,6 +371,8 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
         "skipped": False,
         # **採用した AI の出力の件数**（R2-C5・2026-09-26）。記録の「宣言どおり」の証拠
         "accepted_items": 0,
+        # 番号ずれなどで直しを捨てた行。校閲されないまま残るので、呼び出し側が小さく分けて聞き直す
+        "rejected_rows": [],
     }
 
     def _return(segs):
@@ -686,6 +688,7 @@ def proofread_segments(segments, update_callback=None, return_stats=False, refer
                                 logger.debug(f"音声認識での裏付けをスキップ: {e}")
                         if verdict != "ok":
                             stats["rejected_items"] = stats.get("rejected_items", 0) + 1
+                            stats["rejected_rows"].append(item_idx)
                             logger.warning(
                                 f"AI Proofreader: 元の文と離れすぎた直しを捨てました [{item_idx}] "
                                 f"{segments[item_idx]['text'][:20]!r} → {item['text'][:20]!r}")

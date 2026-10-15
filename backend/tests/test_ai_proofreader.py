@@ -388,6 +388,18 @@ class TestProofreadSegmentsResponseValidation:
         result, stats = self._run_with_response_text('[{"index":9,"text":"x"}]', segments)
         assert stats["accepted_items"] == 0
 
+    def test_番号ずれで捨てた直しの行を返す(self):
+        """45回目: AI が100行のうち途中から1〜2行ずつ前の行の文を返し、10行の直しを捨てた。
+        捨てた行は校閲されないまま残るので、呼び出し側が小さく分けて聞き直せるよう行の番号を返す。"""
+        segments = [{"text": "今日は晴れです。"}, {"text": "明日は雨が降るでしょう。"},
+                    {"text": "あさっては曇りになるそうです。"}]
+        reply = json.dumps([{"index": 0, "text": "今日は晴れです。"},
+                            {"index": 1, "text": "あさっては曇りになるそうです。"},
+                            {"index": 2, "text": "あさっては曇りになるそうです。"}], ensure_ascii=False)
+        result, stats = self._run_with_response_text(reply, segments)
+        assert stats["rejected_rows"] == [1]
+        assert result[1]["text"] == "明日は雨が降るでしょう。"
+
     def test_校閲が足した聞こえない字は戻す(self):
         """2026-10-06 実走: 「最初 に 書 に」→「最初にな書に」。音声認識に無い足しは戻す。"""
         class Ref:

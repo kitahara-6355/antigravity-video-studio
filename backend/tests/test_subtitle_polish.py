@@ -159,6 +159,86 @@ def test_unrepaired_batches_stay_failed():
     assert stats["failed_batches"] > 0
 
 
+def test_repaired_batches_pass_on_the_rows_whose_corrections_were_thrown_away():
+    from agents.workers.proofread_worker import _repair_failed_batches
+    segs = [{"text": f"t{i}"} for i in range(8)]
+
+    def fake(sub, return_stats=True):
+        return sub, {"failed_batches": 0, "accepted_items": len(sub) - 1, "rejected_rows": [1]}
+
+    stats = _repair_failed_batches(segs, {"failed_ranges": [[0, 8]], "failed_batches": 1}, fake)
+    assert stats["rejected_rows"] == [1, 5]
+
+
+def _asking(rejected_at=()):
+    """校閲の代わり: 渡された行に「?」を付け、rejected_at の文の行は捨てたことにする。"""
+    calls = []
+
+    def fake(sub, return_stats=True):
+        calls.append([s["text"] for s in sub])
+        rejected = [k for k, s in enumerate(sub) if s["text"] in rejected_at]
+        for k, s in enumerate(sub):
+            if k not in rejected:
+                s["text"] += "?"
+        return sub, {"failed_batches": 0, "accepted_items": len(sub) - len(rejected), "rejected_rows": rejected}
+    return fake, calls
+
+
+def test_rows_whose_corrections_were_thrown_away_are_asked_again_in_a_small_batch():
+    # 45回目: AI が100行の途中から1〜2行ずつ前の行の文を返し、10行の直しを捨てて校閲されないまま残った
+    # （「死んだ番匠と西西これ」「イヌクロ」など）。前後の数行を付けた小さいバッチで聞き直す
+    from agents.workers import proofread_worker as pw
+    original = [f"t{i}" for i in range(40)]
+    segs = [{"text": t + "!"} for t in original]  # 1回目の校閲で直しを採った行
+    segs[20]["text"], segs[22]["text"] = "t20", "t22"
+    fake, calls = _asking()
+
+    stats = pw._retry_rejected_rows(segs, original, {"rejected_rows": [20, 22]}, fake)
+
+    lo, hi = 20 - pw.RETRY_CONTEXT, 22 + pw.RETRY_CONTEXT + 1
+    assert calls == [original[lo:hi]], "前後の行を付けた1つのバッチで、校閲の前の文を渡す"
+    assert segs[20]["text"] == "t20?" and segs[22]["text"] == "t22?"
+    assert segs[21]["text"] == "t21!", "前後の行は文脈。1回目の校閲の直しのまま"
+    assert stats["retried_rows"] == 2 and stats["rejected_rows"] == []
+
+
+def test_rows_still_thrown_away_after_asking_again_are_left_and_reported():
+    from agents.workers import proofread_worker as pw
+    original = [f"t{i}" for i in range(10)]
+    segs = [{"text": t} for t in original]
+    fake, _ = _asking(rejected_at=("t5",))
+
+    stats = pw._retry_rejected_rows(segs, original, {"rejected_rows": [3, 5]}, fake)
+
+    assert segs[3]["text"] == "t3?" and segs[5]["text"] == "t5"
+    assert stats["retried_rows"] == 1 and stats["rejected_rows"] == [5]
+
+
+def test_rows_far_apart_are_asked_again_in_separate_small_batches():
+    from agents.workers import proofread_worker as pw
+    original = [f"t{i}" for i in range(200)]
+    segs = [{"text": t} for t in original]
+    rows = list(range(10, 100, 3))
+    fake, calls = _asking()
+
+    pw._retry_rejected_rows(segs, original, {"rejected_rows": rows}, fake)
+
+    assert all(len(c) <= pw.RETRY_MAX_ROWS for c in calls)
+    assert all(segs[k]["text"].endswith("?") for k in rows)
+    assert len(calls) <= 4, "30行の捨てた行を、まとめて少ない回数で聞き直す"
+
+
+def test_a_row_already_corrected_by_the_repair_is_not_asked_again():
+    from agents.workers import proofread_worker as pw
+    original = ["a", "b", "c"]
+    segs = [{"text": "a"}, {"text": "b!"}, {"text": "c"}]
+    fake, calls = _asking()
+
+    stats = pw._retry_rejected_rows(segs, original, {"rejected_rows": [1]}, fake)
+
+    assert calls == [] and segs[1]["text"] == "b!" and stats["rejected_rows"] == []
+
+
 def test_the_proofreading_memo_lives_next_to_the_source_and_follows_it(tmp_path):
     # 一度採った校閲の直しは素材ごとに控えて、次の書き出しでも使う（29回目で冒頭の直しが揺れた）
     from agents.workers.proofread_worker import _memo_for
@@ -191,6 +271,31 @@ def test_the_stage_says_which_model_made_the_corrections_taken_from_the_memo(mon
     res = asyncio.run(proofread_worker.ProofreadWorker().execute(create_mock_ctx(segments=3)))
     assert "校閲の控え3行（gemini-3.5-flash-lite）" in res.detail
     assert res.data["memo_hits"] == 3 and res.data["memo_models"] == ["gemini-3.5-flash-lite"]
+
+
+def test_the_stage_asks_again_for_rows_whose_corrections_were_thrown_away(monkeypatch):
+    import asyncio
+    from agents.workers import proofread_worker
+    from subtitle_engine import ai_proofreader
+    from tests.fixtures.mock_pipeline import create_mock_ctx
+    calls = []
+
+    def fake(segs, return_stats=True, **kwargs):
+        calls.append(len(segs))
+        if len(calls) == 1:  # 1回目は 1 行目の直しを捨てた
+            return segs, {"total_batches": 1, "failed_batches": 0, "total_retries": 0,
+                          "accepted_items": len(segs) - 1, "failed_ranges": [], "rejected_rows": [1]}
+        for s in segs:
+            s["text"] += "?"
+        return segs, {"total_batches": 1, "failed_batches": 0, "accepted_items": len(segs), "rejected_rows": []}
+
+    monkeypatch.setattr(ai_proofreader, "proofread_segments", fake)
+    monkeypatch.setattr(proofread_worker, "_referee_for", lambda path: None)
+    monkeypatch.setattr(proofread_worker, "_memo_for", lambda path: None)
+    ctx = create_mock_ctx(segments=3)
+    res = asyncio.run(proofread_worker.ProofreadWorker().execute(ctx))
+    assert len(calls) == 2 and "番号ずれの聞き直し1行" in res.detail
+    assert res.data["ai"] == 1 and not any("校閲していません" in w for w in ctx.warnings)
 
 
 def test_quality_gate_blocks_unproofread_subtitles(tmp_path, monkeypatch):
