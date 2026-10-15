@@ -413,7 +413,7 @@ def test_chunks_whose_cut_did_not_change_are_taken_from_the_earlier_cutting(tmp_
     tx = gt.transcribe(tmp_path / "v.mp4", client=object(), model="m", call=call, first_chunk_sec=15,
                        earlier=[earlier])
 
-    assert called == ["c1", "c2"]
+    assert sorted(called) == ["c1", "c2"]  # チャンクは並列に起こすので、呼ぶ順は決まらない
     assert [s["text"] for s in tx.segments] == ["前の起こし一本目", "起こしc1", "起こしc2"]
     assert tx.carried == 1
     assert tx.models_used == ["m", "old-model"]
@@ -438,7 +438,7 @@ def test_an_earlier_transcription_without_its_cuts_is_not_taken(tmp_path, monkey
     tx = gt.transcribe(tmp_path / "v.mp4", client=object(), model="m", call=call, first_chunk_sec=15,
                        earlier=[earlier])
 
-    assert called == ["c0", "c1"] and tx.carried == 0
+    assert sorted(called) == ["c0", "c1"] and tx.carried == 0
 
 
 # ------------------------------------------------------------
