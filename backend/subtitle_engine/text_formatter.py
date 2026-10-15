@@ -472,6 +472,26 @@ def _phrase_parser():
     return _budoux_parser or None
 
 
+# 終助詞（わ・よ・ね）に引用の「って」が続く文節の頭
+_PARTICLE_QUOTE_HEADS = ("わって", "よって", "ねって")
+
+
+def _parse(parser, text: str) -> list[str]:
+    """BudouX の文節。終助詞＋引用の「って」で始まる文節は、前の文節に付ける。
+
+    BudouX は動詞の後ろの終助詞を次の文節の頭に読む（「泣きそうに|なる|わっていうね」「そう|なる|よっていう|話」
+    「行く|わって|言って」）。そこで切ると終助詞が行の頭に浮く（49回目の 11分49秒「泣きそうになる/わっていうね
+    エピソードなんですか？」）。前の文節が句読点で終わるとき（「。よって、」）は付けない。
+    """
+    out: list[str] = []
+    for part in parser.parse(text):
+        if out and part.startswith(_PARTICLE_QUOTE_HEADS) and _script(out[-1][-1]) != "other":
+            out[-1] += part
+        else:
+            out.append(part)
+    return out
+
+
 def _binds_to_next(p: str, nxt: str) -> bool:
     """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」・「〜かなんか」・「〜たらいい」）か。"""
     nxt = nxt.lstrip()
@@ -594,7 +614,7 @@ def _phrases(text: str, max_chars: int) -> list[str]:
     if parser is None:
         return []
     phrases: list[str] = []
-    for part in parser.parse(text):
+    for part in _parse(parser, text):
         # 句読点で始まる文節は前の文節に付ける（行頭に「、」を置かない）
         while part and part[0] in _LEADING_PUNCT and phrases:
             phrases[-1] += part[0]
@@ -886,7 +906,7 @@ _RESTART_MIN_CHARS = 3
 
 def _phrase_ends(parser, text: str) -> list[int]:
     ends, pos = [], 0
-    for ph in parser.parse(text):
+    for ph in _parse(parser, text):
         pos += len(ph)
         ends.append(pos)
     return ends

@@ -957,6 +957,24 @@ def test_the_quoting_tte_stays_with_iu():
 
 
 @pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,verb", [
+    # 49回目の 11分49秒: BudouX が「泣きそうに|なる|わっていうね」と読み、字幕が「泣きそうになる/わっていうね
+    # エピソードなんですか？」と折れた
+    ("もう照明はカンカン当たってるわ、暑いわ、焦るわ、泣きそうになるわっていうね、エピソードなんですか？", "なる"),
+    ("それでみんなが、そうなるよっていう話をずっとしてくれていたんです。", "なる"),
+    ("それで先生に、また明日行くわって言ってから帰ったんですけどね。", "行く"),
+])
+def test_a_sentence_ending_particle_before_tte_stays_with_its_verb(text, verb):
+    caps = tf.split_into_captions(text, 18, 2, trim=True)
+    assert not any(a.endswith(verb) and b.startswith(("わ", "よ")) for a, b in _junctions(caps)), caps
+    # 字幕を切り直す所（文節の切れ目）にも数えない
+    k = text.index(verb) + len(verb)
+    assert k not in tf._phrase_ends(tf._phrase_parser(), text)
+    # 句読点の後ろの「よって」（接続詞）は前に付けない
+    assert "よって、" in tf._parse(tf._phrase_parser(), "それが答えです。よって、次は")
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
 def test_an_adnominal_at_the_end_of_a_phrase_stays_with_its_noun():
     # 34回目の 31分48秒: BudouX が「普段どんな」を1つの文節に読み、字幕が「…普段どんな」/「人なんだろう
     # って…」と割れた（文節の尻の「な」を、語尾の「な」と同じく切ってよい所に数えていた）
