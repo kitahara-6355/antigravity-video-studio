@@ -298,6 +298,78 @@ def test_unheard_flash_that_cannot_be_merged_is_dropped():
     assert stats["dropped"] == 1
 
 
+def test_an_unheard_caption_snapped_too_short_gets_back_the_time_it_was_given():
+    # 実例（11分52秒・50回目）: 認識が拾えなかった聞き手の「エピソードなんですか？」を前後の聞こえた字幕の
+    # 間（1.31 秒）に配り、声の立ち上がり（712.54 秒）に寄せた。次の「ああ なるほど」まで 0.72 秒になり、
+    # 読めない・声も拾えない字幕として外していた。出だしを配った所の方へ、読める長さまで戻す
+    sp = _map([(707.56, 709.23), (709.55, 710.59), (711.31, 712.03), (712.54, 713.12),
+               (713.33, 714.47), (714.59, 714.99)], total=730)
+    segs = [{"start": 709.12, "end": 711.97, "text": "泣きそうになるわっていうね", "_asr": True,
+             "_asr_first": 709.12, "_asr_marks": [(0, 709.12), (12, 711.84)]},
+            {"start": 711.97, "end": 713.28, "text": "エピソードなんですか？", "_asr_interp": True},
+            {"start": 713.28, "end": 713.96, "text": "ああ　なるほど", "_asr": True,
+             "_asr_first": 713.67, "_asr_marks": [(3, 713.67), (4, 713.79), (5, 713.83)]}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    shown = [s for s in out if s["text"] == "エピソードなんですか？"]
+    assert len(shown) == 1 and stats["dropped"] == 0
+    assert shown[0]["end"] - shown[0]["start"] >= RULES["min_display_sec"]
+    # 戻すのは読める長さぎりぎりまで（声より早く出る分を小さくする）
+    assert shown[0]["start"] > 712.54 - 0.2
+    nxt = [s for s in out if s["text"].startswith("ああ")][0]
+    assert nxt["start"] == pytest.approx(713.33, abs=0.02)
+    before = [s for s in out if s["text"].startswith("泣き")][0]
+    assert before["end"] >= 712.03
+
+
+def test_an_unheard_caption_takes_back_time_only_while_the_one_before_stays_readable():
+    # 実例（29分24秒・50回目）: 認識がほぼ拾えない所に3枚を配った。真ん中の「皆さんぜひ」は声に寄せて
+    # 0.51 秒になり外れた。前の（これも声の拾えない）字幕を読める長さに残して戻す
+    sp = _map([(1761.42, 1762.40), (1762.78, 1764.74), (1764.89, 1765.18), (1765.47, 1766.47),
+               (1766.69, 1766.86), (1767.07, 1768.36)], total=1780)
+    segs = [{"start": 1760.9, "end": 1763.0, "text": "それでいいですか？", "_asr": True,
+             "_asr_first": 1761.03, "_asr_marks": [(1, 1761.03), (7, 1762.87)]},
+            {"start": 1763.0, "end": 1764.359, "text": "ありがとうございます", "_asr_interp": True},
+            {"start": 1764.359, "end": 1765.038, "text": "皆さんぜひ", "_asr_interp": True},
+            {"start": 1765.038, "end": 1766.94, "text": "ご応募ください　お待ちしてます", "_asr_interp": True},
+            {"start": 1766.94, "end": 1770.39, "text": "はいどこに\n当たるか分かりませんからね", "_asr": True,
+             "_asr_first": 1767.33, "_asr_marks": [(3, 1767.33), (16, 1770.13)]}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    texts = [s["text"] for s in out]
+    assert "皆さんぜひ" in texts and stats["dropped"] == 0
+    for s in out:
+        assert not sync._too_short(s, RULES["min_display_sec"]), s
+    assert out[texts.index("ご応募ください　お待ちしてます")]["start"] == pytest.approx(1765.47, abs=0.02)
+
+
+def test_an_unheard_backchannel_is_not_given_time_back():
+    # 相づちだけの字幕は字幕に出さない（`is_standalone_omittable`）ので、前の字幕の時間を削ってまで戻さない
+    # （25分11秒「うんうんうん」）
+    sp = _map([(1506.77, 1508.56), (1508.85, 1510.93), (1511.68, 1511.91), (1512.39, 1512.75),
+               (1512.92, 1513.93)], total=1520)
+    segs = [{"start": 1508.51, "end": 1510.97, "text": "一週間のうち六日間費やす", "_asr": True,
+             "_asr_first": 1508.51, "_asr_marks": [(0, 1508.79), (10, 1510.71)]},
+            {"start": 1510.97, "end": 1512.37, "text": "うんうんうん", "_asr_interp": True},
+            {"start": 1512.37, "end": 1515.0, "text": "もうある程度これで書ける状況に", "_asr": True,
+             "_asr_first": 1512.37, "_asr_marks": [(0, 1512.37), (1, 1512.89)]}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert "うんうんうん" not in [s["text"] for s in out]
+    assert stats["unheard_roomed"] == 0
+
+
+def test_an_unheard_caption_given_too_little_time_is_still_dropped():
+    # 実例（4分53秒）: 聞き手が重ねた「オリンピック はい」は、配った間（0.76 秒）から読める長さを取れない
+    sp = _map([(291.44, 293.70), (293.92, 294.10), (294.53, 294.75), (294.90, 297.58)], total=300)
+    segs = [{"start": 291.43, "end": 293.76, "text": "僕生まれた年のオリンピック", "_asr": True,
+             "_asr_first": 291.43, "_asr_marks": [(0, 291.43), (12, 293.63)]},
+            {"start": 293.76, "end": 294.52, "text": "オリンピック　はい", "_asr_interp": True},
+            {"start": 294.52, "end": 297.97, "text": "こっから\nいわゆる広告デザインっていうのが", "_asr": True,
+             "_asr_first": 294.52, "_asr_marks": [(0, 294.52), (1, 294.80)]}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert all("はい" not in s["text"] for s in out)
+    assert stats["dropped"] == 1
+    assert out[0]["end"] >= 293.70
+
+
 def test_an_unheard_caption_with_no_room_does_not_cut_a_heard_one_short():
     # 実例（15分26秒）: 重なって話した「ファンが」は認識に無く、前後の聞こえた字幕の間に隙も無い。
     # それでも時刻を取り合いに加わり、聞こえた「そういう中でね…」を 0.33 秒で消させた

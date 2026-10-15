@@ -546,6 +546,48 @@ def _unheard(s: dict) -> bool:
     return bool(s.get("_asr_interp") and not s.get("_asr") and not s.get("_asr_heard"))
 
 
+def _readable_sec(s: dict, min_display: float) -> float:
+    """`_too_short` にならない最短の出る長さ（丸めの分を少し足す）。"""
+    return max(FLASH_SEC, min(min_display, _chars(s) / FAST_CPS)) + 0.01
+
+
+def _give_unheard_room(items: list[dict], given: list[dict], min_display: float) -> int:
+    """隣とまとめられず読めないほど短い、声の拾えない字幕（`_unheard`）の出だしを、配った所（前後の
+    聞こえた字幕の間・`aligner.interpolate_unaligned`。given の `_sync_index` 番）の方へ、読める長さまで
+    戻す。戻した数を返す。
+
+    話し始めに寄せた後で次の字幕までが読めない長さになると、言った言葉の字幕が外れていた
+    （`_drop_unheard_flashes`。50回目の 11分52秒: 聞き手の「エピソードなんですか？」を前後の字幕の間
+    1.31 秒に配り、声の立ち上がりに寄せて 0.72 秒になった）。声より早く出る分が小さくなるよう、戻すのは
+    読める長さぎりぎりまで。配った所より前・区間の外へは戻さず、前の字幕にも読める長さを残す。
+    配った間から読める長さを取れなければ、今までどおり外す。相づちだけの字幕（字幕に出さない）は戻さない。
+    """
+    try:
+        from subtitle_engine.text_formatter import is_standalone_omittable
+    except Exception:  # 読めなければ相づちも戻す
+        def is_standalone_omittable(text):
+            return False
+    live = [s for s in items if not s.get("_merged")]
+    moved = 0
+    for i, s in enumerate(live):
+        if not _unheard(s) or not _too_short(s, min_display) or is_standalone_omittable(s.get("text")):
+            continue
+        a, b = float(s["start"]), float(s["end"])
+        lo = max(float(given[s["_sync_index"]]["start"]), _zone(s)[0])
+        p = live[i - 1] if i > 0 and _zone(live[i - 1]) == _zone(s) else None
+        if p is not None:
+            lo = max(lo, float(p["start"]) + max(MIN_STEP_SEC, _readable_sec(p, min_display))
+                     + 2 * VIDEO_FRAME)
+        t = round(max(lo, b - _readable_sec(s, min_display)), 3)
+        if t >= a or _too_short({"start": t, "end": b, "text": s.get("text")}, min_display):
+            continue
+        s["start"] = t
+        if p is not None:
+            p["end"] = round(min(float(p["end"]), t - 2 * VIDEO_FRAME), 3)
+        moved += 1
+    return moved
+
+
 def _drop_unheard_flashes(items: list[dict], min_display: float = DEFAULT_TIMING["min_display_sec"]) -> int:
     """隣とまとめられなかった読めない字幕（`_too_short`）のうち、音声認識に声が無いものを出さない。
 
@@ -846,11 +888,12 @@ def _align_once(segments: list[dict], speech: SpeechMap, cut_points: list[float]
     past_end = _drop_past_end(result, speech.duration)
     merged = _merge_flashes(result, r["min_display_sec"])
     resplit = _resplit_flashes(result, r["min_display_sec"])
+    roomed = _give_unheard_room(result, segments, r["min_display_sec"])
     dropped = (_drop_unheard_flashes(result, r["min_display_sec"]) + _drop_squeezed(result)
                + past_end + no_room)
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
              "redistributed": redistributed, "merged": merged, "resplit": resplit,
-             "dropped": dropped}
+             "dropped": dropped, "unheard_roomed": roomed}
     result = [s for s in result if not s.get("_merged")]
     logger.info(f"🎯 字幕の出だし・終わりを音声に合わせました: {n}枚, 話し始めに寄せた {snapped_in}, "
                 f"話し終わりに寄せた {snapped_out}")
