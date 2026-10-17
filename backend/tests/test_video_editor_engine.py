@@ -152,6 +152,15 @@ class TestFFmpegEditor:
                 editor = FFmpegEditor(output_dir=tmp_path)
                 assert editor.use_gpu is True
 
+            # 1b. 一覧にはあるが開けない（GPU の無いコンテナ・2026-10-05 実走）
+            mock_run = MagicMock(side_effect=[
+                subprocess.CompletedProcess(args=[], returncode=0, stdout="h264_nvenc enabled"),
+                subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="Cannot load libcuda.so.1"),
+            ])
+            with patch("subprocess.run", mock_run):
+                editor = FFmpegEditor(output_dir=tmp_path)
+                assert editor.use_gpu is False
+
             # 2. GPU非対応 (h264_nvencなし)
             mock_run = MagicMock(return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="other encoders"))
             with patch("subprocess.run", mock_run):
@@ -890,3 +899,13 @@ def test_get_video_info_json_decode_error(tmp_path, caplog):
             "duration": 0.0
         }
         assert any("Failed to get video info" in record.message for record in caplog.records)
+
+
+@pytest.mark.parametrize("use_gpu", [True, False])
+def test_encode_args_always_ask_for_yuv420p(tmp_path, use_gpu):
+    """どの書き出しも 4:2:0。4:4:4 は一般のプレーヤーで映像が出ない（2026-10-05）。"""
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = use_gpu
+    for quality in ("fast", "balanced", "quality"):
+        args = editor._get_encode_args(quality)
+        assert args[args.index("-pix_fmt") + 1] == "yuv420p"

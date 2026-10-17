@@ -1154,3 +1154,51 @@ async def test_thumbnail_stage_bound_agent_retry_on_failure(tmp_path):
         conn.close()
         
     await agent.stop()
+
+
+# --- SmartCut が決めた区間で切る（2026-10-13 ユーザー指摘「26秒の語尾が切れている」）--------
+
+
+def _render_env(tmpdir, render):
+    mock_sce = MagicMock()
+    mock_sce.render_smart_cut = render
+    mock_safe_io = MagicMock()
+    mock_safe_io.VAULT_OUTPUTS_DIR = Path(tmpdir)
+    return patch.dict("sys.modules", {"smart_cut_engine": mock_sce, "safe_io": mock_safe_io})
+
+
+@pytest.mark.asyncio
+async def test_the_preview_cuts_where_smartcut_planned():
+    """声の切れ目に寄せた区間・冒頭をつないだ区間で切る（字幕の区間から決め直さない）。"""
+    seen = {}
+
+    def _render(segments, video_path, output_path, ranges=None):
+        seen["ranges"] = ranges
+        Path(output_path).write_bytes(b"\x00" * 1024)
+        return True
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ctx = _make_preview_ctx(selected_count=5)
+        ctx.cut_ranges = [(1.35, 91.15), (95.0, 99.55)]
+        with _render_env(tmpdir, _render):
+            result = await PreviewWorker().execute(ctx)
+
+    assert result.success is True
+    assert seen["ranges"] == [(1.35, 91.15), (95.0, 99.55)]
+
+
+@pytest.mark.asyncio
+async def test_without_a_plan_the_renderer_decides_from_the_captions():
+    seen = {}
+
+    def _render(segments, video_path, output_path, ranges=None):
+        seen["ranges"] = ranges
+        Path(output_path).write_bytes(b"\x00" * 1024)
+        return True
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ctx = _make_preview_ctx(selected_count=5)
+        with _render_env(tmpdir, _render):
+            result = await PreviewWorker().execute(ctx)
+
+    assert result.success is True and seen["ranges"] is None

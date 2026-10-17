@@ -666,6 +666,95 @@ def test_AIの出力を一部だけ捨てた工程は一部スタブとして記
 
 
 
+def test_控えから使った校閲の直しは行数とモデルが記録に残る(tmp_path):
+    """校閲の控え（2026-10-08）: 控えから使った直しはこの回に呼んでいないので台帳に出ない。
+    どのモデルの直しかを記録で追えるよう、行数とモデルを工程の記録に残す。"""
+    c = _coordinator(tmp_path)
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _memo(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="控え",
+                                   data={"memo_hits": 3, "memo_models": ["gemini-3.5-flash-lite"]})
+            w.execute = _memo
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["memo"] == {"rows": 3, "models": ["gemini-3.5-flash-lite"]}
+    assert "memo" not in st["youtube_opt"]
+
+
+def test_別の聞き取りをどう選び校閲がいくつ採ったかが記録に残る(tmp_path):
+    """別の聞き取り（2026-10-15）: 文字起こしで決まらなかった所を、本文と並べて選ばせた結果と
+    選んだモデル、校閲が採った行の数を工程の記録に残す（どの直しがどこから来たかを追える）。"""
+    c = _coordinator(tmp_path)
+    heard = {"given": 2, "chosen": 1, "adopted": 1, "models": ["gemini-3.5-flash-lite"],
+             "spots": [{"incorrect": "座右の目はなく", "choices": ["heard", "heard"], "chosen": True},
+                       {"incorrect": "主催されて", "choices": ["body", "body"], "chosen": False}]}
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _heard(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="別の聞き取り",
+                                   data={"heard": heard})
+            w.execute = _heard
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["heard"] == heard
+    assert "heard" not in st["youtube_opt"]
+
+
+def test_2回目の起こしが割れた所をどう選びいくつ字を置いたかが記録に残る(tmp_path):
+    """割れた聞き取り（2026-10-15）: 校閲の後の文と並べて選ばせた結果と選んだモデル、字を置いた数を
+    工程の記録に残す（校閲の後に置いた字がどこから来たかを追える）。来た所が無ければ残さない。"""
+    c = _coordinator(tmp_path)
+    split = {"given": 2, "chosen": 1, "applied": 1, "models": ["gemini-3.5-flash-lite"],
+             "spots": [{"incorrect": "ように鳴ってる", "choices": ["heard", "heard"], "chosen": True},
+                       {"incorrect": "そこが書道教室", "choices": ["body", "body"], "chosen": False}]}
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _split(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="割れた聞き取り",
+                                   data={"split": split, "heard": {"given": 0, "chosen": 0, "adopted": 0}})
+            w.execute = _split
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["split"] == split
+    assert "heard" not in st["proofread"]
+
+
+def test_校正台帳のどの直しが当たりどれが当たらなかったかが記録に残る(tmp_path):
+    """人の直し（校正台帳・2026-10-17）: どの台帳を当て、どの直しが当たり・既に直っていて・当たらなかったかを
+    工程の記録に残す。キャッシュ無しで作り直したとき、人が見直す所を記録から引ける。台帳なしなら残さない。"""
+    c = _coordinator(tmp_path)
+    review = {"ledger": "backend/config/reviews/raw4_20250922.json",
+              "applied": [{"id": "2026-10-17-07", "at": 561.7}], "already": [{"id": "2026-10-17-09", "at": 615.3}],
+              "missing": [{"id": "2026-10-17-08", "at": 575.7}], "glossary": {"剣閃": 3}}
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _review(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="人の直し",
+                                   data={"review": review})
+            w.execute = _review
+        elif type(w).__name__ == "YouTubeOptWorker":
+            async def _no_ledger(ctx, _w=w):
+                return StageResult(stage_name=_w.name, success=True, detail="台帳なし", data={"review": {}})
+            w.execute = _no_ledger
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["review"] == review
+    assert "review" not in st["youtube_opt"]
+
+
 def test_採用したAIの出力の件数が記録に残りゼロならスタブ(tmp_path):
     """**「宣言どおり」は断定ではなく証拠で決める**（2026-09-26 ユーザー決定・作りの変更）。
     工程が採用した AI の出力の件数を記録に残し、ゼロなら経路に依らず stub。"""

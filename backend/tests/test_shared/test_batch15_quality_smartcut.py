@@ -765,6 +765,7 @@ class TestRunAllPlugins:
                 type('O', (), {"name": "ai_rule_check"})(),
                 type('O', (), {"name": "audio_presence_check"})(),
                 type('O', (), {"name": "duration_sanity_check"})(),
+                type('O', (), {"name": "subtitle_coverage_check"})(),
             ])
 
     def test_qg_46_run_all_block_mode_critical(self):

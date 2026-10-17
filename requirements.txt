@@ -7,6 +7,9 @@ fastapi
 uvicorn
 python-dotenv
 google-genai
+# 字幕を文節（意味の塊）で区切る (backend/subtitle_engine/text_formatter.py)。
+# 無ければ従来の助詞での分割に戻るが、字幕の切れ目が語の途中に入る。
+budoux
 # Drive / Sheets 連携 (backend/services/workspace_sync.py)。
 # google-adk 経由で入ることがあるため未宣言でも動く場合があるが、
 # それに依存すると adk の依存が変わった日に黙って壊れる。
@@ -16,3 +19,6 @@ requests
 pillow
 websockets
 python-multipart
+# 字幕の時刻合わせ（文字ごとの時刻を取る・CPU・無料）。モデルは
+# python -m backend.subtitle_engine.aligner --setup で取得する
+sherpa-onnx

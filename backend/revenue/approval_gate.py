@@ -636,6 +636,11 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
                 理由 = "**未検証**（一度も呼ばれていない — 提案はこのモデルが出したものではない）"
             else:
                 理由 = "（理由の記録なし — D-39 より前の実走）"
+            # 控えから使った直し（校閲・2026-10-08）はこの回に呼んでいない。どのモデルの直しかを並べる
+            控え = st.get("memo") if isinstance(st.get("memo"), dict) else {}
+            if 控え.get("rows"):
+                理由 += (f"／控えから {int(控え['rows'])} 行"
+                         f"（{', '.join(控え.get('models') or []) or '?'} の直し）")
             lines.append(f"    {st.get('name')}: {model}{段} — {理由}")
 
     history_dir = run_dir / APPROVAL_HISTORY

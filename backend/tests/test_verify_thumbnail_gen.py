@@ -208,9 +208,10 @@ def test_smartcut_strategy_service_thumbnail_integration(tmp_path):
     async def run_test():
         await agent.register_task(task_id=task_id, initial_status="READY", max_retries=1)
         await agent.start(service.resolve_session_thumbnail_task)
-        
-        # 完了を待つ
-        for _ in range(50):
+
+        # 完了を待つ（最長 60 秒。CombinedOverlay の読み込みと描画で数秒かかり、2.5 秒では
+        # 混んだ CI で RUNNING のまま落ちた・2026-10-06）
+        for _ in range(1200):
             status = await agent.get_task_status(task_id)
             if status in ("COMPLETED", "FAILED"):
                 break

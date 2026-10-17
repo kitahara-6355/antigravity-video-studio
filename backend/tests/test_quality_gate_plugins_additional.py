@@ -103,7 +103,8 @@ def test_subtitle_line_check_with_template():
     tc.template_id = "test_tmpl"
     tc.get_subtitle_rules.return_value = {"max_chars_per_line": 5}
     
-    ctx = _MockCtx(segments=[{"text": "123456"}] * 4) # long lines = 4 > 3
+    # 行は整形と同じ幅で測る（半角は 0.5）ので、全角の6字にする
+    ctx = _MockCtx(segments=[{"text": "１２３４５６"}] * 4) # long lines = 4 > 3
     r = SubtitleLineCheck().analyze(ctx, tc)
     assert r["deductions"] == 5
     assert "長い字幕行" in r["feedback"][0]
