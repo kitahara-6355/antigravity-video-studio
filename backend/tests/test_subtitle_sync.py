@@ -716,6 +716,25 @@ def test_a_long_caption_is_split_at_the_best_break_rather_than_at_the_line_break
     assert out[1]["_asr_marks"][0] == (2, 5.6)
 
 
+# 試しの書き出し（2026-10-17）の 37分47秒。1行目を幅で測るようになって長く入り、改行が「毛が」の後ろから
+# 「3年前から」の後ろに動いた
+WEASEL = "2022年からイタチの毛がもう3年前から\n入ってこなくて"
+
+
+def test_a_long_caption_is_split_after_a_particle_when_the_stronger_breaks_leave_a_part_too_short():
+    # 改行で分けると2枚目の「入ってこなくて」が 1.1 秒、「2022年から」の後ろで分けると1枚目が 1.4 秒で読めず、
+    # 1枚のまま 7.2 秒出た。格助詞の後ろ（「毛が」）で分ける（53回目はここが改行で、3.1 秒と 3.7 秒の2枚だった）
+    sp = _map([(1.0, 3.6), (4.4, 7.7)], total=12)
+    marks = [(0, 1.0), (3, 1.72), (4, 1.96), (5, 2.2), (6, 2.28), (7, 2.6), (8, 2.72), (9, 2.88), (10, 3.08),
+             (13, 4.49), (14, 4.93), (15, 5.29), (16, 5.53), (17, 5.81), (18, 6.01), (19, 6.09), (20, 6.45),
+             (21, 6.61), (22, 6.69), (23, 6.93), (24, 7.09), (25, 7.25)]
+    segs = [{"start": 1.0, "end": 7.51, "text": WEASEL, "_asr": True, "_asr_first": 1.0, "_asr_marks": marks}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["2022年からイタチの毛が", "もう3年前から入ってこなくて"]
+    assert stats["split_long"] == 1
+    assert out[1]["start"] == pytest.approx(4.4, abs=0.02)
+
+
 def test_speech_left_without_a_caption_is_measured_from_where_the_words_end():
     # 「に」の伸びた声（0.47 秒）と、拾えなかった「お習」の声（0.34 秒）は字幕の言葉の声。字幕に無い声は
     # 間の 0.35 秒だけなので分けてよい。間の声が長ければ（1.2 秒）分けない
