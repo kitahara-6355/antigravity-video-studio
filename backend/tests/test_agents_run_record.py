@@ -729,6 +729,32 @@ def test_2回目の起こしが割れた所をどう選びいくつ字を置い�
     assert "heard" not in st["proofread"]
 
 
+def test_校正台帳のどの直しが当たりどれが当たらなかったかが記録に残る(tmp_path):
+    """人の直し（校正台帳・2026-10-17）: どの台帳を当て、どの直しが当たり・既に直っていて・当たらなかったかを
+    工程の記録に残す。キャッシュ無しで作り直したとき、人が見直す所を記録から引ける。台帳なしなら残さない。"""
+    c = _coordinator(tmp_path)
+    review = {"ledger": "backend/config/reviews/raw4_20250922.json",
+              "applied": [{"id": "2026-10-17-07", "at": 561.7}], "already": [{"id": "2026-10-17-09", "at": 615.3}],
+              "missing": [{"id": "2026-10-17-08", "at": 575.7}], "glossary": {"剣閃": 3}}
+    for w in c.workers:
+        if type(w).__name__ == "ProofreadWorker":
+            async def _review(ctx, _w=w):
+                ctx.ai_accepted = {**getattr(ctx, "ai_accepted", {}), "AI校閲": 3}
+                return StageResult(stage_name=_w.name, success=True, detail="人の直し",
+                                   data={"review": review})
+            w.execute = _review
+        elif type(w).__name__ == "YouTubeOptWorker":
+            async def _no_ledger(ctx, _w=w):
+                return StageResult(stage_name=_w.name, success=True, detail="台帳なし", data={"review": {}})
+            w.execute = _no_ledger
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["proofread"]["review"] == review
+    assert "review" not in st["youtube_opt"]
+
+
 def test_採用したAIの出力の件数が記録に残りゼロならスタブ(tmp_path):
     """**「宣言どおり」は断定ではなく証拠で決める**（2026-09-26 ユーザー決定・作りの変更）。
     工程が採用した AI の出力の件数を記録に残し、ゼロなら経路に依らず stub。"""

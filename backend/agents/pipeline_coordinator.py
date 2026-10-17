@@ -336,6 +336,10 @@ class PipelineCoordinator:
                 # 2回目の起こしが割れた所（2026-10-15）: 校閲の後の文と並べてどう選び、いくつ字を置いたか
                 if isinstance(data, dict) and isinstance(data.get("split"), dict) and data["split"].get("given"):
                     entry["split"] = data["split"]
+                # 人の直し（校正台帳・2026-10-17）: どの台帳のどの直しが当たり、どれが当たらなかったか。
+                # キャッシュ無しで作り直したとき、人が見直す所を記録から引けるようにする
+                if isinstance(data, dict) and isinstance(data.get("review"), dict) and data["review"].get("ledger"):
+                    entry["review"] = data["review"]
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
                 elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):

@@ -641,10 +641,12 @@
    "symbol": "main",
    "category": "品質スコア",
    "status": "out_of_scope",
-   "reason": "CLI 専用（backend/main.py・routers/ から到達しない）。かつ未計測時の表示は 0 点で悲観側",
+   "reason": "CLI 専用（backend/main.py・routers/ から到達しない）。かつ未計測時の表示は 0 点で悲観側。校正台帳（--review）を読めないときの except は return 1 で、API を呼ぶ前に止まる側（2026-10-17）",
    "fingerprint": [
     "const_return",
     "const_return",
+    "const_return",
+    "except_returns",
     "or_default",
     "or_default"
    ]
@@ -4349,6 +4351,15 @@
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "_rewrap の中で、折った2行の1行目と2行目の継ぎ目に text_formatter._break_score の点を付けるだけの局所関数。点は2つの折り方を比べる場でしか使わず、品質スコア・投稿・統計・retention のどれにも出ない",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/review_flags.py::flag_captions",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "flag_captions",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "人が字幕を通しで見るときの「機械の要確認」の印を付けるだけの関数。中の score は字幕1枚ごとの、字幕と別の音声認識（ReazonSpeech）の食い違いの字数で、しきい以上の字幕を印の一覧にして返す。一覧はレビュー画面の控え（review_sheet.export の flags）にしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（正典 limits 2「字幕の質は対象外」）",
    "fingerprint": []
   },
   {
