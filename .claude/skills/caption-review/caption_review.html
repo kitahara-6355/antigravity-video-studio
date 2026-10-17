@@ -4,7 +4,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <style>
-/* 机の上: 左に画面（動画・いまの字幕・朱を入れるボタン）、右に朱を入れた所の控え。狭い画面では縦に積む */
+/* 1画面の机: 左に動画・時間の帯・ボタン・いまの字幕、右に朱を入れた所の控え（中だけスクロール）。
+   伸び縮みするのは動画だけで、ボタンと字幕の枠は高さが決まっている（字幕の行数でボタンが動かない）。
+   縦長の画面か幅 600px 未満では縦に積み、控えが残りの高さを使う */
 :root {
   --paper: #eef1f4;
   --sheet: #fbfcfd;
@@ -24,6 +26,7 @@
   --font-head: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --font-time: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --r: 6px;
+  --gap: 8px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -41,117 +44,168 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html, body { height: 100%; }
 body {
-  background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.6;
+  background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 16px 48px;
+  padding-block: 8px;
+  display: flex; flex-direction: column; gap: var(--gap); overflow: hidden;
 }
-.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px;
-  max-width: 1400px; margin: 0 auto 14px; }
-h1 { font-family: var(--font-head); font-size: 1.55rem; font-weight: 700; margin: 0; letter-spacing: .06em; text-wrap: balance; }
-.sub { margin: 0; color: var(--ink-soft); font-size: .88rem; }
-.counts { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { font-size: .78rem; padding: 1px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet);
-  white-space: nowrap; font-variant-numeric: tabular-nums; }
-.chip.shu { color: var(--shu); background: var(--shu-wash); border-color: transparent; }
-.chip.matsu { color: var(--matsu); background: var(--matsu-wash); border-color: transparent; }
-.chip.gunjo { color: var(--gunjo); background: var(--gunjo-wash); border-color: transparent; }
-.desk { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 1400px; margin: 0 auto; }
-@media (min-width: 980px) {
-  .desk { grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); align-items: start; }
-  .ledger { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); }
-}
-.stage { min-width: 0; display: grid; gap: 10px; }
-.screen { position: relative; background: var(--screen); border-radius: var(--r); overflow: hidden; aspect-ratio: 16 / 9;
-  max-width: 100%; }
-.screen video { width: 100%; height: 100%; display: block; background: var(--screen); }
+
+/* 見出し: 1行。数の札が帯の色の見本を兼ねる */
+.top { flex: none; display: flex; align-items: center; gap: 4px 14px; min-width: 0; }
+h1 { font-family: var(--font-head); font-size: 1.12rem; font-weight: 700; margin: 0; letter-spacing: .06em; white-space: nowrap; }
+.sub { margin: 0; color: var(--ink-soft); font-size: .8rem; flex: 1 1 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.counts { display: flex; gap: 6px; flex: none; }
+.chip { font-size: .76rem; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet);
+  white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--sw, var(--ink-soft)); }
+.chip.shu { color: var(--shu); background: var(--shu-wash); border-color: transparent; --sw: var(--shu); }
+.chip.matsu { color: var(--matsu); background: var(--matsu-wash); border-color: transparent; --sw: var(--matsu); }
+.chip.gunjo { color: var(--gunjo); background: var(--gunjo-wash); border-color: transparent; --sw: var(--gunjo); }
+.chip.plain::before { display: none; }
+
+.desk { flex: 1 1 auto; min-height: 0; display: grid; gap: 12px;
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 32vw, 420px); }
+
+/* 左: 動画は幅いっぱい（16:9）を目安に、高さが足りなければ縮む。ほかは高さ固定 */
+.stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--gap); container-type: inline-size; }
+.screen { position: relative; flex: 0 1 calc(100cqw * 9 / 16); min-height: 120px; background: var(--screen);
+  border-radius: var(--r); overflow: hidden; }
+.screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block;
+  background: var(--screen); }
 .loader { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 16px;
   color: var(--on-screen); text-align: center; font-size: .95rem; }
 .loader p { margin: 0; max-width: 34em; }
-.bar { width: min(320px, 70vw); height: 4px; background: var(--on-screen-dim); border-radius: 2px; overflow: hidden; }
+.bar { width: min(320px, 70%); height: 4px; background: var(--on-screen-dim); border-radius: 2px; overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: var(--on-screen); transition: width .2s; }
 .loader .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .loader button { background: transparent; color: var(--on-screen); border-color: var(--on-screen-dim); }
-.strip { position: relative; height: 24px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+.strip { flex: none; position: relative; height: 22px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
   cursor: pointer; touch-action: manipulation; }
 .strip .tick { position: absolute; width: 3px; margin-left: -1px; border-radius: 1px; pointer-events: none; }
-.strip .tick.mark { top: 3px; height: 9px; background: var(--shu); }
+.strip .tick.mark { top: 2px; height: 9px; background: var(--shu); }
 .strip .tick.mark.fixed { background: var(--matsu); }
 .strip .tick.mark.ok { background: var(--ink-soft); }
-.strip .tick.flag { bottom: 3px; height: 7px; background: var(--gunjo); }
+.strip .tick.flag { bottom: 2px; height: 6px; background: var(--gunjo); }
 .strip .head { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .78rem; color: var(--ink-soft); margin-top: -4px; }
-.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px;
-  vertical-align: 0; background: var(--sw); }
-.now { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 12px 16px; display: grid; gap: 4px; }
-.now-meta { font-family: var(--font-time); font-size: .8rem; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 4px 14px;
-  font-variant-numeric: tabular-nums; }
-.now-text { font-size: 1.3rem; font-weight: 700; white-space: pre-line; margin: 0; min-height: 2.7em; line-height: 1.35; }
-.now.is-marked .now-text { color: var(--shu); }
-.now-side { color: var(--ink-soft); font-size: .88rem; white-space: pre-line; margin: 0; overflow-wrap: anywhere; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* ボタンの帯: 高さ固定でボタンだけを置く。「違和感あり」はいつも左端。印の所を流している間は右側だけが送りのボタンに替わる */
+.actions { flex: none; height: 46px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.grp { display: flex; align-items: center; gap: 8px; flex: none; }
 button { font: inherit; font-size: .92rem; border-radius: var(--r); border: 1px solid var(--rule); background: var(--sheet);
-  color: var(--ink); padding: 7px 14px; cursor: pointer; line-height: 1.4; }
+  color: var(--ink); padding: 0 14px; height: 38px; cursor: pointer; line-height: 1; white-space: nowrap; }
 button:hover { border-color: var(--ink-soft); }
 button:disabled { opacity: .45; cursor: default; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, .strip:focus-visible {
   outline: 2px solid var(--gunjo); outline-offset: 2px; }
-.btn-mark { background: var(--shu); border-color: var(--shu); color: var(--sheet); font-weight: 700; font-size: 1.05rem;
-  padding: 10px 22px; }
+.btn-mark { flex: none; height: 46px; padding: 0 20px; background: var(--shu); border-color: var(--shu); color: var(--sheet);
+  font-weight: 700; font-size: 1.05rem; }
 .btn-mark:hover { border-color: var(--ink); }
 kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px;
   margin-left: 6px; opacity: .8; }
-.keys { margin: 0; font-size: .8rem; color: var(--ink-soft); }
-.reel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; border-radius: var(--r);
-  background: var(--shu-wash); color: var(--ink); }
-.reel strong { color: var(--shu); font-variant-numeric: tabular-nums; }
-.ledger { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); min-width: 0; display: flex;
-  flex-direction: column; }
-.tabs { display: flex; border-bottom: 1px solid var(--rule); overflow-x: auto; }
-.tabs button { border: 0; border-radius: 0; background: transparent; padding: 10px 14px; border-bottom: 2px solid transparent;
-  white-space: nowrap; }
+.reel-pos { color: var(--shu); font-weight: 500; }
+
+/* いまの字幕: 4段とも高さ固定（前の字幕1行・いまの字幕2行・次の字幕1行）。字の大きさは1行18字が枠の幅に収まるように決める */
+.now { flex: none; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 6px 14px 8px;
+  display: grid; gap: 1px; }
+.now-meta { height: 1.4rem; font-family: var(--font-time); font-size: .76rem; color: var(--ink-soft); display: flex;
+  align-items: center; gap: 14px; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+.now-side { height: 1.5rem; line-height: 1.5rem; margin: 0; font-size: .84rem; color: var(--ink-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now-text { margin: 0; font-weight: 700; font-size: clamp(.8rem, (100cqw - 30px) / 18.5, 1.28rem); line-height: 1.35; height: 2.8em;
+  overflow: hidden; white-space: pre-line; overflow-wrap: anywhere; }
+.now.is-marked .now-text { color: var(--shu); }
+.keys { margin-left: auto; min-width: 0; font-family: var(--font-ui); font-size: .72rem; overflow: hidden; text-overflow: ellipsis; }
+.keys kbd { margin-left: 0; margin-right: 3px; }
+
+/* 右: 朱を入れた所の控え。机の高さに収め、中だけスクロールする */
+.ledger { min-width: 0; min-height: 0; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r);
+  display: flex; flex-direction: column; overflow: hidden; }
+.tabs { flex: none; display: flex; border-bottom: 1px solid var(--rule); overflow-x: auto; }
+.tabs button { border: 0; border-radius: 0; background: transparent; height: 40px; padding: 0 14px;
+  border-bottom: 2px solid transparent; }
 .tabs button[aria-selected="true"] { border-bottom-color: var(--ink); font-weight: 700; }
-.list { overflow-y: auto; padding: 10px; display: grid; gap: 10px; align-content: start; flex: 1; min-height: 140px; }
-.empty { color: var(--ink-soft); font-size: .9rem; padding: 18px 8px; margin: 0; }
+.list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px; display: grid;
+  gap: 8px; align-content: start; }
+.empty { color: var(--ink-soft); font-size: .88rem; padding: 12px 6px; margin: 0; }
 .empty b { color: var(--shu); }
-.item { border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 7px; background: var(--paper); }
+.item { border: 1px solid var(--rule); border-radius: var(--r); padding: 8px 10px; display: grid; gap: 6px; background: var(--paper); }
 .item.is-playing { border-color: var(--shu); box-shadow: 0 0 0 1px var(--shu); }
 .item-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .time { font-family: var(--font-time); font-variant-numeric: tabular-nums; color: var(--shu); background: transparent;
-  border-color: var(--shu); padding: 2px 10px; font-size: .85rem; }
+  border-color: var(--shu); height: 28px; padding: 0 10px; font-size: .85rem; }
 .item.is-flag .time { color: var(--gunjo); border-color: var(--gunjo); }
-.idx { font-family: var(--font-time); font-size: .78rem; color: var(--ink-soft); }
+.idx { font-family: var(--font-time); font-size: .76rem; color: var(--ink-soft); }
 .item-head .chip { margin-left: auto; }
 .orig { margin: 0; white-space: pre-line; font-size: .95rem; overflow-wrap: anywhere; }
-.heard { margin: 0; font-size: .85rem; color: var(--gunjo); overflow-wrap: anywhere; }
+.heard { margin: 0; font-size: .84rem; color: var(--gunjo); overflow-wrap: anywhere; }
 .flag-lead { display: grid; gap: 8px; justify-items: start; }
-.flag-lead .empty { padding: 4px 2px 0; }
+.flag-lead .empty { padding: 2px 2px 0; }
 .item.is-flag.is-marked { border-color: var(--shu); }
-.item label { font-size: .75rem; color: var(--ink-soft); display: grid; gap: 2px; }
+.item label { font-size: .74rem; color: var(--ink-soft); display: grid; gap: 2px; }
 .item textarea, .item input { font: inherit; font-size: .95rem; width: 100%; min-width: 0; border: 1px solid var(--rule);
-  border-radius: 4px; padding: 6px 8px; background: var(--sheet); color: var(--ink); resize: vertical; }
-.item textarea { min-height: 3.4em; line-height: 1.4; }
+  border-radius: 4px; padding: 5px 8px; background: var(--sheet); color: var(--ink); resize: vertical; }
+.item textarea { min-height: 3.2em; line-height: 1.4; }
 .item-tools { display: flex; flex-wrap: wrap; gap: 6px; }
-.item-tools button { font-size: .8rem; padding: 4px 10px; }
-.foot { border-top: 1px solid var(--rule); padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.save { margin: 0; font-size: .8rem; color: var(--ink-soft); flex: 1 1 12em; }
+.item-tools button { font-size: .8rem; height: 30px; padding: 0 10px; }
+.foot { flex: none; border-top: 1px solid var(--rule); padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.save { margin: 0; font-size: .78rem; color: var(--ink-soft); flex: 1 1 10em; min-width: 0; }
 .save.warn { color: var(--shu); }
 .save.ok { color: var(--matsu); }
-.copybox { width: 100%; min-height: 8em; font: inherit; font-size: .85rem; }
-.toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+.foot button { height: 32px; font-size: .84rem; }
+.copybox { width: 100%; height: 7em; font: inherit; font-size: .85rem; resize: none; }
+/* 知らせは動画の上端に重ねる（字幕の枠・ボタン・控えを隠さない） */
+.toast { position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
   background: var(--ink); color: var(--sheet); padding: 8px 10px 8px 16px; border-radius: 999px; font-size: .88rem;
-  max-width: calc(100% - 32px); display: flex; gap: 12px; align-items: center; opacity: 0; pointer-events: none;
-  transition: opacity .2s; z-index: 20; }
+  max-width: calc(100% - 20px); display: flex; gap: 12px; align-items: center; opacity: 0; pointer-events: none;
+  transition: opacity .2s; z-index: 20; white-space: nowrap; }
+.toast #toastText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .toast.on { opacity: 1; pointer-events: auto; }
-.toast button { background: transparent; color: inherit; border-color: currentColor; padding: 2px 10px; font-size: .82rem; }
+.toast button { background: transparent; color: inherit; border-color: currentColor; height: 28px; padding: 0 10px; font-size: .82rem; }
+
+/* 縦長か狭い画面: 縦に積む（正方形に近い画面は2列のほうが控えが広い）。見出しは1行のまま、数の札は横に送れる */
+@media (max-width: 599px), (max-aspect-ratio: 9/10) {
+  .sub { display: none; }
+  h1 { font-size: 1rem; }
+  .counts { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .desk { display: flex; flex-direction: column; gap: var(--gap); }
+  .stage { flex: 0 1 auto; }
+  .ledger { flex: 1 1 200px; min-height: 170px; }
+}
+/* 背の低い画面（横向きのスマホなど）では1画面に収めず、ページごとスクロールする */
+@media (max-height: 479px) {
+  html, body { height: auto; }
+  body { overflow: visible; }
+  .desk { display: flex; flex-direction: column; }
+  .screen { flex: none; aspect-ratio: 16 / 9; max-height: 80vh; }
+  .ledger { flex: none; height: 80vh; }
+}
+/* 左の列が狭いとき（ボタンの帯が入りきらないとき）は詰める。幅は動画の列で決める */
+@container (max-width: 599px) {
+  .keys, button kbd { display: none; }
+  button { padding: 0 11px; }
+  .btn-mark { padding: 0 15px; }
+}
+@container (max-width: 439px) {
+  .actions, .grp { gap: 5px; }
+  .actions { overflow-x: auto; scrollbar-width: none; }
+  button { font-size: .86rem; padding: 0 8px; }
+  .btn-mark { font-size: .98rem; padding: 0 12px; }
+  .now { padding-inline: 10px; }
+}
+/* さらに狭いとき（スマホなど）は2段: 上に幅いっぱいの「違和感あり」、下に残りのボタン。段の高さは決めておく */
+@container (max-width: 369px) {
+  .actions { height: 90px; flex-wrap: wrap; align-content: space-between; overflow: visible; }
+  .btn-mark { flex: 1 0 100%; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <header class="top">
-  <div>
-    <h1>字幕の朱入れ</h1>
-    <p class="sub" id="runLabel">美麗チャンネル 対談 第1回 · 字幕を読み込んでいます</p>
-  </div>
+  <h1>字幕の朱入れ</h1>
+  <p class="sub" id="runLabel">美麗チャンネル 対談 第1回 · 字幕を読み込んでいます</p>
   <div class="counts" id="counts" aria-live="polite"></div>
 </header>
 
@@ -168,35 +222,31 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
         </div>
         <input type="file" id="pick" accept=".mp4,.json,video/mp4,application/json" multiple hidden>
       </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastBtn" hidden></button></div>
     </div>
     <div class="strip" id="strip" role="slider" tabindex="0" aria-label="動画の時間（朱は印・群青は機械の要確認）"
          aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><div class="head" id="head"></div></div>
-    <div class="legend">
-      <span style="--sw: var(--shu)">印（未記入）</span>
-      <span style="--sw: var(--matsu)">直しあり</span>
-      <span style="--sw: var(--ink-soft)">問題なし</span>
-      <span style="--sw: var(--gunjo)" id="legendFlag" hidden>機械の要確認</span>
-    </div>
-    <div class="now" id="now">
-      <div class="now-meta"><span id="nowTime">0:00</span><span id="nowIdx">字幕 —</span><span id="nowSrc"></span></div>
-      <p class="now-side" id="nowPrev"></p>
-      <p class="now-text" id="nowText">動画が出たら再生してください。違和感があったら、その場で「違和感あり」を押します。</p>
-      <p class="now-side" id="nowNext"></p>
-    </div>
     <div class="actions">
       <button type="button" class="btn-mark" id="markBtn" disabled>違和感あり<kbd>M</kbd></button>
-      <button type="button" id="backBtn" disabled>3秒戻る<kbd>←</kbd></button>
-      <button type="button" id="reelBtn" disabled>印の所だけ再生</button>
+      <div class="grp" id="normal">
+        <button type="button" id="backBtn" disabled>3秒戻る<kbd>←</kbd></button>
+        <button type="button" id="reelBtn" disabled>印の所だけ再生</button>
+      </div>
+      <div class="grp" id="reel" hidden>
+        <button type="button" id="reelPrev">前へ</button>
+        <button type="button" id="reelAgain">もう一度</button>
+        <button type="button" id="reelNext">次へ</button>
+        <button type="button" id="reelStop">やめる</button>
+      </div>
     </div>
-    <div class="reel" id="reel" hidden>
-      <span><span id="reelKind">印の所だけ再生中</span> <strong id="reelPos">1 / 1</strong></span>
-      <button type="button" id="reelPrev">前へ</button>
-      <button type="button" id="reelAgain">もう一度</button>
-      <button type="button" id="reelNext">次へ</button>
-      <button type="button" id="reelStop">やめる</button>
+    <div class="now" id="now">
+      <div class="now-meta"><span class="reel-pos" id="reelInfo" hidden><span id="reelKind">印の所</span> <span id="reelPos">1 / 1</span></span><span id="nowTime">0:00</span><span id="nowIdx">字幕 —</span><span id="nowSrc"></span><span class="keys"
+        title="押すまでの遅れを見込んで、0.4秒前に出ていた字幕に印が付きます"><kbd>M</kbd>印 · <kbd>Space</kbd>再生と停止 ·
+        <kbd>←</kbd><kbd>→</kbd>3秒 · <kbd>,</kbd><kbd>.</kbd>前後の字幕</span></div>
+      <p class="now-side" id="nowPrev"></p>
+      <p class="now-text" id="nowText">再生して、違和感があったら M か「違和感あり」を押します</p>
+      <p class="now-side" id="nowNext"></p>
     </div>
-    <p class="keys">キー: <kbd>M</kbd> 印を付ける・<kbd>Space</kbd> 再生と停止・<kbd>←</kbd><kbd>→</kbd> 3秒・<kbd>,</kbd><kbd>.</kbd> 前後の字幕。
-      押すまでの遅れを見込んで、0.4秒前に出ていた字幕に印が付きます。</p>
   </section>
 
   <aside class="ledger" aria-label="朱を入れた所">
@@ -206,7 +256,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     </div>
     <div class="list" id="marksList" role="tabpanel" aria-labelledby="tabMarks">
       <p class="empty" id="marksEmpty">まだ印はありません。動画を見ながら違和感があれば <b>違和感あり</b>（キーは M）を押すと、その字幕がここに入ります。
-        あとで「印の所だけ再生」で順に聞き直し、「正しくは」に正しい字を書いてください。</p>
+        押すまでの遅れを見込んで、0.4秒前に出ていた字幕に印が付きます。あとで「印の所だけ再生」で順に聞き直し、「正しくは」に正しい字を書いてください。</p>
     </div>
     <div class="list" id="flagsList" role="tabpanel" aria-labelledby="tabFlags" hidden></div>
     <div class="foot">
@@ -219,7 +269,6 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   </aside>
 </main>
 
-<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastBtn" hidden></button></div>
 
 <script>
 (() => {
@@ -240,6 +289,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     return m + ":" + String(s).padStart(2, "0"); };
   const idOf = (i) => "c" + String(i).padStart(4, "0");
   const flat = (t) => String(t || "").replace(/\n/g, "").replace(/　/g, " ");
+  const oneLine = (t) => String(t || "").replace(/\n/g, "　");
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ── 字幕を時間で引く ──
@@ -339,7 +389,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     $("runLabel").textContent = "美麗チャンネル 対談 第1回 · " + (sheet.label || sheet.run || "") + " · 字幕 " + S.caps.length + " 枚 · "
       + clock(duration());
     $("strip").setAttribute("aria-valuemax", String(Math.round(duration())));
-    $("tabFlags").hidden = !S.flags.length; $("legendFlag").hidden = !S.flags.length; $("nFlags").textContent = S.flags.length;
+    $("tabFlags").hidden = !S.flags.length; $("nFlags").textContent = S.flags.length;
     renderFlags(); renderAll(); connectDb(sheet.run || "run");
   }
 
@@ -427,12 +477,15 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 
   // ── 再生 ──
   function seek(t) { video.currentTime = Math.min(Math.max(0, t), (video.duration || duration()) - 0.05); }
+  // 印の所を続けて流している間は、ボタンの帯の右側が送りのボタンに替わる（帯の高さと「違和感あり」の位置は変わらない）。
+  // 何枚目かは字幕の枠の見出し行に出す（桁が増えてもボタンが横にずれない）
+  function showReel(on) { $("reel").hidden = !on; $("normal").hidden = on; $("reelInfo").hidden = !on; }
   function playList(ks, kind) {
     if (!ks.length || !video.src) return;
     clearTimeout(S.reel && S.reel.wait);
     S.reel = { ks, n: 0, until: 0, wait: 0 };
-    $("reelKind").textContent = kind === "flags" ? "要確認の所だけ再生中" : "印の所だけ再生中";
-    $("reel").hidden = ks.length < 2;
+    $("reelKind").textContent = kind === "flags" ? "要確認の所" : "印の所";
+    showReel(ks.length >= 2);
     reelGo();
   }
   function reelGo() {
@@ -453,7 +506,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   }
   function stopReel() {
     if (S.reel) clearTimeout(S.reel.wait);
-    S.reel = null; $("reel").hidden = true; highlight(null);
+    S.reel = null; showReel(false); highlight(null);
   }
   function tick() {
     renderNow(false);
@@ -487,15 +540,17 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   $("strip").addEventListener("keydown", (ev) => {
     if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") { ev.preventDefault(); ev.stopPropagation(); seek(video.currentTime + (ev.key === "ArrowLeft" ? -10 : 10)); }
   });
+  const typing = (ev) => ev.target.closest && ev.target.closest("input, textarea, select, [contenteditable]");
   document.addEventListener("keydown", (ev) => {
-    if (ev.target.closest && ev.target.closest("input, textarea, select, [contenteditable]")) {
+    if (typing(ev)) {
       if (ev.key === "Escape") ev.target.blur();
       return;
     }
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     const key = ev.key;
     if (key === "m" || key === "M") { ev.preventDefault(); markNow(); }
-    else if (key === " " && ev.target.tagName !== "BUTTON") { ev.preventDefault(); if (video.src) (video.paused ? video.play().catch(() => {}) : video.pause()); }
+    // Space はどこに焦点があっても再生と停止（押した直後のボタンをもう一度押してしまわないように）
+    else if (key === " ") { ev.preventDefault(); if (video.src) (video.paused ? video.play().catch(() => {}) : video.pause()); }
     else if (key === "ArrowLeft" && ev.target.id !== "strip") { ev.preventDefault(); seek(video.currentTime - 3); }
     else if (key === "ArrowRight" && ev.target.id !== "strip") { ev.preventDefault(); seek(video.currentTime + 3); }
     else if (key === "," || key === ".") {
@@ -505,6 +560,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       const c = S.caps[Math.min(Math.max(k, 0), S.caps.length - 1)]; if (c) seek(c.s);
     }
   }, true);
+  document.addEventListener("keyup", (ev) => { if (ev.key === " " && !typing(ev)) ev.preventDefault(); }, true);
 
   // ── 描画 ──
   function renderAll() { renderCounts(); renderMarks(); updateFlags(); renderStrip(); renderNow(true); updateReelButton(); }
@@ -519,6 +575,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     const box = $("counts"); box.textContent = "";
     const chip = (cls, text) => { const s = document.createElement("span"); s.className = "chip " + cls; s.textContent = text; box.appendChild(s); };
     chip("shu", "未記入 " + open); chip("matsu", "直しあり " + fixed); chip("", "問題なし " + ok);
+    if (S.flags.length) chip("gunjo", "要確認 " + S.flags.length);
     $("nMarks").textContent = S.marks.size;
   }
   function renderStrip() {
@@ -542,8 +599,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     $("nowIdx").textContent = c ? "字幕 #" + c.i : "字幕なし";
     $("nowSrc").textContent = c ? "素材 " + clock(c.src) : "";
     if (S.caps.length) $("nowText").textContent = c ? c.t : "（字幕なし）";
-    $("nowPrev").textContent = S.caps[before] ? S.caps[before].t : "";
-    $("nowNext").textContent = S.caps[after] ? S.caps[after].t : "";
+    $("nowPrev").textContent = S.caps[before] ? oneLine(S.caps[before].t) : "";
+    $("nowNext").textContent = S.caps[after] ? oneLine(S.caps[after].t) : "";
     $("now").classList.toggle("is-marked", !!(c && S.marks.has(idOf(c.i))));
   }
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -583,7 +640,6 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     return node;
   }
   function renderMarks() {
-    const list = $("marksList");
     const order = sortedMarks();
     $("marksEmpty").hidden = order.length > 0;
     const keep = new Set(order.map(([id]) => id));
@@ -597,7 +653,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       const p = node._parts, [cls, label] = chipFor(m);
       p.time.textContent = "▶ " + clock(m.t);
       p.idx.textContent = "#" + m.cap + " · 素材 " + clock(m.src);
-      p.chip.className = "chip " + cls; p.chip.textContent = label;
+      p.chip.className = "chip plain " + cls; p.chip.textContent = label;
       p.orig.textContent = m.text;
       p.okBtn.textContent = m.state === "ok" ? "問題なしをやめる" : "問題なし";
       if (document.activeElement !== p.fix && p.fix.value !== (m.fix || "")) p.fix.value = m.fix || "";
@@ -618,7 +674,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       const id = idOf(c.i);
       const node = el("article", "item is-flag"); node.dataset.id = id;
       const head = el("div", "item-head");
-      const chip = el("span", "chip gunjo", "要確認");
+      const chip = el("span", "chip plain gunjo", "要確認");
       head.append(button("▶ " + clock(c.s), () => playList([k]), "time"), el("span", "idx", "#" + c.i + " · 素材 " + clock(c.src)), chip);
       const tools = el("div", "item-tools");
       const mark = button("朱を入れる", () => { if (S.marks.has(id)) focusItem(id); else addMark(k); });
@@ -633,7 +689,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     S.flagNodes.forEach((node, id) => {
       const on = S.marks.has(id);
       node.classList.toggle("is-marked", on);
-      node._parts.chip.className = "chip " + (on ? "shu" : "gunjo"); node._parts.chip.textContent = on ? "朱あり" : "要確認";
+      node._parts.chip.className = "chip plain " + (on ? "shu" : "gunjo"); node._parts.chip.textContent = on ? "朱あり" : "要確認";
       node._parts.mark.textContent = on ? "朱を入れた所へ" : "朱を入れる";
     });
   }

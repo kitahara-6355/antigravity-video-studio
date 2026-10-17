@@ -20,6 +20,7 @@ description: 実写の対談動画の字幕を、人が通しで見て直し、�
 | 画面の控え | `review_sheet.py export` | 書き出しの字幕から、画面が読む JSON を作る |
 | 機械の要確認 | `backend/subtitle_engine/review_flags.py` | 字幕と ReazonSpeech が食い違う字幕に印（数は値で比べる） |
 | レビュー画面 | `caption_review.html`（このフォルダ） | 印を付ける・印の所だけ再生・正しい字を書く（Artifact） |
+| 画面の配置の点検 | `layout_check.js`（このフォルダ） | 画面が1画面に収まり、字幕の長さや送りでボタンが動かないことを確かめる |
 | 印を台帳へ | `review_sheet.py import` | 画面の印を、違う字だけの短い直しにして台帳に足す |
 | 作り直しの確かめ | `review_sheet.py compare` | 承認した書き出しと作り直しの字幕の違いを出す |
 
@@ -57,6 +58,10 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet export <プ�
 ### 3. レビュー画面を公開・更新する
 
 - `caption_review.html` の `DIR`・`VIDEO`・`SHEET` を置き場に合わせる
+- 画面は1画面に収める（43分を通して見るので、ページがスクロールしたりボタンが動いたりすると続かない）。
+  伸び縮みするのは動画だけで、ボタンの帯と字幕の窓は高さを決めてある。画面を直したら、公開の前に
+  `node .claude/skills/caption-review/layout_check.js <画面の控え>` を流す。14通りの大きさで、スクロール・はみ出し・
+  「違和感あり」や字幕の窓の動き・字の欠け・ボタンの帯の入りきらなさが1つでもあれば終了コード 1（Playwright と ffmpeg を使う）
 - Artifact で公開する。capabilities は `{files: {project: "<プロジェクトの chan_ id>"}, db: {}, user: {}}`
 - 印は db の `runs/<run>/marks/c<字幕番号>` に1字幕1件で入る（`cap`・`t`・`src`・`text`・`fix`・`note`・`state`）
 - 公開したら ArtifactData で `runs/<run>/marks` を1回読んで、読めることを確かめる
