@@ -1360,6 +1360,54 @@ def test_kept_ranges_are_cut_without_drift(tmp_path):
         assert abs(dur - expected) < 0.1, (stream, dur, expected)
 
 
+def _flashes_and_beeps(path):
+    """白いフレームの番号と、音が鳴り始める秒（出力の時間軸）。"""
+    import subprocess
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vf", "scale=8:8,format=gray",
+                          "-f", "rawvideo", "-"], capture_output=True, check=True).stdout
+    frames = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 64).mean(axis=1)
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-ac", "1", "-ar", "48000",
+                          "-f", "s16le", "-"], capture_output=True, check=True).stdout
+    loud = np.flatnonzero(np.abs(np.frombuffer(pcm, dtype=np.int16).astype(float)) > 8000)
+    beeps = [loud[0]] + [b for a, b in zip(loud, loud[1:]) if b - a > 4800]
+    return len(frames), list(np.flatnonzero(frames > 128)), [b / 48000 for b in beeps], len(pcm) / 2 / 48000
+
+
+def test_the_sound_stays_with_the_picture_across_a_join_that_lost_sound(tmp_path):
+    """結合した素材は、収録のつなぎ目で音が 65ms 欠けていた（素材の 29分58秒。音の時刻はその分
+    飛んでいる）。音を詰めて並べると、つなぎ目より後ろは音が映像より 65ms 早く出た。区間ごとの
+    フレームと 10ms の端数も別々に積み上がり、54回目は 35〜38分で映像が音より約 0.25 秒遅れた
+    （2026-10-17 実測）。毎秒ちょうどに白いフレームと短い音を入れた素材で、出力の白いフレームと
+    音の鳴り始めが揃っているかを見る。"""
+    import subprocess
+    from video_editor_engine import FFmpegEditor
+
+    src = tmp_path / "src.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                    "color=c=black:s=64x36:r=30:d=20,"
+                    "drawbox=x=0:y=0:w=64:h=36:color=white:t=fill:enable='lt(mod(n,30),1)'",
+                    "-f", "lavfi", "-i", "aevalsrc=exprs='if(lt(mod(t,1),1/30),0.8*sin(2*PI*1000*t),0)':s=48000:d=20",
+                    # 9.92〜9.98 秒の音を抜く（時刻は詰めない）。つなぎ目で音が欠けた素材と同じ形
+                    "-filter_complex", "[1:a]aselect='not(between(t,9.9,9.98))'[a]", "-map", "0:v", "-map", "[a]",
+                    "-g", "30", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-c:a", "aac", str(src)], check=True)
+    assert _flashes_and_beeps(src)[3] < 19.95  # 素材の音は 20 秒に足りない
+    # 区間の端はフレームの間（plan の前の形）。2つ目の区間がつなぎ目をまたぐ
+    ranges = [(0.5, 3.5), (4.2, 13.6), (14.3, 17.8)]
+    out = tmp_path / "cut.mp4"
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = False
+
+    assert smart_cut_engine._cut_kept_ranges_exact(editor, src, ranges, out) is True
+
+    frames, flashes, beeps, sound = _flashes_and_beeps(out)
+    # 端は一番近いフレームの境目で切る。15〜105・126〜408・429〜534 番目のフレーム
+    assert frames == 90 + 282 + 105
+    assert len(flashes) == 15 and len(beeps) == 15
+    assert [round(f / 30 - b, 3) for f, b in zip(flashes, beeps)] == [0.0] * 15
+    assert abs(sound - frames / 30) < 0.03
+
+
 @patch("subprocess.run")
 def test_render_cuts_the_ranges_it_is_given(mock_run, dummy_video, tmp_path):
     """SmartCut が声の切れ目に寄せた区間で切る。字幕の区間から決め直すと、26秒の「ます」の

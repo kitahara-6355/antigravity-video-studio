@@ -8,6 +8,7 @@
 出てきたので外す規則も足した。
 """
 import sys
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -609,6 +610,62 @@ def test_plan_trims_a_flash_and_the_captions_still_fit_in_their_range(monkeypatc
     assert segs[1]["sourceStart"] == pytest.approx(2268.225) and segs[1]["start"] == pytest.approx(2268.225)
     assert segs[1]["end"] == 2272.84 and segs[2]["start"] == 2272.84
     assert len(retime_segments(segs, ranges)[0]) == 3
+
+
+# ------------------------------------------------------------------
+# 区間の端は映像のフレームの境目に置く
+# ------------------------------------------------------------------
+
+def _frames(ranges, rate=30):
+    return [(round(a * rate, 6), round(b * rate, 6)) for a, b in ranges]
+
+
+def test_the_ranges_are_put_on_the_frame_grid():
+    """映像はフレーム単位でしか切れない。端がフレームの間にあると区間ごとに映像は最大1フレーム、
+    音は 10ms の端数が出て、別々に積み上がる（54回目は 42 区間で、35〜38分の映像が音より約 0.25 秒
+    遅れた）。端を一番近いフレームの境目に置けば、出力の長さは区間の合計とフレーム単位で合う"""
+    out = cut_plan.on_frames([(1.38, 217.99), (218.62, 351.01)], Fraction(30))
+    assert _frames(out) == [(41, 6540), (6559, 10530)]
+
+
+def test_ranges_that_meet_on_the_grid_are_joined_and_ones_shorter_than_a_frame_dropped():
+    out = cut_plan.on_frames([(2.015, 3.0), (1.0, 2.01), (5.001, 5.012)], Fraction(30))
+    assert _frames(out) == [(30, 90)]
+
+
+def test_a_range_cut_at_a_shot_change_starts_on_the_first_frame_of_the_new_shot():
+    # trim_flashes は切り替わりのフレーム（素材の 37分48.23秒）の 5ms 手前に端を置く。前の収録の
+    # フレームは入れない（2026-10-17 ユーザー指摘の映り込み）
+    out = cut_plan.on_frames([(68047 / 30 - cut_plan.SHOT_EDGE_SEC, 2275.1)], Fraction(30))
+    assert _frames(out)[0][0] == 68047
+
+
+def test_the_frame_rate_and_the_sample_rate_are_read_from_the_file(tmp_path):
+    import shutil
+    import subprocess
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg が無い")
+    video = tmp_path / "ntsc.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=1:size=64x36:rate=30000/1001",
+                    "-f", "lavfi", "-i", "sine=duration=1:sample_rate=44100", "-shortest", "-pix_fmt", "yuv420p",
+                    str(video)], check=True)
+    assert cut_plan.read_rates(video) == (Fraction(30000, 1001), 44100)
+    assert cut_plan.read_rates(tmp_path / "missing.mp4") == (None, None)
+    assert cut_plan.read_rates(None) == (None, None)
+
+
+def test_plan_puts_the_ranges_on_the_frame_grid_and_the_captions_still_fit(monkeypatch):
+    from smart_cut_engine import retime_segments
+    segs = [_seg(2247.0, 2257.9, "前の話です"),
+            dict(start=2267.84, end=2272.84, text="先生がこれからの今から", sourceStart=2267.84, sourceEnd=2274.74)]
+    tokens = list(zip("前の話です", (2247.2, 2247.4, 2247.6, 2247.8, 2248.0)))
+    monkeypatch.setattr(cut_plan, "read_shots", lambda path: [(2268.23, 7.03)])
+    monkeypatch.setattr(cut_plan, "read_rates", lambda path: (Fraction(30), 48000))
+    ranges, _ = _plan_with(monkeypatch, segs, tokens, [(2247.1, 2257.8), (2267.7, 2268.65), (2268.95, 2274.6)])
+    assert all(x * 30 == pytest.approx(round(x * 30), abs=1e-6) for r in ranges for x in r)
+    assert round(ranges[-1][0] * 30) == round(2268.23 * 30)
+    cut_plan.fit_spans(segs, ranges)
+    assert len(retime_segments(segs, ranges)[0]) == 2
 
 
 def test_fitting_leaves_spans_that_are_inside_a_range_alone():

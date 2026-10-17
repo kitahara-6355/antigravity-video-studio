@@ -13,6 +13,7 @@ import json
 import os
 import sys
 import logging
+from fractions import Fraction
 from pathlib import Path
 import subprocess
 
@@ -308,20 +309,47 @@ def _align_to_speech(cut_path, segments, cut_points, source_path=None, ranges=No
         return segments
 
 
+def _frame_cut_graph(ranges, rate, sample_rate) -> str:
+    """区間をフレームで切るフィルタ。映像はフレームの数、音は1フレームぶんのかたまりの数で数える。
+
+    端は一番近いフレームの境目（`cut_plan.on_frames` と同じ丸め）の半フレーム手前で切るので、
+    フレームの時刻の数 ms の揺れでは入るフレームが変わらない。先に素材の時間軸をならす。映像は
+    1枠に1フレーム（つなぎ目の欠けたフレームは前を繰り返し、重なったフレームは1つ捨てる）、音は
+    時刻どおりに並べる（つなぎ目で欠けた音は無音で埋める）。音を詰めて並べると、素材の 29分58秒の
+    つなぎ目より後ろで音が映像より 65ms 早く出た（2026-10-17 実測）。
+    """
+    per_frame = Fraction(sample_rate) / rate
+    # 1フレームが整数のサンプルにならない（29.97fps など）ときは 1ms ずつ数える（端数は 1ms 未満）
+    block = per_frame.numerator if per_frame.denominator == 1 else max(1, round(sample_rate / 1000))
+    expr = "+".join(f"gte(t,{(round(a * rate) - 0.5) / rate:.6f})*lt(t,{(round(b * rate) - 0.5) / rate:.6f})"
+                    for a, b in ranges)
+    return (f"[0:v]fps={rate.numerator}/{rate.denominator},select='{expr}',setpts=N/FRAME_RATE/TB[v];"
+            f"[0:a]aresample=async=1:min_hard_comp=0.01:first_pts=0,asetnsamples=n={block}:p=0,"
+            f"aselect='{expr}',asetpts=N/SR/TB[a]")
+
+
 def _cut_kept_ranges_exact(ffmpeg, input_path, ranges, out_path) -> bool:
     """残す区間（素材の秒）だけを、1回のエンコードで時間ぴったりに抜き出す。
 
-    select / aselect で区間内のフレームだけを通し、時刻を詰め直す。出力の長さは
-    区間の合計とほぼ一致し（1区間あたり ±1 フレーム・±10ms・偏りなし）、字幕の時刻
-    （`retime_segments`）とずれが積み上がらない。
+    select / aselect で区間内のフレームだけを通し、時刻を詰め直す。素材のフレームレートと
+    サンプリングレートが読めれば、区間をフレームで切る（`_frame_cut_graph`）。映像と音の長さが
+    区間ごとにぴったり揃い、区間の端がフレームの境目にあれば（`cut_plan.plan`）字幕の時刻
+    （`retime_segments`）ともずれない。読めなければ、区間内の時刻のフレームと 10ms のかたまりを通す
+    （1区間あたり映像 ±1 フレーム・音 ±10ms の端数が別々に積み上がる）。
     """
     if not ranges or not hasattr(ffmpeg, "run_command"):
         return False
-    # 終わりは含めない（gte・lt）。between は両端を含むので、区間ごとに1フレーム余分に
-    # 入り、179 区間で映像が音声より 3 秒長くなった（2026-10-06 実測）
-    expr = "+".join(f"gte(t,{a:.3f})*lt(t,{b:.3f})" for a, b in ranges)
-    graph = (f"[0:v]select='{expr}',setpts=N/FRAME_RATE/TB[v];"
-             f"[0:a]asetnsamples=n=480:p=0,aselect='{expr}',asetpts=N/SR/TB[a]")
+    from cut_plan import read_rates
+    rate, sample_rate = read_rates(input_path)
+    if rate is not None and sample_rate:
+        graph = _frame_cut_graph(ranges, rate, sample_rate)
+        logger.info(f"区間をフレームで切ります（{float(rate):.3f}fps・{len(ranges)}区間）")
+    else:
+        # 終わりは含めない（gte・lt）。between は両端を含むので、区間ごとに1フレーム余分に
+        # 入り、179 区間で映像が音声より 3 秒長くなった（2026-10-06 実測）
+        expr = "+".join(f"gte(t,{a:.3f})*lt(t,{b:.3f})" for a, b in ranges)
+        graph = (f"[0:v]select='{expr}',setpts=N/FRAME_RATE/TB[v];"
+                 f"[0:a]asetnsamples=n=480:p=0,aselect='{expr}',asetpts=N/SR/TB[a]")
     script = Path(out_path).with_suffix(".filter.txt")
     try:
         script.write_text(graph, encoding="utf-8")

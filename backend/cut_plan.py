@@ -55,6 +55,12 @@
 29分54秒〜30分53秒）が書き始めと「はい」の前後の約10秒になっていた。場面の中の段取りの声
 （30分49秒「はい。取ります。はい。」）は外したまま。
 
+区間の端は映像のフレームの境目に置く（`on_frames`。2026-10-17）。映像はフレーム単位でしか切れず、
+端がフレームの間にあると区間ごとに映像は最大1フレーム、音は 10ms の端数が出て別々に積み上がる。
+54回目は 42 区間の端数と、素材の 29分58秒のつなぎ目で欠けていた音 65ms を詰めたのが重なり、
+35〜38分で映像が音より約 0.25 秒遅れていた。切る側（`smart_cut_engine._cut_kept_ranges_exact`）は
+映像をフレーム、音を1フレームぶんずつ数えて切る。
+
 数字・冒頭・場面・段取りの言葉はテンプレートの `cut_rules` で変えられる（`cut_rules()`）。
 """
 from __future__ import annotations
@@ -65,6 +71,7 @@ import json
 import logging
 import subprocess
 from dataclasses import dataclass, field
+from fractions import Fraction
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -91,6 +98,8 @@ SHOT_CHANGE_SCORE = 5.0
 # 映像を見るときに書き残す値の下限。キャッシュは値ごと持ち、SHOT_CHANGE_SCORE は使うときに当てる
 SHOT_SCAN_FLOOR = 2.0
 SHOTS_CACHE_VERSION = 1
+# 映像のフレームレートとして受け取る範囲。外れた値（ffprobe の 0/0、静止画の 90000/1）は読めないとみなす
+FRAME_RATE_RANGE = (1, 240)
 # 切り落とすときに区間の端を切り替わりのフレームの手前に置く幅（フレームの時刻の丸めを吸収する）
 SHOT_EDGE_SEC = 0.005
 
@@ -782,6 +791,57 @@ def read_shots(path) -> list[tuple[float, float]] | None:
         return None
 
 
+def read_rates(path) -> tuple[Fraction | None, int | None]:
+    """素材の映像のフレームレートと音声のサンプリングレート（ffprobe・ローカル）。読めない方は None。"""
+    try:
+        if not path or not Path(path).is_file() or Path(path).stat().st_size == 0:
+            return None, None
+        proc = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                               "stream=codec_type,r_frame_rate,avg_frame_rate,sample_rate", "-of", "json",
+                               str(path)], capture_output=True, text=True, timeout=60)
+        streams = json.loads(proc.stdout or "{}").get("streams", [])
+    except (OSError, subprocess.SubprocessError, ValueError) as e:
+        logger.warning(f"素材のフレームレートを読めないので、区間をフレームに揃えません: {e}")
+        return None, None
+    rate = sample_rate = None
+    for stream in streams:
+        if stream.get("codec_type") == "video" and rate is None:
+            for key in ("r_frame_rate", "avg_frame_rate"):
+                try:
+                    value = Fraction(stream.get(key) or "")
+                except (ValueError, ZeroDivisionError):
+                    continue
+                if FRAME_RATE_RANGE[0] <= value <= FRAME_RATE_RANGE[1]:
+                    rate = value
+                    break
+        elif stream.get("codec_type") == "audio" and sample_rate is None:
+            try:
+                sample_rate = int(stream.get("sample_rate") or 0) or None
+            except ValueError:
+                pass
+    return rate, sample_rate
+
+
+def on_frames(ranges, rate: Fraction) -> list[tuple[float, float]]:
+    """区間の端を、一番近い映像のフレームの境目に置く。境目で触れ合った区間はつなぎ、1フレームに
+    満たない区間は捨てる。
+
+    切り替わりのフレームの手前 `SHOT_EDGE_SEC` に置いた端（`trim_flashes`）は、切り替わりのフレームの
+    境目に寄るので、前の収録のフレームは入らない。端は最大で半フレーム動くので、字幕を割り当てる前に
+    `fit_spans` で発話の区間を収める。
+    """
+    slots: list[list[int]] = []
+    for a, b in sorted(ranges):
+        first, end = round(a * rate), round(b * rate)
+        if end <= first:
+            continue
+        if slots and first <= slots[-1][1]:
+            slots[-1][1] = max(slots[-1][1], end)
+        else:
+            slots.append([first, end])
+    return [(float(first / rate), float(end / rate)) for first, end in slots]
+
+
 def _has_words(audio: SourceAudio, lo: float, hi: float) -> bool:
     """lo〜hi 秒に言葉があるか。音声認識の字（字の立ち上がりから HEARD_CHAR_SEC）で見る。
     認識が無ければ音量で見た声で見る。"""
@@ -873,6 +933,7 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
     （`_speech_end`・`_speech_start`）。
     映像の切り替わりが読めれば、区間の端の短い映り込みを切り落とす（`trim_flashes`）。区間が発話の
     区間より短くなることがあるので、字幕を割り当てる前に `fit_spans` で発話の区間を収める。
+    映像のフレームレートが読めれば、区間の端をフレームの境目に置く（`on_frames`）。
     """
     rules = rules or cut_rules()
     info: dict = {}
@@ -924,4 +985,7 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
             info["flashes_trimmed"] = flashes["trimmed"]
         if flashes["kept"]:
             info["flashes_kept"] = flashes["kept"]
+    rate, _ = read_rates(source_path)
+    if rate is not None:
+        snapped = on_frames(snapped, rate)
     return snapped, info
