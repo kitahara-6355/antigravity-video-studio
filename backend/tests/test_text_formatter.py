@@ -82,6 +82,43 @@ def test_opening_bracket_moves_to_the_next_line():
 
 
 @needs_budoux
+def test_a_proper_noun_is_not_split_where_budoux_reads_a_particle(monkeypatch):
+    """BudouX は社名の頭の「は」を助詞と読んで「記事広告がは|ごろも|フーズ」と割る（53回目の 5分38秒）。"""
+    monkeypatch.setattr(tf, "_keep_words", lambda: (("はごろもフーズ",), 18))
+
+    assert tf.split_into_captions("その記事広告がはごろもフーズだったんで、うん。", 18) == [
+        "その記事広告が\nはごろもフーズだったんで、うん。"]
+
+
+@needs_budoux
+def test_a_word_too_long_for_a_line_is_still_split_where_budoux_splits_it(monkeypatch):
+    # 寄せると1行に入らない（「筆文字で伝えたいことば大賞」っていうのがね、で22字）。寄せずに割る
+    monkeypatch.setattr(tf, "_keep_words", lambda: (("筆文字で伝えたいことば大賞",), 18))
+
+    assert tf.split_into_captions("主催されている「筆文字で伝えたいことば大賞」っていうのがね、", 18) == [
+        "主催されている「筆文字で伝えたい\nことば大賞」っていうのがね、"]
+
+
+def test_the_words_kept_whole_are_proper_nouns_and_review_glossary_terms(monkeypatch):
+    from types import SimpleNamespace
+    from subtitle_engine import review_ledger
+    entries = [{"incorrect": "羽衣図", "correct": "はごろもフーズ", "type": "company"},
+               {"incorrect": "久北", "correct": "久木田", "type": "person_name"},
+               {"incorrect": "円が", "correct": "縁が", "type": "word_context"},
+               {"incorrect": "もう毛筆", "correct": "もう毛筆ですか", "type": "hint"},
+               {"incorrect": "撰出", "correct": "選出", "type": "term", "confirmed": False}]
+    monkeypatch.setitem(sys.modules, "proper_noun_dict",
+                        SimpleNamespace(proper_noun_dict=SimpleNamespace(get_all_entries=lambda: entries)))
+    monkeypatch.setattr(review_ledger, "terms", lambda: {"剣閃", "Be Original"})
+    monkeypatch.setattr(tf, "_keep_cache", None)
+
+    words, _ = tf._keep_words()
+
+    # 言い回しの手掛かり・前後で決まる直し・確認していない項目は語ではないので入れない。長い順
+    assert words == ("Be Original", "はごろもフーズ", "久木田", "剣閃")
+
+
+@needs_budoux
 def test_every_caption_fits_two_lines_of_max_chars():
     text = ("では、記念すべき第1回目のゲストは、日本デザイン書道作家協会理事長で、"
             "デザイン書道の第一人者久木田博信先生です。")

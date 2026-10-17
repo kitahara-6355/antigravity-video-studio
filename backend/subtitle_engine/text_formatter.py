@@ -489,7 +489,69 @@ def _parse(parser, text: str) -> list[str]:
             out[-1] += part
         else:
             out.append(part)
-    return out
+    words, limit = _keep_words()
+    return _keep_whole(out, words, limit)
+
+
+# 改行・字幕の切れ目で割らない語にする、固有名詞の辞書の種類。言い回しの手掛かり（hint）や
+# 前後の語で決まる直し（word_context）は語ではないので入れない
+_KEEP_TYPES = frozenset({"person_name", "company", "organization", "channel_name", "term"})
+_keep_cache: tuple[tuple[str, ...], int] | None = None
+
+
+def _keep_words() -> tuple[tuple[str, ...], int]:
+    """割らない語（長い順）と、寄せた文節が入るべき1行の字数。初めて使うときに読む。
+
+    固有名詞の辞書（`proper_nouns.json`）の確認済みの語と、校正台帳の用語（`review_ledger.terms`）。
+    """
+    global _keep_cache
+    if _keep_cache is None:
+        words: set[str] = set()
+        try:
+            from proper_noun_dict import proper_noun_dict
+            words |= {str(e.get("correct") or "") for e in proper_noun_dict.get_all_entries()
+                      if e.get("type") in _KEEP_TYPES and e.get("confirmed", True) is not False}
+        except Exception as e:  # noqa: BLE001 — 辞書が読めなくても整形はする
+            logger.warning(f"割らない語: 固有名詞の辞書を読めません: {e}")
+        try:
+            from subtitle_engine import review_ledger
+            words |= review_ledger.terms()
+        except Exception as e:  # noqa: BLE001 — 台帳が読めなくても整形はする
+            logger.warning(f"割らない語: 校正台帳の用語を読めません: {e}")
+        _keep_cache = (tuple(sorted((w for w in words if len(w) >= 2), key=lambda w: (-len(w), w))),
+                       get_max_chars_from_template())
+    return _keep_cache
+
+
+def _keep_whole(parts: list[str], words: tuple[str, ...], limit: int) -> list[str]:
+    """割らない語の途中にある文節の切れ目を、語の頭へ寄せる。
+
+    BudouX はひらがなで始まる社名の頭を助詞と読んで割る（53回目の 5分38秒「記事広告がは|ごろも|フーズ」
+    → 「記事広告が|はごろもフーズだったんで」）。寄せた文節が1行（limit 字）に入らないとき
+    （「「筆文字で伝えたいことば大賞」っていうのがね」）は、寄せずに BudouX の切れ目のままにする。
+    """
+    if len(parts) < 2 or not words:
+        return parts
+    text = "".join(parts)
+    cuts, pos = set(), 0
+    for p in parts[:-1]:
+        pos += len(p)
+        cuts.add(pos)
+    moved_any = False
+    for w in words:
+        i = text.find(w)
+        while i >= 0:
+            j = i + len(w)
+            inside = {c for c in cuts if i < c < j}
+            if inside:
+                moved = (cuts - inside) | ({i} if i else set())
+                if min((c for c in moved if c >= j), default=len(text)) - i <= limit:
+                    cuts, moved_any = moved, True
+            i = text.find(w, j)
+    if not moved_any:
+        return parts
+    bounds = [0, *sorted(cuts), len(text)]
+    return [text[a:b] for a, b in zip(bounds, bounds[1:])]
 
 
 def _binds_to_next(p: str, nxt: str) -> bool:
