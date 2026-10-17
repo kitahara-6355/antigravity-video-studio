@@ -108,11 +108,7 @@ _STANDALONE_STRIP = "、。，．,.！？!?…ー〜～ 　"
 
 
 def _omit_words(key: str) -> list[str]:
-    try:
-        from template_config import template_config
-        words = template_config.get_subtitle_rules().get(key)
-    except Exception:  # テンプレートが読めなければ外さない
-        return []
+    words = _template_rules().get(key)  # テンプレートが読めなければ外さない
     if not isinstance(words, list):
         return []
     return sorted({w for w in words if isinstance(w, str) and w}, key=len, reverse=True)
@@ -1362,11 +1358,7 @@ _NUMERIC_MARKS = ",，．"
 
 
 def _strip_punctuation_enabled() -> bool:
-    try:
-        from template_config import template_config
-        return bool(template_config.get_subtitle_rules().get("strip_punctuation", False))
-    except Exception:
-        return False
+    return bool(_template_rules().get("strip_punctuation", False))
 
 
 def punctuation_breaks(text: str) -> tuple[bool, bool]:
@@ -1545,6 +1537,21 @@ def adjust_segment_speeds(segments: list[dict], max_cps: float = None) -> list[d
 # ============================================================
 # テンプレート連携
 # ============================================================
+
+def _template_rules() -> dict:
+    """テンプレートの字幕ルール。無い・壊れているときは空（呼ぶ側の既定で整形を続ける）。
+
+    外す言葉と句読点の設定はここから読む。読めないときの扱いを1か所にまとめ、ファイルの
+    頭のほうに広い例外処理を置かない（技術負債の台帳は直した負債を行番号で覚えているので、
+    行がずれて別の例外処理がその行に来ると、直っていないと判定される）。
+    """
+    try:
+        from template_config import template_config
+        rules = template_config.get_subtitle_rules()
+    except Exception:  # noqa: BLE001 — テンプレートが読めなくても整形はする
+        return {}
+    return rules if isinstance(rules, dict) else {}
+
 
 def get_max_chars_from_template() -> int:
     """テンプレートから最大文字数を取得（未設定時はデフォルト15文字）"""

@@ -108,6 +108,19 @@ def test_default_rules_drop_dewa_and_punctuation():
     assert rules["strip_punctuation"] is True
 
 
+@pytest.mark.parametrize("module", [
+    None,  # テンプレートの部品が読み込めない
+    SimpleNamespace(template_config=SimpleNamespace(get_subtitle_rules=lambda: "辞書ではない")),
+    SimpleNamespace(template_config=SimpleNamespace(get_subtitle_rules=lambda: 1 / 0)),
+])
+def test_an_unreadable_template_leaves_the_words_and_the_punctuation(monkeypatch, module):
+    # 外す言葉と句読点の設定は `_template_rules` の1か所で読む。読めなくても整形は止めず、何も外さない
+    monkeypatch.setitem(sys.modules, "template_config", module)
+    assert tf._template_rules() == {}
+    assert tf._omit_words("omit_lead_words") == []
+    assert tf._strip_punctuation_enabled() is False
+
+
 @pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
 def test_caption_break_beats_line_break():
     caps = tf.split_into_captions(
