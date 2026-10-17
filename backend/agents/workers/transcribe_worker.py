@@ -327,10 +327,10 @@ class TranscribeWorker(PipelineStageWorker):
         """区切りをずらしてもう1回起こし、食い違いを手元の音声認識で決める（`transcript_fusion`）。
 
         区切りを変えると Gemini の聞き違いが別の所に出る（2026-10-06 実測）。cuts は1回目の区切りで、
-        2回目はそこから離して切る（`gemini_transcriber.SECOND_PASS_GAP_SEC`）。前の区切り方の2回目の
-        キャッシュは、区切りが変わらないチャンクを写す元にし、いまの2回目の後にもう1つの聞き取りとして
-        突き合わせる（集計の `earlier`）。認識が使えない・2回目が落ちたら1回目のまま進む（2回目は
-        直すためだけに使う）。返り値は (行, 集計)。
+        2回目はそこから離して切る（`gemini_transcriber.SECOND_PASS_GAP_SEC`）。前の区切り方の2回目は、
+        区切りが変わらないチャンクを写す元にし、いまの2回目の後にもう1つの聞き取りとして突き合わせる
+        （集計の `earlier`）。キャッシュに無ければ先に起こす（`_ensure_earlier_reading`）。認識が使えない・
+        2回目が落ちたら1回目のまま進む（2回目は直すためだけに使う）。返り値は (行, 集計)。
         """
         from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
         if not gemini_transcriber.SECOND_PASS:
@@ -341,9 +341,11 @@ class TranscribeWorker(PipelineStageWorker):
             logger.info("手元の音声認識が使えないので、文字起こしの2回目は飛ばします")
             return segments, None
         checkpoint = _gemini_checkpoint(whisper_checkpoint, second=True)
-        earlier = [(t, c) for t, c in ((t, _gemini_checkpoint(whisper_checkpoint, second=True, second_tag=t))
-                                       for t in gemini_transcriber.SECOND_PASS_EARLIER_TAGS)
-                   if Path(c).exists() and Path(c).stat().st_size > 1000]
+        earlier = []
+        for tag in gemini_transcriber.SECOND_PASS_EARLIER_TAGS:
+            path = _gemini_checkpoint(whisper_checkpoint, second=True, second_tag=tag)
+            if await self._ensure_earlier_reading(ctx, tag, path):
+                earlier.append((tag, path))
         if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
             second = self._read_gemini_checkpoint(checkpoint)
             made = gemini_transcriber.read_meta(checkpoint)
@@ -375,7 +377,8 @@ class TranscribeWorker(PipelineStageWorker):
         for tag, path in earlier:
             readings.append(self._read_gemini_checkpoint(path))
             fused, more = transcript_fusion.fuse(fused, readings[-1], tokens, cuts=list(cuts))
-            stats["earlier"].append({"tag": tag, "differences": more["differences"], "adopted": more["adopted"]})
+            stats["earlier"].append({"tag": tag, "differences": more["differences"], "adopted": more["adopted"],
+                                     "models": list(gemini_transcriber.read_meta(path).get("models_used") or [])})
             logger.info(f"🗳️ 前の区切り方の2回目（{tag}）とも突き合わせ: 食い違い {more['differences']} か所のうち "
                         f"{more['adopted']} か所を直しました")
         # 校閲の後に、2回目が別の字を書いたまま決まらない所を選び直すために残す（`ProofreadWorker`）
@@ -384,6 +387,32 @@ class TranscribeWorker(PipelineStageWorker):
         if look is not None:
             stats = dict(stats, third_look=look)
         return fused, stats
+
+    async def _ensure_earlier_reading(self, ctx: PipelineContext, tag: str, path: str) -> bool:
+        """前の区切り方の2回目（`gemini_transcriber.SECOND_PASS_EARLIER`）のキャッシュが無ければ起こす。
+
+        53回目の字幕はこの聞き取りとも突き合わせていたが、キャッシュにしか無く、キャッシュ無しで作り直すと
+        作られなかった（完成版の再現・2026-10-17）。区切り方は今のコードで同じに決まる（43分の素材で
+        キャッシュの区切り 103 か所と一致）。いまの2回目より先に起こすので、いまの2回目は区切りが変わらない
+        チャンクをここから写せる（43分の素材で 15 チャンク）。使えれば True。落ちたらこの聞き取り抜きで進む。
+        """
+        if Path(path).exists() and Path(path).stat().st_size > 1000:
+            return True
+        from subtitle_engine import gemini_transcriber
+        loop = asyncio.get_running_loop()
+        try:
+            journal = gemini_transcriber.journal_path(path)
+            tx = await loop.run_in_executor(None, functools.partial(
+                gemini_transcriber.transcribe, ctx.video_path, journal=journal,
+                **gemini_transcriber.SECOND_PASS_EARLIER[tag]))
+            gemini_transcriber.write_checkpoint(tx.segments, path,
+                                                meta={"cuts": tx.cuts, "models_used": tx.models_used})
+            journal.unlink(missing_ok=True)
+            return True
+        except Exception as e:  # noqa: BLE001 — 前の区切り方の2回目も直すためだけ。落ちても進む
+            logger.warning(f"⚠️ 前の区切り方の2回目（{tag}）に失敗 → それ抜きで突き合わせます: {e}")
+            ctx.warnings.append(f"文字起こし: 前の区切り方の2回目（{tag}）に失敗したため、それ抜きで突き合わせました（{e}）")
+            return False
 
     async def _third_look(self, ctx: PipelineContext, whisper_checkpoint: str, fused: list[dict],
                           readings: list[list[dict]], tokens: list) -> tuple[list[dict], dict | None]:

@@ -488,10 +488,10 @@ def test_the_stage_fuses_a_second_pass_with_shifted_cuts(tmp_path, monkeypatch):
     result = asyncio.run(TranscribeWorker().execute(ctx))
 
     assert result.success
-    assert calls == [None, 15]  # 2回目は区切りを半分ずらす
+    assert calls == [None, 15, 15]  # 2回目は区切りを半分ずらす（前の区切り方の2回目も起こす）
     assert ctx.segments[0]["text"].startswith("こんにちは、書家の北原美麗です。")
     assert result.data["second_pass"]["adopted"] == 1
-    assert len(list(tmp_path.glob("_gemini_*.jsonl"))) == 2, "1回目と2回目を別々にキャッシュする"
+    assert len(list(tmp_path.glob("_gemini_*.jsonl"))) == 3, "1回目・前の区切り方の2回目・いまの2回目を別々にキャッシュする"
 
 
 def test_the_second_pass_is_read_from_its_cache(tmp_path, monkeypatch):
@@ -504,7 +504,7 @@ def test_the_second_pass_is_read_from_its_cache(tmp_path, monkeypatch):
 
     asyncio.run(TranscribeWorker().execute(ctx))
 
-    assert calls == [None, 15]  # 2回目の実行では起こさない
+    assert calls == [None, 15, 15]  # 2回目の実行では起こさない
     assert ctx.segments[0]["text"].startswith("こんにちは、書家の北原美麗です。")
 
 
@@ -528,7 +528,7 @@ def test_the_second_pass_is_told_where_the_first_pass_cut(tmp_path, monkeypatch)
         p.unlink()
     asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
 
-    assert avoid == [[], [30.0], [30.0]]
+    assert avoid == [[], [], [30.0], [30.0]]  # 前の区切り方の2回目は1回目の区切りを避けない
     assert result.data["second_pass"]["models"] == ["m"], "2回目のモデルも実行記録に残す"
 
 
@@ -554,7 +554,7 @@ def test_a_second_pass_cut_the_earlier_way_is_made_again_from_its_unchanged_chun
 
     asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
 
-    assert calls == [None, 15, 15], "前の区切り方の2回目をそのままは使わない"
+    assert calls == [None, 15, 15, 15], "前の区切り方の2回目をそのままは使わない"
     assert len(earlier) == 1 and earlier[0] and all(before in name for name in earlier[0])
 
 
@@ -586,6 +586,39 @@ def test_a_second_pass_cut_the_earlier_way_is_also_heard_as_one_more_reading(tmp
     assert result.data["second_pass"]["adopted"] == 0
     assert [(e["tag"], e["adopted"]) for e in result.data["second_pass"]["earlier"]] == [
         (gt.SECOND_PASS_EARLIER_TAGS[-1], 1)]
+
+
+def test_a_fresh_run_also_makes_the_earlier_cut_second_pass_before_the_current_one(tmp_path, monkeypatch):
+    """キャッシュ無しで作り直しても同じ聞き取りの組になるように、前の区切り方の2回目も起こす。
+
+    53回目の字幕は前の区切り方の2回目とも突き合わせていたが、それはキャッシュにしか無く、キャッシュ無しで
+    作り直すと作られなかった（完成版の再現・2026-10-17）。先に起こすので、いまの区切り方の2回目は区切りが
+    変わらないチャンクをそこから写せる。
+    """
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import gemini_transcriber as gt
+
+    _setup_two_passes(tmp_path, monkeypatch)
+    fake = gt.transcribe
+    made = []
+
+    def noting(path, **kw):
+        made.append((kw.get("first_chunk_sec"), list(kw.get("avoid_cuts") or []),
+                     [Path(e).name for e in kw.get("earlier") or []], Path(kw["journal"]).name))
+        return fake(path, **kw)
+    monkeypatch.setattr(gt, "transcribe", noting)
+
+    result = asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+
+    before = gt.CUT_TAG + gt.SECOND_PASS_EARLIER_TAGS[-1] + "_"
+    now = gt.CUT_TAG + gt.SECOND_PASS_TAG + "_"
+    # 1回目・前の区切り方の2回目（1回目の区切りを避けない）・いまの2回目の順
+    assert [(m[0], m[1]) for m in made] == [(None, []), (15, []), (15, [30.0])]
+    assert before in made[1][3] and now in made[2][3]
+    assert made[2][2] and all(before in name for name in made[2][2]), "いまの2回目は前の区切り方から写せる"
+    earlier = result.data["second_pass"]["earlier"]
+    assert [(e["tag"], e["models"]) for e in earlier] == [(gt.SECOND_PASS_EARLIER_TAGS[-1], ["m"])]
 
 
 def test_a_failed_second_pass_keeps_the_first_and_says_so(tmp_path, monkeypatch):
@@ -634,8 +667,8 @@ def test_each_pass_keeps_chunk_notes_beside_its_cache_until_the_cache_is_written
 
     asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
 
-    assert [j.parent for j in journals] == [tmp_path, tmp_path]
-    assert len(set(journals)) == 2, "1回目と2回目で控えを分ける"
+    assert [j.parent for j in journals] == [tmp_path] * 3
+    assert len(set(journals)) == 3, "1回目・前の区切り方の2回目・いまの2回目で控えを分ける"
     assert not any(j.exists() for j in journals), "キャッシュを書いたら控えは要らない"
 
 
@@ -1400,5 +1433,5 @@ def test_the_stage_keeps_the_second_readings_for_choosing_after_proofreading(tmp
     ctx = PipelineContext(video_path=str(_video(tmp_path)))
 
     assert asyncio.run(TranscribeWorker().execute(ctx)).success
-    assert len(ctx.second_readings) == 1
-    assert ctx.second_readings[0][0]["text"].startswith("こんにちは、書家の北原美麗です。")
+    assert len(ctx.second_readings) == 2  # いまの区切り方・前の区切り方
+    assert all(r[0]["text"].startswith("こんにちは、書家の北原美麗です。") for r in ctx.second_readings)
