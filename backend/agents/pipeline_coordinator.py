@@ -1791,6 +1791,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--transcriber", choices=("whisper", "gemini"), default=None,
                         help="文字起こしのエンジン（既定は環境変数 AVS_TRANSCRIBE_ENGINE、無ければ whisper）。"
                              "gemini は課金経路（無料枠の段）")
+    parser.add_argument("--review", default="", metavar="FILE",
+                        help="校正台帳（人が通しで見て直した字幕。backend/config/reviews/）。"
+                             "校閲の後に毎回同じ直しを当てる")
     args = parser.parse_args(argv)
     if args.transcriber:
         os.environ["AVS_TRANSCRIBE_ENGINE"] = args.transcriber
@@ -1799,6 +1802,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not video.is_file():
         print(f"🚫 入力がありません: {video}")
         return 1
+    if args.review:
+        # 壊れた台帳で 30分走らせない（API を呼ぶ前に読んでみる）
+        from subtitle_engine import review_ledger
+        try:
+            ledger = review_ledger.load(args.review)
+        except (OSError, ValueError) as e:
+            print(f"🚫 校正台帳を読めません: {e}")
+            return 1
+        print(f"📝 校正台帳: {args.review}（直し{len(ledger['corrections'])}件・用語{len(ledger['glossary'])}語）")
 
     target_minutes = args.target_minutes
     if target_minutes is None:
@@ -1821,6 +1833,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ctx = PipelineContext(video_path=str(video),
                           target_minutes=target_minutes,
                           target_auto=args.target_minutes is None,
+                          review_ledger=args.review,
                           session_id=f"cli-{uuid.uuid4().hex[:8]}")
 
     result = asyncio.run(coordinator.execute(ctx))

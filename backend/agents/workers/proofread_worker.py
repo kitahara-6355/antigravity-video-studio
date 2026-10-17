@@ -184,6 +184,22 @@ class ProofreadWorker(PipelineStageWorker):
         except Exception as e:
             logger.warning(f"表記の統一スキップ: {e}")
 
+        # 人が通しで見て直した所（校正台帳）を当てる。文字起こしと校閲は呼ぶたびに揺れるので、
+        # 人の直しは AI に渡さず、AI と表記の統一の後・整形の前に毎回同じに当てる（2026-10-17）
+        review = {}
+        if getattr(ctx, "review_ledger", ""):
+            try:
+                from subtitle_engine import review_ledger
+                review = {"ledger": str(ctx.review_ledger),
+                          **review_ledger.apply(ctx.segments, review_ledger.load(ctx.review_ledger))}
+            except Exception as e:  # noqa: BLE001 — 台帳が当たらなくても字幕は校閲したもので進む
+                logger.warning(f"校正台帳スキップ: {e}")
+                ctx.warnings.append(f"校正台帳を当てられませんでした（{e}）。人の直しが入っていません")
+            if review.get("missing"):
+                at = "・".join(f"{int(m['at']) // 60}分{int(m['at']) % 60:02d}秒" for m in review["missing"])
+                ctx.warnings.append(f"校正台帳: {len(review['missing'])}件の直しが当たりませんでした（素材の {at}）。"
+                                    "その所は字が変わっているので見直しが要ります")
+
         # ━━━ FIX-3A: テキスト整形（旧 src/clean_linguistic.py 復元） ━━━
         # 長文を18文字/行に分割し、字幕の画面はみ出しを防止
         format_stats = ""
@@ -239,6 +255,12 @@ class ProofreadWorker(PipelineStageWorker):
                       if heard["given"] else "")
         split_note = (f" / 割れた聞き取り{split['given']}か所中 選んだ{split['chosen']}・置いた{split['applied']}"
                       if split["given"] else "")
+        review_note = ""
+        if review:
+            review_note = (f" / 人の直し{len(review['applied'])}件"
+                           + (f"（既に直っていた{len(review['already'])}件）" if review["already"] else "")
+                           + (f"（当たらない{len(review['missing'])}件）" if review["missing"] else "")
+                           + (f" / 用語{sum(review['glossary'].values())}件" if review["glossary"] else ""))
         # 使用モデルを取得（UI可視化用）
         try:
             from subtitle_engine.ai_proofreader import _get_current_model
@@ -269,10 +291,10 @@ class ProofreadWorker(PipelineStageWorker):
         return StageResult(
             stage_name=self.name, success=True,
             detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{retry_note}"
-                   f"{heard_note}{split_note}{notation_note}{format_stats}{skip_warn}",
+                   f"{heard_note}{split_note}{notation_note}{review_note}{format_stats}{skip_warn}",
             data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
                   "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation, "heard": heard,
-                  "split": split},
+                  "split": split, "review": review},
             duration_seconds=round(time.time() - start, 1),
         )
 
