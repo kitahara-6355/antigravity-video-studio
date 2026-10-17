@@ -12,8 +12,9 @@ from subtitle_engine import review_ledger
 
 REPO = Path(__file__).resolve().parents[2]
 RAW4 = REPO / "backend" / "config" / "reviews" / "raw4_20250922.json"
-# 52回目の校閲の後・整形の前の行（素材の秒）のうち、台帳が直す行だけを写したもの
-RAW4_LINES = Path(__file__).with_name("fixtures") / "review_raw4_lines52.json"
+# 校閲の後・整形の前の行（素材の秒）のうち、台帳が直す行だけを写したもの。52回目の 18分までの14か所と、
+# 53回目の通しの朱入れ（2026-10-17）の17か所
+RAW4_LINES = [Path(__file__).with_name("fixtures") / f"review_raw4_lines{run}.json" for run in (52, 53)]
 
 
 def _seg(a, b, text):
@@ -114,21 +115,50 @@ def test_the_raw4_ledger_is_well_formed():
 
 
 def test_the_raw4_ledger_applies_to_every_line_it_was_written_for():
-    """52回目の行に当てると、北原さんの14か所を含む直しが全部当たり、誤りの字が残らない。"""
-    lines = json.loads(RAW4_LINES.read_text(encoding="utf-8"))
+    """52回目と53回目の行に当てると、北原さんの直しが全部当たり、誤りの字が残らない。"""
+    lines = [s for p in RAW4_LINES for s in json.loads(p.read_text(encoding="utf-8"))]
     report = review_ledger.apply(lines, review_ledger.load(RAW4))
     assert report["missing"] == [] and report["already"] == []
     text = "".join(s["text"] for s in lines)
     for wrong in ("ところにご", "ホテイフーズ", "ホウライ", "レスキュー", "早川式繰出鉛筆書", "焦る", "藤田さん",
                   "安心そう", "新・日本", "一日一書", "おそらって", "和歌山", "北原美麗の生徒", "10月にはね",
-                  "剣先", "Bオリジナル", "伝えたい言葉大賞"):
+                  "剣先", "Bオリジナル", "伝えたい言葉大賞",
+                  "とととと", "素敵すぎ", "大、", "第1回め", "どうぞどうぞ", "横島", "しけが荒れて", "うれしい口",
+                  "作れたんだがね", "今はいれない", "去年初めて"):
         assert wrong not in text, wrong
     for right in ("ところに移行", "はごろもフーズ", "ホンハイ精密工業", "レール引いて", "ここ Be Original 書いてください",
                   "こうやって Be Original 書くのよ", "折れるわけ", "久木田さん", "泣きそうになった", "暑いわ、折れるわ",
-                  "「森羅万象」と、あと「日々是好日」", "おそらく", "私のこの美麗書院の", "11月にはね"):
+                  "「森羅万象」と、あと「日々是好日」", "おそらく", "私のこの美麗書院の", "11月にはね",
+                  "エピソードなんですね", "だから、逆に", "どういう", "プロットラフ書いた", "なんと、なんと、皆さん",
+                  "何かあの美麗さん", "普通すぎま", "題、何だっけ？", "第1回目の時の", "そうそう、そうです",
+                  "お住まいは？", "横浜", "磯枯れがしている", "うれしくてしょうがない", "作れたんだけども",
+                  "今は騒いでないんだけれど", "今日ね初めての"):
         assert right in text, right
     # Sharp の歴史を語る所（6分53秒）の「早川式繰出鉛筆」は正しいので残る
     assert "早川式繰出鉛筆っていう名前で" in text
+
+
+def test_a_filler_left_in_the_line_does_not_stop_a_correction_written_from_the_caption():
+    """53回目 32分23秒: 字幕は「大　何だっけ？」で、直しもその形から作る。当てる行は整形の前なので
+    「大、えっと何だっけ？」と言いよどみが残っていて、当たらなかった。"""
+    segs = [_seg(1940.54, 1952.46, "大、えっと何だっけ？えー、こんな感じで、5ページなんですね。")]
+    report = review_ledger.apply(segs, _ledger([{"id": "c1", "at": 1943.52, "from": "大、何だっけ？",
+                                                 "to": "題、何だっけ？"}]))
+    assert segs[0]["text"] == "題、何だっけ？えー、こんな感じで、5ページなんですね。"
+    assert report["missing"] == []
+
+
+def test_a_one_letter_word_is_not_skipped_as_a_filler():
+    # 「で」「ね」は言いよどみでもふつうの言葉でもあるので、飛ばして当てない
+    segs = [_seg(10.0, 12.0, "大で何だっけ")]
+    report = review_ledger.apply(segs, _ledger([{"id": "c1", "at": 11.0, "from": "大何だっけ", "to": "題何だっけ"}]))
+    assert segs[0]["text"] == "大で何だっけ" and report["missing"] == [{"id": "c1", "at": 11.0}]
+
+
+def test_the_punctuation_at_the_end_of_a_correction_is_not_doubled():
+    segs = [_seg(10.0, 12.0, "大、何だっけ？こんな感じで")]
+    review_ledger.apply(segs, _ledger([{"id": "c1", "at": 11.0, "from": "大何だっけ？", "to": "題、何だっけ？"}]))
+    assert segs[0]["text"] == "題、何だっけ？こんな感じで"
 
 
 def _proofread(monkeypatch, ctx, rewrite=lambda t: t):

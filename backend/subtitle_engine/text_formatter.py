@@ -1595,3 +1595,17 @@ def get_chars_per_second_from_template() -> float:
     except Exception as e:
         logger.warning(f"Template config CPS fallback due to template/system exception: {e}")
         return 4.0
+
+
+def spoken_only_words(min_len: int = 2) -> list[str]:
+    """整形が字幕から外す言いよどみ・聞き流しの語（声には残る）。min_len 字以上を長い順に。
+
+    校正台帳（`review_ledger`）は、画面の字幕（この語を外した形）から作った直しを、整形の前の
+    文に当てる。そのとき文に残っているこの語を飛ばして探す。1字の語（「で」「ね」「え」）は
+    ふつうの言葉と見分けられないので、既定では入れない。
+    """
+    words = {w.strip("、,，。 　") for w in FILLERS}
+    for key in ("omit_interjections", "omit_fillers_unless_after_noun", "omit_unheard_fillers",
+                "omit_lead_words", "omit_lead_words_bare"):
+        words.update(_omit_words(key))
+    return sorted((w for w in words if len(w) >= min_len), key=lambda w: (-len(w), w))

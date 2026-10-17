@@ -7,8 +7,9 @@
 台帳（JSON。`backend/config/reviews/`）:
 
 - ``corrections``: ``{"id", "at", "from", "to", ...}``。``at`` は素材の秒（その言葉を言った所）。
-  ``at`` に近い行から ``from`` を探して ``to`` に置き換える。句読点と空白は無視して探す
-  （字幕で見える形は句読点を外した形なので）。行の範囲から ``WINDOW_SEC`` より離れた行は見ない。
+  ``at`` に近い行から ``from`` を探して ``to`` に置き換える。句読点と空白、字幕で消える言いよどみ
+  （「えっと」）は無視して探す（字幕で見える形はそれを外した形なので）。行の範囲から ``WINDOW_SEC``
+  より離れた行は見ない。
 - ``glossary``: ``{"term", "wrong": [...]}``。この素材の中だけで ``wrong`` を ``term`` に置き換える
   （同じ語の聞き違いが何度も出る固有名詞。ほかの素材には当てない — 全体の辞書は `proper_nouns.json`）。
   ``wrong`` が無い用語も書いてよい。用語はどの素材でも改行・字幕の切れ目で割らない（`terms`）。
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -75,7 +77,13 @@ def _distance(at: float, seg: dict) -> float:
 
 
 def _find(text: str, pattern: str) -> tuple[int, int] | None:
-    """``pattern`` が ``text`` のどこにあるか（[i, j)）。句読点と空白は無視して探す。"""
+    """``pattern`` が ``text`` のどこにあるか（[i, j)）。句読点と空白は無視して探す。
+
+    それでも無ければ、字幕で消える言いよどみ（`text_formatter.spoken_only_words`）も飛ばして探す。
+    直しは画面の字幕から作るが、当てるのは整形の前の文で、言いよどみが残っている（53回目
+    32分23秒の字幕「大　何だっけ？」は、文では「大、えっと何だっけ？」だった）。
+    ``pattern`` の頭と後ろの句読点は、``text`` の同じ所の句読点まで含める（置き換えで「？？」にしない）。
+    """
     i = text.find(pattern)
     if i >= 0:
         return i, i + len(pattern)
@@ -85,9 +93,25 @@ def _find(text: str, pattern: str) -> tuple[int, int] | None:
     pos = [k for k, ch in enumerate(text) if ch not in _IGNORE]
     bare = "".join(text[k] for k in pos)
     i = bare.find(want)
-    if i < 0:
-        return None
-    return pos[i], pos[i + len(want) - 1] + 1
+    if i >= 0:
+        return _with_marks(text, pattern, pos[i], pos[i + len(want) - 1] + 1)
+    from subtitle_engine import text_formatter
+    ignore = f"[{re.escape(''.join(sorted(_IGNORE)))}]"
+    words = text_formatter.spoken_only_words()
+    gap = f"(?:{ignore}|{'|'.join(map(re.escape, words))})*" if words else f"{ignore}*"
+    m = re.search(gap.join(map(re.escape, want)), text)
+    return _with_marks(text, pattern, m.start(), m.end()) if m else None
+
+
+def _with_marks(text: str, pattern: str, i: int, j: int) -> tuple[int, int]:
+    """[i, j) を、``pattern`` の頭と後ろにある句読点・空白の数まで、``text`` の句読点・空白に広げる。"""
+    head = len(pattern) - len(pattern.lstrip("".join(_IGNORE)))
+    tail = len(pattern) - len(pattern.rstrip("".join(_IGNORE)))
+    while head and i > 0 and text[i - 1] in _IGNORE:
+        i, head = i - 1, head - 1
+    while tail and j < len(text) and text[j] in _IGNORE:
+        j, tail = j + 1, tail - 1
+    return i, j
 
 
 def apply(segments: list[dict], ledger: dict | None) -> dict:
