@@ -36,6 +36,8 @@ PYTHONPATH=./backend python -m backend.agents.pipeline_coordinator <素材>.mp4 
 
 - 台帳が壊れていれば API を呼ぶ前に止まる
 - 校閲の工程の記録に「人の直し N件（当たらない M件）」が出る。当たらない直しは警告にも出る
+- 実行記録（`output/runs/<実行>/run.json`）の proofread の `review` に、当たった・既に直っていた・
+  当たらなかった直しの id が残る
 - 書き出しの後、`backend/branding/proper_nouns.json` と `backend/usage_tracker/usage_data.json` を
   `git checkout` で戻す（実行が書き換える）
 
@@ -58,6 +60,9 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet export <プ�
 - Artifact で公開する。capabilities は `{files: {project: "<プロジェクトの chan_ id>"}, db: {}, user: {}}`
 - 印は db の `runs/<run>/marks/c<字幕番号>` に1字幕1件で入る（`cap`・`t`・`src`・`text`・`fix`・`note`・`state`）
 - 公開したら ArtifactData で `runs/<run>/marks` を1回読んで、読めることを確かめる
+- 画面の使い方: 見ながら M（違和感あり）で印 →「印の所だけ再生」で聞き直し →「正しくは」に字を書く。
+  「機械の要確認」タブは「要確認の所だけ再生」で続けて聞ける。再生中の M はいま再生している字幕に付き、
+  食い違いの説明がメモに入る
 
 ### 4. 印を読んで台帳に入れる
 

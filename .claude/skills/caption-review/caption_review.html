@@ -124,6 +124,9 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 .item-head .chip { margin-left: auto; }
 .orig { margin: 0; white-space: pre-line; font-size: .95rem; overflow-wrap: anywhere; }
 .heard { margin: 0; font-size: .85rem; color: var(--gunjo); overflow-wrap: anywhere; }
+.flag-lead { display: grid; gap: 8px; justify-items: start; }
+.flag-lead .empty { padding: 4px 2px 0; }
+.item.is-flag.is-marked { border-color: var(--shu); }
 .item label { font-size: .75rem; color: var(--ink-soft); display: grid; gap: 2px; }
 .item textarea, .item input { font: inherit; font-size: .95rem; width: 100%; min-width: 0; border: 1px solid var(--rule);
   border-radius: 4px; padding: 6px 8px; background: var(--sheet); color: var(--ink); resize: vertical; }
@@ -186,7 +189,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       <button type="button" id="reelBtn" disabled>印の所だけ再生</button>
     </div>
     <div class="reel" id="reel" hidden>
-      <span>印の所だけ再生中 <strong id="reelPos">1 / 1</strong></span>
+      <span><span id="reelKind">印の所だけ再生中</span> <strong id="reelPos">1 / 1</strong></span>
       <button type="button" id="reelPrev">前へ</button>
       <button type="button" id="reelAgain">もう一度</button>
       <button type="button" id="reelNext">次へ</button>
@@ -231,7 +234,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   const $ = (id) => document.getElementById(id);
   const video = $("video");
   const S = { sheet: null, caps: [], flags: [], marks: new Map(), col: null, uid: "", writable: true,
-              current: -2, reel: null, nodes: new Map(), flagNodes: false };
+              current: -2, reel: null, nodes: new Map(), flagNodes: new Map() };
 
   const clock = (t) => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = Math.floor(t % 60);
     return m + ":" + String(s).padStart(2, "0"); };
@@ -377,12 +380,17 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function sortedMarks() { return Array.from(S.marks.entries()).sort((a, b) => (a[1].cap || 0) - (b[1].cap || 0)); }
   function markNow() {
     if (!S.caps.length || !video.src) return;
+    // 印・要確認の所だけ再生している間は、いま再生している字幕に付ける（前後の余白で隣の字幕に付かないように）
+    if (S.reel) { addMark(S.reel.ks[S.reel.n]); return; }
     const t = video.currentTime - (video.paused ? 0 : REACT_SEC);
     let k = showingAt(t); if (k < 0) k = capIndexAt(t); if (k < 0) k = 0;
     addMark(k);
   }
+  // 機械の要確認が付いた字幕に印を付けたら、食い違いの説明をメモに入れておく
+  function flagExtra(c) { const f = S.flags.find((x) => x.i === c.i); return f ? { note: "機械の要確認: " + (f.why || "") } : null; }
   function addMark(k, extra) {
     const c = S.caps[k]; if (!c) return;
+    extra = extra || flagExtra(c);
     const id = idOf(c.i);
     if (S.marks.has(id)) { toast(clock(c.s) + " の字幕にはもう印があります"); focusItem(id); return; }
     const body = Object.assign({ cap: c.i, t: c.s, src: c.src, text: c.t, fix: "", note: "", state: "open",
@@ -419,10 +427,11 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 
   // ── 再生 ──
   function seek(t) { video.currentTime = Math.min(Math.max(0, t), (video.duration || duration()) - 0.05); }
-  function playList(ks) {
+  function playList(ks, kind) {
     if (!ks.length || !video.src) return;
     clearTimeout(S.reel && S.reel.wait);
     S.reel = { ks, n: 0, until: 0, wait: 0 };
+    $("reelKind").textContent = kind === "flags" ? "要確認の所だけ再生中" : "印の所だけ再生中";
     $("reel").hidden = ks.length < 2;
     reelGo();
   }
@@ -498,7 +507,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   }, true);
 
   // ── 描画 ──
-  function renderAll() { renderCounts(); renderMarks(); renderStrip(); renderNow(true); updateReelButton(); }
+  function renderAll() { renderCounts(); renderMarks(); updateFlags(); renderStrip(); renderNow(true); updateReelButton(); }
   function updateReelButton() {
     const n = sortedMarks().filter(([, m]) => m.state !== "ok").length;
     $("reelBtn").disabled = !n || !video.src;
@@ -595,25 +604,43 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       if (document.activeElement !== p.note && p.note.value !== (m.note || "")) p.note.value = m.note || "";
     }
   }
+  function flagKs() { return S.flags.map((f) => kOfCap(f.i)).filter((k) => k >= 0); }
   function renderFlags() {
-    const list = $("flagsList"); list.textContent = "";
+    const list = $("flagsList"); list.textContent = ""; S.flagNodes.clear();
     if (!S.flags.length) return;
-    list.appendChild(el("p", "empty", "機械が、字幕と音声認識の聞き取りが食い違う所に付けた要確認です。聞いて違えば「朱を入れる」を押してください。"));
+    const lead = el("div", "flag-lead");
+    lead.append(el("p", "empty", "機械が、字幕と音声認識の聞き取りが食い違う所に付けた要確認です。多くは音声認識の聞き違いです。"
+                 + "続けて聞き、違っていたら M（または「朱を入れる」）で印を付けてください。"),
+                button("要確認の所だけ再生（" + S.flags.length + "）", () => playList(flagKs(), "flags")));
+    list.appendChild(lead);
     for (const f of S.flags) {
       const k = kOfCap(f.i); const c = S.caps[k]; if (!c) continue;
-      const node = el("article", "item is-flag");
+      const id = idOf(c.i);
+      const node = el("article", "item is-flag"); node.dataset.id = id;
       const head = el("div", "item-head");
-      head.append(button("▶ " + clock(c.s), () => playList([k]), "time"), el("span", "idx", "#" + c.i + " · 素材 " + clock(c.src)),
-                  el("span", "chip gunjo", "要確認"));
+      const chip = el("span", "chip gunjo", "要確認");
+      head.append(button("▶ " + clock(c.s), () => playList([k]), "time"), el("span", "idx", "#" + c.i + " · 素材 " + clock(c.src)), chip);
       const tools = el("div", "item-tools");
-      tools.append(button("朱を入れる", () => { addMark(k, { note: f.why ? "機械の要確認: " + f.why : "機械の要確認" }); selectTab("marks"); }));
+      const mark = button("朱を入れる", () => { if (S.marks.has(id)) focusItem(id); else addMark(k); });
+      tools.append(mark);
       node.append(head, el("p", "orig", c.t), el("p", "heard", f.why || ("音声認識は「" + (f.heard || "") + "」")), tools);
+      node._parts = { chip, mark };
+      S.flagNodes.set(id, node);
       list.appendChild(node);
     }
   }
+  function updateFlags() {
+    S.flagNodes.forEach((node, id) => {
+      const on = S.marks.has(id);
+      node.classList.toggle("is-marked", on);
+      node._parts.chip.className = "chip " + (on ? "shu" : "gunjo"); node._parts.chip.textContent = on ? "朱あり" : "要確認";
+      node._parts.mark.textContent = on ? "朱を入れた所へ" : "朱を入れる";
+    });
+  }
   function highlight(id) {
-    S.nodes.forEach((node, nid) => node.classList.toggle("is-playing", nid === id));
-    if (id && S.nodes.get(id)) S.nodes.get(id).scrollIntoView({ block: "nearest", behavior: "smooth" });
+    for (const map of [S.nodes, S.flagNodes]) map.forEach((node, nid) => node.classList.toggle("is-playing", nid === id));
+    const node = id && ($("marksList").hidden ? S.flagNodes : S.nodes).get(id);
+    if (node) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   function focusItem(id) { selectTab("marks"); highlight(id); }
   function selectTab(which) {
