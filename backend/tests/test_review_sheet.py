@@ -69,6 +69,34 @@ def test_a_change_across_a_line_break_keeps_the_punctuation_of_the_line():
     assert len(report["applied"]) == 2
 
 
+def test_neighbouring_short_changes_become_one_correction_so_neither_undoes_the_other():
+    # 短い直しが隣の直した塊を付けると、別々に当てたとき先の直しで後の直しの字が消えて当たらない
+    # （53回目 29分10秒「なんと　なん　なん」→「なんと　なんと　皆さん」の「なん、なん」が当たらなかった）
+    new, _ = review_sheet.to_corrections([_mark("なんと　なん　なん", "なんと　なんと　皆さん")],
+                                         by="北原", day="2026-10-18", label="53回目")
+    assert [(c["from"], c["to"]) for c in new] == [("なんと、なん、なん", "なんと、なんと、皆さん")]
+    line = [{"start": 1765.0, "end": 1770.0, "sourceStart": 1765.0, "sourceEnd": 1770.0,
+             "text": "なんと、なん、なん。あのプレゼント"}]
+    report = review_ledger.apply(line, {"corrections": [{**c, "at": 1768.0} for c in new], "glossary": []})
+    assert line[0]["text"] == "なんと、なんと、皆さん。あのプレゼント"
+    assert report["missing"] == []
+
+
+def test_a_long_change_next_to_a_short_one_is_written_as_one_correction():
+    # 長い直しの塊を、隣の短い直しが付けて使う形も同じ（先に長い直しが当たると、短い直しの字が無くなる）
+    new, _ = review_sheet.to_corrections([_mark("横島は横島パンですか　ね", "横浜　ねえ")],
+                                         by="北原", day="2026-10-18", label="53回目")
+    assert [(c["from"], c["to"]) for c in new] == [("横島は横島パンですか、ね", "横浜、ねえ")]
+
+
+def test_a_gap_written_into_the_fix_comes_back_as_a_comma_in_the_line():
+    # 塊の数が変わる直しは全体を1組にする。塊の切れ目（句読点の跡）は「、」に戻し、直しで足した切れ目も残す
+    # （53回目 33分52秒「どうぞどうぞどうぞ」→「そうそう　そうです」が「そうそうそうです」と1語になっていた）
+    new, _ = review_sheet.to_corrections([_mark("どうぞどうぞどうぞ", "そうそう　そうです")],
+                                         by="北原", day="2026-10-18", label="53回目")
+    assert [(c["from"], c["to"]) for c in new] == [("どうぞどうぞどうぞ", "そうそう、そうです")]
+
+
 def test_marks_without_a_written_fix_are_kept_for_a_person_to_read():
     marks = [_mark("ここは合ってる", "", note="音が聞き取れない"),
              _mark("問題なしの印", "問題なしの印を直した", state="ok"),

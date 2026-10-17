@@ -87,25 +87,32 @@ def _diff(text: str, fix: str, context: int = CONTEXT_CHARS) -> list[tuple[str, 
 
     句読点を外した跡（改行・全角スペース）をまたがない: 台帳は整形の前の行に当て、またぐと行の句読点ごと
     置き換わる（「「新・日本」と、あと」の「、」が消える）。塊の数が同じなら塊ごとに比べ、違えば
-    （句読点の位置まで直した）全体を1組にする。
+    全体を1組にする。そのときも塊の切れ目は「、」に戻す（直しで足した切れ目「そうそう　そうです」を消さない）。
+
+    台帳の直しは1つずつ順に当たるので、組どうしが同じ塊を使ってはいけない（先の直しで後の直しの「from」が
+    無くなる）。短い直しが付けた隣の塊も直した所なら、重なった塊の全体を1組にする。
     """
     pa, pb = _parts(text), _parts(fix)
     if len(pa) != len(pb):
-        pa, pb = ["".join(pa)], ["".join(pb)]
-    pairs = []
+        pa, pb = ["、".join(pa)], ["、".join(pb)]
+    groups: list[list] = []  # [始めの塊, 終わりの塊, (from, to)]
     for k, (a, b) in enumerate(zip(pa, pb)):
         pair = _diff_part(a, b, context)
         if not pair:
             continue
         src, dst = pair
+        lo = hi = k
         # 短すぎると行の中で決まらない（「ね」）。隣の塊を「、」でつないで付ける
         if len(src) < context and k > 0:
-            src, dst = f"{pa[k - 1]}、{src}", f"{pb[k - 1]}、{dst}"
+            lo, src, dst = k - 1, f"{pa[k - 1]}、{src}", f"{pb[k - 1]}、{dst}"
         elif len(src) < context and k + 1 < len(pa):
-            src, dst = f"{src}、{pa[k + 1]}", f"{dst}、{pb[k + 1]}"
-        if src:
-            pairs.append((src, dst))
-    return pairs
+            hi, src, dst = k + 1, f"{src}、{pa[k + 1]}", f"{dst}、{pb[k + 1]}"
+        if groups and lo <= groups[-1][1]:
+            lo, hi = groups[-1][0], max(hi, groups[-1][1])
+            groups[-1] = [lo, hi, ("、".join(pa[lo:hi + 1]), "、".join(pb[lo:hi + 1]))]
+        elif src:
+            groups.append([lo, hi, (src, dst)])
+    return [pair for _, _, pair in groups]
 
 
 def _clock(sec: float) -> str:
