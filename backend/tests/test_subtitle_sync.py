@@ -604,6 +604,32 @@ def test_a_two_line_caption_shown_too_long_is_split_where_the_second_line_is_sai
     assert out[1]["_asr_marks"][0] == (0, 6.0)
 
 
+def test_a_long_caption_the_recogniser_heard_only_in_part_is_split_at_what_it_heard():
+    # 試しの書き出し（2026-10-17）の 32分50秒: 「ものだったんですけどま20数作品応募が/ありましてそのうちの4点を」は
+    # 32字のうち認識が拾えたのが10字で、字幕の時刻を取れず 9.2 秒出た。拾えた字の時刻（`_asr_partial`）で分ける
+    sp = _map([(1.0, 5.2), (6.0, 9.6)], total=12)
+    segs = [{"start": 1.0, "end": 9.6, "text": LONG, "_asr_interp": True, "_asr_heard": 4,
+             "_asr_partial": [(0, 1.0), (11, 5.0), (12, 6.0), (23, 9.5)]}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == ["あ" * 12, "い" * 12]
+    assert out[1]["start"] == pytest.approx(6.0, abs=0.02)
+    assert stats["split_long"] == 1
+    # 分けた字幕も時刻を取った字幕にはしない。拾えた字は行ごとの番号で付け直す
+    assert not any(s.get("_asr") or s.get("_asr_marks") for s in out)
+    assert out[1]["_asr_partial"][0] == (0, 6.0)
+
+
+def test_a_long_caption_whose_second_line_was_not_heard_is_not_split():
+    # 34分48秒（53回目も 8.5 秒）: 認識が拾えたのは終わりの「べて問題ないと」だけ。2行目を話し始めた時刻が
+    # 分からないので分けない
+    sp = _map([(1.0, 5.2), (6.0, 9.6)], total=12)
+    segs = [{"start": 1.0, "end": 9.6, "text": LONG, "_asr_interp": True, "_asr_heard": 3,
+             "_asr_partial": [(20, 9.0), (21, 9.2), (23, 9.5)]}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert [s["text"] for s in out] == [LONG]
+    assert stats["split_long"] == 0
+
+
 def test_a_two_line_caption_within_the_limit_is_left_alone():
     sp = _map([(1.0, 3.2), (3.6, 6.0)], total=10)
     segs = [{"start": 1.0, "end": 6.0, "text": LONG, "_asr": True, "_asr_first": 1.0,

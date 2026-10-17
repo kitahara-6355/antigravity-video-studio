@@ -757,13 +757,17 @@ def _split_in_two(s: dict, speech: SpeechMap) -> list[dict] | None:
     認識が拾えなくても SPLIT_HEAD_SKIP 字までなら、次に拾えた字から1字 SPLIT_CHAR_SEC 秒でさかのぼる
     （頭を拾えなかった字幕と同じく、後で拾えた字の前の話し始めに寄る）。2枚の間に字幕に無い声がある
     （SPLIT_MAX_UNSAID_SEC 超え）・分けた1枚が読めないほど短い・2字以下になる所では分けない。
+    認識が字幕の時刻を取るには足りない字しか拾えなかった字幕（`aligner` の `_asr_partial`）も、拾えた字の
+    時刻で同じように分ける。分けた2枚も時刻を取った字幕にはしない（試しの書き出し（2026-10-17）の 32分50秒:
+    32字のうち10字しか拾えず 9.2 秒出た。2行目の「そのうちの四点を」は認識が聞いている）。
     """
     from subtitle_engine import aligner
     from subtitle_engine import text_formatter as tf
     lines = str(s.get("text") or "").split("\n")
-    if len(lines) != 2 or not s.get("_asr"):
+    marks_key = "_asr_marks" if s.get("_asr") else "_asr_partial"
+    if len(lines) != 2 or not s.get(marks_key):
         return None
-    marks = [(int(c), float(t)) for c, t in s.get("_asr_marks") or ()]
+    marks = [(int(c), float(t)) for c, t in s.get(marks_key) or ()]
     max_chars, max_lines = _caption_limits()
     flat = _flat(s)
     marked = flat.replace("\u3000", "、")  # 句読点を外した跡を「、」に戻して切れ目の良さを測る
@@ -808,14 +812,14 @@ def _split_in_two(s: dict, speech: SpeechMap) -> list[dict] | None:
     if best is None:
         return None
     _, pos, n, head, tail, first_off, second_on, first_text, second_text = best
-    first = dict(s, text=first_text, end=round(first_off, 3), _asr_marks=head, _asr_heard=len(head),
+    first = dict(s, text=first_text, end=round(first_off, 3), _asr_heard=len(head),
                  _break_punct=_breaks_at_space(flat[:pos].rstrip("\u3000 "), first_text),
-                 _ends_punct=flat[pos - 1] in "\u3000 ")
+                 _ends_punct=flat[pos - 1] in "\u3000 ", **{marks_key: head})
     # 字幕から外した言いよどみの声（`_asr_tail`）は字幕の尻のものなので、2枚目に残す
     first.pop("_asr_tail", None)
     second = dict(s, text=second_text, start=round(second_on, 3), _asr_first=round(tail[0][1], 3),
-                  _asr_marks=[(c - n, t) for c, t in tail], _asr_heard=len(tail),
-                  _break_punct=_breaks_at_space(flat[pos:].lstrip("\u3000 "), second_text))
+                  _asr_heard=len(tail), _break_punct=_breaks_at_space(flat[pos:].lstrip("\u3000 "), second_text),
+                  **{marks_key: [(c - n, t) for c, t in tail]})
     return [first, second]
 
 

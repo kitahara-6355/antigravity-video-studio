@@ -48,6 +48,15 @@ def test_a_single_common_character_does_not_move_a_caption():
     assert aligner.align_captions(caps, toks("まったく別の話", 9.0)) == 0
 
 
+def test_a_caption_heard_only_in_part_keeps_the_times_of_what_was_heard():
+    # 試しの書き出し（2026-10-17）の 32分50秒: 32字のうち認識が拾えたのは「そのうちの四点を」など10字で、
+    # 字幕の時刻を取るには足りない（3割5分に届かない）。拾えた字の時刻は、長く出る字幕を分けるのに残す
+    caps = [{"start": 0.0, "end": 9.0, "text": "ものだったんですけど応募がありましてそのうちの4点を"}]
+    assert aligner.align_captions(caps, toks("そのうちの四点を", 7.0)) == 0
+    assert "_asr" not in caps[0] and caps[0]["start"] == 0.0
+    assert caps[0]["_asr_partial"][0] == (18, 7.0) and len(caps[0]["_asr_partial"]) == 8
+
+
 def test_unaligned_captions_are_spread_between_aligned_ones():
     caps = [{"start": 0.0, "end": 1.0, "text": "あいうえお"},
             {"start": 1.0, "end": 2.0, "text": "ききとれない"},

@@ -639,6 +639,8 @@ def align_captions(captions: list[dict], tokens: list[tuple[str, float]]) -> int
         cap["_asr_heard"] = len(pairs)
         length = len(_norm_text(cap.get("text")))
         if len(pairs) < max(MIN_HITS, MIN_MATCH_RATIO * length):
+            # 拾えた字の時刻は残す。長く出続ける字幕を、拾えた字の所で分けるのに使う（`sync._split_in_two`）
+            cap["_asr_partial"] = [(c, round(t, 3)) for c, t in pairs]
             continue
         (c0, t0), (c1, t1) = pairs[0], pairs[-1]
         start = t0 - c0 * CHAR_SEC
