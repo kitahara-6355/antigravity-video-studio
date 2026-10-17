@@ -1224,6 +1224,24 @@
    ]
   },
   {
+   "id": "backend/cut_plan.py::_parse_scdet",
+   "file": "backend/cut_plan.py",
+   "symbol": "_parse_scdet",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "ffmpeg の scdet（映像の切り替わりの検出）の出力を読むだけの関数。score は ffmpeg が付ける「前のフレームとの絵の違い」（lavfi.scd.score）で、映像の良し悪しではない。返すのは（切り替わりの秒, 違いの値）の一覧で、cut_plan.read_shots が素材の横のキャッシュに残すだけ。4カテゴリの数字・判定を作らず、品質ゲート・投稿・統計・retention のどれにも出ない",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/cut_plan.py::plan",
+   "file": "backend/cut_plan.py",
+   "symbol": "plan",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "残す区間（素材の秒の組）を決める関数。中の score は _parse_scdet が読んだ ffmpeg の絵の違いの値で、SHOT_CHANGE_SCORE 以上を映像の切り替わりとみなして区間の端の映り込みを切るのに使うだけ。返すのは区間と工程の記録（切り替わりの数・切った端・残した端）で、4カテゴリの数字・判定を作らず、品質スコア・品質ゲートの合否にも入らない（正典 limits 1「動画の良し悪しは判定しない」）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/design_system/design_auto_learner.py::DesignAutoLearner.learn_from_quality_check",
    "file": "backend/design_system/design_auto_learner.py",
    "symbol": "DesignAutoLearner.learn_from_quality_check",
