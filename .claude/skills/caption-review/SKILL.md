@@ -1,0 +1,103 @@
+---
+name: caption-review
+description: 実写の対談動画の字幕を、人が通しで見て直し、その直しを毎回同じに当てて作り直せる形にする。書き出した字幕を人に見てもらうとき、レビュー画面の印を校正台帳に入れるとき、キャッシュ無しで完成版を作り直して確かめるときに使う。
+---
+
+# 字幕の朱入れ（通しで見て直す・直しを残す・作り直して確かめる）
+
+文字起こしと校閲（AI）は呼ぶたびに揺れる。人が見て直した所は**素材ごとの校正台帳**に残し、
+書き出しのたびに機械的に当てる。完成版は「raw + 校正台帳 + コード」で作り直せる。
+
+2026-10-17 に北原さんが 52回目の 18分までを見て 14か所を直した。どれも文字起こしか校閲の
+聞き違い・書き換えで、多くは別の音声認識（ReazonSpeech）が正しく聞いていた。
+
+## 部品
+
+| 部品 | 場所 | 役目 |
+|---|---|---|
+| 校正台帳 | `backend/config/reviews/<素材>.json` | 人の直し（素材の秒つき）と、その素材の用語 |
+| 台帳を当てる | `backend/subtitle_engine/review_ledger.py` | 校閲・表記統一の後、整形の前に当てる。当たらない直しは警告 |
+| 画面の控え | `review_sheet.py export` | 書き出しの字幕から、画面が読む JSON を作る |
+| 機械の要確認 | `backend/subtitle_engine/review_flags.py` | 字幕と ReazonSpeech が食い違う字幕に印（数は値で比べる） |
+| レビュー画面 | `caption_review.html`（このフォルダ） | 印を付ける・印の所だけ再生・正しい字を書く（Artifact） |
+| 印を台帳へ | `review_sheet.py import` | 画面の印を、違う字だけの短い直しにして台帳に足す |
+| 作り直しの確かめ | `review_sheet.py compare` | 承認した書き出しと作り直しの字幕の違いを出す |
+
+`review_sheet.py` は `backend/subtitle_engine/` にある。どれも `python -m backend.subtitle_engine.<名前>` で動く。
+
+## 手順
+
+### 1. 台帳つきで書き出す
+
+```
+PYTHONPATH=./backend python -m backend.agents.pipeline_coordinator <素材>.mp4 \
+    --transcriber gemini --review backend/config/reviews/<素材>.json
+```
+
+- 台帳が壊れていれば API を呼ぶ前に止まる
+- 校閲の工程の記録に「人の直し N件（当たらない M件）」が出る。当たらない直しは警告にも出る
+- 書き出しの後、`backend/branding/proper_nouns.json` と `backend/usage_tracker/usage_data.json` を
+  `git checkout` で戻す（実行が書き換える）
+
+### 2. 確認用の動画と画面の控えを置く
+
+- 360p の全編版を作り、共有フォルダ（`/mnt/project-files/outputs/<フォルダ>/`）に置く
+- 同じフォルダに画面の控えを書く:
+
+```
+PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet export <プレビュー>.subtitles.json \
+    --run r53 --label 53回目 --video <360p のファイル名> \
+    --asr <素材のフォルダ>/_align_rz_<鍵>.json --out /mnt/project-files/outputs/<フォルダ>/review_captions.json
+```
+
+- 置いたファイルは streamhash で照合する（共有フォルダはヘッダが書き換わる）
+
+### 3. レビュー画面を公開・更新する
+
+- `caption_review.html` の `DIR`・`VIDEO`・`SHEET` を置き場に合わせる
+- Artifact で公開する。capabilities は `{files: {project: "<プロジェクトの chan_ id>"}, db: {}, user: {}}`
+- 印は db の `runs/<run>/marks/c<字幕番号>` に1字幕1件で入る（`cap`・`t`・`src`・`text`・`fix`・`note`・`state`）
+- 公開したら ArtifactData で `runs/<run>/marks` を1回読んで、読めることを確かめる
+
+### 4. 印を読んで台帳に入れる
+
+- ArtifactData の list で `runs/<run>/marks` を読み、各文書の中身を JSON の配列にして保存する
+- 取り込む:
+
+```
+PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet import marks.json \
+    --ledger backend/config/reviews/<素材>.json --by 北原 --day YYYY-MM-DD --label 53回目
+```
+
+- 「直しにならない印」（メモだけ・問題なし）は表示される。自分で聞いて決めるか、人に聞く
+- 同じ語の誤りが何度も出る固有名詞は、直しではなく `glossary` に書く（`wrong` で置き換え・改行で割らない）
+- 固有名詞は一次情報で表記を確かめる（社名の正式表記など）。人の指定と違うときは決めてもらう
+
+### 5. 書き出し直して確かめる
+
+- 1 に戻る。記録の「当たらない」が 0 で、誤りの字が字幕に残っていないことを確かめる
+- 確認用ファイルと画面の控えを差し替え、画面の `run`（`r54` など）を進める
+
+### 6. 完成版の再現（キャッシュ無し）
+
+- キャッシュは素材と同じフォルダに置かれる（`_gemini_*`・`_proofread_*`・`_align_rz_*`）。
+  素材を空のフォルダに置くと、キャッシュ無しで走る（ハードリンク `ln` なら容量を使わない）。
+  raw から作り直すなら、raw 4本を同じ順で結合してから置く
+- **API を全部呼び直す。** 無料枠の段でも1日の回数を食うので、実行前に枠と予算（`.claude/budget.json`）を確かめる
+- 比べる:
+
+```
+PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet compare <承認>.subtitles.json <作り直し>.subtitles.json
+```
+
+- AI は温度0・seed 固定でも同じ字を返すとは限らない。違いは2種類に分かれる:
+  - 台帳の直しが当たらなかった所（記録の「当たらない」）→ 台帳の `from` を見直す
+  - AI が前と違う字を書いた所 → 人が見て、正しければそのまま、違えば台帳に足す
+- 違いが 0 になれば「raw + 台帳 + コード」で再現できたことになる
+
+## 原則
+
+- 人の直しは AI に渡さない。AI と表記統一の後、整形の前に当てる
+- 直しは「素材の秒 + 違う字だけ」。行の割り付けが変わっても当たる短さにする
+- 当たらない直しは黙って捨てない（警告と記録に残す）
+- 用語（固有名詞の辞書の確認済みの語と台帳の用語）は改行・字幕の切れ目で割らない

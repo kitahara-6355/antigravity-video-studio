@@ -1,0 +1,656 @@
+<title>字幕の朱入れ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 机の上: 左に画面（動画・いまの字幕・朱を入れるボタン）、右に朱を入れた所の控え。狭い画面では縦に積む */
+:root {
+  --paper: #eef1f4;
+  --sheet: #fbfcfd;
+  --ink: #1a2130;
+  --ink-soft: #566074;
+  --rule: #d5dbe3;
+  --shu: #c43a1e;
+  --shu-wash: #f6e0d9;
+  --gunjo: #2d4ea3;
+  --gunjo-wash: #dfe6f6;
+  --matsu: #2e7350;
+  --matsu-wash: #dcefe3;
+  --screen: #0b0f16;
+  --on-screen: #f2f4f7;
+  --on-screen-dim: #5b6372;
+  --font-ui: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+  --font-head: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-time: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10141c; --sheet: #171c27; --ink: #e6e9ef; --ink-soft: #9aa3b4; --rule: #2a3141;
+    --shu: #ff7354; --shu-wash: #3a211c; --gunjo: #93abff; --gunjo-wash: #1d2643;
+    --matsu: #6cc394; --matsu-wash: #173323; --screen: #000000; --on-screen: #f2f4f7; --on-screen-dim: #4a5160;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #10141c; --sheet: #171c27; --ink: #e6e9ef; --ink-soft: #9aa3b4; --rule: #2a3141;
+  --shu: #ff7354; --shu-wash: #3a211c; --gunjo: #93abff; --gunjo-wash: #1d2643;
+  --matsu: #6cc394; --matsu-wash: #173323; --screen: #000000; --on-screen: #f2f4f7; --on-screen-dim: #4a5160;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 48px;
+}
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px;
+  max-width: 1400px; margin: 0 auto 14px; }
+h1 { font-family: var(--font-head); font-size: 1.55rem; font-weight: 700; margin: 0; letter-spacing: .06em; text-wrap: balance; }
+.sub { margin: 0; color: var(--ink-soft); font-size: .88rem; }
+.counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: .78rem; padding: 1px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet);
+  white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip.shu { color: var(--shu); background: var(--shu-wash); border-color: transparent; }
+.chip.matsu { color: var(--matsu); background: var(--matsu-wash); border-color: transparent; }
+.chip.gunjo { color: var(--gunjo); background: var(--gunjo-wash); border-color: transparent; }
+.desk { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 1400px; margin: 0 auto; }
+@media (min-width: 980px) {
+  .desk { grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); align-items: start; }
+  .ledger { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); }
+}
+.stage { min-width: 0; display: grid; gap: 10px; }
+.screen { position: relative; background: var(--screen); border-radius: var(--r); overflow: hidden; aspect-ratio: 16 / 9;
+  max-width: 100%; }
+.screen video { width: 100%; height: 100%; display: block; background: var(--screen); }
+.loader { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 16px;
+  color: var(--on-screen); text-align: center; font-size: .95rem; }
+.loader p { margin: 0; max-width: 34em; }
+.bar { width: min(320px, 70vw); height: 4px; background: var(--on-screen-dim); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--on-screen); transition: width .2s; }
+.loader .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.loader button { background: transparent; color: var(--on-screen); border-color: var(--on-screen-dim); }
+.strip { position: relative; height: 24px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+  cursor: pointer; touch-action: manipulation; }
+.strip .tick { position: absolute; width: 3px; margin-left: -1px; border-radius: 1px; pointer-events: none; }
+.strip .tick.mark { top: 3px; height: 9px; background: var(--shu); }
+.strip .tick.mark.fixed { background: var(--matsu); }
+.strip .tick.mark.ok { background: var(--ink-soft); }
+.strip .tick.flag { bottom: 3px; height: 7px; background: var(--gunjo); }
+.strip .head { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .78rem; color: var(--ink-soft); margin-top: -4px; }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px;
+  vertical-align: 0; background: var(--sw); }
+.now { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 12px 16px; display: grid; gap: 4px; }
+.now-meta { font-family: var(--font-time); font-size: .8rem; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 4px 14px;
+  font-variant-numeric: tabular-nums; }
+.now-text { font-size: 1.3rem; font-weight: 700; white-space: pre-line; margin: 0; min-height: 2.7em; line-height: 1.35; }
+.now.is-marked .now-text { color: var(--shu); }
+.now-side { color: var(--ink-soft); font-size: .88rem; white-space: pre-line; margin: 0; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: inherit; font-size: .92rem; border-radius: var(--r); border: 1px solid var(--rule); background: var(--sheet);
+  color: var(--ink); padding: 7px 14px; cursor: pointer; line-height: 1.4; }
+button:hover { border-color: var(--ink-soft); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, .strip:focus-visible {
+  outline: 2px solid var(--gunjo); outline-offset: 2px; }
+.btn-mark { background: var(--shu); border-color: var(--shu); color: var(--sheet); font-weight: 700; font-size: 1.05rem;
+  padding: 10px 22px; }
+.btn-mark:hover { border-color: var(--ink); }
+kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px;
+  margin-left: 6px; opacity: .8; }
+.keys { margin: 0; font-size: .8rem; color: var(--ink-soft); }
+.reel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; border-radius: var(--r);
+  background: var(--shu-wash); color: var(--ink); }
+.reel strong { color: var(--shu); font-variant-numeric: tabular-nums; }
+.ledger { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); min-width: 0; display: flex;
+  flex-direction: column; }
+.tabs { display: flex; border-bottom: 1px solid var(--rule); overflow-x: auto; }
+.tabs button { border: 0; border-radius: 0; background: transparent; padding: 10px 14px; border-bottom: 2px solid transparent;
+  white-space: nowrap; }
+.tabs button[aria-selected="true"] { border-bottom-color: var(--ink); font-weight: 700; }
+.list { overflow-y: auto; padding: 10px; display: grid; gap: 10px; align-content: start; flex: 1; min-height: 140px; }
+.empty { color: var(--ink-soft); font-size: .9rem; padding: 18px 8px; margin: 0; }
+.empty b { color: var(--shu); }
+.item { border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 7px; background: var(--paper); }
+.item.is-playing { border-color: var(--shu); box-shadow: 0 0 0 1px var(--shu); }
+.item-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.time { font-family: var(--font-time); font-variant-numeric: tabular-nums; color: var(--shu); background: transparent;
+  border-color: var(--shu); padding: 2px 10px; font-size: .85rem; }
+.item.is-flag .time { color: var(--gunjo); border-color: var(--gunjo); }
+.idx { font-family: var(--font-time); font-size: .78rem; color: var(--ink-soft); }
+.item-head .chip { margin-left: auto; }
+.orig { margin: 0; white-space: pre-line; font-size: .95rem; overflow-wrap: anywhere; }
+.heard { margin: 0; font-size: .85rem; color: var(--gunjo); overflow-wrap: anywhere; }
+.item label { font-size: .75rem; color: var(--ink-soft); display: grid; gap: 2px; }
+.item textarea, .item input { font: inherit; font-size: .95rem; width: 100%; min-width: 0; border: 1px solid var(--rule);
+  border-radius: 4px; padding: 6px 8px; background: var(--sheet); color: var(--ink); resize: vertical; }
+.item textarea { min-height: 3.4em; line-height: 1.4; }
+.item-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.item-tools button { font-size: .8rem; padding: 4px 10px; }
+.foot { border-top: 1px solid var(--rule); padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.save { margin: 0; font-size: .8rem; color: var(--ink-soft); flex: 1 1 12em; }
+.save.warn { color: var(--shu); }
+.save.ok { color: var(--matsu); }
+.copybox { width: 100%; min-height: 8em; font: inherit; font-size: .85rem; }
+.toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--ink); color: var(--sheet); padding: 8px 10px 8px 16px; border-radius: 999px; font-size: .88rem;
+  max-width: calc(100% - 32px); display: flex; gap: 12px; align-items: center; opacity: 0; pointer-events: none;
+  transition: opacity .2s; z-index: 20; }
+.toast.on { opacity: 1; pointer-events: auto; }
+.toast button { background: transparent; color: inherit; border-color: currentColor; padding: 2px 10px; font-size: .82rem; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="top">
+  <div>
+    <h1>字幕の朱入れ</h1>
+    <p class="sub" id="runLabel">美麗チャンネル 対談 第1回 · 字幕を読み込んでいます</p>
+  </div>
+  <div class="counts" id="counts" aria-live="polite"></div>
+</header>
+
+<main class="desk">
+  <section class="stage" aria-label="動画">
+    <div class="screen">
+      <video id="video" controls playsinline preload="auto"></video>
+      <div class="loader" id="loader">
+        <p id="loaderText">共有フォルダの動画を読み込んでいます</p>
+        <div class="bar" id="loaderBar"><i id="loaderFill"></i></div>
+        <div class="row" id="loaderButtons" hidden>
+          <button type="button" id="retry">もう一度読み込む</button>
+          <button type="button" id="pickBtn">手元のファイルを選ぶ</button>
+        </div>
+        <input type="file" id="pick" accept=".mp4,.json,video/mp4,application/json" multiple hidden>
+      </div>
+    </div>
+    <div class="strip" id="strip" role="slider" tabindex="0" aria-label="動画の時間（朱は印・群青は機械の要確認）"
+         aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><div class="head" id="head"></div></div>
+    <div class="legend">
+      <span style="--sw: var(--shu)">印（未記入）</span>
+      <span style="--sw: var(--matsu)">直しあり</span>
+      <span style="--sw: var(--ink-soft)">問題なし</span>
+      <span style="--sw: var(--gunjo)" id="legendFlag" hidden>機械の要確認</span>
+    </div>
+    <div class="now" id="now">
+      <div class="now-meta"><span id="nowTime">0:00</span><span id="nowIdx">字幕 —</span><span id="nowSrc"></span></div>
+      <p class="now-side" id="nowPrev"></p>
+      <p class="now-text" id="nowText">動画が出たら再生してください。違和感があったら、その場で「違和感あり」を押します。</p>
+      <p class="now-side" id="nowNext"></p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn-mark" id="markBtn" disabled>違和感あり<kbd>M</kbd></button>
+      <button type="button" id="backBtn" disabled>3秒戻る<kbd>←</kbd></button>
+      <button type="button" id="reelBtn" disabled>印の所だけ再生</button>
+    </div>
+    <div class="reel" id="reel" hidden>
+      <span>印の所だけ再生中 <strong id="reelPos">1 / 1</strong></span>
+      <button type="button" id="reelPrev">前へ</button>
+      <button type="button" id="reelAgain">もう一度</button>
+      <button type="button" id="reelNext">次へ</button>
+      <button type="button" id="reelStop">やめる</button>
+    </div>
+    <p class="keys">キー: <kbd>M</kbd> 印を付ける・<kbd>Space</kbd> 再生と停止・<kbd>←</kbd><kbd>→</kbd> 3秒・<kbd>,</kbd><kbd>.</kbd> 前後の字幕。
+      押すまでの遅れを見込んで、0.4秒前に出ていた字幕に印が付きます。</p>
+  </section>
+
+  <aside class="ledger" aria-label="朱を入れた所">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabMarks" aria-selected="true" aria-controls="marksList">朱を入れた所 <span id="nMarks">0</span></button>
+      <button type="button" role="tab" id="tabFlags" aria-selected="false" aria-controls="flagsList" hidden>機械の要確認 <span id="nFlags">0</span></button>
+    </div>
+    <div class="list" id="marksList" role="tabpanel" aria-labelledby="tabMarks">
+      <p class="empty" id="marksEmpty">まだ印はありません。動画を見ながら違和感があれば <b>違和感あり</b>（キーは M）を押すと、その字幕がここに入ります。
+        あとで「印の所だけ再生」で順に聞き直し、「正しくは」に正しい字を書いてください。</p>
+    </div>
+    <div class="list" id="flagsList" role="tabpanel" aria-labelledby="tabFlags" hidden></div>
+    <div class="foot">
+      <p class="save" id="save">印は自動で保存され、Claude が読み取って校正台帳に入れます。</p>
+      <button type="button" id="copyBtn">印を文字でコピー</button>
+    </div>
+    <div class="foot" id="copyFallback" hidden>
+      <textarea class="copybox" id="copyText" readonly aria-label="印の一覧（選んでコピー）"></textarea>
+    </div>
+  </aside>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastBtn" hidden></button></div>
+
+<script>
+(() => {
+  "use strict";
+  const DIR = "outputs/raw4_test_20261005";
+  const VIDEO = "raw4_concat_preview_360p.mp4";
+  const SHEET = "review_captions.json";
+  const REACT_SEC = 0.4;              // 気づいてから押すまでの遅れ
+  const LEAD_SEC = 1.0, TAIL_SEC = 0.4; // 印の所を再生するときの前後
+  const CHUNK = 25 * 1024 * 1024;
+
+  const $ = (id) => document.getElementById(id);
+  const video = $("video");
+  const S = { sheet: null, caps: [], flags: [], marks: new Map(), col: null, uid: "", writable: true,
+              current: -2, reel: null, nodes: new Map(), flagNodes: false };
+
+  const clock = (t) => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = Math.floor(t % 60);
+    return m + ":" + String(s).padStart(2, "0"); };
+  const idOf = (i) => "c" + String(i).padStart(4, "0");
+  const flat = (t) => String(t || "").replace(/\n/g, "").replace(/　/g, " ");
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ── 字幕を時間で引く ──
+  function capIndexAt(t) {
+    const caps = S.caps; let lo = 0, hi = caps.length - 1, ans = -1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (caps[mid].s <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
+    return ans;
+  }
+  function showingAt(t) { const k = capIndexAt(t); return k >= 0 && t <= S.caps[k].e + 0.05 ? k : -1; }
+  function kOfCap(i) { return S.caps[i] && S.caps[i].i === i ? i : S.caps.findIndex((c) => c.i === i); }
+  const duration = () => (S.sheet && S.sheet.duration) || video.duration || 1;
+
+  // ── 読み込み ──
+  function setLoader(text, pct, buttons) {
+    $("loader").hidden = false; $("loaderText").textContent = text;
+    $("loaderBar").hidden = pct == null; if (pct != null) $("loaderFill").style.width = Math.round(pct * 100) + "%";
+    $("loaderButtons").hidden = !buttons;
+  }
+  async function call(fn) {
+    for (let k = 0; ; k++) {
+      try { return await fn(); } catch (e) {
+        const code = e && e.code;
+        if (code === "rate_limited" && k < 3) { await sleep((e && e.retryAfterMs) || 1500); continue; }
+        if (code === "not_found" && k < 1) { await sleep(2500); continue; }
+        throw e;
+      }
+    }
+  }
+  async function readAll(files, path, onProgress) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const parts = []; let offset = 0, size = 1, rev = null, changed = false;
+      while (offset < size) {
+        const r = await call(() => files.read(path, { offset, length: CHUNK }));
+        if (rev !== null && r.revision !== rev) { changed = true; break; }
+        rev = r.revision; size = r.size; parts.push(r.bytes); offset += r.bytes.length;
+        if (onProgress) onProgress(offset, size);
+        if (!r.bytes.length) break;
+      }
+      if (!changed) return parts;
+    }
+    throw { code: "changed" };
+  }
+  async function locate(files) {
+    let entries = [], cursor;
+    do { const res = await call(() => files.list(cursor ? { path: DIR, cursor } : { path: DIR }));
+         entries = entries.concat(res.entries || []); cursor = res.cursor; } while (cursor);
+    const find = (name) => entries.find((e) => !e.isDirectory && e.path.split("/").pop() === name);
+    const v = find(VIDEO), s = find(SHEET);
+    if (!v || !s) throw { code: "not_found" };
+    return { video: v.path, sheet: s.path };
+  }
+  function failed(e) {
+    const code = (e && e.code) || "unavailable";
+    const msg = {
+      not_granted: "ファイルの読み取りを許可しなかったので、動画を出せません。手元に動画と字幕の控えがあれば選べます。",
+      not_found: "共有フォルダ（" + DIR + "）に動画か字幕の控えが見つかりません。",
+      changed: "読んでいる間にファイルが差し替わりました。もう一度読み込んでください。",
+    }[code] || "読み込めませんでした（" + code + "）。もう一度読み込むか、手元のファイルを選んでください。";
+    setLoader(msg, null, true);
+  }
+  async function start() {
+    const c = window.claude;
+    let files = null;
+    try { files = c && c.use ? await c.use("files") : null; } catch (_) { files = null; }
+    if (!files) { setLoader("この画面では共有フォルダを読めません。手元の動画（" + VIDEO + "）と字幕の控え（" + SHEET + "）を選んでください。", null, true); return; }
+    try {
+      setLoader("共有フォルダを開いています", null, false);
+      const where = await locate(files);
+      setLoader("字幕の控えを読み込んでいます", 0, false);
+      const sheetParts = await readAll(files, where.sheet, null);
+      loadSheet(JSON.parse(await new Blob(sheetParts).text()));
+      const parts = await readAll(files, where.video, (done, size) =>
+        setLoader("動画を読み込んでいます " + (done / 1048576).toFixed(0) + " / " + (size / 1048576).toFixed(0) + " MB", done / size, false));
+      useVideo(new Blob(parts, { type: "video/mp4" }));
+    } catch (e) { failed(e); }
+  }
+  function useVideo(blob) {
+    video.src = URL.createObjectURL(blob);
+    $("loader").hidden = true;
+    ["markBtn", "backBtn"].forEach((id) => { $(id).disabled = false; });
+    updateReelButton();
+  }
+  $("retry").addEventListener("click", () => start());
+  $("pickBtn").addEventListener("click", () => $("pick").click());
+  $("pick").addEventListener("change", async (ev) => {
+    const list = Array.from(ev.target.files || []);
+    try {
+      for (const f of list) if (/\.json$/i.test(f.name)) loadSheet(JSON.parse(await f.text()));
+      const v = list.find((f) => /\.mp4$/i.test(f.name) || /^video\//.test(f.type));
+      if (v) useVideo(v);
+      if (!S.caps.length) setLoader("字幕の控え（" + SHEET + "）も選んでください。", null, true);
+    } catch (_) { setLoader("選んだファイルを読めませんでした。動画（.mp4）と字幕の控え（.json）を選んでください。", null, true); }
+  });
+
+  function loadSheet(sheet) {
+    S.sheet = sheet; S.caps = Array.isArray(sheet.captions) ? sheet.captions : []; S.flags = Array.isArray(sheet.flags) ? sheet.flags : [];
+    $("runLabel").textContent = "美麗チャンネル 対談 第1回 · " + (sheet.label || sheet.run || "") + " · 字幕 " + S.caps.length + " 枚 · "
+      + clock(duration());
+    $("strip").setAttribute("aria-valuemax", String(Math.round(duration())));
+    $("tabFlags").hidden = !S.flags.length; $("legendFlag").hidden = !S.flags.length; $("nFlags").textContent = S.flags.length;
+    renderFlags(); renderAll(); connectDb(sheet.run || "run");
+  }
+
+  // ── 保存（db） ──
+  function setSave(text, kind) { const el = $("save"); el.textContent = text; el.className = "save" + (kind ? " " + kind : ""); }
+  function readOnly() {
+    S.writable = false;
+    setSave("この画面では印を保存できません（書き込みの権限がありません）。「印を文字でコピー」でチャットに貼ってください。", "warn");
+  }
+  async function connectDb(run) {
+    const c = window.claude; let db = null, user = null;
+    try { db = c && c.use ? await c.use("db") : null; } catch (_) { db = null; }
+    try { user = c && c.use ? await c.use("user") : null; } catch (_) { user = null; }
+    if (user) {
+      try { S.uid = (await user.id()) || ""; } catch (_) { S.uid = ""; }
+      try { if ((await user.can("data.write")) === false) readOnly(); } catch (_) { /* 書いてみて決める */ }
+    }
+    if (!db) { setSave("この画面では印を保存できません。「印を文字でコピー」でチャットに貼ってください。", "warn"); return; }
+    S.col = db.collection("runs/" + run + "/marks");
+    S.col.onSnapshot((snap) => {
+      S.marks = new Map(snap.docs.filter((d) => d.exists).map((d) => [d.id, d.data()]));
+      renderAll();
+    }, (e) => setSave("印の読み込みが止まりました（" + (e && e.code) + "）。画面を開き直してください。", "warn"));
+  }
+  const queues = new Map();
+  function write(id, op) {
+    if (!S.col || !S.writable) return Promise.resolve();
+    const prev = queues.get(id) || Promise.resolve();
+    const next = prev.then(() => op(S.col.doc(id))).then(
+      () => setSave("保存しました（" + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) + "）", "ok"),
+      (e) => { if (e && e.code === "invalid_argument") readOnly();
+               else setSave("保存できませんでした（" + (e && e.code) + "）。もう一度やってみてください。", "warn"); });
+    queues.set(id, next);
+    return next;
+  }
+
+  // ── 印 ──
+  function sortedMarks() { return Array.from(S.marks.entries()).sort((a, b) => (a[1].cap || 0) - (b[1].cap || 0)); }
+  function markNow() {
+    if (!S.caps.length || !video.src) return;
+    const t = video.currentTime - (video.paused ? 0 : REACT_SEC);
+    let k = showingAt(t); if (k < 0) k = capIndexAt(t); if (k < 0) k = 0;
+    addMark(k);
+  }
+  function addMark(k, extra) {
+    const c = S.caps[k]; if (!c) return;
+    const id = idOf(c.i);
+    if (S.marks.has(id)) { toast(clock(c.s) + " の字幕にはもう印があります"); focusItem(id); return; }
+    const body = Object.assign({ cap: c.i, t: c.s, src: c.src, text: c.t, fix: "", note: "", state: "open",
+                                 run: (S.sheet && S.sheet.run) || "", label: (S.sheet && S.sheet.label) || "",
+                                 by: S.uid, at: new Date().toISOString() }, extra || {});
+    S.marks.set(id, body); renderAll();
+    toast(clock(c.s) + "「" + flat(c.t).slice(0, 12) + "…」に印", { label: "取り消す", fn: () => removeMark(id) });
+    write(id, (ref) => ref.set(body));
+  }
+  function removeMark(id) {
+    const body = S.marks.get(id); if (!body) return;
+    S.marks.delete(id); renderAll();
+    write(id, (ref) => ref.delete());
+    toast("印を取り消しました", { label: "元に戻す", fn: () => { S.marks.set(id, body); renderAll(); write(id, (ref) => ref.set(Object.assign({}, body))); } });
+  }
+  function patchMark(id, patch) {
+    const m = S.marks.get(id); if (!m) return;
+    const changed = Object.keys(patch).some((k) => m[k] !== patch[k]); if (!changed) return;
+    S.marks.set(id, Object.assign({}, m, patch)); renderAll();
+    write(id, (ref) => ref.update(patch));
+  }
+  function stateFor(m, fix) { return fix && flat(fix).replace(/\s/g, "") !== flat(m.text).replace(/\s/g, "") ? "fixed" : "open"; }
+  function shiftMark(id, dir) {
+    const m = S.marks.get(id); if (!m) return;
+    const k = kOfCap(m.cap) + dir, c = S.caps[k]; if (!c) return;
+    const nid = idOf(c.i);
+    if (S.marks.has(nid)) { toast("その字幕にはもう印があります"); return; }
+    const keepFix = m.fix && flat(m.fix) !== flat(m.text) ? m.fix : "";
+    const body = Object.assign({}, m, { cap: c.i, t: c.s, src: c.src, text: c.t, fix: keepFix, state: keepFix ? m.state : "open" });
+    S.marks.delete(id); S.marks.set(nid, body); renderAll();
+    write(nid, (ref) => ref.set(body)).then(() => write(id, (ref) => ref.delete()));
+    playList([k]);
+  }
+
+  // ── 再生 ──
+  function seek(t) { video.currentTime = Math.min(Math.max(0, t), (video.duration || duration()) - 0.05); }
+  function playList(ks) {
+    if (!ks.length || !video.src) return;
+    clearTimeout(S.reel && S.reel.wait);
+    S.reel = { ks, n: 0, until: 0, wait: 0 };
+    $("reel").hidden = ks.length < 2;
+    reelGo();
+  }
+  function reelGo() {
+    const r = S.reel; if (!r) return;
+    const c = S.caps[r.ks[r.n]];
+    r.until = c.e + TAIL_SEC;
+    $("reelPos").textContent = (r.n + 1) + " / " + r.ks.length;
+    seek(c.s - LEAD_SEC);
+    video.play().catch(() => {});
+    highlight(idOf(c.i));
+  }
+  function reelStep(d) {
+    const r = S.reel; if (!r) return;
+    clearTimeout(r.wait);
+    const n = r.n + d;
+    if (n < 0 || n >= r.ks.length) { stopReel(); return; }
+    r.n = n; reelGo();
+  }
+  function stopReel() {
+    if (S.reel) clearTimeout(S.reel.wait);
+    S.reel = null; $("reel").hidden = true; highlight(null);
+  }
+  function tick() {
+    renderNow(false);
+    const r = S.reel;
+    if (r && !video.paused && video.currentTime >= r.until) {
+      video.pause();
+      if (r.ks.length > 1) r.wait = setTimeout(() => reelStep(1), 700); else stopReel();
+    }
+    if (!video.paused) requestAnimationFrame(tick);
+  }
+  video.addEventListener("play", () => requestAnimationFrame(tick));
+  video.addEventListener("seeked", () => renderNow(false));
+  video.addEventListener("timeupdate", () => { if (video.paused) renderNow(false); });
+  video.addEventListener("loadedmetadata", () => { renderStrip(); renderNow(true); });
+  $("markBtn").addEventListener("click", markNow);
+  $("backBtn").addEventListener("click", () => seek(video.currentTime - 3));
+  $("reelBtn").addEventListener("click", () => {
+    const ks = sortedMarks().filter(([, m]) => m.state !== "ok").map(([, m]) => kOfCap(m.cap)).filter((k) => k >= 0);
+    playList(ks);
+  });
+  $("reelPrev").addEventListener("click", () => reelStep(-1));
+  $("reelNext").addEventListener("click", () => reelStep(1));
+  $("reelAgain").addEventListener("click", () => { if (S.reel) { clearTimeout(S.reel.wait); reelGo(); } });
+  $("reelStop").addEventListener("click", () => { stopReel(); video.pause(); });
+  function stripSeek(ev) {
+    const box = $("strip").getBoundingClientRect();
+    const x = Math.min(Math.max(0, ev.clientX - box.left), box.width);
+    seek((x / box.width) * duration());
+  }
+  $("strip").addEventListener("click", stripSeek);
+  $("strip").addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") { ev.preventDefault(); ev.stopPropagation(); seek(video.currentTime + (ev.key === "ArrowLeft" ? -10 : 10)); }
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.target.closest && ev.target.closest("input, textarea, select, [contenteditable]")) {
+      if (ev.key === "Escape") ev.target.blur();
+      return;
+    }
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    const key = ev.key;
+    if (key === "m" || key === "M") { ev.preventDefault(); markNow(); }
+    else if (key === " " && ev.target.tagName !== "BUTTON") { ev.preventDefault(); if (video.src) (video.paused ? video.play().catch(() => {}) : video.pause()); }
+    else if (key === "ArrowLeft" && ev.target.id !== "strip") { ev.preventDefault(); seek(video.currentTime - 3); }
+    else if (key === "ArrowRight" && ev.target.id !== "strip") { ev.preventDefault(); seek(video.currentTime + 3); }
+    else if (key === "," || key === ".") {
+      ev.preventDefault();
+      let k = capIndexAt(video.currentTime + 0.01) + (key === "," ? -1 : 1);
+      if (key === "," && showingAt(video.currentTime) < 0) k += 1;
+      const c = S.caps[Math.min(Math.max(k, 0), S.caps.length - 1)]; if (c) seek(c.s);
+    }
+  }, true);
+
+  // ── 描画 ──
+  function renderAll() { renderCounts(); renderMarks(); renderStrip(); renderNow(true); updateReelButton(); }
+  function updateReelButton() {
+    const n = sortedMarks().filter(([, m]) => m.state !== "ok").length;
+    $("reelBtn").disabled = !n || !video.src;
+    $("reelBtn").textContent = n ? "印の所だけ再生（" + n + "）" : "印の所だけ再生";
+  }
+  function renderCounts() {
+    let open = 0, fixed = 0, ok = 0;
+    S.marks.forEach((m) => { if (m.state === "ok") ok++; else if (m.state === "fixed") fixed++; else open++; });
+    const box = $("counts"); box.textContent = "";
+    const chip = (cls, text) => { const s = document.createElement("span"); s.className = "chip " + cls; s.textContent = text; box.appendChild(s); };
+    chip("shu", "未記入 " + open); chip("matsu", "直しあり " + fixed); chip("", "問題なし " + ok);
+    $("nMarks").textContent = S.marks.size;
+  }
+  function renderStrip() {
+    const strip = $("strip"), dur = duration();
+    strip.querySelectorAll(".tick").forEach((n) => n.remove());
+    const add = (cls, t) => { const d = document.createElement("i"); d.className = "tick " + cls; d.style.left = (100 * t / dur).toFixed(3) + "%"; strip.appendChild(d); };
+    S.marks.forEach((m) => add("mark" + (m.state === "fixed" ? " fixed" : m.state === "ok" ? " ok" : ""), m.t || 0));
+    S.flags.forEach((f) => { const k = kOfCap(f.i); if (k >= 0) add("flag", S.caps[k].s); });
+  }
+  function renderNow(force) {
+    const t = video.currentTime || 0;
+    $("nowTime").textContent = clock(t) + " / " + clock(duration());
+    $("head").style.left = (100 * t / duration()).toFixed(3) + "%";
+    $("strip").setAttribute("aria-valuenow", String(Math.round(t)));
+    const k = showingAt(t);
+    if (k === S.current && !force) return;
+    S.current = k;
+    const c = k >= 0 ? S.caps[k] : null;
+    // 字幕の間（字幕なし）では、直前に消えた字幕と次に出る字幕を並べる
+    const before = k >= 0 ? k - 1 : capIndexAt(t), after = k >= 0 ? k + 1 : capIndexAt(t) + 1;
+    $("nowIdx").textContent = c ? "字幕 #" + c.i : "字幕なし";
+    $("nowSrc").textContent = c ? "素材 " + clock(c.src) : "";
+    if (S.caps.length) $("nowText").textContent = c ? c.t : "（字幕なし）";
+    $("nowPrev").textContent = S.caps[before] ? S.caps[before].t : "";
+    $("nowNext").textContent = S.caps[after] ? S.caps[after].t : "";
+    $("now").classList.toggle("is-marked", !!(c && S.marks.has(idOf(c.i))));
+  }
+  function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function button(text, fn, cls) { const b = el("button", cls || "", text); b.type = "button"; b.addEventListener("click", fn); return b; }
+  function chipFor(m) {
+    return m.state === "ok" ? ["", "問題なし"] : m.state === "fixed" ? ["matsu", "直しあり"] : ["shu", "未記入"];
+  }
+  function buildItem(id) {
+    const node = el("article", "item"); node.dataset.id = id;
+    const head = el("div", "item-head");
+    const time = button("▶ 0:00", () => { const m = S.marks.get(id); if (m) playList([kOfCap(m.cap)]); }, "time");
+    const idx = el("span", "idx"); const chip = el("span", "chip");
+    head.append(time, idx, chip);
+    const orig = el("p", "orig");
+    const fixLabel = el("label"); fixLabel.append("正しくは（違う字だけ直せば十分です）");
+    const fix = el("textarea"); fix.rows = 2; fix.id = "fix-" + id; fixLabel.appendChild(fix);
+    const noteLabel = el("label"); noteLabel.append("メモ（任意。聞き取れない・どちらか迷う など）");
+    const note = el("input"); note.type = "text"; note.id = "note-" + id; noteLabel.appendChild(note);
+    let timer = 0;
+    const saveFix = () => { clearTimeout(timer); const m = S.marks.get(id); if (!m) return;
+      const v = fix.value; patchMark(id, { fix: v, state: m.state === "ok" ? "ok" : stateFor(m, v) }); };
+    fix.addEventListener("focus", () => { const m = S.marks.get(id); if (m && !fix.value) fix.value = m.text; });
+    fix.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(saveFix, 1200); });
+    fix.addEventListener("blur", () => { const m = S.marks.get(id); if (m && fix.value === m.text && !m.fix) return; saveFix(); });
+    let ntimer = 0;
+    const saveNote = () => { clearTimeout(ntimer); patchMark(id, { note: note.value }); };
+    note.addEventListener("input", () => { clearTimeout(ntimer); ntimer = setTimeout(saveNote, 1200); });
+    note.addEventListener("blur", saveNote);
+    note.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); note.blur(); } });
+    const tools = el("div", "item-tools");
+    const okBtn = button("問題なし", () => { const m = S.marks.get(id); if (!m) return;
+      patchMark(id, { state: m.state === "ok" ? stateFor(m, m.fix) : "ok" }); });
+    tools.append(button("◀ 前の字幕", () => shiftMark(id, -1)), button("次の字幕 ▶", () => shiftMark(id, 1)), okBtn,
+                 button("印を取り消す", () => removeMark(id)));
+    node.append(head, orig, fixLabel, noteLabel, tools);
+    node._parts = { time, idx, chip, orig, fix, note, okBtn };
+    return node;
+  }
+  function renderMarks() {
+    const list = $("marksList");
+    const order = sortedMarks();
+    $("marksEmpty").hidden = order.length > 0;
+    const keep = new Set(order.map(([id]) => id));
+    S.nodes.forEach((node, id) => { if (!keep.has(id)) { node.remove(); S.nodes.delete(id); } });
+    let prev = $("marksEmpty");
+    for (const [id, m] of order) {
+      let node = S.nodes.get(id);
+      if (!node) { node = buildItem(id); S.nodes.set(id, node); }
+      if (prev.nextElementSibling !== node) prev.after(node);
+      prev = node;
+      const p = node._parts, [cls, label] = chipFor(m);
+      p.time.textContent = "▶ " + clock(m.t);
+      p.idx.textContent = "#" + m.cap + " · 素材 " + clock(m.src);
+      p.chip.className = "chip " + cls; p.chip.textContent = label;
+      p.orig.textContent = m.text;
+      p.okBtn.textContent = m.state === "ok" ? "問題なしをやめる" : "問題なし";
+      if (document.activeElement !== p.fix && p.fix.value !== (m.fix || "")) p.fix.value = m.fix || "";
+      if (document.activeElement !== p.note && p.note.value !== (m.note || "")) p.note.value = m.note || "";
+    }
+  }
+  function renderFlags() {
+    const list = $("flagsList"); list.textContent = "";
+    if (!S.flags.length) return;
+    list.appendChild(el("p", "empty", "機械が、字幕と音声認識の聞き取りが食い違う所に付けた要確認です。聞いて違えば「朱を入れる」を押してください。"));
+    for (const f of S.flags) {
+      const k = kOfCap(f.i); const c = S.caps[k]; if (!c) continue;
+      const node = el("article", "item is-flag");
+      const head = el("div", "item-head");
+      head.append(button("▶ " + clock(c.s), () => playList([k]), "time"), el("span", "idx", "#" + c.i + " · 素材 " + clock(c.src)),
+                  el("span", "chip gunjo", "要確認"));
+      const tools = el("div", "item-tools");
+      tools.append(button("朱を入れる", () => { addMark(k, { note: f.why ? "機械の要確認: " + f.why : "機械の要確認" }); selectTab("marks"); }));
+      node.append(head, el("p", "orig", c.t), el("p", "heard", f.why || ("音声認識は「" + (f.heard || "") + "」")), tools);
+      list.appendChild(node);
+    }
+  }
+  function highlight(id) {
+    S.nodes.forEach((node, nid) => node.classList.toggle("is-playing", nid === id));
+    if (id && S.nodes.get(id)) S.nodes.get(id).scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  function focusItem(id) { selectTab("marks"); highlight(id); }
+  function selectTab(which) {
+    const marks = which === "marks";
+    $("tabMarks").setAttribute("aria-selected", String(marks)); $("tabFlags").setAttribute("aria-selected", String(!marks));
+    $("marksList").hidden = !marks; $("flagsList").hidden = marks;
+  }
+  $("tabMarks").addEventListener("click", () => selectTab("marks"));
+  $("tabFlags").addEventListener("click", () => selectTab("flags"));
+
+  // ── 文字でコピー ──
+  function marksText() {
+    const lines = sortedMarks().map(([, m]) => clock(m.t) + "（素材 " + clock(m.src) + "）「" + flat(m.text) + "」"
+      + (m.state === "ok" ? " → 問題なし" : m.fix && m.state === "fixed" ? " → 「" + flat(m.fix) + "」" : " → （未記入）")
+      + (m.note ? " メモ: " + m.note : ""));
+    return ((S.sheet && S.sheet.label) || "") + " の印 " + lines.length + " 件\n" + lines.join("\n");
+  }
+  $("copyBtn").addEventListener("click", () => {
+    const text = marksText();
+    const fallback = () => { $("copyFallback").hidden = false; const t = $("copyText"); t.value = text; t.focus(); t.select(); toast("下の枠を選んでコピーしてください"); };
+    try { navigator.clipboard.writeText(text).then(() => toast("印 " + S.marks.size + " 件をコピーしました"), fallback); }
+    catch (_) { fallback(); }
+  });
+
+  // ── 知らせ ──
+  let toastTimer = 0;
+  function toast(text, action) {
+    const box = $("toast"), btn = $("toastBtn");
+    $("toastText").textContent = text;
+    btn.hidden = !action;
+    btn.onclick = action ? () => { box.classList.remove("on"); action.fn(); } : null;
+    if (action) btn.textContent = action.label;
+    box.classList.add("on");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => box.classList.remove("on"), action ? 5000 : 2600);
+  }
+
+  renderAll();
+  if (document.readyState === "complete") start(); else window.addEventListener("load", () => start(), { once: true });
+})();
+</script>
