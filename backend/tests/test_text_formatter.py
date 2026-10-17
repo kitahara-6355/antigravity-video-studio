@@ -448,8 +448,8 @@ def test_coverage_branch_gaps(without_budoux):
     res_no_break = _split_at_boundary("私は今日プログラミングをaaaaaaaaa", 15)
     assert res_no_break == ["私は今日プログラミングを", "aaaaaaaaa"]
 
-    # 2. _split_at_boundary の 91->94 (remaining が空になる)
-    res_empty_remaining = _split_at_boundary("私は今日、                  ", 15)
+    # 2. _split_at_boundary の 91->94 (remaining が空になる)。半角の空白は幅 0.5 なので30個で15を超える
+    res_empty_remaining = _split_at_boundary("私は今日、" + " " * 30, 15)
     assert res_empty_remaining == ["私は今日、"]
 
     # 3. enforce_line_length の 127->110 (temp_line が空になる)

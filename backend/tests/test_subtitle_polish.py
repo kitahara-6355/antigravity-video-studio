@@ -483,9 +483,10 @@ def test_flash_caption_is_rewrapped_into_a_two_line_neighbour():
 
 def test_flash_caption_that_does_not_fit_stays():
     from subtitle_engine import sync
+    # 2枚を続けると幅38（1枚は 18×2 の幅36まで）。半角の数字は 0.5 と数えるので漢数字で書く
     items = [{"start": 0.0, "end": 0.4, "text": "知って初めて書く"},
              {"start": 0.47, "end": 3.5,
-              "text": "だからもう頭の中は整理できてるから\n書くのは30分か40分か"}]
+              "text": "だからもう頭の中は整理できてるから\n書くのは三十分か四十分か"}]
     assert sync._merge_flashes(items, 0.8, max_chars=18, max_lines=2) == 0
 
 
@@ -793,6 +794,47 @@ def test_line_length_check_follows_the_formatters_line_width():
     long = SimpleNamespace(segments=[{"text": "あ" * (width + 1)} for _ in range(5)])
     assert SubtitleLineCheck().analyze(ok)["deductions"] == 0
     assert SubtitleLineCheck().analyze(long)["deductions"] == 5
+
+
+def test_line_width_counts_half_width_characters_as_half():
+    # 1行の字数（max_chars_per_line）は画面の幅の上限。英数字と半角の空白は全角の半分の幅で出る
+    assert tf.display_width("ここ Be Original 書いてください") == 15.5
+    assert tf.display_width("１２３") == 3
+    assert tf.display_width("123") == 1.5
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_line_with_english_words_is_measured_by_its_width(monkeypatch):
+    # 実例（53回目の 7分58秒・2026-10-17 ユーザー指摘）: 「ここ Be Original 書いてください」は
+    # 22字・幅15.5。英字も1字と数えて1行に入らず、「書いてください」が次の字幕に分かれて 0.8 秒しか
+    # 出なかった
+    monkeypatch.setattr(tf, "_keep_words", lambda: (("Be Original",), 18))
+    caps = tf.split_into_captions("こうやって、で、ここ Be Original 書いてください。", 18, 2, True)
+    assert caps == ["こうやって、で、\nここ Be Original 書いてください。"]
+
+
+def test_the_last_line_length_guard_measures_width_too(monkeypatch):
+    monkeypatch.setattr(tf, "_phrase_parser", lambda: None)  # BudouX が無いときの従来の折り方も
+    line = "ここ Be Original 書いてください"
+    assert tf.enforce_line_length(line, 18) == line
+    assert tf._split_at_boundary(line, 18) == [line]
+    # 全角だけの行は今までどおり 18 字で折る
+    assert tf.enforce_line_length("あ" * 20, 18) == "あ" * 18 + "\nああ"
+
+
+def test_two_captions_joined_without_budoux_are_cut_by_width(monkeypatch):
+    from subtitle_engine import sync
+    monkeypatch.setattr(tf, "_phrase_parser", lambda: None)
+    joined = sync._as_one_caption("ここ\nBe Original", "書いて\nください", 18, 2)
+    assert joined == "ここBe Original　書いてください"
+
+
+def test_line_length_check_measures_the_formatters_width():
+    from quality_gate_plugins import SubtitleLineCheck
+    from template_constants import _DEFAULT_SUBTITLE_RULES as rules
+    line = "ここ Be Original 書いてください"
+    assert tf.display_width(line) <= rules["max_chars_per_line"] < len(line)
+    assert SubtitleLineCheck().analyze(SimpleNamespace(segments=[{"text": line}] * 5))["deductions"] == 0
 
 
 def test_word_spaced_transcript_is_joined():

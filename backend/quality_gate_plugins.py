@@ -278,10 +278,12 @@ class SubtitleLineCheck(QualityCheckPlugin):
             except (ImportError, KeyError, TypeError, ValueError):
                 max_cpl = 15  # テレビ放送標準: 15文字/行
         long_lines = 0
-        
+        # 整形と同じ幅で測る（半角は 0.5。「ここ Be Original 書いてください」は22字・幅15.5）
+        from subtitle_engine.text_formatter import display_width
+
         for seg in ctx.segments:
             for line in seg.get("text", "").split("\n"):
-                if len(line) > max_cpl:
+                if display_width(line) > max_cpl:
                     long_lines += 1
         
         if long_lines > 3:

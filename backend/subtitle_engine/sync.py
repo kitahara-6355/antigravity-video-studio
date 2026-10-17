@@ -391,9 +391,15 @@ def _as_one_caption(first: str, second: str, max_chars: int, max_lines: int,
     if caps:
         # 継ぎ目の空白が行頭・行末に来たら消す（「…次の週から\n　行かなく…」）
         return "\n".join(line.strip("\u3000 ") for line in caps[0].split("\n")) if len(caps) == 1 else None
-    if len(flat) > max_chars * max_lines:
+    from subtitle_engine import text_formatter as tf
+    if tf.display_width(flat) > max_chars * max_lines:
         return None
-    return "\n".join(flat[k:k + max_chars] for k in range(0, len(flat), max_chars))
+    lines = []
+    while flat:  # 1行の字数は幅で測る（半角は 0.5・`text_formatter.display_width`）
+        k = max(1, tf._fit(flat, max_chars))
+        lines.append(flat[:k])
+        flat = flat[k:]
+    return "\n".join(lines) if len(lines) <= max_lines else None
 
 
 def _merge_flashes(items: list[dict], min_display: float, max_chars: int | None = None,

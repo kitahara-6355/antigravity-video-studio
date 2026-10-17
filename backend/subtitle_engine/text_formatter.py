@@ -10,6 +10,7 @@ Phase C: word_timestamps対応 — 単語レベルタイミングで正確な発
 
 import logging
 import re
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,30 @@ FILLERS = [
 
 # 日本語の助詞・句読点パターン（分割ポイント）
 SPLIT_PATTERN = re.compile(r"(.+?[はがをにのでと、。？！]|.+?です|.+?ます)")
+
+
+def _char_width(ch: str) -> float:
+    return 0.5 if unicodedata.east_asian_width(ch) in ("Na", "H") else 1.0
+
+
+def display_width(text: str) -> float:
+    """字幕の行の幅。全角を1、半角（英数字・半角の空白など）を 0.5 と数える。
+
+    1行の字数（max_chars_per_line）は画面の幅の上限なので、幅で測る。英字も1字と数えていたので、
+    53回目の 7分58秒「ここ Be Original 書いてください」（22字・幅15.5）が1行に入らず、
+    「書いてください」が次の字幕に分かれて 0.8 秒しか出なかった（2026-10-17 ユーザー指摘）。
+    """
+    return sum(_char_width(ch) for ch in text)
+
+
+def _fit(text: str, width: float) -> int:
+    """text の頭から、幅 width に収まる字数。"""
+    acc = 0.0
+    for i, ch in enumerate(text):
+        acc += _char_width(ch)
+        if acc > width:
+            return i
+    return len(text)
 
 
 
@@ -323,20 +348,21 @@ def _split_at_boundary(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[s
     if max_chars <= 0:
         return [text]
 
-    if len(text) <= max_chars:
+    if display_width(text) <= max_chars:
         return [text]
 
-    # イテレーティブに max_chars 以下のチャンクに分割
+    # イテレーティブに max_chars 以下のチャンクに分割（幅で測る。半角は 0.5）
     chunks = []
     remaining = text
 
-    while len(remaining) > max_chars:
+    while display_width(remaining) > max_chars:
+        limit = _fit(remaining, max_chars)
         # パフォーマンス向上のため、対象をスライスして検索範囲を制限
-        search_range = remaining[:max_chars + 5]
+        search_range = remaining[:limit + 5]
         best_split = -1
         for m in SPLIT_PATTERN.finditer(search_range):
             end_pos = m.end()
-            if end_pos <= max_chars:
+            if end_pos <= limit:
                 best_split = end_pos
             else:
                 break  # max_chars を超えたら探索終了
@@ -347,8 +373,8 @@ def _split_at_boundary(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[s
             remaining = remaining[best_split:].strip()
         else:
             # 分割ポイントが見つからない場合: max_chars で強制分割
-            chunks.append(remaining[:max_chars].strip())
-            remaining = remaining[max_chars:].strip()
+            chunks.append(remaining[:limit].strip())
+            remaining = remaining[limit:].strip()
 
     if remaining:
         chunks.append(remaining.strip())
@@ -373,24 +399,25 @@ def enforce_line_length(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> str:
     if max_chars <= 0:
         return text
 
-    if len(text) <= max_chars:
+    if display_width(text) <= max_chars:
         return text
 
     lines = text.split("\n")
     new_lines = []
     for line in lines:
-        if len(line) <= max_chars:
+        if display_width(line) <= max_chars:
             new_lines.append(line)
         else:
             temp_line = line
-            while len(temp_line) > max_chars:
-                split_idx = max_chars
+            while display_width(temp_line) > max_chars:
+                limit = _fit(temp_line, max_chars)
+                split_idx = limit
                 # 助詞・句読点パターンで最後のマッチを探す
-                matches = list(SPLIT_PATTERN.finditer(temp_line[:max_chars + 1]))
+                matches = list(SPLIT_PATTERN.finditer(temp_line[:limit + 1]))
                 if matches:
                     best_match = matches[-1]
                     end_idx = best_match.end()
-                    if 2 <= end_idx <= max_chars:
+                    if 2 <= end_idx <= limit:
                         split_idx = end_idx
                 
                 new_lines.append(temp_line[:split_idx].strip())
@@ -527,7 +554,7 @@ def _keep_whole(parts: list[str], words: tuple[str, ...], limit: int) -> list[st
     """割らない語の途中にある文節の切れ目を、語の頭へ寄せる。
 
     BudouX はひらがなで始まる社名の頭を助詞と読んで割る（53回目の 5分38秒「記事広告がは|ごろも|フーズ」
-    → 「記事広告が|はごろもフーズだったんで」）。寄せた文節が1行（limit 字）に入らないとき
+    → 「記事広告が|はごろもフーズだったんで」）。寄せた文節が1行（幅 limit）に入らないとき
     （「「筆文字で伝えたいことば大賞」っていうのがね」）は、寄せずに BudouX の切れ目のままにする。
     """
     if len(parts) < 2 or not words:
@@ -545,7 +572,8 @@ def _keep_whole(parts: list[str], words: tuple[str, ...], limit: int) -> list[st
             inside = {c for c in cuts if i < c < j}
             if inside:
                 moved = (cuts - inside) | ({i} if i else set())
-                if min((c for c in moved if c >= j), default=len(text)) - i <= limit:
+                end = min((c for c in moved if c >= j), default=len(text))
+                if display_width(text[i:end]) <= limit:
                     cuts, moved_any = moved, True
             i = text.find(w, j)
     if not moved_any:
@@ -657,13 +685,14 @@ def _split_long_phrase(phrase: str, max_chars: int) -> list[str]:
     """
     out = []
     rest = phrase
-    while len(rest) > max_chars:
-        cuts = [(_cut_score(rest, i), i) for i in range(1, min(len(rest), max_chars + 1))]
+    while display_width(rest) > max_chars:
+        limit = _fit(rest, max_chars)
+        cuts = [(_cut_score(rest, i), i) for i in range(1, min(len(rest), limit + 1))]
         cuts = [(sc, i) for sc, i in cuts if sc is not None]
         if cuts:
-            _, _, cut = max((i >= max_chars * 0.4, sc, i) for sc, i in cuts)
+            _, _, cut = max((display_width(rest[:i]) >= max_chars * 0.4, sc, i) for sc, i in cuts)
         else:
-            cut = max_chars
+            cut = limit
         out.append(rest[:cut])
         rest = rest[cut:]
     if rest:
@@ -690,7 +719,7 @@ def _phrases(text: str, max_chars: int) -> list[str]:
         # 漢字1字だけの文節は、漢字で終わる前の文節に付ける。BudouX は熟語の末尾を
         # 分けることがある（「一般社団法｜人」が「一般社団法\n人…」の折り目になった）
         if (len(part) == 1 and _script(part) == "kanji" and phrases and phrases[-1]
-                and _script(phrases[-1][-1]) == "kanji" and len(phrases[-1]) < max_chars):
+                and _script(phrases[-1][-1]) == "kanji" and display_width(phrases[-1]) + 1 <= max_chars):
             phrases[-1] += part
             continue
         if part:
@@ -710,9 +739,9 @@ def _sentences(phrases: list[str]) -> list[list[str]]:
     return out
 
 
-def _line_len(line: str, trim: bool = False) -> int:
-    """行の字数。trim なら、行末で消える句読点（strip_punctuation）を数えない。"""
-    return len(line.rstrip(_PUNCT)) if trim else len(line)
+def _line_len(line: str, trim: bool = False) -> float:
+    """行の幅（`display_width`。半角は 0.5）。trim なら、行末で消える句読点（strip_punctuation）を数えない。"""
+    return display_width(line.rstrip(_PUNCT) if trim else line)
 
 
 def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int, trim: bool = False):
@@ -729,7 +758,7 @@ def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int, trim: bool =
     best = None
     acc = 0
     for i, ph in enumerate(phrases[:-1], start=1):
-        acc += len(ph)
+        acc += display_width(ph)
         head = "".join(phrases[:i])
         if _line_len(head, trim) > max_chars:
             break
@@ -740,7 +769,7 @@ def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int, trim: bool =
         tail = _wrap_lines(phrases[i:], max_chars, max_lines - 1, trim)
         if tail is None:
             continue
-        rest = len(text) - acc
+        rest = display_width(text) - acc
         # 1〜2字だけの行は、ほかに折り方が無いときだけ（「が」/「もう1個別の…」・2026-10-06 実測）
         short = _line_len(head, trim) <= 2 or ("\n" not in tail[0] and _line_len(tail[0], trim) <= 2)
         # 区切りの良さを優先し、同じなら行の長さが揃う方
@@ -779,7 +808,7 @@ def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
             choice = None  # (key, n, text)
             acc = 0
             for n in range(1, len(rest) + 1):
-                acc += len(rest[n - 1])
+                acc += display_width(rest[n - 1])
                 if acc > capacity and n > 1:
                     break
                 wrapped = _wrap_lines(rest[:n], max_chars, max_lines, trim)
@@ -886,7 +915,7 @@ def _split_by_word_timing(words: list[dict], max_chars: int, parent_seg: dict) -
             chunk_end = w_end
 
         # この単語を追加するとmax_charsを超えるか？
-        if current_text and len(current_text) + len(word_text) > max_chars:
+        if current_text and display_width(current_text) + display_width(word_text) > max_chars:
             # 現在のチャンクを保存
             if current_text.strip():
                 try:
@@ -1209,7 +1238,7 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
 
             # Step 2: Phase C — word_timestampsベースの分割
             words = seg.get("words")
-            if isinstance(words, list) and words and len(cleaned) > max_chars:
+            if isinstance(words, list) and words and display_width(cleaned) > max_chars:
                 chunks = _split_by_word_timing(words, max_chars, seg)
                 if chunks and len(chunks) > 1:
                     formatted.extend(chunks)
