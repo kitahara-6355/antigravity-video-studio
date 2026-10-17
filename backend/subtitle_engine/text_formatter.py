@@ -64,7 +64,7 @@ def _char_count(text: str, trim: bool = False) -> int:
     （2026-10-17）では、英数字を含む字幕が1枚に詰まり、「うちの|奥さん」と折れる・2つの文が1行に
     並ぶ（「てっぺんだよね　12時夜の12時」）字幕が出た。
     """
-    return len(text.rstrip(_PUNCT)) if trim else len(text)
+    return len(text.rstrip(_PUNCT)) + _mark_gaps(text) if trim else len(text)
 
 
 
@@ -493,6 +493,9 @@ _QUOTE_HEADS = ("いう", "いっ", "いい", "言う", "言っ", "言い",
                 # 「〜って言われてる」「〜と言える」も「っていう」と同じひと塊（試しの書き出しの
                 # 16分37秒が「4000万人いるって|言われてますけど」と折れた・2026-10-17）
                 "言わ", "いわ", "言え")
+# 打ち消しの「ない」は前の語とひと塊（「狙って|ないから」「しょうが|ない」）。BudouX は「ない」を
+# 1つの文節に分けることがあり、その手前で行を折っていた（54回目の 19分53秒・36分38秒）
+_NEGATIVE_HEADS = ("ない", "なかっ", "なく", "なけ")
 
 _budoux_parser = None
 
@@ -593,10 +596,13 @@ def _keep_whole(parts: list[str], words: tuple[str, ...], limit: int) -> list[st
 
 
 def _binds_to_next(p: str, nxt: str) -> bool:
-    """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」・「〜かなんか」・「〜たらいい」）か。"""
+    """文節 p と次の文節 nxt がひと塊（補助の動詞・引用の「っていう」・「〜かなんか」・「〜たらいい」・
+    打ち消しの「ない」）か。"""
     nxt = nxt.lstrip()
     if not nxt:
         return False
+    if nxt.startswith(_NEGATIVE_HEADS):
+        return True
     if p.endswith(_QUOTE_TAILS) and nxt.startswith(_QUOTE_HEADS):
         return True
     # 「〜かなんか」（〜か何か）。BudouX は「駄菓子屋か|なんか」と分ける（40回目の 1分58秒）
@@ -734,7 +740,22 @@ def _phrases(text: str, max_chars: int) -> list[str]:
             continue
         if part:
             phrases.extend(_split_long_phrase(part, max_chars))
-    return phrases
+    return [p for ph in phrases for p in _split_after_marks(ph)]
+
+
+def _split_after_marks(phrase: str) -> list[str]:
+    """文節の途中の文末（「？」「！」「。」）の後ろに語が続くとき、そこで文節を分ける。
+
+    BudouX は「取っちゃうんでしょ?はい、」を1つの文節にすることがあり、文末で字幕を区切れず、
+    「?」の後ろで行も折れなかった（54回目の 13分51秒）。引用の「って・と」・閉じ括弧の手前では分けない。
+    """
+    out, start = [], 0
+    for k, ch in enumerate(phrase[:-1]):
+        if ch in SENTENCE_END and phrase[k + 1] not in _JOINED_AFTER_MARK:
+            out.append(phrase[start:k + 1])
+            start = k + 1
+    out.append(phrase[start:])
+    return out
 
 
 def _sentences(phrases: list[str]) -> list[list[str]]:
@@ -750,8 +771,9 @@ def _sentences(phrases: list[str]) -> list[list[str]]:
 
 
 def _line_len(line: str, trim: bool = False) -> float:
-    """行の幅（`display_width`。半角は 0.5）。trim なら、行末で消える句読点（strip_punctuation）を数えない。"""
-    return display_width(line.rstrip(_PUNCT) if trim else line)
+    """行の幅（`display_width`。半角は 0.5）。trim なら、行末で消える句読点（strip_punctuation）を数えず、
+    「？」「！」の後ろに置く全角スペース（`_mark_gaps`）を数える。"""
+    return display_width(line.rstrip(_PUNCT)) + _mark_gaps(line) if trim else display_width(line)
 
 
 def _wrap_lines(phrases: list[str], max_chars: int, max_lines: int, trim: bool = False):
@@ -1379,7 +1401,9 @@ def strip_punctuation(text: str) -> str:
     """字幕から句読点（、。）を外す（2026-10-06 ユーザー指摘「句読点は不要」）。
 
     行末の句読点は消す。行の途中の句読点は全角スペースにして、語の切れ目を残す
-    （「はい、いえいえ。」→「はい　いえいえ」）。「！」「？」は語気なので残す。
+    （「はい、いえいえ。」→「はい　いえいえ」）。「！」「？」は語気なので残し、後ろに文が続くときは
+    全角スペースを置く（日本語の組版の慣行。「。」の跡と同じく語の切れ目を残す。54回目の 34分49秒が
+    「お住まいは？横浜」と詰まった）。引用の「って・と」・閉じ括弧・続く記号の手前には置かない。
     数字に挟まれた「,」「．」は桁区切り・小数点なので残す（「1,000」が「1　000」になった・27分03秒）。
     """
     if not isinstance(text, str):
@@ -1395,9 +1419,21 @@ def strip_punctuation(text: str) -> str:
                     out.append("　")
             else:
                 out.append(ch)
+                if ch in _MARKS and k + 1 < len(line) and line[k + 1] not in _JOINED_AFTER_MARK:
+                    out.append("　")
         lines.append("".join(out).strip(" 　"))
     # 句読点だけの字幕は空にする（呼び出し側が捨てる）
     return "\n".join(line for line in lines if line)
+
+
+_MARKS = "？！?!"
+# 「？」「！」の後ろに続けて書く字（全角スペースを置かない）: 引用の「って・と」・閉じ括弧・記号・空白
+_JOINED_AFTER_MARK = "っと」』）)】〉》]…" + _MARKS + _PUNCT + " 　\n"
+
+
+def _mark_gaps(text: str) -> int:
+    """字幕にしたとき「？」「！」の後ろに置く全角スペースの数（`strip_punctuation`）。行を埋めるときに数える。"""
+    return sum(1 for k, ch in enumerate(text[:-1]) if ch in _MARKS and text[k + 1] not in _JOINED_AFTER_MARK)
 
 
 # ============================================================

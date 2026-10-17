@@ -26,9 +26,35 @@ from subtitle_engine import text_formatter as tf  # noqa: E402
     ("1,000、1,500人教えた", "1,000　1,500人教えた"),
     ("２，０００円です。", "２，０００円です"),
     ("1．5倍", "1．5倍"),
+    # 「？」「！」の後ろに文が続くときは全角スペースを置く（54回目の 34分49秒「お住まいは？横浜」。朱入れでは
+    # 「お住まいは？　横浜」と書かれた）。引用の「って・と」・閉じ括弧・続く記号の手前と、行末には置かない
+    ("お住まいは？横浜。", "お住まいは？　横浜"),
+    ("お住まいは？、横浜。", "お住まいは？　横浜"),
+    ("取っちゃうんでしょ?はい、そうですね", "取っちゃうんでしょ?　はい　そうですね"),
+    ("文字書いてくれない？って言われて", "文字書いてくれない？って言われて"),
+    ("「本当？」と聞いた", "「本当？」と聞いた"),
+    ("えっ？！すごい", "えっ？！　すごい"),
+    ("文案家？\nうん", "文案家？\nうん"),
 ])
 def test_strip_punctuation(text, expected):
     assert tf.strip_punctuation(text) == expected
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,want", [
+    # 朱入れの直しの 34分49秒。文頭の「、」を外す規則が「？」の後ろの「、」も外し、「お住まいは？横浜」と詰まった
+    ("お住まいは？、横浜。", ["お住まいは？　横浜"]),
+    # 「？」の後ろの空きも1字に数える。数えないと 18字の1行に入れてから、字幕にして 19字になる
+    ("本当にそれでいいの？いいと思うけどね。", ["本当にそれでいいの？", "いいと思うけどね"]),
+    # BudouX が文末をまたいで1つの文節にした所（「でしょ?はい、」）も、文末で字幕を区切る（54回目の 13分51秒）
+    ("中国の人って日本のものって結構取っちゃうんでしょ?はい、そうですね",
+     ["中国の人って日本のものって\n結構取っちゃうんでしょ?", "はい　そうですね"]),
+    # 引用の「って」の手前は文末ではない
+    ("文字書いてくれない？って言われて書いたのが雑誌広告だったんですよ",
+     ["文字書いてくれない？って言われて\n書いたのが雑誌広告だったんですよ"]),
+])
+def test_a_question_mark_followed_by_more_words_ends_the_sentence(text, want):
+    assert [s["text"] for s in tf.format_segments([{"text": text, "start": 0.0, "end": 5.0}], 18)] == want
 
 
 def test_captions_remember_where_punctuation_was_taken_out():
@@ -882,6 +908,19 @@ def test_a_long_phrase_with_digits_is_measured_by_its_character_count():
 ])
 def test_the_quoting_tte_stays_with_iwareru(text, want):
     assert [s["text"] for s in tf.format_segments([{"text": text, "start": 0.0, "end": 6.0}], 18)] == want
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,end,want", [
+    # 54回目の 36分38秒: 朱入れの直しで字幕が「うれしくてしょうが\nない」と折れた（BudouX が「しょうが」で切る）
+    ("うれしくてしょうがない。", 1.44, "うれしくてしょうがない"),
+    # 54回目の 19分53秒: 「狙って\nないから　はい」（「〜てない」は「〜ていない」の「い」が落ちた形）
+    ("狙ってないから、はい。", 1.1, "狙ってないから　はい"),
+])
+def test_a_negative_nai_is_not_put_at_the_head_of_a_line(text, end, want):
+    # 速く読む字幕は1行を2行に折って短くする（`adjust_segment_speeds`）。打ち消しの「ない」の手前では折らない
+    segs = [{"text": text, "start": 0.0, "end": end}, {"text": "はい。っていうことですかね。", "start": end, "end": end + 2.8}]
+    assert tf.format_segments(segs, 18)[0]["text"] == want
 
 
 @pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
