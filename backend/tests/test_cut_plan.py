@@ -475,3 +475,196 @@ def test_keeping_scenes_can_be_turned_off_in_the_template(monkeypatch):
     assert rules["keep_scenes"] is False
     ranges, _ = cut_plan.plan(WRITING, None, keep_all=True, rules=rules)
     assert len(ranges) == 3
+
+
+# --- 音声認識が聞けなかった言葉の声（2026-10-17 ユーザー指摘）------------------------------------
+
+UNHEARD = [  # 素材の 38分40秒〜（53回目）。2行目の「悪くなっちゃって」を認識が聞けなかった
+    dict(start=2313.94, end=2318.37, text="これぐらい　前はこれぐらいの量で\n例えば100本作れたんだけども",
+         sourceStart=2313.94, sourceEnd=2322.94),
+    dict(start=2318.37, end=2322.94, text="今は30本ぐらいしか作れないとか\nその原毛の質まで悪くなっちゃって",
+         sourceStart=2313.94, sourceEnd=2322.94),
+    dict(start=2327.74, end=2334.64, text="イタチにおいてはもう入ってこないのね",
+         sourceStart=2327.74, sourceEnd=2334.64),
+]
+UNHEARD_TOKENS = [(c, t) for c, t in zip(
+    "百本作れた今は三十本ぐらいしか作れないとか原毛の質までイタチにおいては今",
+    (2318.04, 2318.28, 2318.56, 2318.80, 2318.96, 2320.40, 2320.72, 2321.00, 2321.12, 2321.28, 2321.56,
+     2321.64, 2321.68, 2321.84, 2321.92, 2322.16, 2322.36, 2322.52, 2322.68, 2322.84, 2323.16, 2324.23,
+     2324.55, 2324.79, 2325.03, 2325.47, 2325.59, 2326.33, 2328.25, 2328.41, 2328.61, 2328.85, 2329.01,
+     2329.21, 2329.45, 2330.70))]
+UNHEARD_VOICE = [(2317.5, 2318.19), (2318.39, 2319.1), (2319.59, 2319.96), (2320.4, 2321.24), (2321.4, 2322.45),
+                 (2322.71, 2323.47), (2324.15, 2325.72), (2326.29, 2326.73), (2326.89, 2327.73),
+                 (2328.06, 2329.64), (2330.7, 2334.7)]
+
+
+def _plan_with(monkeypatch, segs, tokens, voice, exclude=(), keep_all=True, rules=None):
+    monkeypatch.setattr(cut_plan, "read_heard", lambda path: tokens)
+    monkeypatch.setattr(cut_plan, "read_audio", lambda path: _audio(voice, duration=voice[-1][1] + 5.0))
+    return cut_plan.plan(segs, "raw.mp4", keep_all=keep_all, rules=dict(rules or RULES, **LIVE), exclude=exclude)
+
+
+def test_the_voice_of_words_the_recogniser_missed_is_not_cut(monkeypatch):
+    """素材の 38分45秒: 認識は「原毛の質まで」の「で」までしか聞けず、「悪くなっちゃって」の声
+    （2326.29〜2327.73 秒）を間として切っていた。聞けなかった8字ぶんの声はその発話の声"""
+    ranges, info = _plan_with(monkeypatch, UNHEARD, UNHEARD_TOKENS, UNHEARD_VOICE)
+    assert any(a <= 2326.29 and 2327.73 <= b for a, b in ranges)
+    assert info["unheard_widened"] == 1
+
+
+def test_the_voice_after_the_heard_words_is_not_taken_beyond_the_missed_words(monkeypatch):
+    # 聞けなかったのが「ね」1字なら、後ろの 1.4 秒の声はその字の声ではない（切ってよい間）
+    segs = [_seg(10.0, 12.0, "書いてくださいね"), _seg(15.0, 17.0, "では次に")]
+    tokens = list(zip("書いてください", (10.2, 10.4, 10.6, 10.8, 11.0, 11.2, 11.4))) + list(zip("では次に", (15.2, 15.4, 15.6, 15.8)))
+    voice = [(10.1, 11.6), (12.3, 13.7), (15.1, 16.0)]
+    ranges, info = _plan_with(monkeypatch, segs, tokens, voice)
+    assert len(ranges) == 2 and ranges[0][1] < 12.3
+    assert "unheard_widened" not in info
+
+
+def test_the_missed_words_do_not_take_the_voice_of_the_next_heard_words(monkeypatch):
+    # 間のすぐ後ろの声に次の発話の聞こえた字があれば、その声は次の発話の声
+    segs = [_seg(10.0, 12.0, "書いてくださいよろしくね"), _seg(13.0, 15.0, "では次に")]
+    tokens = list(zip("書いてください", (10.2, 10.4, 10.6, 10.8, 11.0, 11.2, 11.4))) + list(zip("では次に", (12.5, 12.7, 12.9, 13.1)))
+    voice = [(10.1, 11.6), (12.4, 13.3)]
+    out = cut_plan.unheard_reach(*cut_plan.heard_marks(segs, tokens), _audio(voice), walls=())
+    assert out == {}
+
+
+def test_the_voice_before_the_first_heard_word_is_kept_for_the_missed_words(monkeypatch):
+    # 頭の「そっかごめんなさい」を聞けず、その声（12.4〜12.8 秒）が区間の外になっていた形（素材の 29分09秒）
+    segs = [_seg(8.0, 11.0, "それではまた"), _seg(12.9, 15.5, "そっかごめんなさい今ここに持ってね")]
+    tokens = list(zip("それではまた", (8.2, 8.4, 8.6, 8.8, 9.0, 9.2))) + list(zip("今ここに持ってね", (14.5, 14.7, 14.9, 15.0, 15.1, 15.3, 15.4, 15.5)))
+    voice = [(8.1, 9.4), (12.4, 12.8), (13.1, 15.6)]
+    ranges, info = _plan_with(monkeypatch, segs, tokens, voice)
+    assert ranges[-1][0] <= 12.4 - LIVE["pad_before_sec"] + 1e-6
+    assert info["unheard_widened"] == 1
+
+
+def test_missed_words_do_not_reach_into_dropped_talk(monkeypatch):
+    segs = [_seg(10.0, 12.0, "書いてくださいよろしくお願いします")]
+    tokens = list(zip("書いてください", (10.2, 10.4, 10.6, 10.8, 11.0, 11.2, 11.4)))
+    voice = [(10.1, 11.6), (12.2, 13.0)]
+    ranges, _ = _plan_with(monkeypatch, segs, tokens, voice, exclude=[(12.1, 13.1)])
+    assert ranges[0][1] <= 12.1
+
+
+# --- 映像の切り替わりの向こうが一瞬映る所（2026-10-17 ユーザー指摘）-------------------------------
+
+def test_a_flash_of_the_previous_recording_at_a_cut_is_trimmed():
+    """素材の 37分48秒: 4本目の収録の継ぎ目（2268.23 秒）の 0.44 秒手前から残していて、左にいた
+    美麗さんが消えた3本目の終わりが映った。そこに言葉は無い（「先」は 2267.40 秒・「生」は 2269.08 秒）"""
+    audio = _audio([(2267.36, 2267.72), (2268.06, 2268.65), (2268.95, 2270.67)])
+    audio.heard = [2267.40, 2269.08, 2269.40]
+    ranges, found = cut_plan.trim_flashes([(2247.28, 2258.12), (2267.79, 2275.15)], [2268.23], audio, 1.0)
+    assert ranges == [(2247.28, 2258.12), (2267.79 + (2268.225 - 2267.79), 2275.15)]
+    assert ranges[1][0] == pytest.approx(2268.23 - cut_plan.SHOT_EDGE_SEC)
+    assert found == {"trimmed": [(2267.79, pytest.approx(2268.225))], "kept": []}
+
+
+def test_a_flash_of_the_next_recording_before_a_cut_is_trimmed_too():
+    audio = _audio([(10.0, 19.4)])
+    audio.heard = [10.2, 19.2]
+    ranges, found = cut_plan.trim_flashes([(9.9, 20.0)], [19.6], audio, 1.0)
+    assert ranges == [(9.9, pytest.approx(19.595))] and len(found["trimmed"]) == 1
+
+
+def test_a_flash_holding_words_is_kept_and_reported():
+    # 言葉を切るよりは映り込みを残す（記録に残して知らせる）
+    audio = _audio([(9.9, 12.0)])
+    audio.heard = [10.1, 10.3, 11.0]
+    ranges, found = cut_plan.trim_flashes([(9.8, 20.0)], [10.4], audio, 1.0)
+    assert ranges == [(9.8, 20.0)] and found["kept"] == [(10.4, 0.6)]
+
+
+def test_a_shot_longer_than_the_minimum_at_an_edge_is_left_alone():
+    audio = _audio([(9.9, 12.0)])
+    ranges, found = cut_plan.trim_flashes([(9.8, 20.0)], [11.2, 18.7], audio, 1.0)
+    assert ranges == [(9.8, 20.0)] and found == {"trimmed": [], "kept": []}
+
+
+def test_without_the_recogniser_a_flash_is_judged_by_the_voice():
+    audio = _audio([(10.2, 12.0)])
+    assert cut_plan.trim_flashes([(9.8, 20.0)], [10.1], audio, 1.0)[0] == [(pytest.approx(10.095), 20.0)]
+    assert cut_plan.trim_flashes([(9.8, 20.0)], [10.4], audio, 1.0)[0] == [(9.8, 20.0)]
+
+
+def test_plan_trims_a_flash_and_the_captions_still_fit_in_their_range(monkeypatch):
+    from smart_cut_engine import retime_segments
+    segs = [_seg(2247.0, 2257.9, "前の話です"),
+            dict(start=2267.84, end=2272.84, text="先生がこれからの今から", sourceStart=2267.84, sourceEnd=2274.74),
+            dict(start=2272.84, end=2274.74, text="何かあるんでしょうか？", sourceStart=2267.84, sourceEnd=2274.74)]
+    tokens = (list(zip("前の話です", (2247.2, 2247.4, 2247.6, 2247.8, 2248.0)))
+              + list(zip("生がこれからの今から", (2269.08, 2269.40, 2269.76, 2269.92, 2270.20, 2270.36, 2270.6,
+                                                    2271.07, 2271.31, 2271.39)))
+              + list(zip("何かあるんでしょうか", (2272.9, 2273.1, 2273.3, 2273.5, 2273.7, 2273.9, 2274.1, 2274.3,
+                                                    2274.4, 2274.5))))
+    monkeypatch.setattr(cut_plan, "read_shots", lambda path: [(1798.17, 19.7), (1823.13, 2.6), (2268.23, 7.03)])
+    ranges, info = _plan_with(monkeypatch, segs, tokens, [(2247.1, 2257.8), (2267.7, 2268.65), (2268.95, 2274.6)])
+    assert ranges[-1][0] == pytest.approx(2268.225)
+    assert info["shot_changes"] == 2 and info["flashes_trimmed"] == [(pytest.approx(2267.6), pytest.approx(2268.225))]
+    # 発話の区間（2267.84〜）は区間（2268.225〜）からはみ出したので、収めないと字幕が2行とも落ちる
+    assert len(retime_segments([dict(s) for s in segs], ranges)[0]) == 1
+    assert cut_plan.fit_spans(segs, ranges) == 2
+    assert segs[1]["sourceStart"] == pytest.approx(2268.225) and segs[1]["start"] == pytest.approx(2268.225)
+    assert segs[1]["end"] == 2272.84 and segs[2]["start"] == 2272.84
+    assert len(retime_segments(segs, ranges)[0]) == 3
+
+
+def test_fitting_leaves_spans_that_are_inside_a_range_alone():
+    segs = [_seg(10.0, 12.0, "一"), dict(start=12.0, end=13.0, text="二", sourceStart=12.0, sourceEnd=14.3)]
+    assert cut_plan.fit_spans(segs, [(9.9, 13.9)]) == 0  # 終わりは 0.5 秒まではみ出してよい
+    assert segs[1]["sourceEnd"] == 14.3
+
+
+def test_a_line_wholly_outside_the_shrunk_span_is_moved_in_with_its_length():
+    segs = [dict(start=10.0, end=10.3, text="一", sourceStart=10.0, sourceEnd=14.0)]
+    assert cut_plan.fit_spans(segs, [(10.5, 14.0)]) == 1
+    assert (segs[0]["start"], segs[0]["end"]) == (10.5, pytest.approx(10.8))
+
+
+SCDET_OUT = """frame:0    pts:1798170000 pts_time:1798.17
+lavfi.scd.mafd=20.338
+lavfi.scd.score=19.734
+lavfi.scd.time=1798.17
+frame:1    pts:2268230000 pts_time:2268.23
+lavfi.scd.mafd=7.117
+lavfi.scd.score=7.034
+lavfi.scd.time=2268.23
+"""
+
+
+def test_the_shot_changes_are_read_from_ffmpeg_once_and_cached(tmp_path, monkeypatch):
+    video = tmp_path / "raw.mp4"
+    video.write_bytes(b"x" * 100)
+    calls = []
+
+    def run(args, **kw):
+        calls.append(args)
+        return type("P", (), {"returncode": 0, "stdout": SCDET_OUT, "stderr": ""})()
+
+    monkeypatch.setattr(cut_plan.subprocess, "run", run)
+    assert cut_plan.read_shots(video) == [(1798.17, 19.734), (2268.23, 7.034)]
+    assert "settb=AVTB,scdet=threshold=2.0:sc_pass=1,metadata=print:file=-" in calls[0]
+    assert cut_plan.read_shots(video) == [(1798.17, 19.734), (2268.23, 7.034)]
+    assert len(calls) == 1 and list(tmp_path.glob("_shots_*.json"))
+    assert cut_plan.read_shots(None) is None and cut_plan.read_shots(tmp_path / "missing.mp4") is None
+
+
+def test_the_shot_time_is_read_from_the_microsecond_pts_not_the_rounded_text():
+    # pts_time は有効数字6桁（10000 秒を超えると 0.1 秒刻み）。pts から読む
+    out = "frame:0    pts:10000033333 pts_time:10000\nlavfi.scd.score=8.5\n"
+    assert cut_plan._parse_scdet(out) == [(10000.033333, 8.5)]
+
+
+def test_the_smartcut_stage_fits_the_captions_and_reports_a_flash_it_kept(monkeypatch):
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.smartcut_worker import SmartCutWorker
+    segs = [dict(start=10.0, end=12.0, text="一", sourceStart=10.0, sourceEnd=12.0)]
+    monkeypatch.setattr(cut_plan, "plan", lambda *a, **k: (
+        [(10.395, 12.0)], {"flashes_trimmed": [(10.0, 10.395)], "flashes_kept": [(1830.0, 0.5)]}))
+    ctx = PipelineContext(video_path="raw.mp4", target_minutes=1)
+    note = SmartCutWorker()._plan_cuts(ctx, segs, keep_all=True)
+    assert segs[0]["sourceStart"] == 10.395 and ctx.cut_ranges == [(10.395, 12.0)]
+    assert "1秒未満だけ映る1か所（素材の 0:10ほか）は切り落とした" in note
+    assert any("30:30" in w and "言葉があるので切っていません" in w for w in ctx.warnings)

@@ -33,9 +33,19 @@
   日本の人口の2%だよね」は区間が手前の「言われている」で終わり、「日本の人口の2%だよね」の
   4 秒を切って字幕だけ出ていた。字幕の文字を認識の字と突き合わせ、その発話の言葉が聞こえた所
   まで区間を広げる（`heard_spans`）
+- 認識が聞けなかった言葉にも声はある。素材の 38分45秒「原毛の質まで悪くなっちゃって」は「で」まで
+  しか聞けず、「悪くなっちゃって」の声を間として切っていた（2026-10-17 ユーザー指摘）。字幕の
+  言葉のうち、最後に聞こえた字より後ろ（最初に聞こえた字より前）の字の数ぶんの声までは、その
+  発話の声とみなして区間を広げる（`unheard_reach`）
 
 区間は延ばすだけで縮めない。字幕は発話の区間（sourceStart/sourceEnd）で残す区間に割り当てる
 （`smart_cut_engine.retime_segments`）ので、縮めると字幕が落ちる。
+
+ただし映像の切り替わり（収録の継ぎ目）の向こうが少しだけ映る所は切り落とす（`trim_flashes`。
+2026-10-17 ユーザー指摘「左にいる美麗さんが画面から消えているシーンが1秒未満で映りこんでいる」。
+素材の 37分48秒の継ぎ目の 0.41 秒手前から残していた）。パイプラインは結合した1本を受け取るので、
+継ぎ目は映像から見つける（`read_shots`）。切り落として区間からはみ出した発話の区間は、区間の中に
+縮める（`fit_spans`）。
 
 収録の段取りの声（カメラを止める前後の「ちょっと切ります」「撮った？」「止めた？」）は中身では
 ないので残さない（`production_talk`）。外した発話の声は、前後の区間を延ばしても入れない（`exclude`）。
@@ -50,6 +60,8 @@
 from __future__ import annotations
 
 import bisect
+import hashlib
+import json
 import logging
 import subprocess
 from dataclasses import dataclass, field
@@ -67,6 +79,20 @@ HEARD_CHAR_SEC = 0.13
 # 発話の区間からこれより離れて聞こえた字は、その発話の言葉とみなさない（別の所の同じ言葉）。
 # 字幕の時刻合わせが認識の字を探す範囲（`aligner.SEARCH_AFTER_SEC`）と同じ
 HEARD_WINDOW_SEC = 5.0
+# 認識が聞けなかった字1つが声として続く長さの上限。伸ばしてゆっくり言っても収まる長さ
+# （聞こえた字は1字 `HEARD_CHAR_SEC`）。38分45秒の「悪くなっちゃって」は8字で 1.4 秒
+UNHEARD_CHAR_SEC = 0.3
+# 認識が聞けなかった言葉の声の手前に置ける間（言いさしの息継ぎ）。38分45秒は「で」の後 0.57 秒
+UNHEARD_GAP_SEC = 1.0
+# 映像が切り替わった（収録の継ぎ目・カメラの切り替え）とみなす ffmpeg scdet の値。raw 4本（43分）を
+# 見ると、継ぎ目の3か所が 7.0・19.7・20.4、手や体の動きは 2.9 以下だった。7.0 は同じ構図で人だけが
+# いなくなる継ぎ目（素材の 37分48秒）
+SHOT_CHANGE_SCORE = 5.0
+# 映像を見るときに書き残す値の下限。キャッシュは値ごと持ち、SHOT_CHANGE_SCORE は使うときに当てる
+SHOT_SCAN_FLOOR = 2.0
+SHOTS_CACHE_VERSION = 1
+# 切り落とすときに区間の端を切り替わりのフレームの手前に置く幅（フレームの時刻の丸めを吸収する）
+SHOT_EDGE_SEC = 0.005
 
 DEFAULT_CUT_RULES = {
     # 話し終わりの後ろに残す余白。文末の「す」は声が弱く、音量で見た話し終わりより少し続く
@@ -109,6 +135,9 @@ DEFAULT_CUT_RULES = {
                             "大丈夫", "もう一回", "お願いします"],
     # 段取りの発話とこの秒数以内に続く発話だけを、同じやりとりとみなす
     "production_gap_sec": 3.0,
+    # 区間の端で、映像の切り替わり（収録の継ぎ目）の手前（後ろ）がこれより短く、そこに言葉が無ければ
+    # 切り落とす。1秒に満たない映像は、見る人には別の場面が一瞬映ったように見える
+    "min_shot_sec": 1.0,
 }
 
 SENTENCE_END = "。！？!?"
@@ -378,9 +407,11 @@ def read_heard(path) -> list[tuple[str, float]] | None:
         return None
 
 
-def heard_spans(segments, tokens, window: float = HEARD_WINDOW_SEC) -> dict:
-    """発話（`_span`）ごとに、その字幕の言葉を音声認識が聞いた区間（素材の秒）。
+def heard_marks(segments, tokens, window: float = HEARD_WINDOW_SEC) -> tuple[dict, dict]:
+    """発話（`_span`）ごとに、音声認識が聞いたその字幕の字と、発話の字数。
 
+    返り値は ({発話: [(発話の言葉の何字目か, 素材の秒), ...]}, {発話: 字数})。字は突き合わせ用に
+    そろえた形（`aligner.norm_char`）で数え、発話の行を順につないで数える。
     字幕の文字を認識の字と突き合わせる（`aligner.align_captions`。字幕の時刻合わせと同じ全体の
     突き合わせ）。発話の区間から window 秒より離れた字（別の所の同じ言葉）は使わない。
     """
@@ -394,15 +425,116 @@ def heard_spans(segments, tokens, window: float = HEARD_WINDOW_SEC) -> dict:
                      "start": float(lo if start is None else start),
                      "end": float(hi if end is None else end)})
     aligner.align_captions(caps, tokens)
-    out: dict = {}
+    marks: dict = {}
+    length: dict = {}
     for i, cap in zip(order, caps):
         key = _span(segments[i])
         lo, hi = key
-        for _, t in cap.get("_asr_marks") or ():
+        base = length.get(key, 0)
+        length[key] = base + len(aligner._norm_text(cap["text"]))
+        for c, t in cap.get("_asr_marks") or ():
             t = float(t)
             if lo - window <= t and t + HEARD_CHAR_SEC <= hi + window:
-                a, b = out.get(key, (t, t + HEARD_CHAR_SEC))
-                out[key] = (min(a, t), max(b, t + HEARD_CHAR_SEC))
+                marks.setdefault(key, []).append((base + int(c), t))
+    return marks, length
+
+
+def _spans_of(marks: dict) -> dict:
+    return {key: (min(t for _, t in m), max(t for _, t in m) + HEARD_CHAR_SEC) for key, m in marks.items()}
+
+
+def heard_spans(segments, tokens, window: float = HEARD_WINDOW_SEC) -> dict:
+    """発話（`_span`）ごとに、その字幕の言葉を音声認識が聞いた区間（素材の秒・`heard_marks`）。"""
+    return _spans_of(heard_marks(segments, tokens, window)[0])
+
+
+def _reach_after(speech, t: float, budget: float, limit: float) -> float | None:
+    """t（聞こえた最後の字の後ろ）から後ろに、聞けなかった言葉の声が続く所。続く声が無ければ None。
+
+    声の区間を、間が UNHEARD_GAP_SEC 以下で続き、t からの声の長さが budget に収まり、limit
+    （ほかの言葉）を越えない所までたどる。
+    """
+    used = 0.0
+    end = t
+    i = _run_at(speech, t - FRAME_SEC / 2)
+    if i is not None:
+        # 聞こえた字の声が t の後ろへ続いていれば、その分も聞けなかった言葉の声
+        if speech.offsets[i] > limit:
+            return None
+        used, end = max(0.0, speech.offsets[i] - t), max(t, speech.offsets[i])
+        i += 1
+    else:
+        i = bisect.bisect_left(speech.onsets, t)
+    reach = None
+    while i < len(speech.onsets):
+        on, off = speech.onsets[i], speech.offsets[i]
+        used += off - on
+        if on - end > UNHEARD_GAP_SEC or off > limit or used > budget:
+            break
+        end = reach = off
+        i += 1
+    return reach
+
+
+def _reach_before(speech, t: float, budget: float, limit: float) -> float | None:
+    """t（聞こえた最初の字）から前に、聞けなかった言葉の声が始まる所（`_reach_after` の逆向き）。"""
+    used = 0.0
+    start = t
+    i = _run_at(speech, t)
+    if i is not None:
+        if speech.onsets[i] < limit:
+            return None
+        used, start = max(0.0, t - speech.onsets[i]), min(t, speech.onsets[i])
+        i -= 1
+    else:
+        i = bisect.bisect_right(speech.offsets, t) - 1
+    reach = None
+    while i >= 0:
+        on, off = speech.onsets[i], speech.offsets[i]
+        used += off - on
+        if start - off > UNHEARD_GAP_SEC or on < limit or used > budget:
+            break
+        start = reach = on
+        i -= 1
+    return reach
+
+
+def unheard_reach(marks: dict, length: dict, audio: SourceAudio, walls=()) -> dict:
+    """発話ごとに、音声認識が聞けなかった言葉の声が届く所（素材の秒）。{発話: (前, 後ろ)}。
+
+    marks・length は `heard_marks`。字幕の言葉のうち、最後に聞こえた字より後ろの N 字は、その後に
+    続けて言っている。認識が聞けなくても声はある（素材の 38分45秒「原毛の質まで悪くなっちゃって」は
+    「で」までしか聞けず、「悪くなっちゃって」の声を間として切っていた）。聞こえた所の後ろの声を、
+    間が UNHEARD_GAP_SEC 以下で続き、声の長さが N × UNHEARD_CHAR_SEC に収まるかぎり、その発話の
+    声とみなす（`_reach_after`）。ほかの発話の聞こえた字と、外した発話の区間（walls）は越えない。
+    最初に聞こえた字より前の字も同じに前へ見る（`_reach_before`）。届かない側は None。
+    """
+    speech = audio.speech
+    owned = sorted((t, key) for key, m in marks.items() for _, t in m)
+    times = [t for t, _ in owned]
+    out: dict = {}
+    for key, m in marks.items():
+        offsets = [c for c, _ in m]
+        heard = [t for _, t in m]
+        head, tail = min(offsets), length.get(key, 0) - 1 - max(offsets)
+        lo, hi = min(heard), max(heard) + HEARD_CHAR_SEC
+        before = after = None
+        if tail > 0:
+            k = bisect.bisect_right(times, hi - HEARD_CHAR_SEC)
+            while k < len(owned) and owned[k][1] == key:
+                k += 1
+            limit = min([owned[k][0] if k < len(owned) else float("inf")]
+                        + [a for a, _ in walls if a >= hi - FRAME_SEC])
+            after = _reach_after(speech, hi, tail * UNHEARD_CHAR_SEC, limit)
+        if head > 0:
+            k = bisect.bisect_left(times, lo) - 1
+            while k >= 0 and owned[k][1] == key:
+                k -= 1
+            limit = max([owned[k][0] + HEARD_CHAR_SEC if k >= 0 else float("-inf")]
+                        + [b for _, b in walls if b <= lo + FRAME_SEC])
+            before = _reach_before(speech, lo, head * UNHEARD_CHAR_SEC, limit)
+        if before is not None or after is not None:
+            out[key] = (before, after)
     return out
 
 
@@ -590,6 +722,142 @@ def snap_to_pauses(ranges, audio: SourceAudio | None, rules: dict,
     return [(a, b) for a, b in out], info
 
 
+# ------------------------------------------------------------------
+# 映像の切り替わり（収録の継ぎ目）
+# ------------------------------------------------------------------
+
+def _shots_cache_path(path) -> Path:
+    p = Path(path)
+    st = p.stat()
+    key = hashlib.sha1(f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}|scdet".encode()).hexdigest()[:8]
+    return p.with_name(f"_shots_{key}.json")
+
+
+def _parse_scdet(text: str) -> list[tuple[float, float]]:
+    """ffmpeg の scdet と metadata=print の出力から (切り替わりの最初のフレームの秒, 値)。
+
+    時刻は settb=AVTB にした pts（マイクロ秒）から読む（pts_time は有効数字6桁に丸めて書かれる）。
+    """
+    shots: list[tuple[float, float]] = []
+    pts = None
+    for line in text.splitlines():
+        if line.startswith("frame:"):
+            pts = next((int(w[4:]) for w in line.split() if w.startswith("pts:") and w[4:].lstrip("-").isdigit()),
+                       None)
+        elif line.startswith("lavfi.scd.score=") and pts is not None:
+            shots.append((round(pts / 1_000_000, 6), float(line.split("=", 1)[1])))
+            pts = None
+    return shots
+
+
+def read_shots(path) -> list[tuple[float, float]] | None:
+    """素材の映像が切り替わる所。[(切り替わりの最初のフレームの秒, scdet の値)]（ffmpeg・ローカル）。
+
+    素材と同じフォルダにキャッシュする（43分の素材で約2分かかる）。値は SHOT_SCAN_FLOOR 以上を残す。
+    読めなければ None（映り込みは切らない）。
+    """
+    try:
+        if not path or not Path(path).is_file() or Path(path).stat().st_size == 0:
+            return None
+        cache = _shots_cache_path(path)
+        if cache.exists():
+            data = json.loads(cache.read_text(encoding="utf-8"))
+            if data.get("version") == SHOTS_CACHE_VERSION and data.get("floor") == SHOT_SCAN_FLOOR:
+                return [(float(t), float(s)) for t, s in data["shots"]]
+        logger.info(f"🎞️ 映像の切り替わりを調べています（初回のみ）: {Path(path).name}")
+        proc = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-v", "error", "-i", str(path), "-an", "-sn", "-dn", "-vf",
+             f"settb=AVTB,scdet=threshold={SHOT_SCAN_FLOOR}:sc_pass=1,metadata=print:file=-",
+             "-f", "null", "-"],
+            capture_output=True, text=True, timeout=3600)
+        if proc.returncode != 0:
+            logger.warning(f"映像の切り替わりを読めないので、映り込みは切りません: {proc.stderr[-300:]}")
+            return None
+        shots = _parse_scdet(proc.stdout)
+        cache.write_text(json.dumps({"version": SHOTS_CACHE_VERSION, "floor": SHOT_SCAN_FLOOR,
+                                     "shots": shots}), encoding="utf-8")
+        return shots
+    except Exception as e:  # 映像が読めなくても切る（映り込みは切らない）
+        logger.warning(f"映像の切り替わりを読めないので、映り込みは切りません: {e}")
+        return None
+
+
+def _has_words(audio: SourceAudio, lo: float, hi: float) -> bool:
+    """lo〜hi 秒に言葉があるか。音声認識の字（字の立ち上がりから HEARD_CHAR_SEC）で見る。
+    認識が無ければ音量で見た声で見る。"""
+    if audio.heard:
+        k = bisect.bisect_right(audio.heard, lo - HEARD_CHAR_SEC)
+        return k < len(audio.heard) and audio.heard[k] < hi
+    i = bisect.bisect_left(audio.speech.onsets, hi) - 1
+    return i >= 0 and audio.speech.offsets[i] > lo
+
+
+def trim_flashes(ranges, cuts, audio: SourceAudio, min_sec: float) -> tuple[list, dict]:
+    """区間の端の、映像の切り替わりの向こうが少しだけ映る所を切り落とす。
+
+    区間が切り替わり（cuts: 切り替わりの最初のフレームの秒）の min_sec 秒より短い手前から始まると、
+    前の映像（前の収録の終わり）が一瞬映る。素材の 37分48秒の継ぎ目の 0.41 秒手前から残していて、
+    左にいた美麗さんが画面から消えた所が出ていた（2026-10-17 ユーザー指摘）。そこに言葉が無ければ
+    区間を切り替わりから始める。終わりも同じ（切り替わりの後が min_sec 秒より短ければ、切り替わりで
+    終える）。言葉があるときは言葉を切らないので残す。
+    返り値は (区間, {"trimmed": [(元の端, 新しい端)], "kept": [(切り替わりの秒, 映る秒数)]})。
+    """
+    found: dict = {"trimmed": [], "kept": []}
+    out = []
+    cuts = sorted(cuts)
+    for a, b in ranges:
+        inside = [s for s in cuts if a + FRAME_SEC < s < b - FRAME_SEC]
+        if inside and inside[0] - a < min_sec:
+            s = inside[0]
+            if _has_words(audio, a, s):
+                found["kept"].append((s, round(s - a, 3)))
+            else:
+                found["trimmed"].append((a, s - SHOT_EDGE_SEC))
+                a = s - SHOT_EDGE_SEC
+        inside = [s for s in inside if s > a + SHOT_EDGE_SEC]
+        if inside and b - inside[-1] < min_sec:
+            s = inside[-1]
+            if _has_words(audio, s, b):
+                found["kept"].append((s, round(b - s, 3)))
+            else:
+                found["trimmed"].append((b, s - SHOT_EDGE_SEC))
+                b = s - SHOT_EDGE_SEC
+        out.append((a, b))
+    return out, found
+
+
+def fit_spans(segments, ranges, overhang: float = 0.5) -> int:
+    """残す区間に収まらない発話の区間を、一番重なる区間の中に縮める（その場で書き換える）。
+
+    字幕は、発話の区間（sourceStart/sourceEnd）が残す区間の中にあるとき、その区間に割り当てる
+    （`smart_cut_engine.retime_segments`。終わりは overhang 秒まではみ出してよい）。映り込みを
+    切り落とすと区間が発話の区間より短くなり、そのままでは字幕が落ちる。行の表示の時刻
+    （start/end）も新しい発話の区間の中に入れる。返り値は直した行の数。
+    """
+    fixed = 0
+    for seg in segments:
+        if not isinstance(seg, dict):
+            continue
+        a, b = _span(seg)
+        if not ranges or any(lo <= a and b <= hi + overhang for lo, hi in ranges):
+            continue
+        lo, hi = max(ranges, key=lambda r: min(b, r[1]) - max(a, r[0]))
+        if min(b, hi) <= max(a, lo):
+            continue
+        new_a, new_b = max(a, lo), min(b, hi)
+        seg["sourceStart"], seg["sourceEnd"] = new_a, new_b
+        start, end = seg.get("start"), seg.get("end")
+        if isinstance(start, (int, float)) and isinstance(end, (int, float)):
+            # はみ出した側だけを詰める。行がまるごと外にあれば、長さを保って中へ入れる
+            length = max(float(end) - float(start), 0.0)
+            start, end = min(max(float(start), new_a), new_b), min(float(end), new_b)
+            if end <= start:
+                start, end = max(new_a, min(start, new_b - length)), min(start + length, new_b)
+            seg["start"], seg["end"] = start, end
+        fixed += 1
+    return fixed
+
+
 def plan(segments, source_path=None, *, keep_all: bool = False,
          rules: dict | None = None, exclude=()) -> tuple[list[tuple[float, float]], dict]:
     """残す区間（素材の秒）と、決め方の記録を返す。
@@ -601,17 +869,36 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
     exclude: 外した発話（収録の段取りの声）。字幕か区間（素材の秒）で渡す。前後の区間を
     延ばしても入れない。
     素材の音声認識が読めれば、発話の言葉が聞こえた所まで区間を広げ（`heard_spans`）、
-    認識が続けて聞いた字も声とみなす（`_speech_end`・`_speech_start`）。
+    聞けなかった言葉の声まで広げ（`unheard_reach`）、認識が続けて聞いた字も声とみなす
+    （`_speech_end`・`_speech_start`）。
+    映像の切り替わりが読めれば、区間の端の短い映り込みを切り落とす（`trim_flashes`）。区間が発話の
+    区間より短くなることがあるので、字幕を割り当てる前に `fit_spans` で発話の区間を収める。
     """
     rules = rules or cut_rules()
     info: dict = {}
     exclude = list(exclude)
     tokens = read_heard(source_path)
     dropped = [x for x in exclude if not _is_span(x)]
-    heard = heard_spans(list(segments) + dropped, tokens) if tokens else {}
+    marks, length = heard_marks(list(segments) + dropped, tokens) if tokens else ({}, {})
+    heard = _spans_of(marks)
     walls, widen = _walls_and_widening(segments, exclude, heard)
     if widen:
         info["heard_widened"] = sum(1 for span, w in widen.items() if _widened(span, widen) != span)
+    audio = read_audio(source_path)
+    if audio is not None and tokens:
+        audio.heard = sorted(float(t) for _, t in tokens)
+    if audio is not None and marks:
+        kept = {_span(s) for s in segments}
+        reached = 0
+        for key, (before, after) in unheard_reach(marks, length, audio, walls).items():
+            if key not in kept:
+                continue
+            lo, hi = widen.get(key, key)
+            widen[key] = (min(lo, before) if before is not None else lo,
+                          max(hi, after) if after is not None else hi)
+            reached += _widened(key, widen) != _widened(key, {key: (lo, hi)})
+        if reached:
+            info["unheard_widened"] = reached
     ranges = merge_ranges(segments, rules["min_cut_sec"], widen)
     if keep_all and rules["keep_opening"]:
         until = opening_end(segments, rules["opening_max_sec"])
@@ -624,10 +911,17 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
         if scenes:
             ranges = join_scenes(ranges, scenes, rules["min_cut_sec"], rules["pad_before_sec"])
             info["scenes"] = scenes
-    audio = read_audio(source_path)
-    if audio is not None and tokens:
-        audio.heard = sorted(float(t) for _, t in tokens)
     snapped, moved = snap_to_pauses(ranges, audio, rules,
                                     cut_through_voice=not keep_all, walls=walls)
     info.update(moved)
+    shots = read_shots(source_path) if audio is not None else None
+    if shots:
+        cuts = [t for t, score in shots if score >= SHOT_CHANGE_SCORE]
+        snapped, flashes = trim_flashes(snapped, cuts, audio,
+                                        rules.get("min_shot_sec", DEFAULT_CUT_RULES["min_shot_sec"]))
+        info["shot_changes"] = len(cuts)
+        if flashes["trimmed"]:
+            info["flashes_trimmed"] = flashes["trimmed"]
+        if flashes["kept"]:
+            info["flashes_kept"] = flashes["kept"]
     return snapped, info

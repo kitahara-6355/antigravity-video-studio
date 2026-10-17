@@ -233,9 +233,11 @@ class SmartCutWorker(PipelineStageWorker):
     def _plan_cuts(self, ctx: PipelineContext, segments: list, keep_all: bool,
                    rules: dict | None = None, exclude=()) -> str:
         """残す区間を決めて ctx に置く（`cut_plan`）。返り値は結果の説明に足す文。"""
-        from cut_plan import plan
+        from cut_plan import fit_spans, plan
         ranges, info = plan(segments, getattr(ctx, "video_path", None), keep_all=keep_all,
                             rules=rules, exclude=exclude)
+        # 映り込みを切り落とした区間からはみ出した発話は、区間の中に収める（字幕を落とさない）
+        fit_spans(segments, ranges)
         ctx.cut_ranges = ranges
         ctx.planned_output_sec = sum(max(b - a, 0.0) for a, b in ranges)
         notes = []
@@ -249,6 +251,19 @@ class SmartCutWorker(PipelineStageWorker):
         if info.get("heard_widened"):
             notes.append(f"文字起こしの区間の外でも言葉が聞こえた{info['heard_widened']}発話は、"
                          f"聞こえた所まで残した")
+        if info.get("unheard_widened"):
+            notes.append(f"音声認識が聞けなかった言葉の声も、{info['unheard_widened']}発話で残した")
+        if info.get("flashes_trimmed"):
+            first = info["flashes_trimmed"][0][0]
+            notes.append(f"映像の切り替わりの向こうが1秒未満だけ映る{len(info['flashes_trimmed'])}か所"
+                         f"（素材の {_clock(first)}ほか）は切り落とした")
+        if info.get("flashes_kept"):
+            # 言葉を切らないので残した映り込みは、見えているので知らせる（品質の記録に残す）
+            at = "・".join(_clock(s) for s, _ in info["flashes_kept"])
+            warning = (f"映像の切り替わりの向こうが1秒未満だけ映る所が{len(info['flashes_kept'])}か所"
+                       f"あります（素材の {at}）。言葉があるので切っていません")
+            ctx.warnings.append(warning)
+            notes.append(warning)
         if info.get("gaps"):
             notes.append(f"切れ目{info['gaps']}か所のうち声の途中で終わる{info['extended_end']}か所・"
                          f"途中から始まる{info['pulled_start']}か所を声の切れ目まで動かし、"
