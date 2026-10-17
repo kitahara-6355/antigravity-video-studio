@@ -56,6 +56,17 @@ def _fit(text: str, width: float) -> int:
     return len(text)
 
 
+def _char_count(text: str, trim: bool = False) -> int:
+    """字幕1枚に入れる量の字数（半角も1字）。trim なら、行末で消える句読点を数えない。
+
+    1行に入るか（折り返し・行の上限）は幅（`display_width`）で、1枚にどれだけ入れるか（文を
+    まとめるか・どこで次の字幕に分けるか）と文節の長さは字数で測る。全部を幅で測った試しの書き出し
+    （2026-10-17）では、英数字を含む字幕が1枚に詰まり、「うちの|奥さん」と折れる・2つの文が1行に
+    並ぶ（「てっぺんだよね　12時夜の12時」）字幕が出た。
+    """
+    return len(text.rstrip(_PUNCT)) if trim else len(text)
+
+
 
 # ============================================================
 # 安全なセグメントコピー
@@ -482,7 +493,10 @@ _HELPERS_AFTER_TE = ("いる", "いま", "いた", "いて", "いな", "いれ",
 _HELPERS_AFTER_DE = ("いらっしゃ", "ござ", "ある", "あり", "あっ", "いる", "いま")
 # 引用の「って・と」と「いう」はひと塊（「きっかけって|いうのは」）
 _QUOTE_TAILS = ("って", "と")
-_QUOTE_HEADS = ("いう", "いっ", "いい", "言う", "言っ", "言い")
+_QUOTE_HEADS = ("いう", "いっ", "いい", "言う", "言っ", "言い",
+                # 「〜って言われてる」「〜と言える」も「っていう」と同じひと塊（試しの書き出しの
+                # 16分37秒が「4000万人いるって|言われてますけど」と折れた・2026-10-17）
+                "言わ", "いわ", "言え")
 
 _budoux_parser = None
 
@@ -554,8 +568,9 @@ def _keep_whole(parts: list[str], words: tuple[str, ...], limit: int) -> list[st
     """割らない語の途中にある文節の切れ目を、語の頭へ寄せる。
 
     BudouX はひらがなで始まる社名の頭を助詞と読んで割る（53回目の 5分38秒「記事広告がは|ごろも|フーズ」
-    → 「記事広告が|はごろもフーズだったんで」）。寄せた文節が1行（幅 limit）に入らないとき
+    → 「記事広告が|はごろもフーズだったんで」）。寄せた文節が1行の字数（limit 字）を超えるとき
     （「「筆文字で伝えたいことば大賞」っていうのがね」）は、寄せずに BudouX の切れ目のままにする。
+    文節の長さは字数で測る（`_char_count`）。幅で測ると、寄せた文節を `_split_long_phrase` が字数で割り直す。
     """
     if len(parts) < 2 or not words:
         return parts
@@ -572,8 +587,7 @@ def _keep_whole(parts: list[str], words: tuple[str, ...], limit: int) -> list[st
             inside = {c for c in cuts if i < c < j}
             if inside:
                 moved = (cuts - inside) | ({i} if i else set())
-                end = min((c for c in moved if c >= j), default=len(text))
-                if display_width(text[i:end]) <= limit:
+                if min((c for c in moved if c >= j), default=len(text)) - i <= limit:
                     cuts, moved_any = moved, True
             i = text.find(w, j)
     if not moved_any:
@@ -685,14 +699,14 @@ def _split_long_phrase(phrase: str, max_chars: int) -> list[str]:
     """
     out = []
     rest = phrase
-    while display_width(rest) > max_chars:
-        limit = _fit(rest, max_chars)
-        cuts = [(_cut_score(rest, i), i) for i in range(1, min(len(rest), limit + 1))]
+    # 文節の長さは字数で測る（`_char_count`）。割った後の行の幅は `_wrap_lines` が測る
+    while len(rest) > max_chars:
+        cuts = [(_cut_score(rest, i), i) for i in range(1, min(len(rest), max_chars + 1))]
         cuts = [(sc, i) for sc, i in cuts if sc is not None]
         if cuts:
-            _, _, cut = max((display_width(rest[:i]) >= max_chars * 0.4, sc, i) for sc, i in cuts)
+            _, _, cut = max((i >= max_chars * 0.4, sc, i) for sc, i in cuts)
         else:
-            cut = limit
+            cut = max_chars
         out.append(rest[:cut])
         rest = rest[cut:]
     if rest:
@@ -719,7 +733,7 @@ def _phrases(text: str, max_chars: int) -> list[str]:
         # 漢字1字だけの文節は、漢字で終わる前の文節に付ける。BudouX は熟語の末尾を
         # 分けることがある（「一般社団法｜人」が「一般社団法\n人…」の折り目になった）
         if (len(part) == 1 and _script(part) == "kanji" and phrases and phrases[-1]
-                and _script(phrases[-1][-1]) == "kanji" and display_width(phrases[-1]) + 1 <= max_chars):
+                and _script(phrases[-1][-1]) == "kanji" and len(phrases[-1]) < max_chars):
             phrases[-1] += part
             continue
         if part:
@@ -787,7 +801,9 @@ def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
 
     - 文末（。！？）では必ず区切る
     - 1枚に入りきらない文は、入る範囲で区切りの良さが最大の文節の後ろで切る
-      （短すぎる字幕は作らない: 1枚の容量の 4割以上）
+      （短すぎる字幕は作らない: 1枚の容量の 4割以上。文の最後に1行の3分の1までの字幕を残す切り方は、
+      同じ良さの切れ目がほかにあれば採らない）
+    - 1枚に入れる量は字数、1行に入るかは幅（`display_width`）で測る
     - 改行・区切りは「、」や助詞の後を選び、連体詞や「の」の直後は避ける
 
     - trim なら行末の句読点を字数に数えない（strip_punctuation で消える）
@@ -808,7 +824,7 @@ def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
             choice = None  # (key, n, text)
             acc = 0
             for n in range(1, len(rest) + 1):
-                acc += display_width(rest[n - 1])
+                acc += len(rest[n - 1])  # 1枚に入れる量は字数（`_char_count`）。行の幅は _wrap_lines が測る
                 if acc > capacity and n > 1:
                     break
                 wrapped = _wrap_lines(rest[:n], max_chars, max_lines, trim)
@@ -817,10 +833,14 @@ def split_into_captions(text: str, max_chars: int = MAX_CHARS_PER_LINE,
                 whole = n == len(rest)
                 cut_score = 9 if whole else _break_score(rest[n - 1], rest[n])
                 long_enough = whole or acc >= capacity * 0.4
+                # 文の最後に短い字幕（1行の3分の1まで）を残す切り方は、同じ強さの切れ目がほかに
+                # あれば採らない（53回目の 7分58秒「書いてください」が 0.8 秒だけ出た・2026-10-17
+                # ユーザー指摘。試しの書き出しでは 7分36秒「Be Original って|書くんです」が分かれた）
+                tail_ok = whole or _char_count("".join(rest[n:]), trim) > max_chars / 3
                 # 字幕の切れ目は行の折り目より優先する。「この対談では、/各界で」＋
                 # 「ご活躍されている方を」のように、字幕の途中で文節をまたがせない
                 # （2026-10-06 ユーザー指摘）
-                key = (long_enough, cut_score, wrapped[1], acc)
+                key = (long_enough, cut_score, tail_ok, wrapped[1], acc)
                 if choice is None or key > choice[0]:
                     choice = (key, n, wrapped[0])
             if choice is None:  # 1文節でも折れない（来ないはず）— そのまま置く
@@ -915,7 +935,7 @@ def _split_by_word_timing(words: list[dict], max_chars: int, parent_seg: dict) -
             chunk_end = w_end
 
         # この単語を追加するとmax_charsを超えるか？
-        if current_text and display_width(current_text) + display_width(word_text) > max_chars:
+        if current_text and len(current_text) + len(word_text) > max_chars:
             # 現在のチャンクを保存
             if current_text.strip():
                 try:
@@ -1238,15 +1258,15 @@ def format_segments(segments: list[dict], max_chars: int = MAX_CHARS_PER_LINE) -
 
             # Step 2: Phase C — word_timestampsベースの分割
             words = seg.get("words")
-            if isinstance(words, list) and words and display_width(cleaned) > max_chars:
+            if isinstance(words, list) and words and len(cleaned) > max_chars:
                 chunks = _split_by_word_timing(words, max_chars, seg)
                 if chunks and len(chunks) > 1:
                     formatted.extend(chunks)
                     word_split_count += 1
                     continue
 
-            # Step 3: 短いテキストはそのまま（行末で消える句読点は数えない）
-            if _line_len(cleaned, trim) <= max_chars:
+            # Step 3: 短いテキストはそのまま（行末で消える句読点は数えない）。文をまとめるかは字数で決める
+            if _char_count(cleaned, trim) <= max_chars:
                 new_seg = _safe_copy_segment(seg)
                 new_seg["text"] = cleaned
                 formatted.append(new_seg)

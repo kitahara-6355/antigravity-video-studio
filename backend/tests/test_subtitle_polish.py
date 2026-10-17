@@ -837,6 +837,50 @@ def test_line_length_check_measures_the_formatters_width():
     assert SubtitleLineCheck().analyze(SimpleNamespace(segments=[{"text": line}] * 5))["deductions"] == 0
 
 
+# 1行に入るかは幅で測り、1枚にどれだけ入れるかと文節の長さは字数で測る。全部を幅で測った試しの書き出し
+# （2026-10-17）では、数字を含む字幕が1枚に詰まって折り目が悪くなった（下の4つは 53回目と同じに戻る）
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_two_sentences_with_digits_stay_two_captions():
+    # 試しの書き出しの 9分02秒: 幅で 18 に収まるので「いや　てっぺんだよね　12時夜の12時」と1行に並んだ
+    segs = [{"text": "いや、てっぺんだよね。12時夜の12時。", "start": 0.0, "end": 4.0}]
+    assert [s["text"] for s in tf.format_segments(segs, 18)] == ["いや　てっぺんだよね", "12時夜の12時"]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_caption_with_digits_is_filled_by_its_character_count():
+    # 試しの書き出しの 36分09秒: 1文がまるごと1枚に入り、「もう年末の30日からうちの\n奥さん」と折れた
+    text = "もう30日、もう年末の30日からうちの奥さん、台所に立たせないんですよ、ね。"
+    out = [s["text"] for s in tf.format_segments([{"text": text, "start": 0.0, "end": 5.7}], 18)]
+    assert out == ["もう30日\nもう年末の30日からうちの奥さん", "台所に立たせないんですよ　ね"]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_long_phrase_with_digits_is_measured_by_its_character_count():
+    # 試しの書き出しの 28分33秒: 20字の文節「1,500人教えたのかもしれないけども、」が幅 17.5 で割られず、
+    # 「デザイン書道ね」が次の字幕に分かれた
+    assert tf._split_long_phrase("1,500人教えたのかもしれないけども、", 18) == ["1,500人教えた", "のかもしれないけども、"]
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+@pytest.mark.parametrize("text,want", [
+    # 試しの書き出しの 16分37秒: 「4000万人いるって\n言われてますけど」と折れた
+    ("鬼滅ファンね、世界に4000万人いるって言われてますけど", ["鬼滅ファンね　世界に\n4000万人いるって言われてますけど"]),
+    ("これ横から書いてくれるって言われたんです。", ["これ横から\n書いてくれるって言われたんです"]),
+])
+def test_the_quoting_tte_stays_with_iwareru(text, want):
+    assert [s["text"] for s in tf.format_segments([{"text": text, "start": 0.0, "end": 6.0}], 18)] == want
+
+
+@pytest.mark.skipif(tf._phrase_parser() is None, reason="BudouX が無い")
+def test_a_sentence_does_not_end_with_a_short_caption_when_another_cut_is_as_good(monkeypatch):
+    # 試しの書き出しの 7分36秒: 「Be Original って\n書くんです」の後ろを切って「書くんです」だけが残りそうになる
+    # 切り方より、同じ強さの切れ目（「持って」の後ろ）で切る。53回目の 7分58秒「書いてください」（0.8 秒）と同じ型
+    monkeypatch.setattr(tf, "_keep_words", lambda: (("Be Original",), 18))
+    text = "100年前のシャーペンのレプリカを僕が持ってBe Original って書くんです。"
+    out = [s["text"] for s in tf.format_segments([{"text": text, "start": 0.0, "end": 6.0}], 18)]
+    assert out == ["100年前のシャーペンのレプリカを\n僕が持って", "Be Original って書くんです"]
+
+
 def test_word_spaced_transcript_is_joined():
     # 実例（31 分〜）: 起こし直した区切りが「久田 先生 って 普段 どんな 人 な ん だろ うっ て」と
     # 語ごとに空白で区切って返り、校閲が空白を詰めなかった回は字幕に「人 な\nん だろ うっ て」と出た
