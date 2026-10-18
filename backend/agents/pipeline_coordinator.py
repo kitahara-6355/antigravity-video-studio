@@ -340,6 +340,11 @@ class PipelineCoordinator:
                 # キャッシュ無しで作り直したとき、人が見直す所を記録から引けるようにする
                 if isinstance(data, dict) and isinstance(data.get("review"), dict) and data["review"].get("ledger"):
                     entry["review"] = data["review"]
+                # 品質の点数と講評（2026-10-18）: 承認待ちで止まった回は、動画の隣に講評が残らない
+                # （書き出した後だけ）。なぜその点数なのかを工程の記録から引けるようにする
+                if isinstance(data, dict) and data.get("scored") and isinstance(data.get("feedback"), list):
+                    entry["quality"] = {k: data.get(k) for k in
+                                        ("score", "raw_score", "rank", "feedback", "category_scores")}
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
                 elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):

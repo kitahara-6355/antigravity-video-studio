@@ -225,6 +225,8 @@ class QualityEvaluator:
 
         # カテゴリスコアからも問題を検出
         for cat, score in category_scores.items():
+            if score is None:  # 検査を飛ばしたカテゴリは点が無い（比べると TypeError で落ちる）
+                continue
             if score < 70:  # 70点未満のカテゴリは要改善
                 cat_key = cat.lower().replace(" ", "_")
                 for map_key, map_info in improvement_map.items():

@@ -259,7 +259,8 @@ def run_view(run: dict) -> dict:
                "status": s.get("status"), "model": s.get("model"), "tier": s.get("tier"),
                "reason": s.get("model_reason"), "calls": s.get("calls", 0),
                "fallbacks": len(s.get("fallbacks") or []),
-               "started_at": s.get("started_at"), "finished_at": s.get("finished_at")}
+               "started_at": s.get("started_at"), "finished_at": s.get("finished_at"),
+               **({"quality": s["quality"]} if s.get("quality") else {})}
               for s in run.get("stages") or []]
     return {"run_id": run.get("run_id"), "status": run.get("status"),
             "started_at": run.get("started_at"), "finished_at": run.get("finished_at") or None,

@@ -136,6 +136,8 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--gunjo); o
   color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tk.edge-l { transform: none; }
 .tk.edge-r { transform: translateX(-100%); }
+.qnotes { margin: 0; padding: 0 0 0 1.1em; display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-soft); }
+.qnotes .more { list-style: none; margin-left: -1.1em; }
 .bar { position: absolute; top: 2px; bottom: 2px; min-width: 3px; border-radius: 3px; background: var(--matsu); }
 .row.sub .bar { top: 1px; bottom: 1px; background: var(--matsu-wash); border: 1px solid var(--matsu); }
 .bar.running { background: repeating-linear-gradient(-45deg, var(--gunjo) 0 6px, var(--gunjo-soft) 6px 12px);
@@ -598,6 +600,14 @@ td.err { color: var(--shu); }
       fact("機械の要確認", rev.flags != null ? rev.flags + " 枚" : "—");
       fact("物差しとの違い", compare ? (cmp.diffs != null ? cmp.diffs + " か所" : "—") : "比べない");
       card.appendChild(dl);
+      const qs = ((res.run && res.run.stages) || []).filter((g) => g.quality).pop();
+      const marks = qs ? (qs.quality.feedback || []).filter((f) => /^[⛔⚠]/.test(String(f))) : [];
+      if (marks.length) {
+        const ul = el("ul", "qnotes");
+        marks.slice(0, 6).forEach((f) => ul.appendChild(el("li", "", String(f))));
+        if (marks.length > 6) ul.appendChild(el("li", "more", "ほか " + (marks.length - 6) + " 件"));
+        card.appendChild(ul);
+      }
       if (review && review.state === "done") {
         const img = el("img", "contact"); img.alt = verLabel(s) + "の一覧画像（6コマ）";
         card.appendChild(img);

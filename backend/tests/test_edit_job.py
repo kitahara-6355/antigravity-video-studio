@@ -401,3 +401,15 @@ def test_the_assets_are_kept_with_their_role_and_sha256(tmp_path):
     assert kept["ai/_proofread_94f6cf35.json"]["sha256"] == digest
     assert (tmp_path / "assets" / "ai" / "_proofread_94f6cf35.json").read_text(encoding="utf-8") == \
         "_proofread_94f6cf35.json"
+
+
+def test_the_live_view_carries_the_quality_notes_of_the_gate():
+    """工程ライブの版のカードに、品質の講評（⛔・⚠）を出す。点数だけでは直す所が分からない。"""
+    quality = {"score": 74, "rank": "C", "feedback": ["⛔ 字幕にしなかった発話 2行"], "category_scores": {}}
+    run = {"stages": [{"name": "proofread", "status": "success"},
+                      {"name": "quality_gate", "status": "failed", "quality": quality}]}
+
+    stages = edit_job.run_view(run)["stages"]
+
+    assert "quality" not in stages[0]
+    assert stages[1]["quality"] == quality

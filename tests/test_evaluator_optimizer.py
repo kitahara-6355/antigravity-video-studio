@@ -672,3 +672,18 @@ async def test_action_thumbnail_optimize(tmp_path):
             ImprovementAction("thumbnail_optimize", "thumbnail", "desc", 1, 15), ctx
         )
         assert not res_ex
+
+
+def test_点の無いカテゴリがあっても診断が落ちない():
+    """検査を飛ばしたカテゴリは点が None で来る（2026-10-18 の再現テストで実際に落ちた）。
+    None を 70 と比べて TypeError になり、改善ループが1回分むだに止まっていた。点の無いカテゴリは見ない。"""
+    evaluator = QualityEvaluator()
+    res = {
+        "score": 74,
+        "rank": "C",
+        "feedback": ["音声のラウドネスが低い"],
+        "category_scores": {"audio_quality": 60, "engagement": None},
+    }
+    diag = evaluator.evaluate(res, DummyContext())
+    assert not diag.passed
+    assert not any("engagement" in i["feedback"] for i in diag.issues)
