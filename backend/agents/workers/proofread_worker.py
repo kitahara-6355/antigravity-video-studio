@@ -341,16 +341,13 @@ def _referee_for(video_path):
 def _memo_for(video_path):
     """素材ごとの校閲の控え（素材と同じ場所の `_proofread_<鍵>.json`）。作れなければ None。
 
-    鍵は素材の場所・大きさ・更新時刻（音声認識のキャッシュと同じ決め方）。素材が変われば別の控え。
+    鍵は素材の中身（`video_hash.material_cache`。音声認識・映像の切り替わりの控えと同じ決め方）。
+    素材が変われば別の控え。素材を別の場所に置いても、控えを隣に戻せば使える。
     """
     try:
-        import hashlib
-        from pathlib import Path
         from subtitle_engine.ai_proofreader import ProofreadMemo
-        p = Path(str(video_path))
-        st = p.stat()
-        key = hashlib.sha1(f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
-        return ProofreadMemo(p.with_name(f"_proofread_{key}.json"))
+        from subtitle_engine.video_hash import material_cache
+        return ProofreadMemo(material_cache(str(video_path), "_proofread_"))
     except Exception as e:  # 控えが無くても校閲はする
         logger.debug(f"校閲の控えを使いません: {e}")
         return None
