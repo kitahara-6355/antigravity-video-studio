@@ -28,6 +28,10 @@ CONTEXT_CHARS = 3
 # 字幕で句読点を外した跡（全角スペース）と改行。直しの字では句読点に戻す
 _BREAKS = "\n"
 _GAP = "\u3000"
+# \u300c\u6b63\u3057\u304f\u306f\u300d\u306f\u65e5\u672c\u8a9e\u5165\u529b\u3067\u66f8\u304f\u306e\u3067\u6570\u5b57\u3068\u82f1\u5b57\u304c\u5168\u89d2\u306b\u306a\u308a\u3084\u3059\u3044\uff0859\u56de\u76ee\u306e\u300c\uff16\u65e5\u9593\u300d\uff09\u3002\u5b57\u5e55\u306e\u6570\u5b57\u3068\u82f1\u5b57\u306f
+# \u534a\u89d2\u306a\u306e\u3067\u3001\u76f4\u3057\u3082\u534a\u89d2\u306b\u305d\u308d\u3048\u308b\u3002\u300c\uff1f\u300d\u300c\uff01\u300d\u3084\u5168\u89d2\u30b9\u30da\u30fc\u30b9\u306f\u5b57\u5e55\u306e\u5b57\u306a\u306e\u3067\u89e6\u3089\u306a\u3044
+_HALF_WIDTH = str.maketrans({chr(c): chr(c - 0xFEE0)
+                             for c in (*range(0xFF10, 0xFF1A), *range(0xFF21, 0xFF3B), *range(0xFF41, 0xFF5B))})
 
 
 def source_time(t: float, ranges: list) -> float:
@@ -127,7 +131,8 @@ def to_corrections(marks: list[dict], *, by: str, day: str, label: str, start: i
     out, rest = [], []
     n = start
     for m in sorted(marks, key=lambda m: float(m.get("src") or 0.0)):
-        pairs = _diff(m.get("text", ""), m.get("fix", "")) if m.get("fix") and m.get("state") != "ok" else []
+        fix = str(m.get("fix") or "").translate(_HALF_WIDTH)
+        pairs = _diff(m.get("text", ""), fix) if fix and m.get("state") != "ok" else []
         if not pairs:
             rest.append(m)
             continue

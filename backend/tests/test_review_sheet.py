@@ -97,6 +97,17 @@ def test_a_gap_written_into_the_fix_comes_back_as_a_comma_in_the_line():
     assert [(c["from"], c["to"]) for c in new] == [("どうぞどうぞどうぞ", "そうそう、そうです")]
 
 
+def test_digits_and_letters_typed_full_width_are_written_half_width():
+    # 「正しくは」は日本語入力で書くので数字が全角になる（59回目の 24分58秒「６日間」）。字幕の数字と英字は
+    # 半角（「30本」「Be Original」）なので、直しも半角にそろえる。「？」や全角スペースは字幕の字なので触らない
+    new, _ = review_sheet.to_corrections([_mark("一週間筆取らないから", "６日間筆取らないから", t=1498.19, src=1512.91),
+                                          _mark("これ何号？　ここ", "これ２９６号？　ここ", src=1937.0),
+                                          _mark("エスエヌエスで見た", "ＳＮＳで見た", src=2000.0)],
+                                         by="北原", day="2026-10-18", label="59回目")
+    assert [(c["from"], c["to"]) for c in new] == [("一週間筆取", "6日間筆取"), ("これ何号？", "これ296号？"),
+                                                    ("エスエヌエスで見た", "SNSで見た")]
+
+
 def test_marks_without_a_written_fix_are_kept_for_a_person_to_read():
     marks = [_mark("ここは合ってる", "", note="音が聞き取れない"),
              _mark("問題なしの印", "問題なしの印を直した", state="ok"),

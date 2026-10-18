@@ -14,7 +14,7 @@ REPO = Path(__file__).resolve().parents[2]
 RAW4 = REPO / "backend" / "config" / "reviews" / "raw4_20250922.json"
 # 校閲の後・整形の前の行（素材の秒）のうち、台帳が直す行だけを写したもの。52回目の 18分までの14か所と、
 # 53回目の通しの朱入れ（2026-10-17）の17か所
-RAW4_LINES = [Path(__file__).with_name("fixtures") / f"review_raw4_lines{run}.json" for run in (52, 53)]
+RAW4_LINES = [Path(__file__).with_name("fixtures") / f"review_raw4_lines{run}.json" for run in (52, 53, 59)]
 
 
 def _seg(a, b, text):
@@ -115,7 +115,7 @@ def test_the_raw4_ledger_is_well_formed():
 
 
 def test_the_raw4_ledger_applies_to_every_line_it_was_written_for():
-    """52回目と53回目の行に当てると、北原さんの直しが全部当たり、誤りの字が残らない。"""
+    """52回目・53回目・59回目の行に当てると、北原さんの直しが全部当たり、誤りの字が残らない。"""
     lines = [s for p in RAW4_LINES for s in json.loads(p.read_text(encoding="utf-8"))]
     report = review_ledger.apply(lines, review_ledger.load(RAW4))
     assert report["missing"] == [] and report["already"] == []
@@ -124,15 +124,17 @@ def test_the_raw4_ledger_applies_to_every_line_it_was_written_for():
                   "安心そう", "新・日本", "一日一書", "おそらって", "和歌山", "北原美麗の生徒", "10月にはね",
                   "剣先", "Bオリジナル", "伝えたい言葉大賞",
                   "とととと", "素敵すぎ", "大、", "第1回め", "どうぞどうぞ", "横島", "しけが荒れて", "うれしい口",
-                  "作れたんだがね", "今はいれない", "去年初めて", "角付き", "1296号"):
+                  "作れたんだがね", "今はいれない", "去年初めて", "角付き", "1296号",
+                  "「いよいよ」", "あのよい文字", "一週間筆取", "プロット"):
         assert wrong not in text, wrong
     for right in ("ところに移行", "はごろもフーズ", "ホンハイ精密工業", "レール引いて", "ここ Be Original 書いてください",
                   "こうやって Be Original 書くのよ", "折れるわけ", "久木田さん", "泣きそうになった", "暑いわ、折れるわ",
                   "「森羅万象」と、あと「日々是好日」", "おそらく", "私のこの美麗書院の", "11月にはね",
-                  "エピソードなんですね", "だから、逆に", "どういう", "プロットラフ書いた", "なんと、なんと、皆さん",
+                  "エピソードなんですね", "だから、逆に", "どういう", "したり、ラフ書いたり", "なんと、なんと、皆さん",
                   "何かあの美麗さん", "普通すぎま", "題、何だっけ？", "第1回目の時の", "そうそう、そうです",
                   "お住まいは？", "横浜", "磯枯れがしている", "うれしくてしょうがない", "作れたんだけども",
-                  "今は騒いでないんだけれど", "今日ね初めての", "隔月なので", "これ296号"):
+                  "今は騒いでないんだけれど", "今日ね初めての", "隔月なので", "これ296号",
+                  "「良い字」って", "あの良い文字", "僕、6日間筆取らないから"):
         assert right in text, right
     # Sharp の歴史を語る所（6分53秒）の「早川式繰出鉛筆」は正しいので残る
     assert "早川式繰出鉛筆っていう名前で" in text
