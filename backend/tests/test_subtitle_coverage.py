@@ -456,6 +456,17 @@ def test_a_spoken_line_dropped_by_the_alignment_blocks(tmp_path, monkeypatch):
     assert any("11:51" in f and "エピソードなんですか" in f for f in result["feedback"])
 
 
+def test_a_short_word_dropped_from_a_shown_line_blocks(tmp_path, monkeypatch):
+    # 実例（58回目の 37分13秒）: 「あやかりたいと思います。私も。」の2枚目の「私も」が外れた。2字なので欠落と
+    # 数えず、品質 91 点で通っていた。同じ行の字幕は出ているのに外れた短い声（`line_shown`）は欠落と数える
+    kept = [{"start": 2230.72, "end": 2233.38, "text": "あやかりたいと思います"},
+            {"start": 2233.58, "end": 2235.43, "text": "分かりました"}]
+    gone = [{"start": 2233.089, "end": 2233.58, "text": "私も", "reason": "no_room", "line_shown": True}]
+    result = _gone_check(tmp_path, monkeypatch, kept, gone)
+    assert result["blocking"] is True
+    assert any("37:13" in f and "私も" in f for f in result["feedback"])
+
+
 @pytest.mark.parametrize("kept, gone", [
     # 相づちだけの字幕は焼き込まない
     ([{"start": 1508.5, "end": 1511.4, "text": "一週間のうち六日間費やす"}],

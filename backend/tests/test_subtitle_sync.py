@@ -435,6 +435,44 @@ def test_a_spoken_line_far_from_both_neighbours_is_not_added():
     assert stats["gone"] == [{"start": 5.0, "end": 5.4, "text": "黒子ですよ", "reason": "no_room"}]
 
 
+AYAKARI = {"sourceStart": 2247.38, "sourceEnd": 2257.38}
+
+
+def _ayakari(short_line=AYAKARI, first="あやかりたいと思います"):
+    """58回目の 37分13秒: 「あやかりたいと思います。私も。」を整形で2枚に分けた字幕と、次の行の「分かりました」。"""
+    sp = _map([(2230.4, 2233.2), (2233.5, 2235.3)], total=2240)
+    segs = [dict(AYAKARI, start=2230.72, end=2233.089, text=first, _asr_interp=True),
+            dict(short_line, start=2233.089, end=2233.58, text="私も", _asr_interp=True),
+            {"start": 2233.58, "end": 2235.43, "text": "分かりました", "_asr": True, "_asr_first": 2233.58,
+             "sourceStart": 2256.1, "sourceEnd": 2257.6}]
+    return sync.align_segments(segs, sp, [], RULES)
+
+
+def test_a_short_word_split_off_a_line_goes_back_to_that_line_s_caption():
+    # 認識はどちらの字幕も聞いていない。次の行の「分かりました」が聞こえたので、2枚目の「私も」を配る間が
+    # 0.49 秒になり、置き場所が無いうえ 2字（`LOST_MIN_CHARS` 未満）なので黙って外れていた。
+    # 同じ行を分けた字幕には、短くても行として足す（次の字幕は別の行なので足さない）
+    out, stats = _ayakari()
+    assert [s["text"] for s in out] == ["あやかりたいと思います\n私も", "分かりました"]
+    assert stats["joined"] == 1 and stats["gone"] == []
+
+
+def test_a_short_word_from_another_line_is_not_added():
+    # 別の行の短い声（「おー」など）は今までどおり足さない。欠落とも数えない（`line_shown` が無い）
+    out, stats = _ayakari(short_line={"sourceStart": 2255.8, "sourceEnd": 2256.0})
+    assert [s["text"] for s in out] == ["あやかりたいと思います", "分かりました"]
+    assert stats["gone"] == [{"start": 2233.089, "end": 2233.58, "text": "私も", "reason": "no_room"}]
+
+
+def test_a_short_word_its_line_s_caption_cannot_take_is_marked_for_the_gate():
+    # 同じ行の字幕は出ているのに、2行が埋まっていて足せない短い声は、外した字幕に `line_shown` を付ける
+    # （品質ゲートが短くても欠落と数える）
+    out, stats = _ayakari(first="あ" * 18 + "\n" + "い" * 18)
+    assert all("私も" not in s["text"] for s in out)
+    assert stats["gone"] == [{"start": 2233.089, "end": 2233.58, "text": "私も", "reason": "no_room",
+                              "line_shown": True}]
+
+
 def test_an_unheard_caption_with_no_room_does_not_cut_a_heard_one_short():
     # 実例（15分26秒）: 重なって話した「ファンが」は認識に無く、前後の聞こえた字幕の間に隙も無い。
     # それでも時刻を取り合いに加わり、聞こえた「そういう中でね…」を 0.33 秒で消させた

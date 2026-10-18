@@ -608,6 +608,7 @@ def _drop_unheard_flashes(items: list[dict], min_display: float = DEFAULT_TIMING
 
 
 # 外した字幕を欠落と数える字数。これに満たない短い声（「おー」「もうね」）は数えない
+# （同じ行を分けた字幕が出ていれば、短くてもその字幕に足し、足せなければ数える・`_join_lost`）
 LOST_MIN_CHARS = 4
 # 外した字幕の言葉が、前後この秒数の中の字幕にあれば繰り返し（4分53秒「オリンピック はい」）
 LOST_ECHO_SEC = 5.0
@@ -638,23 +639,40 @@ def _near_text(items: list[dict], a: float, b: float) -> str:
                    and float(s["start"]) <= b + LOST_ECHO_SEC)
 
 
+def _same_line(a: dict, b: dict) -> bool:
+    """2枚の字幕が、文字起こしの同じ行（発話）を整形で分けたものか。分けた字幕は発話の区間
+    （sourceStart・sourceEnd）が同じ（`smart_cut_engine._display_span`）。区間が無ければ False。"""
+    try:
+        return (a.get("sourceStart") is not None and b.get("sourceStart") is not None
+                and abs(float(a["sourceStart"]) - float(b["sourceStart"])) < 1e-6
+                and abs(float(a.get("sourceEnd", 0)) - float(b.get("sourceEnd", 0))) < 1e-6)
+    except (TypeError, ValueError):
+        return False
+
+
 def _join_lost(items: list[dict], given: list[dict], lost: list[tuple[int, str]], cut_points: list[float],
-               max_chars: int | None = None, max_lines: int | None = None) -> tuple[list[tuple[int, str]], int]:
+               max_chars: int | None = None,
+               max_lines: int | None = None) -> tuple[list[tuple[int, str]], int, set[int]]:
     """外す字幕（lost: given の番号と理由）のうち言葉のあるもの（`lost_content`）を、隣の字幕に行として
-    足す（時刻は動かさない）。返り値は (足せなかった分, 足した数)。
+    足す（時刻は動かさない）。返り値は (足せなかった分, 足した数, 足せなかった分のうち、同じ行の字幕が出ている
+    短い声の番号)。
 
     置き場所の無い字幕は時刻の取り合いに加えずに外すので、認識が拾えない言葉が字幕から消えていた
     （12分12秒: 聞き手の「黒子ですよ」の声に、次の字幕の頭の字が張り付いた・41分59秒「思います」も同じ形）。
-    相づちだけ・隣の字幕の繰り返し・短い声・映像の後ろの字幕は足さない。声の拾えない字幕をカット点のそばに
+    相づちだけ・隣の字幕の繰り返し・映像の後ろの字幕は足さない。声の拾えない字幕をカット点のそばに
     配ったときは、カットで声が消えた言葉とみなし、理由を `cut` にして残す。足す先は同じ区間で LOST_JOIN_SEC 秒より
     近い隣の字幕（並びは元の字幕の順）で、1枚（max_lines 行）に収まる方。次の字幕を先に見る: 足した行は次の字幕と
     一緒に、言った後に出る（前の字幕に足すと、言う前から出る）。
+    LOST_MIN_CHARS 字に満たない短い声は、同じ行を分けた隣の字幕（`_same_line`）にだけ足す。別の行の短い声
+    （「おー」）は足さない。58回目の 37分13秒: 「あやかりたいと思います。私も。」の2枚目の「私も」は認識に無く、
+    次の行の「分かりました」が聞こえて配る間が 0.49 秒になり、置き場所が無いうえ短いので黙って外れていた
+    （57回目までは配る間が 0.64 秒あって前の字幕とまとまっていた）。
     """
     if max_chars is None or max_lines is None:
         max_chars, max_lines = _caption_limits()
     live = sorted((s for s in items if not s.get("_merged") and s.get("_sync_index") is not None),
                   key=lambda s: s["_sync_index"])
-    left, joined = [], 0
+    left, joined, shown = [], 0, set()
     for k, why in lost:
         s = given[k]
         a, b = float(s.get("start", 0)), float(s.get("end", 0))
@@ -662,7 +680,9 @@ def _join_lost(items: list[dict], given: list[dict], lost: list[tuple[int, str]]
                 and any(a - LOST_CUT_SEC <= c <= b + LOST_CUT_SEC for c in cut_points)):
             left.append((k, "cut"))
             continue
-        if why == "past_end" or len(lost_content(s.get("text"), _near_text(live, a, b))) < LOST_MIN_CHARS:
+        content = "" if why == "past_end" else lost_content(s.get("text"), _near_text(live, a, b))
+        short = len(content) < LOST_MIN_CHARS
+        if not content or short and not any(_same_line(o, s) for o in live):
             left.append((k, why))
             continue
         zone = _zone(s)
@@ -670,6 +690,8 @@ def _join_lost(items: list[dict], given: list[dict], lost: list[tuple[int, str]]
         after = [o for o in live if _zone(o) == zone and o["_sync_index"] > k]
         cands = ([(after[0], False)] if after and float(after[0]["start"]) - b <= LOST_JOIN_SEC else []) + (
             [(before[-1], True)] if before and a - float(before[-1]["end"]) <= LOST_JOIN_SEC else [])
+        if short:
+            cands = [(o, first) for o, first in cands if _same_line(o, s)]
         for o, first in cands:
             pair = (o, s) if first else (s, o)
             p0, p1 = str(pair[0].get("text", "")), str(pair[1].get("text", ""))
@@ -683,13 +705,19 @@ def _join_lost(items: list[dict], given: list[dict], lost: list[tuple[int, str]]
                 break
         else:
             left.append((k, why))
-    return left, joined
+            if short:
+                shown.add(k)
+    return left, joined, shown
 
 
-def _gone(s: dict, reason: str) -> dict:
-    """外した字幕の記録（時刻合わせの前の時刻・本文・理由）。品質ゲートが字幕にしなかった発話として数える。"""
-    return {"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
-            "text": s.get("text", ""), "reason": reason}
+def _gone(s: dict, reason: str, line_shown: bool = False) -> dict:
+    """外した字幕の記録（時刻合わせの前の時刻・本文・理由）。品質ゲートが字幕にしなかった発話として数える。
+    同じ行の字幕は出ているのに足せなかった短い声は `line_shown` を付ける（字数が短くても欠落と数える）。"""
+    g = {"start": round(float(s.get("start", 0)), 3), "end": round(float(s.get("end", 0)), 3),
+         "text": s.get("text", ""), "reason": reason}
+    if line_shown:
+        g["line_shown"] = True
+    return g
 
 
 def _drop_squeezed(items: list[dict]) -> int:
@@ -987,13 +1015,14 @@ def _align_once(segments: list[dict], speech: SpeechMap, cut_points: list[float]
     dropped = (_drop_unheard_flashes(result, r["min_display_sec"]) + _drop_squeezed(result)
                + past_end + no_room)
     lost += [(s["_sync_index"], s["_gone"]) for s in result if s.get("_gone")]
-    lost, joined = _join_lost(result, segments, lost, cut_points)
+    lost, joined, shown = _join_lost(result, segments, lost, cut_points)
     if joined:
         logger.info(f"🧷 置き場所の無い字幕を隣の字幕に行として足しました: {joined}枚")
     stats = {"captions": n, "snapped_in": snapped_in, "snapped_out": snapped_out,
              "redistributed": redistributed, "merged": merged, "resplit": resplit,
              "dropped": dropped - joined, "unheard_roomed": roomed, "joined": joined,
-             "gone": sorted((_gone(segments[k], why) for k, why in lost), key=lambda g: g["start"])}
+             "gone": sorted((_gone(segments[k], why, k in shown) for k, why in lost),
+                            key=lambda g: g["start"])}
     result = [s for s in result if not s.get("_merged")]
     logger.info(f"🎯 字幕の出だし・終わりを音声に合わせました: {n}枚, 話し始めに寄せた {snapped_in}, "
                 f"話し終わりに寄せた {snapped_out}")

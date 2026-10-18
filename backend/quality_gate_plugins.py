@@ -338,7 +338,9 @@ def _lost_lines(gone: list, rows: list) -> list:
     """時刻合わせ（`sync.align_segments`）が外した字幕 `gone` に、欠落として合格させないか（`blocking`）を
     付ける。相づちだけの字幕（焼き込まない）・前後の字幕の言葉を繰り返しただけの字幕（相手の言葉をなぞった
     「オリンピック はい」）・4字に満たない短い声（`sync.lost_content`）と、カット点のそばでカットで声が消えた
-    言葉（理由 `cut`）は欠落と数えない。rows は焼き込んだ字幕。
+    言葉（理由 `cut`）は欠落と数えない。ただし同じ行の字幕は出ているのに外れた短い声（`line_shown`）は、
+    4字に満たなくても欠落と数える（58回目の 37分13秒「あやかりたいと思います」の後の「私も」）。
+    rows は焼き込んだ字幕。
     """
     try:
         from subtitle_engine import sync
@@ -352,8 +354,9 @@ def _lost_lines(gone: list, rows: list) -> list:
         near = "".join(str(r.get("text") or "") for r in rows
                        if isinstance(r, dict) and float(r.get("end", 0)) >= t0 - sync.LOST_ECHO_SEC
                        and float(r.get("start", 0)) <= t1 + sync.LOST_ECHO_SEC)
+        content = sync.lost_content(g.get("text"), near)
         out.append(dict(g, blocking=g.get("reason") != "cut"
-                        and len(sync.lost_content(g.get("text"), near)) >= sync.LOST_MIN_CHARS))
+                        and (len(content) >= sync.LOST_MIN_CHARS or bool(g.get("line_shown") and content))))
     return out
 
 
