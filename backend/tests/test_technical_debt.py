@@ -388,3 +388,64 @@ def test_save_replace_error(tmp_path):
     
     with patch('os.replace', side_effect=OSError('Replace failed')):
         store._save()
+
+
+def _record_ledger_writes(monkeypatch):
+    """台帳への書き込みを記録して止める。本番の台帳に触れずに、書こうとしたかだけを見る。"""
+    attempts = []
+
+    def mkstemp(*args, **kwargs):
+        attempts.append(("mkstemp", str(kwargs.get("dir"))))
+        raise OSError("書き込みは止めてある")
+
+    real_open = open
+
+    def guarded_open(file, mode="r", *args, **kwargs):
+        if set(mode) & set("wax+"):
+            attempts.append(("open", str(file)))
+            raise OSError("書き込みは止めてある")
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr("tempfile.mkstemp", mkstemp)
+    monkeypatch.setattr("builtins.open", guarded_open)
+    return attempts
+
+
+def test_save_leaves_the_real_ledger_alone_when_its_path_is_spelled_differently(monkeypatch):
+    from backend.agents.memory import technical_debt as td
+
+    # 同じ台帳を `memory/../memory` と綴る。字面では本番の台帳と一致しない
+    store = TechnicalDebtStore(debt_dir=td.DEBT_DIR / ".." / "memory")
+    assert store.index_path != td.DEBT_INDEX_PATH
+    attempts = _record_ledger_writes(monkeypatch)
+
+    store._save()
+
+    assert attempts == []
+
+
+def test_save_leaves_the_real_ledger_alone_when_the_module_was_loaded_through_a_parent_dir(monkeypatch):
+    from backend.agents.memory import technical_debt as td
+
+    # CI のバッチ2で起きた形。テストが sys.path に backend/tests/.. を足した後でこのモジュールが
+    # 読み込まれると、本番の台帳の場所が `..` を含む綴りになる。council_graph は
+    # Path(__file__).parent / "memory" で台帳を作るので、字面が食い違った
+    spelled = td.DEBT_DIR / ".." / "memory"
+    monkeypatch.setattr(td, "DEBT_INDEX_PATH", spelled / "technical_debt_index.json")
+    monkeypatch.setattr(td, "DEBT_MD_PATH", spelled / "../../TECHNICAL_DEBT_REGISTRY.md")
+    store = TechnicalDebtStore(debt_dir=td.DEBT_DIR)
+    assert store.index_path != td.DEBT_INDEX_PATH
+    attempts = _record_ledger_writes(monkeypatch)
+
+    store._save()
+
+    assert attempts == []
+
+
+def test_save_still_writes_a_ledger_outside_the_real_one(tmp_path, monkeypatch):
+    store = TechnicalDebtStore(debt_dir=tmp_path)
+    store.md_path = tmp_path / "TECHNICAL_DEBT_REGISTRY.md"
+    store.register_debt(category="MINOR_INFRA", file_path="a.py", line_number=1, pattern="x")
+
+    assert (tmp_path / "technical_debt_index.json").exists()
+    assert store.md_path.exists()

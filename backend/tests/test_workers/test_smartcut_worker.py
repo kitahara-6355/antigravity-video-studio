@@ -1432,3 +1432,150 @@ class TestC6PerformanceEvolution:
         runs = worker._group_continuous_runs([])
         assert runs == []
 
+
+
+# --- 校閲の整形で分割された字幕（2026-10-05 raw 4本の実走）------------------------
+
+
+def _split_pieces(n_sources: int, pieces: int, span: float = 10.0):
+    """1つの発話（同じ sourceStart/sourceEnd）を `pieces` 行に分けた字幕を作る。"""
+    segs = []
+    for k in range(n_sources):
+        s, e = k * (span + 1.0), k * (span + 1.0) + span
+        for p in range(pieces):
+            segs.append({"start": s + p, "end": s + p + 1, "text": "あ" * (5 + k % 7),
+                         "sourceStart": s, "sourceEnd": e})
+    return segs
+
+
+def test_split_lines_are_not_counted_twice_toward_the_target():
+    """分割された行は同じ元の区間を指す。尺を行の数だけ数えると目標に早く届き、
+    話している区間の半分を捨てていた（38分の発話が 19分のプレビューになった）。"""
+    segs = _split_pieces(n_sources=20, pieces=3)  # 発話 20×10秒 = 200秒、総尺 219秒
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=3)  # 180秒 < 219秒 → カットの経路
+    ctx.segments = segs
+
+    result = asyncio.run(SmartCutWorker().execute(ctx))
+
+    kept = {(s["sourceStart"], s["sourceEnd"]) for s in ctx.selected_segments}
+    assert result.success
+    assert sum(e - s for s, e in kept) >= 180, "目標尺ぶんの発話を残す"
+    assert result.data["duration"] == pytest.approx(sum(e - s for s, e in kept))
+
+
+def test_a_selected_line_brings_its_siblings():
+    """元の区間が残るなら、その区間の字幕の行も全部残す（音はあるのに字幕が欠けない）。"""
+    segs = _split_pieces(n_sources=20, pieces=3)
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=1)
+    ctx.segments = segs
+
+    asyncio.run(SmartCutWorker().execute(ctx))
+
+    from collections import Counter
+    per_source = Counter((s["sourceStart"], s["sourceEnd"]) for s in ctx.selected_segments)
+    assert per_source and set(per_source.values()) == {3}
+
+
+def test_smartcut_leaves_the_planned_output_length_for_the_quality_gate():
+    """計画尺はレンダリングと同じ規則（隙間 0.3秒以内はつなぐ）で数える。"""
+    segs = [{"start": 0, "end": 2, "text": "あいう", "sourceStart": 0.0, "sourceEnd": 2.0},
+            {"start": 2.2, "end": 4, "text": "えお", "sourceStart": 2.2, "sourceEnd": 4.0},
+            {"start": 10, "end": 12, "text": "かき", "sourceStart": 10.0, "sourceEnd": 12.0}]
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=60)
+    ctx.segments = segs
+
+    asyncio.run(SmartCutWorker().execute(ctx))
+
+    assert ctx.planned_output_sec == pytest.approx(6.0)
+
+
+# --- 中身は削らず、間だけ切る・冒頭はノーカット（2026-10-13 ユーザー指摘）----------------
+
+
+def test_nothing_is_dropped_when_the_speech_fits_the_target():
+    """目標尺（素材の43分を丸めた43分）は素材（43分16秒）より短いが、発話は収まる。
+
+    以前は素材の尺と比べて中身を選んでいて、1秒未満の発話を全部落とした（37回目の
+    34分08秒「これ、ただいま発売」の後ろの「です。」・31分41秒「欲しい方は」）。
+    """
+    segs = [{"start": 0, "end": 10, "text": "これ、ただいま発売", "sourceStart": 0.0, "sourceEnd": 10.0},
+            {"start": 10.2, "end": 10.7, "text": "です。", "sourceStart": 10.2, "sourceEnd": 10.7},
+            {"start": 2590, "end": 2596, "text": "ありがとうございました。",
+             "sourceStart": 2590.0, "sourceEnd": 2596.0}]
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=43)
+    ctx.segments = segs
+
+    result = asyncio.run(SmartCutWorker().execute(ctx))
+
+    assert result.success and "カット不要" in result.detail
+    assert ctx.selected_segments == segs
+
+
+def test_a_target_taken_from_the_material_never_drops_speech():
+    """目標尺が素材の尺から決まったとき、目標尺は「素材の長さ」で出来上がりの長さではない。"""
+    segs = [{"start": k * 10.0, "end": k * 10.0 + 9.9, "text": "あいうえお", "sourceStart": k * 10.0,
+             "sourceEnd": k * 10.0 + 9.9} for k in range(65)]  # 発話 643秒 > 目標 10分
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=10, target_auto=True)
+    ctx.segments = segs
+
+    result = asyncio.run(SmartCutWorker().execute(ctx))
+
+    assert result.success and ctx.selected_segments == segs
+
+
+def _talk():
+    """あいさつ → ゲスト紹介 → 最初の質問 → 答え（37回目の素材の冒頭）。"""
+    rows = [(1.4, 4.1, "こんにちは、書家の北原美麗です。"),
+            (4.9, 12.3, "このチャンネルでは書を通して人々の心に触れていきます。"),
+            (46.04, 46.84, "こんにちは。"),
+            (67.94, 74.44, "著者としても書籍が多数おありだということです。"),
+            (74.94, 76.64, "まず先生が、"),
+            (76.64, 81.14, "最初に書に出会ったきっかけっていうのはありますでしょうか？"),
+            (81.64, 90.64, "小学校3年生の時にお習字をスタートしたんですけど、"),
+            (93.14, 96.14, "駄菓子屋によく行ってましたね。")]
+    return [{"start": a, "end": b, "text": t, "sourceStart": a, "sourceEnd": b} for a, b, t in rows]
+
+
+def test_the_opening_is_left_uncut_when_everything_is_kept():
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=43, target_auto=True)
+    ctx.segments = _talk()
+
+    result = asyncio.run(SmartCutWorker().execute(ctx))
+
+    # 冒頭（最初の質問の文の前まで）は1つの区間。本題に入ってからは間を切る
+    assert ctx.cut_ranges == [(1.4, 81.14), (81.64, 90.64), (93.14, 96.14)]
+    assert ctx.planned_output_sec == pytest.approx(sum(b - a for a, b in ctx.cut_ranges))
+    assert "冒頭（素材の 0:01〜1:14）はノーカット" in result.detail
+
+
+def test_the_opening_is_cut_as_before_when_content_is_selected():
+    """中身を選んで削るときは、冒頭の発話も選ばれないことがある。選ばれなかった発話の声が
+    字幕無しで入るので、冒頭のすき間はつながない。"""
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=0.5)
+    ctx.segments = _talk()
+
+    asyncio.run(SmartCutWorker().execute(ctx))
+
+    assert ctx.cut_ranges and ctx.cut_ranges[0] != (1.4, 81.14)
+    kept = {(s["sourceStart"], s["sourceEnd"]) for s in ctx.selected_segments}
+    for a, b in ctx.cut_ranges:
+        assert any(a <= s and e <= b for s, e in kept)
+
+
+def test_the_talk_around_stopping_the_camera_is_left_out():
+    """中身を全部残すと、収録の段取りの声（37分38秒「ちょっと切ります」「撮った？」）も残っていた。"""
+    rows = [(2247.38, 2257.38, "あやかりたいと思います。私も。"),
+            (2258.04, 2259.24, "ちょっと切ります。"),
+            (2262.94, 2264.84, "ちょっと待って。いい。よし。"),
+            (2266.04, 2266.54, "撮った？"),
+            (2267.84, 2274.74, "先生がこれからやってみたいことは何かあるんでしょうか？")]
+    segs = [{"start": a, "end": b, "text": t, "sourceStart": a, "sourceEnd": b} for a, b, t in rows]
+    ctx = PipelineContext(video_path="v.mp4", target_minutes=43, target_auto=True)
+    ctx.segments = segs
+
+    result = asyncio.run(SmartCutWorker().execute(ctx))
+
+    assert [s["text"] for s in ctx.selected_segments] == [rows[0][2], rows[4][2]]
+    assert ctx.cut_ranges == [(2247.38, 2257.38), (2267.84, 2274.74)]
+    assert ctx.segments == segs, "字幕の一覧そのもの（欠落の検査に使う）は変えない"
+    assert "収録の段取りの声 3発話（素材の 37:38「ちょっと切ります。」ほか）は外した" in result.detail

@@ -682,11 +682,26 @@ class TechnicalDebtStore:
         else:
             self.entries = []
 
+    def _is_production_ledger(self) -> bool:
+        """本番の台帳を指しているか。字面ではなく実体の場所で比べる。
+
+        `Path` の `==` は字面の比較なので、同じ場所でも綴りが違うと一致しない。
+        テストが `sys.path` に `backend/tests/..` を足した後でこのモジュールが
+        読み込まれると、`DEBT_INDEX_PATH` が `backend/tests/../agents/memory/...` になる。
+        `council_graph` は `Path(__file__).parent / "memory"` で台帳を作るので字面が
+        食い違い、テストが本番の台帳を書き換えた（2026-10-13 の CI・バッチ2）。
+        """
+        import os
+        return any(
+            os.path.realpath(mine) == os.path.realpath(real)
+            for mine, real in ((self.index_path, DEBT_INDEX_PATH), (self.md_path, DEBT_MD_PATH))
+        )
+
     def _save(self):
         """JSON + Markdown の両方を保存。"""
         import os
         import sys
-        if ("pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST")) and self.index_path == DEBT_INDEX_PATH:
+        if ("pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST")) and self._is_production_ledger():
             logger.info("🧪 Test environment detected. Skipping actual save in TechnicalDebtStore to prevent pollution.")
             return
 

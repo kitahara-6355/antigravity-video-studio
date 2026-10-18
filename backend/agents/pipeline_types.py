@@ -111,6 +111,28 @@ class PipelineContext:
     """パイプライン全体で共有するコンテキスト"""
     video_path: str
     target_minutes: int = 20
+    # **目標尺が素材の尺から決まったか**（CLI の既定）。そのとき目標尺は「素材の長さ」で
+    # あって「出来上がりの長さ」ではない — 無音を詰めれば必ず短くなる
+    target_auto: bool = False
+    # SmartCut が残すと決めた区間の合計（秒）。レンダリングと同じ規則で結合した値
+    planned_output_sec: Optional[float] = None
+    # SmartCut が残すと決めた区間（素材の秒・`cut_plan`）。切る所は声の切れ目に寄せてあり、
+    # 冒頭のあいさつ・紹介はつないである。プレビューはこの区間で切る（空なら字幕の区間から決める）
+    cut_ranges: list = field(default_factory=list)
+    # 文字起こしで「音はあるが発話ではない」と確認した区間（素材の秒）。品質ゲートの欠落検知が除外する
+    verified_quiet: list = field(default_factory=list)
+    # 文字起こしの段階で測った欠落（coverage.CoverageReport.to_dict()）。文字の薄さはここでだけ測る
+    transcript_coverage: Optional[dict] = None
+    # 校閲（AI）が分けて再実行しても失敗した字幕の範囲 [開始, 終了)。品質ゲートが合格させない
+    proofread_failed_ranges: list = field(default_factory=list)
+    # 文字起こしで3回目でも決まらなかった食い違い（`transcript_fusion.heard_hints`）。校閲（AI）に
+    # 「別の音声認識の聞き取り」として渡し、前後の流れで決めさせる
+    heard_hints: list = field(default_factory=list)
+    # 文字起こしの2回目（いまの区切り方・前の区切り方）の行。校閲の後に、2回目が別の字を書いた所を
+    # 本文と並べて選び直す（`transcript_fusion.split_spots`）
+    second_readings: list = field(default_factory=list)
+    # 人が通しで見て直した字幕の台帳（`subtitle_engine.review_ledger`）のパス。校閲の後・整形の前に当てる
+    review_ledger: str = ""
     session_id: str = ""
     started_at: str = ""
     segments: List[Segment] = field(default_factory=list)

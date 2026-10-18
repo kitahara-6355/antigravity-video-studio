@@ -90,6 +90,33 @@ class TestBuildProperNounContext:
             assert "「きたはら」→「北原」（人名）" in context
             assert "「ぷろじぇくと」→「プロジェクト」" in context
 
+    def test_同じ組は1行だけ載せる(self):
+        """2026-10-06: 辞書の 200 件のうち 161 件がテストの残した同じ組（「テスト誤」→「テスト正」）で、
+        校閲の指示の大半を占めていた。"""
+        mock_module = MagicMock()
+        mock_module.proper_noun_dict.get_all_entries.return_value = (
+            [{"incorrect": "初会", "correct": "初回"}]
+            + [{"incorrect": "テスト誤", "correct": "テスト正"}] * 3)
+        with patch.dict("sys.modules", {"proper_noun_dict": mock_module}):
+            context = ai_proofreader._build_proper_noun_context()
+        assert context.count("「テスト誤」→「テスト正」") == 1
+        assert "「初会」→「初回」" in context
+
+    def test_未確認の項目は載せない(self):
+        """2026-10-14: 未確認（confirmed: false）の「選出→撰出」を校閲に渡していた（25分11秒は「線質」）。
+        確認されるまで指示にも控えの鍵にも入れない。confirmed が無い項目は確認済みとみなす。"""
+        mock_module = MagicMock()
+        mock_module.proper_noun_dict.get_all_entries.return_value = [
+            {"incorrect": "選出", "correct": "撰出", "confirmed": False},
+            {"incorrect": "初会", "correct": "初回", "confirmed": True},
+            {"incorrect": "久北", "correct": "久木田"}]
+        with patch.dict("sys.modules", {"proper_noun_dict": mock_module}):
+            context = ai_proofreader._build_proper_noun_context()
+            rows = ai_proofreader._dictionary_rows()
+        assert "撰出" not in context
+        assert "「初会」→「初回」" in context and "「久北」→「久木田」" in context
+        assert [r[0] for r in rows] == ["久北", "初会"]
+
     def test_build_context_empty(self):
         """辞書データが空工程のケース"""
         mock_module = MagicMock()
@@ -330,6 +357,14 @@ class TestProofreadSegmentsResponseValidation:
         # 「宣言どおり」の記録になり、提案がそのモデルの出力ではないことが見えない
         assert stats["failed_batches"] == 1
 
+    def test_相づちを別のかなに書き換えた直しは戻す(self):
+        # 実例（2分37秒・28回目）: 「ああ、強烈な。」が「あお、強烈な。」になった
+        segments = [{"text": "ああ、強烈な。"}, {"text": "もう初会ね。"}]
+        result, stats = self._run_with_response_text(
+            '[{"index": 0, "text": "あお、強烈な。"}, {"index": 1, "text": "もう初回ね。"}]', segments)
+        assert [s["text"] for s in result] == ["ああ、強烈な。", "もう初回ね。"]
+        assert stats["kept_short_phrases"] == 1
+
     def test_採用できた項目がゼロのバッチは失敗に数える(self):
         """リスト形でも中身を全部捨てたら失敗（R2-C5 検証4周目の R4-1）。
         バッチ内の番号で答えた（index が範囲外）・鍵が違う・dict でない・空リスト、のどれも
@@ -352,6 +387,38 @@ class TestProofreadSegmentsResponseValidation:
         assert stats["accepted_items"] == 2
         result, stats = self._run_with_response_text('[{"index":9,"text":"x"}]', segments)
         assert stats["accepted_items"] == 0
+
+    def test_番号ずれで捨てた直しの行を返す(self):
+        """45回目: AI が100行のうち途中から1〜2行ずつ前の行の文を返し、10行の直しを捨てた。
+        捨てた行は校閲されないまま残るので、呼び出し側が小さく分けて聞き直せるよう行の番号を返す。"""
+        segments = [{"text": "今日は晴れです。"}, {"text": "明日は雨が降るでしょう。"},
+                    {"text": "あさっては曇りになるそうです。"}]
+        reply = json.dumps([{"index": 0, "text": "今日は晴れです。"},
+                            {"index": 1, "text": "あさっては曇りになるそうです。"},
+                            {"index": 2, "text": "あさっては曇りになるそうです。"}], ensure_ascii=False)
+        result, stats = self._run_with_response_text(reply, segments)
+        assert stats["rejected_rows"] == [1]
+        assert result[1]["text"] == "明日は雨が降るでしょう。"
+
+    def test_校閲が足した聞こえない字は戻す(self):
+        """2026-10-06 実走: 「最初 に 書 に」→「最初にな書に」。音声認識に無い足しは戻す。"""
+        class Ref:
+            def __call__(self, seg, corrected):
+                return False
+
+            def trim(self, seg, corrected):
+                return corrected.replace("にな書", "に書")
+
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = '[{"index":0,"text":"最初にな書に出会った"}]'
+        mock_client.models.generate_content.return_value = mock_response
+        segments = [{"text": "最初 に 書 に 出会っ た", "start": 0.0, "end": 2.0}]
+        with patch.dict("sys.modules", {"model_governance": MagicMock(get_governed_client=lambda x: mock_client)}):
+            with patch("subtitle_engine.ai_proofreader._get_current_model", return_value="gemini-2.5-flash"):
+                result, stats = ai_proofreader.proofread_segments(segments, return_stats=True, referee=Ref())
+        assert result[0]["text"] == "最初に書に出会った"
+        assert stats["trimmed_items"] == 1
 
     def test_response_item_is_not_a_dict(self):
         """レスポンスのリストの要素が辞書ではない場合のスキップ処理"""
@@ -389,6 +456,351 @@ class TestProofreadSegmentsResponseValidation:
         result, stats = self._run_with_response_text('[{"index": 0, "text": "こんにちは、テストです。"}]', segments)
         assert stats["proofread_count"] == 1
         assert result[0]["text"] == "こんにちは、テストです。"
+
+    def test_同じ文には毎回同じ直しを返させる(self):
+        """2026-10-06 実走: 書き出すたびに校閲の出来が変わった（22回目は「初回」、23回目は冒頭4分で劣化）。
+        温度を 0 にし、乱数の種を固定する（文字起こしと同じ）。"""
+        mock_types = MagicMock()
+        with patch.object(ai_proofreader, "types", mock_types):
+            self._run_with_response_text('[{"index": 0, "text": "テスト"}]', [{"text": "テスト"}])
+        config = mock_types.GenerateContentConfig.call_args.kwargs
+        assert config["temperature"] == 0
+        assert config["seed"] == ai_proofreader.SEED
+
+
+class TestProofreadMemo:
+    """同じ行には、次の書き出しでも同じ直しを使う（2026-10-08）。
+
+    温度 0・seed 固定でも、29回目は冒頭の100行の直しが28回目と違った（「しかも」「初日ね」が
+    戻らず、「主宰」が「主催」になった）。一度直した行は控えておき、次からはそれを使う。
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_api_key(self):
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "fake_key"}):
+            yield
+
+    @staticmethod
+    def _run(response_text, lines, memo, rows=(), served=None, hints=None, prompts=None):
+        client = MagicMock()
+        client.models.generate_content.return_value = MagicMock(text=response_text, model_version=served)
+        extra = {"hints": hints} if hints is not None else {}
+        with patch.dict("sys.modules", {"model_governance": MagicMock(get_governed_client=lambda x: client)}), \
+                patch("subtitle_engine.ai_proofreader._get_current_model", return_value="gemini-3.6-flash"), \
+                patch("subtitle_engine.ai_proofreader._declared_model", return_value="gemini-3.6-flash"), \
+                patch("subtitle_engine.ai_proofreader._dictionary_rows", return_value=list(rows)):
+            out, stats = ai_proofreader.proofread_segments([{"text": t} for t in lines],
+                                                           return_stats=True, memo=memo, **extra)
+        if prompts is not None:
+            prompts += [c.kwargs.get("contents") for c in client.models.generate_content.call_args_list]
+        return [s["text"] for s in out], stats, client.models.generate_content.call_count
+
+    @staticmethod
+    def _reply(*texts):
+        return json.dumps([{"index": k, "text": t} for k, t in enumerate(texts)], ensure_ascii=False)
+
+    def test_同じ行は次の書き出しでも同じ直しを使う(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["もう初会ね。", "読んでいただいて。", "光栄です。"]
+        out, _, calls = self._run(self._reply("もう初回ね。", "呼んでいただいて。", "光栄です。"),
+                                  lines, ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。", "呼んでいただいて。", "光栄です。"] and calls == 1
+        # 次の書き出しで AI が違う直しを返しても、控えの直しを使う（全部控えにあれば呼ばない）
+        out, stats, calls = self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。", "呼んでいただいて。", "光栄です。"]
+        assert calls == 0 and stats["memo_hits"] == 3
+
+    def test_変わった行だけ校閲し直す(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("もう初回ね。", "呼んでいただいて。"),
+                  ["もう初会ね。", "読んでいただいて。"], ai_proofreader.ProofreadMemo(path))
+        # 2行目の起こしが変わった。AI は1行目を直さずに返したが、1行目は控えの直しのまま
+        out, stats, calls = self._run(self._reply("もう初会ね。", "呼んでいただきまして。"),
+                                      ["もう初会ね。", "読んでいただきまして。"],
+                                      ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。", "呼んでいただきまして。"]
+        assert calls == 1 and stats["memo_hits"] == 1
+
+    def test_辞書に足した語を含む行は校閲し直す(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["カドシアター代表で", "光栄です。"]
+        self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        rows = [("カドシアター", "アドシアター", "organization", "")]
+        out, stats, calls = self._run(self._reply("アドシアター代表で", "光栄ですね。"), lines,
+                                      ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["アドシアター代表で", "光栄です。"]
+        assert calls == 1 and stats["memo_hits"] == 1
+
+    def test_文脈で判断する項目を足した行は項目の語の直しだけを取り込む(self, tmp_path):
+        # 2分21秒の「もういつですか？」「あっもう、湿布。」は「毛筆」の聞き違い（2026-10-13）。
+        # 項目を足して校閲し直すと、AI は項目と関係ない所まで直し直した（前の回に外した
+        # 「それで行っと」を「それで行って」と書いて戻した）。前の控えに、項目の語の直しだけを足す
+        path = tmp_path / "_proofread_x.json"
+        lines = ["それで行っと初日に行ったら、ああ。もういつですか？", "あっもう、湿布。", "笑われて"]
+        self._run(self._reply("初日に行ったら。もういつですか？", "あっもう、初日ね。", "笑われて"), lines,
+                  ai_proofreader.ProofreadMemo(path))
+        rows = [("もういつですか", "もう毛筆ですか", "hint", "書道の筆"), ("湿布", "毛筆", "hint", "書道の筆")]
+        out, stats, calls = self._run(
+            self._reply("それで行って初日に行ったら。もう毛筆ですか？", "あっもう、毛筆。", "笑われてね"),
+            lines, ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["初日に行ったら。もう毛筆ですか？", "あっもう、毛筆。", "笑われて"]
+        assert calls == 1 and stats["memo_hits"] == 1
+        # 取り込んだ結果を控える。次の書き出しも同じ字幕になる
+        out, _, calls = self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["初日に行ったら。もう毛筆ですか？", "あっもう、毛筆。", "笑われて"] and calls == 0
+
+    def test_文脈で判断する項目を採らなかった行は前の控えのまま(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["それで行っと初日に行ったら、ああ。もういつですか？"]
+        self._run(self._reply("初日に行ったら。もういつですか？"), lines, ai_proofreader.ProofreadMemo(path))
+        rows = [("もういつですか", "もう毛筆ですか", "hint", "時期を尋ねる「いつ」なら直さない")]
+        out, _, calls = self._run(self._reply("それで行って初日に行ったら。もういつですか？"), lines,
+                                  ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["初日に行ったら。もういつですか？"] and calls == 1
+
+    def test_項目を足す前の控えが無ければ_AI_の直しをそのまま使う(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        rows = [("湿布", "毛筆", "hint", "書道の筆")]
+        out, _, _ = self._run(self._reply("あっ、もう毛筆。"), ["あっもう、湿布。"],
+                              ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["あっ、もう毛筆。"]
+
+    def test_前後の行は文脈の項目を足しても控えのまま(self, tmp_path):
+        # 前後の行まで校閲し直すと、関係ない行の直しが揺れた（2分11秒の「って言って」が
+        # 「てって言って」になった・2026-10-13 の試し）
+        path = tmp_path / "_proofread_x.json"
+        lines = ["って言って、それが8歳です。", "もういつですか？"]
+        self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        rows = [("もういつですか", "もう毛筆ですか", "hint", "書道の筆")]
+        out, stats, _ = self._run(self._reply("てって言って、それが8歳です。", "もう毛筆ですか？"), lines,
+                                  ai_proofreader.ProofreadMemo(path), rows)
+        assert out == ["って言って、それが8歳です。", "もう毛筆ですか？"] and stats["memo_hits"] == 1
+
+    ZAYU = ["座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の目はなくって、僕はだからご縁なので"]
+    ZAYU_HINT = [{"incorrect": "座右の目はなく", "correct": "座右の銘はなく", "term": "銘"}]
+
+    def test_別の音声認識の聞き取りを渡した行は_その語の直しだけを取り込む(self, tmp_path):
+        # 27分12秒（46回目）: 文字起こしは3回とも「座右の目」、認識は「座右の銘」。校閲に認識の字を
+        # 渡して文脈で決めさせる。AI は関係ない所まで直し直す（「なくって」を戻す・読点を足す）ので、
+        # 前の控えに、渡した語の直しだけを足す
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の目はなくて、僕はだからご縁なので"),
+                  self.ZAYU, ai_proofreader.ProofreadMemo(path))
+        prompts = []
+        out, stats, calls = self._run(
+            self._reply("座右の銘って僕ないんだよ。", "なので偉そうな座右の銘はなくって、僕はだから、ご縁なので"),
+            self.ZAYU, ai_proofreader.ProofreadMemo(path), hints=self.ZAYU_HINT, prompts=prompts)
+        assert out == ["座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の銘はなくて、僕はだからご縁なので"]
+        assert calls == 1 and stats["memo_hits"] == 1
+        assert (stats["heard_hints"], stats["heard_adopted"]) == (1, 1)
+        assert "別の音声認識" in prompts[0] and "「座右の目はなく」→「座右の銘はなく」" in prompts[0]
+        # 取り込んだ結果を控える。次の書き出しは呼ばない
+        out, _, calls = self._run(self._reply(*self.ZAYU), self.ZAYU, ai_proofreader.ProofreadMemo(path),
+                                  hints=self.ZAYU_HINT)
+        assert out[1] == "なので偉そうな座右の銘はなくて、僕はだからご縁なので" and calls == 0
+
+    def test_別の聞き取りを採らなかった行は前の控えのまま(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply(self.ZAYU[0], "なので偉そうな座右の目はなくて、僕はだからご縁なので"),
+                  self.ZAYU, ai_proofreader.ProofreadMemo(path))
+        out, stats, calls = self._run(self._reply(self.ZAYU[0], "偉そうな座右の目はなくって、僕はご縁なので"),
+                                      self.ZAYU, ai_proofreader.ProofreadMemo(path), hints=self.ZAYU_HINT)
+        assert out[1] == "なので偉そうな座右の目はなくて、僕はだからご縁なので" and calls == 1
+        assert (stats["heard_hints"], stats["heard_adopted"]) == (1, 0)
+
+    def test_別の聞き取りが掛からない行の控えと指示は変わらない(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply(*self.ZAYU), self.ZAYU, ai_proofreader.ProofreadMemo(path))
+        prompts = []
+        hint = [{"incorrect": "片をのんで", "correct": "固唾をのんで", "term": "固唾"}]
+        _, stats, calls = self._run(self._reply(*self.ZAYU), self.ZAYU, ai_proofreader.ProofreadMemo(path),
+                                    hints=hint, prompts=prompts)
+        assert calls == 0 and stats["memo_hits"] == 2 and stats["heard_hints"] == 0
+        _, _, calls = self._run(self._reply(*self.ZAYU), ["もう一つの行。"], ai_proofreader.ProofreadMemo(path),
+                                hints=hint, prompts=prompts)
+        assert calls == 1 and "別の音声認識" not in prompts[0]
+
+    def test_捨てた直しは控えない(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        lines = ["います。", "では記念すべき第1回目のゲストは日本デザイン"]
+        # 番号ずれ（1行目に2行目の文）は捨てる。控えにも残さない
+        self._run(self._reply("では記念すべき第1回目のゲストは日本デザイン", lines[1]), lines,
+                  ai_proofreader.ProofreadMemo(path))
+        out, stats, calls = self._run(self._reply(*lines), lines, ai_proofreader.ProofreadMemo(path))
+        assert out == lines and calls == 1 and stats["memo_hits"] == 1
+
+    def test_指示文や求めるモデルが変われば控えは使わない(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(path))
+        with patch("subtitle_engine.ai_proofreader.MEMO_VERSION", 999):
+            _, stats, calls = self._run(self._reply("もう初回ね。"), ["もう初会ね。"],
+                                        ai_proofreader.ProofreadMemo(path))
+        assert calls == 1 and stats.get("memo_hits", 0) == 0
+
+    def test_控えから使った直しも出したモデルが分かる(self, tmp_path):
+        # 枠切れで宣言と違うモデルが答えることがある（28・29回目は全部 flash-lite）。控えには
+        # 実際に答えたモデルを残し、控えから使った回にもそれを出す（モデルの見える化）
+        path = tmp_path / "_proofread_x.json"
+        self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(path),
+                  served="gemini-3.5-flash-lite")
+        _, stats, calls = self._run(self._reply("もう初会ね。"), ["もう初会ね。"],
+                                    ai_proofreader.ProofreadMemo(path))
+        assert calls == 0 and stats["memo_models"] == ["gemini-3.5-flash-lite"]
+        # 応答にモデルが書かれていなければ、求めたモデルを残す
+        other = tmp_path / "_proofread_y.json"
+        self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(other))
+        _, stats, _ = self._run(self._reply("もう初会ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(other))
+        assert stats["memo_models"] == ["gemini-3.6-flash"]
+
+    def test_控えが壊れていても校閲は続ける(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        path.write_text("{not json", encoding="utf-8")
+        out, _, calls = self._run(self._reply("もう初回ね。"), ["もう初会ね。"], ai_proofreader.ProofreadMemo(path))
+        assert out == ["もう初回ね。"] and calls == 1
+
+
+class TestJudgeHeardHints:
+    """別の聞き取りは、本文と並べて文として選ばせ、両順で選んだ所だけを校閲に渡す（2026-10-15）。
+
+    「本文が聞き違えていれば直す」と渡すだけでは、校閲は28か所中18か所で認識の字を採った。直りは
+    4か所（固唾・座右の銘・線質・仕上がり）で、崩れが10か所（主催→主宰・引ける→弾ける・
+    細いほど→細いわな・関係なく→考え 等）出た（47回目）。
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_api_key(self):
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "fake_key"}):
+            yield
+
+    LINES = ["座右の銘って僕ないんだよ、全然。", "なので偉そうな座右の目はなくって、僕はだからご縁なので",
+             "先生が主催されている言葉大賞っていうのがね", "光栄です。"]
+    ZAYU = {"incorrect": "座右の目はなく", "correct": "座右の銘はなく", "term": "銘", "start": 1632.0}
+    SHUSAI = {"incorrect": "主催されて", "correct": "主宰されて", "term": "宰", "start": 1032.0}
+
+    @staticmethod
+    def _run(replies, hints, memo=None, lines=None, prompts=None):
+        client = MagicMock()
+        client.models.generate_content.side_effect = [
+            r if isinstance(r, Exception) else MagicMock(text=r, model_version="gemini-3.5-flash-lite")
+            for r in replies]
+        with patch.dict("sys.modules", {"model_governance": MagicMock(get_governed_client=lambda x: client)}), \
+                patch("subtitle_engine.ai_proofreader._get_current_model", return_value="gemini-3.6-flash"), \
+                patch("subtitle_engine.ai_proofreader._declared_model", return_value="gemini-3.6-flash"):
+            chosen, stats = ai_proofreader.judge_heard_hints(
+                hints, [{"text": t} for t in (lines or TestJudgeHeardHints.LINES)], memo=memo)
+        if prompts is not None:
+            prompts += [c.kwargs.get("contents") for c in client.models.generate_content.call_args_list]
+        return chosen, stats, client.models.generate_content.call_count
+
+    @staticmethod
+    def _choices(*choices):
+        return json.dumps([{"id": k, "choice": c} for k, c in enumerate(choices, 1)])
+
+    def test_両順で別の聞き取りを選んだ所だけ採る(self):
+        prompts = []
+        # 本文を候補1にした回と、別の聞き取りを候補1にした回。座右の銘は両方で別の聞き取り、主宰は両方で本文
+        chosen, stats, calls = self._run([self._choices("2", "1"), self._choices("1", "2")],
+                                         [self.ZAYU, self.SHUSAI], prompts=prompts)
+        assert chosen == [self.ZAYU] and calls == 2
+        assert (stats["judged"], stats["chosen"], stats["calls"]) == (2, 1, 2)
+        assert stats["models"] == ["gemini-3.5-flash-lite"]
+        first, second = prompts
+        assert "候補1: なので偉そうな座右の目はなくって" in first and "候補2: なので偉そうな座右の銘はなくって" in first
+        assert "候補1: なので偉そうな座右の銘はなくって" in second and "候補2: なので偉そうな座右の目はなくって" in second
+        assert "前の行: 座右の銘って僕ないんだよ、全然。" in first and "次の行: 先生が主催されて" in first
+        # どの所をどう選んだかを残す（見える化）
+        assert [(s["incorrect"], s["choices"], s["chosen"]) for s in stats["spots"]] == [
+            ("座右の目はなく", ["heard", "heard"], True), ("主催されて", ["body", "body"], False)]
+
+    def test_片方の順でしか選ばない所や_どちらとも言える所は採らない(self):
+        # 並べた順で選んだ（どちらの回も2番目）・どちらとも言える（人名など）
+        chosen, stats, _ = self._run([self._choices("2", "either"), self._choices("2", "either")],
+                                     [self.ZAYU, self.SHUSAI])
+        assert chosen == [] and stats["chosen"] == 0
+        assert [s["choices"] for s in stats["spots"]] == [["heard", "body"], ["either", "either"]]
+
+    def test_選んだ結果は控えて_次の書き出しでは新しい所だけ聞く(self, tmp_path):
+        path = tmp_path / "_proofread_x.json"
+        self._run([self._choices("2", "1"), self._choices("1", "2")], [self.ZAYU, self.SHUSAI],
+                  memo=ai_proofreader.ProofreadMemo(path))
+        chosen, stats, calls = self._run([], [self.ZAYU, self.SHUSAI], memo=ai_proofreader.ProofreadMemo(path))
+        assert chosen == [self.ZAYU] and calls == 0 and stats["memo_hits"] == 4
+        assert stats["models"] == ["gemini-3.5-flash-lite"]  # 控えから使っても、選んだモデルが分かる
+        kata = {"incorrect": "片をのんで", "correct": "固唾をのんで", "term": "固唾"}
+        prompts = []
+        chosen, stats, calls = self._run([self._choices("2"), self._choices("1")], [self.ZAYU, self.SHUSAI, kata],
+                                         memo=ai_proofreader.ProofreadMemo(path),
+                                         lines=self.LINES + ["うん。", "まさに片をのんでね。"], prompts=prompts)
+        assert chosen == [self.ZAYU, kata] and calls == 2 and stats["memo_hits"] == 4
+        assert "座右" not in prompts[0] and "候補1: まさに片をのんでね。" in prompts[0]
+
+    def test_呼べないときや答えが読めないときは採らない(self):
+        chosen, stats, calls = self._run([RuntimeError("boom")], [self.ZAYU])
+        assert chosen == [] and stats["failed"] and calls == 1
+        chosen, stats, calls = self._run(["{not json"], [self.ZAYU])
+        assert chosen == [] and stats["failed"] and calls == 1
+        # 番号が合わない答えは、その所を決めない
+        chosen, stats, _ = self._run([json.dumps([{"id": 5, "choice": "2"}]), self._choices("1")], [self.ZAYU])
+        assert chosen == [] and stats["spots"][0]["choices"] == [None, "heard"]
+
+    def test_本文に1か所だけある所を並べる(self):
+        # 本文に無い（辞書で直った）所・2か所ある所は、どの行か決まらないので並べない
+        gone = {"incorrect": "片をのんで", "correct": "固唾をのんで", "term": "固唾"}
+        twice = {"incorrect": "座右の", "correct": "座右の", "term": ""}
+        chosen, stats, calls = self._run([], [gone, twice])
+        assert chosen == [] and calls == 0 and stats["judged"] == 0
+
+    def test_キーが無ければ呼ばない(self):
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "GOOGLE_GENERATIVE_AI_API_KEY": ""}):
+            chosen, stats, calls = self._run([], [self.ZAYU])
+        assert chosen == [] and calls == 0 and stats["skipped"]
+
+    def test_多い所は分けて聞く(self, monkeypatch):
+        """割れた所は 70 か所を超える（48回目）。並べすぎると番号を飛ばして答えるので JUDGE_BATCH か所ずつ聞く。"""
+        monkeypatch.setattr(ai_proofreader, "JUDGE_BATCH", 1)
+        prompts = []
+        chosen, stats, calls = self._run([self._choices("2"), self._choices("1"), self._choices("1"), self._choices("2")],
+                                         [self.ZAYU, self.SHUSAI], prompts=prompts)
+        assert calls == 4 and chosen == [self.ZAYU]
+        assert all("[1]" in t and "[2]" not in t for t in prompts)
+        assert [t.split("候補1: ")[1].split("\n")[0] for t in prompts] == [
+            self.LINES[1], self.LINES[2], "なので偉そうな座右の銘はなくって、僕はだからご縁なので", "先生が主宰されている言葉大賞っていうのがね"]
+        assert [s["choices"] for s in stats["spots"]] == [["heard", "heard"], ["body", "body"]]
+
+    def test_途中で呼べなくなったら_残りは聞かずに採らない(self, monkeypatch):
+        monkeypatch.setattr(ai_proofreader, "JUDGE_BATCH", 1)
+        chosen, stats, calls = self._run([self._choices("2"), RuntimeError("boom")], [self.ZAYU, self.SHUSAI])
+        assert chosen == [] and stats["failed"] and calls == 2
+
+
+class TestApplyHints:
+    """校閲の後の文で選んだ所（2回目の起こしが割れた所）は、校閲に渡し直さずに字を置く（2026-10-15）。"""
+
+    def test_選んだ所の字を置く(self):
+        segs = [{"text": "僕はね、生活をできるように鳴ってるのは、やっぱりご縁ですよ。"},
+                {"text": "いや、だから僕全部脱いで、羽毛になって"}]
+        applied = ai_proofreader.apply_hints(segs, [{"incorrect": "ように鳴ってる", "correct": "ようになってる"},
+                                                    {"incorrect": "羽毛になっ", "correct": "肌着になっ"}])
+        assert applied == 2
+        assert [s["text"] for s in segs] == ["僕はね、生活をできるようになってるのは、やっぱりご縁ですよ。",
+                                             "いや、だから僕全部脱いで、肌着になって"]
+
+    def test_1か所に決まらない所と_同じ所に別の字を置く項目は置かない(self):
+        segs = [{"text": "隔月なので、角付きなのでね"}, {"text": "羽毛になって、羽毛になって"}]
+        applied = ai_proofreader.apply_hints(segs, [
+            # 2回目と前の2回目が別の字を書き、両方とも選ばれた（32分12秒）
+            {"incorrect": "角付きなので", "correct": "各月なので"}, {"incorrect": "角付きな", "correct": "各付きな"},
+            # 2か所ある
+            {"incorrect": "羽毛になっ", "correct": "肌着になっ"}])
+        assert applied == 0
+        assert [s["text"] for s in segs] == ["隔月なので、角付きなのでね", "羽毛になって、羽毛になって"]
+
+    def test_同じ行の重ならない所はどちらも置く(self):
+        segs = [{"text": "初動人口と初動界の話"}]
+        applied = ai_proofreader.apply_hints(segs, [{"incorrect": "初動人口", "correct": "書道人口"},
+                                                    {"incorrect": "初動界", "correct": "書道界"},
+                                                    {"incorrect": "初動界", "correct": "書道界"}])
+        assert applied == 2 and segs[0]["text"] == "書道人口と書道界の話"
 
 
 class TestProofreadSegmentsRetryAndBackoff:

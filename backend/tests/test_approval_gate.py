@@ -518,6 +518,22 @@ def test_trace_実測が宣言と違えば実際に動いたモデルを出す(t
     assert "未検証" in out
 
 
+def test_trace_控えから使った直しは行数とモデルを出す(tmp_path, capsys):
+    # 校閲の控え（2026-10-08）: 全行を控えから使った回は一度も呼ばないので「未検証」になる。
+    # 直しを出したのがどのモデルかは控えに残っているので、それを並べて出す
+    run_dir = _提案のある実走(tmp_path)
+    run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    run["stages"][1].update({"tier": "standard", "model_reason": "unverified", "model_unverified": True,
+                             "memo": {"rows": 514, "models": ["gemini-3.5-flash-lite"]}})
+    (run_dir / "run.json").write_text(json.dumps(run, ensure_ascii=False), encoding="utf-8")
+    _承認(run_dir)
+
+    rc = ag.main(["--trace", "RID", "--runs-dir", str(tmp_path / "runs")])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "未検証" in out and "控えから 514 行（gemini-3.5-flash-lite の直し）" in out, out
+
+
 def test_trace_スタブに替わった工程はそう言う(tmp_path, capsys):
     run_dir = _提案のある実走(tmp_path)
     run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))

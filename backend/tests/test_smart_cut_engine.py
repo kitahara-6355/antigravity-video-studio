@@ -1258,3 +1258,184 @@ def test_burn_subtitles_ffmpeg_logo_height_invalid_type(mock_run, dummy_video, t
                 str(dummy_video), segments, str(output_path), ffmpeg_editor
             )
             assert result is True
+
+
+# --- 分割された字幕の行の時刻（2026-10-05 raw 4本の実走）-----------------------------
+
+
+def test_split_lines_of_one_utterance_show_one_after_another():
+    """校閲の整形で3行に分かれた発話は、行ごとの時刻で順に出す。
+    発話の区間で出すと3行が同時に出て、下から逆順に積み上がっていた。"""
+    segs = [
+        {"start": 4.0, "end": 6.0, "text": "このチャンネルでは書を", "sourceStart": 4.0, "sourceEnd": 10.0},
+        {"start": 6.0, "end": 8.0, "text": "通して人々の心に触れ、その", "sourceStart": 4.0, "sourceEnd": 10.0},
+        {"start": 8.0, "end": 10.0, "text": "思いを深くお聞きしていきます。", "sourceStart": 4.0, "sourceEnd": 10.0},
+    ]
+
+    out, total, _ = smart_cut_engine.retime_segments(segs, [(4.0, 10.0)])
+
+    assert [(s["start"], s["end"]) for s in out] == [(0.0, 2.0), (2.0, 4.0), (4.0, 6.0)]
+    assert total == 6.0
+
+
+def test_lines_without_their_own_time_fall_back_to_the_utterance():
+    segs = [{"start": 100.0, "end": 101.0, "text": "外れた時刻", "sourceStart": 4.0, "sourceEnd": 6.0}]
+
+    out, _, _ = smart_cut_engine.retime_segments(segs, [(4.0, 6.0)])
+
+    assert (out[0]["start"], out[0]["end"]) == (0.0, 2.0)
+
+
+def test_retime_shifts_later_ranges_and_marks_cut_points():
+    segs = [{"start": 0.0, "end": 2.0, "text": "a", "sourceStart": 0.0, "sourceEnd": 2.0},
+            {"start": 11.0, "end": 12.0, "text": "b", "sourceStart": 10.0, "sourceEnd": 12.0}]
+
+    out, total, cuts = smart_cut_engine.retime_segments(segs, [(0.0, 2.0), (10.0, 12.0)])
+
+    assert cuts == [2.0]
+    assert (out[1]["start"], out[1]["end"]) == (3.0, 4.0)
+    assert total == 4.0
+
+
+def test_retime_marks_the_output_span_each_caption_was_kept_in():
+    """字幕を出してよい区間（出力の秒）。時刻を音声に合わせるとき、カットの向こうに出さない。"""
+    segs = [{"start": 0.0, "end": 2.0, "text": "a", "sourceStart": 0.0, "sourceEnd": 2.0},
+            {"start": 11.0, "end": 12.0, "text": "b", "sourceStart": 10.0, "sourceEnd": 12.0}]
+
+    out, _, _ = smart_cut_engine.retime_segments(segs, [(0.0, 2.0), (10.0, 12.0)])
+
+    assert [s["_zone"] for s in out] == [(0.0, 2.0), (2.0, 4.0)]
+
+
+# --- 書き出しの画素形式（2026-10-05 ユーザー報告: 音だけで映像が出ない）--------------
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg が無い")
+def test_burned_preview_is_yuv420p_so_ordinary_players_show_the_picture(tmp_path):
+    """字幕とロゴ（RGBA の PNG）を合成すると、指定が無ければ yuv444p になる。
+    yuv444p（High 4:4:4）は Windows の標準プレーヤーやブラウザで映像が出ない。"""
+    import subprocess
+    from video_editor_engine import FFmpegEditor
+
+    src = tmp_path / "src.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=320x180:rate=10",
+                    "-f", "lavfi", "-i", "sine=duration=2", "-shortest", "-pix_fmt", "yuv420p", str(src)], check=True)
+    out = tmp_path / "out.mp4"
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = False
+
+    result = smart_cut_engine._burn_subtitles_ffmpeg(
+        str(src), [{"start": 0.0, "end": 1.5, "text": "テスト"}], str(out), editor)
+
+    assert result is True
+    pix = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt",
+                          "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
+    assert pix == "yuv420p"
+
+
+def test_kept_ranges_are_cut_without_drift(tmp_path):
+    """パーツを -c copy で切って結合すると、キーフレームと AAC の端数が積み上がって
+    映像と音声が字幕より遅れた（2026-10-06 実測: 178 区間で 22 秒）。
+    一括抽出なら出力の長さは区間の合計に一致する。"""
+    import subprocess
+    from video_editor_engine import FFmpegEditor
+
+    src = tmp_path / "src.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=60:size=160x90:rate=30",
+                    "-f", "lavfi", "-i", "sine=duration=60", "-shortest", "-g", "60", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", str(src)], check=True)
+    # 20 区間・キーフレームの間を切る。半分はフレームの境目ちょうど（終わりを含めると1フレーム余る）
+    ranges = [(t + 0.37, t + 1.71) if t % 2 else (float(t), t + 1.5) for t in range(0, 58, 3)]
+    out = tmp_path / "cut.mp4"
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = False
+
+    assert smart_cut_engine._cut_kept_ranges_exact(editor, src, ranges, out) is True
+
+    expected = sum(b - a for a, b in ranges)
+    for stream in ("v:0", "a:0"):
+        dur = float(subprocess.run(["ffprobe", "-v", "error", "-select_streams", stream, "-show_entries",
+                                    "stream=duration", "-of", "csv=p=0", str(out)],
+                                   capture_output=True, text=True).stdout.strip())
+        assert abs(dur - expected) < 0.1, (stream, dur, expected)
+
+
+def _flashes_and_beeps(path):
+    """白いフレームの番号と、音が鳴り始める秒（出力の時間軸）。"""
+    import subprocess
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vf", "scale=8:8,format=gray",
+                          "-f", "rawvideo", "-"], capture_output=True, check=True).stdout
+    frames = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 64).mean(axis=1)
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-ac", "1", "-ar", "48000",
+                          "-f", "s16le", "-"], capture_output=True, check=True).stdout
+    loud = np.flatnonzero(np.abs(np.frombuffer(pcm, dtype=np.int16).astype(float)) > 8000)
+    beeps = [loud[0]] + [b for a, b in zip(loud, loud[1:]) if b - a > 4800]
+    return len(frames), list(np.flatnonzero(frames > 128)), [b / 48000 for b in beeps], len(pcm) / 2 / 48000
+
+
+def test_the_sound_stays_with_the_picture_across_a_join_that_lost_sound(tmp_path):
+    """結合した素材は、収録のつなぎ目で音が 65ms 欠けていた（素材の 29分58秒。音の時刻はその分
+    飛んでいる）。音を詰めて並べると、つなぎ目より後ろは音が映像より 65ms 早く出た。区間ごとの
+    フレームと 10ms の端数も別々に積み上がり、54回目は 35〜38分で映像が音より約 0.25 秒遅れた
+    （2026-10-17 実測）。毎秒ちょうどに白いフレームと短い音を入れた素材で、出力の白いフレームと
+    音の鳴り始めが揃っているかを見る。"""
+    import subprocess
+    from video_editor_engine import FFmpegEditor
+
+    src = tmp_path / "src.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                    "color=c=black:s=64x36:r=30:d=20,"
+                    "drawbox=x=0:y=0:w=64:h=36:color=white:t=fill:enable='lt(mod(n,30),1)'",
+                    "-f", "lavfi", "-i", "aevalsrc=exprs='if(lt(mod(t,1),1/30),0.8*sin(2*PI*1000*t),0)':s=48000:d=20",
+                    # 9.92〜9.98 秒の音を抜く（時刻は詰めない）。つなぎ目で音が欠けた素材と同じ形
+                    "-filter_complex", "[1:a]aselect='not(between(t,9.9,9.98))'[a]", "-map", "0:v", "-map", "[a]",
+                    "-g", "30", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-c:a", "aac", str(src)], check=True)
+    assert _flashes_and_beeps(src)[3] < 19.95  # 素材の音は 20 秒に足りない
+    # 区間の端はフレームの間（plan の前の形）。2つ目の区間がつなぎ目をまたぐ
+    ranges = [(0.5, 3.5), (4.2, 13.6), (14.3, 17.8)]
+    out = tmp_path / "cut.mp4"
+    editor = FFmpegEditor(output_dir=tmp_path)
+    editor.use_gpu = False
+
+    assert smart_cut_engine._cut_kept_ranges_exact(editor, src, ranges, out) is True
+
+    frames, flashes, beeps, sound = _flashes_and_beeps(out)
+    # 端は一番近いフレームの境目で切る。15〜105・126〜408・429〜534 番目のフレーム
+    assert frames == 90 + 282 + 105
+    assert len(flashes) == 15 and len(beeps) == 15
+    assert [round(f / 30 - b, 3) for f, b in zip(flashes, beeps)] == [0.0] * 15
+    assert abs(sound - frames / 30) < 0.03
+
+
+@patch("subprocess.run")
+def test_render_cuts_the_ranges_it_is_given(mock_run, dummy_video, tmp_path):
+    """SmartCut が声の切れ目に寄せた区間で切る。字幕の区間から決め直すと、26秒の「ます」の
+    ように発話の区間より長く続く声の尻が切れる（2026-10-13 ユーザー指摘）。"""
+    output_path = tmp_path / "output_planned.mp4"
+    mock_run.return_value = MagicMock(stdout='{"format": {"duration": "20.0"}}')
+    mock_editor = MagicMock()
+    mock_editor.ffmpeg.get_duration.return_value = 20.0
+    mock_editor.ffmpeg.supports_exact_range_cut = False
+    cuts = []
+
+    def mock_cut(input_p, temp_p, start, end):
+        cuts.append((start, end))
+        temp_p.write_bytes(b"cut part")
+        return True
+    mock_editor.ffmpeg.cut_video.side_effect = mock_cut
+    mock_editor.ffmpeg.merge_videos.side_effect = lambda clips, p: p.write_bytes(b"merged") or True
+    mock_editor.ffmpeg.run_command.return_value = (False, "Error")
+    mock_editor.ffmpeg._get_encode_args.return_value = []
+    segments = [{"sourceStart": 1.0, "sourceEnd": 4.0, "start": 1.0, "end": 4.0, "text": "お届けしてまいります"},
+                {"sourceStart": 6.0, "sourceEnd": 9.0, "start": 6.0, "end": 9.0, "text": "記念すべき第1回目"}]
+
+    with patch.dict(sys.modules, {"video_editor_engine": MagicMock(video_editor=mock_editor)}):
+        result = smart_cut_engine.render_smart_cut(segments, str(dummy_video), str(output_path),
+                                                   ranges=[(0.85, 4.55), (6.0, 9.3)])
+
+    assert result is True
+    assert cuts == [(0.85, 4.55), (6.0, 9.3)]
+    import json
+    side = json.loads(output_path.with_name("output_planned.subtitles.json").read_text(encoding="utf-8"))
+    assert side["ranges"] == [[0.85, 4.55], [6.0, 9.3]]

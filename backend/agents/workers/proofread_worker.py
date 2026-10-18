@@ -66,6 +66,15 @@ class ProofreadWorker(PipelineStageWorker):
 
         dict_corrections = 0
         ai_corrections = 0
+        # 控えから使った直しの行数と、その直しを出したモデル（この回には呼んでいない）
+        memo_hits, memo_models = 0, []
+        # 番号ずれなどで直しを捨てて聞き直した行のうち、採れた行数と、採れずに残った行数
+        retried, unproofed = 0, 0
+        # 別の音声認識の聞き取り: 文字起こしから来た所・本文と並べて選んだ所・校閲が採った行
+        heard = {"given": 0, "chosen": 0, "adopted": 0}
+        # 2回目の起こしが割れた所: 候補・本文と並べて選んだ所・字を置いた所
+        split = {"given": 0, "chosen": 0, "applied": 0}
+        memo = None
 
         try:
             from proper_noun_dict import apply_dictionary
@@ -84,17 +93,57 @@ class ProofreadWorker(PipelineStageWorker):
             # → ステータスAPIの応答性を確保し、フロントエンドのタイムアウトを防止
             loop = asyncio.get_running_loop()
             # P-02: return_stats=Trueでリトライ統計を取得
-            result = await loop.run_in_executor(
-                None, lambda: proofread_segments(ctx.segments, return_stats=True)
-            )
+            # 元の文から遠い直しを、音声認識の文字で裁く（認識が使えなければ裁かない）
+            referee = await loop.run_in_executor(None, lambda: _referee_for(ctx.video_path))
+            extra = {"referee": referee} if referee else {}
+            # 一度採った直しは素材ごとに控えて次の書き出しでも使う（同じ入力でも校閲が揺れる・29回目）
+            memo = _memo_for(ctx.video_path)
+            if memo is not None:
+                extra["memo"] = memo
+            # 文字起こしで3回目でも決まらなかった所は、認識の字を渡して文脈で決めさせる（46回目の「座右の目」）。
+            # 渡すのは、本文と並べて文として選ばせ、両順で認識の字を選んだ所だけ（47回目: そのまま渡すと
+            # 「主催→主宰」「細いほど→細いわな」など、本文で通る所まで認識の字にした）
+            if getattr(ctx, "heard_hints", None):
+                # 聞き取りが無ければ判定は使わない（校閲だけ差し替える試験の偽物にも判定は無い）
+                from subtitle_engine.ai_proofreader import judge_heard_hints
+                chosen, judged = await loop.run_in_executor(
+                    None, lambda: judge_heard_hints(ctx.heard_hints, ctx.segments, memo=memo))
+                heard.update(given=len(ctx.heard_hints), chosen=len(chosen), models=judged.get("models") or [],
+                             spots=judged.get("spots") or [])
+                if judged.get("failed"):  # 字幕は校閲したものなので「AI校閲」の印は付けない（一部未校閲ではない）
+                    ctx.warnings.append("別の聞き取り: 選べなかった所は、文字起こしのままにしました")
+                if chosen:
+                    extra["hints"] = chosen
+
+            def proofread(segs, return_stats=True):
+                return proofread_segments(segs, return_stats=return_stats, **extra)
+
+            result = await loop.run_in_executor(None, lambda: proofread(ctx.segments))
             ctx.segments, retry_stats = result
+            heard["adopted"] = int(retry_stats.get("heard_adopted", 0) or 0)
+            # 失敗したバッチは小さく分けて校閲し直す（2026-10-06: 1/7 バッチが落ち、
+            # 「呼んで→読んで」「初回→初会」が未校閲のまま字幕に出た）
+            if retry_stats.get("failed_ranges"):
+                retry_stats = await loop.run_in_executor(
+                    None, lambda: _repair_failed_batches(ctx.segments, retry_stats, proofread))
+            # 番号ずれなどで直しを捨てた行は、前後の行を付けた小さいバッチで聞き直す（45回目: 100行の
+            # 途中から AI が1〜2行ずつ前の行の文を返し、10行が校閲されないまま残った）
+            if retry_stats.get("rejected_rows"):
+                retry_stats = await loop.run_in_executor(
+                    None, lambda: _retry_rejected_rows(ctx.segments, original, retry_stats, proofread))
+                retried, unproofed = int(retry_stats.get("retried_rows", 0) or 0), len(retry_stats["rejected_rows"])
+                if unproofed:
+                    ctx.warnings.append(f"AI校閲: {unproofed}行は直しが元の文と離れすぎて採れず、校閲していません")
             for i, seg in enumerate(ctx.segments):
                 if i < len(original) and seg.get("text", "") != original[i]:
                     ai_corrections += 1
+            memo_hits = int(retry_stats.get("memo_hits", 0) or 0)
+            memo_models = list(retry_stats.get("memo_models") or [])
             # P-02: リトライ統計の可視化
             if retry_stats.get("total_retries", 0) > 0:
                 logger.info(f"🔄 AI校閲リトライ発生: {retry_stats['total_retries']}回 "
                             f"(失敗バッチ: {retry_stats['failed_batches']}/{retry_stats['total_batches']})")
+            ctx.proofread_failed_ranges = list(retry_stats.get("failed_ranges") or [])
             if retry_stats.get("failed_batches", 0) > 0:
                 ctx.warnings.append(
                     f"AI校閲: {retry_stats['failed_batches']}/{retry_stats['total_batches']}バッチが"
@@ -114,6 +163,42 @@ class ProofreadWorker(PipelineStageWorker):
             logger.warning(f"Gemini AI proofread skipped: {e}")
             ctx.skipped_features.append("AI校閲(Gemini)")
             ctx.ai_accepted = {**(getattr(ctx, "ai_accepted", None) or {}), "AI校閲": 0}
+
+        # 2回目の起こしが別の字を書き、認識も決め手にならない所（割れた所）は、校閲の後の文と並べて
+        # 両順で選ばせ、選んだ所だけ字を置く（48回目の 27分05秒「鳴ってる→なってる」・8分15秒「羽毛→肌着」）。
+        # 校閲の前に渡すと、校閲がもう直した所（1分45秒「書道教室」・17分41秒「書道人口」）まで2回目の字
+        # （「初動教室」「初動人口」）に戻すおそれがある。校閲が効いていなければ選ばない
+        if getattr(ctx, "second_readings", None) and "AI校閲(Gemini)" not in ctx.skipped_features:
+            try:
+                split = await asyncio.get_running_loop().run_in_executor(
+                    None, lambda: _choose_split_readings(ctx, memo))
+            except Exception as e:  # noqa: BLE001 — 選べなくても字幕は校閲したもので進む
+                logger.warning(f"割れた聞き取りの選び直しをスキップ: {e}")
+
+        # 同じ語の書き分け（「僕」と「ぼく」）を動画の中で多い方にそろえる。校閲は100行ずつ
+        # 見るので、動画全体の書き方まではそろわない（33回目・2026-10-13）
+        notation = {}
+        try:
+            from subtitle_engine.notation import unify_notation
+            notation = unify_notation(ctx.segments)
+        except Exception as e:
+            logger.warning(f"表記の統一スキップ: {e}")
+
+        # 人が通しで見て直した所（校正台帳）を当てる。文字起こしと校閲は呼ぶたびに揺れるので、
+        # 人の直しは AI に渡さず、AI と表記の統一の後・整形の前に毎回同じに当てる（2026-10-17）
+        review = {}
+        if getattr(ctx, "review_ledger", ""):
+            try:
+                from subtitle_engine import review_ledger
+                review = {"ledger": str(ctx.review_ledger),
+                          **review_ledger.apply(ctx.segments, review_ledger.load(ctx.review_ledger))}
+            except Exception as e:  # noqa: BLE001 — 台帳が当たらなくても字幕は校閲したもので進む
+                logger.warning(f"校正台帳スキップ: {e}")
+                ctx.warnings.append(f"校正台帳を当てられませんでした（{e}）。人の直しが入っていません")
+            if review.get("missing"):
+                at = "・".join(f"{int(m['at']) // 60}分{int(m['at']) % 60:02d}秒" for m in review["missing"])
+                ctx.warnings.append(f"校正台帳: {len(review['missing'])}件の直しが当たりませんでした（素材の {at}）。"
+                                    "その所は字が変わっているので見直しが要ります")
 
         # ━━━ FIX-3A: テキスト整形（旧 src/clean_linguistic.py 復元） ━━━
         # 長文を18文字/行に分割し、字幕の画面はみ出しを防止
@@ -162,6 +247,20 @@ class ProofreadWorker(PipelineStageWorker):
             logger.warning(f"テキスト整形スキップ: {e}")
 
         total = dict_corrections + ai_corrections
+        memo_note = f" / 校閲の控え{memo_hits}行（{'・'.join(memo_models) or '不明'}）" if memo_hits else ""
+        retry_note = (f" / 番号ずれの聞き直し{retried}行" if retried else "") + \
+            (f"（未校閲{unproofed}行）" if unproofed else "")
+        notation_note = f" / 表記{sum(notation.values())}件" if notation else ""
+        heard_note = (f" / 別の聞き取り{heard['given']}か所中 選んだ{heard['chosen']}・採った{heard['adopted']}"
+                      if heard["given"] else "")
+        split_note = (f" / 割れた聞き取り{split['given']}か所中 選んだ{split['chosen']}・置いた{split['applied']}"
+                      if split["given"] else "")
+        review_note = ""
+        if review:
+            review_note = (f" / 人の直し{len(review['applied'])}件"
+                           + (f"（既に直っていた{len(review['already'])}件）" if review["already"] else "")
+                           + (f"（当たらない{len(review['missing'])}件）" if review["missing"] else "")
+                           + (f" / 用語{sum(review['glossary'].values())}件" if review["glossary"] else ""))
         # 使用モデルを取得（UI可視化用）
         try:
             from subtitle_engine.ai_proofreader import _get_current_model
@@ -191,7 +290,155 @@ class ProofreadWorker(PipelineStageWorker):
         logger.info(f"📊 [T-014] ProofreadWorker出口: ctx.segments={len(ctx.segments)}件")
         return StageResult(
             stage_name=self.name, success=True,
-            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{format_stats}{skip_warn}",
-            data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used},
+            detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{retry_note}"
+                   f"{heard_note}{split_note}{notation_note}{review_note}{format_stats}{skip_warn}",
+            data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
+                  "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation, "heard": heard,
+                  "split": split, "review": review},
             duration_seconds=round(time.time() - start, 1),
         )
+
+
+# 失敗したバッチを半分ずつに分けて校閲し直す回数
+REPAIR_ROUNDS = 2
+
+
+def _choose_split_readings(ctx, memo) -> dict:
+    """2回目の起こしが割れた所を、校閲の後の文（ctx.segments）と並べて選ばせ、選んだ所の字を置く。
+
+    返り値は記録に残す集計（given・chosen・applied・models・spots）。候補は
+    `transcript_fusion.split_spots`（辞書の語は誤りの字も正しい字も候補にしない）。
+    """
+    from subtitle_engine import aligner, transcript_fusion
+    from subtitle_engine.ai_proofreader import apply_hints, judge_heard_hints
+    tokens = aligner.tokens_for(str(ctx.video_path))
+    protect = [w for pair in aligner._dictionary_terms() for w in pair]
+    spots = transcript_fusion.split_spots(ctx.segments, ctx.second_readings, tokens, protect=protect)
+    hints = transcript_fusion.heard_hints(ctx.segments, spots, [("open", "")] * len(spots))
+    split = {"given": len(hints), "chosen": 0, "applied": 0}
+    if not hints:
+        return split
+    chosen, judged = judge_heard_hints(hints, ctx.segments, memo=memo)
+    split.update(chosen=len(chosen), applied=apply_hints(ctx.segments, chosen),
+                 models=judged.get("models") or [], spots=judged.get("spots") or [])
+    if judged.get("failed"):
+        ctx.warnings.append("割れた聞き取り: 選べなかった所は、校閲のままにしました")
+    logger.info(f"🗳️ 2回目の起こしが割れた {len(hints)} か所を校閲の後の文と並べて選ばせ、"
+                f"{split['applied']} か所の字を置きました（選んだ {len(chosen)}）")
+    return split
+
+
+def _referee_for(video_path):
+    """校閲の直しを裁く関数（音声認識）。使えなければ None。"""
+    try:
+        from subtitle_engine import aligner
+        return aligner.referee_for(str(video_path)) if video_path else None
+    except Exception as e:  # 認識が無くても校閲はする
+        logger.debug(f"音声認識での裏付けを使いません: {e}")
+        return None
+
+
+def _memo_for(video_path):
+    """素材ごとの校閲の控え（素材と同じ場所の `_proofread_<鍵>.json`）。作れなければ None。
+
+    鍵は素材の場所・大きさ・更新時刻（音声認識のキャッシュと同じ決め方）。素材が変われば別の控え。
+    """
+    try:
+        import hashlib
+        from pathlib import Path
+        from subtitle_engine.ai_proofreader import ProofreadMemo
+        p = Path(str(video_path))
+        st = p.stat()
+        key = hashlib.sha1(f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
+        return ProofreadMemo(p.with_name(f"_proofread_{key}.json"))
+    except Exception as e:  # 控えが無くても校閲はする
+        logger.debug(f"校閲の控えを使いません: {e}")
+        return None
+
+
+def _repair_failed_batches(segments, stats, proofread):
+    """失敗した範囲を半分に分けて校閲し直す。残った失敗の数で stats を更新して返す。
+
+    proofread は渡したリストの字幕（dict）をその場で直す。
+    """
+    ranges = [tuple(r) for r in stats.get("failed_ranges") or []]
+    stats = dict(stats)
+    for _ in range(REPAIR_ROUNDS):
+        if not ranges:
+            break
+        left = []
+        for a, b in ranges:
+            mid = (a + b + 1) // 2
+            for lo, hi in ((a, mid), (mid, b)) if b - a > 1 else ((a, b),):
+                if hi <= lo:
+                    continue
+                _, sub = proofread(segments[lo:hi], return_stats=True)
+                stats["total_retries"] = stats.get("total_retries", 0) + 1
+                stats["accepted_items"] = stats.get("accepted_items", 0) + int(sub.get("accepted_items", 0) or 0)
+                stats["rejected_rows"] = list(stats.get("rejected_rows") or []) + [
+                    lo + k for k in sub.get("rejected_rows") or []]
+                if sub.get("failed_batches") or sub.get("skipped"):
+                    left.append((lo, hi))
+        ranges = left
+    repaired = len(stats.get("failed_ranges") or []) - len(ranges)
+    logger.info(f"🔁 AI校閲の失敗バッチを分けて再実行: 残った失敗 {len(ranges)}件")
+    stats["failed_ranges"] = [list(r) for r in ranges]
+    stats["failed_batches"] = len(ranges)
+    stats["repaired_batches"] = max(0, repaired)
+    return stats
+
+
+# 番号ずれなどで直しを捨てた行を聞き直すとき、前後に付ける行数と、1バッチの行数の上限
+# （100行のバッチでずれた。前後の数行があれば同音の語を文脈で直せる）
+RETRY_CONTEXT = 4
+RETRY_MAX_ROWS = 30
+
+
+def _retry_windows(rows, n):
+    """聞き直す行を、前後 RETRY_CONTEXT 行を付けた [lo, hi) のまとまりに分ける（RETRY_MAX_ROWS 行まで）。
+
+    返り値は [(lo, hi, そのまとまりで聞き直す行)]。
+    """
+    windows = []
+    for r in sorted(set(rows)):
+        lo, hi = max(0, r - RETRY_CONTEXT), min(n, r + RETRY_CONTEXT + 1)
+        if windows and lo <= windows[-1][1] and hi - windows[-1][0] <= RETRY_MAX_ROWS:
+            windows[-1] = (windows[-1][0], hi, windows[-1][2] + [r])
+        else:
+            windows.append((lo, hi, [r]))
+    return windows
+
+
+def _retry_rejected_rows(segments, original, stats, proofread):
+    """番号ずれなどで直しを捨てた行を、前後の行を付けた小さいバッチで校閲し直す。stats を更新して返す。
+
+    渡すのは校閲の前の文（original）。直すのは捨てた行だけで、前後の行は文脈（1回目の直しのまま）。
+    失敗したバッチの再実行で直った行は聞き直さない。聞き直しても捨てた行は stats["rejected_rows"] に残す。
+    proofread は渡したリストの字幕（dict）をその場で直す。
+    """
+    stats = dict(stats)
+    rows = [r for r in sorted(set(stats.get("rejected_rows") or []))
+            if r < len(segments) and segments[r].get("text", "") == original[r]]
+    left, retried = [], 0
+    for lo, hi, targets in _retry_windows(rows, len(segments)):
+        part = [dict(segments[k], text=original[k]) for k in range(lo, hi)]
+        _, sub = proofread(part, return_stats=True)
+        stats["total_retries"] = stats.get("total_retries", 0) + 1
+        if sub.get("failed_batches") or sub.get("skipped"):
+            left.extend(targets)
+            continue
+        again = {lo + k for k in sub.get("rejected_rows") or []}
+        for r in targets:
+            if r in again:
+                left.append(r)
+            else:
+                segments[r]["text"] = part[r - lo]["text"]
+                retried += 1
+    if rows:
+        logger.info(f"🔁 AI校閲で直しを捨てた {len(rows)} 行を小さいバッチで聞き直し: "
+                    f"{retried} 行を採り、{len(left)} 行は校閲せずに残しました")
+    stats["accepted_items"] = stats.get("accepted_items", 0) + retried
+    stats["retried_rows"] = retried
+    stats["rejected_rows"] = left
+    return stats
+
