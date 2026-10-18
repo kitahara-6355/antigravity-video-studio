@@ -199,6 +199,10 @@ class ProofreadWorker(PipelineStageWorker):
                 at = "・".join(f"{int(m['at']) // 60}分{int(m['at']) % 60:02d}秒" for m in review["missing"])
                 ctx.warnings.append(f"校正台帳: {len(review['missing'])}件の直しが当たりませんでした（素材の {at}）。"
                                     "その所は字が変わっているので見直しが要ります")
+            if review.get("near"):
+                at = "・".join(f"{int(m['at']) // 60}分{int(m['at']) % 60:02d}秒" for m in review["near"])
+                ctx.warnings.append(f"校正台帳: {len(review['near'])}件の直しを、字が少し違う所に当てました（素材の {at}）。"
+                                    "当てた所が合っているか見直しが要ります")
 
         # ━━━ FIX-3A: テキスト整形（旧 src/clean_linguistic.py 復元） ━━━
         # 長文を18文字/行に分割し、字幕の画面はみ出しを防止
@@ -259,6 +263,7 @@ class ProofreadWorker(PipelineStageWorker):
         if review:
             review_note = (f" / 人の直し{len(review['applied'])}件"
                            + (f"（既に直っていた{len(review['already'])}件）" if review["already"] else "")
+                           + (f"（字の近い所に当てた{len(review['near'])}件）" if review.get("near") else "")
                            + (f"（当たらない{len(review['missing'])}件）" if review["missing"] else "")
                            + (f" / 用語{sum(review['glossary'].values())}件" if review["glossary"] else ""))
         # 使用モデルを取得（UI可視化用）

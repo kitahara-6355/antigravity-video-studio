@@ -545,6 +545,33 @@ class Runner:
         self._event("note", text=text)
         self.write_status()
 
+    def redo(self, key: str, why: str) -> list[str]:
+        """手順 key とその後の手順を、まだ済んでいない形に戻す（次の `run` でやり直す）。返り値は戻した手順。
+
+        コードを直した後に同じ素材で書き出し直すときに使う（2026-10-18: 字幕の欠落と台帳の当て方を直した後、
+        キャッシュ無しの通しの AI の出力のまま2つの版を作り直した）。作業場の AI の出力は消さないので、
+        書き出しは API をほとんど呼ばない。前の確認用ファイルは置き場の `previous/<時刻>/` に移して残す。
+        """
+        keys = [s["key"] for s in self.steps]
+        if key not in keys:
+            raise JobError(f"「{key}」という手順はありません（{'・'.join(keys)}）")
+        undone = [k for k in keys[keys.index(key):] if k in self.state["steps"]]
+        stamp = self.now().strftime("%Y%m%dT%H%M%SZ")
+        for k in undone:
+            name = "assets" if k == "keep" else k.split(":", 1)[1] if k.split(":")[0] in ("review", "compare") else None
+            folder = self.out / name if name else None
+            if folder is not None and folder.is_dir():
+                dest = self.out / "previous" / stamp / folder.name
+                if not dest.exists():
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(folder), str(dest))
+            del self.state["steps"][k]
+        self.state["finished_at"] = None
+        self._save_state()
+        self._event("redo", step=key, steps=undone, text=why)
+        self.write_status()
+        return undone
+
     def write_status(self) -> None:
         """工程ライブの画面が読む status.json を書き直す（全体のいま）。"""
         now = self.now()
@@ -581,7 +608,7 @@ class Runner:
             "budget": ({"id": budget.get("id"), "limit_jpy": budget.get("limit_jpy"),
                         "left_jpy": round(budget_left, 1)} if budget else None),
             "disk_free_gb": disk,
-            "notes": [e for e in self._journal() if e.get("kind") == "note"],
+            "notes": [e for e in self._journal() if e.get("kind") in ("note", "redo")],
         }
         self.live.mkdir(parents=True, exist_ok=True)
         _write_json(self.live / "status.json", status)
@@ -914,6 +941,10 @@ def main(argv: list[str] | None = None) -> int:
     note = sub.add_parser("note", help="工程ライブに判断を書き足す")
     note.add_argument("job")
     note.add_argument("text")
+    redo = sub.add_parser("redo", help="手順とその後をやり直す形に戻す（理由は工程ライブに残る）")
+    redo.add_argument("job")
+    redo.add_argument("step", help="手順の名前（edit:zero など。status で見る）")
+    redo.add_argument("why", help="なぜやり直すか")
     mainline = sub.add_parser("mainline", help="本線を進み具合つきで動かす（run が使う。引数は本線と同じ）")
     mainline.add_argument("args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -928,6 +959,14 @@ def main(argv: list[str] | None = None) -> int:
         return runner.run()
     if args.cmd == "note":
         runner.note(args.text)
+        return 0
+    if args.cmd == "redo":
+        try:
+            undone = runner.redo(args.step, args.why)
+        except JobError as e:
+            print(f"🚫 {e}", file=sys.stderr)
+            return 2
+        print(f"↩ やり直す形に戻しました: {'・'.join(undone) or 'なし'}（次の run で進めます）")
         return 0
     if args.cmd == "status":
         _print_status(runner)

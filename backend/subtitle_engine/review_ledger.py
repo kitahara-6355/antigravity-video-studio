@@ -29,8 +29,15 @@ logger = logging.getLogger(__name__)
 REVIEWS_DIR = Path(__file__).resolve().parents[1] / "config" / "reviews"
 # 行の範囲からこれより離れた行には当てない（行は長いと 15 秒ほどある）
 WINDOW_SEC = 30.0
-# 探すときに無視する字（字幕では句読点を外して空白にする）
-_IGNORE = frozenset("、。，．,.!?！？ 　\n")
+# 探すときに無視する字（字幕では句読点を外して空白にする）。かぎ括弧も、校閲が付けたり外したりするので見ない
+# （「主宰されている「筆文字」の直しが、括弧の無い行に当たらなかった・2026-10-18 のキャッシュ無しの再現テスト）
+_IGNORE = frozenset("、。，．,.!?！？ 　\n「」『』")
+# 字が少し違っても当てる（`_near_match`）のは、言った所からこの秒数の中の行だけ
+FUZZY_SEC = 5.0
+# 字が少し違っても当てるときの似ている度合いの下限（同じ字の数 ÷ 長い方の字数）
+FUZZY_RATIO = 0.65
+# これより短い直しは字が少し違う所には当てない（「うんと」が「うなん」に当たった）
+FUZZY_MIN_CHARS = 4
 
 
 def load(path) -> dict | None:
@@ -114,14 +121,62 @@ def _with_marks(text: str, pattern: str, i: int, j: int) -> tuple[int, int]:
     return i, j
 
 
+def _bare(text: str) -> tuple[str, list[int]]:
+    """探すときに無視する字（`_IGNORE`）を外した文と、その各字の元の位置。"""
+    pos = [k for k, ch in enumerate(text) if ch not in _IGNORE]
+    return "".join(text[k] for k in pos), pos
+
+
+def _near_match(segments: list[dict], c: dict, near: list[tuple[float, int]]) -> tuple[int, int, int] | None:
+    """``from`` も ``to`` もそのままは無いとき、言った所から ``FUZZY_SEC`` 秒の中の行で、``from`` か ``to`` に
+    いちばん似ている所（行の番号, [i, j)）。似ている度合いが ``FUZZY_RATIO`` に満たなければ None。
+
+    台帳の直しは「AI が書いた字（from）」を探すので、キャッシュ無しで起こし直して AI が別の字を書くと
+    当たらなかった（2026-10-18 のキャッシュ無しの再現テストで 39件中28件。9分21秒は「焦るわけ」が
+    「怒れるわけ」になっていた）。同じ所の同じ言葉の聞き違いは字が近いので、似ている所に ``to`` を当てる。
+    """
+    from difflib import SequenceMatcher
+    want = [w for w in (_bare(c["from"])[0], _bare(c.get("to") or "")[0]) if len(w) >= FUZZY_MIN_CHARS]
+    if not want:
+        return None
+    best = None
+    for d, k in near:
+        if d > FUZZY_SEC:
+            continue
+        bare, pos = _bare(segments[k].get("text", ""))
+        for w in want:
+            for n in range(max(2, len(w) - 2), len(w) + 3):
+                for i in range(0, len(bare) - n + 1):
+                    # 同じ字の数を長い方の字数で割る（短い所だけに当てて、頭の字を残さない）
+                    blocks = [b for b in SequenceMatcher(
+                        None, bare[i:i + n], w, autojunk=False).get_matching_blocks() if b.size]
+                    if not blocks:
+                        continue
+                    r = sum(b.size for b in blocks) / max(n, len(w))
+                    # 窓の頭と後ろの、どの字とも合わない字は外す（隣の語を巻き込まない）。直しの字の頭・後ろも
+                    # 合っていなければ、その分は聞き違いの字なので残す（「怒れるわけ」→「折れるわけ」の「怒」）
+                    head = max(0, blocks[0].a - blocks[0].b)
+                    tail = max(0, (n - blocks[-1].a - blocks[-1].size) - (len(w) - blocks[-1].b - blocks[-1].size))
+                    if best is None or (r, -abs(n - len(w)), -d) > (best[0], -best[1], -best[2]):
+                        best = (r, abs(n - len(w)), d, k, pos[i + head], pos[i + n - 1 - tail] + 1)
+    if best is None or best[0] < FUZZY_RATIO:
+        return None
+    _, _, _, k, i, j = best
+    return (k, *_with_marks(segments[k].get("text", ""), c["to"], i, j))
+
+
 def apply(segments: list[dict], ledger: dict | None) -> dict:
     """台帳の直しと用語を ``segments`` の ``text`` に当てる（その場で書き換える）。
 
-    返り値は記録に残す報告: applied・already・missing（直しの id と at）と、glossary（用語ごとの置き換え数）。
+    直しの ``from`` をそのまま探して当て、次に用語を当て、最後に当たらなかった直しを見直す。用語を当てた
+    後に ``to`` があれば already（用語の誤りが ``from`` の字を変えていた）、似ている所があれば near
+    （`_near_match`。人が見直せるよう、置き換える前の字を ``was`` に残す）、どちらも無ければ missing。
+    返り値は記録に残す報告: applied・already・near・missing（直しの id と at）と、glossary（用語ごとの置き換え数）。
     """
-    report = {"applied": [], "already": [], "missing": [], "glossary": {}}
+    report = {"applied": [], "already": [], "near": [], "missing": [], "glossary": {}}
     if not ledger:
         return report
+    pending = []
     for c in ledger.get("corrections", []):
         at = float(c["at"])
         near = sorted((d, k) for k, s in enumerate(segments)
@@ -135,8 +190,7 @@ def apply(segments: list[dict], ledger: dict | None) -> dict:
                 report["applied"].append(entry)
                 break
         else:
-            right = c["to"] and any(_find(segments[k].get("text", ""), c["to"]) for _, k in near)
-            report["already" if right else "missing"].append(entry)
+            pending.append((c, near, entry))
     for g in ledger.get("glossary", []):
         n = 0
         for w in g.get("wrong", []):
@@ -147,4 +201,14 @@ def apply(segments: list[dict], ledger: dict | None) -> dict:
                     s["text"] = text.replace(w, g["term"])
         if n:
             report["glossary"][g["term"]] = n
+    for c, near, entry in pending:
+        if c["to"] and any(_find(segments[k].get("text", ""), c["to"]) for _, k in near):
+            report["already"].append(entry)
+        elif c["to"] and (m := _near_match(segments, c, near)):
+            k, i, j = m
+            text = segments[k].get("text", "")
+            segments[k]["text"] = text[:i] + c["to"] + text[j:]
+            report["near"].append(dict(entry, was=text[i:j]))
+        else:
+            report["missing"].append(entry)
     return report

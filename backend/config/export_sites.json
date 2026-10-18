@@ -201,6 +201,16 @@
       ]
     },
     {
+      "id": "backend/edit_job.py::Runner.redo",
+      "file": "backend/edit_job.py",
+      "symbol": "Runner.redo",
+      "status": "intermediate",
+      "reason": "やり直す前の**確認用ファイル**（`place` が置いた3分版・全編360p版・一覧画像）を、置き場の `previous/<時刻>/` に移して残す。人が見比べるための縮小コピーで、完成品ではない（投稿にも本番の書き出しにも使わない）",
+      "tools": [
+        "move"
+      ]
+    },
+    {
       "id": "backend/fix_video_quality.py::fix_and_concat",
       "file": "backend/fix_video_quality.py",
       "symbol": "fix_and_concat",

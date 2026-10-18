@@ -37,8 +37,12 @@ PYTHONPATH=./backend python -m backend.agents.pipeline_coordinator <素材>.mp4 
 
 - 台帳が壊れていれば API を呼ぶ前に止まる
 - 校閲の工程の記録に「人の直し N件（当たらない M件）」が出る。当たらない直しは警告にも出る
-- 実行記録（`output/runs/<実行>/run.json`）の proofread の `review` に、当たった・既に直っていた・
-  当たらなかった直しの id が残る
+- 実行記録（`output/runs/<実行>/run.json`）の proofread の `review` に、当たった（applied）・既に直っていた
+  （already）・字の近い所に当てた（near・置き換える前の字は `was`）・当たらなかった（missing）直しの id が残る
+- 当て方は3段: `from` をそのまま探す → 用語を当てる → 残りは `to` が既にあるか、言った所から5秒の中で
+  `from` か `to` に似ている所（同じ字が長い方の 65% 以上・4字以上の直しだけ）を探す。キャッシュ無しで起こし直すと
+  AI が同じ所を別の字に聞き違える（2026-10-18 の再現テストで 39件中28件が当たらなかった）ので、似ている所に当てて
+  「字の近い所に当てた」として警告に出す。当てた所が合っているかは人が見る
 - 書き出しの後、`backend/branding/proper_nouns.json` と `backend/usage_tracker/usage_data.json` を
   `git checkout` で戻す（実行が書き換える）
 
@@ -113,7 +117,8 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet compare <承
 ```
 
 - AI は温度0・seed 固定でも同じ字を返すとは限らない。違いは2種類に分かれる:
-  - 台帳の直しが当たらなかった所（記録の「当たらない」）→ 台帳の `from` を見直す
+  - 台帳の直しが当たらなかった所（記録の「当たらない」）→ 台帳の `from` を見直す。同じ語の聞き違いなら
+    `glossary` の `wrong` に足す（どの書き出しでも当たる）
   - AI が前と違う字を書いた所 → 人が見て、正しければそのまま、違えば台帳に足す
 - 違いが 0 になれば「raw + 台帳 + コード」で再現できたことになる
 

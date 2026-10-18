@@ -464,9 +464,10 @@ def test_a_short_word_from_another_line_is_not_added():
     assert stats["gone"] == [{"start": 2233.089, "end": 2233.58, "text": "私も", "reason": "no_room"}]
 
 
-def test_a_short_word_its_line_s_caption_cannot_take_is_marked_for_the_gate():
-    # 同じ行の字幕は出ているのに、2行が埋まっていて足せない短い声は、外した字幕に `line_shown` を付ける
-    # （品質ゲートが短くても欠落と数える）
+def test_a_short_word_its_line_s_caption_cannot_take_is_marked_for_the_gate(monkeypatch):
+    # 同じ行の字幕は出ているのに、2行が埋まっていて足せず、2枚にも組み直せない短い声は、外した字幕に
+    # `line_shown` を付ける（品質ゲートが短くても欠落と数える）
+    monkeypatch.setattr(sync, "_reflow_into_two", lambda *a, **k: False)
     out, stats = _ayakari(first="あ" * 18 + "\n" + "い" * 18)
     assert all("私も" not in s["text"] for s in out)
     assert stats["gone"] == [{"start": 2233.089, "end": 2233.58, "text": "私も", "reason": "no_room",
@@ -781,3 +782,35 @@ def test_speech_left_without_a_caption_is_measured_from_where_the_words_end():
     sp = _map([(1.0, 4.2), (4.3, 5.5), (5.6, 8.0), (8.4, 9.6)], total=12)
     out, _ = sync.align_segments([_school_caption()], sp, [], RULES)
     assert "私\u3000小学校3年生の時に" not in [s["text"] for s in out]
+
+
+def test_a_spoken_line_both_full_neighbours_cannot_take_is_reflowed_into_two_captions():
+    # 実例（16分36秒・2026-10-18 のキャッシュ無しの再現テスト）: 「先生の文字を」は認識に無く 0.44 秒で
+    # 置き場所が無かった。両隣の字幕が2行で埋まっていて行として足せず、言った言葉が字幕から消えて
+    # 品質ゲートが不合格にした。次の字幕と続けて2枚に組み直し、次の字幕の出ている間を字数で分ける
+    sp = _map([(991.8, 996.1), (996.8, 1000.9)], total=1005)
+    segs = [{"start": 991.8, "end": 996.1, "text": "鬼滅ファンね　世界に\n4000万人いるって言われてますけど",
+             "_asr": True, "_asr_first": 991.8, "_break_punct": True},
+            {"start": 996.35, "end": 996.78, "text": "先生の文字を", "_asr_interp": True},
+            {"start": 996.8, "end": 1000.9, "text": "ファンの　そういう中でね　筆文字を\n見てくれているわけじゃないですか",
+             "_asr": True, "_asr_first": 996.8}]
+    out, stats = sync.align_segments(segs, sp, [], RULES)
+    assert stats["joined"] == 1 and stats["gone"] == []
+    texts = [s["text"] for s in out]
+    assert texts[0] == "鬼滅ファンね　世界に\n4000万人いるって言われてますけど"
+    assert len(texts) == 3 and texts[1].startswith("先生の文字を")
+    assert "".join(t.replace("\n", "").replace("　", "") for t in texts[1:]) == (
+        "先生の文字をファンのそういう中でね筆文字を見てくれているわけじゃないですか")
+    # 2枚は次の字幕の出ていた間を分け合う（外側の時刻は動かさない）
+    assert out[1]["start"] == pytest.approx(996.8, abs=0.35)
+    assert out[1]["end"] < out[2]["start"] and out[2]["end"] == pytest.approx(1000.9, abs=0.6)
+    assert all(s["end"] - s["start"] >= RULES["min_display_sec"] for s in out[1:])
+
+
+def test_a_reflow_that_would_flash_a_caption_is_not_made():
+    # 組み直した2枚のどちらかが読めないほど短く出るなら組み直さない（今までどおり外し、品質ゲートが数える）
+    o = {"start": 10.0, "end": 11.2, "text": "ファンの　そういう中でね　筆文字を\n見てくれているわけじゃないですか"}
+    s = {"start": 9.6, "end": 9.9, "text": "先生の文字を"}
+    items = [o]
+    assert sync._reflow_into_two(items, o, s, False, 18, 2) is False
+    assert items == [o] and o["end"] == 11.2

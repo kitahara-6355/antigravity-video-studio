@@ -203,6 +203,42 @@ def test_a_failed_step_is_recorded_and_the_next_run_starts_from_it(tmp_path):
     assert any(json.loads(line)["kind"] == "fail" for line in journal)
 
 
+def test_redo_undoes_a_step_and_the_ones_after_it_and_keeps_the_earlier_files(tmp_path):
+    # コードを直した後に同じ素材で書き出し直す。作業場（AI の出力）はそのまま、前の確認用ファイルは残す
+    runner = _runner(tmp_path)
+    done = []
+
+    def ok(step):
+        done.append(step["key"])
+        return {}
+
+    runner.handlers = {k: ok for k in runner.handlers}
+    assert runner.run() == 0
+    (tmp_path / "out" / "zero").mkdir(parents=True)
+    (tmp_path / "out" / "zero" / "first3.mp4").write_bytes(b"old")
+
+    undone = runner.redo("edit:zero", "字幕の欠落を直したので書き出し直す")
+
+    assert undone[0] == "edit:zero" and undone[-1] == "keep" and "join" not in undone
+    assert not (tmp_path / "out" / "zero").exists()
+    kept = list((tmp_path / "out" / "previous").glob("*/zero/first3.mp4"))
+    assert len(kept) == 1 and kept[0].read_bytes() == b"old"
+    journal = [json.loads(line) for line in
+               (tmp_path / "out" / "live" / "journal.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert journal[-1]["kind"] == "redo" and journal[-1]["text"] == "字幕の欠落を直したので書き出し直す"
+
+    again = _runner(tmp_path)
+    again.handlers = {k: ok for k in again.handlers}
+    done.clear()
+    assert again.run() == 0
+    assert done == ["check"] + undone
+
+
+def test_redo_refuses_a_step_the_job_does_not_have(tmp_path):
+    with pytest.raises(edit_job.JobError, match="手順はありません"):
+        _runner(tmp_path).redo("edit:nope", "x")
+
+
 def test_a_note_goes_into_the_journal_and_the_live_status(tmp_path):
     runner = _runner(tmp_path)
 
