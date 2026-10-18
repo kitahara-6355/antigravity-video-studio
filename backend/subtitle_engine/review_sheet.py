@@ -185,6 +185,16 @@ def compare(approved: dict, again: dict) -> list[dict]:
     return out
 
 
+def format_compare(diff: list[dict]) -> list[str]:
+    """`compare` の違いを人が読む行にする（最後の行は違いの数）。"""
+    def show(ts):
+        return " / ".join(t.replace(_BREAKS, " ") for t in ts) or "（なし）"
+    lines = [f"素材 {_clock(d['src'])}  承認: {show(d['approved'])}\n          作り直し: {show(d['again'])}"
+             for d in diff]
+    lines.append(f"違い {len(diff)} か所" if diff else "字幕は承認したものと同じです")
+    return lines
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="字幕のレビュー画面の控えを作る・画面の印を校正台帳に入れる")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -209,10 +219,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "compare":
         diff = compare(*(json.loads(Path(p).read_text(encoding="utf-8")) for p in (args.approved, args.again)))
-        for d in diff:
-            show = lambda ts: " / ".join(t.replace(_BREAKS, " ") for t in ts) or "（なし）"  # noqa: E731
-            print(f"素材 {_clock(d['src'])}  承認: {show(d['approved'])}\n          作り直し: {show(d['again'])}")
-        print(f"違い {len(diff)} か所" if diff else "字幕は承認したものと同じです")
+        print("\n".join(format_compare(diff)))
         return 1 if diff else 0
 
     if args.cmd == "export":
