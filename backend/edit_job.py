@@ -62,8 +62,8 @@ RUNTIME_FILES = ("backend/branding/proper_nouns.json",
                  "backend/usage_tracker/usage_data.json",
                  "backend/usage_tracker/daily_usage.json")
 
-# 43分の素材を最初から書き出すと約220回（起こし2回 × 104・校閲7・起こし直しと説明文）。ゆとりを足す
-CACHELESS_CALLS = 250
+# 43分の素材を最初から書き出すと約410回（2026-10-18 の実測: 起こし 400・校閲 12・説明文 1）。ゆとりを足す
+CACHELESS_CALLS = 450
 CACHED_CALLS = 10
 # 予算の残りの下限（見積もりは上限側で、無料枠に収まれば実費は 0 円。キャッシュ無しの通しは上限見積もりで約 ¥25）
 CACHELESS_JPY = 60.0
@@ -733,7 +733,7 @@ class Runner:
         return {"from": folder or f"raw のフォルダ（ID 末尾 {folder_id[-4:]}）",
                 "parts": [{"name": f["name"], "size": int(f.get("size") or 0),
                            "md5": f.get("md5Checksum")} for f in chosen],
-                "mb": round(size / 1e6, 1)}
+                "mb": round(size / 1024 ** 2, 1)}
 
     def step_join(self, step: dict) -> dict:
         from backend import media_concat
@@ -877,7 +877,7 @@ class Runner:
                      "temp": "完成したら消してよい（確認用）"},
             "files": files, "review": review})
         size = sum(f["size"] for f in files)
-        return {"files": len(files), "mb": round(size / 1e6, 1), "path": str(dest)}
+        return {"files": len(files), "mb": round(size / 1024 ** 2, 1), "path": str(dest)}
 
 
 def _existing(path: Path) -> Path:
