@@ -171,7 +171,8 @@ def test_no_storage_token_is_only_informational():
 def _clean_env(monkeypatch):
     for name in ("GOOGLE_API_KEY", "GOOGLE_API_KEY_PRO", "GEMINI_API_KEY",
                  "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
-                 "R2_BUCKET", "CCR_SESSION_PROFILE"):
+                 "R2_BUCKET", "CCR_SESSION_PROFILE", "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
+                 "AVS_RAW_DRIVE_FOLDER_ID", "AVS_ASSETS_GOOGLE_TOKEN_JSON"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -298,3 +299,137 @@ def test_the_real_ledger_checks_the_drive_token_scope():
                if r["id"] == "avs-raw")
     assert row["token_env"] in row["env"]
     assert row["oauth_scope"] == _READONLY
+
+
+# --- 5. 過程の資産の Drive トークンは drive.file だけ（2026-10-18） --------------------
+
+_FILE = "https://www.googleapis.com/auth/drive.file"
+_ASSETS_ROW = {
+    "id": "avs-assets", "provider": "google_drive",
+    "env": ["AVS_ASSETS_GOOGLE_TOKEN_JSON"], "token_env": "AVS_ASSETS_GOOGLE_TOKEN_JSON",
+    "key_suffix": None, "oauth_scope": _FILE, "read_only": False,
+    "login": "python scripts/google_oauth_login.py --assets", "status": "planned",
+}
+
+
+def _both_ledger() -> dict:
+    ledger = _drive_ledger()
+    ledger["storage"].append(dict(_ASSETS_ROW))
+    return ledger
+
+
+def _tok(scopes, refresh="SECRET-RT") -> str:
+    return json.dumps({"refresh_token": refresh, "scopes": scopes})
+
+
+def _both_env(raw_scopes=(_READONLY,), assets_scopes=None, *, raw_rt="SECRET-RT",
+              assets_rt="SECRET-RT-2") -> dict:
+    env = _drive_env(_tok(list(raw_scopes), raw_rt))
+    if assets_scopes is not None:
+        env["AVS_ASSETS_GOOGLE_TOKEN_JSON"] = _tok(list(assets_scopes), assets_rt)
+    return env
+
+
+def test_the_real_ledger_has_the_assets_row():
+    ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+    row = next(r for r in ledger["storage"] if r["id"] == "avs-assets")
+    raw = next(r for r in ledger["storage"] if r["id"] == "avs-raw")
+
+    assert row["oauth_scope"] == _FILE
+    assert row["token_env"] == "AVS_ASSETS_GOOGLE_TOKEN_JSON" and row["token_env"] in row["env"]
+    assert row["token_env"] != raw["token_env"]
+    assert row["gcp_project_id"] == raw["gcp_project_id"] == "avs-prod-free-kb"
+    assert row["account"] == "corporate" and row["read_only"] is False
+    assert row["status"] == "planned" and row["key_suffix"] is None
+    assert "--assets" in row["login"]
+    assert "AVS_ASSETS_GOOGLE_TOKEN_JSON" in ledger["cloud_allowed_env"]
+
+
+def test_an_absent_assets_token_is_fine_while_planned():
+    findings = check_projects(_both_env(), _both_ledger(), cloud=True)
+
+    assert _fails(findings) == []
+    assert any(level == "INFO" and "avs-assets" in t for level, t in findings)
+
+
+def test_a_drive_file_assets_token_passes():
+    findings = check_projects(_both_env(assets_scopes=[_FILE]), _both_ledger(), cloud=True)
+
+    assert _fails(findings) == []
+    assert any(level == "OK" and "avs-assets" in t and "drive.file" in t for level, t in findings)
+    assert any(level == "OK" and "avs-raw" in t and "読み取り専用" in t for level, t in findings)
+
+
+@pytest.mark.parametrize("scopes", [
+    ["https://www.googleapis.com/auth/drive"],
+    [_READONLY],
+    [_FILE, "https://www.googleapis.com/auth/drive"],
+    [],
+])
+def test_an_assets_token_that_is_not_exactly_drive_file_fails(scopes):
+    fails = _fails(check_projects(_both_env(assets_scopes=scopes), _both_ledger(), cloud=True))
+
+    assert any("avs-assets" in t and "権限" in t and "--assets" in t for t in fails)
+    assert not any("SECRET-RT" in t for t in fails)
+
+
+def test_the_same_token_in_both_ports_fails():
+    env = _both_env(assets_scopes=[_FILE])
+    env["AVS_ASSETS_GOOGLE_TOKEN_JSON"] = env["ANTIGRAVITY_GOOGLE_TOKEN_JSON"]
+
+    fails = _fails(check_projects(env, _both_ledger(), cloud=True))
+
+    assert any("同じトークン" in t for t in fails)
+    assert not any("SECRET-RT" in t for t in fails)
+
+
+def test_the_same_refresh_token_in_both_ports_fails():
+    env = _both_env(assets_scopes=[_FILE], raw_rt="SAME-RT", assets_rt="SAME-RT")
+
+    fails = _fails(check_projects(env, _both_ledger(), cloud=True))
+
+    assert any("同じトークン" in t for t in fails)
+    assert not any("SAME-RT" in t for t in fails)
+
+
+def test_a_read_token_carrying_drive_file_is_mixing():
+    env = _both_env(raw_scopes=[_READONLY, _FILE], assets_scopes=[_FILE])
+
+    fails = _fails(check_projects(env, _both_ledger(), cloud=True))
+
+    assert any("avs-raw" in t and "avs-assets" in t and "混ざって" in t for t in fails)
+
+
+def test_an_assets_token_carrying_readonly_is_mixing():
+    env = _both_env(assets_scopes=[_FILE, _READONLY])
+
+    fails = _fails(check_projects(env, _both_ledger(), cloud=True))
+
+    assert any(t.startswith("avs-assets のトークンに avs-raw の権限") for t in fails)
+
+
+def test_a_broken_assets_token_fails_without_echoing_it():
+    env = _both_env()
+    env["AVS_ASSETS_GOOGLE_TOKEN_JSON"] = '{"refresh_token": "SECRET-RT", oops'
+
+    fails = _fails(check_projects(env, _both_ledger(), cloud=True))
+
+    assert any("avs-assets" in t and "JSON" in t for t in fails)
+    assert not any("SECRET-RT" in t for t in fails)
+
+
+def test_the_real_ledger_passes_with_good_tokens_and_no_assets_token():
+    """実台帳で、raw の読み取り用だけが揃った今の状態は FAIL にならない（資産は planned）。"""
+    ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+    raw = next(r for r in ledger["storage"] if r["id"] == "avs-raw")
+    prod = next(p for p in ledger["projects"] if p["id"] == "avs-prod-free")
+    env = {"GOOGLE_API_KEY": "AIzaSyLOOKS_REAL_ENOUGH_000" + prod["key_suffix"],
+           "ANTIGRAVITY_GOOGLE_TOKEN_JSON": _tok([_READONLY]),
+           "AVS_RAW_DRIVE_FOLDER_ID": "1AbCdEfGh" + raw["key_suffix"]}
+
+    findings = check_projects(env, ledger, cloud=True)
+
+    assert _fails(findings) == []
+    assert any(level == "INFO" and "avs-assets" in t for level, t in findings)
+    env["AVS_ASSETS_GOOGLE_TOKEN_JSON"] = _tok([_FILE], "OTHER-RT")
+    assert _fails(check_projects(env, ledger, cloud=True)) == []

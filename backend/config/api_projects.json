@@ -9,9 +9,10 @@
   "cloud_allowed_env": [
     "GOOGLE_API_KEY",
     "ANTIGRAVITY_GOOGLE_TOKEN_JSON",
-    "AVS_RAW_DRIVE_FOLDER_ID"
+    "AVS_RAW_DRIVE_FOLDER_ID",
+    "AVS_ASSETS_GOOGLE_TOKEN_JSON"
   ],
-  "cloud_rule": "クラウドの Secrets に置くのは avs-prod-free のキーと raw の読み取り専用トークン（Drive）だけ（2026-09-26 ユーザー決定）。GOOGLE_API_KEY_PRO をクラウドに置かない → クラウドからは課金が物理的に起きない",
+  "cloud_rule": "クラウドの Secrets に置くのは avs-prod-free のキーと raw の読み取り専用トークン（Drive）だけ（2026-09-26 ユーザー決定）。GOOGLE_API_KEY_PRO をクラウドに置かない → クラウドからは課金が物理的に起きない。2026-10-18 追記: 過程の資産を書く drive.file だけのトークン（AVS_ASSETS_GOOGLE_TOKEN_JSON）も置く。北原さんの追加要望③（Google の許可を都度の承認なしに）と、書く許可を「作るファイルだけ」にした北原さんの選択（10-18 カード）から。Drive API は無料なので課金は起きない",
   "deprecated_env": [
     "GEMINI_API_KEY"
   ],
@@ -79,6 +80,24 @@
       "key_suffix": "2h-z",
       "read_only": true,
       "status": "active"
+    },
+    {
+      "id": "avs-assets",
+      "provider": "google_drive",
+      "role": "過程の資産（AI の出力・字幕・実行記録）の保管。drive.file でアプリが作ったものだけ読み書きする。マイドライブに『AVS 過程の資産』をアプリが作る（後から動かしてよい）。書く許可は drive.file（2026-10-18 北原さんがカードで選択）。raw を読むトークンとは別のトークンにする（raw_source は書ける権限の混ざったトークンを断るため）。backend/asset_store.py",
+      "account": "corporate",
+      "account_note": "法人（info@kitahara-birei.com）で同意する。同意画面は avs-prod-free-kb の avs-raw-reader（内部）",
+      "gcp_project": "avs-prod-free",
+      "gcp_project_id": "avs-prod-free-kb",
+      "oauth_scope": "https://www.googleapis.com/auth/drive.file",
+      "env": [
+        "AVS_ASSETS_GOOGLE_TOKEN_JSON"
+      ],
+      "token_env": "AVS_ASSETS_GOOGLE_TOKEN_JSON",
+      "key_suffix": null,
+      "read_only": false,
+      "login": "python scripts/google_oauth_login.py --assets",
+      "status": "planned"
     }
   ],
   "not_ours": [
