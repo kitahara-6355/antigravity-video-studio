@@ -9,11 +9,19 @@
 食い違った所だけを手元の音声認識（ReazonSpeech・`aligner`）に聞いて 2対1 で決める。
 複数の認識結果を突き合わせて1本にする定石（NIST の ROVER・1997）と同じ考え。
 
-- 1回目を骨組みにする。行の分け方と時刻は1回目のまま、字だけを直す
+- 1回目を骨組みにする。行の分け方と時刻は1回目のまま、字だけを直す（1回目が丸ごと落とした文を
+  行の切れ目に足すときだけ、2回目の時刻で行を足す）
 - 食い違いごとに、2回目の字（前後の字を2字まで付けて3字以上）が認識に聞こえていて、
   1回目の字が聞こえていないときだけ2回目の字にする
 - 2回目だけが足した字は、全部は聞こえなくても、前の字と続けて認識に聞こえる頭の部分は足す
   （「出会いな」→「出会いなんです」。2回目は「なんですて」・認識は「なんですね」）
+- 1回目が丸ごと落とした文は、文の時刻のそばで認識に聞こえれば、前後の字が聞こえなくても足す
+  （2026-10-18・素材の 37分36秒「分かりました」: 1回目は「…私も。」の次が段取りの「ちょっと切ります。」で、
+  2回目と前の区切り方の2回目は書いていた。認識は前の「あやかりたいと思います私も」を聞かず、頭の「分か」は
+  認識に渡した区間の頭（3秒前）にこぼれていて、前の字と続けて探す決め方では足せなかった。字幕が無いまま声だけが
+  残り、品質ゲートにも見えなかった）。数えるのは、文と2字以上続けて合い、1回目の字と合っていない、文の
+  時刻の前後1秒の認識の字（区切りで2回目が同じ文を繰り返しても、認識の字は1回目の文と合っているので
+  足さない）。言いよどみ・相づちだけの文と4字未満の文は足さない。43分の素材で足すのはこの1文だけ
 - 1回目の字を2〜3字消すのは、2回目にも無く、認識が前後の字を、その字数を言う間もなく
   （毎秒 MAX_CPS 字で言っても足りない間で）続けて聞いたときだけ（2分49秒「しようと
   そういう」→「しようという」。認識は「と」と「い」を 0.2 秒で聞いた）
@@ -153,6 +161,12 @@ MAX_EXAMPLES = 50
 # 行の頭の時刻がチャンクの区切りからこれ以内なら、区切りで始まる行とみなす
 # （`gemini_transcriber.drop_boundary_echoes` と同じ幅）
 CUT_SLACK_SEC = 0.3
+# 1回目に無い文を丸ごと足すとき（`_heard_sentence`）: 文の字数の下限、認識に聞こえた字の割合の下限、
+# 認識の字を数える文の時刻の前後の幅
+SENTENCE_MIN = 4
+SENTENCE_HEARD = 0.6
+SENTENCE_PAD_SEC = 1.0
+_SENTENCE_END = "。？！?!"
 
 
 def _flatten(segments: list[dict]) -> list[tuple[str, int, int]]:
@@ -315,6 +329,58 @@ def _drop_filler_rows(ops: list[tuple], fa: list[tuple[str, int, int]]) -> list[
     return out
 
 
+def _sentence_starts(rows: list[dict], flat: list[tuple[str, int, int]]) -> set[int]:
+    """そろえた字の位置のうち、文の頭（行の頭か、前の字との間に文末の句読点がある所）。末尾の位置も含む。"""
+    starts = {0, len(flat)}
+    for k in range(1, len(flat)):
+        (_, r0, c0), (_, r1, c1) = flat[k - 1], flat[k]
+        if r0 != r1 or any(ch in _SENTENCE_END for ch in str(rows[r1].get("text") or "")[c0 + 1:c1]):
+            starts.add(k)
+    return starts
+
+
+def _sentence_span(rows: list[dict], flat: list[tuple[str, int, int]],
+                   s0: int, s1: int) -> tuple[float, float, str] | None:
+    """そろえた字の s0〜s1 の文の時刻（行の時刻を字数で割り振った見込み）と、元の文（文末の句読点まで）。
+    文が2行にまたがる・行の時刻が読めなければ None。"""
+    row = flat[s0][1]
+    if flat[s1 - 1][1] != row:
+        return None
+    try:
+        t0, t1 = float(rows[row]["start"]), float(rows[row]["end"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    ks = [k for k, (_, r, _) in enumerate(flat) if r == row]
+    text = str(rows[row].get("text") or "")
+    end = flat[s1][2] if s1 < len(flat) and flat[s1][1] == row else len(text)
+    return (round(t0 + (t1 - t0) * (s0 - ks[0]) / len(ks), 3), round(t0 + (t1 - t0) * (s1 - ks[0]) / len(ks), 3),
+            text[flat[s0][2]:end].strip())
+
+
+def _heard_sentence(said: str, heard: str, times: list[float], claimed: set[int],
+                    lo: int, hi: int, t0: float, t1: float) -> bool:
+    """1回目に無い文 said（そろえた字）を、認識が heard[lo:hi] の中で、文の時刻 t0〜t1 のそばで聞いたか。
+
+    数えるのは、文と2字以上続けて合い、1回目の字と合っていない（claimed でない・1回目の別の字の声
+    ではない）、文の時刻の前後 SENTENCE_PAD_SEC 秒の中の認識の字。文の SENTENCE_HEARD 以上がそうで、
+    3字以上続くこと。言いよどみ・相づちだけの文と、SENTENCE_MIN 字未満の文は足さない。
+    """
+    if len(said) < SENTENCE_MIN or _only_fillers(said):
+        return False
+    near, run = 0, 0
+    for blk in difflib.SequenceMatcher(None, said, heard[lo:hi], autojunk=False).get_matching_blocks():
+        if blk.size < 2:
+            continue
+        cur = 0
+        for k in range(lo + blk.b, lo + blk.b + blk.size):
+            if k not in claimed and t0 - SENTENCE_PAD_SEC <= times[k] <= t1 + SENTENCE_PAD_SEC:
+                near, cur = near + 1, cur + 1
+                run = max(run, cur)
+            else:
+                cur = 0
+    return run >= MIN_PROBE and near >= SENTENCE_HEARD * len(said)
+
+
 def fuse(primary: list[dict], secondary: list[dict],
          tokens: list[tuple[str, float]] | None,
          cuts: list[float] | tuple = ()) -> tuple[list[dict], dict]:
@@ -323,11 +389,15 @@ def fuse(primary: list[dict], secondary: list[dict],
     cuts は primary を起こしたときのチャンクの区切り（素材の秒）。区切りで割れて隣り合う2行に
     またがった語は、割れた字の多い方の行に直した字を置く（`_split_at_cut`）。ほかの行をまたぐ
     食い違いは決めない（どちらの行の字か分からない）。
+    primary に無い文を secondary が書き、文の時刻のそばで認識に聞こえたときは、前後の字が認識に
+    聞こえなくても文ごと足す（`_heard_sentence`）。足す所が primary の行の切れ目なら、secondary の
+    時刻で行を足す。行の中なら、前の文の後ろに句読点ごと入れる。
     返り値は (行, 集計)。行は primary の写し（渡した行は書き換えない）。
-    集計は {"differences", "adopted", "examples": [{"start", "before", "after"}]}。
+    集計は {"differences", "adopted", "sentences", "examples": [{"start", "before", "after"}]}。
+    sentences は足した文の数（adopted にも入る）。
     """
     out = [dict(s) for s in primary]
-    stats = {"differences": 0, "adopted": 0, "examples": []}
+    stats = {"differences": 0, "adopted": 0, "sentences": 0, "examples": []}
     if not tokens or not primary or not secondary:
         return out, stats
     fa, fb = _flatten(primary), _flatten(secondary)
@@ -340,8 +410,10 @@ def fuse(primary: list[dict], secondary: list[dict],
     ops = _drop_filler_rows(ops, fa)
     anchors = sorted(k for k in a2b if k in a2r)
     breaks = _breaks(fa)
+    starts_a, starts_b = _sentence_starts(primary, fa), _sentence_starts(secondary, fb)
+    claimed = set(a2r.values())
 
-    chosen = []
+    chosen, sentences = [], []
     for op, i1, i2, j1, j2 in ops:
         if op == "equal":
             continue
@@ -376,12 +448,38 @@ def fuse(primary: list[dict], secondary: list[dict],
             n = _heard_head(window, left, b)
             if n:
                 chosen.append((i1, i2, j1, j1 + n))
+            elif i1 in starts_a and j1 in starts_b:
+                # 1回目に無い文は、文の時刻のそばで認識に聞こえれば丸ごと足す（素材の 37分36秒「分かりました」:
+                # 認識は前の「あやかりたいと思います私も」を聞かず、前の字と続けて探せなかった）
+                ends = sorted(k for k in starts_b if j1 < k <= j2)
+                for s0, s1 in zip([j1] + ends, ends):
+                    span = _sentence_span(secondary, fb, s0, s1)
+                    if span and _heard_sentence(xb[s0:s1], heard, times, claimed, max(0, lo - WINDOW_PAD),
+                                                hi + WINDOW_PAD + 1, span[0], span[1]):
+                        sentences.append((i1, s0, span))
 
     texts = [list(str(s.get("text") or "")) for s in primary]
     btexts = [str(s.get("text") or "") for s in secondary]
     examples = []
+    added: dict[int, list[dict]] = {}  # 1回目の行の番号 → その後ろに足す行
     # 後ろから置き換える（前の字の位置がずれない）
-    for i1, i2, j1, j2 in sorted(chosen, reverse=True):
+    for i1, i2, j1, j2, span in sorted([(i1, i2, j1, j2, None) for i1, i2, j1, j2 in chosen]
+                                       + [(i1, i1, s0, s0, span) for i1, s0, span in sentences],
+                                       key=lambda e: e[:4], reverse=True):
+        if span is not None:  # 1回目に無い文
+            t0, t1, said = span
+            if i1 < len(fa) and fa[i1 - 1][1] == fa[i1][1]:  # 行の中: 前の文の後ろに入れる
+                row = fa[i1][1]
+                texts[row][fa[i1][2]:fa[i1][2]] = list(said)
+                at = primary[row].get("start")
+            else:  # 行の切れ目: 2回目の時刻で行を足す
+                added.setdefault(fa[i1 - 1][1], []).insert(0, dict(
+                    secondary[fb[j1][1]], start=t0, end=t1, text=said, sourceStart=t0, sourceEnd=t1, words=[]))
+                at = t0
+            stats["adopted"] += 1
+            stats["sentences"] += 1
+            examples.append({"start": at, "before": "", "after": said})
+            continue
         if j2 > j1:
             if fb[j1][1] != fb[j2 - 1][1]:  # 2回目の行をまたぐ字は使わない
                 continue
@@ -411,6 +509,8 @@ def fuse(primary: list[dict], secondary: list[dict],
         examples.append({"start": primary[row].get("start"), "before": before, "after": new})
     for seg, chars in zip(out, texts):
         seg["text"] = "".join(chars)
+    if added:
+        out = [r for k, seg in enumerate(out) for r in (seg, *added.get(k, ()))]
     stats["examples"] = examples[::-1][:MAX_EXAMPLES]
     return out, stats
 

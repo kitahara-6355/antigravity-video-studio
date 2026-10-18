@@ -368,7 +368,8 @@ class TranscribeWorker(PipelineStageWorker):
         # 2回目のモデルも実行記録に残す（前の区切り方から写したチャンクはモデルを記録していないことがある）
         stats = dict(stats, models=list(made.get("models_used") or []), carried=int(made.get("carried") or 0))
         logger.info(f"🗳️ 文字起こしの2回目と突き合わせ: 食い違い {stats['differences']} か所のうち "
-                    f"{stats['adopted']} か所を、2回目と手元の音声認識が同じ字に直しました")
+                    f"{stats['adopted']} か所を、2回目と手元の音声認識が同じ字に直しました"
+                    f"（1回目に無い文を足したのは {stats.get('sentences', 0)} か所）")
         # 前の区切り方の2回目も、もう1つの聞き取りとして突き合わせる。区切りが違えば聞き違える所も
         # 違うので、捨てると、前の2回目が正しかった所が1回目の字に戻る（45回目: 2回目を起こし直したら
         # 締めの「絶やして」「増やしていく」や「豊橋筆」「書道家」が戻った。突き合わせると 44 か所を直し、
@@ -378,9 +379,10 @@ class TranscribeWorker(PipelineStageWorker):
             readings.append(self._read_gemini_checkpoint(path))
             fused, more = transcript_fusion.fuse(fused, readings[-1], tokens, cuts=list(cuts))
             stats["earlier"].append({"tag": tag, "differences": more["differences"], "adopted": more["adopted"],
+                                     "sentences": more.get("sentences", 0),
                                      "models": list(gemini_transcriber.read_meta(path).get("models_used") or [])})
             logger.info(f"🗳️ 前の区切り方の2回目（{tag}）とも突き合わせ: 食い違い {more['differences']} か所のうち "
-                        f"{more['adopted']} か所を直しました")
+                        f"{more['adopted']} か所を直しました（1回目に無い文を足したのは {more.get('sentences', 0)} か所）")
         # 校閲の後に、2回目が別の字を書いたまま決まらない所を選び直すために残す（`ProofreadWorker`）
         ctx.second_readings = readings
         fused, look = await self._third_look(ctx, whisper_checkpoint, fused, readings, tokens)

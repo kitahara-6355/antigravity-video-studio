@@ -6,9 +6,11 @@
 
 守りたい性質:
 
-1. 2回目と手元の音声認識が同じ字を聞き、1回目だけが違う所は 2回目の字にする（2対1）
+1. 2回目と手元の音声認識が同じ字を聞き、1回目だけが違う所は 2回目の字にする（2対1）。
+   1回目が丸ごと落とした文は、文の時刻のそばで認識に聞こえれば、前後の字が聞こえなくても足す
+   （言いよどみ・相づちだけの文、4字未満の文、1回目の字と合う認識の字は数えない）
 2. 認識が1回目と同じ・どちらとも違う所は 1回目のまま
-3. 行の分け方と時刻は 1回目のまま（字だけ直す）
+3. 行の分け方と時刻は 1回目のまま（字だけ直す）。1回目の行の切れ目に文を足すときだけ、2回目の時刻で行を足す
 4. 1回目の字を2字以上消すのは、2回目にも無く、認識が前後の字を言う間もなく続けて聞いた所だけ（3字まで）。
    言いよどみと数字は触らない（認識が落としやすい所）
 5. 2回目は区切りの位置をずらして起こす（1回目の区切りの前後が2回目では区切りの中ほどになる）。
@@ -110,6 +112,75 @@ def test_the_head_of_an_addition_is_not_taken_where_the_first_pass_was_heard():
     out, _ = tfu.fuse(first, second, _heard("へえそういう出会いなしかもなんですね", start=10.0))
 
     assert out[0]["text"] == first[0]["text"]
+
+
+# 実例（素材の 37分36秒・57回目）: 1回目は「…私も。」の次が段取りの「ちょっと切ります。」で、間の
+# 「分かりました。」が無い。2回目と前の区切り方の2回目は書いた。認識は「あやかりたいと思います私も」を
+# 聞かず（前の字と続けて探せない）、「分かりました」の頭の「分か」は声の区間の頭（2秒前）にこぼれた
+WAKARI_FIRST = [_row(2247.4, 2257.4, "はあ、素晴らしいと思います。あの、あやかりたいと思います。私も。"),
+                _row(2258.0, 2259.2, "ちょっと切ります。")]
+WAKARI_SECOND = [_row(2251.6, 2256.1, "はあ、素晴らしいと思います。あの、あやかりたいと思います、私も。"),
+                 _row(2256.1, 2257.6, "分かりました。"),
+                 _row(2258.1, 2259.1, "ちょっと切ります。")]
+
+
+def _wakari_heard(tail="りました"):
+    return (_heard("すばらしいと思います", start=2251.4, step=0.15) + [("分", 2253.5), ("か", 2253.6)]
+            + _heard(tail, start=2256.6, step=0.3) + _heard("切ります", start=2258.5, step=0.2))
+
+
+def test_a_whole_sentence_only_the_first_pass_left_out_is_added_as_its_own_row():
+    out, stats = tfu.fuse(WAKARI_FIRST, WAKARI_SECOND, _wakari_heard())
+
+    assert [s["text"] for s in out] == [WAKARI_FIRST[0]["text"], "分かりました。", "ちょっと切ります。"]
+    # 足した行の時刻は2回目の行から。ほかの行は1回目のまま
+    assert [(s["start"], s["end"]) for s in out] == [(2247.4, 2257.4), (2256.1, 2257.6), (2258.0, 2259.2)]
+    assert out[1]["sourceStart"] == 2256.1 and out[1]["words"] == []
+    assert stats["adopted"] == 1 and stats["sentences"] == 1
+    assert stats["examples"] == [{"start": 2256.1, "before": "", "after": "分かりました。"}]
+
+
+def test_a_sentence_the_recogniser_heard_only_far_from_where_it_was_said_is_not_added():
+    """頭の「分か」は2秒前にこぼれた字。文の時刻のそばで聞こえた字だけを数える。"""
+    out, stats = tfu.fuse(WAKARI_FIRST, WAKARI_SECOND, _wakari_heard(tail="た"))
+
+    assert [s["text"] for s in out] == [s["text"] for s in WAKARI_FIRST]
+    assert stats["sentences"] == 0
+
+
+def test_a_sentence_the_second_pass_wrote_twice_is_not_added_again():
+    """区切りの境目で2回目が同じ文を繰り返しても、認識の字は1回目の文と合っている（1回目の声）。"""
+    first = [_row(0.0, 4.0, "もう、終わりです。あ、もう、残念。")]
+    second = [_row(0.0, 2.0, "もう終わりです。"), _row(2.0, 4.0, "もう終わりです。あ、もう、残念。")]
+
+    out, stats = tfu.fuse(first, second, _heard("もう終わりですあもう残念", step=0.3))
+
+    assert [s["text"] for s in out] == [first[0]["text"]] and stats["sentences"] == 0
+
+
+def test_a_sentence_left_out_inside_a_row_goes_in_after_the_sentence_before_it():
+    """足す所が1回目の行の中なら、その行の文の切れ目に句点ごと入れる（行と時刻はそのまま）。"""
+    first = [_row(0.0, 6.0, "料理ですかね。素晴らしいと思います。")]
+    second = [_row(0.0, 2.5, "料理ですかね。分かりました。"), _row(2.5, 6.0, "素晴らしいと思います。")]
+    heard = _heard("料理です", step=0.2) + _heard("分かりました", start=1.6) + _heard("素晴らしいと思います", start=2.6)
+
+    out, stats = tfu.fuse(first, second, heard)
+
+    assert [(s["text"], s["start"], s["end"]) for s in out] == [
+        ("料理ですかね。分かりました。素晴らしいと思います。", 0.0, 6.0)]
+    assert stats["sentences"] == 1
+
+
+@pytest.mark.parametrize("extra", ["うん、はい。", "そう。"])
+def test_fillers_and_very_short_sentences_are_not_added(extra):
+    first = [_row(0.0, 6.0, "料理ですかね。素晴らしいと思います。")]
+    second = [_row(0.0, 2.5, f"料理ですかね。{extra}"), _row(2.5, 6.0, "素晴らしいと思います。")]
+    said = extra.replace("、", "").replace("。", "")
+    heard = _heard("料理です", step=0.2) + _heard(said, start=1.6) + _heard("素晴らしいと思います", start=2.6)
+
+    out, stats = tfu.fuse(first, second, heard)
+
+    assert out[0]["text"] == first[0]["text"] and stats["sentences"] == 0
 
 
 def test_more_than_three_characters_of_the_first_pass_are_never_dropped():
