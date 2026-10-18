@@ -39,6 +39,8 @@ MODEL_FILES = {
     "tokens": "tokens.txt",
 }
 CACHE_VERSION = 1
+# キャッシュの字の時刻の時間軸（`_on_source_timeline`）。素材の時間軸（映像と同じ）
+TIMELINE = "source"
 SAMPLE_RATE = 16000
 # 認識に渡す1回の長さの上限。長くすると認識が落ちる（2026-10-06 実測: 20秒だと
 # 20 秒ぶんの発話から十数文字しか出ないことがある。8 秒なら取りこぼさない）
@@ -150,12 +152,10 @@ def _get_recognizer():
 
 def _read_pcm(media: str):
     import numpy as np
-    proc = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-v", "error", "-i", str(media), "-vn", "-ac", "1",
-         "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"], capture_output=True, timeout=3600)
-    if proc.returncode != 0:
-        raise RuntimeError(f"音声の読み出しに失敗: {proc.stderr[-300:]!r}")
-    return np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+    import media_timeline
+    # 映像と同じ時間軸で読む（つなぎ目で飛んだ音を詰めて読むと、後ろの字の時刻が早くなる）
+    pcm = media_timeline.read_pcm(media, SAMPLE_RATE, timeout=3600)
+    return np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
 
 
 def chunk_bounds(onsets: list[float], offsets: list[float], duration: float,
@@ -214,18 +214,18 @@ def _cache_path(media: str) -> Path:
 
 
 def tokens_for(media: str) -> list[tuple[str, float]] | None:
-    """素材の認識結果（キャッシュがあれば読む）。使えなければ None。"""
+    """素材の認識結果（キャッシュがあれば読む）。時刻は素材の時間軸（映像と同じ）。使えなければ None。"""
     try:
         cache = _cache_path(media)
         if cache.exists():
             data = json.loads(cache.read_text(encoding="utf-8"))
             if data.get("version") == CACHE_VERSION:
-                return _lagged(data["tokens"])
+                return _lagged(_on_source_timeline(data["tokens"], media, data.get("timeline")))
         if not available():
             return None
         logger.info(f"🎙️ 字幕の時刻合わせ用に音声認識しています（初回のみ）: {Path(media).name}")
         tokens = recognize(media)
-        cache.write_text(json.dumps({"version": CACHE_VERSION, "model": MODEL_NAME,
+        cache.write_text(json.dumps({"version": CACHE_VERSION, "model": MODEL_NAME, "timeline": TIMELINE,
                                      "tokens": tokens}, ensure_ascii=False), encoding="utf-8")
         return _lagged(tokens)
     except Exception as e:  # 認識できなくても字幕は出す
@@ -236,6 +236,42 @@ def tokens_for(media: str) -> list[tuple[str, float]] | None:
 def _lagged(tokens) -> list[tuple[str, float]]:
     """キャッシュは認識の時刻のまま持ち、使うときに声の立ち上がりへずらす。"""
     return [(c, round(float(t) + LAG_SEC, 3)) for c, t in tokens]
+
+
+def _on_source_timeline(tokens, media: str, timeline: str | None = None) -> list:
+    """キャッシュの字の時刻を素材の時間軸に直す。
+
+    印（timeline）の無いキャッシュは、音を詰めて読んで認識していた（2026-10-18 まで）。つなぎ目で
+    飛んだ音の分だけ後ろの字が早いので、飛びを足す（`media_timeline`）。飛びが測れなければそのまま使う。
+    """
+    if timeline == TIMELINE:
+        return tokens
+    import media_timeline
+    try:
+        gaps = media_timeline.audio_gaps(media)
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
+        logger.warning(f"音の飛びを測れないので、認識の時刻を直さずに使います: {e}")
+        return tokens
+    if not gaps:
+        return tokens
+    times = media_timeline.to_source_times([t for _, t in tokens], gaps)
+    return [(c, t) for (c, _), t in zip(tokens, times)]
+
+
+def cached_tokens(cache) -> list:
+    """認識のキャッシュ（`_cache_path`）の字と時刻を、素材の時間軸で読む（`LAG_SEC` は足さない）。
+
+    印の無いキャッシュは、同じフォルダの素材（キャッシュの鍵が合うもの）の音の飛びで直す
+    （`_on_source_timeline`）。素材が見つからなければ書いてある時刻のまま。
+    """
+    cache = Path(cache)
+    data = json.loads(cache.read_text(encoding="utf-8"))
+    if data.get("timeline") == TIMELINE:
+        return data["tokens"]
+    for media in sorted(cache.parent.iterdir()):
+        if media.is_file() and media != cache and _cache_path(str(media)) == cache:
+            return [list(t) for t in _on_source_timeline(data["tokens"], str(media))]
+    return data["tokens"]
 
 
 # 校閲の直しを裁くとき、行の前後これだけの認識結果を聞く

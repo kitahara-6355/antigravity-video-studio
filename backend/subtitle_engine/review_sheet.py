@@ -189,7 +189,8 @@ def main(argv: list[str] | None = None) -> int:
     ex.add_argument("--label", required=True)
     ex.add_argument("--video", required=True, help="画面が読む動画のファイル名（控えと同じフォルダ）")
     ex.add_argument("--out", required=True)
-    ex.add_argument("--asr", default="", help="別の音声認識の字と時刻（ReazonSpeech の _align_rz_*.json）。機械の要確認を付ける")
+    ex.add_argument("--asr", default="", help="別の音声認識の字と時刻（ReazonSpeech の _align_rz_*.json。素材の時間軸に"
+                    "直して読む）。機械の要確認を付ける")
     im = sub.add_parser("import", help="画面の印（JSON の配列）を校正台帳の直しに足す")
     im.add_argument("marks")
     im.add_argument("--ledger", required=True)
@@ -211,7 +212,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "export":
         sidecar = json.loads(Path(args.sidecar).read_text(encoding="utf-8"))
-        tokens = json.loads(Path(args.asr).read_text(encoding="utf-8"))["tokens"] if args.asr else None
+        from subtitle_engine import aligner
+        tokens = aligner.cached_tokens(args.asr) if args.asr else None
         sheet = export(sidecar, args.run, args.label, args.video, tokens)
         Path(args.out).write_text(json.dumps(sheet, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         flags = f"・機械の要確認 {len(sheet['flags'])} 枚" if "flags" in sheet else ""

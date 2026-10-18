@@ -222,7 +222,13 @@ class QuietMap:
 
     @classmethod
     def from_media(cls, media: str | Path) -> "QuietMap | None":
-        """音声を読んで地図を作る。読めなければ None（呼び出し側は機械的な区切りに戻る）。"""
+        """音声を読んで地図を作る。読めなければ None（呼び出し側は機械的な区切りに戻る）。
+
+        音は詰めて読む（`media_timeline.read_pcm` を使わない）。区切りの位置は起こしの控え（チャンク・
+        3回目の区間）の鍵で、映像と同じ時間軸で読むと、つなぎ目より後ろの区切りが動いて（raw 4本の
+        結合では最大 0.165 秒）控えが使えず、起こし直しになる。一番静かな所を選ぶのには、この揺れは
+        ほとんど効かない。
+        """
         try:
             import numpy as np
 
@@ -298,8 +304,11 @@ def split_audio(video_path: str | Path, work_dir: str | Path,
                 plan: list[tuple[float, float]] | None = None) -> list[tuple[Path, float, float]]:
     """音声を mono 16kHz の mp3 にして切る。(path, offset, duration)。
 
-    plan（`plan_chunks` の (開始, 長さ)）が無ければ `chunk_sec` 秒ずつ。
+    plan（`plan_chunks` の (開始, 長さ)）が無ければ `chunk_sec` 秒ずつ。チャンクの中も映像と同じ
+    時間軸で並べる（`media_timeline.TIMELINE_FILTER`。つなぎ目で飛んだ音を詰めると、チャンクの
+    後ろの行の時刻が早くなる）。
     """
+    from media_timeline import TIMELINE_FILTER
     if plan is None:
         plan = plan_chunks(_probe_duration(video_path), chunk_sec, None)
     work_dir = Path(work_dir)
@@ -309,8 +318,8 @@ def split_audio(video_path: str | Path, work_dir: str | Path,
         path = work_dir / f"chunk_{idx:03d}.mp3"
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-ss", f"{offset:.3f}", "-t", f"{dur:.3f}",
-             "-i", str(video_path), "-vn", "-ac", "1", "-ar", "16000", "-b:a", "32k",
-             str(path)],
+             "-i", str(video_path), "-vn", "-af", TIMELINE_FILTER, "-ac", "1", "-ar", "16000",
+             "-b:a", "32k", str(path)],
             capture_output=True, text=True, check=True, timeout=300)
         chunks.append((path, offset, dur))
     return chunks

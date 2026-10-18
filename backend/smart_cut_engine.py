@@ -318,13 +318,14 @@ def _frame_cut_graph(ranges, rate, sample_rate) -> str:
     時刻どおりに並べる（つなぎ目で欠けた音は無音で埋める）。音を詰めて並べると、素材の 29分58秒の
     つなぎ目より後ろで音が映像より 65ms 早く出た（2026-10-17 実測）。
     """
+    from media_timeline import TIMELINE_FILTER
     per_frame = Fraction(sample_rate) / rate
     # 1フレームが整数のサンプルにならない（29.97fps など）ときは 1ms ずつ数える（端数は 1ms 未満）
     block = per_frame.numerator if per_frame.denominator == 1 else max(1, round(sample_rate / 1000))
     expr = "+".join(f"gte(t,{(round(a * rate) - 0.5) / rate:.6f})*lt(t,{(round(b * rate) - 0.5) / rate:.6f})"
                     for a, b in ranges)
     return (f"[0:v]fps={rate.numerator}/{rate.denominator},select='{expr}',setpts=N/FRAME_RATE/TB[v];"
-            f"[0:a]aresample=async=1:min_hard_comp=0.01:first_pts=0,asetnsamples=n={block}:p=0,"
+            f"[0:a]{TIMELINE_FILTER},asetnsamples=n={block}:p=0,"
             f"aselect='{expr}',asetpts=N/SR/TB[a]")
 
 

@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 from dataclasses import dataclass
 
 import numpy as np
@@ -175,14 +174,9 @@ def speech_map_from_levels(levels: np.ndarray) -> SpeechMap:
 
 
 def speech_map(media: str, rate: int = 16000) -> SpeechMap:
-    """動画・音声ファイルから話し始め・話し終わりを取る（ffmpeg・ローカル）。"""
-    proc = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-v", "error", "-i", str(media), "-vn", "-ac", "1",
-         "-ar", str(rate), "-f", "s16le", "-"],
-        capture_output=True, timeout=1800)
-    if proc.returncode != 0:
-        raise RuntimeError(f"音声の読み出しに失敗: {proc.stderr[-300:]!r}")
-    samples = np.frombuffer(proc.stdout, dtype=np.int16)
+    """動画・音声ファイルから話し始め・話し終わりを取る（映像と同じ時間軸・ffmpeg・ローカル）。"""
+    import media_timeline
+    samples = np.frombuffer(media_timeline.read_pcm(media, rate), dtype=np.int16)
     return speech_map_from_levels(frame_levels_db(samples, rate))
 
 

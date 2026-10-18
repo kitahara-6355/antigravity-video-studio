@@ -378,21 +378,23 @@ class SourceAudio:
 
 
 def read_audio(path, rate: int = 16000) -> SourceAudio | None:
-    """素材の音を読む（ffmpeg・ローカル）。読めなければ None（切れ目は動かさない）。"""
+    """素材の音を、映像と同じ時間軸で読む（`media_timeline.read_pcm`・ffmpeg・ローカル）。
+    読めなければ None（切れ目は動かさない）。"""
     try:
         if not path or not Path(path).is_file() or Path(path).stat().st_size == 0:
             return None
-        proc = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-v", "error", "-i", str(path), "-vn", "-ac", "1",
-             "-ar", str(rate), "-f", "s16le", "-"],
-            capture_output=True, timeout=1800)
-        if proc.returncode != 0 or not isinstance(proc.stdout, bytes) or not proc.stdout:
+        import media_timeline
+        try:
+            pcm = media_timeline.read_pcm(path, rate)
+        except RuntimeError:
+            return None
+        if not isinstance(pcm, bytes) or not pcm:
             return None
         # 音が読めてから読み込む（subtitle_engine・numpy は読み込みが重く、読めない素材では要らない。
         # 字幕だけで切る経路は numpy を読まない）
         import numpy as np
         from subtitle_engine import sync
-        levels = sync.frame_levels_db(np.frombuffer(proc.stdout, dtype=np.int16), rate)
+        levels = sync.frame_levels_db(np.frombuffer(pcm, dtype=np.int16), rate)
         if len(levels) == 0:
             return None
         return SourceAudio(levels=levels, speech=sync.speech_map_from_levels(levels))

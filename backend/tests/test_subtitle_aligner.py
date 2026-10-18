@@ -127,6 +127,55 @@ def test_recognised_times_are_moved_to_the_voice_onset(tmp_path):
     assert 0.1 <= aligner.LAG_SEC <= 0.3
 
 
+def test_an_old_cache_is_put_on_the_timeline_of_the_picture(tmp_path, monkeypatch):
+    """2026-10-18 までのキャッシュは音を詰めて読んで認識していた。素材の 29分58秒のつなぎ目で音の
+    時刻が 65ms 飛んでいて、そこより後ろの字が映像より早かった。飛びの分を足して使う。"""
+    import media_timeline
+    media = tmp_path / "v.mp4"
+    media.write_bytes(b"x")
+    monkeypatch.setattr(media_timeline, "audio_gaps", lambda m: [(1798.1, 0.065)])
+    aligner._cache_path(str(media)).write_text(
+        json.dumps({"version": aligner.CACHE_VERSION, "tokens": [["あ", 1000.0], ["い", 2000.0]]}),
+        encoding="utf-8")
+    assert aligner.tokens_for(str(media)) == [("あ", pytest.approx(1000.0 + aligner.LAG_SEC)),
+                                              ("い", pytest.approx(2000.065 + aligner.LAG_SEC))]
+
+    # 映像と同じ時間軸で認識したキャッシュ（印あり）は直さない
+    aligner._cache_path(str(media)).write_text(
+        json.dumps({"version": aligner.CACHE_VERSION, "timeline": aligner.TIMELINE,
+                    "tokens": [["い", 2000.0]]}), encoding="utf-8")
+    assert aligner.tokens_for(str(media)) == [("い", pytest.approx(2000.0 + aligner.LAG_SEC))]
+
+
+def test_a_cache_file_is_read_on_the_timeline_of_its_source(tmp_path, monkeypatch):
+    """朱入れの控え（`review_sheet export --asr`）はキャッシュのファイルを直に読む。印の無いキャッシュは、
+    鍵の合う素材を同じフォルダから探して飛びを足す。素材が無ければ書いてある時刻のまま。"""
+    import media_timeline
+    media = tmp_path / "v.mp4"
+    media.write_bytes(b"x")
+    (tmp_path / "other.mp4").write_bytes(b"yy")
+    monkeypatch.setattr(media_timeline, "audio_gaps", lambda m: [(1798.1, 0.065)] if Path(m) == media else [])
+    cache = aligner._cache_path(str(media))
+    cache.write_text(json.dumps({"version": aligner.CACHE_VERSION, "tokens": [["あ", 1000.0], ["い", 2000.0]]}),
+                     encoding="utf-8")
+    assert aligner.cached_tokens(cache) == [["あ", 1000.0], ["い", 2000.065]]
+
+    lone = tmp_path / "lone" / cache.name
+    lone.parent.mkdir()
+    lone.write_text(cache.read_text(encoding="utf-8"), encoding="utf-8")
+    assert aligner.cached_tokens(lone) == [["あ", 1000.0], ["い", 2000.0]]
+
+
+def test_a_new_recognition_is_marked_as_on_the_timeline_of_the_picture(tmp_path, monkeypatch):
+    media = tmp_path / "v.mp4"
+    media.write_bytes(b"x")
+    monkeypatch.setattr(aligner, "available", lambda: True)
+    monkeypatch.setattr(aligner, "recognize", lambda m: [("あ", 2000.0)])
+    assert aligner.tokens_for(str(media)) == [("あ", pytest.approx(2000.0 + aligner.LAG_SEC))]
+    cached = json.loads(aligner._cache_path(str(media)).read_text(encoding="utf-8"))
+    assert cached["timeline"] == aligner.TIMELINE
+
+
 def test_a_character_glued_across_a_long_gap_is_not_used():
     # 実例（20分08秒）: 「なるべくね」の「な」が、2.3 秒前の「しれない」の「な」と
     # ひと続きで突き合い、字幕が 2 秒早く出た

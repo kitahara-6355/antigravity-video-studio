@@ -7,6 +7,7 @@
 中身を全部残すようにしたら、収録の段取りの声（37分38秒「ちょっと切ります」「撮った？」）が
 出てきたので外す規則も足した。
 """
+import shutil
 import sys
 from fractions import Fraction
 from pathlib import Path
@@ -122,6 +123,21 @@ def test_without_audio_the_ranges_are_left_alone():
     ranges = [(1.0, 2.0), (3.0, 4.0)]
     out, info = cut_plan.snap_to_pauses(ranges, None, RULES)
     assert out == ranges and info == {}
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg が無い")
+def test_the_voice_is_found_at_the_time_of_the_picture_after_a_join_that_lost_sound(tmp_path):
+    """区間は映像の時刻で切る。音を詰めて読むと、つなぎ目で欠けた音の分だけ後ろの声が早く見え、
+    区間の終わりが声より早くなる（43分の素材の 37分48秒より後ろは 0.165 秒・2026-10-18 実測）。"""
+    import subprocess
+    src = tmp_path / "beeps.m4a"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                    "aevalsrc=exprs='if(lt(mod(t,1),0.3),0.8*sin(2*PI*1000*t),0)':s=48000:d=4",
+                    # 1.5〜1.6 秒の音を時刻ごと抜く（時刻は詰めない）
+                    "-af", "aselect='not(between(t,1.5,1.6))'", "-c:a", "aac", str(src)], check=True)
+    audio = cut_plan.read_audio(src)
+    assert audio.speech.onsets == pytest.approx([0.0, 1.0, 2.0, 3.0], abs=0.02)
+    assert audio.speech.offsets[2:] == pytest.approx([2.3, 3.3], abs=0.02)
 
 
 def test_snapping_reports_what_it_moved():
