@@ -506,6 +506,42 @@ class SubtitleCoverageCheck(QualityCheckPlugin):
                 "coverage": reports, "timing": timing}
 
 
+def _output_silences(ctx, longer_than: float) -> list[tuple[float, float]] | None:
+    """出力（`ctx.preview_path`）の音で、longer_than 秒より長く、動作の場面（`cut_plan` の
+    `scene_min_sec`）より短い無音（出力の秒の (始まり, 長さ)）。音を測れなければ None。
+
+    話し始め・話し終わりは字幕の時刻合わせと同じもの（`sync.speech_map`）を使い、字幕の検査の
+    控え（`ctx._coverage_cache`）があればそれを読む。"""
+    preview = getattr(ctx, "preview_path", None)
+    if not isinstance(preview, (str, Path)) or not preview or not Path(preview).exists():
+        return None
+    try:
+        try:
+            from subtitle_engine import sync
+            from cut_plan import DEFAULT_CUT_RULES, cut_rules
+        except ImportError:
+            from backend.subtitle_engine import sync  # type: ignore[no-redef]
+            from backend.cut_plan import DEFAULT_CUT_RULES, cut_rules  # type: ignore[no-redef]
+        cache = getattr(ctx, "_coverage_cache", None)
+        key = ("sync", str(preview))
+        if isinstance(cache, dict) and key in cache:
+            speech = cache[key]
+        else:
+            speech = sync.speech_map(str(preview))
+            if isinstance(cache, dict):
+                cache[key] = speech
+        scene = float(cut_rules().get("scene_min_sec", DEFAULT_CUT_RULES["scene_min_sec"]))
+    except Exception as e:  # noqa: BLE001 — ffmpeg が無い・読めない。字幕のすき間で数える
+        logger.warning(f"出力の無音を測れません（字幕のすき間で数えます）: {e}")
+        return None
+    out = []
+    for i in range(1, min(len(speech.onsets), len(speech.offsets))):
+        a, b = float(speech.offsets[i - 1]), float(speech.onsets[i])
+        if longer_than < b - a < scene:
+            out.append((a, round(b - a, 2)))
+    return out
+
+
 class DeadAirCheck(QualityCheckPlugin):
     """無音区間チェック（dead_air_max_seconds）"""
     name = "dead_air_check"
@@ -529,20 +565,29 @@ class DeadAirCheck(QualityCheckPlugin):
             tmpl_id = "業界標準"
             dead_air_max = 3.0  # 通常動画の許容値: 3秒
         count = 0
-        
-        for i in range(1, len(ctx.segments)):
-            gap = ctx.segments[i].get("start", 0) - ctx.segments[i - 1].get("end", 0)
-            if gap > dead_air_max:
-                count += 1
+        where = ""
+        silences = _output_silences(ctx, dead_air_max)
+        if silences is not None:
+            # **出力の音で測る**（2026-10-18）。字幕のすき間で数えると、焼き込まない相づち（「はい」）の
+            # 所や、残すと決めた字を書く場面まで無音に数えた（raw 4本で字幕のすき間 9か所・音の無音 2か所で、
+            # どちらも字を書く場面）。だれも話さない長い所（`cut_plan` の `scene_min_sec` 以上）は動作の
+            # 場面なので数えない
+            count = len(silences)
+            where = "（" + ", ".join(f"{int(a) // 60}:{int(a) % 60:02d}" for a, _ in silences[:6]) + "）"
+        else:
+            for i in range(1, len(ctx.segments)):
+                gap = ctx.segments[i].get("start", 0) - ctx.segments[i - 1].get("end", 0)
+                if gap > dead_air_max:
+                    count += 1
         
         if count > 5:
             deductions = 10
             feedback.append(
                 f"🔇 [{tmpl_id}] 無音区間超過: {count}箇所が"
-                f"基準({dead_air_max}秒)を超過")
+                f"基準({dead_air_max}秒)を超過{where}")
         elif count > 0:
             deductions = 3
-            feedback.append(f"⚠ [{tmpl_id}] 無音区間注意: {count}箇所")
+            feedback.append(f"⚠ [{tmpl_id}] 無音区間注意: {count}箇所{where}")
         
         return {"deductions": deductions, "feedback": feedback}
 
