@@ -191,6 +191,16 @@
       ]
     },
     {
+      "id": "backend/edit_job.py::place",
+      "file": "backend/edit_job.py",
+      "symbol": "place",
+      "status": "intermediate",
+      "reason": "通しの道具が作った**確認用ファイル**（3分版・全編360p版・一覧画像）を共有フォルダへ写して照合する。人が見て判断するための縮小コピーで、完成品ではない（投稿にも本番の書き出しにも使わない）",
+      "tools": [
+        "copyfile"
+      ]
+    },
+    {
       "id": "backend/fix_video_quality.py::fix_and_concat",
       "file": "backend/fix_video_quality.py",
       "symbol": "fix_and_concat",
