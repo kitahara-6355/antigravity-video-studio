@@ -105,6 +105,37 @@ python -m backend.edit_job status <名前>
 
 確認用ファイルは置いた後に照合してある（mp4 は映像と音声のハッシュ、他は sha256）。
 
+### 6. 控えから作り直す（API をほとんど呼ばない再現）
+
+承認した書き出しは「raw + AI の控え + 校正台帳 + コード」で同じ字幕に作り直せる。
+2026-10-19 に 61回目を 60回目の控えから作り直し、字幕は1字も違わず品質も同じ 91 だった（API は1回）。
+
+1. 空のフォルダに素材を置く（`ln` のハードリンクなら容量を使わない）
+2. 控え（`_gemini_*`・`_proofread_*`・`_align_rz_*`）をその隣に写す。控えは置き場の `assets/` か
+   `cache/<回>/` にある。写したら sha256 で照合する。映像の切り替わり（`_shots_*`）は毎回同じに作れるので要らない
+3. 承認したときの台帳で書き出す:
+
+```
+PYTHONPATH=./backend:. python -m backend.agents.pipeline_coordinator <フォルダ>/<素材>.mp4 \
+    --transcriber gemini --review backend/config/reviews/<素材>.json
+```
+
+4. 承認した字幕と比べる（「字幕は承認したものと同じです」と出れば再現できている）:
+
+```
+PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet compare <承認>.subtitles.json <作り直し>.subtitles.json
+```
+
+- 書き出しの後、本線が書き換えるファイルを戻す（手順 3 と同じ）
+- 校閲の控えの鍵には、その行に掛かる辞書の項目が入る。全体の辞書（`backend/branding/proper_nouns.json`）を
+  変えると、掛かる行だけ校閲を呼び直す。違いが出たらまずそこを見る
+- 違いが出たら、caption-review の手順 6 と同じく「台帳が当たらなかった所」と「AI が前と違う字を書いた所」に分ける
+
+## 辞書と台帳の分け方
+
+- **どの素材でも正しい直し**（ゲストのお名前・社名の聞き違い）は全体の辞書に入れる。台帳の無いゼロからの版にも効く
+- **その素材でだけ誤りになる直し**（「剣先」は普通の言葉なので、全体で「剣閃」にすると他の素材を壊す）は台帳の `glossary` に残す
+
 ## AI の工程を誰がやるか
 
 いまは本線が **Gemini API**（無料枠の段）を呼ぶ。段とモデルは `backend/model_config.json` が正典で、
