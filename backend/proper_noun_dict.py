@@ -15,6 +15,7 @@ except ImportError:
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass, field, asdict
@@ -129,7 +130,15 @@ class ProperNounDictionary:
             # 「選出→撰出」が 25分11秒の「選出」を書き換えていた。音声認識は「線質」と聞いた）
             if entry.type == "hint" or not entry.confirmed:
                 continue
-            if entry.incorrect in corrected_text:
+            found = entry.incorrect in corrected_text
+            if not found and entry.incorrect != entry.correct:
+                # 字の間の空白は見ない（2026-10-19: AI が「B オリジナル」と書き、「Bオリジナル」の項目が当たらなかった）。
+                # 正と誤が同じ項目（表記の固定）は、話し手の間の空白を詰めないように対象外
+                spaced = _spaced_pattern(entry.incorrect)
+                if spaced.search(corrected_text):
+                    corrected_text = spaced.sub(lambda _: entry.correct, corrected_text)
+                    found = True
+            if found:
                 corrected_text = corrected_text.replace(entry.incorrect, entry.correct)
                 corrections.append({
                     "original": entry.incorrect,
@@ -229,6 +238,11 @@ class ProperNounDictionary:
     def get_pending(self) -> List[Dict[str, Any]]:
         """確認待ちを取得"""
         return [asdict(pending_entry) for pending_entry in self.pending]
+
+
+def _spaced_pattern(word: str) -> "re.Pattern[str]":
+    """word の字の間に半角・全角の空白が入っていても当たる形。"""
+    return re.compile("[ \u3000]*".join(re.escape(c) for c in word))
 
 
 # シングルトンインスタンス
