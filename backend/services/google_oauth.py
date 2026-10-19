@@ -27,6 +27,14 @@
 この経路ではリフレッシュ後のトークンを**書き戻さない**（書き戻す先が無い。
 リフレッシュトークン自体は変わらないので、次回も同じ値で更新できる）。
 
+## 過程の資産を書くトークンは別に持つ（2026-10-18 北原さん決定）
+
+raw を読むトークン（`drive.readonly`）とは混ぜない。書き込みは `drive.file`
+（アプリが作ったファイルだけ見える・触れる）だけのトークンで行う。
+クラウドでは `AVS_ASSETS_GOOGLE_TOKEN_JSON`、ローカルでは
+`backend/data/google/token_assets_file.json` から読む（`backend/asset_store.py`）。
+`read_token_info` / `load_credentials` に環境変数名とファイルを渡すと、その口だけを見る。
+
 ## 失敗したら例外を上げる
 
 このモジュールは**フォールバックしない**。認証できないまま処理を続けると、
@@ -50,12 +58,15 @@ except ImportError:  # backend/ を直接 sys.path に載せている経路向�
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ASSETS_TOKEN_JSON_ENV",
+    "DRIVE_FILE_SCOPES",
     "DRIVE_READONLY_SCOPES",
     "DRIVE_SCOPES",
     "TOKEN_JSON_ENV",
     "SHEETS_SCOPES",
     "CredentialsNotFoundError",
     "GoogleAuthError",
+    "assets_token_path",
     "client_secret_path",
     "load_credentials",
     "read_token_info",
@@ -83,12 +94,20 @@ DRIVE_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/drive",)
 # 渡すトークンはこれだけで作る。書けないトークンなら、誤って raw を消しようがない。
 DRIVE_READONLY_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/drive.readonly",)
 
+# 過程の資産（AI の出力・字幕・実行記録）を書く口。アプリが作ったファイルしか
+# 見えないので、raw にも他人のファイルにも届かない。raw を読む口とはトークンを分ける。
+DRIVE_FILE_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/drive.file",)
+
 # 進捗の書き戻しがあるので readonly では足りない。
 SHEETS_SCOPES: tuple[str, ...] = ("https://www.googleapis.com/auth/spreadsheets",)
 
 
 # トークンの中身（JSON）を直接受ける環境変数。クラウドのセッション用。
 TOKEN_JSON_ENV = "ANTIGRAVITY_GOOGLE_TOKEN_JSON"
+
+# 過程の資産を書くトークン（drive.file）の中身を受ける環境変数。クラウドのセッション用。
+ASSETS_TOKEN_JSON_ENV = "AVS_ASSETS_GOOGLE_TOKEN_JSON"
+ASSETS_TOKEN_NAME = "token_assets_file.json"
 
 
 def _from_env(*names: str) -> Path | None:
@@ -115,6 +134,14 @@ def client_secret_path() -> Path:
 def token_path() -> Path:
     """同意後に得たトークンの保存先。"""
     return _from_env("ANTIGRAVITY_GOOGLE_TOKEN") or (_default_dir() / "token.json")
+
+
+def assets_token_path() -> Path:
+    """過程の資産を書くトークン（drive.file）のローカルの保存先。
+
+    読み取り専用のトークン（`token_raw_readonly.json`）と同じく、通常のトークンの隣に置く。
+    """
+    return token_path().parent / ASSETS_TOKEN_NAME
 
 
 # 実物の import をこの2関数に閉じ込める。テストはここを差し替えるだけで済み、
@@ -159,10 +186,14 @@ def _save_token(path: Path, credentials: Any) -> None:
         os.chmod(path, 0o600)
 
 
-def read_token_info() -> tuple[dict[str, Any], str, Path | None]:
+def read_token_info(
+    json_env: str = TOKEN_JSON_ENV, token_file: Path | None = None,
+) -> tuple[dict[str, Any], str, Path | None]:
     """保存済みトークンの中身を読む。リフレッシュはしない。
 
-    `ANTIGRAVITY_GOOGLE_TOKEN_JSON` があればそれを、無ければトークンファイルを読む。
+    環境変数 `json_env`（既定 `ANTIGRAVITY_GOOGLE_TOKEN_JSON`）があればそれを、
+    無ければトークンファイル `token_file`（既定 `token_path()`）を読む。
+    別の口（過程の資産など）は両方を渡す。渡した口以外は見ない。
 
     Returns:
         (中身, 出どころの説明, 書き戻し先)。環境変数から読んだときの書き戻し先は None。
@@ -172,9 +203,9 @@ def read_token_info() -> tuple[dict[str, Any], str, Path | None]:
         CredentialsNotFoundError: トークン未作成。初回セットアップが必要。
         GoogleAuthError: 読み取り不能、または JSON として壊れている。
     """
-    raw = os.environ.get(TOKEN_JSON_ENV)
+    raw = os.environ.get(json_env)
     if raw:
-        source = f"環境変数 {TOKEN_JSON_ENV}"
+        source = f"環境変数 {json_env}"
         try:
             info = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -187,8 +218,13 @@ def read_token_info() -> tuple[dict[str, Any], str, Path | None]:
             raise GoogleAuthError(f"{source} の中身が JSON オブジェクトではありません")
         return info, source, None
 
-    path = token_path()
+    path = token_file or token_path()
     if not path.exists():
+        if json_env != TOKEN_JSON_ENV or token_file is not None:
+            raise CredentialsNotFoundError(
+                f"Google の認証トークンがありません: {path}\n"
+                f"クラウドのセッションでは {json_env} に中身を入れます。"
+            )
         raise CredentialsNotFoundError(
             f"Google の認証トークンがありません: {path}\n"
             "初回セットアップを実行してください: python scripts/google_oauth_login.py\n"
@@ -213,14 +249,19 @@ def token_scopes(info: dict[str, Any]) -> set[str]:
     return {str(s) for s in scopes}
 
 
-def load_credentials(scopes: Sequence[str]) -> Any:
+def load_credentials(
+    scopes: Sequence[str], *,
+    json_env: str = TOKEN_JSON_ENV, token_file: Path | None = None,
+) -> Any:
     """保存済みトークンを読み、必要ならリフレッシュして返す。
+
+    `json_env` / `token_file` は `read_token_info` と同じ。既定は従来の口。
 
     Raises:
         CredentialsNotFoundError: トークン未作成。初回セットアップが必要。
         GoogleAuthError: 読み取り不能、またはリフレッシュ不能。
     """
-    info, source, save_to = read_token_info()
+    info, source, save_to = read_token_info(json_env, token_file)
 
     try:
         credentials = _credentials_from_info(info, scopes)

@@ -66,7 +66,6 @@
 from __future__ import annotations
 
 import bisect
-import hashlib
 import json
 import logging
 import subprocess
@@ -738,10 +737,9 @@ def snap_to_pauses(ranges, audio: SourceAudio | None, rules: dict,
 # ------------------------------------------------------------------
 
 def _shots_cache_path(path) -> Path:
-    p = Path(path)
-    st = p.stat()
-    key = hashlib.sha1(f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}|scdet".encode()).hexdigest()[:8]
-    return p.with_name(f"_shots_{key}.json")
+    """素材の隣の映像の切り替わりの控え。鍵は素材の中身（`video_hash.material_cache`）。"""
+    from subtitle_engine.video_hash import material_cache
+    return material_cache(path, "_shots_", legacy_salt="scdet")
 
 
 def _parse_scdet(text: str) -> list[tuple[float, float]]:

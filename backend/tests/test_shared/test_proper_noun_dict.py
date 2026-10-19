@@ -238,3 +238,16 @@ def test_an_unconfirmed_entry_is_not_applied(tmp_path):
     assert corrected == "選出もどうするか 初回の"
     assert [c["original"] for c in corrections] == ["初会"]
     assert pnd.entries[0].usage_count == 0
+
+
+def test_a_space_inside_the_wrong_word_does_not_hide_it(tmp_path):
+    """2026-10-19: 辞書に「Bオリジナル→Be Original」があったのに、ゼロからの版の 8分01秒は
+    「ここに B オリジナル書いて」のまま残った。AI は英字とかなの間に空白を入れることがある。"""
+    pnd = ProperNounDictionary(dict_path=tmp_path / "proper_nouns.json")
+    pnd.add_entry("Bオリジナル", "Be Original", "term")
+    pnd.add_entry("デザイン書道", "デザイン書道", "term")  # 正と誤が同じ項目（表記の固定）は空白を詰めない
+
+    corrected, corrections = pnd.apply_corrections("ここに B オリジナル書いて　デザイン　書道")
+
+    assert corrected == "ここに Be Original書いて　デザイン　書道"
+    assert [c["original"] for c in corrections] == ["Bオリジナル"]

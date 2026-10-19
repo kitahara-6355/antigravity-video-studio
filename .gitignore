@@ -46,6 +46,7 @@ credentials.json
 *client_secret*.json
 token.json
 *_token.json
+token_*.json
 oauth_token*.json
 
 # Large Media Files (RAW素材は聖域として保護されるが、Gitには含めない)

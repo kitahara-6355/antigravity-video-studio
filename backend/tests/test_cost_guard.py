@@ -193,6 +193,25 @@ def test_every_call_is_written_to_the_ledger(tmp_path):
     assert all(json.loads(line)["budget_id"] == "test" for line in lines)
 
 
+def test_the_model_that_answered_is_kept_when_it_is_not_the_one_asked_for(tmp_path):
+    """**頼んだ名前と答えた中身を分けて残す**（2026-10-19: `gemini-3.7-flash` を頼むと
+    `gemini-3.8-flash` が答えた。台帳には頼んだ名前しか無く、替わったことが記録から見えなかった）。"""
+    guard = _guard(tmp_path)
+    answered = _Response(_Usage(prompt=10))
+    answered.model_version = "gemini-3.8-flash"
+    same = _Response(_Usage(prompt=10))
+    same.model_version = "gemini-3.7-flash"
+
+    guard.after_call("gemini-3.7-flash", answered)
+    guard.after_call("gemini-3.7-flash", same)
+    guard.after_call("gemini-3.7-flash", _Response(_Usage(prompt=10)))
+
+    rows = [json.loads(line) for line in
+            (tmp_path / "ledger.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert rows[0]["model"] == "gemini-3.7-flash" and rows[0]["served"] == "gemini-3.8-flash"
+    assert "served" not in rows[1] and "served" not in rows[2]
+
+
 def test_the_budget_file_is_updated_with_the_actual_spend(tmp_path):
     """`spent_jpy` を実績で書き戻す（憲法第3条の「使ったら更新する」）。"""
     path = tmp_path / "budget.json"

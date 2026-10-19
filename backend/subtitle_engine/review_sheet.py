@@ -45,10 +45,13 @@ def source_time(t: float, ranges: list) -> float:
     return round(float(ranges[-1][1]), 2) if ranges else round(float(t), 2)
 
 
-def export(sidecar: dict, run: str, label: str, video: str, tokens: list | None = None) -> dict:
+def export(sidecar: dict, run: str, label: str, video: str, tokens: list | None = None,
+           readings: dict | None = None) -> dict:
     """画面が読む字幕の控え。``captions`` の ``src`` は字幕の真ん中の素材の秒（直しの ``at`` になる）。
 
     ``tokens``（別の音声認識の ``[字, 素材の秒]``）があれば、食い違う字幕に機械の要確認（``flags``）を付ける。
+    ``readings``（名前 → 文字起こしの行）もあれば、それとも並べ、印にほかの聞き取りの字を候補として付ける
+    （``review_flags.flag_with_readings``）。
     """
     ranges = sidecar.get("ranges") or []
     caps = []
@@ -63,8 +66,43 @@ def export(sidecar: dict, run: str, label: str, video: str, tokens: list | None 
         from subtitle_engine import review_flags
         spans = [{"i": c["i"], "t": c["t"], "a": source_time(c["s"], ranges), "b": source_time(c["e"], ranges)}
                  for c in caps]
-        sheet["flags"] = review_flags.flag_captions(spans, tokens)
+        if readings:
+            sources = {review_flags.RECOGNISER: tokens,
+                       **{name: review_flags.reading_tokens(segs) for name, segs in readings.items()}}
+            sheet["flags"] = review_flags.flag_with_readings(spans, sources)
+        else:
+            sheet["flags"] = review_flags.flag_captions(spans, tokens)
     return sheet
+
+
+# 印の候補に使う、素材の隣の文字起こしのキャッシュ（`transcribe_worker._gemini_checkpoint` の名前の区切りの印）
+READINGS = (("2回目", "b2"), ("3回目", "c"), ("1回目", ""))
+
+
+def readings_beside(material: str | Path) -> dict:
+    """素材の隣にある文字起こしのキャッシュの行（名前 → 行）。無いものは入れない。3回目は区間ごとの控えも読む。"""
+    from subtitle_engine import gemini_transcriber as gt
+    from subtitle_engine.video_hash import material_cache
+
+    material = Path(material)
+    if not material.is_file():
+        return {}
+    out = {}
+    for name, tag in READINGS:
+        path = material_cache(material, f"_gemini_c{gt.CHUNK_SEC}{gt.CUT_TAG}{tag}_", ".jsonl")
+        rows = []
+        if path.is_file():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    rows.append(json.loads(line))
+                except ValueError:
+                    continue
+        else:
+            for segs, _model in gt.read_journal(gt.journal_path(path)).values():
+                rows.extend(segs)
+        if rows:
+            out[name] = rows
+    return out
 
 
 def _parts(text: str) -> list[str]:
@@ -185,6 +223,16 @@ def compare(approved: dict, again: dict) -> list[dict]:
     return out
 
 
+def format_compare(diff: list[dict]) -> list[str]:
+    """`compare` の違いを人が読む行にする（最後の行は違いの数）。"""
+    def show(ts):
+        return " / ".join(t.replace(_BREAKS, " ") for t in ts) or "（なし）"
+    lines = [f"素材 {_clock(d['src'])}  承認: {show(d['approved'])}\n          作り直し: {show(d['again'])}"
+             for d in diff]
+    lines.append(f"違い {len(diff)} か所" if diff else "字幕は承認したものと同じです")
+    return lines
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="字幕のレビュー画面の控えを作る・画面の印を校正台帳に入れる")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -196,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
     ex.add_argument("--out", required=True)
     ex.add_argument("--asr", default="", help="別の音声認識の字と時刻（ReazonSpeech の _align_rz_*.json。素材の時間軸に"
                     "直して読む）。機械の要確認を付ける")
+    ex.add_argument("--material", default="", help="素材（隣の文字起こしのキャッシュも並べ、要確認に候補の字を付ける）")
     im = sub.add_parser("import", help="画面の印（JSON の配列）を校正台帳の直しに足す")
     im.add_argument("marks")
     im.add_argument("--ledger", required=True)
@@ -209,17 +258,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "compare":
         diff = compare(*(json.loads(Path(p).read_text(encoding="utf-8")) for p in (args.approved, args.again)))
-        for d in diff:
-            show = lambda ts: " / ".join(t.replace(_BREAKS, " ") for t in ts) or "（なし）"  # noqa: E731
-            print(f"素材 {_clock(d['src'])}  承認: {show(d['approved'])}\n          作り直し: {show(d['again'])}")
-        print(f"違い {len(diff)} か所" if diff else "字幕は承認したものと同じです")
+        print("\n".join(format_compare(diff)))
         return 1 if diff else 0
 
     if args.cmd == "export":
         sidecar = json.loads(Path(args.sidecar).read_text(encoding="utf-8"))
         from subtitle_engine import aligner
         tokens = aligner.cached_tokens(args.asr) if args.asr else None
-        sheet = export(sidecar, args.run, args.label, args.video, tokens)
+        readings = readings_beside(args.material) if args.material else None
+        sheet = export(sidecar, args.run, args.label, args.video, tokens, readings=readings)
         Path(args.out).write_text(json.dumps(sheet, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         flags = f"・機械の要確認 {len(sheet['flags'])} 枚" if "flags" in sheet else ""
         print(f"字幕 {len(sheet['captions'])} 枚{flags} → {args.out}")

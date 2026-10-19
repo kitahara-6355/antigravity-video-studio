@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import bisect
 import difflib
-import hashlib
 import json
 import logging
 import os
@@ -207,10 +206,10 @@ def recognize(media: str) -> list[tuple[str, float]]:
 
 
 def _cache_path(media: str) -> Path:
-    p = Path(media)
-    st = p.stat()
-    key = hashlib.sha1(f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}|{MODEL_NAME}".encode()).hexdigest()[:8]
-    return p.with_name(f"_align_rz_{key}.json")
+    """素材の隣の認識の控え。鍵は素材の中身（2026-10-18 まではモデルの名前も鍵に入れていた。
+    いまは控えの中の `model` で見る）。"""
+    from subtitle_engine.video_hash import material_cache
+    return material_cache(media, "_align_rz_", legacy_salt=MODEL_NAME)
 
 
 def tokens_for(media: str) -> list[tuple[str, float]] | None:
@@ -219,7 +218,7 @@ def tokens_for(media: str) -> list[tuple[str, float]] | None:
         cache = _cache_path(media)
         if cache.exists():
             data = json.loads(cache.read_text(encoding="utf-8"))
-            if data.get("version") == CACHE_VERSION:
+            if data.get("version") == CACHE_VERSION and data.get("model", MODEL_NAME) == MODEL_NAME:
                 return _lagged(_on_source_timeline(data["tokens"], media, data.get("timeline")))
         if not available():
             return None

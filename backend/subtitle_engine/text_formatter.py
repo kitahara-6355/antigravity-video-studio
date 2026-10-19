@@ -1138,10 +1138,14 @@ def _split_head(prev: str, cur: str, parser) -> int:
         if noun:
             # 名詞が割れた（56 秒「…久木田デザイン書道塾」「主宰、そして」）。読点・句点までの短い名詞だけ戻す
             # （「東京」「大阪に行きました」のような、区切りの無いつなぎは割れ目と決められない）
-            if not (0 < len(head) <= 4 and k == len(head) + 1 and cur[len(head)] in _HEAD_PUNCT
-                    and all(_script(c) in _NOUN_SCRIPTS for c in head)):
+            # 名詞は句読点で切る。BudouX 0.10 は「主宰、そして、」を1文節に読むので、文節の切れ目は
+            # 句読点より後ろに来ることがある（つなぎ目をまたぐ文節が句読点まで届いていればよい）
+            stop = next((i for i, c in enumerate(cur[:5]) if c in _HEAD_PUNCT), 0)
+            head = cur[:stop]
+            if not (0 < len(head) <= 4 and k > stop and all(_script(c) in _NOUN_SCRIPTS for c in head)):
                 return 0
-            return k if k in _phrase_ends(parser, cur[:24]) else 0
+            ends = _phrase_ends(parser, cur[:24])
+            return stop + 1 if (stop + 1 in ends or not any(e <= stop for e in ends)) else 0
         if not head or any(_script(c) != "hiragana" for c in head):
             return 0
         if len(head) > 2 and head not in _HEAD_COMPOUNDS:

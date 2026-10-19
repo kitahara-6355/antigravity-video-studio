@@ -1,0 +1,637 @@
+{
+  "version": 1,
+  "title": "編集の決まり（フェーズ1の品質基準）",
+  "about": "対談の自動編集で、北原さんがチャットで出した指示と、書き出しで起きた失敗から生まれた決まり。2026-10-05〜19 の raw4 結合テスト（1〜61回目）でできた。どの決まりも本線のどこで守るか（where）とテスト（tests）を持ち、書き出した字幕で確かめられるものは点検（check）を持つ。python -m backend.edit_standards --show で一覧、--gate で守る所とテストが今もあるか、--check で書き出しの字幕が決まりを守っているかを見る。",
+  "groups": [
+    "字幕の字",
+    "字幕の割り方",
+    "字幕の時刻",
+    "欠落",
+    "カット",
+    "名前と用語",
+    "書き出し",
+    "再現"
+  ],
+  "rules": [
+    {
+      "id": "S01",
+      "group": "字幕の字",
+      "rule": "句読点（、。）は字幕に出さない。行の途中の区切りは全角スペースにする",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "あと全てにおいて句読点は不要です"
+      },
+      "failure": "初めの書き出しでは字幕に句読点が出ていた",
+      "where": [
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.strip_punctuation"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_polish.py::test_strip_punctuation",
+        "backend/tests/test_subtitle_polish.py::test_default_rules_drop_dewa_and_punctuation",
+        "backend/tests/test_subtitle_polish.py::test_captions_remember_where_punctuation_was_taken_out"
+      ],
+      "check": "no_punctuation"
+    },
+    {
+      "id": "S02",
+      "group": "字幕の字",
+      "rule": "話題に触れないつなぎ言葉（それから・さて・では・それでは 等）は字幕にしない。耳で聞けば足りる",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "「それから」「さて」のような…耳で聞くだけで良いような言葉は字幕であえて文字にしなくても良い／冒頭の「では」も不要です"
+      },
+      "failure": "冒頭と 28秒の「では」が字幕に出ていた",
+      "where": [
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.omit_lead_words",
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.omit_lead_words_bare"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_polish.py::test_bare_lead_word_is_removed_without_comma",
+        "backend/tests/test_subtitle_polish.py::test_lead_word_at_the_head_of_a_later_caption_is_removed",
+        "backend/tests/test_subtitle_coverage.py::test_lead_words_are_dropped_only_at_the_head_before_a_comma"
+      ],
+      "check": null
+    },
+    {
+      "id": "S03",
+      "group": "字幕の字",
+      "rule": "相づち・言いよどみだけの字幕（はい・うん・なるほど・そうですね 等）は画面に出さない。音声は残し（カットしない）、字幕データにも残す（番組化の基礎データ）",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "話題の内容に直接触れていない、耳で聞くだけで良いような言葉は字幕であえて文字にしなくても良い"
+      },
+      "failure": "相づちだけの字幕が画面に出ていた",
+      "where": [
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.omit_standalone_words",
+        "backend/subtitle_engine/text_formatter.py::is_standalone_omittable",
+        "backend/smart_cut_engine.py::_burn_subtitles_ffmpeg"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_polish.py::test_filler_only_caption_is_not_shown",
+        "backend/tests/test_subtitle_coverage.py::test_aizuchi_only_captions_are_omittable",
+        "backend/tests/test_subtitle_coverage.py::test_burned_srt_skips_aizuchi_only_captions"
+      ],
+      "check": null
+    },
+    {
+      "id": "S04",
+      "group": "字幕の字",
+      "rule": "文の途中の言いよどみ（え・ま・あの・その・こう 等）は外す。音声認識が書き起こさなかった言いよどみも外す",
+      "from": {
+        "day": "2026-10-06",
+        "by": "Claude（失敗から）",
+        "said": "「時に、ま、お習字を」の「ま」など、25回目に46か所残っていた"
+      },
+      "failure": "言いよどみが字幕に残り、読みにくかった（25回目46か所・31回目約30か所）",
+      "where": [
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.omit_interjections",
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.omit_unheard_fillers",
+        "backend/subtitle_engine/aligner.py::drop_unheard_fillers"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_coverage.py::test_format_segments_drops_fillers_between_commas",
+        "backend/tests/test_subtitle_aligner.py::test_a_filler_the_recogniser_skipped_is_removed_from_the_caption",
+        "backend/tests/test_subtitle_aligner.py::test_the_fillers_to_check_live_in_the_template_rules"
+      ],
+      "check": null
+    },
+    {
+      "id": "S05",
+      "group": "字幕の字",
+      "rule": "同じ語の書き分けは、動画の中で多い方にそろえる（僕/ぼく・分かる/わかる 等）",
+      "from": {
+        "day": "2026-10-13",
+        "by": "Claude（失敗から）",
+        "said": "33回目で「僕」53・「ぼく」2、「分かる」8・「わかる」5"
+      },
+      "failure": "1本の動画の中で表記が揺れていた",
+      "where": [
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.notation_variants",
+        "backend/subtitle_engine/notation.py::unify_notation"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_notation.py::test_the_minority_spelling_takes_the_majority_one",
+        "backend/tests/test_subtitle_notation.py::test_the_spellings_live_in_the_template_rules",
+        "backend/tests/test_subtitle_notation.py::test_the_proofread_step_unifies_before_formatting"
+      ],
+      "check": null
+    },
+    {
+      "id": "S06",
+      "group": "字幕の字",
+      "rule": "誤変換（同音異義）は校閲で文脈から直す。校閲は温度0・seed 固定で、採った直しは控えに残し、次回も同じ直しを使う",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "「読んでいただいて」が直っていないのも問題…４２秒にある「初会」は「初回」が正しいので校閲できていない"
+      },
+      "failure": "書き出すたびに校閲の直しが変わり、直ったはずの「読んで」「初会」が戻った（既定温度のサンプリング）",
+      "where": [
+        "backend/subtitle_engine/ai_proofreader.py::SEED",
+        "backend/subtitle_engine/ai_proofreader.py::ProofreadMemo"
+      ],
+      "tests": [
+        "backend/tests/test_ai_proofreader.py::TestProofreadSegmentsResponseValidation::test_同じ文には毎回同じ直しを返させる",
+        "backend/tests/test_ai_proofreader.py::TestProofreadMemo::test_同じ行は次の書き出しでも同じ直しを使う"
+      ],
+      "check": null
+    },
+    {
+      "id": "S07",
+      "group": "字幕の字",
+      "rule": "音に無い字は足さない。校閲が言い換えた語が音声認識に聞こえず元の語が聞こえていれば、元に戻す（校閲の作り話を差し戻す）",
+      "from": {
+        "day": "2026-10-15",
+        "by": "Claude（失敗から）",
+        "said": "44回目の「早川式繰出鉛筆」「アドシアターのね」は校閲の作り話だった"
+      },
+      "failure": "見た目がもっともらしい直しが、音とまったく違っていた",
+      "where": [
+        "backend/subtitle_engine/aligner.py::drop_unheard_edits"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_aligner.py::test_a_character_the_proofreader_added_but_nobody_said_is_removed",
+        "backend/tests/test_subtitle_aligner.py::test_a_replacement_that_changes_what_was_said_is_undone",
+        "backend/tests/test_subtitle_aligner.py::test_only_the_replacement_the_audio_contradicts_is_undone"
+      ],
+      "check": null
+    },
+    {
+      "id": "S08",
+      "group": "字幕の割り方",
+      "rule": "1画面は2行まで、1行は18字まで（柔軟でよいが上限18）",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "一度に表示できる文字数制限が厳しいのであれば、柔軟に変更していきたいと思っています"
+      },
+      "failure": "15字では意味の塊を割りやすかった",
+      "where": [
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.max_chars_per_line",
+        "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.max_lines"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_polish.py::test_line_length_check_follows_the_formatters_line_width",
+        "backend/tests/test_template_config.py::test_template_config_default",
+        "backend/tests/test_subtitle_polish.py::test_flash_caption_is_rewrapped_into_a_two_line_neighbour"
+      ],
+      "check": "line_limits"
+    },
+    {
+      "id": "S09",
+      "group": "字幕の割り方",
+      "rule": "字幕の切れ目は意味の塊（文節）にする。文節の途中や「各界で|ご活躍」のような所で切らない。切れ目の強さは 文末 >「、」> 節の終わり >「て・は」・条件 > 格助詞",
+      "from": {
+        "day": "2026-10-05",
+        "by": "北原",
+        "said": "字幕の切れ目について、単語やセンテンスの区切りが意味の塊になっていないように見える"
+      },
+      "failure": "単語の途中や助詞の頭で字幕が切れていた（「を深掘りして」など）",
+      "where": [
+        "backend/subtitle_engine/text_formatter.py::_break_score"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_polish.py::test_caption_break_beats_line_break",
+        "backend/tests/test_subtitle_polish.py::test_the_end_of_a_clause_is_a_stronger_break_than_te",
+        "backend/tests/test_subtitle_polish.py::test_from_after_a_noun_or_a_conjunction_is_not_the_end_of_a_clause"
+      ],
+      "check": null
+    },
+    {
+      "id": "S10",
+      "group": "字幕の割り方",
+      "rule": "7秒を超えて出る2行の字幕は、2行目の頭を話した所で2枚に分ける（2行目が話す前から見えないように）",
+      "from": {
+        "day": "2026-10-14",
+        "by": "Claude（失敗から）",
+        "said": "1分22秒は10.2秒出て、2行目が話す6秒前から見えていた"
+      },
+      "failure": "長く出る字幕で、まだ言っていない言葉が先に見えた（40回目22枚）",
+      "where": [
+        "backend/subtitle_engine/sync.py::_split_long"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_sync.py::test_a_two_line_caption_shown_too_long_is_split_where_the_second_line_is_said",
+        "backend/tests/test_subtitle_sync.py::test_a_two_line_caption_within_the_limit_is_left_alone",
+        "backend/tests/test_subtitle_sync.py::test_the_longest_display_can_be_changed_in_the_template"
+      ],
+      "check": "long_captions"
+    },
+    {
+      "id": "S11",
+      "group": "字幕の時刻",
+      "rule": "字幕の出だしは話し始めちょうど。終わりは言い終わりに合わせ、常に字幕を出し続けない",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "常に字幕が出ている状態が良いというわけではない…冒頭60秒までの文字頭出しは少し遅く感じるので、私の案はベストではなかった"
+      },
+      "failure": "字幕が言葉より先に出すぎた／話し始め+0.3秒にすると遅く感じた",
+      "where": [
+        "backend/subtitle_engine/sync.py::timing_rules",
+        "backend/subtitle_engine/aligner.py::LAG_SEC",
+        "backend/subtitle_engine/sync.py::DEFAULT_TIMING.lead_in_sec"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_sync.py::test_lead_in_starts_on_the_onset_by_default",
+        "backend/tests/test_subtitle_sync.py::test_caption_ends_before_next_sentence_starts",
+        "backend/tests/test_subtitle_aligner.py::test_recognised_times_are_moved_to_the_voice_onset"
+      ],
+      "check": null
+    },
+    {
+      "id": "S12",
+      "group": "字幕の時刻",
+      "rule": "1文を数枚に分けた字幕の時刻は、喋っている時間で配り、区切りは声の間に寄せる",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "１２秒ぐらいにある「各界で」と「ご活躍されている方をお招きし」が字幕表示がずれているのは見ていて違和感があります"
+      },
+      "failure": "間を含んだ時間で割り振っていて、字幕と声がずれた",
+      "where": [
+        "backend/subtitle_engine/sync.py::_distribute_by_speech"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_sync.py::test_split_captions_are_timed_by_speaking_time_not_wall_time",
+        "backend/tests/test_subtitle_sync.py::test_recognised_captions_keep_their_times_in_a_split_utterance"
+      ],
+      "check": null
+    },
+    {
+      "id": "S13",
+      "group": "字幕の時刻",
+      "rule": "一瞬で消える字幕（0.5秒未満など読めない速さ）を出さない。隣とまとめるか、声に合わせて配り直す",
+      "from": {
+        "day": "2026-10-06",
+        "by": "Claude（失敗から）",
+        "said": "62秒「いらっしゃいまして」0.7秒など、22回目に17件"
+      },
+      "failure": "読めないうちに消える字幕があった",
+      "where": [
+        "backend/subtitle_engine/sync.py::_merge_flashes",
+        "backend/subtitle_engine/sync.py::_resplit_flashes"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_polish.py::test_flash_caption_is_merged_into_neighbour",
+        "backend/tests/test_subtitle_polish.py::test_a_flash_that_cannot_be_merged_takes_the_end_of_the_previous_caption",
+        "backend/tests/test_subtitle_sync.py::test_unheard_flash_that_cannot_be_merged_is_dropped"
+      ],
+      "check": "flashes"
+    },
+    {
+      "id": "S14",
+      "group": "字幕の時刻",
+      "rule": "字幕はカットをまたがない。時刻合わせは残す区間の中だけで行う",
+      "from": {
+        "day": "2026-10-14",
+        "by": "Claude（失敗から）",
+        "said": "36分03秒「私も」が次の質問に0.8秒出た"
+      },
+      "failure": "カットの向こうの言葉が次の場面に出た（38回目17枚）",
+      "where": [
+        "backend/subtitle_engine/aligner.py::keep_in_zones"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_aligner.py::test_an_unheard_tail_does_not_run_past_the_cut",
+        "backend/tests/test_subtitle_aligner.py::test_an_unheard_caption_stays_before_the_cut",
+        "backend/tests/test_subtitle_sync.py::test_a_caption_does_not_linger_past_the_cut"
+      ],
+      "check": "no_cross_cut"
+    },
+    {
+      "id": "S15",
+      "group": "欠落",
+      "rule": "話している言葉の字幕を落とさない。欠落を検知できずに高得点が出ることは許さない。言葉のある字幕が1行でも外れたら品質ゲートで不合格にする",
+      "from": {
+        "day": "2026-10-06",
+        "by": "北原",
+        "said": "欠落を検知できていないのがそもそも品質点数として90点程度出ていることが問題だと思う"
+      },
+      "failure": "55秒〜1分50秒のゲストの回答約30秒が字幕ごと消えて88点が出た／50回目に聞き手の「エピソードなんですか？」が外れて91点が出た",
+      "where": [
+        "backend/quality_gate_plugins.py::SubtitleCoverageCheck",
+        "backend/quality_gate_plugins.py::_lost_lines",
+        "backend/subtitle_engine/sync.py::_join_lost"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_coverage.py::test_a_spoken_line_dropped_by_the_alignment_blocks",
+        "backend/tests/test_subtitle_coverage.py::test_coverage_plugin_blocks_when_speech_is_missing",
+        "backend/tests/test_subtitle_sync.py::test_a_spoken_line_with_no_room_is_added_to_the_next_caption_as_a_line"
+      ],
+      "check": "no_lost_words"
+    },
+    {
+      "id": "S16",
+      "group": "欠落",
+      "rule": "文字起こしの抜けを防ぐ。区切りは話の切れ目で30秒以内、区切りをずらした2回目と音声認識で多数決し、決まらない所は3回目で読み直す",
+      "from": {
+        "day": "2026-10-06",
+        "by": "Claude（失敗から）",
+        "said": "Gemini が120秒チャンク内でゲストの回答約30秒を落とした"
+      },
+      "failure": "1回の起こしでは文の抜けと聞き違いが残った",
+      "where": [
+        "backend/subtitle_engine/gemini_transcriber.py::plan_chunks",
+        "backend/subtitle_engine/gemini_transcriber.py::SECOND_PASS_GAP_SEC",
+        "backend/subtitle_engine/transcript_fusion.py::look_spots"
+      ],
+      "tests": [
+        "backend/tests/test_subtitle_coverage.py::test_chunks_are_cut_in_the_pauses",
+        "backend/tests/test_transcript_fusion.py::test_the_second_pass_keeps_its_cuts_away_from_the_first_pass_cuts",
+        "backend/tests/test_transcript_fusion.py::test_a_spot_both_passes_dropped_is_found_where_the_recogniser_heard_more",
+        "backend/tests/test_transcript_fusion.py::test_a_word_the_second_pass_and_the_recogniser_both_heard_replaces_the_first"
+      ],
+      "check": null
+    },
+    {
+      "id": "S17",
+      "group": "カット",
+      "rule": "冒頭のあいさつ・ゲスト紹介はノーカット（最初の質問の文の頭までつなぐ）。本題に入ってからはカットを使う",
+      "from": {
+        "day": "2026-10-13",
+        "by": "北原",
+        "said": "冒頭1分10秒までの「あいさつ・ゲスト紹介」までのフレーズは、ノーカットの方が感じが良い。テーマトーク開始後は、カットが有効だと感じる"
+      },
+      "failure": "あいさつの間を詰めて落ち着かなかった",
+      "where": [
+        "backend/cut_plan.py::DEFAULT_CUT_RULES.keep_opening",
+        "backend/cut_plan.py::opening_end",
+        "backend/cut_plan.py::join_opening"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_the_opening_ends_where_the_sentence_of_the_first_question_begins",
+        "backend/tests/test_cut_plan.py::test_plan_joins_the_opening_and_then_snaps_the_rest",
+        "backend/tests/test_cut_plan.py::test_every_gap_before_the_theme_is_joined"
+      ],
+      "check": null
+    },
+    {
+      "id": "S18",
+      "group": "カット",
+      "rule": "語尾・話し始めを切らない。区間の終わりは声の終わり+0.15秒、始まりは話し始め-0.10秒。音声認識が聞いた弱い語尾も声に数える",
+      "from": {
+        "day": "2026-10-13",
+        "by": "北原",
+        "said": "26秒「まいります」の発話フレーズの最後の言葉が切れている"
+      },
+      "failure": "37回目は切れ目146か所中90か所が声の途中だった",
+      "where": [
+        "backend/cut_plan.py::snap_to_pauses",
+        "backend/cut_plan.py::heard_spans"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_a_soft_ending_the_recogniser_heard_is_kept",
+        "backend/tests/test_cut_plan.py::test_a_soft_start_the_recogniser_heard_is_kept",
+        "backend/tests/test_cut_plan.py::test_a_cut_never_starts_inside_the_voice"
+      ],
+      "check": null
+    },
+    {
+      "id": "S19",
+      "group": "カット",
+      "rule": "発話の途中でカットしない。音声認識が言葉の途中までしか聞けなくても、声が続く所まで残す",
+      "from": {
+        "day": "2026-10-17",
+        "by": "北原",
+        "said": "「悪くなっちゃって」の部分が発話シーンがカットされてしまっているように見える（38分8秒～38分10秒）"
+      },
+      "failure": "認識が「で」までしか聞けず、残りの声を切った",
+      "where": [
+        "backend/cut_plan.py::unheard_reach"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_the_voice_of_words_the_recogniser_missed_is_not_cut",
+        "backend/tests/test_cut_plan.py::test_the_missed_words_do_not_take_the_voice_of_the_next_heard_words",
+        "backend/tests/test_cut_plan.py::test_an_utterance_is_kept_until_its_words_were_heard"
+      ],
+      "check": null
+    },
+    {
+      "id": "S20",
+      "group": "カット",
+      "rule": "字を書く場面など、10秒以上だれも話さない所は会話の間ではなく場面なので切らない",
+      "from": {
+        "day": "2026-10-14",
+        "by": "北原",
+        "said": "決定カード「全部残す」（字を書く場面を残す）"
+      },
+      "failure": "書いている場面が詰められていた",
+      "where": [
+        "backend/cut_plan.py::DEFAULT_CUT_RULES.keep_scenes",
+        "backend/cut_plan.py::DEFAULT_CUT_RULES.scene_min_sec",
+        "backend/cut_plan.py::find_scenes"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_a_long_stretch_where_nobody_speaks_is_kept_as_a_scene",
+        "backend/tests/test_cut_plan.py::test_keeping_scenes_can_be_turned_off_in_the_template",
+        "backend/tests/test_cut_plan.py::test_a_pause_shorter_than_a_scene_is_still_cut"
+      ],
+      "check": null
+    },
+    {
+      "id": "S21",
+      "group": "カット",
+      "rule": "収録の段取りの声（「ちょっと切ります」「撮った？」等）は外す",
+      "from": {
+        "day": "2026-10-13",
+        "by": "Claude（失敗から）",
+        "said": "中身を全部残すと 37分38秒「ちょっと切ります」などが出た"
+      },
+      "failure": "撮影の段取りの会話が本編に入った",
+      "where": [
+        "backend/cut_plan.py::production_talk"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_the_talk_around_stopping_the_camera_is_found",
+        "backend/tests/test_cut_plan.py::test_the_misheard_cue_at_the_end_of_the_writing_scene_is_found",
+        "backend/tests/test_cut_plan.py::test_a_gap_holding_dropped_talk_is_cut_even_when_it_is_short"
+      ],
+      "check": null
+    },
+    {
+      "id": "S22",
+      "group": "カット",
+      "rule": "収録の継ぎ目の一瞬の映像（人が消えた1秒未満の映像）を残さない。切れ目は映像の切り替わりに合わせる",
+      "from": {
+        "day": "2026-10-17",
+        "by": "北原",
+        "said": "左にいる美麗さんが画面から消えているシーンが１秒未満で映りこんでいる（37分12秒）"
+      },
+      "failure": "収録の継ぎ目の0.41秒手前から残していた",
+      "where": [
+        "backend/cut_plan.py::read_shots",
+        "backend/cut_plan.py::trim_flashes"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_a_flash_of_the_previous_recording_at_a_cut_is_trimmed",
+        "backend/tests/test_cut_plan.py::test_a_range_cut_at_a_shot_change_starts_on_the_first_frame_of_the_new_shot",
+        "backend/tests/test_cut_plan.py::test_the_shot_changes_are_read_from_ffmpeg_once_and_cached"
+      ],
+      "check": null
+    },
+    {
+      "id": "S23",
+      "group": "カット",
+      "rule": "映像と音声をフレーム単位で同じ所で切る（ずれ0フレーム）",
+      "from": {
+        "day": "2026-10-17",
+        "by": "Claude（失敗から）",
+        "said": "54回目は35〜38分で映像と音が約0.25秒ずれた"
+      },
+      "failure": "切り方の違いで映像と音がずれた",
+      "where": [
+        "backend/smart_cut_engine.py::_frame_cut_graph"
+      ],
+      "tests": [
+        "backend/tests/test_smart_cut_engine.py::test_the_sound_stays_with_the_picture_across_a_join_that_lost_sound",
+        "backend/tests/test_smart_cut_engine.py::test_kept_ranges_are_cut_without_drift",
+        "backend/tests/test_cut_plan.py::test_the_ranges_are_put_on_the_frame_grid"
+      ],
+      "check": null
+    },
+    {
+      "id": "S24",
+      "group": "名前と用語",
+      "rule": "ゲスト・社名などどの素材でも正しい直しは全体の辞書に入れる。その素材でだけ誤りになる直しは素材の校正台帳に入れる",
+      "from": {
+        "day": "2026-10-19",
+        "by": "Claude（失敗から）",
+        "said": "台帳の直しは AI の字を探すので、AI の字が揺れると39件中28件が当たらなかった"
+      },
+      "failure": "ゼロからの版でゲスト名が「久木田博信」に戻った",
+      "where": [
+        "backend/proper_noun_dict.py::ProperNounDictionary.apply_corrections",
+        "backend/subtitle_engine/review_ledger.py::apply"
+      ],
+      "tests": [
+        "backend/tests/test_review_ledger.py::test_a_correction_replaces_the_words_in_the_line_spoken_at_that_time",
+        "backend/tests/test_review_ledger.py::test_a_glossary_entry_replaces_its_wrong_forms_throughout_the_material",
+        "backend/tests/test_shared/test_proper_noun_dict.py::test_proper_noun_dict_lifecycle"
+      ],
+      "check": null
+    },
+    {
+      "id": "S25",
+      "group": "名前と用語",
+      "rule": "辞書は校閲 AI の前と後の両方で当てる（AI が直した名前を戻すことがある）。字の間に空白が入っても当てる",
+      "from": {
+        "day": "2026-10-19",
+        "by": "Claude（失敗から）",
+        "said": "AI が「久木田ヒロノブ」を「久木田博信」に戻していた／「B オリジナル」に当たらなかった"
+      },
+      "failure": "辞書に入れた名前が字幕で戻った",
+      "where": [
+        "backend/agents/workers/proofread_worker.py::ProofreadWorker.execute",
+        "backend/proper_noun_dict.py::_spaced_pattern"
+      ],
+      "tests": [
+        "backend/tests/test_proofread_worker_standalone.py::test_the_dictionary_is_applied_again_after_the_ai_so_it_cannot_undo_a_known_name",
+        "backend/tests/test_shared/test_proper_noun_dict.py::test_a_space_inside_the_wrong_word_does_not_hide_it"
+      ],
+      "check": null
+    },
+    {
+      "id": "S26",
+      "group": "名前と用語",
+      "rule": "名前・用語は改行や字幕の切れ目で割らない。未確認の辞書の語（confirmed:false）は機械的に当てない",
+      "from": {
+        "day": "2026-10-15",
+        "by": "Claude（失敗から）",
+        "said": "25分11秒「選出→撰出」は未確認の辞書の語が当たっていた"
+      },
+      "failure": "確かめていない辞書の語で正しい字を壊した",
+      "where": [
+        "backend/proper_noun_dict.py::ProperNounDictionary.apply_corrections",
+        "backend/subtitle_engine/text_formatter.py::_keep_words"
+      ],
+      "tests": [
+        "backend/tests/test_shared/test_proper_noun_dict.py::test_an_unconfirmed_entry_is_not_applied",
+        "backend/tests/test_subtitle_aligner.py::test_an_unconfirmed_dictionary_entry_is_not_kept_against_the_recogniser",
+        "backend/tests/test_subtitle_polish.py::test_a_line_with_english_words_is_measured_by_its_width"
+      ],
+      "check": "terms_unbroken"
+    },
+    {
+      "id": "S27",
+      "group": "書き出し",
+      "rule": "完成版の左上のロゴは書き出しで足す（raw には無い）。今の位置のまま残す",
+      "from": {
+        "day": "2026-10-18",
+        "by": "北原",
+        "said": "決定カード「残す」（左上のロゴ）"
+      },
+      "failure": "失敗ではなく確認。raw にロゴは無く、書き出しで足していると 10-18 に分かった",
+      "where": [
+        "backend/agents/workers/render_worker.py::RenderWorker._overlay_logo"
+      ],
+      "tests": [
+        "backend/tests/test_logo_overlay.py::test_apply_logo_default_params",
+        "backend/tests/test_logo_overlay.py::test_apply_logo_success"
+      ],
+      "check": null
+    },
+    {
+      "id": "S28",
+      "group": "書き出し",
+      "rule": "書き出す mp4 は yuv420p にする（どの再生機でも映像が出る）",
+      "from": {
+        "day": "2026-10-05",
+        "by": "北原",
+        "said": "2つのmp4ファイルをダウンロードし再生したが、音声のみ再生され映像がなかった"
+      },
+      "failure": "yuv444p で書き出していて、映像が再生されなかった",
+      "where": [
+        "backend/video_editor_engine.py::FFmpegEditor._get_encode_args"
+      ],
+      "tests": [
+        "backend/tests/test_smart_cut_engine.py::test_burned_preview_is_yuv420p_so_ordinary_players_show_the_picture"
+      ],
+      "check": null
+    },
+    {
+      "id": "S29",
+      "group": "再現",
+      "rule": "人が承認した編集は固定し、作り直しは固定から行う（AI を呼ばずに字幕が1字も違わない）。AI の出力の控えも保存する",
+      "from": {
+        "day": "2026-10-17",
+        "by": "北原",
+        "said": "再度キャッシュなしの状態で同じRaw動画4本から完成版の再現を行いたい"
+      },
+      "failure": "控え無しで作り直すと、台帳があっても字の約13%が承認版と違った",
+      "where": [
+        "backend/subtitle_engine/edit_lock.py::make",
+        "backend/subtitle_engine/edit_lock.py::render"
+      ],
+      "tests": [
+        "backend/tests/test_edit_lock.py::test_a_rebuild_from_the_lock_has_the_approved_captions_and_cut",
+        "backend/tests/test_edit_lock.py::test_a_lock_whose_captions_were_changed_after_approval_is_refused",
+        "backend/tests/test_ai_proofreader.py::TestProofreadMemo::test_同じ行は次の書き出しでも同じ直しを使う"
+      ],
+      "check": null
+    },
+    {
+      "id": "S30",
+      "group": "再現",
+      "rule": "人に見てもらう所は、機械が疑った所（聞き取りが割れた所）だけにし、ほかの聞き取りの字を候補として並べる",
+      "from": {
+        "day": "2026-10-17",
+        "by": "北原",
+        "said": "違和感があった場所をワンタッチでマーキングできるように…マーキングした箇所の字幕相当分だけを再生できるようになれば"
+      },
+      "failure": "43分を通しで3回見て35件を手で打つ必要があった",
+      "where": [
+        "backend/subtitle_engine/review_flags.py::flag_with_readings"
+      ],
+      "tests": [
+        "backend/tests/test_review_flags.py::test_a_caption_two_other_readings_disagree_with_is_flagged_with_their_words_as_options",
+        "backend/tests/test_review_flags.py::test_one_reading_alone_other_than_the_recogniser_does_not_flag",
+        "backend/tests/test_review_flags.py::test_the_review_sheet_flags_with_the_readings_when_given"
+      ],
+      "check": null
+    }
+  ]
+}

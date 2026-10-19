@@ -10,6 +10,22 @@ import pytest
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 backend_dir = os.path.join(project_root, "backend")
+
+
+# 2026-10-18: 下の3つの一時フォルダは、作った process が終わるときに消す（2週間で約20GB 残った）。
+# 詳細は backend/tests/conftest.py の同じ関数を参照。
+def _remove_at_exit(path):
+    import atexit
+    import shutil
+    owner = os.getpid()
+
+    def _remove():
+        if os.getpid() == owner:
+            shutil.rmtree(path, ignore_errors=True)
+
+    atexit.register(_remove)
+
+
 # 2026-09-25: **テストが本番の完成品の置き場（vault-outputs/final/）に偽物を書いていた。**
 # `safe_io.VAULT_OUTPUTS_DIR` は import の時点で `ANTIGRAVITY_VAULT_OUTPUTS` から決まるのに、
 # どの conftest もこれを差し替えていなかった。RenderWorker のテストが 2MiB ちょうどの偽の
@@ -19,8 +35,9 @@ backend_dir = os.path.join(project_root, "backend")
 # 末尾を `vault-outputs` にしてあるのは、置き場の名前を確かめているテストがあるため。
 if not os.environ.get("ANTIGRAVITY_VAULT_OUTPUTS"):
     import tempfile as _tempfile_vault
-    os.environ["ANTIGRAVITY_VAULT_OUTPUTS"] = os.path.join(
-        _tempfile_vault.mkdtemp(prefix="antigravity_vault_"), "vault-outputs")
+    _vault_root = _tempfile_vault.mkdtemp(prefix="antigravity_vault_")
+    _remove_at_exit(_vault_root)
+    os.environ["ANTIGRAVITY_VAULT_OUTPUTS"] = os.path.join(_vault_root, "vault-outputs")
     os.makedirs(os.environ["ANTIGRAVITY_VAULT_OUTPUTS"], exist_ok=True)
 
 
@@ -31,6 +48,7 @@ if not os.environ.get("ANTIGRAVITY_VERIFIED_FACTS_DIR"):
     os.environ["ANTIGRAVITY_VERIFIED_FACTS_DIR"] = tempfile.mkdtemp(
         prefix="antigravity_facts_"
     )
+    _remove_at_exit(os.environ["ANTIGRAVITY_VERIFIED_FACTS_DIR"])
 
 # 2026-07-31: backend/tests/conftest.py にはあったが、こちら側には無かった。
 # その結果このツリーのテストは path_resolver.writable_path() の振り向けを
@@ -43,6 +61,7 @@ if not os.environ.get("ANTIGRAVITY_VERIFIED_FACTS_DIR"):
 if not os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"):
     import tempfile
     _writable_root = tempfile.mkdtemp(prefix="antigravity_writable_")
+    _remove_at_exit(_writable_root)
     os.environ["ANTIGRAVITY_WRITABLE_ROOT"] = _writable_root
     # 書き込み先の親ディレクトリはここで作る。本番コード側で mkdir すると、
     # Path.stat を差し替えているテストで exist_ok の内部判定が壊れる。

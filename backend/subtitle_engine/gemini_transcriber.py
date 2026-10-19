@@ -134,6 +134,13 @@ class TranscribeResult:
     cuts: list[float] = field(default_factory=list)
     # 前の区切り方の起こし（earlier）から写したチャンクの数
     carried: int = 0
+    # チャンクごとに起こしたモデル（チャンクの順）。写したチャンクは写し元のモデル、分からなければ空文字
+    chunk_models: list[str] = field(default_factory=list)
+
+    def cache_meta(self) -> dict:
+        """キャッシュの付帯情報に残す、区切りとモデル（どの字がどのモデルの字かを後から辿れるように）。"""
+        return {"cuts": self.cuts, "models_used": self.models_used, "chunk_models": self.chunk_models,
+                "carried": self.carried}
 
 
 def _extract_json_array(text: str) -> list:
@@ -557,7 +564,8 @@ def transcribe(video_path: str | Path, *, client: Any = None, model: str | None 
                            f"薄い区間 {len(report['sparse'])}件")
     return TranscribeResult(segments=segments, model=model, chunks=len(chunks), models_used=used,
                             rechecked=rechecked, coverage=report,
-                            quiet=quiet if speech is not None else [], cuts=cuts, carried=carried)
+                            quiet=quiet if speech is not None else [], cuts=cuts, carried=carried,
+                            chunk_models=[u for _, u in results])
 
 
 def look_windows(spans: list[tuple[float, float]], quiet: QuietMap | None = None,
@@ -703,8 +711,8 @@ def chunks_of(checkpoint: str | Path, total: float) -> dict[tuple[float, float],
     """起こしのキャッシュをチャンクごとに分ける: (チャンクの頭, 長さ) → (行, モデル)（控えと同じ形）。
 
     区切りは付帯情報の cuts、行は頭の時刻でチャンクに振り分ける。区切りを記録していない・読めない
-    キャッシュは空（どこがどのチャンクか分からない）。モデルは付帯情報の models_used が1つなら
-    それ、分からなければ空文字（`TranscribeResult.models_used` には載せない）。
+    キャッシュは空（どこがどのチャンクか分からない）。モデルは付帯情報の chunk_models（チャンクの順）、
+    それが無ければ models_used が1つならそれ、分からなければ空文字（`TranscribeResult.models_used` には載せない）。
     """
     meta = read_meta(checkpoint)
     cuts = meta.get("cuts")
@@ -719,8 +727,12 @@ def chunks_of(checkpoint: str | Path, total: float) -> dict[tuple[float, float],
     models = [m for m in meta.get("models_used") or [] if m]
     model = models[0] if len(models) == 1 else ""
     edges = [0.0] + sorted(float(c) for c in cuts) + [float(total)]
-    return {_journal_key(a, b - a): ([r for r, s in zip(rows, starts) if a <= s < b], model)
-            for a, b in zip(edges, edges[1:]) if b > a}
+    spans = [(a, b) for a, b in zip(edges, edges[1:]) if b > a]
+    per_chunk = meta.get("chunk_models")
+    if not isinstance(per_chunk, list) or len(per_chunk) != len(spans):
+        per_chunk = [model] * len(spans)
+    return {_journal_key(a, b - a): ([r for r, s in zip(rows, starts) if a <= s < b], str(m or ""))
+            for (a, b), m in zip(spans, per_chunk)}
 
 
 def _append_journal(journal: str | Path | None, lock: threading.Lock, offset: float, dur: float,

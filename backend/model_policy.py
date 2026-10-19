@@ -380,6 +380,29 @@ def _resolver_disagreements() -> tuple[list[tuple[str, str, str]], str]:
     return disagreements, ""
 
 
+def _served_instead() -> dict[str, dict[str, int]]:
+    """台帳から、頼んだモデル → 代わりに答えたモデル → 回数。台帳が読めなければ空。"""
+    try:
+        from backend import cost_guard
+    except ImportError:  # backend/ を直接 sys.path に載せている経路
+        import cost_guard  # type: ignore[no-redef]
+    out: dict[str, dict[str, int]] = {}
+    try:
+        lines = Path(cost_guard.LEDGER_PATH).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        asked, served = row.get("model"), row.get("served")
+        if row.get("kind") is None and asked and served and served != asked:
+            out.setdefault(asked, {})
+            out[asked][served] = out[asked].get(served, 0) + 1
+    return out
+
+
 def audit() -> tuple[list[AuditFinding], str]:
     """入替トリガーに当たっていないかを点検する。
 
@@ -408,6 +431,17 @@ def audit() -> tuple[list[AuditFinding], str]:
                 "obsolescence", tier, model,
                 "**この ID は実 API のモデル一覧にありません。**"
                 "廃止されたか、名前が違います"))
+
+    # **名前が残ったまま中身が替わる**（10-19: gemini-3.7-flash を頼むと gemini-3.8-flash が答えた）。
+    # models.list には名前があるので一覧との照合では見えない。台帳の「答えたモデル」で見る
+    served = _served_instead()
+    for tier in tier_order():
+        model = (table.get(tier) or {}).get("model", "")
+        for other, n in sorted((served.get(model) or {}).items()):
+            findings.append(AuditFinding(
+                "obsolescence", tier, model,
+                f"**この名前で頼むと `{other}` が答えています**（台帳の {n} 回）。"
+                "中身が替わったので、単価・無料枠・成果物を確かめて段を組み替えてください"))
 
     # 単価表に載っていない段のモデルは、実費を見積もれない。
     try:

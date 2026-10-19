@@ -280,11 +280,14 @@ class TranscribeWorker(PipelineStageWorker):
             ctx.segments = segments
             ctx.verified_quiet = [tuple(q) for q in meta.get("quiet", [])]
             ctx.transcript_coverage = meta.get("coverage")
+            # キャッシュでも、起こしたモデルを名乗る（記録の無い古いキャッシュは「記録なし」）
+            used = [m for m in meta.get("models_used") or [] if m]
             return StageResult(
                 stage_name=self.name, success=True,
-                detail=f"{len(segments)}セグメント検出 (Gemini・キャッシュ)",
-                data={"segment_count": len(segments), "engine": "gemini", "model": "cached",
-                      "second_pass": fusion},
+                detail=f"{len(segments)}セグメント検出 (Gemini {', '.join(used) or 'モデルの記録なし'}・キャッシュ)",
+                data={"segment_count": len(segments), "engine": "gemini",
+                      "model": used[0] if len(used) == 1 else (", ".join(used) or "cached"),
+                      "models_used": used, "from_cache": True, "second_pass": fusion},
                 duration_seconds=round(time.time() - start, 1),
             )
         try:
@@ -296,7 +299,7 @@ class TranscribeWorker(PipelineStageWorker):
             gemini_transcriber.write_checkpoint(
                 tx.segments, checkpoint,
                 meta={"quiet": tx.quiet, "coverage": tx.coverage, "rechecked": tx.rechecked,
-                      "cuts": tx.cuts})
+                      **tx.cache_meta()})
             journal.unlink(missing_ok=True)
         except Exception as e:  # noqa: BLE001 — 主経路の失敗は従経路へ。理由は残す
             logger.warning(f"⚠️ Gemini 文字起こしに失敗 → Whisper に切り替えます: {e}")
@@ -356,7 +359,7 @@ class TranscribeWorker(PipelineStageWorker):
                     gemini_transcriber.transcribe, ctx.video_path,
                     first_chunk_sec=gemini_transcriber.SECOND_PASS_FIRST_SEC, avoid_cuts=list(cuts),
                     journal=journal, earlier=[c for _, c in earlier]))
-                made = {"cuts": tx.cuts, "models_used": tx.models_used, "carried": tx.carried}
+                made = tx.cache_meta()
                 gemini_transcriber.write_checkpoint(tx.segments, checkpoint, meta=made)
                 journal.unlink(missing_ok=True)
                 second = tx.segments
@@ -407,8 +410,7 @@ class TranscribeWorker(PipelineStageWorker):
             tx = await loop.run_in_executor(None, functools.partial(
                 gemini_transcriber.transcribe, ctx.video_path, journal=journal,
                 **gemini_transcriber.SECOND_PASS_EARLIER[tag]))
-            gemini_transcriber.write_checkpoint(tx.segments, path,
-                                                meta={"cuts": tx.cuts, "models_used": tx.models_used})
+            gemini_transcriber.write_checkpoint(tx.segments, path, meta=tx.cache_meta())
             journal.unlink(missing_ok=True)
             return True
         except Exception as e:  # noqa: BLE001 — 前の区切り方の2回目も直すためだけ。落ちても進む

@@ -1,4 +1,4 @@
-"""scripts/google_oauth_login.py の `--readonly` / `--token`（M2）。
+"""scripts/google_oauth_login.py の `--readonly` / `--assets` / `--token`（M2）。
 
 同意画面は開かない。スコープと保存先の決め方、保存形式だけを見る。
 """
@@ -64,3 +64,73 @@ def test_args_are_parsed(login, tmp_path):
     assert args.readonly is True
     assert args.token == tmp_path / "t.json"
     assert login._parse_args([]).readonly is False
+
+
+# --- --assets（過程の資産を書く口・drive.file） ------------------------------------
+
+
+def test_assets_requests_only_drive_file(login):
+    scopes, _ = login.resolve_plan(readonly=False, token=None, assets=True)
+    assert scopes == ["https://www.googleapis.com/auth/drive.file"]
+
+
+def test_assets_has_its_own_default_file(login, monkeypatch, tmp_path):
+    """読み取り用・通常のトークンを上書きしない。"""
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tmp_path / "token.json"))
+    _, out = login.resolve_plan(readonly=False, token=None, assets=True)
+    assert out == tmp_path / "token_assets_file.json"
+    assert out != login.resolve_plan(readonly=True, token=None)[1]
+
+
+def test_token_flag_overrides_the_assets_destination(login, tmp_path):
+    target = tmp_path / "a.json"
+    assert login.resolve_plan(readonly=False, token=target, assets=True)[1] == target
+
+
+def test_readonly_and_assets_cannot_be_combined(login, capsys):
+    """1本のトークンに読みと書きを混ぜない。"""
+    with pytest.raises(SystemExit):
+        login._parse_args(["--readonly", "--assets"])
+    assert "--assets" in capsys.readouterr().err
+    with pytest.raises(ValueError):
+        login.resolve_plan(readonly=True, token=None, assets=True)
+
+
+def test_assets_flag_is_parsed(login):
+    assert login._parse_args(["--assets"]).assets is True
+    assert login._parse_args([]).assets is False
+
+
+def test_assets_token_is_saved_on_one_line_and_names_its_env(login, monkeypatch, tmp_path, capsys):
+    """同意の流れを偽物にして、保存の形と案内だけを見る（ブラウザも Google も使わない）。"""
+    import types
+
+    secret = tmp_path / "client_secret.json"
+    secret.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_CLIENT_SECRET", str(secret))
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tmp_path / "token.json"))
+    asked = {}
+
+    class _Flow:
+        @classmethod
+        def from_client_secrets_file(cls, path, scopes):
+            asked["scopes"] = scopes
+            return cls()
+
+        def run_local_server(self, port):
+            return types.SimpleNamespace(to_json=lambda: json.dumps(
+                {"refresh_token": "SECRET-RT", "scopes": asked["scopes"]}, indent=2))
+
+    fake = types.ModuleType("google_auth_oauthlib.flow")
+    fake.InstalledAppFlow = _Flow
+    monkeypatch.setitem(sys.modules, "google_auth_oauthlib.flow", fake)
+
+    assert login.main(["--assets"]) == 0
+
+    out = tmp_path / "token_assets_file.json"
+    text = out.read_text(encoding="utf-8")
+    assert "\n" not in text
+    assert json.loads(text)["scopes"] == ["https://www.googleapis.com/auth/drive.file"]
+    printed = capsys.readouterr().out
+    assert "AVS_ASSETS_GOOGLE_TOKEN_JSON" in printed
+    assert "SECRET-RT" not in printed

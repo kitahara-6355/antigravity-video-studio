@@ -1,0 +1,700 @@
+<title>工程ライブ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 進行表: 上に「いま」と4つの数字、真ん中に時間の軸（手順の帯・書き出しの工程の帯・AI の呼び出しの目盛り・
+   判断の旗）、下に版ごとの結果と判断の記録。色は字幕の朱入れの画面と同じ系統（朱・群青・松葉）にそろえる */
+:root {
+  --paper: #eef1f4;
+  --sheet: #fbfcfd;
+  --ink: #1a2130;
+  --ink-soft: #566074;
+  --rule: #d5dbe3;
+  --grid: #e3e8ee;
+  --shu: #c43a1e;
+  --shu-wash: #f6e0d9;
+  --gunjo: #2d4ea3;
+  --gunjo-soft: #8da3d8;
+  --gunjo-wash: #dfe6f6;
+  --matsu: #2e7350;
+  --matsu-wash: #dcefe3;
+  --fuji: #6a4c9c;
+  --kicha: #94660f;
+  --kicha-wash: #f3e8d2;
+  --font-ui: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+  --font-head: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-time: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10141c; --sheet: #171c27; --ink: #e6e9ef; --ink-soft: #9aa3b4; --rule: #2a3141; --grid: #212836;
+    --shu: #ff7354; --shu-wash: #3a211c; --gunjo: #93abff; --gunjo-soft: #4b5f99; --gunjo-wash: #1d2643;
+    --matsu: #6cc394; --matsu-wash: #173323; --fuji: #b59cf0; --kicha: #e2b25a; --kicha-wash: #3a2e17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #10141c; --sheet: #171c27; --ink: #e6e9ef; --ink-soft: #9aa3b4; --rule: #2a3141; --grid: #212836;
+  --shu: #ff7354; --shu-wash: #3a211c; --gunjo: #93abff; --gunjo-soft: #4b5f99; --gunjo-wash: #1d2643;
+  --matsu: #6cc394; --matsu-wash: #173323; --fuji: #b59cf0; --kicha: #e2b25a; --kicha-wash: #3a2e17;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 32px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1, h2 { font-family: var(--font-head); font-weight: 700; margin: 0; letter-spacing: .06em; text-wrap: balance; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.05rem; }
+code, .mono { font-family: var(--font-time); font-size: .86em; }
+button { font: inherit; }
+button:focus-visible, summary:focus-visible { outline: 2px solid var(--gunjo); outline-offset: 2px; }
+
+/* 見出し */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 20px; }
+.ttl { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.job { margin: 0; color: var(--ink-soft); font-size: .92rem; }
+.meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.upd { color: var(--ink-soft); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.btn { border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); border-radius: var(--r);
+  padding: 4px 12px; cursor: pointer; font-size: .85rem; }
+.btn:hover { border-color: var(--gunjo); color: var(--gunjo); }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 999px;
+  font-size: .85rem; font-weight: 700; letter-spacing: .04em; background: var(--grid); color: var(--ink-soft); }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill[data-state="running"] { background: var(--gunjo-wash); color: var(--gunjo); }
+.pill[data-state="running"]::before { animation: pulse 1.6s ease-in-out infinite; }
+.pill[data-state="done"] { background: var(--matsu-wash); color: var(--matsu); }
+.pill[data-state="failed"], .pill[data-state="stale"] { background: var(--shu-wash); color: var(--shu); }
+@keyframes pulse { 50% { opacity: .25; } }
+
+/* 知らせの帯（まだ始まっていない・止まった・読めない） */
+.banner { border-radius: var(--r); padding: 12px 16px; background: var(--sheet); border: 1px solid var(--rule); }
+.banner[data-tone="bad"] { background: var(--shu-wash); border-color: var(--shu); }
+.banner[data-tone="wait"] { background: var(--kicha-wash); border-color: var(--kicha); }
+.banner p { margin: 0; }
+.banner .cmd { margin-top: 6px; color: var(--ink-soft); font-size: .82rem; overflow-wrap: anywhere; }
+
+/* いま */
+.now { background: var(--sheet); border: 1px solid var(--rule); border-left: 4px solid var(--gunjo);
+  border-radius: var(--r); padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.now[data-state="done"] { border-left-color: var(--matsu); }
+.now[data-state="failed"], .now[data-state="stale"] { border-left-color: var(--shu); }
+.now-step { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.now-step .lbl { font-size: .78rem; color: var(--ink-soft); letter-spacing: .12em; }
+.now-step strong { font-size: 1.15rem; }
+.place { font-size: .82rem; color: var(--ink-soft); }
+.now-line { margin: 0; font-family: var(--font-time); font-size: .84rem; overflow-wrap: anywhere; }
+.now-sub { margin: 0; font-size: .82rem; color: var(--ink-soft); }
+
+/* 4つの数字 */
+.figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.fig { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fig .k { font-size: .76rem; color: var(--ink-soft); letter-spacing: .08em; }
+.fig b { font-family: var(--font-time); font-size: 1.45rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.fig .s { font-size: .78rem; color: var(--ink-soft); overflow-wrap: anywhere; }
+@media (max-width: 760px) { .figs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 時間の軸 */
+.axis-wrap { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 12px 16px 16px;
+  display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.axis-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .76rem; color: var(--ink-soft); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.axis { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: minmax(11em, 30%) minmax(0, 1fr); gap: 0 12px; align-items: center;
+  padding: 5px 0; border-top: 1px solid var(--grid); }
+.row.ruler { border-top: 0; padding: 0 0 4px; }
+.row.sub { padding: 2px 0; border-top: 0; }
+.row.sub .rl { padding-left: 22px; }
+.row.lane { border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 8px; }
+.rl { display: flex; flex-direction: column; min-width: 0; }
+.rl .nm { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rl .nm span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.sub .rl .nm { font-size: .86rem; }
+.rl .sum { font-size: .76rem; color: var(--ink-soft); padding-left: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.sub .rl .sum { padding-left: 0; }
+.row[data-state="failed"] .rl .sum { color: var(--shu); white-space: normal; }
+.mark { flex: none; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 10px; font-weight: 700; line-height: 1; border: 2px solid var(--rule); color: transparent; }
+.row[data-state="done"] .mark { background: var(--matsu); border-color: var(--matsu); color: var(--sheet); }
+.row[data-state="running"] .mark { border-color: var(--gunjo); background: radial-gradient(var(--gunjo) 35%, transparent 40%); }
+.row[data-state="failed"] .mark { background: var(--shu); border-color: var(--shu); color: var(--sheet); }
+.track { position: relative; height: 18px; min-width: 0; }
+.row.sub .track { height: 12px; }
+.row.lane .track { height: 30px; }
+.row.ruler .track { height: 22px; }
+.gl { position: absolute; top: -6px; bottom: -6px; width: 1px; background: var(--grid); }
+.tk { position: absolute; bottom: 0; transform: translateX(-50%); font-family: var(--font-time); font-size: .72rem;
+  color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tk.edge-l { transform: none; }
+.tk.edge-r { transform: translateX(-100%); }
+.qnotes { margin: 0; padding: 0 0 0 1.1em; display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-soft); }
+.qnotes .more { list-style: none; margin-left: -1.1em; }
+.bar { position: absolute; top: 2px; bottom: 2px; min-width: 3px; border-radius: 3px; background: var(--matsu); }
+.row.sub .bar { top: 1px; bottom: 1px; background: var(--matsu-wash); border: 1px solid var(--matsu); }
+.bar.running { background: repeating-linear-gradient(-45deg, var(--gunjo) 0 6px, var(--gunjo-soft) 6px 12px);
+  background-size: 17px 17px; animation: crawl 1.2s linear infinite; border: 0; }
+.bar.failed { background: var(--shu); border: 0; }
+.row.sub .bar.m-lite { border-color: var(--matsu); }
+.row.sub .bar.m-standard { background: var(--gunjo-wash); border-color: var(--gunjo); }
+.row.sub .bar.m-premium { background: var(--gunjo-wash); border-color: var(--fuji); }
+.row.sub .bar.m-pro { background: var(--shu-wash); border-color: var(--shu); }
+.row.sub .bar.m-local { background: var(--grid); border-color: var(--ink-soft); }
+.row.sub .bar.thin { border: 0; border-radius: 1px; background: var(--matsu); }
+.row.sub .bar.thin.m-standard, .row.sub .bar.thin.m-premium { background: var(--gunjo); }
+.row.sub .bar.thin.m-pro { background: var(--shu); }
+.row.sub .bar.thin.m-local { background: var(--ink-soft); }
+@keyframes crawl { to { background-position: 17px 0; } }
+.chip { display: inline-flex; align-items: center; gap: 4px; flex: none; font-family: var(--font-time); font-size: .7rem;
+  padding: 0 6px; border-radius: 4px; border: 1px solid var(--rule); color: var(--ink-soft); }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); }
+.m-lite.chip::before, .tick.m-lite, .legend i.m-lite { background: var(--matsu); }
+.m-standard.chip::before, .tick.m-standard, .legend i.m-standard { background: var(--gunjo); }
+.m-premium.chip::before, .tick.m-premium, .legend i.m-premium { background: var(--fuji); }
+.m-pro.chip::before, .tick.m-pro, .legend i.m-pro { background: var(--shu); }
+.legend i.fb { background: transparent; border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 9px solid var(--shu); border-radius: 0; width: 0; height: 0; }
+.tick { position: absolute; bottom: 0; width: 2px; height: 16px; margin-left: -1px; border-radius: 1px; opacity: .85; }
+.fbk { position: absolute; top: 0; width: 0; height: 0; margin-left: -5px; border-left: 5px solid transparent;
+  border-right: 5px solid transparent; border-top: 9px solid var(--shu); }
+.flag { position: absolute; top: 0; transform: translateX(-50%); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 3px;
+  background: var(--kicha); color: var(--sheet); font-family: var(--font-time); font-size: .66rem; line-height: 16px;
+  text-align: center; }
+@media (max-width: 620px) {
+  .row { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .row.ruler .rl { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar.running, .pill[data-state="running"]::before { animation: none; }
+}
+
+/* 版ごとの結果 */
+.versions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 12px; }
+.ver { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ver-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin: 0; }
+.facts div { display: flex; flex-direction: column; min-width: 0; }
+.facts dt { font-size: .72rem; color: var(--ink-soft); }
+.facts dd { margin: 0; font-family: var(--font-time); font-variant-numeric: tabular-nums; font-size: .95rem; }
+.contact { width: 100%; max-width: 100%; aspect-ratio: 32 / 27; border-radius: 4px; background: var(--grid);
+  object-fit: contain; display: block; }
+.saves { display: flex; flex-wrap: wrap; gap: 6px; }
+.ver .wait { margin: 0; color: var(--ink-soft); font-size: .85rem; }
+
+/* 判断の記録・手順の記録 */
+.notes-wrap { display: flex; flex-direction: column; gap: 8px; }
+.notes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.notes li { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 10px; align-items: baseline;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 8px 12px; }
+.notes .no { font-family: var(--font-time); font-size: .72rem; background: var(--kicha); color: var(--sheet);
+  border-radius: 3px; padding: 0 5px; }
+.notes time { font-family: var(--font-time); font-size: .8rem; color: var(--ink-soft); }
+.notes p { margin: 0; overflow-wrap: anywhere; }
+.notes .empty { display: block; color: var(--ink-soft); background: transparent; border: 1px dashed var(--rule); }
+details.log { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 16px; }
+details.log summary { cursor: pointer; font-weight: 700; }
+.steps-scroll { overflow-x: auto; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .84rem; }
+th, td { text-align: left; padding: 6px 10px 6px 0; border-top: 1px solid var(--grid); vertical-align: top; }
+th { font-size: .74rem; color: var(--ink-soft); font-weight: 500; border-top: 0; white-space: nowrap; }
+td.t { font-family: var(--font-time); white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.err { color: var(--shu); }
+.foot { color: var(--ink-soft); font-size: .78rem; }
+.foot code { overflow-wrap: anywhere; }
+</style>
+
+<main class="wrap">
+  <header class="top">
+    <div class="ttl">
+      <h1>工程ライブ</h1>
+      <p class="job" id="jobLabel">記録を読み込んでいます</p>
+    </div>
+    <div class="meta">
+      <span class="pill" id="statePill" data-state="loading">読み込み中</span>
+      <span class="upd" id="updated"></span>
+      <button class="btn" id="reload" type="button">読み直す</button>
+    </div>
+  </header>
+
+  <section class="banner" id="banner" hidden>
+    <p id="bannerText"></p>
+    <p class="cmd mono" id="bannerCmd" hidden></p>
+  </section>
+
+  <section class="now" id="nowPanel" aria-live="polite">
+    <div class="now-step"><span class="lbl">いま</span><strong id="nowStep">—</strong><span class="place" id="nowPlace"></span></div>
+    <p class="now-line" id="nowLine"></p>
+    <p class="now-sub" id="nowSub"></p>
+  </section>
+
+  <section class="figs" aria-label="数字">
+    <div class="fig"><span class="k">AI の呼び出し</span><b id="fCalls">—</b><span class="s" id="fCallsSub"></span></div>
+    <div class="fig"><span class="k">混雑・降格</span><b id="fFall">—</b><span class="s" id="fFallSub"></span></div>
+    <div class="fig"><span class="k">今日の無料枠の残り</span><b id="fQuota">—</b><span class="s" id="fQuotaSub"></span></div>
+    <div class="fig"><span class="k">予算の残り</span><b id="fBudget">—</b><span class="s" id="fBudgetSub"></span></div>
+  </section>
+
+  <section class="axis-wrap" aria-label="時間の軸">
+    <div class="axis-head">
+      <h2>時間の軸（日本時間）</h2>
+      <span class="legend">
+        <span><i class="m-lite"></i>flash-lite</span>
+        <span><i class="m-standard"></i>3.6-flash</span>
+        <span><i class="m-premium"></i>3.7-flash</span>
+        <span><i class="m-pro"></i>pro（課金）</span>
+        <span><i class="fb"></i>混雑・降格</span>
+      </span>
+    </div>
+    <div class="axis" id="axis"></div>
+  </section>
+
+  <section class="versions" id="versions" aria-label="版ごとの結果"></section>
+
+  <section class="notes-wrap">
+    <h2>判断の記録</h2>
+    <ol class="notes" id="notes"></ol>
+  </section>
+
+  <details class="log">
+    <summary>手順の記録（時刻と結果）</summary>
+    <div class="steps-scroll">
+      <table>
+        <thead><tr><th>手順</th><th>場所</th><th>始まり</th><th>終わり</th><th>かかった時間</th><th>結果</th></tr></thead>
+        <tbody id="stepsBody"></tbody>
+      </table>
+    </div>
+  </details>
+
+  <p class="foot" id="foot"></p>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const DEFAULT_JOB = "raw4_repro_20261018";
+  const POLL_MS = 15000;
+  const STALE_MS = 3 * 60 * 1000;   // 通しの間は15秒ごとに書かれる。これより古ければ止まったかもしれない
+  const JOB = ((location.hash || "").slice(1).replace(/[^\w.~-]/g, "") || DEFAULT_JOB);
+  const DIR = "outputs/" + JOB;
+  const STATUS = DIR + "/live/status.json";
+
+  const $ = (id) => document.getElementById(id);
+  const S = { files: null, status: null, timer: null, ticker: null, images: new Map(), loadingImg: new Set() };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ── 時刻 ──
+  const hhmm = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const hhmmss = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  const mdhm = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const ms = (v) => { const t = v ? Date.parse(v) : NaN; return Number.isFinite(t) ? t : null; };
+  const clock = (t) => (t == null ? "—" : hhmm.format(t));
+  function span(a, b) {
+    if (a == null || b == null) return "—";
+    const s = Math.max(0, Math.round((b - a) / 1000));
+    if (s < 60) return s + "秒";
+    const m = Math.round(s / 60);
+    return m < 60 ? m + "分" : Math.floor(m / 60) + "時間" + (m % 60 ? (m % 60) + "分" : "");
+  }
+
+  // ── モデル ──
+  function modelClass(m) {
+    m = String(m || "");
+    if (!m) return "m-none";
+    if (m.startsWith("local:")) return "m-local";
+    if (/flash-lite/.test(m)) return "m-lite";
+    if (/pro/.test(m)) return "m-pro";
+    if (/3\.7/.test(m)) return "m-premium";
+    return "m-standard";
+  }
+  const shortModel = (m) => String(m || "").replace(/^local:/, "").replace(/^gemini-/, "").replace(/-preview$/, "");
+
+  // ── 要素 ──
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  // ── 共有フォルダを読む ──
+  async function call(fn) {
+    for (let k = 0; ; k++) {
+      try { return await fn(); } catch (e) {
+        const code = e && e.code;
+        if ((code === "rate_limited" || code === "changed") && k < 3) { await sleep((e && e.retryAfterMs) || 1500); continue; }
+        throw e;
+      }
+    }
+  }
+  async function readBytes(path) {
+    const parts = []; let offset = 0, size = 1, rev = null;
+    while (offset < size) {
+      const r = await call(() => S.files.read(path, { offset, length: 25 * 1024 * 1024 }));
+      if (rev !== null && r.revision !== rev) throw { code: "changed" };
+      rev = r.revision; size = r.size; parts.push(r.bytes); offset += r.bytes.length;
+      if (!r.bytes.length) break;
+    }
+    return parts;
+  }
+
+  function banner(text, tone, cmd) {
+    $("banner").hidden = !text;
+    $("banner").dataset.tone = tone || "";
+    $("bannerText").textContent = text || "";
+    $("bannerCmd").hidden = !cmd;
+    $("bannerCmd").textContent = cmd || "";
+  }
+
+  async function poll() {
+    clearTimeout(S.timer);
+    let stop = false;
+    try {
+      const text = await new Blob(await readBytes(STATUS)).text();
+      S.status = JSON.parse(text);
+      render();
+    } catch (e) {
+      const code = (e && e.code) || (e instanceof SyntaxError ? "parse" : "unavailable");
+      if (code === "not_found") {
+        if (!S.status) {
+          $("statePill").dataset.state = "waiting"; $("statePill").textContent = "始まる前";
+          $("jobLabel").textContent = JOB;
+          banner("まだ始まっていません。通しを始めると、ここに手順が時間の軸で並びます（15秒ごとに読み直します）。", "wait",
+                 "読み先: " + STATUS);
+        }
+      } else if (code === "not_granted") {
+        banner("共有フォルダの読み取りを許可しなかったので、記録を出せません。ページを開き直すと、もう一度たずねます。", "bad");
+        stop = true;
+      } else if (code === "parse") {
+        // 書き換えの途中を読んだ。次の回に読み直す
+      } else {
+        banner("記録を読めませんでした（" + code + "）。少し待って「読み直す」を押してください。", "bad");
+      }
+    }
+    if (!stop && !document.hidden) S.timer = setTimeout(poll, POLL_MS);
+  }
+
+  // ── 描く ──
+  function stepsOf(st) { return Array.isArray(st.steps) ? st.steps : []; }
+  function runOf(st, step) {
+    const res = step.result || {};
+    if (res.run && res.run.stages) return res.run;
+    const p = st.progress || {};
+    return p.step === step.key && p.run ? p.run : null;
+  }
+  function overall(st, now) {
+    const upd = ms(st.updated_at);
+    if (st.state === "running" && upd != null && now - upd > STALE_MS) return "stale";
+    return st.state || "waiting";
+  }
+  const STATE_TEXT = { running: "進行中", done: "終わった", failed: "止まった", waiting: "始まる前", stale: "記録が止まっている", loading: "読み込み中" };
+
+  function render() {
+    const st = S.status; if (!st) return;
+    const now = Date.now();
+    const state = overall(st, now);
+    $("jobLabel").textContent = (st.job && st.job.label) || JOB;
+    $("statePill").dataset.state = state; $("statePill").textContent = STATE_TEXT[state] || state;
+    $("updated").textContent = "記録 " + (ms(st.updated_at) ? hhmmss.format(ms(st.updated_at)) : "—") + " ・15秒ごとに読み直し";
+    const failed = stepsOf(st).find((s) => s.state === "failed");
+    if (state === "stale") {
+      banner("記録が " + span(ms(st.updated_at), now) + " 更新されていません。作業が止まったかもしれません。", "bad",
+             "続きから: python -m backend.edit_job run " + JOB);
+    } else if (failed && state !== "running") {
+      banner("止まりました: " + failed.label + " — " + (failed.error || ""), "bad",
+             "直した後、続きから: python -m backend.edit_job run " + JOB);
+    } else banner("");
+    renderNow(st, now, state);
+    renderFigs(st);
+    renderAxis(st, now);
+    renderVersions(st);
+    renderNotes(st);
+    renderTable(st);
+    $("foot").textContent = "数字はすべて " + STATUS + " から（費用の台帳と本線の実行記録をもとに、通しの道具が15秒ごとに書く）。この画面は読むだけです。";
+  }
+
+  function renderNow(st, now, state) {
+    const steps = stepsOf(st);
+    const cur = steps.find((s) => s.state === "running") || steps.find((s) => s.state === "failed")
+      || [...steps].reverse().find((s) => s.state === "done");
+    $("nowPanel").dataset.state = state;
+    if (state === "done") {
+      $("nowStep").textContent = "通しが終わりました"; $("nowPlace").textContent = "";
+      $("nowLine").textContent = "";
+      $("nowSub").textContent = "始まり " + clock(ms(st.started_at)) + "・終わり " + clock(ms(st.finished_at)) + "・" + span(ms(st.started_at), ms(st.finished_at));
+      return;
+    }
+    if (!cur) { $("nowStep").textContent = "—"; $("nowPlace").textContent = ""; $("nowLine").textContent = ""; $("nowSub").textContent = ""; return; }
+    $("nowStep").textContent = cur.label;
+    $("nowPlace").textContent = cur.place || "";
+    const p = st.progress || {};
+    const run = p.step === cur.key ? p.run : null;
+    const stage = run && (run.stages || []).find((s) => s.status === "running");
+    const journals = (p.step === cur.key && p.journals) || [];
+    const bits = [];
+    if (stage) bits.push("工程: " + stage.label + (stage.model ? "（" + shortModel(stage.model) + "）" : ""));
+    if (journals.length) bits.push("起こしの控え " + journals.map((j) => j.chunks + "チャンク").join("・"));
+    $("nowLine").textContent = (cur.state === "running" && p.step === cur.key && p.line) ? p.line : (cur.state === "failed" ? (cur.error || "") : "");
+    const t0 = ms(cur.started_at);
+    $("nowSub").textContent = [cur.state === "running" ? "経過 " + span(t0, now) : "", ...bits].filter(Boolean).join("・");
+  }
+
+  function renderFigs(st) {
+    const calls = (st.calls || []).filter((c) => c.kind === "call");
+    const falls = (st.calls || []).filter((c) => c.kind === "fallback");
+    const byModel = {};
+    calls.forEach((c) => { const k = shortModel(c.model); byModel[k] = (byModel[k] || 0) + 1; });
+    $("fCalls").textContent = calls.length + " 回";
+    $("fCallsSub").textContent = Object.entries(byModel).map(([k, v]) => k + " " + v).join("・") || "まだ呼んでいない";
+    const byReason = {};
+    falls.forEach((c) => { const k = String(c.reason || "").split(":")[0] || "?"; byReason[k] = (byReason[k] || 0) + 1; });
+    $("fFall").textContent = falls.length + " 回";
+    $("fFallSub").textContent = Object.entries(byReason).map(([k, v]) => k + " " + v).join("・") || "なし";
+    const q = st.quota || {};
+    $("fQuota").textContent = q.left != null ? q.left + " 回" : "—";
+    $("fQuotaSub").textContent = ((q.tiers || []).map((t) => shortModel(t.model) + " " + t.used + "/" + t.limit).join("・"))
+      + (q.reset_at ? "・" + clock(ms(q.reset_at)) + " に戻る" : "");
+    const b = st.budget;
+    $("fBudget").textContent = b ? "¥" + Math.round(b.left_jpy).toLocaleString("ja-JP") : "—";
+    $("fBudgetSub").textContent = (b ? b.id + "（上限 ¥" + Number(b.limit_jpy).toLocaleString("ja-JP") + "）" : "予算なし")
+      + (st.disk_free_gb != null ? "・空き " + st.disk_free_gb + " GB" : "");
+  }
+
+  function niceStep(spanMs) {
+    const steps = [1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 360].map((m) => m * 60000);
+    return steps.find((s) => spanMs / s <= 7) || steps[steps.length - 1];
+  }
+
+  function renderAxis(st, now) {
+    const axis = $("axis"); axis.textContent = "";
+    const steps = stepsOf(st);
+    const starts = steps.map((s) => ms(s.started_at)).filter((t) => t != null);
+    const t0 = ms(st.started_at) ?? (starts.length ? Math.min(...starts) : null);
+    if (t0 == null) { axis.appendChild(el("p", "now-sub", "手順が始まると、ここに帯が並びます。")); return; }
+    const running = st.state === "running";
+    const ends = steps.map((s) => ms(s.finished_at)).filter((t) => t != null);
+    const t1 = running ? Math.max(now, t0 + 60000) : (ms(st.finished_at) ?? (ends.length ? Math.max(...ends) : now));
+    const total = Math.max(60000, t1 - t0);
+    const pct = (t) => Math.min(100, Math.max(0, ((t - t0) / total) * 100));
+    const every = niceStep(total);
+    const ticks = [];
+    for (let t = Math.ceil(t0 / every) * every; t <= t1; t += every) ticks.push(t);
+
+    const track = () => {
+      const tr = el("div", "track");
+      ticks.forEach((t) => { const g = el("i", "gl"); g.style.left = pct(t) + "%"; tr.appendChild(g); });
+      return tr;
+    };
+    const row = (cls, state, name, sum, mark, chip) => {
+      const r = el("div", "row" + (cls ? " " + cls : ""));
+      if (state) r.dataset.state = state;
+      const rl = el("div", "rl");
+      const nm = el("div", "nm");
+      if (mark) nm.appendChild(el("span", "mark", state === "done" ? "✓" : state === "failed" ? "×" : ""));
+      if (chip) nm.appendChild(chip);
+      nm.appendChild(el("span", "", name));
+      rl.appendChild(nm);
+      if (sum) { const s = el("span", "sum", sum); s.title = sum; rl.appendChild(s); }
+      r.appendChild(rl);
+      const tr = track(); r.appendChild(tr);
+      axis.appendChild(r);
+      return tr;
+    };
+    const bar = (tr, a, b, cls, title) => {
+      if (a == null) return;
+      const x = el("div", "bar" + (cls ? " " + cls : ""));
+      x.style.left = pct(a) + "%";
+      const w = Math.max(0, pct(b ?? t1) - pct(a));
+      x.style.width = w + "%";
+      if (w < 0.6) x.classList.add("thin");
+      if (title) x.title = title;
+      tr.appendChild(x);
+    };
+
+    // 目盛りと判断の旗
+    const ruler = row("ruler", "", "", "", false, null);
+    ticks.forEach((t, i) => {
+      const lab = el("span", "tk", clock(t)); lab.style.left = pct(t) + "%";
+      if (pct(t) < 4) lab.classList.add("edge-l"); else if (pct(t) > 96) lab.classList.add("edge-r");
+      ruler.appendChild(lab);
+    });
+    (st.notes || []).forEach((n, i) => {
+      const t = ms(n.at); if (t == null) return;
+      const f = el("span", "flag", String(i + 1)); f.style.left = pct(t) + "%"; f.title = n.text || "";
+      ruler.appendChild(f);
+    });
+
+    // 手順と、書き出しの中の工程
+    steps.forEach((s) => {
+      const a = ms(s.started_at), b = ms(s.finished_at);
+      const sum = s.state === "failed" ? (s.error || "") : (s.summary || (s.state === "running" ? "進行中" : ""));
+      const tr = row("", s.state || "waiting", s.label, sum, true, null);
+      bar(tr, a, s.state === "running" ? now : b, s.state === "running" ? "running" : s.state === "failed" ? "failed" : "",
+          s.label + " " + clock(a) + "〜" + (s.state === "running" ? "" : clock(b)));
+      const run = String(s.key || "").startsWith("edit:") ? runOf(st, s) : null;
+      (run ? run.stages || [] : []).forEach((g) => {
+        const ga = ms(g.started_at), gb = ms(g.finished_at);
+        const gs = g.status === "success" ? "done" : g.status === "failed" ? "failed" : "running";
+        const chip = g.model ? el("span", "chip " + modelClass(g.model), shortModel(g.model)) : null;
+        const notes = [];
+        if (g.calls) notes.push("AI " + g.calls + "回");
+        else if (g.reason === "unverified" && gs === "done") notes.push("控えを使った（0回）");
+        if (g.fallbacks) notes.push("降格 " + g.fallbacks);
+        if (g.reason === "stub") notes.push("AI を使わずに進めた");
+        if (gs === "done" && ga != null && gb != null) notes.push(span(ga, gb));
+        const gtr = row("sub", gs, g.label || g.name, notes.join("・"), false, chip);
+        bar(gtr, ga, gs === "running" ? now : gb, (gs === "running" ? "running " : gs === "failed" ? "failed " : "") + modelClass(g.model),
+            (g.label || g.name) + " " + clock(ga) + "〜" + (gs === "running" ? "" : clock(gb)));
+      });
+    });
+
+    // AI の呼び出し（1本の目盛りが1回）と、混雑・降格（▼）
+    const calls = (st.calls || []);
+    const lane = row("lane", "", "AI の呼び出し", calls.filter((c) => c.kind === "call").length + " 回・▼ は混雑や枠切れで別のモデルに落ちた所", false, null);
+    calls.forEach((c) => {
+      const t = ms(c.at); if (t == null || t < t0) return;
+      if (c.kind === "fallback") {
+        const m = el("i", "fbk"); m.style.left = pct(t) + "%";
+        m.title = clock(t) + " " + shortModel(c.from) + " → " + shortModel(c.model) + "（" + (c.reason || "") + "）";
+        lane.appendChild(m);
+      } else {
+        const m = el("i", "tick " + modelClass(c.model)); m.style.left = pct(t) + "%";
+        m.title = hhmmss.format(t) + " " + shortModel(c.model);
+        lane.appendChild(m);
+      }
+    });
+  }
+
+  function verLabel(step) { return String(step.label || step.version || "").replace(/を書き出す$/, ""); }
+  function findStep(st, key) { return stepsOf(st).find((s) => s.key === key) || null; }
+
+  function renderVersions(st) {
+    const box = $("versions"); box.textContent = "";
+    stepsOf(st).filter((s) => String(s.key).startsWith("edit:")).forEach((s) => {
+      const key = s.version || String(s.key).slice(5);
+      const review = findStep(st, "review:" + key), compare = findStep(st, "compare:" + key);
+      const res = s.result || {}, rev = (review && review.result) || {}, cmp = (compare && compare.result) || {};
+      const card = el("article", "ver");
+      const head = el("div", "ver-head");
+      head.appendChild(el("h2", "", verLabel(s)));
+      const pill = el("span", "pill", STATE_TEXT[s.state] || "始まる前"); pill.dataset.state = s.state || "waiting";
+      head.appendChild(pill); card.appendChild(head);
+      if (s.state !== "done") {
+        card.appendChild(el("p", "wait", s.state === "running" ? "書き出しの途中です。" : s.state === "failed" ? (s.error || "止まりました。") : "前の手順が終わると始まります。"));
+        box.appendChild(card); return;
+      }
+      const dl = el("dl", "facts");
+      const fact = (k, v) => { const d = el("div"); d.appendChild(el("dt", "", k)); d.appendChild(el("dd", "", v)); dl.appendChild(d); };
+      fact("品質", res.quality != null ? String(res.quality) : "—");
+      fact("AI の呼び出し", res.calls != null ? res.calls + " 回" : "—");
+      fact("かかった時間", span(ms(s.started_at), ms(s.finished_at)));
+      fact("字幕", rev.captions != null ? rev.captions + " 枚" : "—");
+      fact("機械の要確認", rev.flags != null ? rev.flags + " 枚" : "—");
+      fact("物差しとの違い", compare ? (cmp.diffs != null ? cmp.diffs + " か所" : "—") : "比べない");
+      card.appendChild(dl);
+      const qs = ((res.run && res.run.stages) || []).filter((g) => g.quality).pop();
+      const marks = qs ? (qs.quality.feedback || []).filter((f) => /^[⛔⚠]/.test(String(f))) : [];
+      if (marks.length) {
+        const ul = el("ul", "qnotes");
+        marks.slice(0, 6).forEach((f) => ul.appendChild(el("li", "", String(f))));
+        if (marks.length > 6) ul.appendChild(el("li", "more", "ほか " + (marks.length - 6) + " 件"));
+        card.appendChild(ul);
+      }
+      if (review && review.state === "done") {
+        const img = el("img", "contact"); img.alt = verLabel(s) + "の一覧画像（6コマ）";
+        card.appendChild(img);
+        loadImage(DIR + "/" + key + "/contact.jpg", img);
+        const saves = el("div", "saves");
+        [["3分版", "first3.mp4"], ["全編 360p 版", "full360.mp4"]].forEach(([label, name]) => {
+          const b = el("button", "btn", label + "を保存"); b.type = "button";
+          b.addEventListener("click", () => save(DIR + "/" + key + "/" + name, b));
+          saves.appendChild(b);
+        });
+        if (compare && compare.state === "done") {
+          const b = el("button", "btn", "違いの一覧を保存"); b.type = "button";
+          b.addEventListener("click", () => save(DIR + "/" + key + "/compare.txt", b));
+          saves.appendChild(b);
+        }
+        card.appendChild(saves);
+      } else {
+        card.appendChild(el("p", "wait", "確認用ファイルを作っています。"));
+      }
+      box.appendChild(card);
+    });
+  }
+
+  async function loadImage(path, img) {
+    if (S.images.has(path)) { img.src = S.images.get(path); return; }
+    if (S.loadingImg.has(path)) return;
+    S.loadingImg.add(path);
+    try {
+      const url = URL.createObjectURL(new Blob(await readBytes(path), { type: "image/jpeg" }));
+      S.images.set(path, url); img.src = url;
+    } catch (_) { img.alt = "一覧画像を読めませんでした"; }
+    finally { S.loadingImg.delete(path); }
+  }
+
+  async function save(path, button) {
+    const text = button.textContent;
+    try { await S.files.download(path); button.textContent = "保存しました"; }
+    catch (e) { button.textContent = (e && e.code) === "declined" ? text : "保存できませんでした"; }
+    setTimeout(() => { button.textContent = text; }, 2500);
+  }
+
+  function renderNotes(st) {
+    const ol = $("notes"); ol.textContent = "";
+    const notes = st.notes || [];
+    if (!notes.length) { ol.appendChild(el("li", "empty", "まだありません。通しの途中で決めたこと（モデルを待つ・続きから始める など）を、理由と一緒にここに書きます。")); return; }
+    notes.forEach((n, i) => {
+      const li = el("li");
+      li.appendChild(el("span", "no", String(i + 1)));
+      const t = el("time", "", ms(n.at) ? mdhm.format(ms(n.at)) : ""); t.dateTime = n.at || "";
+      li.appendChild(t);
+      li.appendChild(el("p", "", n.text || ""));
+      ol.appendChild(li);
+    });
+  }
+
+  function renderTable(st) {
+    const body = $("stepsBody"); body.textContent = "";
+    stepsOf(st).forEach((s) => {
+      const tr = el("tr");
+      tr.appendChild(el("td", "", s.label));
+      tr.appendChild(el("td", "", s.place || ""));
+      tr.appendChild(el("td", "t", ms(s.started_at) ? hhmmss.format(ms(s.started_at)) : "—"));
+      tr.appendChild(el("td", "t", ms(s.finished_at) ? hhmmss.format(ms(s.finished_at)) : "—"));
+      tr.appendChild(el("td", "t", span(ms(s.started_at), ms(s.finished_at))));
+      tr.appendChild(el("td", s.state === "failed" ? "err" : "", s.state === "failed" ? (s.error || "") : (s.summary || STATE_TEXT[s.state] || "")));
+      body.appendChild(tr);
+    });
+  }
+
+  // ── 始める ──
+  async function boot() {
+    $("jobLabel").textContent = JOB;
+    let files = null;
+    try { files = window.claude && window.claude.use ? await window.claude.use("files") : null; } catch (_) { files = null; }
+    if (!files) {
+      $("statePill").dataset.state = "failed"; $("statePill").textContent = "読めない";
+      banner("この画面では共有フォルダを読めません（プロジェクトのメンバーが Claude の中で開くと読めます）。", "bad", "読み先: " + STATUS);
+      return;
+    }
+    S.files = files;
+    poll();
+    S.ticker = setInterval(() => { if (S.status && !document.hidden) { const now = Date.now(); renderNow(S.status, now, overall(S.status, now)); renderAxis(S.status, now); } }, 5000);
+  }
+  $("reload").addEventListener("click", () => { if (S.files) poll(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearTimeout(S.timer); else if (S.files) poll();
+  });
+  boot();
+})();
+</script>

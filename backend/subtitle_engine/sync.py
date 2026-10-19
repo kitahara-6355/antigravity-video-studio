@@ -704,10 +704,52 @@ def _join_lost(items: list[dict], given: list[dict], lost: list[tuple[int, str]]
                 joined += 1
                 break
         else:
-            left.append((k, why))
-            if short:
-                shown.add(k)
+            # どちらの隣も行が埋まっていて1枚に入らなければ、隣の字幕と合わせて2枚に組み直す
+            # （16分36秒「先生の文字を」・キャッシュ無しの再現テスト 2026-10-18）
+            for o, first in cands:
+                if _reflow_into_two(items, o, s, first, max_chars, max_lines):
+                    joined += 1
+                    break
+            else:
+                left.append((k, why))
+                if short:
+                    shown.add(k)
     return left, joined, shown
+
+
+def _reflow_into_two(items: list[dict], o: dict, s: dict, first: bool,
+                     max_chars: int, max_lines: int,
+                     min_display: float = DEFAULT_TIMING["min_display_sec"]) -> bool:
+    """外す字幕 s の言葉を隣の字幕 o と続けて2枚に組み直し、o の出ている間を字数で分ける（時刻の外側は
+    動かさない）。first は o が s の前か。2枚に収まらない・どちらかが min_display 秒に満たなければ何もせず False。
+
+    隣が2行で埋まっていると行として足せず、言った言葉が字幕から消えていた（16分36秒「先生の文字を」。
+    両隣とも2行で、品質ゲートが欠落として不合格にした・2026-10-18 のキャッシュ無しの再現テスト）。
+    """
+    pair = (o, s) if first else (s, o)
+    flat = f"{_flat(pair[0])}　{_flat(pair[1])}"
+    try:
+        caps = _split_flat(flat, max_chars, max_lines)
+    except Exception:  # 組めなければ今までどおり外す
+        return False
+    caps = ["\n".join(line.strip("　 ") for line in c.split("\n")) for c in caps]
+    if len(caps) != 2 or not all(caps):
+        return False
+    a, b = float(o["start"]), float(o["end"])
+    n0, n1 = (len(c.replace("\n", "")) for c in caps)
+    mid = round(a + (b - a) * n0 / (n0 + n1), 3)
+    if mid - 2 * VIDEO_FRAME - a < min_display or b - mid < min_display:
+        return False
+    # 改行が句読点を外した跡（継ぎ目の空白）の所か。`_flat` が語の切れ目を戻すのに使う
+    def at_space(c: str) -> bool:
+        return "\n" in c and any(c.replace("\n", sp) in flat for sp in ("　", " "))
+
+    second = dict(o, text=caps[1], start=mid, end=b, _break_punct=at_space(caps[1]),
+                  _ends_punct=s.get("_ends_punct", False) if first else o.get("_ends_punct", False))
+    o["text"], o["end"], o["_break_punct"] = caps[0], round(mid - 2 * VIDEO_FRAME, 3), at_space(caps[0])
+    o["_ends_punct"] = True  # 2枚の切れ目は組んだときの語の切れ目
+    items.insert(items.index(o) + 1, second)
+    return True
 
 
 def _gone(s: dict, reason: str, line_shown: bool = False) -> dict:

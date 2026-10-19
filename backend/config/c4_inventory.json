@@ -506,6 +506,21 @@
    "fingerprint": []
   },
   {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._execute_worker",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator._execute_worker",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "品質の点数を作らない。QualityGateWorker が返した data に `scored` が立っているときだけ、score・rank・講評を**そのまま**工程の記録に写す（無い項目は写さず、既定値も入れない）。2026-10-18 に足した（承認待ちで止まった回の74点の理由を記録から引けなかった）。既定値の4つの getattr と or は記録の付帯情報（採用件数・警告）の読み出しで、点数ではない",
+   "fingerprint": [
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "or_default"
+   ]
+  },
+  {
    "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._finalize_harness",
    "file": "backend/agents/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._finalize_harness",
@@ -4378,6 +4393,33 @@
    "category": "品質スコア",
    "status": "out_of_scope",
    "reason": "人が字幕を通しで見るときの「機械の要確認」の印を付けるだけの関数。中の score は字幕1枚ごとの、字幕と別の音声認識（ReazonSpeech）の食い違いの字数で、しきい以上の字幕を印の一覧にして返す。一覧はレビュー画面の控え（review_sheet.export の flags）にしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/review_flags.py::_compare",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "_compare",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "flag_captions の本体。字幕と1つの聞き取りの食い違いの字数（score）を数え、印の一覧と、食い違った所の位置と聞き取りの字（候補を作るため）を返すだけ。一覧はレビュー画面の控え（review_sheet.export の flags）にしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/review_flags.py::flag_with_readings",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "flag_with_readings",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "機械の要確認を、音声認識に加えて文字起こしの2回目・3回目・1回目とも並べて付け、印に候補の字を添えるだけの関数。score は聞き取りごとの食い違いの字数の和で、印の並べ順（tier）にしか使わない。一覧はレビュー画面の控えにしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（直すのは人が候補を選んだ後の校正台帳）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/edit_standards.py::check_no_lost_words",
+   "file": "backend/edit_standards.py",
+   "symbol": "check_no_lost_words",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "書き出した字幕を編集の決まり（S15 欠落）で点検し、品質ゲートと同じ判定（quality_gate_plugins._lost_lines の blocking）で外れた言葉の一覧を返すだけ。結果は置き場の standards.txt と edit_job の結果（standards_failed）にしか出ず、品質スコア・品質ゲート・投稿・統計・retention のどれにも入らない。合否を新しく決めず、ゲートの判定を読むだけ",
    "fingerprint": []
   },
   {

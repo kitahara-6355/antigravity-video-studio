@@ -184,6 +184,19 @@ class ProofreadWorker(PipelineStageWorker):
         except Exception as e:
             logger.warning(f"表記の統一スキップ: {e}")
 
+        # 辞書は AI の後にもう一度当てる。校閲は辞書の語を自分の知っている字に戻すことがある
+        # （2026-10-19: 文字起こしの「久木田ヒロノブ」を「久木田博信」に書き換え、ゼロからの版に残った）
+        dict_after_ai = 0
+        try:
+            from proper_noun_dict import apply_dictionary
+            for seg in ctx.segments:
+                corrected, corrections = apply_dictionary(seg.get("text", ""))
+                if corrected != seg.get("text", ""):  # 正と誤が同じ項目（表記の固定）は数えない
+                    seg["text"] = corrected
+                    dict_after_ai += sum(c.get("original") != c.get("corrected") for c in corrections)
+        except Exception as e:
+            logger.debug(f"固有名詞辞書（AI の後）スキップ: {e}")
+
         # 人が通しで見て直した所（校正台帳）を当てる。文字起こしと校閲は呼ぶたびに揺れるので、
         # 人の直しは AI に渡さず、AI と表記の統一の後・整形の前に毎回同じに当てる（2026-10-17）
         review = {}
@@ -199,6 +212,10 @@ class ProofreadWorker(PipelineStageWorker):
                 at = "・".join(f"{int(m['at']) // 60}分{int(m['at']) % 60:02d}秒" for m in review["missing"])
                 ctx.warnings.append(f"校正台帳: {len(review['missing'])}件の直しが当たりませんでした（素材の {at}）。"
                                     "その所は字が変わっているので見直しが要ります")
+            if review.get("near"):
+                at = "・".join(f"{int(m['at']) // 60}分{int(m['at']) % 60:02d}秒" for m in review["near"])
+                ctx.warnings.append(f"校正台帳: {len(review['near'])}件の直しを、字が少し違う所に当てました（素材の {at}）。"
+                                    "当てた所が合っているか見直しが要ります")
 
         # ━━━ FIX-3A: テキスト整形（旧 src/clean_linguistic.py 復元） ━━━
         # 長文を18文字/行に分割し、字幕の画面はみ出しを防止
@@ -251,6 +268,7 @@ class ProofreadWorker(PipelineStageWorker):
         retry_note = (f" / 番号ずれの聞き直し{retried}行" if retried else "") + \
             (f"（未校閲{unproofed}行）" if unproofed else "")
         notation_note = f" / 表記{sum(notation.values())}件" if notation else ""
+        after_note = f" / AI の後に辞書{dict_after_ai}件" if dict_after_ai else ""
         heard_note = (f" / 別の聞き取り{heard['given']}か所中 選んだ{heard['chosen']}・採った{heard['adopted']}"
                       if heard["given"] else "")
         split_note = (f" / 割れた聞き取り{split['given']}か所中 選んだ{split['chosen']}・置いた{split['applied']}"
@@ -259,6 +277,7 @@ class ProofreadWorker(PipelineStageWorker):
         if review:
             review_note = (f" / 人の直し{len(review['applied'])}件"
                            + (f"（既に直っていた{len(review['already'])}件）" if review["already"] else "")
+                           + (f"（字の近い所に当てた{len(review['near'])}件）" if review.get("near") else "")
                            + (f"（当たらない{len(review['missing'])}件）" if review["missing"] else "")
                            + (f" / 用語{sum(review['glossary'].values())}件" if review["glossary"] else ""))
         # 使用モデルを取得（UI可視化用）
@@ -291,8 +310,9 @@ class ProofreadWorker(PipelineStageWorker):
         return StageResult(
             stage_name=self.name, success=True,
             detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{retry_note}"
-                   f"{heard_note}{split_note}{notation_note}{review_note}{format_stats}{skip_warn}",
+                   f"{heard_note}{split_note}{notation_note}{after_note}{review_note}{format_stats}{skip_warn}",
             data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
+                  "dict_after_ai": dict_after_ai,
                   "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation, "heard": heard,
                   "split": split, "review": review},
             duration_seconds=round(time.time() - start, 1),
@@ -341,16 +361,13 @@ def _referee_for(video_path):
 def _memo_for(video_path):
     """素材ごとの校閲の控え（素材と同じ場所の `_proofread_<鍵>.json`）。作れなければ None。
 
-    鍵は素材の場所・大きさ・更新時刻（音声認識のキャッシュと同じ決め方）。素材が変われば別の控え。
+    鍵は素材の中身（`video_hash.material_cache`。音声認識・映像の切り替わりの控えと同じ決め方）。
+    素材が変われば別の控え。素材を別の場所に置いても、控えを隣に戻せば使える。
     """
     try:
-        import hashlib
-        from pathlib import Path
         from subtitle_engine.ai_proofreader import ProofreadMemo
-        p = Path(str(video_path))
-        st = p.stat()
-        key = hashlib.sha1(f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
-        return ProofreadMemo(p.with_name(f"_proofread_{key}.json"))
+        from subtitle_engine.video_hash import material_cache
+        return ProofreadMemo(material_cache(str(video_path), "_proofread_"))
     except Exception as e:  # 控えが無くても校閲はする
         logger.debug(f"校閲の控えを使いません: {e}")
         return None

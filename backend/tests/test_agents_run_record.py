@@ -755,6 +755,27 @@ def test_校正台帳のどの直しが当たりどれが当たらなかった�
     assert "review" not in st["youtube_opt"]
 
 
+def test_品質の点数と講評が工程の記録に残る(tmp_path):
+    """**承認待ちで止まった回は、動画の隣に講評が残らない**（書き出した後だけ・2026-10-18 の再現テスト）。
+    74点の理由をログからも記録からも引けなかった。品質の工程の記録に点数・ランク・講評・カテゴリ別の点を残す。"""
+    c = _coordinator(tmp_path)
+    講評 = ["⛔ 字幕にしなかった発話（時刻合わせで外れた）2行: 16:36「そう　すごい」"]
+    for w in c.workers:
+        if type(w).__name__ == "QualityGateWorker":
+            async def _採点(ctx, _w=w):
+                return StageResult(stage_name=_w.name, success=True, detail="スコア: 91点 (ランクA)",
+                                   data={"scored": True, "score": 91, "raw_score": 93, "rank": "A",
+                                         "feedback": 講評, "category_scores": {"core": 88, "engagement": None}})
+            w.execute = _採点
+
+    _run(c, tmp_path)
+
+    st = {s["name"]: s for s in _run_json(tmp_path)["stages"]}
+    assert st["quality_gate"]["quality"] == {"score": 91, "raw_score": 93, "rank": "A", "feedback": 講評,
+                                             "category_scores": {"core": 88, "engagement": None}}
+    assert "quality" not in st["proofread"]
+
+
 def test_採用したAIの出力の件数が記録に残りゼロならスタブ(tmp_path):
     """**「宣言どおり」は断定ではなく証拠で決める**（2026-09-26 ユーザー決定・作りの変更）。
     工程が採用した AI の出力の件数を記録に残し、ゼロなら経路に依らず stub。"""

@@ -5,7 +5,9 @@ SHA-256ハッシュを計算し、その先頭N文字（デフォルト8文字�
 これにより、同一ファイルに対する重複処理を防ぎ、進捗の追跡やレジュームを可能にします。
 """
 
+import functools
 import hashlib
+import shutil
 from pathlib import Path
 from typing import BinaryIO, Union
 
@@ -186,3 +188,41 @@ def get_checkpoint_path(video_path: Union[str, Path]) -> str:
 OLD_CHECKPOINT_NAME = "_whisper_segments.jsonl"
 
 
+# 2026-10-18: **素材の隣に置く AI の控え（校閲・音声認識・映像の切り替わり）の鍵を、素材の場所・
+# 大きさ・更新時刻から中身に変えた。** 前の鍵だと、素材を別の場所（クラウドの新しいコンテナ・
+# Drive から取り直した素材）に置いた途端に控えが見つからず、保存した控えを戻しても AI を呼び直していた。
+# 文字起こしの控え（`_gemini_*`）は前から中身の鍵なので、同じ素材の控えはどれも同じ8文字を名前に持つ。
+
+
+def content_digest(path: Union[str, Path]) -> str:
+    """ファイルの中身の SHA-256（64文字）。
+
+    同じ process では、大きさ・更新時刻・inode が変わっていないファイルを読み直さない
+    （raw4 の結合は 827MB、撮影生データは数GB あり、控えの名前を引くたびに読むと遅い）。
+    """
+    p = Path(path).resolve()
+    st = p.stat()
+    return _cached_digest(str(p), st.st_size, st.st_mtime_ns, st.st_ino)
+
+
+@functools.lru_cache(maxsize=64)
+def _cached_digest(resolved: str, size: int, mtime_ns: int, ino: int) -> str:
+    return _read_and_compute_file_sha256(Path(resolved))
+
+
+def material_cache(media: Union[str, Path], prefix: str, ext: str = ".json", legacy_salt: str = "") -> Path:
+    """素材の隣に置く控え `<prefix><中身の鍵8文字><ext>` の場所。
+
+    中身が同じ素材なら、置き場所・ファイル名・更新時刻が違っても同じ控えを指す。
+    前の鍵（場所・大きさ・更新時刻。`legacy_salt` があれば `|<legacy_salt>` も足していた）で作った
+    控えしか無ければ、新しい名前に写してから返す（前の控えは消さない）。
+    """
+    p = Path(media)
+    path = p.with_name(f"{prefix}{content_digest(p)[:8]}{ext}")
+    if not path.exists():
+        st = p.stat()
+        old = f"{p.resolve()}|{st.st_size}|{int(st.st_mtime)}" + (f"|{legacy_salt}" if legacy_salt else "")
+        legacy = p.with_name(f"{prefix}{hashlib.sha1(old.encode()).hexdigest()[:8]}{ext}")
+        if legacy.is_file():
+            shutil.copyfile(legacy, path)
+    return path

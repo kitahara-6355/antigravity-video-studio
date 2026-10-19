@@ -63,10 +63,57 @@ def test_a_correction_already_right_in_the_transcript_is_reported_and_left_alone
 
 
 def test_a_correction_that_matches_nowhere_is_reported_as_missing():
+    segs = [_seg(561.5, 563.8, "で、困るんですよ。")]
+    report = review_ledger.apply(segs, _ledger([{"id": "c1", "at": 561.7, "from": "焦るわけ", "to": "折れるわけ"}]))
+    assert segs[0]["text"] == "で、困るんですよ。"
+    assert [r["id"] for r in report["missing"]] == ["c1"]
+
+
+def test_a_correction_lands_where_the_ai_wrote_a_slightly_different_word():
+    # キャッシュ無しで起こし直すと、同じ所の聞き違いが別の字になる（2026-10-18 の再現テスト・9分21秒は
+    # 「焦るわけ」が「怒れるわけ」）。似ている所に当て、人が見直せるよう置き換える前の字を残す
     segs = [_seg(561.5, 563.8, "で、怒れるわけ。")]
     report = review_ledger.apply(segs, _ledger([{"id": "c1", "at": 561.7, "from": "焦るわけ", "to": "折れるわけ"}]))
-    assert segs[0]["text"] == "で、怒れるわけ。"
-    assert [r["id"] for r in report["missing"]] == ["c1"]
+    assert segs[0]["text"] == "で、折れるわけ。"
+    assert report["near"] == [{"id": "c1", "at": 561.7, "was": "怒れるわけ"}] and report["missing"] == []
+
+
+def test_a_near_correction_does_not_swallow_the_neighbouring_words():
+    # 窓の頭と後ろの合わない字は巻き込まない（「9月1日　これ126号」の「日」を消さない）
+    segs = [_seg(1930.0, 1940.0, "これ9月1日　これ126号っていうのは")]
+    report = review_ledger.apply(segs, _ledger([{"id": "c", "at": 1937.0, "from": "これ1296号", "to": "これ296号"}]))
+    assert segs[0]["text"] == "これ9月1日　これ296号っていうのは"
+    assert report["near"][0]["was"] == "これ126号"
+
+
+def test_a_short_correction_is_not_placed_on_a_slightly_different_word():
+    # 3字以下の直しは似ているだけでは当てない（「うんと」が「うなん」に当たった）
+    segs = [_seg(2090.0, 2094.0, "そうなんですか")]
+    report = review_ledger.apply(segs, _ledger([{"id": "c", "at": 2092.2, "from": "うんと", "to": "えっと"}]))
+    assert segs[0]["text"] == "そうなんですか" and [r["id"] for r in report["missing"]] == ["c"]
+
+
+def test_a_near_correction_is_only_looked_for_close_to_where_it_was_said():
+    segs = [_seg(570.0, 572.0, "で、怒れるわけ。")]
+    report = review_ledger.apply(segs, _ledger([{"id": "c1", "at": 561.7, "from": "焦るわけ", "to": "折れるわけ"}]))
+    assert segs[0]["text"] == "で、怒れるわけ。" and [r["id"] for r in report["missing"]] == ["c1"]
+
+
+def test_quotation_marks_do_not_stop_a_correction_from_matching():
+    # 校閲はかぎ括弧を付けたり外したりする（17分12秒「主宰されている「筆文字」が括弧の無い行に当たらなかった）
+    segs = [_seg(1030.0, 1035.0, "先生が主宰されている筆文字で伝えたいことば大賞って")]
+    review_ledger.apply(segs, _ledger([{"id": "c", "at": 1032.7, "from": "主宰されている「筆文字", "to": "主催されている「筆文字"}]))
+    assert "主催されている" in segs[0]["text"]
+
+
+def test_a_correction_the_glossary_already_put_right_is_reported_as_already():
+    # 用語の誤り（「Bオリジナル」）を含む行は、用語を当てた後に直しの to があれば既に直っている
+    segs = [_seg(509.0, 512.0, "こうやってBオリジナル書くのよ")]
+    report = review_ledger.apply(segs, _ledger(
+        [{"id": "c", "at": 510.3, "from": "こうやって早川式繰出鉛筆書くのよ", "to": "こうやって Be Original 書くのよ"}],
+        [{"term": "Be Original", "wrong": ["Bオリジナル"]}]))
+    assert segs[0]["text"] == "こうやってBe Original書くのよ"
+    assert [r["id"] for r in report["already"]] == ["c"]
 
 
 def test_a_glossary_entry_replaces_its_wrong_forms_throughout_the_material():
@@ -151,10 +198,11 @@ def test_a_filler_left_in_the_line_does_not_stop_a_correction_written_from_the_c
 
 
 def test_a_one_letter_word_is_not_skipped_as_a_filler():
-    # 「で」「ね」は言いよどみでもふつうの言葉でもあるので、飛ばして当てない
+    # 「で」「ね」は言いよどみでもふつうの言葉でもあるので、飛ばして当てない（そのままは当たらない）。
+    # 字の近い所として当て、人が見直す所に残す
     segs = [_seg(10.0, 12.0, "大で何だっけ")]
     report = review_ledger.apply(segs, _ledger([{"id": "c1", "at": 11.0, "from": "大何だっけ", "to": "題何だっけ"}]))
-    assert segs[0]["text"] == "大で何だっけ" and report["missing"] == [{"id": "c1", "at": 11.0}]
+    assert report["applied"] == [] and report["near"] == [{"id": "c1", "at": 11.0, "was": "大で何だっけ"}]
 
 
 def test_the_punctuation_at_the_end_of_a_correction_is_not_doubled():
@@ -207,10 +255,20 @@ def test_a_correction_the_run_cannot_place_is_raised_as_a_warning(monkeypatch, t
     p = tmp_path / "ledger.json"
     p.write_text(json.dumps(_ledger([{"id": "c7", "at": 561.7, "from": "焦るわけ", "to": "折れるわけ"}]),
                             ensure_ascii=False), encoding="utf-8")
-    ctx = _ctx(p, _seg(561.5, 563.8, "で、怒れるわけ。"))
+    ctx = _ctx(p, _seg(561.5, 563.8, "で、困るんですよ。"))
     result = _proofread(monkeypatch, ctx)
     assert "当たらない1件" in result.detail
     assert any("1件の直しが当たりませんでした（素材の 9分21秒）" in w for w in ctx.warnings)
+
+
+def test_a_correction_placed_on_a_slightly_different_word_is_raised_for_review(monkeypatch, tmp_path):
+    p = tmp_path / "ledger.json"
+    p.write_text(json.dumps(_ledger([{"id": "c7", "at": 561.7, "from": "焦るわけ", "to": "折れるわけ"}]),
+                            ensure_ascii=False), encoding="utf-8")
+    ctx = _ctx(p, _seg(561.5, 563.8, "で、怒れるわけ。"))
+    result = _proofread(monkeypatch, ctx)
+    assert "字の近い所に当てた1件" in result.detail
+    assert any("1件の直しを、字が少し違う所に当てました（素材の 9分21秒）" in w for w in ctx.warnings)
 
 
 def test_no_ledger_leaves_the_proofread_step_as_it_was(monkeypatch):

@@ -152,3 +152,23 @@ def test_comparing_a_rebuild_lists_only_the_captions_that_changed(capsys, tmp_pa
     assert review_sheet.main(["compare", str(a), str(b)]) == 1
     assert "違い 1 か所" in capsys.readouterr().out
     assert review_sheet.main(["compare", str(a), str(a)]) == 0
+
+
+def test_the_readings_beside_the_material_are_found_by_its_content_key(tmp_path):
+    """印の候補には、素材の隣の文字起こしのキャッシュ（1回目・2回目・3回目の控え）を使う。"""
+    from subtitle_engine.video_hash import content_digest
+    material = tmp_path / "m.mp4"
+    material.write_bytes(b"\x00" * 4096)
+    key = content_digest(material)[:8]
+    (tmp_path / f"_gemini_c30q_{key}.jsonl").write_text(
+        json.dumps({"start": 1.0, "end": 2.0, "text": "一回目"}, ensure_ascii=False) + "\n", encoding="utf-8")
+    (tmp_path / f"_gemini_c30qb2_{key}.jsonl").write_text(
+        json.dumps({"start": 1.0, "end": 2.0, "text": "二回目"}, ensure_ascii=False) + "\n", encoding="utf-8")
+    (tmp_path / f"_gemini_c30qc_{key}.chunks.journal").write_text(
+        json.dumps({"offset": 0.0, "duration": 5.0, "model": "m",
+                    "segments": [{"start": 1.0, "end": 2.0, "text": "三回目"}]}, ensure_ascii=False) + "\n",
+        encoding="utf-8")
+    got = review_sheet.readings_beside(material)
+    assert {k: [s["text"] for s in v] for k, v in got.items()} == \
+        {"2回目": ["二回目"], "3回目": ["三回目"], "1回目": ["一回目"]}
+    assert review_sheet.readings_beside(tmp_path / "missing.mp4") == {}
