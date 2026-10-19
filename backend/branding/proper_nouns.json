@@ -9,7 +9,7 @@
       "incorrect": "久北",
       "correct": "久木田",
       "type": "person_name",
-      "context_hint": "博信先生",
+      "context_hint": "ヒロノブ先生",
       "confirmed": true,
       "usage_count": 37,
       "created_at": "2026-01-17T14:45:00Z"
@@ -347,7 +347,7 @@
     {
       "id": "pn_196",
       "incorrect": "久保田博信",
-      "correct": "久木田博信",
+      "correct": "久木田ヒロノブ",
       "type": "person_name",
       "context_hint": "ゲスト名（Gemini の聞き違い）",
       "confirmed": true,
@@ -413,6 +413,96 @@
       "confirmed": true,
       "usage_count": 0,
       "created_at": "2026-10-13T09:00:00Z"
+    },
+    {
+      "id": "pn_203",
+      "incorrect": "久木田博信",
+      "correct": "久木田ヒロノブ",
+      "type": "person_name",
+      "context_hint": "ゲストのお名前。下の名前はカタカナ（北原さんの指定・2026-10-18）。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_204",
+      "incorrect": "久木田ひろのぶ",
+      "correct": "久木田ヒロノブ",
+      "type": "person_name",
+      "context_hint": "同上。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_205",
+      "incorrect": "久木田弘信",
+      "correct": "久木田ヒロノブ",
+      "type": "person_name",
+      "context_hint": "同上。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_206",
+      "incorrect": "久木田浩信",
+      "correct": "久木田ヒロノブ",
+      "type": "person_name",
+      "context_hint": "同上。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_207",
+      "incorrect": "ハゴロモフーズ",
+      "correct": "はごろもフーズ",
+      "type": "company",
+      "context_hint": "はごろもフーズ株式会社。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_208",
+      "incorrect": "ホテイフーズ",
+      "correct": "はごろもフーズ",
+      "type": "company",
+      "context_hint": "52回目の聞き違い。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_209",
+      "incorrect": "ホンファイ精密工業",
+      "correct": "ホンハイ精密工業",
+      "type": "company",
+      "context_hint": "鴻海精密工業（音声認識も「ホンファイ」）。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_210",
+      "incorrect": "Bオリジナル",
+      "correct": "Be Original",
+      "type": "term",
+      "context_hint": "シャープのブランドスローガン。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_211",
+      "incorrect": "筆文字で伝えたい言葉大賞",
+      "correct": "筆文字で伝えたいことば大賞",
+      "type": "term",
+      "context_hint": "日本デザイン書道作家協会の公募の正式名。raw4 の校正台帳の用語から（2026-10-19）。キャッシュ無しの再現テストで AI がこう書いた",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-19T08:30:00Z"
     }
   ],
   "pending_confirmations": []
