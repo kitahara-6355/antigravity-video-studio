@@ -490,6 +490,22 @@ def test_chunks_whose_cut_did_not_change_are_taken_from_the_earlier_cutting(tmp_
     assert [s["text"] for s in tx.segments] == ["前の起こし一本目", "起こしc1", "起こしc2"]
     assert tx.carried == 1
     assert tx.models_used == ["m", "old-model"]
+    # どのチャンクをどのモデルが起こしたかは、写したチャンクも含めてチャンクの順に残る
+    assert tx.chunk_models == ["old-model", "m", "m"]
+
+
+def test_each_chunk_keeps_its_own_model_when_it_is_carried_again(tmp_path, monkeypatch):
+    """モデルが混ざったキャッシュから写しても、チャンクごとのモデルを取り違えない（10-18 の再現: 付帯情報に
+    モデルが無く、どの字がどのモデルの字か分からなかった）。"""
+    from subtitle_engine import gemini_transcriber as gt
+
+    cache = tmp_path / "_gemini_mixed.jsonl"
+    gt.write_checkpoint([_row(1.0, 3.0, "一本目"), _row(16.0, 18.0, "二本目")], cache,
+                        meta={"cuts": [15.0], "models_used": ["a", "b"], "chunk_models": ["b", "a"]})
+
+    chunks = gt.chunks_of(cache, 30.0)
+
+    assert chunks[(0.0, 15.0)][1] == "b" and chunks[(15.0, 15.0)][1] == "a"
 
 
 def test_an_earlier_transcription_without_its_cuts_is_not_taken(tmp_path, monkeypatch):
@@ -577,6 +593,23 @@ def test_the_second_pass_is_read_from_its_cache(tmp_path, monkeypatch):
 
     assert calls == [None, 15, 15]  # 2回目の実行では起こさない
     assert ctx.segments[0]["text"].startswith("こんにちは、書家の北原美麗です。")
+
+
+def test_a_run_read_from_the_cache_still_says_which_model_wrote_it(tmp_path, monkeypatch):
+    """キャッシュから読んだ回の実行記録も、起こしたモデルを名乗る（`"cached"` では工程ごとのモデルが見えない）。"""
+    from agents.pipeline_types import PipelineContext
+    from agents.workers.transcribe_worker import TranscribeWorker
+    from subtitle_engine import gemini_transcriber as gt
+
+    _setup_two_passes(tmp_path, monkeypatch)
+    asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(_video(tmp_path)))))
+    first = next(p for p in tmp_path.glob("_gemini_*.jsonl") if gt.read_meta(p).get("quiet") is not None)
+    assert gt.read_meta(first)["models_used"] == ["m"]
+
+    result = asyncio.run(TranscribeWorker().execute(PipelineContext(video_path=str(tmp_path / "v.mp4"))))
+
+    assert result.data["model"] == "m" and result.data["models_used"] == ["m"]
+    assert "m" in result.detail and "キャッシュ" in result.detail
 
 
 def test_the_second_pass_is_told_where_the_first_pass_cut(tmp_path, monkeypatch):
