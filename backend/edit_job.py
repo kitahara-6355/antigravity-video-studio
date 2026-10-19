@@ -931,7 +931,16 @@ def _print_status(runner: Runner) -> None:
     print(f"  工程ライブ: {runner.live / 'status.json'}")
 
 
+def use_repo_paths() -> None:
+    """手順の一部（確認用ファイルを置く・比べる）はこのプロセスの中で `subtitle_engine` などを読む。
+    本線と同じく `backend/` とリポジトリの根を探す場所に足す（PYTHONPATH を付け忘れても止まらない）。"""
+    for path in (str(REPO_ROOT), str(REPO_ROOT / "backend")):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+
+
 def main(argv: list[str] | None = None) -> int:
+    use_repo_paths()
     parser = argparse.ArgumentParser(description="1本の自動編集を手順どおりに通す（スキル interview-edit）")
     sub = parser.add_subparsers(dest="cmd", required=True)
     for name, text in (("check", "始める前の確かめだけ（AI を呼ばない）"),

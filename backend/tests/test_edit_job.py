@@ -449,3 +449,14 @@ def test_the_live_view_carries_the_quality_notes_of_the_gate():
 
     assert "quality" not in stages[0]
     assert stages[1]["quality"] == quality
+
+
+def test_the_steps_that_run_inside_the_tool_find_the_backend_modules_without_pythonpath():
+    """2026-10-19: PYTHONPATH を付けずに `run` すると、書き出しの後の確認用ファイルを置く手順で
+    `subtitle_engine` が読めずに止まった（本線は子プロセスなので通っていた）。"""
+    code = ("from backend import edit_job; edit_job.use_repo_paths(); "
+            "from subtitle_engine import review_sheet; print('ok')")
+    env = {k: v for k, v in __import__("os").environ.items() if k != "PYTHONPATH"}
+    out = subprocess.run([sys.executable, "-c", code], cwd=edit_job.REPO_ROOT, env=env,
+                         capture_output=True, text=True, timeout=120)
+    assert out.stdout.strip() == "ok", out.stderr
