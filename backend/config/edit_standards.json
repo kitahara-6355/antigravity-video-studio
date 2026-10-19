@@ -22,7 +22,7 @@
         "by": "北原",
         "said": "あと全てにおいて句読点は不要です"
       },
-      "failure": "8回目まで字幕に句読点が出ていた",
+      "failure": "初めの書き出しでは字幕に句読点が出ていた",
       "where": [
         "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.strip_punctuation"
       ],
@@ -63,7 +63,7 @@
         "by": "北原",
         "said": "話題の内容に直接触れていない、耳で聞くだけで良いような言葉は字幕であえて文字にしなくても良い"
       },
-      "failure": "相づちだけの字幕が画面を埋めていた",
+      "failure": "相づちだけの字幕が画面に出ていた",
       "where": [
         "backend/template_constants.py::_DEFAULT_SUBTITLE_RULES.omit_standalone_words",
         "backend/subtitle_engine/text_formatter.py::is_standalone_omittable",
@@ -564,7 +564,7 @@
         "by": "北原",
         "said": "決定カード「残す」（左上のロゴ）"
       },
-      "failure": "raw にロゴがあると思い込んでいた",
+      "failure": "失敗ではなく確認。raw にロゴは無く、書き出しで足していると 10-18 に分かった",
       "where": [
         "backend/agents/workers/render_worker.py::RenderWorker._overlay_logo"
       ],
