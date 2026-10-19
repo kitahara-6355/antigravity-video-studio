@@ -858,7 +858,8 @@ class Runner:
         version = next(v for v in self.job["versions"] if v["key"] == key)
         sheet = review_sheet.export(json.loads(sidecar_of(preview).read_text(encoding="utf-8")),
                                     f"{self.job['name']}-{key}", version.get("label") or key, "full360.mp4",
-                                    aligner.cached_tokens(str(asr)) if asr.is_file() else None)
+                                    aligner.cached_tokens(str(asr)) if asr.is_file() else None,
+                                    readings=review_sheet.readings_beside(self.material))
         (local / "review_captions.json").write_text(
             json.dumps(sheet, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         placed = []

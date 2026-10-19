@@ -144,6 +144,12 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 .flag-lead { display: grid; gap: 8px; justify-items: start; }
 .flag-lead .empty { padding: 2px 2px 0; }
 .item.is-flag.is-marked { border-color: var(--shu); }
+.item.is-flag.is-ok { border-color: var(--matsu); opacity: .72; }
+.options { display: flex; flex-wrap: wrap; gap: 6px; }
+.options button { height: auto; min-height: 30px; padding: 4px 10px; text-align: left; white-space: pre-line;
+  font-size: .9rem; color: var(--ink); border-color: var(--gunjo); }
+.options button small { display: block; font-size: .7rem; color: var(--ink-soft); }
+.options button.is-chosen { border-color: var(--matsu); box-shadow: 0 0 0 1px var(--matsu); }
 .item label { font-size: .74rem; color: var(--ink-soft); display: grid; gap: 2px; }
 .item textarea, .item input { font: inherit; font-size: .95rem; width: 100%; min-width: 0; border: 1px solid var(--rule);
   border-radius: 4px; padding: 5px 8px; background: var(--sheet); color: var(--ink); resize: vertical; }
@@ -660,37 +666,58 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       if (document.activeElement !== p.note && p.note.value !== (m.note || "")) p.note.value = m.note || "";
     }
   }
-  function flagKs() { return S.flags.map((f) => kOfCap(f.i)).filter((k) => k >= 0); }
+  function flagKs() { return orderedFlags().map((f) => kOfCap(f.i)).filter((k) => k >= 0); }
+  // 2つ以上の聞き取りが食い違う所（tier 1）を先に、音声認識だけが食い違う所（tier 2）を後に並べる
+  function orderedFlags() { return S.flags.slice().sort((a, b) => (a.tier || 1) - (b.tier || 1) || a.i - b.i); }
+  // 候補を選ぶ: 印が無ければ付け、「正しくは」に候補の字を入れる。「このまま」は問題なしの印にする
+  function choose(k, fix, why) {
+    const c = S.caps[k]; if (!c) return; const id = idOf(c.i);
+    if (!S.marks.has(id)) { addMark(k, { fix: fix, state: fix ? "fixed" : "ok", note: why }); return; }
+    const m = S.marks.get(id);
+    patchMark(id, fix ? { fix: fix, state: stateFor(m, fix), note: m.note || why } : { fix: "", state: "ok" });
+  }
   function renderFlags() {
     const list = $("flagsList"); list.textContent = ""; S.flagNodes.clear();
     if (!S.flags.length) return;
     const lead = el("div", "flag-lead");
-    lead.append(el("p", "empty", "機械が、字幕と音声認識の聞き取りが食い違う所に付けた要確認です。多くは音声認識の聞き違いです。"
-                 + "続けて聞き、違っていたら M（または「朱を入れる」）で印を付けてください。"),
+    lead.append(el("p", "empty", "機械が、字幕とほかの聞き取り（文字起こしの2回目・3回目・音声認識）が食い違う所に付けた要確認です。"
+                 + "2つ以上が食い違う所を先に並べています。聞いて、正しい候補があれば押してください。字幕のままでよければ「このまま」、"
+                 + "どれも違えば「朱を入れる」で字を書いてください。"),
                 button("要確認の所だけ再生（" + S.flags.length + "）", () => playList(flagKs(), "flags")));
     list.appendChild(lead);
-    for (const f of S.flags) {
+    for (const f of orderedFlags()) {
       const k = kOfCap(f.i); const c = S.caps[k]; if (!c) continue;
       const id = idOf(c.i);
       const node = el("article", "item is-flag"); node.dataset.id = id;
       const head = el("div", "item-head");
       const chip = el("span", "chip plain gunjo", "要確認");
       head.append(button("▶ " + clock(c.s), () => playList([k]), "time"), el("span", "idx", "#" + c.i + " · 素材 " + clock(c.src)), chip);
+      const opts = el("div", "options"); const optButtons = [];
+      for (const o of (f.options || [])) {
+        const b = button("", () => choose(k, o.t, "候補から選んだ（" + (o.by || []).join("・") + "）"));
+        b.append(el("span", "", o.t), el("small", "", (o.by || []).join("・")));
+        b._fix = o.t; optButtons.push(b); opts.appendChild(b);
+      }
       const tools = el("div", "item-tools");
+      const same = button("このまま", () => choose(k, "", ""));
       const mark = button("朱を入れる", () => { if (S.marks.has(id)) focusItem(id); else addMark(k); });
-      tools.append(mark);
-      node.append(head, el("p", "orig", c.t), el("p", "heard", f.why || ("音声認識は「" + (f.heard || "") + "」")), tools);
-      node._parts = { chip, mark };
+      tools.append(same, mark);
+      node.append(head, el("p", "orig", c.t), el("p", "heard", f.why || ("音声認識は「" + (f.heard || "") + "」")));
+      if (optButtons.length) node.appendChild(opts);
+      node.appendChild(tools);
+      node._parts = { chip, mark, same, optButtons };
       S.flagNodes.set(id, node);
       list.appendChild(node);
     }
   }
   function updateFlags() {
     S.flagNodes.forEach((node, id) => {
-      const on = S.marks.has(id);
-      node.classList.toggle("is-marked", on);
-      node._parts.chip.className = "chip plain " + (on ? "shu" : "gunjo"); node._parts.chip.textContent = on ? "朱あり" : "要確認";
-      node._parts.mark.textContent = on ? "朱を入れた所へ" : "朱を入れる";
+      const m = S.marks.get(id); const on = !!m && m.state !== "ok"; const ok = !!m && m.state === "ok";
+      node.classList.toggle("is-marked", on); node.classList.toggle("is-ok", ok);
+      node._parts.chip.className = "chip plain " + (on ? "shu" : ok ? "matsu" : "gunjo");
+      node._parts.chip.textContent = on ? "朱あり" : ok ? "このまま" : "要確認";
+      node._parts.mark.textContent = m ? "朱を入れた所へ" : "朱を入れる";
+      for (const b of node._parts.optButtons) b.classList.toggle("is-chosen", !!m && flat(m.fix || "") === flat(b._fix));
     });
   }
   function highlight(id) {
