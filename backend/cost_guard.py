@@ -198,9 +198,13 @@ class CostGuard:
             self.spent_jpy += jpy
             self.calls += 1
             spent = self.spent_jpy
+        # 頼んだ名前と違うモデルが答えたら、答えた方も残す（名前が残ったまま中身が替わる。
+        # 2026-10-19: gemini-3.7-flash を頼むと gemini-3.8-flash が答えた）
+        served = getattr(response, "model_version", None)
         self._append({
             "at": datetime.now(timezone.utc).isoformat(),
             "model": model,
+            **({"served": served} if isinstance(served, str) and served and served != model else {}),
             "caller": caller,
             "prompt_tokens": prompt,
             "output_tokens": out,
