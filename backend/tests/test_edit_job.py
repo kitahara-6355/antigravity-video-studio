@@ -460,3 +460,29 @@ def test_the_steps_that_run_inside_the_tool_find_the_backend_modules_without_pyt
     out = subprocess.run([sys.executable, "-c", code], cwd=edit_job.REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=120)
     assert out.stdout.strip() == "ok", out.stderr
+
+
+def test_the_review_files_come_with_the_check_of_the_editing_rules(tmp_path, monkeypatch):
+    from subtitle_engine import review_sheet
+
+    runner, _ = _edit_runner(tmp_path, monkeypatch)
+    preview = tmp_path / "preview_x.mp4"
+    edit_job.sidecar_of(preview).write_text(json.dumps(
+        {"segments": [{"start": 0, "end": 2, "text": "書家の、北原です"}], "ranges": [[0, 2]]}), encoding="utf-8")
+    runner.state["steps"]["edit:zero"] = {"state": "done", "result": {"preview": str(preview)}}
+
+    def fake_build(_preview, dest):
+        dest.mkdir(parents=True, exist_ok=True)
+        for name in ("first3.mp4", "full360.mp4", "contact.jpg"):
+            (dest / name).write_bytes(b"x")
+
+    monkeypatch.setattr(edit_job, "build_review_files", fake_build)
+    monkeypatch.setattr(edit_job, "_streamhash", lambda p: p.read_bytes())
+    monkeypatch.setattr(review_sheet, "export", lambda *a, **k: {"captions": [], "flags": []})
+    step = next(s for s in edit_job.plan_steps(runner.job) if s["key"] == "review:zero")
+
+    result = runner.step_review(step)
+
+    assert result["standards_failed"] == ["S01"]
+    assert "zero/standards.txt" in result["files"]
+    assert "S01" in (tmp_path / "out" / "zero" / "standards.txt").read_text(encoding="utf-8")

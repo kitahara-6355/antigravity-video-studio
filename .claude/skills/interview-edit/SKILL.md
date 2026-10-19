@@ -101,6 +101,7 @@ python -m backend.edit_job status <名前>
 
 - `<版>/first3.mp4`（3分版）・`full360.mp4`（全編 360p 版）・`contact.jpg`（一覧画像）・`review_captions.json`（レビュー画面の控え。
   機械の要確認には、ほかの聞き取りの字の候補が付いている。人の見方はスキル caption-review の「人の手間を最小にする流れ」）
+- `<版>/standards.txt`（編集の決まりの点検。❌ があれば人に見せる前に直す。決まりと直し方はスキル `edit-standards`）
 - `<版>/compare.txt`（物差しとの違い）。違いは「台帳の直しが当たらなかった所」と「AI が前と違う字を書いた所」に分かれる
 - `assets/`（AI の出力・字幕データ・記録）と `assets.json`（役目・sha256・残すか一時か）
 
@@ -137,6 +138,13 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet compare <承
 人が承認した版は、スキル caption-review の手順 7（`edit_lock make`）で固定し、置き場の `assets/` に置く。
 固定があれば、AI の控えが無くても、コードが変わっても、raw から同じ字幕の動画を作り直せる（`edit_lock render`・AI を呼ばない）。
 手順 6 の「控えから作り直す」は、コードの直しが承認した字幕を変えないかを確かめるために使う。
+
+## 品質の基準
+
+字幕・カットの品質の基準は、スキル `edit-standards` の決まりの台帳（`backend/config/edit_standards.json`）にある。
+北原さんがチャットで出した指示（句読点・つなぎ言葉・あいさつはノーカット など）と、書き出しの失敗から
+できた決まりで、本線がもう守っている。別の対談でもチャットの指示はいらない。
+新しい指摘や失敗が出たら、同じスキルの「指示と失敗のサイクル」で決まりに足す。
 
 ## 辞書と台帳の分け方
 

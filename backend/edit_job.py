@@ -846,6 +846,7 @@ class Runner:
     # --- 確認用ファイル・比べる・残す ----------------------------------------------------------
 
     def step_review(self, step: dict) -> dict:
+        from backend import edit_standards
         from subtitle_engine import aligner, review_sheet
         from subtitle_engine.video_hash import material_cache
 
@@ -866,7 +867,14 @@ class Runner:
         for name in ("first3.mp4", "full360.mp4", "contact.jpg", "review_captions.json"):
             place(local / name, self.out / key / name)
             placed.append(f"{key}/{name}")
-        return {"files": placed, "captions": len(sheet["captions"]), "flags": len(sheet.get("flags") or [])}
+        # 編集の決まり（スキル edit-standards）を字幕で点検し、人に見せる前に分かるようにする
+        standards = edit_standards.check(json.loads(sidecar_of(preview).read_text(encoding="utf-8")),
+                                         edit_standards.load())
+        (self.out / key / "standards.txt").write_text("\n".join(edit_standards.format_check(standards)) + "\n",
+                                                     encoding="utf-8")
+        placed.append(f"{key}/standards.txt")
+        return {"files": placed, "captions": len(sheet["captions"]), "flags": len(sheet.get("flags") or []),
+                "standards_failed": [r["id"] for r in edit_standards.failed(standards)]}
 
     def step_compare(self, step: dict) -> dict:
         from subtitle_engine import review_sheet

@@ -4414,6 +4414,15 @@
    "fingerprint": []
   },
   {
+   "id": "backend/edit_standards.py::check_no_lost_words",
+   "file": "backend/edit_standards.py",
+   "symbol": "check_no_lost_words",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "書き出した字幕を編集の決まり（S15 欠落）で点検し、品質ゲートと同じ判定（quality_gate_plugins._lost_lines の blocking）で外れた言葉の一覧を返すだけ。結果は置き場の standards.txt と edit_job の結果（standards_failed）にしか出ず、品質スコア・品質ゲート・投稿・統計・retention のどれにも入らない。合否を新しく決めず、ゲートの判定を読むだけ",
+   "fingerprint": []
+  },
+  {
    "id": "backend/subtitle_engine/sync.py::_split_in_two",
    "file": "backend/subtitle_engine/sync.py",
    "symbol": "_split_in_two",
