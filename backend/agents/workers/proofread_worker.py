@@ -184,6 +184,19 @@ class ProofreadWorker(PipelineStageWorker):
         except Exception as e:
             logger.warning(f"表記の統一スキップ: {e}")
 
+        # 辞書は AI の後にもう一度当てる。校閲は辞書の語を自分の知っている字に戻すことがある
+        # （2026-10-19: 文字起こしの「久木田ヒロノブ」を「久木田博信」に書き換え、ゼロからの版に残った）
+        dict_after_ai = 0
+        try:
+            from proper_noun_dict import apply_dictionary
+            for seg in ctx.segments:
+                corrected, corrections = apply_dictionary(seg.get("text", ""))
+                if corrected != seg.get("text", ""):  # 正と誤が同じ項目（表記の固定）は数えない
+                    seg["text"] = corrected
+                    dict_after_ai += sum(c.get("original") != c.get("corrected") for c in corrections)
+        except Exception as e:
+            logger.debug(f"固有名詞辞書（AI の後）スキップ: {e}")
+
         # 人が通しで見て直した所（校正台帳）を当てる。文字起こしと校閲は呼ぶたびに揺れるので、
         # 人の直しは AI に渡さず、AI と表記の統一の後・整形の前に毎回同じに当てる（2026-10-17）
         review = {}
@@ -255,6 +268,7 @@ class ProofreadWorker(PipelineStageWorker):
         retry_note = (f" / 番号ずれの聞き直し{retried}行" if retried else "") + \
             (f"（未校閲{unproofed}行）" if unproofed else "")
         notation_note = f" / 表記{sum(notation.values())}件" if notation else ""
+        after_note = f" / AI の後に辞書{dict_after_ai}件" if dict_after_ai else ""
         heard_note = (f" / 別の聞き取り{heard['given']}か所中 選んだ{heard['chosen']}・採った{heard['adopted']}"
                       if heard["given"] else "")
         split_note = (f" / 割れた聞き取り{split['given']}か所中 選んだ{split['chosen']}・置いた{split['applied']}"
@@ -296,8 +310,9 @@ class ProofreadWorker(PipelineStageWorker):
         return StageResult(
             stage_name=self.name, success=True,
             detail=f"辞書{dict_corrections}件 + AI{ai_corrections}件 = {total}件修正{memo_note}{retry_note}"
-                   f"{heard_note}{split_note}{notation_note}{review_note}{format_stats}{skip_warn}",
+                   f"{heard_note}{split_note}{notation_note}{after_note}{review_note}{format_stats}{skip_warn}",
             data={"dict": dict_corrections, "ai": ai_corrections, "total": total, "model_used": model_used,
+                  "dict_after_ai": dict_after_ai,
                   "memo_hits": memo_hits, "memo_models": memo_models, "notation": notation, "heard": heard,
                   "split": split, "review": review},
             duration_seconds=round(time.time() - start, 1),

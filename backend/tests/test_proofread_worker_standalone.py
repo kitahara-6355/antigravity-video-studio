@@ -106,3 +106,26 @@ async def test_proofread_worker_timestamps_protection():
         assert ctx.segments[1]["sourceStart"] == 0.0
         assert ctx.segments[0]["sourceEnd"] == 4.0
         assert ctx.segments[1]["sourceEnd"] == 4.0
+
+
+@pytest.mark.asyncio
+async def test_the_dictionary_is_applied_again_after_the_ai_so_it_cannot_undo_a_known_name():
+    """2026-10-19: 文字起こしは「久木田ヒロノブ」と書き、辞書は「久木田博信→久木田ヒロノブ」を持っていたのに、
+    校閲（AI）が「久木田博信」に書き換え、ゼロからの版の 0分32秒に残った。辞書は AI の後にも当てる。"""
+    ctx = PipelineContext(video_path="dummy.mp4")
+    ctx.segments = [{"id": 0, "text": "第一人者久木田ヒロノブ先生です"}]
+    worker = ProofreadWorker()
+
+    def apply(text):
+        fixed = text.replace("久木田博信", "久木田ヒロノブ")
+        return fixed, ([{"original": "久木田博信", "corrected": "久木田ヒロノブ"}] if fixed != text else [])
+
+    mock_ai = MagicMock(return_value=([{"id": 0, "text": "第一人者久木田博信先生です"}], {"total_batches": 1}))
+    with patch("proper_noun_dict.apply_dictionary", side_effect=apply), \
+         patch("subtitle_engine.ai_proofreader.proofread_segments", mock_ai), \
+         patch("subtitle_engine.text_formatter.format_segments", side_effect=lambda segs, max_chars=18: segs), \
+         patch("subtitle_engine.text_formatter.get_max_chars_from_template", MagicMock(return_value=18)):
+        result = await worker.execute(ctx)
+    assert ctx.segments[0]["text"] == "第一人者久木田ヒロノブ先生です"
+    assert "AI の後に辞書1件" in result.detail
+    assert result.data["dict_after_ai"] == 1
