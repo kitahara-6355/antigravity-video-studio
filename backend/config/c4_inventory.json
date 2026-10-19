@@ -4396,6 +4396,24 @@
    "fingerprint": []
   },
   {
+   "id": "backend/subtitle_engine/review_flags.py::_compare",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "_compare",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "flag_captions の本体。字幕と1つの聞き取りの食い違いの字数（score）を数え、印の一覧と、食い違った所の位置と聞き取りの字（候補を作るため）を返すだけ。一覧はレビュー画面の控え（review_sheet.export の flags）にしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/review_flags.py::flag_with_readings",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "flag_with_readings",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "機械の要確認を、音声認識に加えて文字起こしの2回目・3回目・1回目とも並べて付け、印に候補の字を添えるだけの関数。score は聞き取りごとの食い違いの字数の和で、印の並べ順（tier）にしか使わない。一覧はレビュー画面の控えにしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（直すのは人が候補を選んだ後の校正台帳）",
+   "fingerprint": []
+  },
+  {
    "id": "backend/subtitle_engine/sync.py::_split_in_two",
    "file": "backend/subtitle_engine/sync.py",
    "symbol": "_split_in_two",
