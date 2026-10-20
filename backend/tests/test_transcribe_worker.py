@@ -403,3 +403,59 @@ def test_run_whisper_subprocess_stderr_read_exception(mock_popen, tmp_path):
     with pytest.raises(RuntimeError) as excinfo:
         worker._run_whisper_subprocess("dummy.mp4", str(checkpoint_path), "small")
     assert "Whisperサブプロセス失敗" in str(excinfo.value)
+
+
+# --- エンジンの切り替え（R2.5-C4: 主は Gemini、従は Whisper）--------------------------
+
+
+def _video(tmp_path):
+    v = tmp_path / "v.mp4"
+    v.write_bytes(b"\x00" * 2048)
+    return v
+
+
+def test_gemini_engine_fills_segments_and_names_the_engine(tmp_path, monkeypatch):
+    from subtitle_engine import gemini_transcriber
+    monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
+    segs = [{"start": 0.0, "end": 1.0, "text": "あ" * 300, "sourceStart": 0.0, "sourceEnd": 1.0, "words": []}]
+    monkeypatch.setattr(gemini_transcriber, "transcribe", lambda path, **kw: gemini_transcriber.TranscribeResult(
+        segments=segs, model="gemini-3.6-flash", chunks=1, models_used=["gemini-3.6-flash"]))
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert result.success
+    assert result.data["engine"] == "gemini"
+    assert ctx.segments == segs
+    assert list(tmp_path.glob("_gemini_*.jsonl")), "Gemini の結果を再開用に残す"
+
+
+def test_a_failed_gemini_switches_to_whisper_and_says_so(tmp_path, monkeypatch):
+    from subtitle_engine import gemini_transcriber
+    monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "gemini")
+
+    def boom(path, **kw):
+        raise gemini_transcriber.TranscriptionError("チャンク 2/3 を起こせません")
+    monkeypatch.setattr(gemini_transcriber, "transcribe", boom)
+    worker = TranscribeWorker()
+
+    def fake_whisper(video, checkpoint, model):
+        Path(checkpoint).write_text(json.dumps({"start": 0, "end": 1, "text": "w" * 1200}) + "\n", encoding="utf-8")
+        return {"status": "completed", "device": "cpu"}
+    monkeypatch.setattr(worker, "_run_whisper_subprocess", fake_whisper)
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(worker.execute(ctx))
+
+    assert result.success and result.data.get("engine") != "gemini"
+    assert any("Whisper に切り替え" in w for w in ctx.warnings)
+
+
+def test_an_unknown_engine_fails_the_stage(tmp_path, monkeypatch):
+    monkeypatch.setenv("AVS_TRANSCRIBE_ENGINE", "whisperx")
+    ctx = PipelineContext(video_path=str(_video(tmp_path)))
+
+    result = asyncio.run(TranscribeWorker().execute(ctx))
+
+    assert not result.success
+    assert "AVS_TRANSCRIBE_ENGINE" in result.detail

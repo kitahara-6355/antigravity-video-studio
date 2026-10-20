@@ -27,10 +27,20 @@ import os
 # 3系統（リポジトリ直下 / backend/tests / tests）で同じ向き先になるよう、設定済みなら尊重する。
 # 末尾を `vault-outputs` にしてあるのは、置き場の名前を確かめているテストがあるため。
 if not os.environ.get("ANTIGRAVITY_VAULT_OUTPUTS"):
+    import atexit as _atexit
+    import shutil as _shutil
     import tempfile as _tempfile_vault
-    os.environ["ANTIGRAVITY_VAULT_OUTPUTS"] = os.path.join(
-        _tempfile_vault.mkdtemp(prefix="antigravity_vault_"), "vault-outputs")
+    _vault_root = _tempfile_vault.mkdtemp(prefix="antigravity_vault_")
+    os.environ["ANTIGRAVITY_VAULT_OUTPUTS"] = os.path.join(_vault_root, "vault-outputs")
     os.makedirs(os.environ["ANTIGRAVITY_VAULT_OUTPUTS"], exist_ok=True)
+
+    # 2026-10-18: 作った process が終わるときに消す（2週間で約20GB 残った）。fork した子では消さない。
+    # 詳細は backend/tests/conftest.py の `_remove_at_exit`。
+    def _remove_vault(path=_vault_root, owner=os.getpid()):
+        if os.getpid() == owner:
+            _shutil.rmtree(path, ignore_errors=True)
+
+    _atexit.register(_remove_vault)
 
 import importlib.util as _ilu
 import sys as _sys

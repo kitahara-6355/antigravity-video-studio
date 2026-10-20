@@ -506,6 +506,21 @@
    "fingerprint": []
   },
   {
+   "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._execute_worker",
+   "file": "backend/agents/pipeline_coordinator.py",
+   "symbol": "PipelineCoordinator._execute_worker",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "品質の点数を作らない。QualityGateWorker が返した data に `scored` が立っているときだけ、score・rank・講評を**そのまま**工程の記録に写す（無い項目は写さず、既定値も入れない）。2026-10-18 に足した（承認待ちで止まった回の74点の理由を記録から引けなかった）。既定値の4つの getattr と or は記録の付帯情報（採用件数・警告）の読み出しで、点数ではない",
+   "fingerprint": [
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "getattr_default",
+    "or_default"
+   ]
+  },
+  {
    "id": "backend/agents/pipeline_coordinator.py::PipelineCoordinator._finalize_harness",
    "file": "backend/agents/pipeline_coordinator.py",
    "symbol": "PipelineCoordinator._finalize_harness",
@@ -641,10 +656,12 @@
    "symbol": "main",
    "category": "品質スコア",
    "status": "out_of_scope",
-   "reason": "CLI 専用（backend/main.py・routers/ から到達しない）。かつ未計測時の表示は 0 点で悲観側",
+   "reason": "CLI 専用（backend/main.py・routers/ から到達しない）。かつ未計測時の表示は 0 点で悲観側。校正台帳（--review）を読めないときの except は return 1 で、API を呼ぶ前に止まる側（2026-10-17）",
    "fingerprint": [
     "const_return",
     "const_return",
+    "const_return",
+    "except_returns",
     "or_default",
     "or_default"
    ]
@@ -1220,6 +1237,24 @@
    "marks": [
     "quality_scored=?"
    ]
+  },
+  {
+   "id": "backend/cut_plan.py::_parse_scdet",
+   "file": "backend/cut_plan.py",
+   "symbol": "_parse_scdet",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "ffmpeg の scdet（映像の切り替わりの検出）の出力を読むだけの関数。score は ffmpeg が付ける「前のフレームとの絵の違い」（lavfi.scd.score）で、映像の良し悪しではない。返すのは（切り替わりの秒, 違いの値）の一覧で、cut_plan.read_shots が素材の横のキャッシュに残すだけ。4カテゴリの数字・判定を作らず、品質ゲート・投稿・統計・retention のどれにも出ない",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/cut_plan.py::plan",
+   "file": "backend/cut_plan.py",
+   "symbol": "plan",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "残す区間（素材の秒の組）を決める関数。中の score は _parse_scdet が読んだ ffmpeg の絵の違いの値で、SHOT_CHANGE_SCORE 以上を映像の切り替わりとみなして区間の端の映り込みを切るのに使うだけ。返すのは区間と工程の記録（切り替わりの数・切った端・残した端）で、4カテゴリの数字・判定を作らず、品質スコア・品質ゲートの合否にも入らない（正典 limits 1「動画の良し悪しは判定しない」）",
+   "fingerprint": []
   },
   {
    "id": "backend/design_system/design_auto_learner.py::DesignAutoLearner.learn_from_quality_check",
@@ -4334,6 +4369,71 @@
    ]
   },
   {
+   "id": "backend/subtitle_engine/aligner.py::_rewrap",
+   "file": "backend/subtitle_engine/aligner.py",
+   "symbol": "_rewrap",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "言いよどみを外した後の2行の字幕を、整形と同じ折り方で組み直すだけの関数。中の score は折り目の候補2つの良し悪し（text_formatter._break_score）を比べる局所の比較で、返すのは字幕の文。4カテゴリの数字・判定を作らず、どこにも残さない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/aligner.py::_rewrap.<locals>.score",
+   "file": "backend/subtitle_engine/aligner.py",
+   "symbol": "_rewrap.<locals>.score",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "_rewrap の中で、折った2行の1行目と2行目の継ぎ目に text_formatter._break_score の点を付けるだけの局所関数。点は2つの折り方を比べる場でしか使わず、品質スコア・投稿・統計・retention のどれにも出ない",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/review_flags.py::flag_captions",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "flag_captions",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "人が字幕を通しで見るときの「機械の要確認」の印を付けるだけの関数。中の score は字幕1枚ごとの、字幕と別の音声認識（ReazonSpeech）の食い違いの字数で、しきい以上の字幕を印の一覧にして返す。一覧はレビュー画面の控え（review_sheet.export の flags）にしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/review_flags.py::_compare",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "_compare",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "flag_captions の本体。字幕と1つの聞き取りの食い違いの字数（score）を数え、印の一覧と、食い違った所の位置と聞き取りの字（候補を作るため）を返すだけ。一覧はレビュー画面の控え（review_sheet.export の flags）にしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/review_flags.py::flag_with_readings",
+   "file": "backend/subtitle_engine/review_flags.py",
+   "symbol": "flag_with_readings",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "機械の要確認を、音声認識に加えて文字起こしの2回目・3回目・1回目とも並べて付け、印に候補の字を添えるだけの関数。score は聞き取りごとの食い違いの字数の和で、印の並べ順（tier）にしか使わない。一覧はレビュー画面の控えにしか入らず、品質スコア・品質ゲート・投稿・統計・retention のどれにも出ない。字幕を直しもしない（直すのは人が候補を選んだ後の校正台帳）",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/edit_standards.py::check_no_lost_words",
+   "file": "backend/edit_standards.py",
+   "symbol": "check_no_lost_words",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "書き出した字幕を編集の決まり（S15 欠落）で点検し、品質ゲートと同じ判定（quality_gate_plugins._lost_lines の blocking）で外れた言葉の一覧を返すだけ。結果は置き場の standards.txt と edit_job の結果（standards_failed）にしか出ず、品質スコア・品質ゲート・投稿・統計・retention のどれにも入らない。合否を新しく決めず、ゲートの判定を読むだけ",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/subtitle_engine/sync.py::_split_in_two",
+   "file": "backend/subtitle_engine/sync.py",
+   "symbol": "_split_in_two",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "長く出続ける2行の字幕を2枚に分ける所を選ぶだけの関数。中の score は分ける候補ごとの切れ目の良さ（text_formatter._break_score）で、候補どうしを比べる局所の値。返すのは分けた2枚の字幕（文と時刻）。`or` の既定値は字幕の文・認識の時刻が無いときの空で、4カテゴリの数字・判定を作らず、どこにも残さない（正典 limits 2「字幕の質は対象外」）",
+   "fingerprint": [
+    "or_default"
+   ]
+  },
+  {
    "id": "backend/subtitle_engine/whisper_subprocess.py::main",
    "file": "backend/subtitle_engine/whisper_subprocess.py",
    "symbol": "main",
@@ -5148,8 +5248,9 @@
    "symbol": "trace",
    "category": "品質スコア",
    "status": "honest",
-   "reason": "証跡の表示だけ（R2-C2）。点数は提案の `quality.score` をそのまま出し、既定値を足さない（無ければ None と出る）。L310 の `or_default` はモデル一覧が空のときに **`(記録なし)` と明示する**ための退避で、モデル名を捏造しない。もう1件の `or_default` は開示辞書の空退避。 2026-09-26（D-39）: 3・4件目の `or_default` は工程ごとの行で（`model_reason` の空退避と） `stage.model` が空のときに **`(記録なし)` と明示する**退避。モデル名も理由も捏造しない（理由が無い古い実走は「理由の記録なし」と出す）。 5件目（2026-09-26・R2-C5 検証1周目）は「実測が宣言と違う」行で `models_observed` が空のときに `?` と出す退避。実測のモデル名を作らない。",
+   "reason": "証跡の表示だけ（R2-C2）。点数は提案の `quality.score` をそのまま出し、既定値を足さない（無ければ None と出る）。L310 の `or_default` はモデル一覧が空のときに **`(記録なし)` と明示する**ための退避で、モデル名を捏造しない。もう1件の `or_default` は開示辞書の空退避。 2026-09-26（D-39）: 3・4件目の `or_default` は工程ごとの行で（`model_reason` の空退避と） `stage.model` が空のときに **`(記録なし)` と明示する**退避。モデル名も理由も捏造しない（理由が無い古い実走は「理由の記録なし」と出す）。 5件目（2026-09-26・R2-C5 検証1周目）は「実測が宣言と違う」行で `models_observed` が空のときに `?` と出す退避。実測のモデル名を作らない。 6件目（2026-10-08・PR #94）は校閲の控えから使った直しの行で、控えにモデルの記録が無いときに `?` と出す退避（`models` の空の器の退避と同じ式）。行数は控えの記録（`memo.rows`）が正のときだけそのまま出し、モデル名も行数も作らない。",
    "fingerprint": [
+    "or_default",
     "or_default",
     "or_default",
     "or_default",

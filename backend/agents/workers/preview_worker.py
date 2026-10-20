@@ -20,6 +20,15 @@ from agents.pipeline_types import PipelineStageWorker, PipelineContext, StageRes
 logger = logging.getLogger(__name__)
 
 
+def _accepts_ranges(render) -> bool:
+    """描画の関数が `ranges`（残す区間）を受け取れるか。"""
+    import inspect
+    try:
+        return "ranges" in inspect.signature(render).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 class PreviewWorker(PipelineStageWorker):
     def __init__(self):
         super().__init__("プレビュー生成", "🎬", 3)
@@ -115,7 +124,14 @@ class PreviewWorker(PipelineStageWorker):
             # 取り合うと、片方の提案が相手のプレビューを指す（承認の指紋の照合で止まるが、止まる前に防ぐ）
             preview_path = str(preview_dir / f"preview_{ts}_{uuid.uuid4().hex[:8]}.mp4")
 
-            success = render_smart_cut(ctx.selected_segments, ctx.video_path, preview_path)
+            # SmartCut が決めた区間（声の切れ目に寄せ、冒頭のあいさつはつないだ区間）で切る。
+            # 区間を受け取れない描画（差し替えられたもの）には渡さない
+            ranges = list(getattr(ctx, "cut_ranges", None) or [])
+            if ranges and _accepts_ranges(render_smart_cut):
+                success = render_smart_cut(ctx.selected_segments, ctx.video_path, preview_path,
+                                           ranges=ranges)
+            else:
+                success = render_smart_cut(ctx.selected_segments, ctx.video_path, preview_path)
             if success and Path(preview_path).exists() and Path(preview_path).stat().st_size >= 1024:
                 size_mb = Path(preview_path).stat().st_size / 1024 / 1024
                 ctx.preview_path = preview_path

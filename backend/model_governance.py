@@ -90,7 +90,9 @@ class ModelGovernanceEngine:
     # 同一モデルで再試行する対象。**404 は入れない。**
     # 存在しないモデルは待っても現れない。降格だけが正しい対処で、
     # 叩き直すのは無駄な負荷にしかならない。
-    RETRYABLE_ERROR_CODES = {429, 503}
+    # 500/502/504 はサーバー側・経路上の一時エラー（2026-10-06 の実走で
+    # 校閲のバッチの多くが 502 で落ち、同じ時間帯に数秒で通る呼び出しもあった）。
+    RETRYABLE_ERROR_CODES = {429, 500, 502, 503, 504}
     RETRYABLE_ERROR_KEYWORDS = ("RESOURCE_EXHAUSTED", "UNAVAILABLE")
 
     # リトライ設定
@@ -120,6 +122,8 @@ class ModelGovernanceEngine:
         self._task_mapping: Dict[str, str] = {}
         self._default_model: str = "gemini-3.6-flash"
         self._event_log: List[Dict] = []
+        # **枠が長く戻らないモデル**（日次の枠切れなど）。model → (戻る時刻 monotonic, 最後のエラー)
+        self._exhausted: Dict[str, tuple] = {}
         self._stats = {
             "deprecation_corrections": 0,
             "fallback_activations": 0,
@@ -307,6 +311,33 @@ class ModelGovernanceEngine:
         )
         half = base / 2
         return half + random.uniform(0, half)
+
+    def waits_too_long(self, error) -> bool:
+        """サーバーの指定が待てる上限を超えている（日次の枠切れなど）。
+
+        2026-10-05 の実走で、`gemini-3.6-flash` の無料枠（1日20回）が尽きた後も
+        呼び出しのたびに 60秒×2回待ってから降格していた（指定は「11時間後」）。
+        待っても戻らないので、**すぐ降格し、戻るまでこのモデルを飛ばす。**
+        """
+        hint = self.retry_after_seconds(error)
+        return hint is not None and hint > self.BACKOFF_MAX_SECONDS
+
+    def mark_exhausted(self, model: str, error) -> None:
+        hint = self.retry_after_seconds(error) or self.BACKOFF_MAX_SECONDS
+        self._exhausted[model] = (time.monotonic() + hint, error)
+        logger.warning(
+            f"🛡️ ModelGovernance: '{model}' の枠は {hint / 3600:.1f} 時間戻りません → 戻るまで飛ばします")
+
+    def exhausted_error(self, model: str):
+        """枠切れで飛ばすモデルなら、その時のエラーを返す（戻っていれば `None`）。"""
+        entry = self._exhausted.get(model)
+        if entry is None:
+            return None
+        until, error = entry
+        if time.monotonic() >= until:
+            self._exhausted.pop(model, None)
+            return None
+        return error
 
     def _record_retry(self, model: str, caller: str, attempt: int,
                       delay: float, error) -> None:
@@ -524,6 +555,11 @@ class ModelGovernanceEngine:
         # 3. チェーンを順に試行
         last_error = None
         for i, try_model in enumerate(chain):
+            # 枠が長く戻らないと分かっているモデルは叩かずに飛ばす（末端は試す）
+            skipped = self.exhausted_error(try_model) if i + 1 < len(chain) else None
+            if skipped is not None:
+                last_error = skipped
+                continue
             try:
                 # 非同期 API 呼び出し
                 gen_kwargs = {"model": try_model, "contents": prompt}
@@ -652,6 +688,9 @@ def _attempt_with_backoff(call, *, model: str, caller: str):
                 raise
             if not model_governance.is_retryable_error(e):
                 raise
+            if model_governance.waits_too_long(e):
+                model_governance.mark_exhausted(model, e)
+                raise
             delay = model_governance.backoff_delay(attempt, e)
             model_governance._record_retry(
                 model, caller, attempt + 1, delay, e,
@@ -670,6 +709,9 @@ async def _attempt_with_backoff_async(call, *, model: str, caller: str):
             if attempt >= model_governance.MAX_RETRY_PER_MODEL:
                 raise
             if not model_governance.is_retryable_error(e):
+                raise
+            if model_governance.waits_too_long(e):
+                model_governance.mark_exhausted(model, e)
                 raise
             delay = model_governance.backoff_delay(attempt, e)
             model_governance._record_retry(
@@ -723,6 +765,11 @@ class GovernedModelsProxy:
 
         last_error = None
         for i, try_model in enumerate(chain):
+            # 枠が長く戻らないと分かっているモデルは叩かずに飛ばす（末端は試す）
+            skipped = model_governance.exhausted_error(try_model) if i + 1 < len(chain) else None
+            if skipped is not None:
+                last_error = skipped
+                continue
             try:
                 def _call(try_model=try_model):
                     _guard = guard_before(try_model, self._caller)
@@ -799,6 +846,11 @@ class GovernedModelsProxy:
 
         last_error = None
         for i, try_model in enumerate(chain):
+            # 枠が長く戻らないと分かっているモデルは叩かずに飛ばす（末端は試す）
+            skipped = model_governance.exhausted_error(try_model) if i + 1 < len(chain) else None
+            if skipped is not None:
+                last_error = skipped
+                continue
             try:
                 def _call(try_model=try_model):
                     return self._real.embed_content(
@@ -895,6 +947,11 @@ class GovernedAsyncModelsProxy:
 
         last_error = None
         for i, try_model in enumerate(chain):
+            # 枠が長く戻らないと分かっているモデルは叩かずに飛ばす（末端は試す）
+            skipped = model_governance.exhausted_error(try_model) if i + 1 < len(chain) else None
+            if skipped is not None:
+                last_error = skipped
+                continue
             try:
                 async def _call(try_model=try_model):
                     _guard = guard_before(try_model, self._caller)
@@ -964,6 +1021,11 @@ class GovernedAsyncModelsProxy:
 
         last_error = None
         for i, try_model in enumerate(chain):
+            # 枠が長く戻らないと分かっているモデルは叩かずに飛ばす（末端は試す）
+            skipped = model_governance.exhausted_error(try_model) if i + 1 < len(chain) else None
+            if skipped is not None:
+                last_error = skipped
+                continue
             try:
                 async def _call(try_model=try_model):
                     _guard = guard_before(try_model, self._caller)

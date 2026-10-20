@@ -90,9 +90,10 @@ def _worker_side_effect(worker, quality_score: int = 95):
             result.data = {"segment_count": 10, "model": "small", "device": "cuda"}
         elif isinstance(worker, PreviewWorker):
             # **実在するプレビューを作る**（R2-C1）。見ていないものは承認できないので、
-            # 承認して書き出すテストはプレビューが要る
+            # 承認して書き出すテストはプレビューが要る。テストの一時フォルダ（終わるときに消える）に作る
             import tempfile
-            fd, preview = tempfile.mkstemp(suffix=".mp4", prefix="mock_preview_")
+            fd, preview = tempfile.mkstemp(suffix=".mp4", prefix="mock_preview_",
+                                           dir=os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"))
             os.write(fd, b"mock-preview")
             os.close(fd)
             ctx.preview_path = preview

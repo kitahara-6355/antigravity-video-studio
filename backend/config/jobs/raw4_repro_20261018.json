@@ -1,0 +1,20 @@
+{
+  "name": "raw4_repro_20261018",
+  "label": "raw 4本の再現テスト（2025-09-22 対談・久木田ヒロノブさん）",
+  "raw": {
+    "folder": null,
+    "parts": [
+      "2025-09-22_16-34-33.mp4",
+      "2025-09-22_17-09-02.mp4",
+      "2025-09-22_17-12-47.mp4",
+      "2025-09-22_17-24-02.mp4"
+    ]
+  },
+  "material": "raw4_concat.mp4",
+  "versions": [
+    {"key": "zero", "label": "ゼロからの版"},
+    {"key": "ledger", "label": "朱を足した版", "review": "backend/config/reviews/raw4_20250922.json"}
+  ],
+  "approved": "/mnt/project-files/outputs/raw4_repro_20261018/approved/r61.subtitles.json",
+  "out": "/mnt/project-files/outputs/raw4_repro_20261018"
+}

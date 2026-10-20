@@ -132,6 +132,15 @@ STATUS_COMPLETED = "completed"
 STATUS_DEGRADED = "degraded"
 
 
+def _transcribe_engine_or_none() -> Optional[str]:
+    """記録の宣言に使うエンジン。値が不正なら `None`（工程側が理由つきで落とす）。"""
+    from agents.workers.transcribe_worker import transcribe_engine
+    try:
+        return transcribe_engine()
+    except ValueError:
+        return None
+
+
 def _merge_intermediates(before: list, after: list) -> list:
     """提案まで（`before`）と書き出し（`after`）の中間成果物の使われ方を合わせる。
 
@@ -201,6 +210,10 @@ class PipelineCoordinator:
         """記録に残す工程名と、モデルの出どころ、再開に要る入力。"""
         name, source = STAGE_RECORD.get(
             type(worker).__name__, (type(worker).__name__, {}))
+        if isinstance(worker, TranscribeWorker) and _transcribe_engine_or_none() == "gemini":
+            # **Gemini 音声入力の実走は段から引く**（R2.5-C4）。Whisper に切り替わったら
+            # 台帳に Gemini の呼び出しが残らず、記録の実測との食い違いで見える
+            source = {"task": "transcription"}
         return name, {
             **source,
             "stage_input": {
@@ -310,6 +323,29 @@ class PipelineCoordinator:
                 採用 = (getattr(ctx, "ai_accepted", None) or {}).get(印) if 印 else None
                 if 採用 is not None:
                     entry["ai_accepted"] = int(採用)
+                # 控えから使った直し（校閲・2026-10-08）はこの回に呼んでいないので台帳に出ない。
+                # どのモデルの直しかを記録で追えるよう、行数とモデルを残す
+                data = getattr(result, "data", None) or {}
+                if isinstance(data, dict) and int(data.get("memo_hits") or 0) > 0:
+                    entry["memo"] = {"rows": int(data["memo_hits"]),
+                                     "models": list(data.get("memo_models") or [])}
+                # 別の聞き取り（2026-10-15）: 文字起こしで決まらなかった所を本文と並べてどう選び、
+                # 校閲がいくつ採ったか。どの直しが認識の字から来たかを記録で追えるようにする
+                if isinstance(data, dict) and isinstance(data.get("heard"), dict) and data["heard"].get("given"):
+                    entry["heard"] = data["heard"]
+                # 2回目の起こしが割れた所（2026-10-15）: 校閲の後の文と並べてどう選び、いくつ字を置いたか
+                if isinstance(data, dict) and isinstance(data.get("split"), dict) and data["split"].get("given"):
+                    entry["split"] = data["split"]
+                # 人の直し（校正台帳・2026-10-17）: どの台帳のどの直しが当たり、どれが当たらなかったか。
+                # キャッシュ無しで作り直したとき、人が見直す所を記録から引けるようにする
+                if isinstance(data, dict) and isinstance(data.get("review"), dict) and data["review"].get("ledger"):
+                    entry["review"] = data["review"]
+                # 品質の点数と講評（2026-10-18）: 承認待ちで止まった回は、動画の隣に講評が残らない
+                # （書き出した後だけ）。なぜその点数なのかを工程の記録から引けるようにする
+                if isinstance(data, dict) and data.get("scored") and isinstance(data.get("feedback"), list):
+                    entry["quality"] = {k: data[k] for k in
+                                        ("score", "raw_score", "rank", "feedback", "category_scores")
+                                        if k in data}
                 if 印 and any(印 in s for s in ctx.skipped_features if s not in before):
                     entry["ai_skipped"] = True
                 elif 印 and any(印 in w for w in (getattr(ctx, "warnings", None) or []) if w not in warn_before):
@@ -1740,8 +1776,9 @@ def _auto_target_minutes(duration_sec: Optional[float]) -> Optional[int]:
     QV-01 が「出力尺異常（目標20分, 差19.6分）」で満額 -50 を打ち、
     スコアが 2/100 に張り付いていた。**目標尺を素材に合わせるだけで 52点。**
 
-    `target_minutes` は SmartCut では使われておらず、**品質ゲートが
-    「出来上がりはこれくらいのはず」と照らす期待値**としてだけ効く。
+    このとき `target_minutes` は**素材の長さ**であって出来上がりの長さではない
+    （`ctx.target_auto`）。SmartCut は中身を削らず間だけを切り（2026-10-13）、品質ゲートは
+    SmartCut の計画尺と照らす。
     """
     if duration_sec is None or duration_sec <= 0:
         return None
@@ -1761,12 +1798,29 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="実行記録の置き場（既定 output/runs）")
     parser.add_argument("--no-ledger", action="store_true",
                         help="台帳に1本ぶんの要約を書かない（試し撃ち用）")
+    parser.add_argument("--transcriber", choices=("whisper", "gemini"), default=None,
+                        help="文字起こしのエンジン（既定は環境変数 AVS_TRANSCRIBE_ENGINE、無ければ whisper）。"
+                             "gemini は課金経路（無料枠の段）")
+    parser.add_argument("--review", default="", metavar="FILE",
+                        help="校正台帳（人が通しで見て直した字幕。backend/config/reviews/）。"
+                             "校閲の後に毎回同じ直しを当てる")
     args = parser.parse_args(argv)
+    if args.transcriber:
+        os.environ["AVS_TRANSCRIBE_ENGINE"] = args.transcriber
 
     video = Path(args.video)
     if not video.is_file():
         print(f"🚫 入力がありません: {video}")
         return 1
+    if args.review:
+        # 壊れた台帳で 30分走らせない（API を呼ぶ前に読んでみる）
+        from subtitle_engine import review_ledger
+        try:
+            ledger = review_ledger.load(args.review)
+        except (OSError, ValueError) as e:
+            print(f"🚫 校正台帳を読めません: {e}")
+            return 1
+        print(f"📝 校正台帳: {args.review}（直し{len(ledger['corrections'])}件・用語{len(ledger['glossary'])}語）")
 
     target_minutes = args.target_minutes
     if target_minutes is None:
@@ -1788,6 +1842,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     ctx = PipelineContext(video_path=str(video),
                           target_minutes=target_minutes,
+                          target_auto=args.target_minutes is None,
+                          review_ledger=args.review,
                           session_id=f"cli-{uuid.uuid4().hex[:8]}")
 
     result = asyncio.run(coordinator.execute(ctx))

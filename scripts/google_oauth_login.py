@@ -38,6 +38,23 @@ GCP コンソールでの作業。ここは自動化できない。
 保存先は `--token` で変えられる。法人 Workspace の同意画面を「内部」にしていれば、
 下の「7日で失効」は当たらない。
 
+## 過程の資産を書くトークン（drive.file・2026-10-18）
+
+    python scripts/google_oauth_login.py --assets
+
+`drive.file` **だけ**を要求する（アプリが作ったファイルしか見えない・触れない）。
+raw を読むトークンとは別に作る。`--readonly` とは同時に付けられない。
+backend/data/google/token_assets_file.json に **1行の JSON** で保存する。
+
+一度だけの手順:
+
+1. 法人アカウント（info@kitahara-birei.com）でブラウザにログインしておく
+2. 上のコマンドを実行し、同意画面（avs-prod-free-kb の `avs-raw-reader`・内部）で許可する。
+   同意画面のスコープ一覧に drive.file が無ければ先に足しておく（内部なので審査は要らない）
+3. ローカルはこのファイルのまま使える。クラウドのセッションでは中身（1行）を
+   環境変数 `AVS_ASSETS_GOOGLE_TOKEN_JSON` に貼る（チャットには貼らない）
+4. `python -m backend.asset_store check` で権限が drive.file だけか確かめる（外には出ない）
+
 ## 注意
 
 公開ステータスが「テスト」の間、リフレッシュトークンは **7日で失効する**。
@@ -56,10 +73,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.services.google_oauth import (
+    ASSETS_TOKEN_JSON_ENV,
+    DRIVE_FILE_SCOPES,
     DRIVE_READONLY_SCOPES,
     DRIVE_SCOPES,
     SHEETS_SCOPES,
     TOKEN_JSON_ENV,
+    assets_token_path,
     client_secret_path,
     token_path,
 )
@@ -70,25 +90,37 @@ READONLY_TOKEN_NAME = "token_raw_readonly.json"
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Google の OAuth 同意を済ませてトークンを保存する")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--readonly", action="store_true",
         help="drive.readonly だけを要求する（raw を読むだけの口・クラウド用）",
     )
+    mode.add_argument(
+        "--assets", action="store_true",
+        help="drive.file だけを要求する（過程の資産を書く口・クラウド用）",
+    )
     parser.add_argument(
         "--token", type=Path, default=None,
-        help="トークンの保存先（既定: 通常は token.json、--readonly なら token_raw_readonly.json）",
+        help="トークンの保存先（既定: 通常は token.json、--readonly なら token_raw_readonly.json、"
+             "--assets なら token_assets_file.json）",
     )
     return parser.parse_args(argv)
 
 
-def resolve_plan(readonly: bool, token: Path | None) -> tuple[list[str], Path]:
+def resolve_plan(readonly: bool, token: Path | None,
+                 assets: bool = False) -> tuple[list[str], Path]:
     """要求するスコープと保存先を決める。
 
     `--readonly` で読み書きのスコープが混ざることはない。混ざると
     クラウドのセッションに raw を消せるトークンを渡すことになる。
+    `--assets` も drive.file だけ。読み取りの口と同じトークンにしない。
     """
+    if readonly and assets:
+        raise ValueError("--readonly と --assets は同時に使えません（トークンを分ける）")
     if readonly:
         return list(DRIVE_READONLY_SCOPES), token or (token_path().parent / READONLY_TOKEN_NAME)
+    if assets:
+        return list(DRIVE_FILE_SCOPES), token or assets_token_path()
     return list(SCOPES), token or token_path()
 
 
@@ -102,7 +134,8 @@ def serialize_token(credentials_json: str, *, one_line: bool) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    scopes, out = resolve_plan(args.readonly, args.token)
+    scopes, out = resolve_plan(args.readonly, args.token, assets=args.assets)
+    one_line = args.readonly or args.assets
 
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -130,13 +163,16 @@ def main(argv: list[str] | None = None) -> int:
     print("\nブラウザを開きます。Google の同意画面で許可してください。")
     if args.readonly:
         print("（raw を読むだけのトークンです。法人アカウントで同意してください）")
+    if args.assets:
+        print("（過程の資産を書くトークンです。アプリが作ったファイルだけ触れます。"
+              "法人アカウントで同意してください）")
 
     flow = InstalledAppFlow.from_client_secrets_file(str(secret), scopes)
     credentials = flow.run_local_server(port=0)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        serialize_token(credentials.to_json(), one_line=args.readonly),
+        serialize_token(credentials.to_json(), one_line=one_line),
         encoding="utf-8",
     )
     if os.name == "posix":
@@ -144,10 +180,11 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"\n完了しました。トークンを保存: {out}")
     print("このファイルは秘密です。共有しないでください。")
-    if args.readonly:
+    if one_line:
+        env_name = ASSETS_TOKEN_JSON_ENV if args.assets else TOKEN_JSON_ENV
         print(
             f"\nクラウドのセッションで使うには、このファイルの中身（1行）を\n"
-            f"環境変数 {TOKEN_JSON_ENV} に貼ってください。チャットには貼らないでください。"
+            f"環境変数 {env_name} に貼ってください。チャットには貼らないでください。"
         )
     return 0
 

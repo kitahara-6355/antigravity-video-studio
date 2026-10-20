@@ -80,8 +80,10 @@ async def _書き出すまで(pc, ctx):
 
     if not ctx.preview_path:
         # **見ていないものは承認できない**（R2-C1）。このファイルの worker は汎用のモックで
-        # プレビューを作らないので、承認の材料だけ実在させておく
-        fd, preview = tempfile.mkstemp(suffix=".mp4", prefix="mock_preview_")
+        # プレビューを作らないので、承認の材料だけ実在させておく。
+        # テストの一時フォルダ（終わるときに消える）に作る — /tmp に1回の全件で約60本・280MB 残っていた
+        fd, preview = tempfile.mkstemp(suffix=".mp4", prefix="mock_preview_",
+                                       dir=os.environ.get("ANTIGRAVITY_WRITABLE_ROOT"))
         os.write(fd, b"mock-preview")
         os.close(fd)
         ctx.preview_path = preview

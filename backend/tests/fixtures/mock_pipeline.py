@@ -131,7 +131,10 @@ def create_approved_run(root: Optional[str] = None) -> str:
 
     from backend.revenue import approval_gate as ag
 
-    run_dir = Path(root or tempfile.mkdtemp(prefix="mock_run_"))
+    # 2026-10-18: 置き場は conftest が作り、終わるときに消す一時フォルダの中（/tmp に直に作ると
+    # 片付かず、2週間で 11,067 個残った）。conftest の外から呼ばれたときは /tmp のまま。
+    run_dir = Path(root or tempfile.mkdtemp(prefix="mock_run_",
+                                            dir=os.environ.get("ANTIGRAVITY_WRITABLE_ROOT")))
     run_dir.mkdir(parents=True, exist_ok=True)
     # **見ていないものは承認できない**（R2-C1・4周目の反例B）ので、承認の材料のプレビューを置く
     preview = run_dir / "mock_preview.mp4"

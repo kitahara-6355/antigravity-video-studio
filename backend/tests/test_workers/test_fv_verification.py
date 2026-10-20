@@ -373,7 +373,9 @@ class TestFV_Proofread:
         violations = []
         for i, seg in enumerate(formatted):
             text = seg.get("text", "")
-            if len(text) > 18:
+            # 1枚の字幕は2行まで（テンプレの max_lines）。文字数は1行ずつ見る
+            lines = text.split("\n")
+            if len(lines) > 2 or any(len(line) > 18 for line in lines):
                 violations.append(
                     f"seg[{i}]: {len(text)}文字 — 「{text[:30]}...」"
                 )

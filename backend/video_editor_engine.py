@@ -52,6 +52,10 @@ class VideoClip:
 
 class FFmpegEditor:
     """FFmpeg連携エディター（Phase D: GPU/NVENC対応）"""
+
+    # smart_cut_engine が「残す区間を1回のエンコードで抜く」経路を使ってよい印
+    # （select/aselect のフィルタ台本を実行できる本物の ffmpeg であること）
+    supports_exact_range_cut = True
     
     def __init__(self, output_dir: Path = None):
         self.output_dir = output_dir or DEFAULT_OUTPUT_DIR
@@ -126,6 +130,19 @@ class FFmpegEditor:
             )
             has_nvenc = "h264_nvenc" in result.stdout
             if has_nvenc:
+                # **一覧に載っていても使えるとは限らない。** ビルドに入っているだけで、
+                # GPU もドライバも無いクラウドのコンテナでは `Cannot load libcuda.so.1` で
+                # 開けず、字幕の焼き込みが全部「字幕なしのコピー」に落ちていた（2026-10-05 実走）。
+                # 小さく1回エンコードして確かめる
+                probe = subprocess.run(
+                    [self.ffmpeg_path, "-v", "error", "-f", "lavfi",
+                     "-i", "color=c=black:s=256x144:d=0.1", "-c:v", "h264_nvenc",
+                     "-f", "null", "-"],
+                    capture_output=True, text=True, timeout=20
+                )
+                if probe.returncode != 0:
+                    logger.info("⚠️ NVENC はビルドにあるが開けない（GPU なし）— CPU エンコードを使います")
+                    return False
                 logger.info("✅ GPU (NVENC) detected — hardware encoding enabled")
             else:
                 logger.info("⚠️ NVENC not available — falling back to CPU encoding")
@@ -153,6 +170,11 @@ class FFmpegEditor:
                 "-c:v", "h264_nvenc",
                 "-preset", preset_cfg["gpu"][0],
                 "-cq", preset_cfg["gpu"][1],
+                # **yuv420p を明示する。** 指定しないと字幕・ロゴの合成（RGBA の PNG を
+                # overlay）で yuv444p（High 4:4:4）になり、Windows の標準プレーヤーや
+                # ブラウザ・スマホで**音だけ鳴って映像が出ない**（2026-10-05 ユーザー報告）。
+                # YouTube の推奨も 4:2:0
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
             ]
         else:
@@ -160,6 +182,11 @@ class FFmpegEditor:
                 "-c:v", "libx264",
                 "-preset", preset_cfg["cpu"][0],
                 "-crf", preset_cfg["cpu"][1],
+                # **yuv420p を明示する。** 指定しないと字幕・ロゴの合成（RGBA の PNG を
+                # overlay）で yuv444p（High 4:4:4）になり、Windows の標準プレーヤーや
+                # ブラウザ・スマホで**音だけ鳴って映像が出ない**（2026-10-05 ユーザー報告）。
+                # YouTube の推奨も 4:2:0
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
             ]
     

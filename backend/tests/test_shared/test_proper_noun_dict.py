@@ -221,3 +221,33 @@ def test_proper_noun_dict_load_non_dict_json():
         assert len(pnd.entries) == 0
     finally:
         os.unlink(f.name)
+
+
+def test_an_unconfirmed_entry_is_not_applied(tmp_path):
+    """未確認（confirmed: false）の項目は、確認されるまで使わない。
+
+    2026-10-14: 未確認の「選出→撰出」が、25分11秒の「選出」を機械的に「撰出」に書き換えていた
+    （手元の音声認識は「線質」と聞いた）。「選出」はふつうの語なので、ほかの所でも書き換わる。
+    """
+    pnd = ProperNounDictionary(dict_path=tmp_path / "proper_nouns.json")
+    pnd.add_entry("選出", "撰出", "word_context", "書道用語: 書を選ぶ", confirmed=False)
+    pnd.add_entry("初会", "初回", "word")
+
+    corrected, corrections = pnd.apply_corrections("選出もどうするか 初会の")
+
+    assert corrected == "選出もどうするか 初回の"
+    assert [c["original"] for c in corrections] == ["初会"]
+    assert pnd.entries[0].usage_count == 0
+
+
+def test_a_space_inside_the_wrong_word_does_not_hide_it(tmp_path):
+    """2026-10-19: 辞書に「Bオリジナル→Be Original」があったのに、ゼロからの版の 8分01秒は
+    「ここに B オリジナル書いて」のまま残った。AI は英字とかなの間に空白を入れることがある。"""
+    pnd = ProperNounDictionary(dict_path=tmp_path / "proper_nouns.json")
+    pnd.add_entry("Bオリジナル", "Be Original", "term")
+    pnd.add_entry("デザイン書道", "デザイン書道", "term")  # 正と誤が同じ項目（表記の固定）は空白を詰めない
+
+    corrected, corrections = pnd.apply_corrections("ここに B オリジナル書いて　デザイン　書道")
+
+    assert corrected == "ここに Be Original書いて　デザイン　書道"
+    assert [c["original"] for c in corrections] == ["Bオリジナル"]

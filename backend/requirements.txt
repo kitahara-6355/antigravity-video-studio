@@ -15,6 +15,9 @@ pydantic>=2.10.0
 google-adk>=1.0.0
 google-genai>=1.11.0
 
+# 字幕を文節で区切る（text_formatter.split_into_captions）
+budoux==0.9.3  # 版で字幕の切れ目が変わる。上げるときは字幕のテストと作り直しで確かめる
+
 # Subtitle Engine (Phase E: large-v3 model)
 faster-whisper>=1.0.0
 

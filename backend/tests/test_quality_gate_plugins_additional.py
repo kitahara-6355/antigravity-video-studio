@@ -103,7 +103,8 @@ def test_subtitle_line_check_with_template():
     tc.template_id = "test_tmpl"
     tc.get_subtitle_rules.return_value = {"max_chars_per_line": 5}
     
-    ctx = _MockCtx(segments=[{"text": "123456"}] * 4) # long lines = 4 > 3
+    # 行は整形と同じ幅で測る（半角は 0.5）ので、全角の6字にする
+    ctx = _MockCtx(segments=[{"text": "１２３４５６"}] * 4) # long lines = 4 > 3
     r = SubtitleLineCheck().analyze(ctx, tc)
     assert r["deductions"] == 5
     assert "長い字幕行" in r["feedback"][0]
@@ -366,3 +367,31 @@ def test_thumbnail_quality_check_corrupted_image_handling(tmp_path):
         r = ThumbnailQualityCheck().analyze(_MockCtx(thumbnail_path=str(f_corrupt)))
         assert r["deductions"] == 25
         assert "画像が破損しているか" in r["feedback"][0]
+
+
+def _speech(spans, total):
+    from subtitle_engine import sync
+    return sync.SpeechMap(onsets=[a for a, _ in spans], offsets=[b for _, b in spans], duration=total)
+
+
+def test_dead_air_is_measured_on_the_output_sound_not_on_caption_gaps(tmp_path):
+    # raw 4本（2026-10-18）: 字幕のすき間は 9か所が3秒を超えたが、焼き込まない相づちの声が入っていて、
+    # 出力の音で3秒を超える無音は字を書く場面の中だけだった。音で数え、動作の場面（10秒以上）は数えない
+    preview = tmp_path / "preview.mp4"
+    preview.write_bytes(b"x")
+    segs = [{"start": float(i * 10), "end": float(i * 10 + 2)} for i in range(10)]
+    ctx = _MockCtx(preview_path=str(preview), segments=segs)
+    # 声は 0〜95 秒で切れ目なく続き、95〜120 秒が字を書く場面（25 秒）、120〜125 の後に 4 秒の間
+    ctx._coverage_cache = {("sync", str(preview)): _speech([(0, 95), (120, 125), (129, 140)], 140)}
+    r = DeadAirCheck().analyze(ctx)
+    assert r["deductions"] == 3
+    assert r["feedback"] == ["⚠ [業界標準] 無音区間注意: 1箇所（2:05）"]
+
+
+def test_dead_air_falls_back_to_caption_gaps_when_the_sound_cannot_be_read(tmp_path):
+    preview = tmp_path / "preview.mp4"
+    preview.write_bytes(b"not a video")
+    segs = [{"start": float(i * 10), "end": float(i * 10 + 2)} for i in range(10)]
+    with patch("subtitle_engine.sync.speech_map", side_effect=RuntimeError("ffmpeg が無い")):
+        r = DeadAirCheck().analyze(_MockCtx(preview_path=str(preview), segments=segs))
+    assert r["deductions"] == 10 and "無音区間超過" in r["feedback"][0]

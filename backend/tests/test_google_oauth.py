@@ -21,6 +21,17 @@ from backend.services.google_oauth import (
     token_path,
 )
 
+@pytest.fixture(autouse=True)
+def _no_real_token(monkeypatch):
+    """実行環境に本物のトークンが入っていても読まない。
+
+    クラウドのセッションには `ANTIGRAVITY_GOOGLE_TOKEN_JSON` が実際に入っている。
+    残したままだとファイルより優先され、本物でリフレッシュしに外へ出る（2026-10-18 に踏んだ）。
+    """
+    monkeypatch.delenv(google_oauth.TOKEN_JSON_ENV, raising=False)
+    monkeypatch.delenv(google_oauth.ASSETS_TOKEN_JSON_ENV, raising=False)
+
+
 # ---- 保存先の解決 ----
 
 def test_token_path_uses_path_resolver(monkeypatch, tmp_path):
@@ -245,3 +256,58 @@ def test_empty_token_json_env_falls_back_to_the_file(monkeypatch, tmp_path):
 ])
 def test_token_scopes_reads_list_or_space_separated(info, expected):
     assert google_oauth.token_scopes(info) == expected
+
+
+# ---- 過程の資産を書く口（drive.file・2026-10-18） ----
+
+_FILE_INFO = dict(_TOKEN_INFO, scopes=["https://www.googleapis.com/auth/drive.file"])
+
+
+def test_drive_file_scope_is_only_drive_file():
+    assert google_oauth.DRIVE_FILE_SCOPES == ("https://www.googleapis.com/auth/drive.file",)
+    assert "DRIVE_FILE_SCOPES" in google_oauth.__all__
+    assert "ASSETS_TOKEN_JSON_ENV" in google_oauth.__all__
+    assert google_oauth.ASSETS_TOKEN_JSON_ENV == "AVS_ASSETS_GOOGLE_TOKEN_JSON"
+
+
+def test_assets_token_file_sits_next_to_the_normal_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tmp_path / "token.json"))
+    assert google_oauth.assets_token_path() == tmp_path / "token_assets_file.json"
+
+
+def test_assets_env_is_read_only_when_asked(monkeypatch, tmp_path):
+    """資産の口を指定したときだけ AVS_ASSETS_GOOGLE_TOKEN_JSON を読む。既定の口は従来どおり。"""
+    monkeypatch.setenv(google_oauth.ASSETS_TOKEN_JSON_ENV, json.dumps(_FILE_INFO))
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, json.dumps(_TOKEN_INFO))
+
+    info, source, save_to = google_oauth.read_token_info(
+        google_oauth.ASSETS_TOKEN_JSON_ENV, tmp_path / "absent.json")
+    assert info["scopes"] == _FILE_INFO["scopes"]
+    assert google_oauth.ASSETS_TOKEN_JSON_ENV in source
+    assert save_to is None
+
+    default, _, _ = google_oauth.read_token_info()
+    assert default["scopes"] == _TOKEN_INFO["scopes"]
+
+
+def test_assets_port_never_falls_back_to_the_readonly_token(monkeypatch, tmp_path):
+    """資産の口が空なら、読み取り用のトークンがあっても使わずに止まる。"""
+    monkeypatch.setenv(google_oauth.TOKEN_JSON_ENV, json.dumps(_TOKEN_INFO))
+    with pytest.raises(CredentialsNotFoundError) as exc:
+        google_oauth.read_token_info(google_oauth.ASSETS_TOKEN_JSON_ENV, tmp_path / "absent.json")
+    assert google_oauth.ASSETS_TOKEN_JSON_ENV in str(exc.value)
+
+
+def test_assets_token_file_is_read_and_written_back(monkeypatch, tmp_path):
+    """ローカルのファイルから読んだ資産のトークンは、リフレッシュ後にそのファイルへ書き戻す。"""
+    tok = tmp_path / "token_assets_file.json"
+    tok.write_text(json.dumps(_FILE_INFO), encoding="utf-8")
+    fake = MagicMock(expired=True, valid=True, refresh_token="rt")
+    fake.to_json.return_value = json.dumps({"token": "NEW"})
+    with patch.object(google_oauth, "_credentials_from_info", return_value=fake) as m, \
+         patch.object(google_oauth, "_transport_request", return_value=MagicMock()):
+        google_oauth.load_credentials(google_oauth.DRIVE_FILE_SCOPES,
+                                      json_env=google_oauth.ASSETS_TOKEN_JSON_ENV,
+                                      token_file=tok)
+    assert m.call_args[0][1] == google_oauth.DRIVE_FILE_SCOPES
+    assert json.loads(tok.read_text(encoding="utf-8"))["token"] == "NEW"

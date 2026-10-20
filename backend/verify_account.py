@@ -38,6 +38,9 @@
 - 旧式の変数名（`GEMINI_API_KEY`）
 - クラウドのセッションに置いてはいけないキー（`GOOGLE_API_KEY_PRO`）
 - 保管（raw の Google Drive）のトークンが揃っていない・読み取り専用でない
+- 過程の資産（`avs-assets`）のトークンの権限が `drive.file` ちょうどでない。
+  未着手（planned）の間は未設定でよい（INFO）
+- raw を読むトークンと資産を書くトークンが同じ・権限が混ざっている
 """
 from __future__ import annotations
 
@@ -273,6 +276,14 @@ def _check_storage(env: Mapping[str, str], ledger: dict) -> Iterable[Finding]:
             yield "FAIL", (f"{row['id']} のトークンが揃っていません。"
                            f"不足: {', '.join(missing)}（手順書の環境変数をすべて置く）")
             continue
+        if not row.get("suffix_env"):
+            # 末尾で同定する物（フォルダ ID など）が無い行は、権限だけを見る
+            scope_fail = _token_scope_problem(env, row)
+            if scope_fail:
+                yield "FAIL", scope_fail
+            else:
+                yield "OK", f"{row['id']} = {row.get('provider', '?')}（{_scope_label(row)}）"
+            continue
         suffix = key_suffix(env[row["suffix_env"]])
         if row.get("key_suffix") is None:
             yield "FAIL", (f"{row['id']} のトークン（{row['suffix_env']} 末尾 {suffix}）が台帳に未記載。"
@@ -284,7 +295,14 @@ def _check_storage(env: Mapping[str, str], ledger: dict) -> Iterable[Finding]:
             if scope_fail:
                 yield "FAIL", scope_fail
             else:
-                yield "OK", f"{row['id']} = {row.get('provider', '?')}（末尾 {suffix}・読み取り専用）"
+                yield "OK", f"{row['id']} = {row.get('provider', '?')}（末尾 {suffix}・{_scope_label(row)}）"
+
+
+def _scope_label(row: dict) -> str:
+    if row.get("read_only"):
+        return "読み取り専用"
+    scope = str(row.get("oauth_scope") or "?")
+    return f"{scope.rsplit('/', 1)[-1]} だけ"
 
 
 def _token_scope_problem(env: Mapping[str, str], row: dict) -> str | None:
@@ -304,9 +322,48 @@ def _token_scope_problem(env: Mapping[str, str], row: dict) -> str | None:
     granted = token_scopes(info)
     if granted != {expected}:
         shown = ", ".join(sorted(granted)) or "記録なし"
+        login = row.get("login") or "python scripts/google_oauth_login.py --readonly"
         return (f"{row['id']} のトークンの権限が台帳（{expected} だけ）と違う: {shown}。"
-                f"scripts/google_oauth_login.py --readonly で作り直す")
+                f"{login} で作り直す")
     return None
+
+
+def _check_token_mixing(env: Mapping[str, str], ledger: dict) -> Iterable[Finding]:
+    """保管のトークン同士が混ざっていないかを見る（raw を読む口と資産を書く口）。
+
+    - 同じトークン（中身が同じ・リフレッシュトークンが同じ）を2つの口に入れていたら FAIL
+    - ある口のトークンに、別の口の権限が入っていたら FAIL
+    **中身（秘密）は出さない。**
+    """
+    rows = [r for r in ledger.get("storage", []) if r.get("token_env") and r.get("oauth_scope")]
+    tokens: dict[str, tuple[str, dict]] = {}
+    for row in rows:
+        value = env.get(row["token_env"]) or ""
+        if not value:
+            continue
+        try:
+            info = json.loads(value)
+        except json.JSONDecodeError:
+            continue  # 読めないことは _token_scope_problem が出す
+        if isinstance(info, dict):
+            tokens[row["id"]] = (value, info)
+    for i, a in enumerate(rows):
+        if a["id"] not in tokens:
+            continue
+        value_a, info_a = tokens[a["id"]]
+        granted = token_scopes(info_a)
+        for b in rows:
+            if b["id"] != a["id"] and b["oauth_scope"] in granted:
+                yield "FAIL", (f"{a['id']} のトークンに {b['id']} の権限（{b['oauth_scope']}）が混ざっている。"
+                               f"口ごとにトークンを分ける")
+        for b in rows[i + 1:]:
+            if b["id"] not in tokens or a["token_env"] == b["token_env"]:
+                continue
+            value_b, info_b = tokens[b["id"]]
+            refresh = info_a.get("refresh_token")
+            if value_a == value_b or (refresh and refresh == info_b.get("refresh_token")):
+                yield "FAIL", (f"{a['id']}（{a['token_env']}）と {b['id']}（{b['token_env']}）に"
+                               f"同じトークンが入っている。読む口と書く口はトークンを分ける")
 
 
 def check_projects(env: Mapping[str, str], ledger: dict, *,
@@ -316,6 +373,7 @@ def check_projects(env: Mapping[str, str], ledger: dict, *,
     findings += _check_deprecated(env, ledger)
     findings += _check_gemini_keys(env, ledger, cloud)
     findings += _check_storage(env, ledger)
+    findings += _check_token_mixing(env, ledger)
     return findings
 
 

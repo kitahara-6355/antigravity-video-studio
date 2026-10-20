@@ -46,6 +46,7 @@ credentials.json
 *client_secret*.json
 token.json
 *_token.json
+token_*.json
 oauth_token*.json
 # `--readonly` の token_raw_readonly.json は上の3つのどれにも当たらず、
 # 2026-10-04 に `git add -A` でコミットされうる状態だった（PR #91 の後）。

@@ -4,11 +4,18 @@ TranscribeWorker — 文字起こしステージ
 Whisperサブプロセスによる音声文字起こし。
 CTranslate2デストラクタ→CUDAクラッシュ回避のためサブプロセス分離。
 チェックポイント(JSONL)による冪等性を保証。
+
+**エンジンは2つ**（2026-09-26 ユーザー決定: 主は Gemini 音声入力、従は Whisper）。
+`AVS_TRANSCRIBE_ENGINE=gemini` で Gemini（`subtitle_engine.gemini_transcriber`）を使い、
+落ちたら Whisper に切り替える（切り替えた事実は警告と結果に残す）。
+既定は whisper のまま — Gemini は課金経路なので、明示した実走だけが叩く。
 """
 
+import functools
 import json
 import logging
 import asyncio
+import os
 import time
 import sys
 import subprocess
@@ -18,6 +25,34 @@ from pathlib import Path
 from agents.pipeline_types import PipelineStageWorker, PipelineContext, StageResult
 
 logger = logging.getLogger(__name__)
+
+ENGINE_ENV = "AVS_TRANSCRIBE_ENGINE"
+ENGINES = ("whisper", "gemini")
+
+
+def transcribe_engine() -> str:
+    """この実走の文字起こしエンジン。知らない値は whisper に倒さず止める。"""
+    engine = (os.environ.get(ENGINE_ENV) or "whisper").strip().lower()
+    if engine not in ENGINES:
+        raise ValueError(f"{ENGINE_ENV}={engine!r} は使えません（{' / '.join(ENGINES)}）")
+    return engine
+
+
+def _gemini_checkpoint(whisper_checkpoint: str, second: bool = False, third: bool = False,
+                       second_tag: str | None = None) -> str:
+    """Gemini の起こしのキャッシュ。**刻み方が変わったら別のキャッシュにする**
+    （120 秒チャンクで欠落した起こしを、30 秒に変えた後も使い回さないため。
+    30 秒ごとの機械的な区切りの起こしを、話の切れ目で区切るようにした後も使い回さないため）。
+    second なら2回目の起こし（区切りをずらしたもの。second_tag を渡すと前の区切り方のもの）、
+    third なら3回目の起こし（決めきれない所だけ。区間ごとの控えがそのままキャッシュ）のキャッシュ。"""
+    from subtitle_engine.gemini_transcriber import (
+        CHUNK_SEC, CUT_TAG, SECOND_PASS_TAG, THIRD_LOOK_TAG)
+    p = Path(whisper_checkpoint)
+    name = p.name.replace("_whisper_", "_gemini_", 1)
+    tag = CUT_TAG + ((second_tag or SECOND_PASS_TAG) if second else THIRD_LOOK_TAG if third else "")
+    if CHUNK_SEC != 120 or second or third:  # 120 秒時代のキャッシュ名はそのまま読めるようにしておく
+        name = name.replace("_gemini_", f"_gemini_c{CHUNK_SEC}{tag}_", 1)
+    return str(p.with_name(name))
 
 
 class TranscribeWorker(PipelineStageWorker):
@@ -161,7 +196,8 @@ class TranscribeWorker(PipelineStageWorker):
             logger.warning("⚠️ サブプロセスのstdout解析失敗、チェックポイントファイルから復旧")
             return {"status": "completed", "device": "unknown", "model": model_size}
 
-        raise RuntimeError(f"Whisperサブプロセス失敗: exit={proc.returncode}, stderr={stderr_out[:500]}")
+        # **末尾を出す。** 先頭は起動時の INFO ログで埋まり、原因（例外）が切れて見えなかった
+        raise RuntimeError(f"Whisperサブプロセス失敗: exit={proc.returncode}, stderr=…{stderr_out[-800:]}")
 
     async def execute(self, ctx: PipelineContext) -> StageResult:
         """文字起こしを実行
@@ -181,6 +217,13 @@ class TranscribeWorker(PipelineStageWorker):
             old_checkpoint = Path(ctx.video_path).parent / OLD_CHECKPOINT_NAME
             if old_checkpoint.exists():
                 logger.info(f"⚠️ 旧形式キャッシュ検出 — 無視します: {old_checkpoint}")
+
+            engine = transcribe_engine()
+            if engine == "gemini":
+                result = await self._execute_gemini(ctx, checkpoint_path, start)
+                if result is not None:
+                    return result
+                # 落ちた → Whisper へ（切り替えた事実は _execute_gemini が警告に残した）
 
             # 既存のチェックポイントがある場合はWhisperを完全スキップ
             if Path(checkpoint_path).exists() and Path(checkpoint_path).stat().st_size > 1000:
@@ -223,6 +266,224 @@ class TranscribeWorker(PipelineStageWorker):
                 stage_name=self.name, success=False,
                 detail=str(e), duration_seconds=round(time.time() - start, 1),
             )
+
+    async def _execute_gemini(self, ctx: PipelineContext, whisper_checkpoint: str,
+                              start: float):
+        """Gemini で起こす。**落ちたら `None`**（呼び出し側が Whisper に切り替える）。"""
+        checkpoint = _gemini_checkpoint(whisper_checkpoint)
+        if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
+            from subtitle_engine import gemini_transcriber
+            segments = self._read_gemini_checkpoint(checkpoint)
+            meta = gemini_transcriber.read_meta(checkpoint)
+            segments, fusion = await self._second_pass(ctx, whisper_checkpoint, segments,
+                                                       meta.get("cuts") or ())
+            ctx.segments = segments
+            ctx.verified_quiet = [tuple(q) for q in meta.get("quiet", [])]
+            ctx.transcript_coverage = meta.get("coverage")
+            # キャッシュでも、起こしたモデルを名乗る（記録の無い古いキャッシュは「記録なし」）
+            used = [m for m in meta.get("models_used") or [] if m]
+            return StageResult(
+                stage_name=self.name, success=True,
+                detail=f"{len(segments)}セグメント検出 (Gemini {', '.join(used) or 'モデルの記録なし'}・キャッシュ)",
+                data={"segment_count": len(segments), "engine": "gemini",
+                      "model": used[0] if len(used) == 1 else (", ".join(used) or "cached"),
+                      "models_used": used, "from_cache": True, "second_pass": fusion},
+                duration_seconds=round(time.time() - start, 1),
+            )
+        try:
+            from subtitle_engine import gemini_transcriber
+            loop = asyncio.get_running_loop()
+            journal = gemini_transcriber.journal_path(checkpoint)
+            tx = await loop.run_in_executor(None, functools.partial(
+                gemini_transcriber.transcribe, ctx.video_path, journal=journal))
+            gemini_transcriber.write_checkpoint(
+                tx.segments, checkpoint,
+                meta={"quiet": tx.quiet, "coverage": tx.coverage, "rechecked": tx.rechecked,
+                      **tx.cache_meta()})
+            journal.unlink(missing_ok=True)
+        except Exception as e:  # noqa: BLE001 — 主経路の失敗は従経路へ。理由は残す
+            logger.warning(f"⚠️ Gemini 文字起こしに失敗 → Whisper に切り替えます: {e}")
+            ctx.warnings.append(f"文字起こし: Gemini が失敗したため Whisper に切り替えました（{e}）")
+            return None
+        segments, fusion = await self._second_pass(ctx, whisper_checkpoint, tx.segments, tx.cuts)
+        ctx.segments = segments
+        ctx.verified_quiet = list(tx.quiet)
+        ctx.transcript_coverage = tx.coverage
+        return StageResult(
+            stage_name=self.name, success=True,
+            detail=f"{len(segments)}セグメント検出 (Gemini {', '.join(tx.models_used)}・{tx.chunks}チャンク)",
+            data={"segment_count": len(segments), "engine": "gemini", "model": tx.model,
+                  "models_used": tx.models_used, "chunks": tx.chunks,
+                  "rechecked": tx.rechecked, "coverage": tx.coverage, "second_pass": fusion},
+            duration_seconds=round(time.time() - start, 1),
+        )
+
+    def _read_gemini_checkpoint(self, checkpoint: str) -> list[dict]:
+        from subtitle_engine import gemini_transcriber
+        meta = gemini_transcriber.read_meta(checkpoint)
+        return gemini_transcriber.drop_boundary_echoes(gemini_transcriber.join_spaced_words(
+            self._load_segments_from_checkpoint(checkpoint)), cuts=meta.get("cuts"))
+
+    async def _second_pass(self, ctx: PipelineContext, whisper_checkpoint: str,
+                           segments: list[dict],
+                           cuts: list[float] | tuple = ()) -> tuple[list[dict], dict | None]:
+        """区切りをずらしてもう1回起こし、食い違いを手元の音声認識で決める（`transcript_fusion`）。
+
+        区切りを変えると Gemini の聞き違いが別の所に出る（2026-10-06 実測）。cuts は1回目の区切りで、
+        2回目はそこから離して切る（`gemini_transcriber.SECOND_PASS_GAP_SEC`）。前の区切り方の2回目は、
+        区切りが変わらないチャンクを写す元にし、いまの2回目の後にもう1つの聞き取りとして突き合わせる
+        （集計の `earlier`）。キャッシュに無ければ先に起こす（`_ensure_earlier_reading`）。認識が使えない・
+        2回目が落ちたら1回目のまま進む（2回目は直すためだけに使う）。返り値は (行, 集計)。
+        """
+        from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
+        if not gemini_transcriber.SECOND_PASS:
+            return segments, None
+        loop = asyncio.get_running_loop()
+        tokens = await loop.run_in_executor(None, aligner.tokens_for, str(ctx.video_path))
+        if not tokens:
+            logger.info("手元の音声認識が使えないので、文字起こしの2回目は飛ばします")
+            return segments, None
+        checkpoint = _gemini_checkpoint(whisper_checkpoint, second=True)
+        earlier = []
+        for tag in gemini_transcriber.SECOND_PASS_EARLIER_TAGS:
+            path = _gemini_checkpoint(whisper_checkpoint, second=True, second_tag=tag)
+            if await self._ensure_earlier_reading(ctx, tag, path):
+                earlier.append((tag, path))
+        if Path(checkpoint).exists() and Path(checkpoint).stat().st_size > 1000:
+            second = self._read_gemini_checkpoint(checkpoint)
+            made = gemini_transcriber.read_meta(checkpoint)
+        else:
+            try:
+                journal = gemini_transcriber.journal_path(checkpoint)
+                tx = await loop.run_in_executor(None, functools.partial(
+                    gemini_transcriber.transcribe, ctx.video_path,
+                    first_chunk_sec=gemini_transcriber.SECOND_PASS_FIRST_SEC, avoid_cuts=list(cuts),
+                    journal=journal, earlier=[c for _, c in earlier]))
+                made = tx.cache_meta()
+                gemini_transcriber.write_checkpoint(tx.segments, checkpoint, meta=made)
+                journal.unlink(missing_ok=True)
+                second = tx.segments
+            except Exception as e:  # noqa: BLE001 — 2回目は直すためだけ。落ちても1回目で進む
+                logger.warning(f"⚠️ 文字起こしの2回目に失敗 → 1回目のまま進みます: {e}")
+                ctx.warnings.append(f"文字起こし: 2回目（聞き違いの突き合わせ）に失敗したため1回目のまま進みました（{e}）")
+                return segments, None
+        fused, stats = transcript_fusion.fuse(segments, second, tokens, cuts=list(cuts))
+        # 2回目のモデルも実行記録に残す（前の区切り方から写したチャンクはモデルを記録していないことがある）
+        stats = dict(stats, models=list(made.get("models_used") or []), carried=int(made.get("carried") or 0))
+        logger.info(f"🗳️ 文字起こしの2回目と突き合わせ: 食い違い {stats['differences']} か所のうち "
+                    f"{stats['adopted']} か所を、2回目と手元の音声認識が同じ字に直しました"
+                    f"（1回目に無い文を足したのは {stats.get('sentences', 0)} か所）")
+        # 前の区切り方の2回目も、もう1つの聞き取りとして突き合わせる。区切りが違えば聞き違える所も
+        # 違うので、捨てると、前の2回目が正しかった所が1回目の字に戻る（45回目: 2回目を起こし直したら
+        # 締めの「絶やして」「増やしていく」や「豊橋筆」「書道家」が戻った。突き合わせると 44 か所を直し、
+        # 変わった 39 行のうち 36 行が認識に近づいた。遠のいたのは「これね」「なんというのか」の2行・2026-10-15）
+        stats["earlier"], readings = [], [second]
+        for tag, path in earlier:
+            readings.append(self._read_gemini_checkpoint(path))
+            fused, more = transcript_fusion.fuse(fused, readings[-1], tokens, cuts=list(cuts))
+            stats["earlier"].append({"tag": tag, "differences": more["differences"], "adopted": more["adopted"],
+                                     "sentences": more.get("sentences", 0),
+                                     "models": list(gemini_transcriber.read_meta(path).get("models_used") or [])})
+            logger.info(f"🗳️ 前の区切り方の2回目（{tag}）とも突き合わせ: 食い違い {more['differences']} か所のうち "
+                        f"{more['adopted']} か所を直しました（1回目に無い文を足したのは {more.get('sentences', 0)} か所）")
+        # 校閲の後に、2回目が別の字を書いたまま決まらない所を選び直すために残す（`ProofreadWorker`）
+        ctx.second_readings = readings
+        fused, look = await self._third_look(ctx, whisper_checkpoint, fused, readings, tokens)
+        if look is not None:
+            stats = dict(stats, third_look=look)
+        return fused, stats
+
+    async def _ensure_earlier_reading(self, ctx: PipelineContext, tag: str, path: str) -> bool:
+        """前の区切り方の2回目（`gemini_transcriber.SECOND_PASS_EARLIER`）のキャッシュが無ければ起こす。
+
+        53回目の字幕はこの聞き取りとも突き合わせていたが、キャッシュにしか無く、キャッシュ無しで作り直すと
+        作られなかった（完成版の再現・2026-10-17）。区切り方は今のコードで同じに決まる（43分の素材で
+        キャッシュの区切り 103 か所と一致）。いまの2回目より先に起こすので、いまの2回目は区切りが変わらない
+        チャンクをここから写せる（43分の素材で 15 チャンク）。使えれば True。落ちたらこの聞き取り抜きで進む。
+        """
+        if Path(path).exists() and Path(path).stat().st_size > 1000:
+            return True
+        from subtitle_engine import gemini_transcriber
+        loop = asyncio.get_running_loop()
+        try:
+            journal = gemini_transcriber.journal_path(path)
+            tx = await loop.run_in_executor(None, functools.partial(
+                gemini_transcriber.transcribe, ctx.video_path, journal=journal,
+                **gemini_transcriber.SECOND_PASS_EARLIER[tag]))
+            gemini_transcriber.write_checkpoint(tx.segments, path, meta=tx.cache_meta())
+            journal.unlink(missing_ok=True)
+            return True
+        except Exception as e:  # noqa: BLE001 — 前の区切り方の2回目も直すためだけ。落ちても進む
+            logger.warning(f"⚠️ 前の区切り方の2回目（{tag}）に失敗 → それ抜きで突き合わせます: {e}")
+            ctx.warnings.append(f"文字起こし: 前の区切り方の2回目（{tag}）に失敗したため、それ抜きで突き合わせました（{e}）")
+            return False
+
+    async def _third_look(self, ctx: PipelineContext, whisper_checkpoint: str, fused: list[dict],
+                          readings: list[list[dict]], tokens: list) -> tuple[list[dict], dict | None]:
+        """2回でも決めきれない所だけ、そこが真ん中に来るように区切ってもう1回起こして決める。
+
+        2回の起こしが同じ所で聞き違えると突き合わせても直らない（3分03秒「普通泣いて帰ったら」）。
+        候補は `transcript_fusion.look_spots`、裁きは `transcript_fusion.judge`。3回目で決まらない所は
+        区間の前後の余白を広げて読み直す（`gemini_transcriber.LOOK_PADS`。区間の長さで聞き取りが変わる）。
+        区間ごとの控えがキャッシュで、候補が変わらなければ2回目以降の実行は呼ばない。
+        認識だけが別の字を聞いた所（2回とも同じ字の "swap"、2回が食い違ってどちらも聞こえない "neither"）は、
+        種類ごとに別の区間で読む（同じ区間にまとめると、先にあった候補の区間が変わって控えが使えず、
+        直っていた所を読み直すことになる）。辞書の語は候補にしない。
+        落ちたら、それまでに決まった所だけを直して進む（3回目は直すためだけに使う）。
+        readings は2回目の起こし（いまの区切り方のもの、前の区切り方のもの）。候補は起こしごとに探して
+        まとめる（前の区切り方の2回目だけが1字消した所も読む。45回目の後に「書道で→書で」などが戻った）。
+        3回目でも決まらない所は、校閲に「別の聞き取り」として渡す（`ctx.heard_hints`。Gemini は何度
+        起こしても「座右の目」と書き、認識は「座右の銘」と聞いた・46回目）。
+        """
+        from subtitle_engine import aligner, gemini_transcriber, transcript_fusion
+        if not gemini_transcriber.THIRD_LOOK:
+            return fused, None
+        protect = [correct for _, correct in aligner._dictionary_terms()]
+        spots, taken = [], set()
+        for reading in readings:
+            for spot in transcript_fusion.look_spots(fused, reading, tokens, protect=protect):
+                if (spot["row"], spot["c0"], spot["c1"]) not in taken:
+                    taken.add((spot["row"], spot["c0"], spot["c1"]))
+                    spots.append(spot)
+        if not spots:
+            return fused, {"spots": 0, "windows": 0, "adopted": 0, "examples": []}
+        loop = asyncio.get_running_loop()
+        rows = [fused[s["row"]] for s in spots]
+        spans = [(float(r.get("start") or 0), float(r.get("end") or r.get("start") or 0)) for r in rows]
+        verdicts = [("open", "")] * len(spots)
+        windows, models, error = 0, set(), None
+        try:
+            quiet = await loop.run_in_executor(None, gemini_transcriber.QuietMap.from_media, str(ctx.video_path))
+            journal = gemini_transcriber.journal_path(_gemini_checkpoint(whisper_checkpoint, third=True))
+            for kinds in (("omit", "drop"), ("swap",), ("neither",)):
+                for pad in gemini_transcriber.LOOK_PADS:
+                    pending = [i for i, (verdict, _) in enumerate(verdicts)
+                               if verdict == "open" and spots[i]["kind"] in kinds]
+                    if not pending:
+                        break
+                    for w in gemini_transcriber.look_windows([spans[i] for i in pending], quiet, pad=pad):
+                        third, used = await loop.run_in_executor(None, functools.partial(
+                            gemini_transcriber.transcribe_windows, ctx.video_path, [w], journal=journal))
+                        windows += 1
+                        models.update(used)
+                        # 行の真ん中が入る区間の起こしだけで裁く（重なる区間の起こしを混ぜない）
+                        for i in pending:
+                            if verdicts[i][0] == "open" and w[0] <= sum(spans[i]) / 2 <= w[0] + w[1]:
+                                verdicts[i] = transcript_fusion.judge(fused, third, spots[i])
+        except Exception as e:  # noqa: BLE001 — 3回目は直すためだけ。落ちても決まった所だけ直して進む
+            error = str(e)
+            logger.warning(f"⚠️ 文字起こしの3回目に失敗 → 決まった所だけ直して進みます: {e}")
+            ctx.warnings.append(f"文字起こし: 3回目（決めきれない所の起こし直し）に失敗したため、"
+                                f"それまでに決まった所だけを直して進みました（{e}）")
+        settled, look = transcript_fusion.settle(fused, spots, verdicts)
+        ctx.heard_hints = transcript_fusion.heard_hints(fused, spots, verdicts, settled)
+        look.update(spots=len(spots), windows=windows, models=sorted(models), hints=len(ctx.heard_hints))
+        if error is not None:
+            look["error"] = error
+        logger.info(f"🔍 決めきれない {len(spots)} か所を {windows} 区間で起こし直し、{look['adopted']} か所を"
+                    f"3回目と手元の音声認識がそろう字に直しました（そのまま {look['kept']}・決まらない {look['open']}）。"
+                    f"{len(ctx.heard_hints)} か所は認識の字を校閲に渡します")
+        return settled, look
 
     def verify(self, result: StageResult) -> bool:
         return result.success and result.data.get("segment_count", 0) > 0

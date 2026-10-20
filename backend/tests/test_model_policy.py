@@ -256,6 +256,26 @@ def test_a_model_missing_from_the_live_list_is_flagged(sandbox, monkeypatch):
                for f in findings)
 
 
+def test_a_tier_whose_model_is_answered_by_another_model_is_flagged(sandbox, monkeypatch):
+    """**名前が残ったまま中身が替わった段を見逃さない**（10-19: premium の `gemini-3.7-flash` を
+    頼むと `gemini-3.8-flash` が答えた。models.list には名前があるので、一覧との照合では見えない）。"""
+    from backend import cost_guard
+
+    ledger = sandbox / "ledger.jsonl"
+    rows = [{"model": "m-premium", "served": "m-premium-next"}] * 3 + [
+        {"model": "m-batch"}, {"kind": "fallback", "model": "m-batch", "requested": "m-standard"}]
+    ledger.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    monkeypatch.setattr(cost_guard, "LEDGER_PATH", ledger)
+    monkeypatch.setattr(model_policy, "live_model_ids",
+                        lambda: ({"m-batch", "m-standard", "m-premium", "m-pro"}, ""))
+
+    findings, _ = model_policy.audit()
+
+    hits = [f for f in findings if f.trigger == "obsolescence" and f.tier == "premium"]
+    assert len(hits) == 1 and "m-premium-next" in hits[0].what and "3" in hits[0].what
+    assert not any(f.tier == "batch" and f.trigger == "obsolescence" for f in findings)
+
+
 def test_a_verified_and_live_ladder_raises_no_obsolescence(sandbox, monkeypatch):
     """検証済み＆実在するなら、未検証・陳腐化の指摘は出ない。
 

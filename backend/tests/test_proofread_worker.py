@@ -128,11 +128,11 @@ async def test_proofread_worker_segment_objects():
     worker = ProofreadWorker()
     ctx = PipelineContext("test.mp4")
     ctx.segments = [
-        Segment(start=0.0, end=4.0, text="これはSegmentオブジェクトのテストです。", sourceStart=0.0, sourceEnd=4.0)
+        Segment(start=0.0, end=4.0, text="これはSegmentオブジェクトのテストです。長い文を字幕に分けたときにも元の時刻が残ることを確かめます。", sourceStart=0.0, sourceEnd=4.0)
     ]
     
     mock_result = (
-        [{"text": "これはSegmentオブジェクトのテストです。", "start": 0.0, "end": 4.0, "sourceStart": 0.0, "sourceEnd": 4.0}],
+        [{"text": "これはSegmentオブジェクトのテストです。長い文を字幕に分けたときにも元の時刻が残ることを確かめます。", "start": 0.0, "end": 4.0, "sourceStart": 0.0, "sourceEnd": 4.0}],
         {"total_retries": 0, "failed_batches": 0, "total_batches": 1}
     )
     with patch("subtitle_engine.ai_proofreader.proofread_segments", return_value=mock_result),          patch("subtitle_engine.ai_proofreader._get_current_model", return_value="gemini-1.5-flash"):
