@@ -288,6 +288,22 @@ def test_the_root_name_comes_from_the_env(drive, monkeypatch):
     assert drive.named("試しの置き場")
 
 
+def test_a_renamed_or_moved_root_is_still_found_by_its_mark(drive):
+    """共有ドライブへ移して名前を変えても、印で同じ置き場を見つける（新しく作らない）。"""
+    root = asset_store.ensure_root(drive)
+    drive.items[root]["name"] = "30_AVS_作業"
+    drive.items[root]["parents"] = ["shared-drive-folder"]
+    assert asset_store.ensure_root(drive) == root
+    assert drive.creates == 1
+
+
+def test_a_root_name_set_in_the_env_is_looked_up_by_name_too(drive, monkeypatch):
+    """試しの置き場を名前で分けたいときは、名前と印の両方で探す（本番の置き場を使わない）。"""
+    main = asset_store.ensure_root(drive)
+    monkeypatch.setenv(asset_store.ROOT_NAME_ENV, "試しの置き場")
+    assert asset_store.ensure_root(drive) != main
+
+
 def test_a_subfolder_with_the_root_name_is_not_taken_for_the_root(drive):
     root = asset_store.ensure_root(drive)
     asset_store.ensure_path(drive, root, "AVS 過程の資産")  # 下に同じ名前
