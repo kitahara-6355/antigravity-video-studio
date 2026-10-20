@@ -18,10 +18,12 @@ AI の出力・字幕・実行記録を Drive に残す。クラウドの作業�
 - **アプリが作っていないフォルダの中には書けない**（共有ドライブの既存のフォルダなど）。
   だから置き場の一番上（ルート）のフォルダもアプリが自分で作る
 - ルートは マイドライブ に `AVS_ASSETS_DRIVE_ROOT_NAME`（既定「AVS 過程の資産」）の名前で作る。
-  作った後に北原さんが別の場所（共有ドライブなど）へ動かしてもよい。
-  アプリが作ったものへの権限は残るので、次からも名前で見つけて使える
-- ルートの id は名前（と作ったときに付けた印）で毎回引き直す。作業場は消えるので、
-  手元に覚えておく先が無い。1回の実行の中では引いた id を使い回す
+  作った後に北原さんが別の場所（共有ドライブなど）へ動かし、名前を変えてもよい
+  （2026-10-20 の構成案では「動画制作 / 30_AVS_作業」）
+- ルートの id は作ったときに付けた印（`ROOT_MARK`）で毎回引き直す。名前は見ないので、
+  移しても名前を変えても同じ置き場を使い続ける。作業場は消えるので、
+  手元に覚えておく先が無い。1回の実行の中では引いた id を使い回す。
+  `AVS_ASSETS_DRIVE_ROOT_NAME` を指定したときだけ、名前と印の両方で探す（試しの置き場を分ける用）
 
 ## 送り方
 
@@ -185,10 +187,13 @@ def root_name(env: Mapping[str, str] | None = None) -> str:
 def ensure_root(service: Any, name: str | None = None) -> str:
     """置き場のルートのフォルダを見つける。無ければ マイドライブ に作る。
 
-    名前と印（`ROOT_MARK`）の両方で探す。2つ見つかったらどちらにも書かずに止まる。
+    ふだんは印（`ROOT_MARK`）だけで探す。共有ドライブへ移したり名前を変えたりしても
+    同じ置き場を使い続けるため（2026-10-20）。名前を指定したとき（引数か `ROOT_NAME_ENV`）は
+    名前と印の両方で探す。2つ見つかったらどちらにも書かずに止まる。
     """
-    name = name or root_name()
-    found = _find(service, name=name, folder=True, root_mark=True)
+    pinned = name or os.environ.get(ROOT_NAME_ENV) or None
+    name = pinned or root_name()
+    found = _find(service, name=pinned, folder=True, root_mark=True)
     if len(found) > 1:
         raise PathError(f"置き場のルート「{name}」が {len(found)} つあります。1つにしてください")
     if found:
@@ -412,7 +417,8 @@ def run_check() -> int:
         print(f"🚫 {e}", file=sys.stderr)
         return 1
     print(f"✅ 過程の資産のトークン: {source}（drive.file だけ）")
-    print(f"   置き場のルート: マイドライブ「{root_name()}」（無ければ最初の put で作る）")
+    print(f"   置き場のルート: 印の付いた「{root_name()}」（共有ドライブへ移しても・名前を変えても印で見つける。"
+          "無ければ最初の put でマイドライブに作る）")
     return 0
 
 
