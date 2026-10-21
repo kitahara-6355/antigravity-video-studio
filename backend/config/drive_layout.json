@@ -1,0 +1,39 @@
+{
+  "_doc": "Google Drive の「動画制作」の決まり（正典）。点検は python -m backend.drive_layout audit。スキル drive-layout。",
+  "approved": "2026-10-21 北原さん承認（構成案 https://claude.ai/artifact/H24KKV7HAWYn43xxhppn5z 。置き場は共有ドライブ「美麗書院_共有データ」の中）",
+  "base": {
+    "name": "動画制作",
+    "find": "raw のフォルダ（環境変数 AVS_RAW_DRIVE_FOLDER_ID）の親。名前ではなく id で辿る"
+  },
+  "folders": [
+    {"key": "guide", "name": "00_使い方", "holds": "この決まりの要約1枚", "put_by": "AI が書く", "ai": "write", "made_by": "ai"},
+    {"key": "raw", "name": "10_raw", "holds": "撮ったままの動画。収録ID ごとのフォルダ", "put_by": "北原さん（撮影後にアップロード）", "ai": "read", "made_by": "human", "per_recording": true},
+    {"key": "material", "name": "20_素材", "holds": "Bロール・インサート画像・OP 映像・ロゴ・BGM。「共通」と収録ID ごと", "put_by": "北原さん", "ai": "read", "made_by": "ai", "per_recording": true, "shared": "共通"},
+    {"key": "work", "name": "30_AVS_作業", "holds": "字幕データ・校正台帳・編集の固定・AI の控え・記録・スキル", "put_by": "AI", "ai": "write", "made_by": "ai"},
+    {"key": "finished", "name": "40_完成", "holds": "書き出した動画（確認用・公開用）。収録ID ごと・版ごと", "put_by": "AI", "ai": "write", "made_by": "ai", "per_recording": true},
+    {"key": "hold", "name": "90_保管", "holds": "古い版・重複していた raw。消す日を名前に付けた箱に入れる", "put_by": "北原さん（箱は AI が作ってよい）", "ai": "box", "made_by": "ai"}
+  ],
+  "recording_id": {
+    "pattern": "^(\\d{8})_([^_\\s/]+)(?:_(\\d+))?$",
+    "example": "20250922_久木田ヒロノブ",
+    "rule": "撮影日_ゲスト名。同じ日に2本目は末尾に _2"
+  },
+  "forbidden_words": {
+    "words": ["最新", "テスト中"],
+    "tokens": ["新"],
+    "why": "次の版が出た時点で名前が事実と合わなくなる（「Raw最新_久木田収録」がその例）"
+  },
+  "finished_name": {
+    "pattern": "^{id}_v(\\d+)_(.+)\\.mp4$",
+    "example": "20250922_久木田ヒロノブ_v61_確認用360p.mp4"
+  },
+  "hold_box": {
+    "pattern": "^(\\d{8})削除予定_(.+)$",
+    "example": "20261121削除予定_重複raw_20250922_久木田ヒロノブ",
+    "default_days": 31
+  },
+  "work_paths": {
+    "recording": "収録/{id}/{作業}_{YYYYMMDD}",
+    "skills": "skills/{名前}_v{版}_{YYYYMMDD}"
+  }
+}
