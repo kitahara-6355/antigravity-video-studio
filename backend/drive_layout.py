@@ -10,12 +10,18 @@
     python -m backend.drive_layout put finished <手元> --to <収録ID>  40_完成 や 00_使い方 へ送る（書く）
     python -m backend.drive_layout qc-record <動画の名前> --by 北原 --on 2026-10-19   目視で確かめた動画を台帳に控える
     python -m backend.drive_layout qc-list                            控えた動画が今も同じ中身か（読むだけ）
+    python -m backend.drive_layout qc-sync                            ラベル「品質確認」を読んで台帳に控える
 
 ## 品質確認の控え（2026-10-22）
 
 人が目視で確かめた動画は、そのときの md5 を `backend/config/qc_ledger.json` に控える。
 `audit`・`qc-list` は今の md5 と比べ、中身が差し替わっていれば確認が外れたと知らせる（qc_changed）。
 控えと md5 が合う動画は、見直さなくてよい。
+
+人は Drive の分類ラベル「品質確認」（状態・確認日・確認者）を 40_完成 の動画に付ける。`qc-sync` が
+ラベルを読み（読み取りの鍵の `files.listLabels`）、まだ控えていない動画を台帳に足す。
+**AI はラベルを付けない。** 自分の書き出しを自分で「目視OK」にしない（憲法第4条）。
+ラベルが付いたまま中身が差し替わった動画は、控え直さずに qc_changed を出す。
 
 ## 2つの鍵を使い分ける
 
@@ -291,6 +297,65 @@ def qc_findings(root: Node, ledger: Mapping[str, Any]) -> list[Finding]:
                                f"{e['checked_on']} に {e['checked_by']} さんが確かめた後に中身が変わっています"
                                f"（md5 {e['md5'][:8]} → {(node.md5 or '?')[:8]}）。確認は外れました。見直しが要ります"))
     return out
+
+
+def read_labels(service: Any, root: Node, layout: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """40_完成 の動画に付いたラベル「品質確認」を読む。id → {state, date, by}。"""
+    spec = layout["qc_label"]
+    fields = spec["fields"]
+    finished = _top(root, folder_names(layout)["finished"])
+    out: dict[str, dict[str, Any]] = {}
+    for node in (finished.walk() if finished else []):
+        if not node.video:
+            continue
+        got = service.files().listLabels(fileId=node.id).execute()
+        for label in got.get("labels", []):
+            if label.get("id") != spec["id"]:
+                continue
+            values = label.get("fields", {})
+            choice = (values.get(fields["state"], {}).get("selection") or [None])[0]
+            dates = values.get(fields["date"], {}).get("dateString") or []
+            users = values.get(fields["by"], {}).get("user") or []
+            out[node.id] = {
+                "state": spec["ok_state"] if choice == spec["ok_choice"] else
+                         (spec["other_state"] if choice else None),
+                "date": dates[0] if dates else None,
+                "by": users[0].get("displayName") if users else None,
+            }
+    return out
+
+
+def sync_qc(root: Node, labels: Mapping[str, Mapping[str, Any]],
+            ledger: Mapping[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """ラベルを台帳に写す。控え済みは触らない（中身が変わっていても控え直さない）。"""
+    by_id = {n.id: n for n in root.walk()}
+    known = {e["id"]: e for e in ledger.get("checked", [])}
+    added: list[dict[str, Any]] = []
+    notes: list[str] = []
+    for file_id, lab in sorted(labels.items(), key=lambda kv: by_id[kv[0]].path):
+        node = by_id[file_id]
+        if not lab["state"]:
+            notes.append(f"  {node.path}: ラベルに状態が無い（控えない）")
+            continue
+        if file_id in known:
+            entry = known[file_id]
+            entry["path"], entry["name"] = node.path, node.name  # 移した・名前を変えた後の場所に合わせる
+            if entry["md5"] != node.md5:
+                notes.append(f"  {node.path}: ラベルは「{lab['state']}」のまま、控えた後に中身が変わっている。"
+                             "確認は外れた（ラベルを付け直しても、見直すまで控えない）")
+            elif entry["state"] != lab["state"]:
+                notes.append(f"  {node.path}: 台帳「{entry['state']}」とラベル「{lab['state']}」が違う。"
+                             "ラベルを正として台帳を直す")
+                entry["state"] = lab["state"]
+            continue
+        on = dt.date.fromisoformat(lab["date"]) if lab["date"] else dt.datetime.now(JST).date()
+        entry = qc_entry(node, lab["by"] or "?", on, lab["state"], note="ラベル「品質確認」から")
+        added.append(entry)
+        notes.append(f"  {node.path}: 控えた（{lab['state']}・{entry['checked_by']}・{entry['checked_on']}・"
+                     f"md5 {entry['md5'][:8]}）")
+    new = dict(ledger)
+    new["checked"] = list(ledger.get("checked", [])) + added
+    return new, notes
 
 
 def qc_entry(node: Node, by: str, on: dt.date, state: str, note: str = "") -> dict[str, Any]:
@@ -626,6 +691,22 @@ def run_qc_list(env: Mapping[str, str]) -> int:
     return 1 if fails else 0
 
 
+def run_qc_sync(env: Mapping[str, str]) -> int:
+    layout = load_layout()
+    try:
+        service, base, raw_id = _base_id(env)
+        root = read_tree(service, base, layout["base"]["name"], raw_id)
+        labels = read_labels(service, root, layout)
+    except _errors() as e:
+        print(f"🚫 {e}", file=sys.stderr)
+        return 1
+    ledger, notes = sync_qc(root, labels, load_qc())
+    QC_LEDGER_PATH.write_text(json.dumps(ledger, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"ラベル「{layout['qc_label']['name']}」の付いた動画: {len(labels)} 件")
+    print("\n".join(notes) or "  台帳に足す物はありません")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Drive の「動画制作」の決まりを点検する・フォルダを用意する")
     sub = parser.add_subparsers(dest="command")
@@ -650,6 +731,7 @@ def main(argv: list[str] | None = None) -> int:
     p_qc.add_argument("--state", default="目視OK", help="目視OK（既定）か 要直し")
     p_qc.add_argument("--note", default="", help="メモ")
     sub.add_parser("qc-list", help="控えた動画が今も同じ中身か（読むだけ）")
+    sub.add_parser("qc-sync", help="ラベル「品質確認」を読んで台帳に控える")
     args = parser.parse_args(argv)
     if args.command == "check-id":
         layout = load_layout()
@@ -675,6 +757,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_qc_record(os.environ, args.name, args.by, args.on, args.state, args.note)
     if args.command == "qc-list":
         return run_qc_list(os.environ)
+    if args.command == "qc-sync":
+        return run_qc_sync(os.environ)
     parser.print_help()
     return 2
 

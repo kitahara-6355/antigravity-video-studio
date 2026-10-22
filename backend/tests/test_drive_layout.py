@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime as dt
 import itertools
+import json
 
 import pytest
 
@@ -341,6 +342,63 @@ def test_qc_follows_the_id_when_moved_or_renamed_and_warns_when_gone():
 def test_qc_entry_needs_a_video_with_md5():
     with pytest.raises(ValueError):
         dl.qc_entry(doc("メモ.txt"), "北原", TODAY, "目視OK")
+
+
+class _LabelDrive:
+    """files().listLabels だけを持つ偽物。"""
+
+    def __init__(self, labels):
+        self._labels = labels
+
+    def files(self):
+        return self
+
+    def listLabels(self, fileId):
+        return _Req(lambda: {"labels": self._labels.get(fileId, [])})
+
+
+def _label(choice, date="2026-10-20", by="北原克洋"):
+    spec = LAYOUT["qc_label"]
+    f = spec["fields"]
+    return {"id": spec["id"], "fields": {
+        f["state"]: {"selection": [choice]} if choice else {},
+        f["date"]: {"dateString": [date]},
+        f["by"]: {"user": [{"displayName": by, "emailAddress": "x@example.com"}]}}}
+
+
+def _finished_tree(*clips):
+    root = tidy()
+    fin = next(c for c in root.children if c.name == "40_完成")
+    fin.children.append(folder("20250922_久木田ヒロノブ", *clips))
+    return base(*root.children, raw_id=root.raw_id)
+
+
+def test_labels_are_read_only_on_finished_videos_and_mapped_to_states():
+    ok, fix, other = video("v61.mp4", "a"), video("v60.mp4", "b"), video("x.mp4", "c")
+    root = _finished_tree(ok, fix)
+    root.children[0].children.append(other)  # 00_使い方 の動画は読まない
+    service = _LabelDrive({ok.id: [_label(LAYOUT["qc_label"]["ok_choice"])],
+                           fix.id: [_label("OTHER")], other.id: [_label(LAYOUT["qc_label"]["ok_choice"])]})
+    got = dl.read_labels(service, root, LAYOUT)
+    assert got == {ok.id: {"state": "目視OK", "date": "2026-10-20", "by": "北原克洋"},
+                   fix.id: {"state": "要直し", "date": "2026-10-20", "by": "北原克洋"}}
+
+
+def test_sync_adds_new_labels_and_never_rerecords_a_changed_video():
+    clip, fresh = video("v61.mp4", "a"), video("v62.mp4", "n")
+    root = _finished_tree(clip, fresh)
+    old = dl.qc_entry(clip, "北原", dt.date(2026, 10, 20), "目視OK")
+    lab = {"state": "目視OK", "date": "2026-10-22", "by": "北原克洋"}
+    ledger, notes = dl.sync_qc(root, {clip.id: lab, fresh.id: lab}, {"checked": [old]})
+    assert [e["id"] for e in ledger["checked"]] == [clip.id, fresh.id]
+    assert ledger["checked"][1]["md5"] == "n" and ledger["checked"][1]["checked_on"] == "2026-10-22"
+    assert "email" not in json.dumps(ledger)  # 台帳にメールアドレスを残さない
+
+    clip.md5 = "changed"
+    ledger2, notes2 = dl.sync_qc(root, {clip.id: lab}, ledger)
+    assert ledger2["checked"][0]["md5"] == "a"  # 控え直さない
+    assert any("確認は外れた" in n for n in notes2)
+    assert codes(dl.qc_findings(root, ledger2)) == ["qc_changed"]
 
 
 def test_check_id_cli():
