@@ -13,7 +13,7 @@
 
     name       作業の名前（作業場と置き場のフォルダ名になる）
     label      人が読む名前
-    raw        {"folder": raw のフォルダの中の素材のフォルダ名（null なら raw のフォルダそのもの）,
+    raw        {"folder": raw のフォルダ（10_raw）の中の収録ID のフォルダ名（null なら raw のフォルダそのもの）,
                 "parts": [つなぐ順のファイル名]}
     material   つないだ素材のファイル名
     versions   [{"key", "label", "review": 校正台帳（無ければ台帳なし）}]。この順に書き出す

@@ -25,6 +25,7 @@ pytestmark = pytest.mark.skipif(
     "backend/data/google/token.json",
     "backend/data/google/token_raw_readonly.json",
     "backend/data/google/token_assets_file.json",
+    "backend/data/google/token_drive_organizer.json",
     "backend/data/google/client_secret.json",
     "backend/data/google/anything_else.json",
     "token_raw_readonly.json",

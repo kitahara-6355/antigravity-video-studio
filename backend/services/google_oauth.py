@@ -62,6 +62,7 @@ __all__ = [
     "DRIVE_FILE_SCOPES",
     "DRIVE_READONLY_SCOPES",
     "DRIVE_SCOPES",
+    "ORGANIZER_TOKEN_JSON_ENV",
     "TOKEN_JSON_ENV",
     "SHEETS_SCOPES",
     "CredentialsNotFoundError",
@@ -109,6 +110,12 @@ TOKEN_JSON_ENV = "ANTIGRAVITY_GOOGLE_TOKEN_JSON"
 ASSETS_TOKEN_JSON_ENV = "AVS_ASSETS_GOOGLE_TOKEN_JSON"
 ASSETS_TOKEN_NAME = "token_assets_file.json"
 
+# 「動画制作」を整理する（移す・名前を変える）トークン（drive 全体・2026-10-22 北原さん決定）。
+# 人が置いたファイルも動かせるので、使うのは backend/drive_organize.py だけ。
+# 中身を変える・消す口はそちらに作らない（raw を守る歯止めは道具の側にある）。
+ORGANIZER_TOKEN_JSON_ENV = "AVS_DRIVE_ORGANIZER_TOKEN_JSON"
+ORGANIZER_TOKEN_NAME = "token_drive_organizer.json"
+
 
 def _from_env(*names: str) -> Path | None:
     """環境変数を順に見て、最初の非空値を返す。空文字は未設定扱い。"""
@@ -134,6 +141,11 @@ def client_secret_path() -> Path:
 def token_path() -> Path:
     """同意後に得たトークンの保存先。"""
     return _from_env("ANTIGRAVITY_GOOGLE_TOKEN") or (_default_dir() / "token.json")
+
+
+def organizer_token_path() -> Path:
+    """「動画制作」を整理するトークン（drive 全体）のローカルの保存先。"""
+    return token_path().parent / ORGANIZER_TOKEN_NAME
 
 
 def assets_token_path() -> Path:

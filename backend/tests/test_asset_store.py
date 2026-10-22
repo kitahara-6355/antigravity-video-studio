@@ -116,7 +116,17 @@ class FakeDrive:
             return dict(f)
         return _Req(run, chunks=3 if media_body is not None and media_body.resumable else 1)
 
-    def update(self, fileId, media_body, fields, **_):
+    def update(self, fileId, media_body=None, fields=None, body=None, addParents=None,
+               removeParents=None, **_):
+        if media_body is None:  # 動かす・名前を変える・ゴミ箱へ（中身は変えない）
+            def meta():
+                f = self.items[fileId]
+                f.update(body or {})
+                if addParents:
+                    f["parents"] = [x for x in f["parents"] if x != removeParents] + [addParents]
+                return dict(f)
+            return _Req(meta)
+
         def run():
             self.updates += 1
             f = self.items[fileId]
@@ -593,3 +603,54 @@ def test_cli_list_prints_the_files(drive, monkeypatch, tmp_path, capsys):
     assert "captions/final.srt" in out and "3 件" in out
 
     assert asset_store.main(["list", "jobs/nope"]) == 1
+
+
+# --- 6. 置き場の中で動かす（収録ID で並べ直す・2026-10-21） ------------------------
+
+
+def _seed(drive, tmp_path, rel):
+    """`rel`（a/b/file）を送っておく。"""
+    local = tmp_path / "seed"
+    target = local / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"data")
+    root = asset_store.ensure_root(drive)
+    asset_store.put_tree(drive, local, "", root_id=root, log=lambda _: None)
+    return root
+
+
+def test_move_renames_and_reparents_without_resending(drive, tmp_path):
+    root = _seed(drive, tmp_path, "raw4_20250922/repro_20261018/assets/a.json")
+    file_id = drive.named("a.json")[0]["id"]
+    creates = drive.creates
+
+    done = asset_store.move(drive, "raw4_20250922/repro_20261018",
+                            "収録/20250922_久木田ヒロノブ/再現_20261018", root_id=root)
+
+    moved = asset_store.find_path(drive, root, "収録/20250922_久木田ヒロノブ/再現_20261018/assets")
+    assert moved is not None
+    assert drive.named("a.json")[0]["id"] == file_id  # 送り直していない
+    assert drive.updates == 0
+    assert drive.creates - creates == 2  # 収録・20250922_久木田ヒロノブ のフォルダだけ
+    assert done["pruned"] == ["raw4_20250922"]  # 空になった元はゴミ箱へ
+    assert asset_store.find_path(drive, root, "raw4_20250922") is None
+
+
+def test_move_keeps_a_source_parent_that_still_has_other_things(drive, tmp_path):
+    root = _seed(drive, tmp_path, "raw4/repro/a.json")
+    _seed(drive, tmp_path / "2", "raw4/other.txt")
+    done = asset_store.move(drive, "raw4/repro", "収録/x/repro", root_id=root)
+    assert done["pruned"] == []
+    assert asset_store.find_path(drive, root, "raw4") is not None
+
+
+def test_move_refuses_an_existing_destination_or_a_missing_source(drive, tmp_path):
+    root = _seed(drive, tmp_path, "a/f.txt")
+    _seed(drive, tmp_path / "2", "b/f.txt")
+    with pytest.raises(asset_store.PathError, match="既にあります"):
+        asset_store.move(drive, "a", "b", root_id=root)
+    with pytest.raises(asset_store.PathError, match="ありません"):
+        asset_store.move(drive, "nope", "c", root_id=root)
+    with pytest.raises(asset_store.PathError, match="自分の中"):
+        asset_store.move(drive, "a", "a/inner", root_id=root)
+    assert asset_store.find_path(drive, root, "a") is not None

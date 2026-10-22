@@ -27,7 +27,7 @@ description: 撮影済みの対談の raw（Google Drive）から、字幕つき
 {
   "name": "raw4_repro_20261018",
   "label": "人が読む名前",
-  "raw": {"folder": null, "parts": ["つなぐ順のファイル名.mp4", "..."]},
+  "raw": {"folder": "<収録ID>", "parts": ["つなぐ順のファイル名.mp4", "..."]},
   "material": "raw4_concat.mp4",
   "versions": [
     {"key": "zero", "label": "ゼロからの版"},
@@ -38,7 +38,8 @@ description: 撮影済みの対談の raw（Google Drive）から、字幕つき
 }
 ```
 
-- `raw.folder` は raw のフォルダ（環境変数 `AVS_RAW_DRIVE_FOLDER_ID`）の中の素材のフォルダ名。null ならそのフォルダそのもの
+- `raw.folder` は raw のフォルダ（`10_raw`・環境変数 `AVS_RAW_DRIVE_FOLDER_ID`）の中の**収録ID**（例 `20250922_久木田ヒロノブ`）。
+  置き場の決まりはスキル `drive-layout`。null は raw のフォルダそのもの（決まりの前の並び）
 - `raw.parts` は Drive に出ている名前どおりに書く（`python -m backend.raw_source --list` で確かめる）
 - `versions` は上から順に書き出す。最初の版は作業場が空なのでキャッシュ無し（AI を全部呼ぶ）。
   後の版は同じ素材のフォルダで走るので、最初の版の AI の出力をそのまま使う（台帳だけが違う版を比べられる）
