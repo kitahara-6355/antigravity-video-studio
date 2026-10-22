@@ -8,6 +8,14 @@
     python -m backend.drive_layout prepare [--recording 収録ID]       AI が作る側のフォルダを用意する（書く）
     python -m backend.drive_layout hold <中身の名前> [--until 日付]   90_保管 に消す日つきの箱を作る（書く）
     python -m backend.drive_layout put finished <手元> --to <収録ID>  40_完成 や 00_使い方 へ送る（書く）
+    python -m backend.drive_layout qc-record <動画の名前> --by 北原 --on 2026-10-19   目視で確かめた動画を台帳に控える
+    python -m backend.drive_layout qc-list                            控えた動画が今も同じ中身か（読むだけ）
+
+## 品質確認の控え（2026-10-22）
+
+人が目視で確かめた動画は、そのときの md5 を `backend/config/qc_ledger.json` に控える。
+`audit`・`qc-list` は今の md5 と比べ、中身が差し替わっていれば確認が外れたと知らせる（qc_changed）。
+控えと md5 が合う動画は、見直さなくてよい。
 
 ## 2つの鍵を使い分ける
 
@@ -42,6 +50,7 @@ from zoneinfo import ZoneInfo
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LAYOUT_PATH = REPO_ROOT / "backend" / "config" / "drive_layout.json"
+QC_LEDGER_PATH = REPO_ROOT / "backend" / "config" / "qc_ledger.json"
 FOLDER_MIME = "application/vnd.google-apps.folder"
 LAYOUT_MARK = "avs_layout"
 JST = ZoneInfo("Asia/Tokyo")
@@ -259,6 +268,41 @@ def audit(root: Node, layout: Mapping[str, Any], today: dt.date | None = None) -
     return out
 
 
+# --- 品質確認の控え -------------------------------------------------------------
+
+
+def load_qc(path: Path = QC_LEDGER_PATH) -> dict[str, Any]:
+    if not path.exists():
+        return {"checked": []}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def qc_findings(root: Node, ledger: Mapping[str, Any]) -> list[Finding]:
+    """控えた動画が今も同じ中身か。id で探すので、移しても名前を変えても追える。"""
+    by_id = {n.id: n for n in root.walk()}
+    out: list[Finding] = []
+    for e in ledger.get("checked", []):
+        node = by_id.get(e["id"])
+        if node is None:
+            out.append(Finding("WARN", "qc_missing", e["name"],
+                               f"{e['checked_on']} に確かめた動画が「{root.name}」の中にありません（消えた・外へ移した）"))
+        elif node.md5 != e["md5"]:
+            out.append(Finding("FAIL", "qc_changed", node.path,
+                               f"{e['checked_on']} に {e['checked_by']} さんが確かめた後に中身が変わっています"
+                               f"（md5 {e['md5'][:8]} → {(node.md5 or '?')[:8]}）。確認は外れました。見直しが要ります"))
+    return out
+
+
+def qc_entry(node: Node, by: str, on: dt.date, state: str, note: str = "") -> dict[str, Any]:
+    if not node.video or not node.md5:
+        raise ValueError(f"「{node.path}」は md5 のある動画ではありません")
+    entry = {"id": node.id, "name": node.name, "path": node.path, "md5": node.md5, "size": node.size,
+             "state": state, "checked_by": by, "checked_on": on.isoformat()}
+    if note:
+        entry["note"] = note
+    return entry
+
+
 def _holds(layout: Mapping[str, Any], key: str) -> str:
     return next(f["holds"] for f in layout["folders"] if f["key"] == key)
 
@@ -460,7 +504,7 @@ def run_audit(env: Mapping[str, str], json_path: str | None) -> int:
     except _errors() as e:
         print(f"🚫 {e}", file=sys.stderr)
         return 1
-    findings = audit(root, layout)
+    findings = audit(root, layout) + qc_findings(root, load_qc())
     fails = [f for f in findings if f.level == "FAIL"]
     for f in findings:
         print(f"{'❌' if f.level == 'FAIL' else '⚠️ '} [{f.code}] {f.path}\n     {f.message}")
@@ -537,6 +581,51 @@ def run_put(key: str, local_dir: str, sub: str) -> int:
     return 0
 
 
+def _find_video(root: Node, name: str) -> Node:
+    hits = [n for n in root.walk() if n.video and (n.name == name or n.id == name)]
+    if not hits:
+        raise LookupError(f"動画「{name}」が見つかりません")
+    if len(hits) > 1:
+        raise LookupError(f"「{name}」が {len(hits)} か所にあります: " + "、".join(n.path for n in hits)
+                          + "。id で指定してください")
+    return hits[0]
+
+
+def run_qc_record(env: Mapping[str, str], name: str, by: str, on: str, state: str, note: str) -> int:
+    layout = load_layout()
+    try:
+        node = _find_video(_read(env, layout), name)
+        entry = qc_entry(node, by, dt.date.fromisoformat(on), state, note)
+    except _errors() as e:
+        print(f"🚫 {e}", file=sys.stderr)
+        return 1
+    ledger = load_qc()
+    ledger["checked"] = [e for e in ledger.get("checked", []) if e["id"] != entry["id"]] + [entry]
+    QC_LEDGER_PATH.write_text(json.dumps(ledger, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"控えた: {node.path}（md5 {entry['md5'][:8]}・{state}・{by}・{on}）")
+    return 0
+
+
+def run_qc_list(env: Mapping[str, str]) -> int:
+    layout = load_layout()
+    try:
+        root = _read(env, layout)
+    except _errors() as e:
+        print(f"🚫 {e}", file=sys.stderr)
+        return 1
+    ledger = load_qc()
+    bad = {f.path: f for f in qc_findings(root, ledger)}
+    by_id = {n.id: n for n in root.walk()}
+    for e in ledger.get("checked", []):
+        node = by_id.get(e["id"])
+        where = node.path if node else e["name"]
+        mark = "❌" if where in bad and bad[where].level == "FAIL" else ("⚠️ " if where in bad else "✅")
+        print(f"{mark} {where}  {e['state']}・{e['checked_by']}・{e['checked_on']}")
+    fails = [f for f in bad.values() if f.level == "FAIL"]
+    print(f"\n控え {len(ledger.get('checked', []))} 件・確認が外れた {len(fails)} 件")
+    return 1 if fails else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Drive の「動画制作」の決まりを点検する・フォルダを用意する")
     sub = parser.add_subparsers(dest="command")
@@ -554,6 +643,13 @@ def main(argv: list[str] | None = None) -> int:
     p_put.add_argument("key", help="guide（00_使い方）か finished（40_完成）")
     p_put.add_argument("local_dir", help="送るフォルダ")
     p_put.add_argument("--to", default="", dest="sub", help="その中の行き先（例 収録ID）")
+    p_qc = sub.add_parser("qc-record", help="目視で確かめた動画を台帳に控える（md5 を記録）")
+    p_qc.add_argument("name", help="動画の名前か id（動画制作の中で1つに決まること）")
+    p_qc.add_argument("--by", required=True, help="確かめた人")
+    p_qc.add_argument("--on", required=True, help="確かめた日 YYYY-MM-DD")
+    p_qc.add_argument("--state", default="目視OK", help="目視OK（既定）か 要直し")
+    p_qc.add_argument("--note", default="", help="メモ")
+    sub.add_parser("qc-list", help="控えた動画が今も同じ中身か（読むだけ）")
     args = parser.parse_args(argv)
     if args.command == "check-id":
         layout = load_layout()
@@ -575,6 +671,10 @@ def main(argv: list[str] | None = None) -> int:
         return run_hold(args.content, args.until)
     if args.command == "put":
         return run_put(args.key, args.local_dir, args.sub)
+    if args.command == "qc-record":
+        return run_qc_record(os.environ, args.name, args.by, args.on, args.state, args.note)
+    if args.command == "qc-list":
+        return run_qc_list(os.environ)
     parser.print_help()
     return 2
 

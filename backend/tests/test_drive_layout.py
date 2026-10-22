@@ -307,6 +307,42 @@ def test_put_goes_only_to_ai_written_folders(drive, monkeypatch, tmp_path):
             dl.put_to(drive, LAYOUT, key, tmp_path)
 
 
+# --- 7. 品質確認の控え（2026-10-22） -----------------------------------------------------
+
+
+def test_qc_entry_records_the_md5_and_a_changed_video_loses_its_check():
+    root = tidy()
+    fin = next(c for c in root.children if c.name == "40_完成")
+    clip = video("20250922_久木田ヒロノブ_v61_確認用360p.mp4", "ok1")
+    fin.children.append(folder("20250922_久木田ヒロノブ", clip))
+    root = base(*root.children, raw_id=root.raw_id)
+    entry = dl.qc_entry(clip, "北原", dt.date(2026, 10, 19), "目視OK")
+    assert entry["md5"] == "ok1" and entry["id"] == clip.id
+    ledger = {"checked": [entry]}
+    assert dl.qc_findings(root, ledger) == []
+
+    clip.md5 = "other"  # 同じ id のまま新しい版で差し替えられた
+    found = dl.qc_findings(root, ledger)
+    assert codes(found) == ["qc_changed"]
+    assert "確認は外れました" in found[0].message
+
+
+def test_qc_follows_the_id_when_moved_or_renamed_and_warns_when_gone():
+    root = tidy()
+    clip = video("a.mp4", "ok1")
+    root.children[0].children.append(clip)
+    entry = dl.qc_entry(clip, "北原", TODAY, "目視OK")
+    clip.name = "b.mp4"
+    assert dl.qc_findings(root, {"checked": [entry]}) == []
+    root.children[0].children.clear()
+    assert codes(dl.qc_findings(root, {"checked": [entry]})) == ["qc_missing"]
+
+
+def test_qc_entry_needs_a_video_with_md5():
+    with pytest.raises(ValueError):
+        dl.qc_entry(doc("メモ.txt"), "北原", TODAY, "目視OK")
+
+
 def test_check_id_cli():
     assert dl.main(["check-id", "20250922_久木田ヒロノブ"]) == 0
     assert dl.main(["check-id", "Raw最新_久木田収録"]) == 1
