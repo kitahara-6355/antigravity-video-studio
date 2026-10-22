@@ -1,0 +1,135 @@
+---
+name: drive-layout
+description: Google Drive の「動画制作」（共有ドライブ「美麗書院_共有データ」）の置き場の決まりを守る。新しい対談の raw や素材を足すとき、AI の作業の資産や完成動画を Drive に置くとき、重複した raw や古い版を 90_保管 へ寄せるとき、置き場が決まりどおりか点検するときに使う。
+---
+
+# 動画制作の置き場の決まり（Google Drive）
+
+2026-10-21 に北原さんが承認した構成。正典は `backend/config/drive_layout.json`、
+点検と用意は `python -m backend.drive_layout`。経緯と図は構成案
+（https://claude.ai/artifact/H24KKV7HAWYn43xxhppn5z ）。
+
+## 構成
+
+共有ドライブ「美麗書院_共有データ」/「動画制作」の下に、工程順に番号を付けた6つ。
+各フォルダの中は**収録ID**で分ける。
+
+| フォルダ | 中身 | 入れる人 | AI |
+|---|---|---|---|
+| 00_使い方 | この決まりの要約1枚 | AI | 書く |
+| 10_raw | 撮ったままの動画。`10_raw/<収録ID>/` | 北原さん（撮影後にアップロード） | **読むだけ** |
+| 20_素材 | Bロール・インサート画像・OP 映像・ロゴ・BGM。`共通/` と `<収録ID>/` | 北原さん | 読むだけ |
+| 30_AVS_作業 | 字幕データ・校正台帳・編集の固定・AI の控え・記録・スキル | AI | 書く |
+| 40_完成 | 書き出した動画。`40_完成/<収録ID>/` | AI | 書く |
+| 90_保管 | 古い版・重複していた raw。消す日を名前に付けた箱に入れる | 北原さん | 箱を作るだけ |
+
+## 名前の付け方
+
+- **収録ID** = `撮影日_ゲスト名`（例 `20250922_久木田ヒロノブ`）。同じ日の2本目は `_2`。
+  確かめる: `python -m backend.drive_layout check-id <名前>`
+- フォルダ名に「最新」「テスト中」、単独の「新」を入れない。次の版が出た時点で事実と合わなくなる
+- 完成動画は `<収録ID>_v<版>_<用途>.mp4`（例 `20250922_久木田ヒロノブ_v61_確認用360p.mp4`）
+- 撮ったままのファイル名（`2025-09-22_16-34-33.mp4`）は変えない。カメラの時刻がつなぐ順の手がかり
+- 90_保管 の箱は `<消す日 YYYYMMDD>削除予定_<中身>`（例 `20261121削除予定_重複raw_20250922_久木田ヒロノブ`）
+- 30_AVS_作業 の中: 収録の作業は `収録/<収録ID>/<作業>_<YYYYMMDD>`、スキルは `skills/<名前>_v<版>_<YYYYMMDD>`
+
+## 鍵と権限（ここから来る決まり）
+
+| 鍵 | 環境変数 | 権限 | 使う道具 |
+|---|---|---|---|
+| raw を読む | `ANTIGRAVITY_GOOGLE_TOKEN_JSON` | drive.readonly | `raw_source`・`drive_layout audit/plan` |
+| 資産を書く | `AVS_ASSETS_GOOGLE_TOKEN_JSON` | drive.file | `asset_store`・`drive_layout prepare/hold` |
+| 整理する | `AVS_DRIVE_ORGANIZER_TOKEN_JSON` | drive（全体） | `drive_organize` だけ |
+
+- drive.file は**アプリが作った物にしか触れない。** 人が作ったフォルダ（動画制作・10_raw）の中には書けず、
+  raw も動かせない。資産を置くのはこの鍵のまま
+- AI が書くフォルダは印（appProperties）で見つけるので、移しても名前を変えても見失わない
+- **整理の鍵（2026-10-22 北原さんが「広げる」を選択）。** 人が置いた物を移す・名前を変えるのは AI がやる。
+  鍵は Drive 全体に届くので、歯止めは `drive_organize` のコードにある（下の「整理する」）。
+  この鍵をほかの道具に渡さない。作り方は `python scripts/google_oauth_login.py --organize`（法人アカウントで許可）
+- **消すのは北原さん。** 整理の道具にも消す口・ゴミ箱へ入れる口は無い
+- 「動画制作」は raw のフォルダ（`AVS_RAW_DRIVE_FOLDER_ID`）の親として id で辿る。名前は見ない
+- 環境変数を足した・変えたときは、**新しく始めたセッション**でしか見えない。
+  確かめは `create_trigger`（新しいセッション）→ `fire_trigger` で行う（同じコンテナの別エージェントでは確かめられない）
+
+## 手順
+
+すべてリポジトリの根で `PYTHONPATH=.:./backend` をつけて動かす。Drive API は無料。
+
+### 新しい対談を足す
+
+1. 収録ID を決めて `check-id` で確かめる
+2. AI 側のフォルダを用意する: `python -m backend.drive_layout prepare --recording <収録ID>`
+   （20_素材・40_完成・30_AVS_作業/収録 の下に収録ID のフォルダを作る）
+3. 北原さんに頼む: `10_raw` に `<収録ID>` のフォルダを作って raw を入れる（AI は作れない）。
+   素材は `20_素材/共通` か `20_素材/<収録ID>` へ
+4. raw を確かめる: `python -m backend.raw_source --list --folder <収録ID>`
+5. job ファイル（スキル `interview-edit`）の `raw.folder` に収録ID を書く
+
+### AI の作業を残す
+
+- 資産: `python -m backend.asset_store put <手元のフォルダ> --to 収録/<収録ID>/<作業>_<YYYYMMDD>`
+  （送った後 md5 を照合する。目録は `--manifest` で共有フォルダへ）
+- 並べ直し: `python -m backend.asset_store move <元> --to <先>`（id・md5 は変わらない。空になった元はゴミ箱へ）
+- スキル: `skills/<名前>_v<版>_<YYYYMMDD>` へ put
+
+### 整理する（移す・名前を変える・フォルダを作る）
+
+```
+python -m backend.drive_organize mv <元> <行き先のフォルダ> [--name 新しい名前] [--apply]
+python -m backend.drive_organize rename <元> <新しい名前> [--apply]
+python -m backend.drive_organize mkdir <親のフォルダ> <名前> [--apply]
+```
+
+- パスは「動画制作」からの相対（`40_完成/20250922_久木田ヒロノブ/…`）。**既定は下見。** `--apply` で変える
+- 歯止め（破ると何もせずに止まる）: 10_raw の物は外へ出さない・外の物を 10_raw へ入れない／
+  10_raw のファイルの名前は変えない・中のフォルダは収録ID だけ／「動画制作」と工程のフォルダは動かさない／
+  同じ名前が行き先にあれば止まる
+- 動かした後に中の動画の md5 と大きさを照合し、`pipeline_work/drive_ops/journal.jsonl` に1行ずつ残す
+- 終わったら `audit` と `qc-sync` を流し、台帳が変われば コミットする
+
+### 重複や古い版を 90_保管 へ寄せる
+
+1. 一覧を出す: `python -m backend.drive_layout plan`。10_raw と同じ md5 の動画を余分とし、
+   中身が余分だけのフォルダは一番外側までまとめて、1回で移せる単位で出る
+2. 移す: `python -m backend.drive_organize hold <中身の名前> [--until YYYY-MM-DD] --apply`
+   （消す日つきの箱を作り、一覧の物をそこへ移す。既定は31日後）
+3. `audit` で duplicate_raw が消え、10_raw の raw の md5 が変わっていないことを確かめる
+5. 消す日が来たら `audit` が hold_overdue で知らせる。**消すのは北原さん。** 消す前に、
+   同じ md5 が 10_raw にまだあることを `plan` / `audit` で確かめて伝える
+
+### 点検する
+
+```
+python -m backend.drive_layout audit [--json 結果.json]
+```
+
+FAIL（終了コード 1）: 工程のフォルダが無い・2つある／raw のフォルダの名前が 10_raw でない／
+10_raw の直下に動画がある・収録ID でないフォルダがある／10_raw と同じ動画がほかにある（duplicate_raw）／
+10_raw に無い動画が2か所以上にある（duplicate_unkept。どれを raw にするか人が決める）。
+WARN: 名前の決まり（最新・テスト中・新）、20_素材・40_完成の名前、90_保管 の消す日が無い・過ぎた。
+
+### 目視で確かめた動画を控える（2026-10-22）
+
+人が目視で OK を出した動画は、そのときの md5 を台帳 `backend/config/qc_ledger.json` に控える。
+md5 が同じなら中身は同じなので、**控えと合う動画は見直さなくてよい。**
+
+```
+python -m backend.drive_layout qc-record <動画の名前か id> --by 北原 --on YYYY-MM-DD [--state 要直し] [--note "…"]
+python -m backend.drive_layout qc-list
+```
+
+- 控えは id で追うので、移しても名前を変えても外れない
+- 同じ id のまま「新しい版をアップロード」で中身が変わると、`audit`・`qc-list` が qc_changed（FAIL）を出す。見直しが要る
+- **画面での印は Drive の分類ラベル「品質確認」**（10-22 北原さんが選び、作成。項目は 状態〔目視OK／要直し〕・確認日・確認者）。
+  人が 40_完成 の動画に付ける。id は `drive_layout.json` の `qc_label`。確認済み用のフォルダは作らない（ラベルと台帳で分かる）
+- `python -m backend.drive_layout qc-sync` がラベルを読み（読み取りの鍵の `files.listLabels`）、まだ控えていない動画を台帳に足す。
+  足したら台帳をコミットする。確認者は表示名だけ残し、メールアドレスは残さない
+- **AI はラベルを付けない。** 自分の書き出しを自分で目視OK にしない（憲法第4条）。整理の道具にもラベルを書く口は無い
+- ラベルが付いたまま中身が差し替わった動画は、控え直さずに qc_changed を出す。見直して人がラベルを付け直し、
+  台帳の古い控えを消してから qc-sync する
+
+## 範囲の外
+
+- 「動画制作」の外（例: 「克洋アップロード」）は点検しない。重複を見つけたら知らせるだけ
+- 「000_テスト中」のような整理前のフォルダの振り分けは、一覧を読んで案を出し、北原さんが決めたら `drive_organize` で移す

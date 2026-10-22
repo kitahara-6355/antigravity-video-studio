@@ -41,6 +41,10 @@ AI の出力・字幕・実行記録を Drive に残す。クラウドの作業�
     python -m backend.asset_store put pipeline_work/job1 --to jobs/job1
     python -m backend.asset_store put pipeline_work/job1 --to jobs/job1 --manifest m.json
     python -m backend.asset_store list jobs/job1
+    python -m backend.asset_store move raw4_20250922/repro_20261018 --to 収録/20250922_久木田ヒロノブ/再現_20261018
+
+`move` は置き場の中で並べ直すだけ（アプリが作った物どうし）。中身は送り直さないので id と md5 は変わらない。
+動かした後に空になった元のフォルダはゴミ箱へ入れる（Drive のゴミ箱から戻せる）。
 
 終了コード: 0 = できた ／ 1 = 認証・権限・照合・Drive の失敗 ／ 2 = 引数の誤り。
 **課金は発生しない**（Drive API は無料）。
@@ -406,6 +410,44 @@ def list_tree(service: Any, dest_path: str | Path, *,
     return out
 
 
+def move(service: Any, src: str | Path, dest: str | Path, *,
+         root_id: str | None = None) -> dict[str, Any]:
+    """置き場の中の `src` を `dest` へ動かす（名前も変える）。行き先が既にあれば動かさずに止まる。
+
+    Returns:
+        {id, from, to, pruned}。pruned は空になってゴミ箱へ入れた元のフォルダ（下から順）。
+    """
+    root_id = root_id or ensure_root(service)
+    src_parts, dest_parts = _segments(src), _segments(dest)
+    if not src_parts or not dest_parts:
+        raise PathError("置き場のルートそのものは動かせません")
+    if dest_parts[:len(src_parts)] == src_parts:
+        raise PathError(f"「{dest}」は「{src}」の中です。自分の中へは動かせません")
+    src_parent = find_path(service, root_id, "/".join(src_parts[:-1])) if len(src_parts) > 1 else root_id
+    found = _find(service, name=src_parts[-1], parent=src_parent) if src_parent else []
+    if not found:
+        raise PathError(f"置き場に「{src}」がありません")
+    if len(found) > 1:
+        raise PathError(f"「{src}」が {len(found)} つあります。どれを動かすか決められません")
+    dest_parent = ensure_path(service, root_id, "/".join(dest_parts[:-1])) if len(dest_parts) > 1 else root_id
+    if _find(service, name=dest_parts[-1], parent=dest_parent):
+        raise PathError(f"行き先「{dest}」が既にあります。動かしていません")
+    item_id = str(found[0]["id"])
+    service.files().update(fileId=item_id, body={"name": dest_parts[-1]}, addParents=dest_parent,
+                           removeParents=src_parent, fields="id", supportsAllDrives=True).execute()
+    pruned: list[str] = []
+    parts = src_parts[:-1]
+    while parts:
+        folder_id = find_path(service, root_id, "/".join(parts))
+        if folder_id is None or _find(service, parent=folder_id):
+            break
+        service.files().update(fileId=folder_id, body={"trashed": True}, fields="id",
+                               supportsAllDrives=True).execute()
+        pruned.append("/".join(parts))
+        parts = parts[:-1]
+    return {"id": item_id, "from": "/".join(src_parts), "to": "/".join(dest_parts), "pruned": pruned}
+
+
 # --- CLI ---------------------------------------------------------------------
 
 
@@ -467,6 +509,25 @@ def run_list(dest: str) -> int:
     return 0
 
 
+def run_move(src: str, dest: str) -> int:
+    try:
+        service = _build_drive()
+        done = move(service, src, dest)
+    except (GoogleAuthError, PathError) as e:
+        print(f"🚫 {e}", file=sys.stderr)
+        return 1
+    except ImportError as e:
+        print(f"🚫 google-api-python-client が入っていません: {e}", file=sys.stderr)
+        return 1
+    except _api_error_types() as e:
+        print(f"🚫 Drive で動かせませんでした: {e}", file=sys.stderr)
+        return 1
+    print(f"動かした: {done['from']} → {done['to']}")
+    for p in done["pruned"]:
+        print(f"  空になった「{p}」をゴミ箱へ（Drive のゴミ箱から戻せる）")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="過程の資産を Drive に置く（drive.file）")
     sub = parser.add_subparsers(dest="command")
@@ -477,6 +538,9 @@ def main(argv: list[str] | None = None) -> int:
     p_put.add_argument("--manifest", default=None, help="マニフェストの書き出し先（既定は標準出力）")
     p_list = sub.add_parser("list", help="置き場の中を読む")
     p_list.add_argument("dest", help="置き場のルートからのパス")
+    p_move = sub.add_parser("move", help="置き場の中で動かす・名前を変える")
+    p_move.add_argument("src", help="動かす物（置き場のルートからのパス）")
+    p_move.add_argument("--to", required=True, dest="dest", help="行き先（置き場のルートからのパス）")
     args = parser.parse_args(argv)
     if args.command == "check":
         return run_check()
@@ -484,6 +548,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_put(args.local_dir, args.dest, args.manifest)
     if args.command == "list":
         return run_list(args.dest)
+    if args.command == "move":
+        return run_move(args.src, args.dest)
     parser.print_help()
     return 2
 

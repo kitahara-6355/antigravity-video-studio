@@ -1,0 +1,16 @@
+{
+  "_doc": "人が目視で確かめた動画と、そのときの md5。python -m backend.drive_layout qc-record で足し、audit・qc-list が今の md5 と比べる。スキル drive-layout。",
+  "checked": [
+    {
+      "id": "1nhCsQ-YTs_4XezeBdHJH-ma-8MZp8Kii",
+      "name": "20250922_久木田ヒロノブ_v61_確認用360p.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/20250922_久木田ヒロノブ_v61_確認用360p.mp4",
+      "md5": "3efcf0f1e51267a57d32b574f1a4312d",
+      "size": 55275094,
+      "state": "目視OK",
+      "checked_by": "北原",
+      "checked_on": "2026-10-20",
+      "note": "固定（edit_lock）から raw で作り直した全編360p。結合テスト thread で 2026-10-19 21:47 UTC（JST 10-20 06:47）に目視 OK"
+    }
+  ]
+}

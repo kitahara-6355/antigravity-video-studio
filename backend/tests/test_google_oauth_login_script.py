@@ -134,3 +134,27 @@ def test_assets_token_is_saved_on_one_line_and_names_its_env(login, monkeypatch,
     printed = capsys.readouterr().out
     assert "AVS_ASSETS_GOOGLE_TOKEN_JSON" in printed
     assert "SECRET-RT" not in printed
+
+
+# --- --organize（「動画制作」を整理する口・drive 全体・2026-10-22） ---------------------
+
+
+def test_organize_requests_only_drive(login):
+    scopes, _ = login.resolve_plan(readonly=False, token=None, organize=True)
+    assert scopes == ["https://www.googleapis.com/auth/drive"]
+
+
+def test_organize_has_its_own_default_file(login, monkeypatch, tmp_path):
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tmp_path / "token.json"))
+    _, out = login.resolve_plan(readonly=False, token=None, organize=True)
+    assert out == tmp_path / "token_drive_organizer.json"
+    assert out != login.resolve_plan(readonly=False, token=None, assets=True)[1]
+
+
+def test_organize_cannot_be_combined(login, capsys):
+    for other in ("--readonly", "--assets"):
+        with pytest.raises(SystemExit):
+            login._parse_args([other, "--organize"])
+    with pytest.raises(ValueError):
+        login.resolve_plan(readonly=False, token=None, assets=True, organize=True)
+    assert login._parse_args(["--organize"]).organize is True

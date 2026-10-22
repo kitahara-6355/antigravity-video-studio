@@ -55,6 +55,17 @@ backend/data/google/token_assets_file.json に **1行の JSON** で保存する�
    環境変数 `AVS_ASSETS_GOOGLE_TOKEN_JSON` に貼る（チャットには貼らない）
 4. `python -m backend.asset_store check` で権限が drive.file だけか確かめる（外には出ない）
 
+## 「動画制作」を整理するトークン（drive 全体・2026-10-22）
+
+    python scripts/google_oauth_login.py --organize
+
+`drive` **だけ**を要求する（人が置いたファイルも移せる・名前を変えられる）。北原さんが
+2026-10-22 に「AI の書く鍵を Drive 全体に広げ、移動と名前の変更を任せる」と決めた。
+使うのは `backend/drive_organize.py` だけで、そこには中身を変える・消す口が無い。
+backend/data/google/token_drive_organizer.json に **1行の JSON** で保存する。
+クラウドでは中身を環境変数 `AVS_DRIVE_ORGANIZER_TOKEN_JSON` に貼る。
+法人アカウント（info@kitahara-birei.com）で許可する。
+
 ## 注意
 
 公開ステータスが「テスト」の間、リフレッシュトークンは **7日で失効する**。
@@ -77,10 +88,12 @@ from backend.services.google_oauth import (
     DRIVE_FILE_SCOPES,
     DRIVE_READONLY_SCOPES,
     DRIVE_SCOPES,
+    ORGANIZER_TOKEN_JSON_ENV,
     SHEETS_SCOPES,
     TOKEN_JSON_ENV,
     assets_token_path,
     client_secret_path,
+    organizer_token_path,
     token_path,
 )
 
@@ -99,6 +112,10 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--assets", action="store_true",
         help="drive.file だけを要求する（過程の資産を書く口・クラウド用）",
     )
+    mode.add_argument(
+        "--organize", action="store_true",
+        help="drive だけを要求する（動画制作を整理する口・移す/名前を変える・クラウド用）",
+    )
     parser.add_argument(
         "--token", type=Path, default=None,
         help="トークンの保存先（既定: 通常は token.json、--readonly なら token_raw_readonly.json、"
@@ -108,15 +125,17 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def resolve_plan(readonly: bool, token: Path | None,
-                 assets: bool = False) -> tuple[list[str], Path]:
+                 assets: bool = False, organize: bool = False) -> tuple[list[str], Path]:
     """要求するスコープと保存先を決める。
 
     `--readonly` で読み書きのスコープが混ざることはない。混ざると
     クラウドのセッションに raw を消せるトークンを渡すことになる。
     `--assets` も drive.file だけ。読み取りの口と同じトークンにしない。
     """
-    if readonly and assets:
-        raise ValueError("--readonly と --assets は同時に使えません（トークンを分ける）")
+    if sum((readonly, assets, organize)) > 1:
+        raise ValueError("--readonly・--assets・--organize は同時に使えません（トークンを分ける）")
+    if organize:
+        return list(DRIVE_SCOPES), token or organizer_token_path()
     if readonly:
         return list(DRIVE_READONLY_SCOPES), token or (token_path().parent / READONLY_TOKEN_NAME)
     if assets:
@@ -134,8 +153,8 @@ def serialize_token(credentials_json: str, *, one_line: bool) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    scopes, out = resolve_plan(args.readonly, args.token, assets=args.assets)
-    one_line = args.readonly or args.assets
+    scopes, out = resolve_plan(args.readonly, args.token, assets=args.assets, organize=args.organize)
+    one_line = args.readonly or args.assets or args.organize
 
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -166,6 +185,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.assets:
         print("（過程の資産を書くトークンです。アプリが作ったファイルだけ触れます。"
               "法人アカウントで同意してください）")
+    if args.organize:
+        print("（動画制作を整理するトークンです。Drive 全体に届きます。"
+              "法人アカウントで同意してください）")
 
     flow = InstalledAppFlow.from_client_secrets_file(str(secret), scopes)
     credentials = flow.run_local_server(port=0)
@@ -181,7 +203,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n完了しました。トークンを保存: {out}")
     print("このファイルは秘密です。共有しないでください。")
     if one_line:
-        env_name = ASSETS_TOKEN_JSON_ENV if args.assets else TOKEN_JSON_ENV
+        env_name = (ASSETS_TOKEN_JSON_ENV if args.assets else
+                    ORGANIZER_TOKEN_JSON_ENV if args.organize else TOKEN_JSON_ENV)
         print(
             f"\nクラウドのセッションで使うには、このファイルの中身（1行）を\n"
             f"環境変数 {env_name} に貼ってください。チャットには貼らないでください。"
