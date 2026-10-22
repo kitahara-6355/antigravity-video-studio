@@ -558,19 +558,22 @@
     {
       "id": "S27",
       "group": "書き出し",
-      "rule": "完成版の左上のロゴは書き出しで足す（raw には無い）。今の位置のまま残す",
+      "rule": "完成版の左上にロゴは足さない（raw には無い）。足すかどうかは backend/config/logo.json の1か所で決め、書き出す口はすべてそこに聞く",
       "from": {
-        "day": "2026-10-18",
+        "day": "2026-10-22",
         "by": "北原",
-        "said": "決定カード「残す」（左上のロゴ）"
+        "said": "左上画像入りのフェーズ１完成動画の画像を無くした物を、完全なフェーズ１完了動画としたい"
       },
-      "failure": "失敗ではなく確認。raw にロゴは無く、書き出しで足していると 10-18 に分かった",
+      "failure": "2026-10-18 は「残す」と決めていた（決定カード）。10-22 にロゴなしへ変えた。書き出しの口ごとにロゴを足していたので、1か所の設定にまとめた",
       "where": [
+        "backend/logo_policy.py::logo_enabled",
+        "backend/smart_cut_engine.py::_get_logo_path",
         "backend/agents/workers/render_worker.py::RenderWorker._overlay_logo"
       ],
       "tests": [
-        "backend/tests/test_logo_overlay.py::test_apply_logo_default_params",
-        "backend/tests/test_logo_overlay.py::test_apply_logo_success"
+        "backend/tests/test_logo_policy.py::test_the_shipped_setting_leaves_the_logo_out",
+        "backend/tests/test_logo_policy.py::test_the_burn_has_no_logo_when_off",
+        "backend/tests/test_logo_policy.py::test_the_render_worker_skips_the_logo_when_off"
       ],
       "check": null
     },

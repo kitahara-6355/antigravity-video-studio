@@ -165,8 +165,8 @@
     "src/gateway/endpoints.js|POST|/api/quality/decision/quick": "static_route_scan: routers/quality.py:128 POST /api/quality/decision/quick",
     "src/gateway/endpoints.js|POST|/api/quality/review/approve": "static_route_scan: routers/quality.py:182 POST /api/quality/review/approve",
     "src/gateway/endpoints.js|POST|/api/quality/undo-suggestion": "static_route_scan: routers/quality.py:166 POST /api/quality/undo-suggestion",
-    "src/gateway/endpoints.js|POST|/api/render": "static_route_scan: routers/render.py:478 POST /api/render",
-    "src/gateway/endpoints.js|POST|/api/render/start": "static_route_scan: routers/render.py:170 POST /api/render/start",
+    "src/gateway/endpoints.js|POST|/api/render": "static_route_scan: routers/render.py:479 POST /api/render",
+    "src/gateway/endpoints.js|POST|/api/render/start": "static_route_scan: routers/render.py:171 POST /api/render/start",
     "src/gateway/endpoints.js|POST|/api/rhythm/split": "static_route_scan: routers/legacy_production_router.py:157 POST /api/rhythm/split",
     "src/gateway/endpoints.js|POST|/api/segments": "static_route_scan: routers/segments.py:78 POST /api/segments",
     "src/gateway/endpoints.js|POST|/api/settings/identity": "static_route_scan: routers/legacy_management_router.py:197 POST /api/settings/identity",
@@ -1016,6 +1016,18 @@
       "before": "static_route_scan: routers/pipeline_router.py:951 WEBSOCKET /api/pipeline/ws/pipeline",
       "after": "static_route_scan: routers/pipeline_router.py:887 WEBSOCKET /api/pipeline/ws/pipeline",
       "reason": "R2-C1 の対処: pipeline_router.py の force-render から書き出しの本体（ffmpeg/コピー・evolution_log 記録・WS 通知・200 応答）を取り除き、承認へ案内する 409 にしたため、同ファイルの下側の経路の行番号が 64 行ずれた。経路・メソッド・当たり先のファイルはいずれも変わっていない（呼び出し先 95→95・新規0）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render",
+      "before": "static_route_scan: routers/render.py:478 POST /api/render",
+      "after": "static_route_scan: routers/render.py:479 POST /api/render",
+      "reason": "routers/render.py の先頭に logo_policy の import を1行足したため、同じハンドラの行番号が1つずれた（PR #100・ロゴの既定を設定に寄せる）"
+    },
+    {
+      "key": "src/gateway/endpoints.js|POST|/api/render/start",
+      "before": "static_route_scan: routers/render.py:170 POST /api/render/start",
+      "after": "static_route_scan: routers/render.py:171 POST /api/render/start",
+      "reason": "routers/render.py の先頭に logo_policy の import を1行足したため、同じハンドラの行番号が1つずれた（PR #100・ロゴの既定を設定に寄せる）"
     }
   ],
   "migrations": [

@@ -19,6 +19,7 @@ class TestSmartCutEngineCoverage:
     # 1. _get_logo_path
     # ==========================================
 
+    @patch.dict(os.environ, {"AVS_LOGO": "on"})  # ロゴを足す設定のときの道
     def test_get_logo_path_active_template(self):
         """template_config が active でロゴパスが存在する場合"""
         mock_tc_obj = MagicMock()
@@ -559,6 +560,7 @@ class TestSmartCutEngineCoverage:
             with pytest.raises(ValueError):
                 smart_cut_engine.render_smart_cut(segments, str(src), str(out))
 
+    @patch.dict(os.environ, {"AVS_LOGO": "on"})  # ロゴを足す設定のときの道
     def test_get_logo_path_default_logo_exists(self):
         """template_config からロゴ取得がスキップされ、デフォルトロゴが存在する場合"""
         mock_module = MagicMock()

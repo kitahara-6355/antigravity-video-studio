@@ -814,6 +814,7 @@ class TestC5Integration:
             mock_tc.get_subtitle_style.assert_called()
 
     @pytest.mark.asyncio
+    @patch.dict(os.environ, {"AVS_LOGO": "on"})  # ロゴを足す設定のときの道
     async def test_c5_04_logo_overlay_integration(self):
         """W3-C5-04: ロゴオーバーレイ統合(FIX-6A) — ロゴ有無の分岐"""
         import importlib
@@ -852,6 +853,7 @@ class TestC5Integration:
         assert logo is None
 
     @pytest.mark.asyncio
+    @patch.dict(os.environ, {"AVS_LOGO": "on"})  # ロゴを足す設定のときの道
     async def test_c5_05_hwaccel_filter_complex_compat(self):
         """W3-C5-05: hwaccel/filter_complex互換性 — ロゴ時はhwaccelスキップ"""
         import importlib

@@ -2124,6 +2124,7 @@ class TestRenderWorkerCoverageExpansion:
             Path(logo).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
+    @patch.dict(os.environ, {"AVS_LOGO": "on"})  # ロゴを足す設定のときの道
     async def test_cov_logo_overlay_exception(self):
         """Lines 235-237: ロゴ重畳中に例外が発生した場合のハンドリング"""
         preview = _make_preview_file(2 * 1024 * 1024)
