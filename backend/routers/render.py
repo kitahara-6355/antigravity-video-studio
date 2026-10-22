@@ -14,7 +14,7 @@ except ImportError:
 
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 import json
@@ -25,6 +25,7 @@ import logging
 import base64
 from io import BytesIO
 from PIL import Image
+from logo_policy import logo_enabled as logo_enabled_default
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class RenderStartRequest(BaseModel):
     bgm_volume: float = 50.0  # 0-100%
     bgm_ducking: bool = True
     lufs_target: float = -16.0
-    logo_enabled: bool = True
+    logo_enabled: bool = Field(default_factory=logo_enabled_default)
     logo_position: str = "top-right"  # top-left/top-right/bottom-left/bottom-right
     logo_opacity: float = 0.8
     logo_height: int = 50
@@ -121,7 +122,7 @@ _render_settings: Dict[str, Any] = {
     "bgm_volume": 50.0,
     "bgm_ducking": True,
     "lufs_target": -16.0,
-    "logo_enabled": True,
+    "logo_enabled": logo_enabled_default(),
     "logo_position": "top-right",
     "logo_opacity": 0.8,
     "logo_height": 50,

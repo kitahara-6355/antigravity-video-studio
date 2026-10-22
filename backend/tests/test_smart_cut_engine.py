@@ -21,7 +21,8 @@ def dummy_video(tmp_path):
     return video_path
 
 
-def test_get_logo_path_template_active(tmp_path):
+def test_get_logo_path_template_active(tmp_path, monkeypatch):
+    monkeypatch.setenv("AVS_LOGO", "on")  # ロゴを足す設定のときの道
     logo_path = tmp_path / "logo.png"
     logo_path.touch()
 
@@ -34,7 +35,8 @@ def test_get_logo_path_template_active(tmp_path):
         assert smart_cut_engine._get_logo_path() == str(logo_path)
 
 
-def test_get_logo_path_template_inactive_default_exists(tmp_path):
+def test_get_logo_path_template_inactive_default_exists(tmp_path, monkeypatch):
+    monkeypatch.setenv("AVS_LOGO", "on")  # ロゴを足す設定のときの道
     mock_config = MagicMock()
     mock_config.is_active = False
 

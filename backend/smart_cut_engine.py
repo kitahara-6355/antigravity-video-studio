@@ -27,7 +27,10 @@ if src_dir not in sys.path:
 
 
 def _get_logo_path() -> str | None:
-    """ロゴファイルのパスを取得（FIX-6A: ロゴ重畳復元）"""
+    """ロゴファイルのパスを取得（FIX-6A: ロゴ重畳復元）。ロゴなしの決まりなら None（logo_policy）"""
+    from logo_policy import logo_enabled
+    if not logo_enabled():
+        return None
     # テンプレート設定からロゴパスを取得
     try:
         from template_config import template_config

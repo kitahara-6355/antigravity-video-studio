@@ -339,6 +339,10 @@ class RenderWorker(PipelineStageWorker):
             final_path (str): 対象となる動画 of パス。
             ctx (PipelineContext, optional): パイプラインのコンテキスト。
         """
+        from logo_policy import logo_enabled
+        if not logo_enabled():
+            logger.info("🏷️ ロゴなし（backend/config/logo.json）")
+            return
         try:
             logo_path = None
             logo_position = (10, 10)
