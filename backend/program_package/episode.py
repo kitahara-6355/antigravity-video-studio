@@ -1,7 +1,9 @@
 """目視OKの完成版に、番組の飾り（OP・章の見出し・補足のテロップ・ED）を足す（AI を呼ばない・0円）。
 
 - 本編は完成版をそのまま使う（字幕は焼き込み済み）。絵の中身は1コマも変えない
-- OP: 本編の名場面をいくつかつなぎ、最後にタイトル（色紙と番組名・ゲスト名）
+- 番組 OP: これまでの対談のシーン集に音楽を付け、最後に番組名（どの回でも同じ）
+- 今回の OP: 本編の名場面をいくつかつなぎ、最後にタイトル（色紙と番組名・ゲスト名）
+- 名前のポップ: あいさつと紹介の所に、肩書きと名前
 - 章の見出し: 投稿パッケージのチャプターの時刻に、左上の壁の所へ数秒出す
 - 補足のテロップ: 知らないと分かりにくい言葉に、右上へ短い説明を出す
 - ED: プレゼントの告知とチャンネル登録の呼びかけ。右側は YouTube の終了画面を置く余白
@@ -66,6 +68,36 @@ def title_card(spec: dict, board: Image.Image, theme: dict) -> Image.Image:
     return im
 
 
+def program_card(spec: dict, theme: dict) -> Image.Image:
+    """番組 OP の最後の1枚（番組名）。どの回でも同じものを出す。"""
+    p = spec["program_opening"]
+    im = th.background(theme)
+    d = ImageDraw.Draw(im)
+    f = th.font("mincho", 96)
+    w = d.textlength(p["name"], font=f)
+    d.line([(W / 2 - w / 2, 250), (W / 2 + w / 2, 250)], fill=GOLD_LINE, width=3)
+    th.gradient_text(im, (W / 2, 390), p["name"], f, th.GOLD, anchor="ms", stroke=10)
+    d.line([(W / 2 - w / 2, 440), (W / 2 + w / 2, 440)], fill=GOLD_LINE, width=3)
+    for i, line in enumerate(p.get("tagline", [])):
+        outlined(d, (W / 2, 510 + 46 * i), line, 32, anchor="ms")
+    return im
+
+
+def name_card(lines: list[str], name: str, y: int, right: int | None = None) -> Image.Image:
+    """名前のポップ（肩書きと名前）。右寄せで、その人の近くの壁の所に出す（right は右端の x）。"""
+    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    right = right or th.FRAME[2] - 40
+    sf, nf = th.font("gothic", 24), th.font("mincho", 56)
+    for i, line in enumerate(lines):
+        d.text((right, y + 30 * i), line, font=sf, fill="white", anchor="ra", stroke_width=4, stroke_fill=INK)
+    ly = y + 30 * len(lines) + 8
+    w = max(d.textlength(name, font=nf), *(d.textlength(t, font=sf) for t in lines)) if lines else d.textlength(name, font=nf)
+    d.line([(right - w, ly), (right, ly)], fill=GOLD_LINE + (255,), width=2)
+    th.gradient_text(im, (right, ly + 66), name, nf, th.GOLD, anchor="rs", stroke=8)
+    return im
+
+
 def chapter_card(n: int, text: str) -> Image.Image:
     """章の見出し（C2: 帯なし・金の章番号と白い縁取りの明朝）。透明の1枚で、左上の壁の所に出す。
 
@@ -122,11 +154,22 @@ def shifted_chapters(spec: dict, op_len: float) -> list[tuple[int, str]]:
     return out
 
 
+def program_length(spec: dict) -> float:
+    p = spec.get("program_opening")
+    if not p:
+        return 0.0
+    cuts = sum(c["to"] - c["from"] for c in p["cuts"])
+    return cuts + p["logo_seconds"] - FADE * len(p["cuts"])
+
+
 def op_length(spec: dict) -> float:
+    """本編より前の長さ。番組 OP（あれば）→ 今回の名場面 → タイトル。つなぎ目はどれも短く重ねる。"""
     o = spec["opening"]
     cuts = sum(b - a for a, b in o["cuts"])
-    n = len(o["cuts"]) + 1  # 名場面のつなぎ目と、タイトルへのつなぎ目は重ねる
-    return cuts + o["title_seconds"] - FADE * (n - 1)
+    n = len(o["cuts"]) + 1
+    episode = cuts + o["title_seconds"] - FADE * (n - 1)
+    prog = program_length(spec)
+    return prog + episode - FADE if prog else episode
 
 
 def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
@@ -134,9 +177,13 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
     board, theme = board_of(spec)
     body = ch.parse(Path(spec["package"]).read_text(encoding="utf-8"))
     cards = {"title": title_card(spec, board, theme), "ending": end_card(spec, board, theme)}
+    if spec.get("program_opening"):
+        cards["program"] = program_card(spec, theme)
     for n, (t, title) in enumerate(body, start=1):
-        if n > 1 and title not in spec.get("chapters_skip", []):
+        if title not in spec.get("chapters_skip", []):
             cards[f"ch{n:02d}"] = chapter_card(n, title)
+    for i, pop in enumerate(spec.get("name_pops", [])):
+        cards[f"np{i:02d}"] = name_card(pop["lines"], pop["name"], pop["y"], pop.get("right"))
     for i, tp in enumerate(spec.get("telops", [])):
         cards[f"tp{i:02d}"] = telop_card(tp["head"], tp["body"])
     if cards_only:
@@ -152,7 +199,10 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
         for k, im in cards.items():
             im.save(tmp / f"{k}.png")
         graph, inputs = _graph(spec, body, dur, tmp)
-        dst = out / f"{spec['recording']}_{spec['version']}.mp4"
+        music = (spec.get("program_opening") or {}).get("music") or {}
+        # 仮の曲を入れた版は公開に使わない。名前で分かるようにする
+        tag = "_仮曲入り" if music.get("provisional") else ""
+        dst = out / f"{spec['recording']}_{spec['version']}{tag}.mp4"
         subprocess.run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", graph,
                         "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "20", "-preset", "medium",
                         "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
@@ -167,39 +217,83 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
     return dst
 
 
+def _raw_range(c: dict) -> tuple[str, float, float]:
+    """番組 OP の場面は字幕の無い raw から取る。from/to はその回の完成版の時刻で、lock で raw に直す。"""
+    if "lock" not in c:
+        return c["source"], c["from"], c["to"]
+    from backend.program_package.shorts import raw_pieces
+    ranges = [(float(a), float(b)) for a, b in json.loads(Path(c["lock"]).read_text(encoding="utf-8"))["ranges"]]
+    pieces = raw_pieces(c["from"], c["to"], ranges)
+    if len(pieces) != 1:
+        raise SystemExit(f"番組 OP の場面 {c['from']}〜{c['to']} が編集のつなぎ目をまたいでいる。1つの区間に収める")
+    return c["raw"], *pieces[0]
+
+
+def _chain(g: list[str], clips: list[tuple[str, str, float]], tag: str) -> tuple[str, str, float]:
+    """絵と音の組を順につなぐ。つなぎ目は FADE 秒重ねる。"""
+    v, a, length = clips[0]
+    for j, (nv, na, nl) in enumerate(clips[1:]):
+        g.append(f"[{v}][{nv}]xfade=transition=fade:duration={FADE}:offset={length - FADE:.3f}[{tag}v{j}];"
+                 f"[{a}][{na}]acrossfade=d={FADE}[{tag}a{j}]")
+        v, a, length = f"{tag}v{j}", f"{tag}a{j}", length + nl - FADE
+    return v, a, length
+
+
 def _graph(spec: dict, body, dur: float, tmp: Path) -> tuple[str, list[str]]:
-    o, e = spec["opening"], spec["ending"]
+    o, e, p = spec["opening"], spec["ending"], spec.get("program_opening")
     src = spec["source"]
     inputs = ["-i", src, "-loop", "1", "-framerate", "30", "-t", str(o["title_seconds"]), "-i", str(tmp / "title.png"),
               "-loop", "1", "-framerate", "30", "-t", str(e["seconds"]), "-i", str(tmp / "ending.png")]
     g = []
-    # OP: 名場面をつなぎ（つなぎ目は短く重ねる）、最後にタイトル。
-    # 名場面は場面ごとに別の入力として読む（本編と同じ入力から切ると、そこまでの本編のコマを
-    # 全部メモリに溜めてしまい、42分の本編では落ちる）
     n_in = 3
-    for i, (a, b) in enumerate(o["cuts"]):
-        inputs += ["-ss", f"{a:.3f}", "-t", f"{b - a:.3f}", "-i", src]
-        g.append(f"[{n_in}:v]setpts=PTS-STARTPTS,fps=30,format=yuv420p[ov{i}];"
-                 f"[{n_in}:a]asetpts=PTS-STARTPTS[oa{i}]")
+
+    def cut(path: str, a: float, b: float, tag: str) -> tuple[str, str, float]:
+        # 場面ごとに別の入力として読む（本編と同じ入力から切ると、そこまでの本編のコマを
+        # 全部メモリに溜めてしまい、42分の本編では落ちる）
+        nonlocal n_in
+        inputs.extend(["-ss", f"{a:.3f}", "-t", f"{b - a:.3f}", "-i", path])
+        g.append(f"[{n_in}:v]setpts=PTS-STARTPTS,fps=30,format=yuv420p,scale={W}:{H}[{tag}v];"
+                 f"[{n_in}:a]asetpts=PTS-STARTPTS,aformat=sample_rates=48000:channel_layouts=stereo[{tag}a]")
         n_in += 1
+        return f"{tag}v", f"{tag}a", b - a
+
+    def still(png: Path, sec: float, tag: str) -> tuple[str, str, float]:
+        nonlocal n_in
+        inputs.extend(["-loop", "1", "-framerate", "30", "-t", f"{sec}", "-i", str(png)])
+        g.append(f"[{n_in}:v]format=yuv420p,fps=30[{tag}v];anullsrc=r=48000:cl=stereo,atrim=0:{sec}[{tag}a]")
+        n_in += 1
+        return f"{tag}v", f"{tag}a", sec
+
+    # 今回の名場面 → タイトル
+    clips = [cut(src, a, b, f"o{i}") for i, (a, b) in enumerate(o["cuts"])]
     g.append(f"[1:v]format=yuv420p,fps=30[tv];anullsrc=r=48000:cl=stereo,atrim=0:{o['title_seconds']}[ta]")
-    clips = [(f"ov{i}", f"oa{i}", b - a) for i, (a, b) in enumerate(o["cuts"])] + [("tv", "ta", o["title_seconds"])]
-    v, a, length = clips[0]
-    for j, (nv, na, nl) in enumerate(clips[1:]):
-        g.append(f"[{v}][{nv}]xfade=transition=fade:duration={FADE}:offset={length - FADE:.3f}[xv{j}];"
-                 f"[{a}][{na}]acrossfade=d={FADE}[xa{j}]")
-        v, a, length = f"xv{j}", f"xa{j}", length + nl - FADE
-    op_v, op_a = v, a
-    # 本編: 章の見出しとテロップを、時刻の所でふわっと出して消す
-    cur = "[0:v]fps=30,format=yuv420p[m0]"
-    g.append(cur)
+    op_v, op_a, op_l = _chain(g, [*clips, ("tv", "ta", o["title_seconds"])], "x")
+    # 番組 OP（どの回でも同じ。これまでの対談のシーン集 → 番組名）。音楽があれば音は音楽だけにする
+    if p:
+        pclips = [cut(*_raw_range(c), f"p{i}") for i, c in enumerate(p["cuts"])]
+        pclips.append(still(tmp / "program.png", p["logo_seconds"], "pl"))
+        pv, pa, pl = _chain(g, pclips, "y")
+        music = p.get("music")
+        if music:
+            inputs.extend(["-i", music["path"]])
+            st = music.get("start", 0.0)  # 曲のどこから使うか（番組名で盛り上がる所に合わせる）
+            g.append(f"[{n_in}:a]atrim={st}:{st + pl:.3f},asetpts=PTS-STARTPTS,"
+                     f"aformat=sample_rates=48000:channel_layouts=stereo,volume={music.get('volume', 1.0)},"
+                     f"afade=t=in:d=0.3,afade=t=out:st={pl - 1.5:.3f}:d=1.5[pm]")
+            n_in += 1
+            pa = "pm"
+        op_v, op_a, op_l = _chain(g, [(pv, pa, pl), (op_v, op_a, op_l)], "z")
+    # 本編: 章の見出し・テロップ・名前のポップを、時刻の所でふわっと出して消す
+    g.append("[0:v]fps=30,format=yuv420p[m0]")
     m = "m0"
     shows = []
     for n, (t, title) in enumerate(body, start=1):
         if (tmp / f"ch{n:02d}.png").exists():
-            shows.append((tmp / f"ch{n:02d}.png", t + 1.0, spec.get("chapter_seconds", 4.0)))
+            shows.append((tmp / f"ch{n:02d}.png", t + (0.5 if n == 1 else 1.0), spec.get("chapter_seconds", 4.0)))
     for i, tp in enumerate(spec.get("telops", [])):
         shows.append((tmp / f"tp{i:02d}.png", tp["at"], tp.get("seconds", 5.0)))
+    for i, pop in enumerate(spec.get("name_pops", [])):
+        shows.append((tmp / f"np{i:02d}.png", pop["at"], pop.get("seconds", 7.0)))
     for k, (png, at, sec) in enumerate(shows):
         inputs += ["-loop", "1", "-framerate", "30", "-t", f"{sec:.2f}", "-i", str(png)]
         g.append(f"[{n_in}:v]format=rgba,fade=in:st=0:d={FADE}:alpha=1,fade=out:st={sec - FADE:.2f}:d={FADE}:alpha=1,"

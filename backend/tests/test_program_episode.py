@@ -29,6 +29,26 @@ def spec():
 def test_op_length_counts_the_overlapping_joins():
     s = {"opening": {"cuts": [[0, 5], [10, 14]], "title_seconds": 3}}
     assert ep.op_length(s) == 5 + 4 + 3 - ep.FADE * 2
+    # 番組 OP があれば前に足す（場面2つ＋番組名、今回の OP とのつなぎ目も重ねる）
+    s["program_opening"] = {"cuts": [{"from": 0, "to": 2}, {"from": 5, "to": 8}], "logo_seconds": 4}
+    assert ep.program_length(s) == 2 + 3 + 4 - ep.FADE * 2
+    assert ep.op_length(s) == ep.program_length(s) + (5 + 4 + 3 - ep.FADE * 2) - ep.FADE
+
+
+def test_every_chapter_gets_a_heading_including_the_first():
+    s = spec()
+    body = ch.parse((ROOT / s["package"]).read_text(encoding="utf-8"))
+    shown = [title for title in (t for _, t in body) if title not in s["chapters_skip"]]
+    assert shown[0] == body[0][1]  # 第1章も出す（2026-10-23 北原さん）
+    assert s["chapter_seconds"] >= 8
+
+
+def test_name_pops_for_host_and_guest_do_not_overlap():
+    s = spec()
+    pops = sorted((p["at"], p["at"] + p.get("seconds", 7.0)) for p in s["name_pops"])
+    assert {p["name"] for p in s["name_pops"]} >= {"北原美麗", "久木田ヒロノブ"}
+    for (_, a1), (b0, _) in pairwise(pops):
+        assert a1 <= b0
 
 
 def test_chapters_are_shifted_by_the_opening_and_still_valid():
@@ -51,7 +71,7 @@ def test_overlays_never_overlap_each_other():
     s = spec()
     body = ch.parse((ROOT / s["package"]).read_text(encoding="utf-8"))
     shows = [(t + 1.0, t + 1.0 + s["chapter_seconds"]) for n, (t, title) in enumerate(body, 1)
-             if n > 1 and title not in s["chapters_skip"]]
+             if title not in s["chapters_skip"]]
     shows += [(tp["at"], tp["at"] + tp.get("seconds", 5.0)) for tp in s["telops"]]
     shows.sort()
     for (a0, a1), (b0, _) in pairwise(shows):
