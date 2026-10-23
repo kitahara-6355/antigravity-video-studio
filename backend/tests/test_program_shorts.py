@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from backend.program_package import shorts as sh
 
 SEGS = [
@@ -11,6 +13,12 @@ SEGS = [
 ]
 SPEC = Path(__file__).resolve().parents[1] / "config" / "shorts" / "20250922_久木田ヒロノブ.json"
 
+
+
+def needs_fonts():
+    # フォントは gitignore（Google Fonts から取る）なので、CI には無い。文字を描くテストだけ飛ばす
+    if not all((sh.th.FONT_DIR / f).exists() for f in sh.th.FONTS.values()):
+        pytest.skip("フォントが無い（python -m backend.program_package.thumbnail --fetch-fonts）")
 
 def test_cue_times_snap_to_the_whole_subtitle():
     # "0:13" は2つめの字幕の出だし → 終わりはその字幕の終わりまで
@@ -55,6 +63,7 @@ def test_a_framed_panel_keeps_the_picture_shape_and_centre():
 
 
 def test_the_frame_surrounds_the_picture():
+    needs_fonts()
     im = sh.card(["あ", "い"], "う", sh.LILAC, {"inset": 40, "width": 14, "shadow": True})
     x, y, w, h = sh.panel({"inset": 40})
     gold = sh.GOLD_FRAME

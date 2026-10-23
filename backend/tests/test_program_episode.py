@@ -3,12 +3,20 @@ import json
 from itertools import pairwise
 from pathlib import Path
 
+import pytest
+
 from backend.program_package import chapters as ch
 from backend.program_package import episode as ep
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = ROOT / "backend" / "config" / "episode" / "20250922_久木田ヒロノブ.json"
 
+
+
+def needs_fonts():
+    # フォントは gitignore（Google Fonts から取る）なので、CI には無い。文字を描くテストだけ飛ばす
+    if not all((ep.th.FONT_DIR / f).exists() for f in ep.th.FONTS.values()):
+        pytest.skip("フォントが無い（python -m backend.program_package.thumbnail --fetch-fonts）")
 
 def spec():
     return json.loads(SPEC.read_text(encoding="utf-8"))
@@ -47,6 +55,7 @@ def test_overlays_never_overlap_each_other():
 
 
 def test_telop_stays_in_the_picture_and_above_the_subtitles():
+    needs_fonts()
     im = ep.telop_card("剣閃", "久木田先生が作った筆文字フォント\n「鬼滅の刃」で使われている")
     x0, y0, x1, y1 = im.getbbox()
     fx0, fy0, fx1, _ = ep.th.FRAME
@@ -54,6 +63,7 @@ def test_telop_stays_in_the_picture_and_above_the_subtitles():
 
 
 def test_chapter_heading_sits_just_under_the_top_of_the_picture():
+    needs_fonts()
     # 美麗さんの頭に近づかないよう上に詰める（2026-10-23 北原さん）。絵の外（黒い縁）には出ない
     x0, y0, _, y1 = ep.chapter_card(7, "フォント「剣閃」と「鬼滅の刃」").getbbox()
     assert ep.th.FRAME[1] <= y0 and y1 <= 140 and x0 >= ep.th.FRAME[0]
