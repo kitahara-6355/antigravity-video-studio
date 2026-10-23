@@ -503,6 +503,96 @@
       "confirmed": true,
       "usage_count": 0,
       "created_at": "2026-10-19T08:30:00Z"
+    },
+    {
+      "id": "pn_212",
+      "incorrect": "上野雅美",
+      "correct": "上野雅巳",
+      "type": "person_name",
+      "context_hint": "2025-10-20 対談（ゲスト 上野雅巳先生・堀口記念病院 院長）の当日手持ち台本から",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_213",
+      "incorrect": "上野麻美",
+      "correct": "上野雅巳",
+      "type": "person_name",
+      "context_hint": "2025-10-20 対談（ゲスト 上野雅巳先生・堀口記念病院 院長）の当日手持ち台本から",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_214",
+      "incorrect": "上野正美",
+      "correct": "上野雅巳",
+      "type": "person_name",
+      "context_hint": "2025-10-20 対談（ゲスト 上野雅巳先生・堀口記念病院 院長）の当日手持ち台本から",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_215",
+      "incorrect": "上野和美",
+      "correct": "上野雅巳",
+      "type": "person_name",
+      "context_hint": "2025-10-20 対談（ゲスト 上野雅巳先生・堀口記念病院 院長）の当日手持ち台本から",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_216",
+      "incorrect": "上野正巳",
+      "correct": "上野雅巳",
+      "type": "person_name",
+      "context_hint": "2025-10-20 対談（ゲスト 上野雅巳先生・堀口記念病院 院長）の当日手持ち台本から",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_217",
+      "incorrect": "美玲チャンネル",
+      "correct": "美麗チャンネル",
+      "type": "channel_name",
+      "context_hint": "番組名（当日手持ち台本「美麗チャンネル 第2回」）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_218",
+      "incorrect": "美礼チャンネル",
+      "correct": "美麗チャンネル",
+      "type": "channel_name",
+      "context_hint": "番組名（当日手持ち台本「美麗チャンネル 第2回」）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_219",
+      "incorrect": "美鈴チャンネル",
+      "correct": "美麗チャンネル",
+      "type": "channel_name",
+      "context_hint": "番組名（当日手持ち台本「美麗チャンネル 第2回」）",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
+    },
+    {
+      "id": "pn_220",
+      "incorrect": "堀口記念病院委員長",
+      "correct": "堀口記念病院院長",
+      "type": "title",
+      "context_hint": "2025-10-20 対談（ゲスト 上野雅巳先生・堀口記念病院 院長）の当日手持ち台本から",
+      "confirmed": true,
+      "usage_count": 0,
+      "created_at": "2026-10-23T15:40:00Z"
     }
   ],
   "pending_confirmations": []
