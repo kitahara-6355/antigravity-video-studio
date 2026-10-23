@@ -3,7 +3,8 @@
   "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json",
   "subtitles": "v62.subtitles.json",
   "names": "書家 北原美麗 × 久木田ヒロノブ",
-  "background": {"name": "A 深紫", "light": [104, 50, 90], "deep": [28, 10, 26]},
+  "background": {"name": "薄紫（美麗書院のテーマカラー）", "light": [214, 178, 196], "deep": [92, 52, 78]},
+  "frame": {"name": "H 額縁で四方を囲む", "inset": 40, "width": 14, "shadow": true},
   "note": "時刻は完成版（v62）の時刻。\"m:ss\" は字幕の出だしに合わせ、終わりはその字幕の終わりまで。秒の数はそのまま使う（字幕の無い揮毫の場面など）",
   "clips": [
     {"key": "S1", "title": ["「鬼滅の刃」に使われた", "筆文字フォント"], "parts": [["15:02", "15:53"]]},

@@ -44,3 +44,19 @@ def test_every_clip_fits_a_short():
     assert len(keys) == len(set(keys))
     for c in spec["clips"]:
         assert len(c["title"]) == 2 and c["parts"]
+
+
+def test_a_framed_panel_keeps_the_picture_shape_and_centre():
+    x, y, w, h = sh.panel({"inset": 40})
+    assert (x, w) == (40, sh.W - 80) and h % 2 == 0
+    assert abs(w / h - sh.W / sh.VIDEO_H) < 0.01
+    assert y + h / 2 == sh.VIDEO_Y + sh.VIDEO_H / 2
+    assert sh.panel(None) == (0, sh.VIDEO_Y, sh.W, sh.VIDEO_H)
+
+
+def test_the_frame_surrounds_the_picture():
+    im = sh.card(["あ", "い"], "う", sh.LILAC, {"inset": 40, "width": 14, "shadow": True})
+    x, y, w, h = sh.panel({"inset": 40})
+    gold = sh.GOLD_FRAME
+    assert im.getpixel((x - 8, y + h // 2)) == gold and im.getpixel((x + w + 6, y + h // 2)) == gold
+    assert im.getpixel((sh.W // 2, y - 8)) == gold

@@ -24,6 +24,9 @@ from backend.program_package import thumbnail as th
 
 W, H = 1080, 1920
 VIDEO_Y = 640  # 対談の絵の上端
+VIDEO_H = 612  # 幅いっぱいのときの絵の高さ
+GOLD_FRAME = (196, 156, 72)
+LILAC = {"light": [214, 178, 196], "deep": [92, 52, 78]}  # 美麗書院の薄紫（収録の壁の色）
 LEAD, TAIL = 0.25, 0.35  # 字幕の出だしの少し前から、終わりの少し後まで
 
 
@@ -86,9 +89,22 @@ def ass(cues) -> str:
     return head + "\n".join(lines) + "\n"
 
 
-def card(title: list[str], names: str, theme: dict) -> Image.Image:
-    """動かない部分（背景・キャッチ・名前）を1枚に描く。"""
+def panel(frame: dict | None) -> tuple[int, int, int, int]:
+    """対談の絵を置く所（左・上・幅・高さ）。inset は左右の余白で、額縁で四方を囲むときに使う。"""
+    inset = (frame or {}).get("inset", 0)
+    w = W - 2 * inset
+    h = round(VIDEO_H * w / W / 2) * 2
+    return inset, VIDEO_Y + (VIDEO_H - h) // 2, w, h
+
+
+def card(title: list[str], names: str, theme: dict, frame: dict | None = None) -> Image.Image:
+    """動かない部分（背景・キャッチ・名前・絵の枠）を1枚に描く。
+
+    frame: {"inset": 左右の余白, "width": 金の枠の太さ, "shadow": 影の有無}。
+    無いときは幅いっぱいの絵の上下に細い金の線。
+    """
     import numpy as np
+    from PIL import ImageFilter
     y = np.linspace(0, 1, H)[:, None]
     x = np.linspace(-1, 1, W)[None, :]
     glow = np.clip(1 - (x ** 2 * 0.6 + (y - 0.3) ** 2 * 1.6), 0, 1) ** 1.2
@@ -104,7 +120,23 @@ def card(title: list[str], names: str, theme: dict) -> Image.Image:
     f = th.font("mincho", min(100, int(100 * (W - 120) / longest)))
     th.gradient_text(im, (W / 2, 330), title[0], f, th.RED, anchor="ms", stroke=9)
     th.gradient_text(im, (W / 2, 470), title[1], f, th.GOLD, anchor="ms", stroke=9)
-    d.rectangle([0, VIDEO_Y - 6, W, VIDEO_Y + 618], fill=(196, 156, 72))  # 金の細い枠
+    frame = frame or {}
+    bw = frame.get("width", 6)
+    x, y, w, h = panel(frame)
+    box = [x - bw if x else 0, y - bw, x + w + bw if x else W, y + h + bw]
+    if frame.get("shadow"):
+        m = Image.new("L", im.size, 0)
+        ImageDraw.Draw(m).rectangle([box[0] + 2, box[1] + 8, box[2] - 2, box[3] + 16], fill=170)
+        im = Image.composite(Image.new("RGB", im.size, (30, 8, 26)), im, m.filter(ImageFilter.GaussianBlur(28)))
+        d = ImageDraw.Draw(im)
+    d.rectangle(box, fill=GOLD_FRAME)
+    if bw >= 10:  # 太い枠は上と左を明るく、下と右を暗くして額縁に見せる
+        x0, y0, x1, y1 = box
+        d.rectangle([x0, y0, x1, y0 + 3], fill=(240, 214, 150))
+        d.rectangle([x0, y1 - 3, x1, y1], fill=(120, 88, 34))
+        if x:
+            d.rectangle([x0, y0, x0 + 3, y1], fill=(240, 214, 150))
+            d.rectangle([x1 - 3, y0, x1, y1], fill=(120, 88, 34))
     nf = th.font("mincho", 44)
     d.text((W / 2, 560), names, font=nf, fill="white", anchor="ms", stroke_width=5, stroke_fill=(40, 16, 36))
     return im
@@ -114,11 +146,13 @@ def render(spec: dict, clip: dict, raw: Path, segments: list[dict], out: Path) -
     ranges = [(float(a), float(b)) for a, b in json.loads(Path(spec["lock"]).read_text(encoding="utf-8"))["ranges"]]
     parts = [snap(p, segments) for p in clip["parts"]]
     pieces = [rp for a, b in parts for rp in raw_pieces(a, b, ranges)]
-    # 背景は動画の壁（薄紫）と同化しない色にする（2026-10-23 北原さん）
-    theme = spec.get("background", {"light": [104, 50, 90], "deep": [28, 10, 26]})
+    # 背景は薄紫のまま。壁と同化しないよう、枠（frame）で絵を分ける（2026-10-23 北原さん）
+    theme = spec.get("background", LILAC)
+    frame = spec.get("frame")
+    px, py, pw, ph = panel(frame)
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        card(clip["title"], spec["names"], theme).save(tmp / "card.png")
+        card(clip["title"], spec["names"], theme, frame).save(tmp / "card.png")
         (tmp / "subs.ass").write_text(ass(clip_cues(parts, segments)), encoding="utf-8")
         fx, fy, fx2, fy2 = th.FRAME
         trims = "".join(
@@ -126,8 +160,8 @@ def render(spec: dict, clip: dict, raw: Path, segments: list[dict], out: Path) -
             for i, (a, b) in enumerate(pieces))
         joined = "".join(f"[v{i}][a{i}]" for i in range(len(pieces)))
         graph = (f"{trims}{joined}concat=n={len(pieces)}:v=1:a=1[cv][ca];"
-                 f"[cv]crop={fx2 - fx}:{fy2 - fy}:{fx}:{fy},scale={W}:-2[sv];"
-                 f"[1:v][sv]overlay=0:{VIDEO_Y}:shortest=1[bg];"
+                 f"[cv]crop={fx2 - fx}:{fy2 - fy}:{fx}:{fy},scale={pw}:{ph}[sv];"
+                 f"[1:v][sv]overlay={px}:{py}:shortest=1[bg];"
                  f"[bg]ass={tmp / 'subs.ass'}:fontsdir={th.FONT_DIR}[out]")
         dst = out / f"{spec['recording']}_{clip['key']}.mp4"
         start = max(0.0, pieces[0][0] - 1)
