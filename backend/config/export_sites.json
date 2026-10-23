@@ -252,6 +252,16 @@
       ]
     },
     {
+      "id": "backend/program_package/thumbnail.py::main",
+      "file": "backend/program_package/thumbnail.py",
+      "symbol": "main",
+      "status": "intermediate",
+      "reason": "番組のサムネイルの**画像**（png）と切り抜き候補の一覧（jpg）を作る。動画を1バイトも書かないので、この条件の「書き出し」には当たらない（走査は関数名 compose に掛かった）",
+      "tools": [
+        "compose"
+      ]
+    },
+    {
       "id": "backend/progressive_preview.py::ProgressivePreview.create_comparison_image",
       "file": "backend/progressive_preview.py",
       "symbol": "ProgressivePreview.create_comparison_image",

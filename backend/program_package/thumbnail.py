@@ -135,7 +135,8 @@ def gradient_text(im: Image.Image, xy, s: str, f, colors=GOLD, anchor: str = "ls
 
 def boxed(im: Image.Image, cx: float, y: float, s: str, f) -> None:
     d = ImageDraw.Draw(im)
-    tw = d.textlength(s, font=f); h = f.size + 26
+    tw = d.textlength(s, font=f)
+    h = f.size + 26
     d.rectangle([cx - tw / 2 - 26, y, cx + tw / 2 + 26, y + h], fill=(10, 8, 10), outline=(196, 156, 72), width=3)
     d.rectangle([cx - tw / 2 - 20, y + 6, cx + tw / 2 + 20, y + h - 6], outline=(120, 92, 40), width=1)
     d.text((cx, y + h / 2), s, font=f, fill=(255, 236, 180), anchor="mm")
@@ -152,7 +153,8 @@ def vertical(im: Image.Image, x: float, y: float, s: str, f) -> None:
 
 
 def background(theme: dict) -> Image.Image:
-    y = np.linspace(0, 1, H)[:, None]; x = np.linspace(-1, 1, W)[None, :]
+    y = np.linspace(0, 1, H)[:, None]
+    x = np.linspace(-1, 1, W)[None, :]
     glow = np.clip(1 - (x ** 2 * 0.75 + (y - 0.38) ** 2 * 1.8), 0, 1) ** 1.2
     light, deep = np.array(theme["light"]), np.array(theme["deep"])
     a = deep + (light - deep) * glow[..., None]
@@ -166,7 +168,9 @@ def background(theme: dict) -> Image.Image:
 
 
 def shade(im: Image.Image, color, frm: float = 0.58, mx: int = 235) -> Image.Image:
-    sh = Image.new("L", (W, H), 0); d = ImageDraw.Draw(sh); top = int(H * frm)
+    sh = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(sh)
+    top = int(H * frm)
     for y in range(top, H):
         d.line([(0, y), (W, y)], fill=int(mx * min(1, 1.5 * (y - top) / (H - top))))
     return Image.composite(Image.new("RGB", (W, H), tuple(color)), im, sh)
@@ -221,7 +225,8 @@ def options(spec: dict, raw: Path) -> Image.Image:
     """切り抜きの候補を記号と本編の時刻つきで並べる（人が選ぶ）。"""
     lab = font("gothic", 30)
     n = max(len(spec["left"]), len(spec["right"]))
-    sheet = Image.new("RGB", (n * 320, 800), (60, 30, 52)); d = ImageDraw.Draw(sheet)
+    sheet = Image.new("RGB", (n * 320, 800), (60, 30, 52))
+    d = ImageDraw.Draw(sheet)
     for r, which in enumerate(("left", "right")):
         for i, (key, at) in enumerate(spec[which].items()):
             tile = Image.new("RGB", (640, 740), (176, 130, 150))

@@ -89,7 +89,8 @@ def ass(cues) -> str:
 def card(title: list[str], names: str, theme: dict) -> Image.Image:
     """動かない部分（背景・キャッチ・名前）を1枚に描く。"""
     import numpy as np
-    y = np.linspace(0, 1, H)[:, None]; x = np.linspace(-1, 1, W)[None, :]
+    y = np.linspace(0, 1, H)[:, None]
+    x = np.linspace(-1, 1, W)[None, :]
     glow = np.clip(1 - (x ** 2 * 0.6 + (y - 0.3) ** 2 * 1.6), 0, 1) ** 1.2
     light, deep = np.array(theme["light"]), np.array(theme["deep"])
     a = deep + (light - deep) * glow[..., None]
@@ -155,7 +156,8 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
     spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
     segments = json.loads(Path(a.subs).read_text(encoding="utf-8"))["segments"]
-    out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
     for clip in spec["clips"]:
         if a.only and clip["key"] not in a.only:
             continue
