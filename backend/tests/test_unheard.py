@@ -49,7 +49,7 @@ def test_mean_level_is_measured_from_the_media(tmp_path):
     quiet, loud = tmp_path / "q.wav", tmp_path / "l.wav"
     for path, vol in ((quiet, "0.003"), (loud, "0.5")):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
-                        f"sine=frequency=300:duration=3", "-af", f"volume={vol}", str(path)], check=True)
+                        "sine=frequency=300:duration=3", "-af", f"volume={vol}", str(path)], check=True)
     assert unheard.mean_db(quiet, 0, 2) < unheard.QUIET_DB < unheard.mean_db(loud, 0, 2)
 
 
