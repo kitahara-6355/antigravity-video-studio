@@ -1,0 +1,24 @@
+{
+  "recording": "20250922_久木田ヒロノブ",
+  "version": "v63",
+  "source": "/home/user/work/v62/v62.mp4",
+  "raw": "/home/user/work/raw4_concat.mp4",
+  "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json",
+  "thumbnail": "backend/config/thumbnails/20250922_久木田ヒロノブ.json",
+  "package": ".claude/skills/program-package/examples/20250922_久木田ヒロノブ_投稿パッケージ_v1.txt",
+  "note": "時刻はすべて完成版（v62）の時刻。source・raw・lock は作業場の場所なので、動かす所に合わせて書き換える",
+  "title": {"series": "美麗の書道対談", "episode": "第1回", "tag": "デザイン書道の第一人者", "guest": "久木田ヒロノブ", "host": "聞き手　書家 北原美麗"},
+  "opening": {"cuts": [[948.35, 956.2], [1828.5, 1833.4], [1841.5, 1845.5]], "title_seconds": 3.5},
+  "op_chapter": "オープニング",
+  "chapter_seconds": 4.0,
+  "chapters_skip": ["エンディング"],
+  "telops": [
+    {"at": 339.0, "head": "はごろもフーズ「シーチキン」", "body": "デビュー作はその雑誌広告の筆文字"},
+    {"at": 451.0, "head": "Be Original", "body": "シャープの撮影で\nシャープペンで書いた言葉"},
+    {"at": 902.0, "head": "剣閃", "body": "久木田先生が作った筆文字フォント\n「鬼滅の刃」で使われている"},
+    {"at": 1364.0, "head": "文房四宝", "body": "筆・墨・硯・紙の4つの道具"},
+    {"at": 1900.0, "head": "『墨』", "body": "芸術新聞社の書道の専門誌"},
+    {"at": 2269.5, "head": "イタチの毛", "body": "筆の材料。2022年から入ってこない"}
+  ],
+  "ending": {"seconds": 20, "gift_title": "「縁」の作品をプレゼント", "gift_lines": ["久木田先生が書いた「縁」を1名さまに", "応募はこの動画のコメント欄へ", "締切【未定】"], "subscribe": "チャンネル登録をお願いします"}
+}

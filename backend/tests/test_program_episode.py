@@ -1,0 +1,59 @@
+"""完成版に OP・章の見出し・テロップ・ED を足す道具（backend/program_package/episode.py）。"""
+import json
+from itertools import pairwise
+from pathlib import Path
+
+from backend.program_package import chapters as ch
+from backend.program_package import episode as ep
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "backend" / "config" / "episode" / "20250922_久木田ヒロノブ.json"
+
+
+def spec():
+    return json.loads(SPEC.read_text(encoding="utf-8"))
+
+
+def test_op_length_counts_the_overlapping_joins():
+    s = {"opening": {"cuts": [[0, 5], [10, 14]], "title_seconds": 3}}
+    assert ep.op_length(s) == 5 + 4 + 3 - ep.FADE * 2
+
+
+def test_chapters_are_shifted_by_the_opening_and_still_valid():
+    s = spec()
+    s["package"] = str(ROOT / s["package"])
+    op = ep.op_length(s)
+    shifted = ep.shifted_chapters(s, op)
+    body = ch.parse(Path(s["package"]).read_text(encoding="utf-8"))
+    assert shifted[0] == (0, s["op_chapter"])
+    assert [t for t, _ in shifted[1:]] == [round(t + op) for t, _ in body]
+    assert not ch.problems(shifted, op + 2558.37 + s["ending"]["seconds"])
+
+
+def test_stamp_format():
+    assert ep.stamp(65.9) == "1:05"
+    assert ep.stamp(3725) == "1:02:05"
+
+
+def test_overlays_never_overlap_each_other():
+    s = spec()
+    body = ch.parse((ROOT / s["package"]).read_text(encoding="utf-8"))
+    shows = [(t + 1.0, t + 1.0 + s["chapter_seconds"]) for n, (t, title) in enumerate(body, 1)
+             if n > 1 and title not in s["chapters_skip"]]
+    shows += [(tp["at"], tp["at"] + tp.get("seconds", 5.0)) for tp in s["telops"]]
+    shows.sort()
+    for (a0, a1), (b0, _) in pairwise(shows):
+        assert a1 <= b0, (a0, b0)
+
+
+def test_telop_stays_in_the_picture_and_above_the_subtitles():
+    im = ep.telop_card("剣閃", "久木田先生が作った筆文字フォント\n「鬼滅の刃」で使われている")
+    x0, y0, x1, y1 = im.getbbox()
+    fx0, fy0, fx1, _ = ep.th.FRAME
+    assert fx0 <= x0 and x1 <= fx1 and fy0 <= y0 and y1 < 200
+
+
+def test_chapter_heading_sits_just_under_the_top_of_the_picture():
+    # 美麗さんの頭に近づかないよう上に詰める（2026-10-23 北原さん）。絵の外（黒い縁）には出ない
+    x0, y0, _, y1 = ep.chapter_card(7, "フォント「剣閃」と「鬼滅の刃」").getbbox()
+    assert ep.th.FRAME[1] <= y0 and y1 <= 140 and x0 >= ep.th.FRAME[0]
