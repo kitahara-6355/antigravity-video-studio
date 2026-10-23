@@ -114,7 +114,8 @@ def render(spec: dict, clip: dict, raw: Path, segments: list[dict], out: Path) -
     ranges = [(float(a), float(b)) for a, b in json.loads(Path(spec["lock"]).read_text(encoding="utf-8"))["ranges"]]
     parts = [snap(p, segments) for p in clip["parts"]]
     pieces = [rp for a, b in parts for rp in raw_pieces(a, b, ranges)]
-    theme = spec.get("theme", {"light": [214, 178, 196], "deep": [92, 52, 78]})
+    # 背景は動画の壁（薄紫）と同化しない色にする（2026-10-23 北原さん）
+    theme = spec.get("background", {"light": [104, 50, 90], "deep": [28, 10, 26]})
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         card(clip["title"], spec["names"], theme).save(tmp / "card.png")
