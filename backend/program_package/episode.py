@@ -22,6 +22,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw
 
 from backend.program_package import chapters as ch
@@ -68,19 +69,89 @@ def title_card(spec: dict, board: Image.Image, theme: dict) -> Image.Image:
     return im
 
 
-def program_card(spec: dict, theme: dict) -> Image.Image:
-    """番組 OP の最後の1枚（番組名）。どの回でも同じものを出す。"""
+def _ease(x: float) -> float:
+    x = min(max(x, 0.0), 1.0)
+    return 1 - (1 - x) ** 3
+
+
+def _layer(draw) -> np.ndarray:
+    """透明の1枚に描いて、RGBA の配列（0〜1）で返す。"""
+    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw(im)
+    return np.asarray(im, dtype=np.float32) / 255
+
+
+def title_sequence(spec: dict, theme: dict, dst: Path) -> float:
+    """番組 OP（どの回でも同じ）。収録の絵は使わず、言葉が順に出て番組名で締める文字だけの映像。
+
+    言葉はふわっと浮き上がって出て消え、金の線が中央から伸びる。番組名は左から筆で書くように現れ、
+    最後に光が一度だけ走る。音は付けない（曲は書き出しのときに重ねる）。長さ（秒）を返す。
+    """
     p = spec["program_opening"]
-    im = th.background(theme)
-    d = ImageDraw.Draw(im)
-    f = th.font("mincho", 96)
-    w = d.textlength(p["name"], font=f)
-    d.line([(W / 2 - w / 2, 250), (W / 2 + w / 2, 250)], fill=GOLD_LINE, width=3)
-    th.gradient_text(im, (W / 2, 390), p["name"], f, th.GOLD, anchor="ms", stroke=10)
-    d.line([(W / 2 - w / 2, 440), (W / 2 + w / 2, 440)], fill=GOLD_LINE, width=3)
-    for i, line in enumerate(p.get("tagline", [])):
-        outlined(d, (W / 2, 510 + 46 * i), line, 32, anchor="ms")
-    return im
+    slides, sec, tsec, fps = p["slides"], p["slide_seconds"], p["title_seconds"], 30
+    bg = np.asarray(th.background(theme), dtype=np.float32) / 255
+    sf, nf = th.font("mincho", 56), th.font("mincho", 116)
+    gold = np.array(GOLD_LINE, dtype=np.float32) / 255
+
+    def text_layer(lines):
+        def draw(im):
+            d = ImageDraw.Draw(im)
+            for i, line in enumerate(lines):
+                outlined(d, (W / 2, H / 2 + 20 + (i - (len(lines) - 1) / 2) * 78), line, 56, anchor="ms")
+        return _layer(draw)
+
+    texts = [text_layer(sl if isinstance(sl, list) else [sl]) for sl in slides]
+    widths = [max(ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(t, font=sf)
+                  for t in (sl if isinstance(sl, list) else [sl])) for sl in slides]
+    title = _layer(lambda im: th.gradient_text(im, (W / 2, H / 2 + 40), p["name"], nf, th.GOLD, anchor="ms",
+                                               stroke=11))
+    tw = ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(p["name"], font=nf)
+    xs = np.arange(W, dtype=np.float32)[None, :]
+
+    def over(frame, layer, alpha, dy=0):
+        lay = np.roll(layer, dy, axis=0) if dy else layer
+        a = lay[..., 3:4] * alpha
+        return frame * (1 - a) + lay[..., :3] * a
+
+    def gold_lines(frame, half, y1, y2, alpha):
+        x0, x1 = int(W / 2 - half), int(W / 2 + half)
+        for y in (y1, y2):
+            frame[y:y + 3, x0:x1] = frame[y:y + 3, x0:x1] * (1 - alpha) + gold * alpha
+        return frame
+
+    total = len(slides) * sec + tsec
+    n = round(total * fps)
+    proc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
+                             "-r", str(fps), "-i", "-", "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p",
+                             str(dst)], stdin=subprocess.PIPE)
+    for k in range(n):
+        t = k / fps
+        f = bg.copy()
+        i = int(t // sec)
+        if i < len(slides):
+            lt = t - i * sec
+            alpha = _ease(lt / 0.5) * (1 - _ease((lt - (sec - 0.45)) / 0.45))
+            f = over(f, texts[i], alpha, dy=int(18 * (1 - _ease(lt / 0.6))))
+            f = gold_lines(f, (widths[i] / 2 + 40) * _ease(lt / 0.9), H // 2 - 90, H // 2 + 80, alpha)
+        else:
+            lt = t - len(slides) * sec
+            # 番組名は左から右へ現れる（筆で書くように、境目はぼかす）
+            edge = (W / 2 - tw / 2 - 40) + (tw + 80) * _ease(lt / 1.4)
+            mask = np.clip((edge - xs) / 60, 0, 1)[..., None]
+            lay = title.copy()
+            lay[..., 3:4] *= mask
+            # 現れ終わったあと、光が一度だけ左から右へ走る
+            sweep = np.clip(1 - np.abs(xs - (-200 + (W + 400) * min(max((lt - 1.6) / 0.9, 0), 1))) / 120, 0, 1)
+            lay[..., :3] = np.clip(lay[..., :3] + 0.45 * sweep[..., None], 0, 1)
+            f = over(f, lay, 1.0)
+            f = gold_lines(f, (tw / 2 + 60) * _ease((lt - 0.3) / 1.2), H // 2 - 80, H // 2 + 72, 1.0)
+            fade = _ease((lt - (tsec - 0.6)) / 0.6)  # 最後は少しだけ暗くして次へ
+            f = f * (1 - 0.25 * fade)
+        proc.stdin.write((np.clip(f, 0, 1) * 255).astype(np.uint8).tobytes())
+    proc.stdin.close()
+    if proc.wait():
+        raise SystemExit("番組 OP の書き出しに失敗")
+    return total
 
 
 def name_card(lines: list[str], name: str, y: int, right: int | None = None) -> Image.Image:
@@ -98,16 +169,17 @@ def name_card(lines: list[str], name: str, y: int, right: int | None = None) -> 
     return im
 
 
-def chapter_card(n: int, text: str) -> Image.Image:
+def chapter_card(n: int, text: str, right: bool = False) -> Image.Image:
     """章の見出し（C2: 帯なし・金の章番号と白い縁取りの明朝）。透明の1枚で、左上の壁の所に出す。
 
     美麗さんの頭に近づかないよう、絵の上端（th.FRAME の y=37）まで詰める（2026-10-23 北原さん）。
+    right=True は右上に寄せる（美麗さん一人の場面は頭が左上に来るため。第1章）。
     """
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    x, y = 48, CHAPTER_Y
     f = th.font("mincho", 38)
     w = d.textlength(text, font=f)
+    x, y = (th.FRAME[2] - 40 - w if right else 48), CHAPTER_Y
     d.text((x, y), f"第{n}章", font=th.font("mincho", 24), fill=(255, 226, 140), stroke_width=4, stroke_fill=INK)
     d.line([(x, y + 32), (x + w, y + 32)], fill=GOLD_LINE + (255,), width=2)
     d.text((x, y + 38), text, font=f, fill="white", stroke_width=5, stroke_fill=INK)
@@ -158,8 +230,7 @@ def program_length(spec: dict) -> float:
     p = spec.get("program_opening")
     if not p:
         return 0.0
-    cuts = sum(c["to"] - c["from"] for c in p["cuts"])
-    return cuts + p["logo_seconds"] - FADE * len(p["cuts"])
+    return len(p["slides"]) * p["slide_seconds"] + p["title_seconds"]
 
 
 def op_length(spec: dict) -> float:
@@ -177,11 +248,9 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
     board, theme = board_of(spec)
     body = ch.parse(Path(spec["package"]).read_text(encoding="utf-8"))
     cards = {"title": title_card(spec, board, theme), "ending": end_card(spec, board, theme)}
-    if spec.get("program_opening"):
-        cards["program"] = program_card(spec, theme)
     for n, (t, title) in enumerate(body, start=1):
         if title not in spec.get("chapters_skip", []):
-            cards[f"ch{n:02d}"] = chapter_card(n, title)
+            cards[f"ch{n:02d}"] = chapter_card(n, title, n in spec.get("chapters_right", []))
     for i, pop in enumerate(spec.get("name_pops", [])):
         cards[f"np{i:02d}"] = name_card(pop["lines"], pop["name"], pop["y"], pop.get("right"))
     for i, tp in enumerate(spec.get("telops", [])):
@@ -198,6 +267,7 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
         tmp = Path(tmp)
         for k, im in cards.items():
             im.save(tmp / f"{k}.png")
+        spec = {**spec, "_theme": theme}
         graph, inputs = _graph(spec, body, dur, tmp)
         music = (spec.get("program_opening") or {}).get("music") or {}
         # 仮の曲を入れた版は公開に使わない。名前で分かるようにする
@@ -215,18 +285,6 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
     if bad:
         raise SystemExit("チャプターが YouTube の決まりに合わない: " + " / ".join(bad))
     return dst
-
-
-def _raw_range(c: dict) -> tuple[str, float, float]:
-    """番組 OP の場面は字幕の無い raw から取る。from/to はその回の完成版の時刻で、lock で raw に直す。"""
-    if "lock" not in c:
-        return c["source"], c["from"], c["to"]
-    from backend.program_package.shorts import raw_pieces
-    ranges = [(float(a), float(b)) for a, b in json.loads(Path(c["lock"]).read_text(encoding="utf-8"))["ranges"]]
-    pieces = raw_pieces(c["from"], c["to"], ranges)
-    if len(pieces) != 1:
-        raise SystemExit(f"番組 OP の場面 {c['from']}〜{c['to']} が編集のつなぎ目をまたいでいる。1つの区間に収める")
-    return c["raw"], *pieces[0]
 
 
 def _chain(g: list[str], clips: list[tuple[str, str, float]], tag: str) -> tuple[str, str, float]:
@@ -270,9 +328,12 @@ def _graph(spec: dict, body, dur: float, tmp: Path) -> tuple[str, list[str]]:
     op_v, op_a, op_l = _chain(g, [*clips, ("tv", "ta", o["title_seconds"])], "x")
     # 番組 OP（どの回でも同じ。これまでの対談のシーン集 → 番組名）。音楽があれば音は音楽だけにする
     if p:
-        pclips = [cut(*_raw_range(c), f"p{i}") for i, c in enumerate(p["cuts"])]
-        pclips.append(still(tmp / "program.png", p["logo_seconds"], "pl"))
-        pv, pa, pl = _chain(g, pclips, "y")
+        seq = tmp / "program.mp4"
+        pl = title_sequence(spec, spec["_theme"], seq)
+        inputs.extend(["-i", str(seq)])
+        g.append(f"[{n_in}:v]fps=30,format=yuv420p[pv];anullsrc=r=48000:cl=stereo,atrim=0:{pl:.3f}[pa0]")
+        n_in += 1
+        pv, pa = "pv", "pa0"
         music = p.get("music")
         if music:
             inputs.extend(["-i", music["path"]])

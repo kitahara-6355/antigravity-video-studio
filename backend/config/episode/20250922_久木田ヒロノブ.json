@@ -1,6 +1,6 @@
 {
   "recording": "20250922_久木田ヒロノブ",
-  "version": "v64",
+  "version": "v65",
   "source": "/home/user/work/v62/v62.mp4",
   "raw": "/home/user/work/raw4_concat.mp4",
   "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json",
@@ -15,50 +15,22 @@
     "host": "聞き手　書家 北原美麗"
   },
   "program_opening": {
-    "note": "番組専用 OP。どの回でも同じものを出す。回が増えたら各回の名場面を足す。from/to はその回の完成版の時刻で、字幕の無い raw から lock でたどって取る",
+    "note": "番組専用 OP。どの回でも同じものを出す。収録の絵は使わない文字だけの映像（言葉が順に出て番組名で締める）。言葉は聞き手のあいさつから取った（2026-10-23 北原さん: カット集は今回のハイライトと役割が重なる）",
     "name": "美麗の書道対談",
-    "tagline": [
+    "slides": [
+      "書を通して 人々の心に触れ",
       "各界でご活躍の方をお招きし",
-      "大切にされている言葉を書いていただきます"
+      "大切にされている言葉を 書いていただく"
     ],
-    "cuts": [
-      {
-        "recording": "20250922_久木田ヒロノブ",
-        "from": 50.0,
-        "to": 52.6,
-        "raw": "/home/user/work/raw4_concat.mp4",
-        "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json"
-      },
-      {
-        "recording": "20250922_久木田ヒロノブ",
-        "from": 1800.0,
-        "to": 1803.0,
-        "raw": "/home/user/work/raw4_concat.mp4",
-        "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json"
-      },
-      {
-        "recording": "20250922_久木田ヒロノブ",
-        "from": 1732.0,
-        "to": 1734.6,
-        "raw": "/home/user/work/raw4_concat.mp4",
-        "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json"
-      },
-      {
-        "recording": "20250922_久木田ヒロノブ",
-        "from": 1657.0,
-        "to": 1659.6,
-        "raw": "/home/user/work/raw4_concat.mp4",
-        "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json"
-      }
-    ],
-    "logo_seconds": 4.0,
+    "slide_seconds": 3.0,
+    "title_seconds": 4.5,
     "music": {
       "path": "/home/user/work/music/milky_way.m4a",
       "drive": "20_素材/共通/03. Milky Way.m4a（1nI4GC-doFSbRIOp3UoGVXlCCMhkC_cA6）",
       "title": "Milky Way / Seimo Yamaguchi（アルバム Hikarihurubasho）",
       "provisional": true,
       "note": "仮の曲（北原さんのライブパフォーマンス用）。公開には使わない。北原さんがオリジナル曲を作ったら差し替える（2026-10-23）",
-      "start": 21.0,
+      "start": 21.5,
       "volume": 0.9
     }
   },
@@ -130,7 +102,7 @@
     {
       "at": 0.4,
       "seconds": 7.0,
-      "y": 170,
+      "y": 190,
       "lines": [
         "書家"
       ],
@@ -148,5 +120,8 @@
       "name": "久木田ヒロノブ",
       "right": 900
     }
+  ],
+  "chapters_right": [
+    1
   ]
 }

@@ -29,9 +29,9 @@ def spec():
 def test_op_length_counts_the_overlapping_joins():
     s = {"opening": {"cuts": [[0, 5], [10, 14]], "title_seconds": 3}}
     assert ep.op_length(s) == 5 + 4 + 3 - ep.FADE * 2
-    # 番組 OP があれば前に足す（場面2つ＋番組名、今回の OP とのつなぎ目も重ねる）
-    s["program_opening"] = {"cuts": [{"from": 0, "to": 2}, {"from": 5, "to": 8}], "logo_seconds": 4}
-    assert ep.program_length(s) == 2 + 3 + 4 - ep.FADE * 2
+    # 番組 OP があれば前に足す（言葉3枚＋番組名、今回の OP とのつなぎ目も重ねる）
+    s["program_opening"] = {"slides": ["a", "b", "c"], "slide_seconds": 3, "title_seconds": 4.5}
+    assert ep.program_length(s) == 3 * 3 + 4.5
     assert ep.op_length(s) == ep.program_length(s) + (5 + 4 + 3 - ep.FADE * 2) - ep.FADE
 
 
@@ -89,3 +89,10 @@ def test_chapter_heading_sits_just_under_the_top_of_the_picture(fonts):
     # 美麗さんの頭に近づかないよう上に詰める（2026-10-23 北原さん）。絵の外（黒い縁）には出ない
     x0, y0, _, y1 = ep.chapter_card(7, "フォント「剣閃」と「鬼滅の刃」").getbbox()
     assert ep.th.FRAME[1] <= y0 and y1 <= 140 and x0 >= ep.th.FRAME[0]
+
+
+def test_first_chapter_heading_can_sit_at_the_top_right(fonts):
+    # 美麗さん一人の場面は頭が左上に来るので、第1章は右上に寄せる（2026-10-23 北原さん）
+    x0, _, x1, _ = ep.chapter_card(1, "オープニング・ゲスト紹介", right=True).getbbox()
+    assert x1 <= ep.th.FRAME[2] and x0 > ep.W / 2
+    assert 1 in spec()["chapters_right"]
