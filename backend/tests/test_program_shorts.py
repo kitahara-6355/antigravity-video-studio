@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+from PIL import ImageFont
 
 from backend.program_package import shorts as sh
 
@@ -15,10 +16,13 @@ SPEC = Path(__file__).resolve().parents[1] / "config" / "shorts" / "20250922_久
 
 
 
-def needs_fonts():
-    # フォントは gitignore（Google Fonts から取る）なので、CI には無い。文字を描くテストだけ飛ばす
+@pytest.fixture
+def fonts(monkeypatch):
+    # フォントは gitignore（Google Fonts から取る）で CI には無い。無いときは Pillow 内蔵の字形で
+    # 代える（日本語は豆腐になるが、置き場所と大きさの検査はできる）
     if not all((sh.th.FONT_DIR / f).exists() for f in sh.th.FONTS.values()):
-        pytest.skip("フォントが無い（python -m backend.program_package.thumbnail --fetch-fonts）")
+        monkeypatch.setattr(sh.th, "font", lambda key, size: ImageFont.load_default(size))
+
 
 def test_cue_times_snap_to_the_whole_subtitle():
     # "0:13" は2つめの字幕の出だし → 終わりはその字幕の終わりまで
@@ -62,8 +66,7 @@ def test_a_framed_panel_keeps_the_picture_shape_and_centre():
     assert sh.panel(None) == (0, sh.VIDEO_Y, sh.W, sh.VIDEO_H)
 
 
-def test_the_frame_surrounds_the_picture():
-    needs_fonts()
+def test_the_frame_surrounds_the_picture(fonts):
     im = sh.card(["あ", "い"], "う", sh.LILAC, {"inset": 40, "width": 14, "shadow": True})
     x, y, w, h = sh.panel({"inset": 40})
     gold = sh.GOLD_FRAME
