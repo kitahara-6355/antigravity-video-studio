@@ -149,3 +149,6 @@ fs-guard-records.jsonl
 
 # R1.5-C4b の門が CI で観測した面（成果物として持ち帰るもの。台帳ではない）
 c4b-observed-faces.json
+
+# 番組のサムネ用フォント（python -m backend.program_package.thumbnail --fetch-fonts で取る）
+backend/data/fonts/
