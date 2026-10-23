@@ -9,7 +9,7 @@
   "note": "時刻はすべて完成版（v62）の時刻。source・raw・lock は作業場の場所なので、動かす所に合わせて書き換える",
   "title": {"series": "美麗の書道対談", "episode": "第1回", "tag": "デザイン書道の第一人者", "guest": "久木田ヒロノブ", "host": "聞き手　書家 北原美麗"},
   "opening": {"cuts": [[948.35, 956.2], [1828.5, 1833.4], [1841.5, 1845.5]], "title_seconds": 3.5},
-  "op_chapter": "オープニング",
+  "op_chapter": "ハイライト",
   "chapter_seconds": 4.0,
   "chapters_skip": ["エンディング"],
   "telops": [
