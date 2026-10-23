@@ -281,6 +281,7 @@ def _graph(spec: dict, body, dur: float, tmp: Path) -> tuple[str, list[str]]:
                      f"aformat=sample_rates=48000:channel_layouts=stereo,volume={music.get('volume', 1.0)},"
                      f"afade=t=in:d=0.3,afade=t=out:st={pl - 1.5:.3f}:d=1.5[pm]")
             n_in += 1
+            g.append(f"[{pa}]anullsink")  # 収録の音は使わない（つないだ口を閉じないと ffmpeg が止まる）
             pa = "pm"
         op_v, op_a, op_l = _chain(g, [(pv, pa, pl), (op_v, op_a, op_l)], "z")
     # 本編: 章の見出し・テロップ・名前のポップを、時刻の所でふわっと出して消す
