@@ -486,3 +486,38 @@ def test_the_review_files_come_with_the_check_of_the_editing_rules(tmp_path, mon
     assert result["standards_failed"] == ["S01"]
     assert "zero/standards.txt" in result["files"]
     assert "S01" in (tmp_path / "out" / "zero" / "standards.txt").read_text(encoding="utf-8")
+
+
+# --- 部品の揃い（2026-10-23 上野さんの回: 新しいコンテナに budoux と時刻合わせが無く、字幕が語の途中で折れた） ---
+
+
+def _repo_with_pin(tmp_path, pin="budoux==0.9.3"):
+    (tmp_path / "backend").mkdir(exist_ok=True)
+    (tmp_path / "backend" / "requirements.txt").write_text(f"numpy\n{pin}  # 版で切れ目が変わる\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_missing_or_other_versions_of_pinned_libraries_stop_the_check(tmp_path, monkeypatch):
+    from importlib import metadata
+    from subtitle_engine import aligner
+
+    monkeypatch.setattr(aligner, "available", lambda: True)
+    monkeypatch.setattr(metadata, "version", lambda name: (_ for _ in ()).throw(metadata.PackageNotFoundError(name)))
+    said = edit_job.missing_libraries(_repo_with_pin(tmp_path))
+    assert len(said) == 1 and "budoux" in said[0] and "pip install budoux==0.9.3" in said[0]
+
+    monkeypatch.setattr(metadata, "version", lambda name: "0.7.0")
+    assert "0.7.0" in edit_job.missing_libraries(tmp_path)[0]
+
+    monkeypatch.setattr(metadata, "version", lambda name: "0.9.3")
+    assert edit_job.missing_libraries(tmp_path) == []
+
+
+def test_a_missing_aligner_stops_the_check(tmp_path, monkeypatch):
+    from importlib import metadata
+    from subtitle_engine import aligner
+
+    monkeypatch.setattr(metadata, "version", lambda name: "0.9.3")
+    monkeypatch.setattr(aligner, "available", lambda: False)
+    said = edit_job.missing_libraries(_repo_with_pin(tmp_path))
+    assert len(said) == 1 and "aligner.setup()" in said[0]

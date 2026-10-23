@@ -478,6 +478,43 @@ def _summary(key: str, result: dict) -> str:
     return ""
 
 
+# 無くても本線は止まらずに質を落として進む部品（2026-10-23 上野さんの回の1回目で、新しいコンテナに
+# 入っておらず、字幕が語の途中で折れ・文字ごとの時刻合わせが飛んだ）。だから始める前に止める
+PINNED = ("budoux",)
+
+
+def _pins(repo: Path) -> dict[str, str]:
+    pins = {}
+    for line in (repo / "backend" / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\s*([A-Za-z0-9_.-]+)==([^\s#]+)", line)
+        if m:
+            pins[m.group(1).lower()] = m.group(2)
+    return pins
+
+
+def missing_libraries(repo: Path = REPO_ROOT) -> list[str]:
+    """字幕の質を決める部品が揃っているか。足りない物を「直し方つき」で返す。"""
+    from importlib import metadata
+
+    problems = []
+    pins = _pins(repo)
+    for name in PINNED:
+        want = pins.get(name)
+        try:
+            have = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            have = None
+        if have is None or (want and have != want):
+            problems.append(f"{name} が{'ありません' if have is None else f' {have} です'}（字幕の切れ目が変わる）。"
+                            f"pip install {name}=={want}" if want else f"{name} がありません")
+    from subtitle_engine import aligner
+
+    if not aligner.available():
+        problems.append("文字ごとの時刻合わせ（sherpa-onnx と ReazonSpeech のモデル）がありません。"
+                        "pip install sherpa-onnx の後 python -c 'from subtitle_engine import aligner; aligner.setup()'")
+    return problems
+
+
 class Runner:
     """job を1つ、手順どおりに通す。状態は作業場の state.json、見える化は置き場の live/。"""
 
@@ -713,6 +750,7 @@ class Runner:
         for tool in ("ffmpeg", "ffprobe", "git"):
             if shutil.which(tool) is None:
                 problems.append(f"{tool} がありません")
+        problems += missing_libraries(self.repo)
         for v in self.job["versions"]:
             if v.get("review") and not (self.repo / v["review"]).is_file():
                 problems.append(f"校正台帳がありません: {v['review']}")
