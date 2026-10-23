@@ -777,11 +777,37 @@ class Runner:
                 manifest = saved  # 前の通しでつないだ物（同じ並び・同じ大きさ）
         if manifest is None:
             manifest = media_concat.join([self.work / "raw" / n for n in names], self.material)
+            if (self.job.get("raw") or {}).get("fill"):
+                manifest = self._fill(manifest)
         seconds = float(manifest["duration"])
         return {"mode": manifest["mode"], "duration": seconds,
+                "fill": [{k: s[k] for k in ("start", "end", "crop")} for s in (manifest.get("fill") or {}).get("scenes", [])],
                 "clock": f"{int(seconds) // 60}:{int(seconds) % 60:02d}",
                 "size": manifest["size"], "key": content_digest(self.material)[:8],
                 "parts": [{"name": p["name"], "start": p["start"]} for p in manifest["parts"]]}
+
+    def _fill(self, manifest: dict) -> dict:
+        """job の raw.fill: つないだ素材の黒い縁を拡大で埋め、場面の並びを控えに足す。"""
+        from backend import media_concat, media_fill
+
+        joined = self.material.with_name(f"{self.material.stem}.joined{self.material.suffix}")
+        self.material.replace(joined)
+        try:
+            plan = media_fill.detect(joined)
+            if media_fill.needs_fill(plan):
+                media_fill.fill(joined, self.material, plan)
+            else:
+                joined.replace(self.material)
+        except BaseException:
+            # 埋める前の素材を控えと一緒に残すと、次の run が「つないだ物」と見て拡大を飛ばす
+            joined.unlink(missing_ok=True)
+            media_concat.manifest_path(self.material).unlink(missing_ok=True)
+            raise
+        joined.unlink(missing_ok=True)
+        manifest = {**manifest, "size": self.material.stat().st_size, "fill": plan}
+        media_concat.manifest_path(self.material).write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return manifest
 
     # --- 書き出し ---------------------------------------------------------------------------
 
