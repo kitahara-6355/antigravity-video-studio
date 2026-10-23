@@ -116,3 +116,12 @@ def test_name_pops_stay_off_the_heads(fonts):
     assert guest["avoid"]
     for p in pops:
         assert not ep.pop_hits(p), p["name"]
+
+
+def test_gift_deadline_is_two_weeks_after_publishing():
+    # 締切は動画公開から2週間後（2026-10-23 北原さん）。公開日が決まるまでは【未定】
+    e = spec()["ending"]
+    assert e["deadline_days"] == 14
+    assert any("{deadline}" in s for s in e["gift_lines"])
+    assert "【未定】" in " ".join(ep.gift_lines({**e, "publish_date": None}))
+    assert "締切 11月14日（土）まで" in ep.gift_lines({**e, "publish_date": "2026-10-31"})

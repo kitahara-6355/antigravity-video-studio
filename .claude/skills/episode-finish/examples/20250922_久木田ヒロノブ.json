@@ -96,8 +96,11 @@
     "gift_lines": [
       "久木田先生が書いた「縁」を1名さまに",
       "応募はこの動画のコメント欄へ",
-      "締切【未定】"
+      "締切 {deadline}"
     ],
+    "publish_date": null,
+    "deadline_days": 14,
+    "deadline_note": "締切は動画の公開日から2週間後（2026-10-23 北原さん）。公開日は北原さんが後日知らせる。決まったら publish_date に YYYY-MM-DD で入れて書き出し直す",
     "subscribe": "チャンネル登録をお願いします"
   },
   "name_pops": [

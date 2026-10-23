@@ -20,6 +20,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -242,6 +243,18 @@ def telop_card(head: str, body: str) -> Image.Image:
     return im
 
 
+def deadline_text(e: dict) -> str:
+    """プレゼントの締切。公開日（publish_date）の deadline_days 日後。公開日が未定なら【未定】。"""
+    if not e.get("publish_date"):
+        return "【未定】"
+    d = date.fromisoformat(e["publish_date"]) + timedelta(days=e.get("deadline_days", 14))
+    return f"{d.month}月{d.day}日（{'月火水木金土日'[d.weekday()]}）まで"
+
+
+def gift_lines(e: dict) -> list[str]:
+    return [s.replace("{deadline}", deadline_text(e)) for s in e["gift_lines"]]
+
+
 def end_card(spec: dict, board: Image.Image, theme: dict) -> Image.Image:
     """ED。左に告知、右半分は YouTube の終了画面（動画・登録ボタン）を置く余白。"""
     e = spec["ending"]
@@ -249,7 +262,7 @@ def end_card(spec: dict, board: Image.Image, theme: dict) -> Image.Image:
     d = ImageDraw.Draw(im)
     x = 70
     th.gradient_text(im, (x, 130), e["gift_title"], th.font("mincho", 50), th.RED, stroke=8)
-    for i, s in enumerate(e["gift_lines"]):
+    for i, s in enumerate(gift_lines(e)):
         outlined(d, (x, 205 + 50 * i), s, 32)
     small = board.resize((board.width * 3 // 5, board.height * 3 // 5))
     th.paste_board(im, small, x + 110, 470, angle=-3)
