@@ -81,37 +81,58 @@ def _layer(draw) -> np.ndarray:
     return np.asarray(im, dtype=np.float32) / 255
 
 
+def char_edges(text: str, font, cx: float) -> list[float]:
+    """中央寄せの1行で、各文字の左端の x と最後の文字の右端（len+1 個）。"""
+    d = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    x0 = cx - d.textlength(text, font=font) / 2
+    return [x0 + d.textlength(text[:i], font=font) for i in range(len(text) + 1)]
+
+
+def column_alpha(edges: list[float], lt: float, interval: float, fade: float = 0.22) -> np.ndarray:
+    """書き足していく文字の、画面の列ごとの濃さ（0〜1、形は (1, W, 1)）。
+
+    i 文字目の左端は i*interval 秒後、右端は (i+1)*interval 秒後に出始める。境目はぼかすので、
+    きっちり一文字ずつではなく、筆で左から書き足されていくように見える（2026-10-23 北原さん）。
+    縁取りの分は両端の文字に含める。
+    """
+    xs = np.arange(W, dtype=np.float32)
+    pos = np.interp(xs, edges, np.arange(len(edges), dtype=np.float32))  # 何文字目のどこか（端の外は端と同じ）
+    x = np.clip((lt - pos * interval) / fade, 0, 1)
+    return (1 - (1 - x) ** 3)[None, :, None]
+
+
 def title_sequence(spec: dict, theme: dict, dst: Path) -> float:
     """番組 OP（どの回でも同じ）。収録の絵は使わず、言葉が順に出て番組名で締める文字だけの映像。
 
-    言葉はふわっと浮き上がって出て消え、金の線が中央から伸びる。番組名は左から筆で書くように現れ、
-    最後に光が一度だけ走る。音は付けない（曲は書き出しのときに重ねる）。長さ（秒）を返す。
+    言葉は一文字ずつ書き足されていき、金の線が中央から伸びる。番組名も一文字ずつ大きく書き足し、
+    最後に光が一度だけ走る。背景は斜線なしの薄紫（2026-10-23 北原さん）。
+    いずれ美麗さんの手書きの映像に差し替える前提の試作。音は付けない（曲は書き出しのときに重ねる）。長さ（秒）を返す。
     """
     p = spec["program_opening"]
     slides, sec, tsec, fps = p["slides"], p["slide_seconds"], p["title_seconds"], 30
-    bg = np.asarray(th.background(theme), dtype=np.float32) / 255
+    step, tstep = p.get("char_seconds", 0.12), p.get("title_char_seconds", 0.24)
+    bg = np.asarray(th.background(theme, stripes=False), dtype=np.float32) / 255
     sf, nf = th.font("mincho", 56), th.font("mincho", 116)
     gold = np.array(GOLD_LINE, dtype=np.float32) / 255
+    cy = H / 2 + 20
 
-    def text_layer(lines):
-        def draw(im):
-            d = ImageDraw.Draw(im)
-            for i, line in enumerate(lines):
-                outlined(d, (W / 2, H / 2 + 20 + (i - (len(lines) - 1) / 2) * 78), line, 56, anchor="ms")
-        return _layer(draw)
-
-    texts = [text_layer(sl if isinstance(sl, list) else [sl]) for sl in slides]
-    widths = [max(ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(t, font=sf)
-                  for t in (sl if isinstance(sl, list) else [sl])) for sl in slides]
+    slides = [sl if isinstance(sl, list) else [sl] for sl in slides]
+    texts, edges = [], []
+    for lines in slides:
+        ys = [cy + (i - (len(lines) - 1) / 2) * 78 for i in range(len(lines))]
+        texts.append([_layer(lambda im, s=s, y=y: outlined(ImageDraw.Draw(im), (W / 2, y), s, 56, anchor="ms"))
+                      for s, y in zip(lines, ys, strict=True)])
+        edges.append([char_edges(s, sf, W / 2) for s in lines])
+    widths = [max(e[-1] - e[0] for e in es) for es in edges]
     title = _layer(lambda im: th.gradient_text(im, (W / 2, H / 2 + 40), p["name"], nf, th.GOLD, anchor="ms",
                                                stroke=11))
-    tw = ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(p["name"], font=nf)
+    tedges = char_edges(p["name"], nf, W / 2)
+    tw = tedges[-1] - tedges[0]
     xs = np.arange(W, dtype=np.float32)[None, :]
 
-    def over(frame, layer, alpha, dy=0):
-        lay = np.roll(layer, dy, axis=0) if dy else layer
-        a = lay[..., 3:4] * alpha
-        return frame * (1 - a) + lay[..., :3] * a
+    def over(frame, layer, alpha):
+        a = layer[..., 3:4] * alpha
+        return frame * (1 - a) + layer[..., :3] * a
 
     def gold_lines(frame, half, y1, y2, alpha):
         x0, x1 = int(W / 2 - half), int(W / 2 + half)
@@ -130,21 +151,24 @@ def title_sequence(spec: dict, theme: dict, dst: Path) -> float:
         i = int(t // sec)
         if i < len(slides):
             lt = t - i * sec
-            alpha = _ease(lt / 0.5) * (1 - _ease((lt - (sec - 0.45)) / 0.45))
-            f = over(f, texts[i], alpha, dy=int(18 * (1 - _ease(lt / 0.6))))
-            f = gold_lines(f, (widths[i] / 2 + 40) * _ease(lt / 0.9), H // 2 - 90, H // 2 + 80, alpha)
+            out = 1 - _ease((lt - (sec - 0.45)) / 0.45)
+            f = gold_lines(f, (widths[i] / 2 + 40) * _ease(lt / 0.9), H // 2 - 90, H // 2 + 80, out)
+            start = 0.15
+            for layer, e in zip(texts[i], edges[i], strict=True):  # 行が複数なら上の行から順に書き足す
+                lay = layer.copy()
+                lay[..., 3:4] *= column_alpha(e, lt - start, step)
+                f = over(f, lay, out)
+                start += (len(e) - 1) * step + 0.1
         else:
             lt = t - len(slides) * sec
-            # 番組名は左から右へ現れる（筆で書くように、境目はぼかす）
-            edge = (W / 2 - tw / 2 - 40) + (tw + 80) * _ease(lt / 1.4)
-            mask = np.clip((edge - xs) / 60, 0, 1)[..., None]
+            f = gold_lines(f, (tw / 2 + 60) * _ease(lt / 1.2), H // 2 - 80, H // 2 + 72, 1.0)
             lay = title.copy()
-            lay[..., 3:4] *= mask
-            # 現れ終わったあと、光が一度だけ左から右へ走る
-            sweep = np.clip(1 - np.abs(xs - (-200 + (W + 400) * min(max((lt - 1.6) / 0.9, 0), 1))) / 120, 0, 1)
+            lay[..., 3:4] *= column_alpha(tedges, lt - 0.2, tstep, fade=0.3)
+            # 書き終わったあと、光が一度だけ左から右へ走る
+            done = 0.2 + (len(tedges) - 1) * tstep + 0.3
+            sweep = np.clip(1 - np.abs(xs - (-200 + (W + 400) * min(max((lt - done) / 0.9, 0), 1))) / 120, 0, 1)
             lay[..., :3] = np.clip(lay[..., :3] + 0.45 * sweep[..., None], 0, 1)
             f = over(f, lay, 1.0)
-            f = gold_lines(f, (tw / 2 + 60) * _ease((lt - 0.3) / 1.2), H // 2 - 80, H // 2 + 72, 1.0)
             fade = _ease((lt - (tsec - 0.6)) / 0.6)  # 最後は少しだけ暗くして次へ
             f = f * (1 - 0.25 * fade)
         proc.stdin.write((np.clip(f, 0, 1) * 255).astype(np.uint8).tobytes())
@@ -154,19 +178,34 @@ def title_sequence(spec: dict, theme: dict, dst: Path) -> float:
     return total
 
 
-def name_card(lines: list[str], name: str, y: int, right: int | None = None) -> Image.Image:
-    """名前のポップ（肩書きと名前）。右寄せで、その人の近くの壁の所に出す（right は右端の x）。"""
+def name_card(lines: list[str], name: str, y: int, right: int | None = None,
+              pitch: int = 30, size: int = 56) -> Image.Image:
+    """名前のポップ（肩書きと名前）。右寄せで、その人の近くの壁の所に出す（right は右端の x）。
+
+    pitch は肩書きの行の間隔、size は名前の大きさ。頭の上の壁が狭い場面では詰める。
+    """
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     right = right or th.FRAME[2] - 40
-    sf, nf = th.font("gothic", 24), th.font("mincho", 56)
+    sf, nf = th.font("gothic", 24), th.font("mincho", size)
     for i, line in enumerate(lines):
-        d.text((right, y + 30 * i), line, font=sf, fill="white", anchor="ra", stroke_width=4, stroke_fill=INK)
-    ly = y + 30 * len(lines) + 8
+        d.text((right, y + pitch * i), line, font=sf, fill="white", anchor="ra", stroke_width=4, stroke_fill=INK)
+    ly = y + pitch * len(lines) + 8
     w = max(d.textlength(name, font=nf), *(d.textlength(t, font=sf) for t in lines)) if lines else d.textlength(name, font=nf)
     d.line([(right - w, ly), (right, ly)], fill=GOLD_LINE + (255,), width=2)
-    th.gradient_text(im, (right, ly + 66), name, nf, th.GOLD, anchor="rs", stroke=8)
+    th.gradient_text(im, (right, ly + round(size * 1.18)), name, nf, th.GOLD, anchor="rs", stroke=8)
     return im
+
+
+def pop_card(pop: dict) -> Image.Image:
+    """指定ファイルの name_pops の1件から名前のポップを作る。"""
+    return name_card(pop["lines"], pop["name"], pop["y"], pop.get("right"), pop.get("pitch", 30), pop.get("size", 56))
+
+
+def pop_hits(pop: dict) -> list[list[int]]:
+    """名前のポップが掛かってしまう「頭の来る所」（指定の avoid）を返す。空なら掛からない。"""
+    a = np.asarray(pop_card(pop))[..., 3]
+    return [z for z in pop.get("avoid", []) if a[z[1]:z[3], z[0]:z[2]].any()]
 
 
 def chapter_card(n: int, text: str, right: bool = False) -> Image.Image:
@@ -252,7 +291,7 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
         if title not in spec.get("chapters_skip", []):
             cards[f"ch{n:02d}"] = chapter_card(n, title, n in spec.get("chapters_right", []))
     for i, pop in enumerate(spec.get("name_pops", [])):
-        cards[f"np{i:02d}"] = name_card(pop["lines"], pop["name"], pop["y"], pop.get("right"))
+        cards[f"np{i:02d}"] = pop_card(pop)
     for i, tp in enumerate(spec.get("telops", [])):
         cards[f"tp{i:02d}"] = telop_card(tp["head"], tp["body"])
     if cards_only:

@@ -3,6 +3,7 @@ import json
 from itertools import pairwise
 from pathlib import Path
 
+import numpy as np
 import pytest
 from PIL import ImageFont
 
@@ -96,3 +97,22 @@ def test_first_chapter_heading_can_sit_at_the_top_right(fonts):
     x0, _, x1, _ = ep.chapter_card(1, "オープニング・ゲスト紹介", right=True).getbbox()
     assert x1 <= ep.th.FRAME[2] and x0 > ep.W / 2
     assert 1 in spec()["chapters_right"]
+
+
+def test_opening_words_are_written_in_from_the_left():
+    # 番組 OP の言葉は、きっちり一文字ずつでなくても書き足されていく感じに（2026-10-23 北原さん）
+    edges = [400.0 + 56 * i for i in range(9)]
+    early, mid, late = (ep.column_alpha(edges, t, 0.11)[0, :, 0] for t in (0.0, 0.5, 5.0))
+    assert early.max() == 0
+    assert mid[420] == 1 and mid[860] == 0  # 左は書き終わり、右はまだ
+    assert np.all(np.diff(mid) <= 1e-6)  # 左から右へ（逆戻りしない）
+    assert late.min() == 1
+
+
+def test_name_pops_stay_off_the_heads(fonts):
+    # 久木田さんの名前が頭に掛かっていた（2026-10-23 北原さん）。頭の来る所（avoid）に1画素も掛けない
+    pops = spec()["name_pops"]
+    guest = next(p for p in pops if p["name"] == "久木田ヒロノブ")
+    assert guest["avoid"]
+    for p in pops:
+        assert not ep.pop_hits(p), p["name"]

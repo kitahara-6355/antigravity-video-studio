@@ -152,7 +152,7 @@ def vertical(im: Image.Image, x: float, y: float, s: str, f) -> None:
         y += f.size * 1.02
 
 
-def background(theme: dict) -> Image.Image:
+def background(theme: dict, stripes: bool = True) -> Image.Image:
     y = np.linspace(0, 1, H)[:, None]
     x = np.linspace(-1, 1, W)[None, :]
     glow = np.clip(1 - (x ** 2 * 0.75 + (y - 0.38) ** 2 * 1.8), 0, 1) ** 1.2
@@ -161,7 +161,7 @@ def background(theme: dict) -> Image.Image:
     a += np.random.default_rng(1).normal(0, 2.5, a.shape)  # 質感（毎回同じ）
     im = Image.fromarray(np.clip(a, 0, 255).astype("uint8"))
     d = ImageDraw.Draw(im)
-    for i in range(-3, 4):  # 細い金の斜線
+    for i in range(-3, 4) if stripes else ():  # 細い金の斜線
         x0 = W / 2 + i * 150
         d.line([(x0 - 260, H), (x0 + 260, 0)], fill=(206, 170, 104), width=1)
     return im
