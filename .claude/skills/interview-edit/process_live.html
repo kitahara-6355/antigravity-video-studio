@@ -291,9 +291,23 @@ td.err { color: var(--shu); }
   ];
   const POLL_MS = 15000;
   const STALE_MS = 3 * 60 * 1000;   // 通しの間は15秒ごとに書かれる。これより古ければ止まったかもしれない
-  const JOB = ((location.hash || "").slice(1).replace(/[^\w.~-]/g, "") || DEFAULT_JOB);
-  const DIR = "outputs/" + JOB;
-  const STATUS = DIR + "/live/status.json";
+  // 選んだ収録は端末に覚えておく（アプリではリンクの # が落ちることがあるので、# だけに頼らない）
+  const PICK_KEY = "process-live-job";
+  const clean = (v) => String(v || "").replace(/[^\w.~-]/g, "");
+  let remembered = "";
+  try { remembered = clean(localStorage.getItem(PICK_KEY)); } catch (_) { remembered = ""; }
+  let JOB = clean((location.hash || "").slice(1)) || remembered || JOBS[JOBS.length - 1].name || DEFAULT_JOB;
+  let DIR = "outputs/" + JOB;
+  let STATUS = DIR + "/live/status.json";
+  function setJob(name) {
+    JOB = clean(name) || DEFAULT_JOB; DIR = "outputs/" + JOB; STATUS = DIR + "/live/status.json";
+    try { localStorage.setItem(PICK_KEY, JOB); } catch (_) { /* 覚えられなくても切り替えはできる */ }
+    S.status = null; S.images.clear(); S.loadingImg.clear();
+    ["axis", "versions", "notes", "stepsBody"].forEach((id) => { $(id).textContent = ""; });
+    $("jobLabel").textContent = JOB; banner("");
+    $("statePill").dataset.state = "loading"; $("statePill").textContent = STATE_TEXT.loading;
+    if (S.files) poll();
+  }
 
   const $ = (id) => document.getElementById(id);
   const S = { files: null, status: null, timer: null, ticker: null, images: new Map(), loadingImg: new Set() };
@@ -366,7 +380,9 @@ td.err { color: var(--shu); }
     clearTimeout(S.timer);
     let stop = false;
     try {
+      const job = JOB;
       const text = await new Blob(await readBytes(STATUS)).text();
+      if (job !== JOB) return;  // 読んでいる間に収録を切り替えた
       S.status = JSON.parse(text);
       render();
     } catch (e) {
@@ -378,7 +394,7 @@ td.err { color: var(--shu); }
     const pick = $("jobPick");
     const names = JOBS.some((j) => j.name === JOB) ? JOBS : [...JOBS, { name: JOB, label: JOB }];
     names.forEach((j) => { const o = el("option", "", j.label); o.value = j.name; o.selected = j.name === JOB; pick.appendChild(o); });
-    pick.addEventListener("change", () => { location.hash = pick.value; });
+    pick.addEventListener("change", () => setJob(pick.value));
           banner("まだ始まっていません。通しを始めると、ここに手順が時間の軸で並びます（15秒ごとに読み直します）。", "wait",
                  "読み先: " + STATUS);
         }
@@ -703,7 +719,7 @@ td.err { color: var(--shu); }
     poll();
     S.ticker = setInterval(() => { if (S.status && !document.hidden) { const now = Date.now(); renderNow(S.status, now, overall(S.status, now)); renderAxis(S.status, now); } }, 5000);
   }
-  window.addEventListener("hashchange", () => location.reload());
+  window.addEventListener("hashchange", () => { const h = clean(location.hash.slice(1)); if (h && h !== JOB) { $("jobPick").value = h; setJob(h); } });
   $("reload").addEventListener("click", () => { if (S.files) poll(); });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) clearTimeout(S.timer); else if (S.files) poll();

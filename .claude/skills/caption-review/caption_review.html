@@ -58,6 +58,7 @@ h1 { font-family: var(--font-head); font-size: 1.12rem; font-weight: 700; margin
 .sub { margin: 0; color: var(--ink-soft); font-size: .8rem; flex: 1 1 auto; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .counts { display: flex; gap: 6px; flex: none; }
+.jobpick { flex: 0 1 auto; min-width: 0; max-width: 11em; font: inherit; font-size: .8rem; }
 .chip { font-size: .76rem; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet);
   white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
 .chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--sw, var(--ink-soft)); }
@@ -211,7 +212,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 
 <header class="top">
   <h1>字幕の朱入れ</h1>
-  <p class="sub" id="runLabel">美麗チャンネル 対談 第1回 · 字幕を読み込んでいます</p>
+  <select id="jobPick" class="jobpick" aria-label="収録"></select>
+  <p class="sub" id="runLabel">字幕を読み込んでいます</p>
   <div class="counts" id="counts" aria-live="polite"></div>
 </header>
 
@@ -279,8 +281,18 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 <script>
 (() => {
   "use strict";
-  const DIR = "outputs/raw4_test_20261005";
-  const VIDEO = "raw4_concat_preview_360p.mp4";
+  // 収録ごとの置き場。job を足したら1行足す（edit_job の確認用ファイルは outputs/<job>/<版>/ にある）
+  const JOBS = [
+    { name: "raw4", label: "久木田さん 第1回", dir: "outputs/raw4_test_20261005", video: "raw4_concat_preview_360p.mp4" },
+    { name: "ueno_20251020", label: "上野さん 第2回", dir: "outputs/ueno_20251020/zero", video: "full360.mp4" },
+  ];
+  const PICK_KEY = "caption-review-job";
+  let picked = "";
+  try { picked = localStorage.getItem(PICK_KEY) || ""; } catch (_) { picked = ""; }
+  const hashPick = (location.hash || "").slice(1);
+  const JOB = JOBS.find((j) => j.name === hashPick) || JOBS.find((j) => j.name === picked) || JOBS[JOBS.length - 1];
+  const DIR = JOB.dir;
+  const VIDEO = JOB.video;
   const SHEET = "review_captions.json";
   const REACT_SEC = 0.4;              // 気づいてから押すまでの遅れ
   const LEAD_SEC = 1.0, TAIL_SEC = 0.4; // 印の所を再生するときの前後
@@ -378,6 +390,13 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     ["markBtn", "backBtn"].forEach((id) => { $(id).disabled = false; });
     updateReelButton();
   }
+  JOBS.forEach((j) => { const o = document.createElement("option"); o.value = j.name; o.textContent = j.label;
+    o.selected = j === JOB; $("jobPick").appendChild(o); });
+  $("jobPick").addEventListener("change", () => {
+    // 動画と印の保存先が丸ごと変わるので、選んだ収録を覚えて読み込み直す（アプリでは # が落ちることがあるので端末に覚える）
+    try { localStorage.setItem(PICK_KEY, $("jobPick").value); } catch (_) { /* 覚えられなければ # で渡す */ }
+    location.hash = $("jobPick").value; location.reload();
+  });
   $("retry").addEventListener("click", () => start());
   $("pickBtn").addEventListener("click", () => $("pick").click());
   $("pick").addEventListener("change", async (ev) => {
@@ -392,7 +411,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 
   function loadSheet(sheet) {
     S.sheet = sheet; S.caps = Array.isArray(sheet.captions) ? sheet.captions : []; S.flags = Array.isArray(sheet.flags) ? sheet.flags : [];
-    $("runLabel").textContent = "美麗チャンネル 対談 第1回 · " + (sheet.label || sheet.run || "") + " · 字幕 " + S.caps.length + " 枚 · "
+    $("runLabel").textContent = "美麗チャンネル 対談 " + JOB.label + " · " + (sheet.label || sheet.run || "") + " · 字幕 " + S.caps.length + " 枚 · "
       + clock(duration());
     $("strip").setAttribute("aria-valuemax", String(Math.round(duration())));
     $("tabFlags").hidden = !S.flags.length; $("nFlags").textContent = S.flags.length;
