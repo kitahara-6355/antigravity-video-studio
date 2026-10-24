@@ -197,6 +197,14 @@ class ProofreadWorker(PipelineStageWorker):
         except Exception as e:
             logger.debug(f"固有名詞辞書（AI の後）スキップ: {e}")
 
+        # 校閲が語の途中で割れた発話を言い切りまで補うと、次の発話と同じ声が2回書かれる
+        # （2本目の対談 18分39秒「全然怖くないですから」が2行・2026-10-24 北原さんの朱入れ）
+        try:
+            from subtitle_engine import retold
+            retold.absorb(ctx.segments)
+        except Exception as e:  # noqa: BLE001 — 見られなくても字幕は校閲したもので進む
+            logger.warning(f"繰り返しの発話の確認スキップ: {e}")
+
         # 人が通しで見て直した所（校正台帳）を当てる。文字起こしと校閲は呼ぶたびに揺れるので、
         # 人の直しは AI に渡さず、AI と表記の統一の後・整形の前に毎回同じに当てる（2026-10-17）
         review = {}

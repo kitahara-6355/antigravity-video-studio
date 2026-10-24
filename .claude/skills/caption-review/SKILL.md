@@ -85,7 +85,7 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet export <プ�
 
 ### 3. レビュー画面を公開・更新する
 
-- `caption_review.html` の `DIR`・`VIDEO`・`SHEET` を置き場に合わせる
+- `caption_review.html` の `JOBS` に収録を1行足す（`dir` は置き場・`video` は 360p の名前）。画面の上の選択で収録を切り替え、選んだ物は端末に覚える。印の保存先は控えの `run` ごとに分かれる
 - 画面は1画面に収める（43分を通して見るので、ページがスクロールしたりボタンが動いたりすると続かない）。
   伸び縮みするのは動画だけで、ボタンの帯と字幕の窓は高さを決めてある。画面を直したら、公開の前に
   `node .claude/skills/caption-review/layout_check.js <画面の控え>` を流す。14通りの大きさで、スクロール・はみ出し・

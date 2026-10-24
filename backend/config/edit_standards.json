@@ -635,6 +635,122 @@
         "backend/tests/test_review_flags.py::test_the_review_sheet_flags_with_the_readings_when_given"
       ],
       "check": null
+    },
+    {
+      "id": "S31",
+      "group": "欠落",
+      "rule": "声の無い所に字幕を出さない。手元の音声認識が8秒以上1字も聞き取らず、音も小さい区間は「声の無い区間」とし、その中の字幕（AI の作り話）を外して、欠落の数え方からも除く",
+      "from": {
+        "day": "2026-10-23",
+        "by": "Claude",
+        "said": "上野さんの回の揮毫の場面で、話し声が無い（音を25dB上げて聞き直しても「話し声なし」）のに、Gemini が「そうですね　ちょっとこういう感じなんですよ」と書いた"
+      },
+      "failure": "ありもしない台詞が21秒出たうえ、その区間が「文字の薄い区間」に数えられて品質ゲートが不合格（77）にした",
+      "where": [
+        "backend/subtitle_engine/unheard.py::voiceless_spans",
+        "backend/agents/workers/transcribe_worker.py::TranscribeWorker._drop_voiceless"
+      ],
+      "tests": [
+        "backend/tests/test_unheard.py::test_only_quiet_gaps_count_as_voiceless",
+        "backend/tests/test_unheard.py::test_only_captions_inside_a_voiceless_span_are_dropped"
+      ],
+      "check": null
+    },
+    {
+      "id": "S32",
+      "group": "カット",
+      "rule": "撮り始めのカウントダウン（数字だけの声）は字幕にせず、出だしを話し始めちょうどにする。素材の頭と、つないだ各ファイルの頭から15秒以内を見る",
+      "from": {
+        "day": "2026-10-23",
+        "by": "Claude",
+        "said": "上野さんの回の1・2回目で、出だしに「4 3 2」の字幕が出た（北原さんの決まり「出だし=話し始めちょうど」に反する）"
+      },
+      "failure": "完成版の頭がカウントダウンから始まった",
+      "where": [
+        "backend/subtitle_engine/unheard.py::drop_countdowns"
+      ],
+      "tests": [
+        "backend/tests/test_unheard.py::test_countdowns_are_dropped_only_near_the_head_of_each_file"
+      ],
+      "check": null
+    },
+    {
+      "id": "S33",
+      "group": "再現",
+      "rule": "字幕の質を決める部品（budoux の決まった版・文字ごとの時刻合わせ）が揃っていなければ、書き出しを始めない",
+      "from": {
+        "day": "2026-10-23",
+        "by": "Claude",
+        "said": "上野さんの回の1回目は新しい作業環境に budoux と sherpa-onnx が無く、本線が黙って質を落として進んだ"
+      },
+      "failure": "字幕が語の途中で折れた（「じ／ゃあ」「すけ／どね」）・文字ごとの時刻合わせが飛んだ",
+      "where": [
+        "backend/edit_job.py::missing_libraries"
+      ],
+      "tests": [
+        "backend/tests/test_edit_job.py::test_missing_or_other_versions_of_pinned_libraries_stop_the_check",
+        "backend/tests/test_edit_job.py::test_a_missing_aligner_stops_the_check"
+      ],
+      "check": null
+    },
+    {
+      "id": "S34",
+      "group": "書き出し",
+      "rule": "収録の映像に黒い縁があれば、場面ごとに縁を測って拡大で埋める（job の raw.fill）",
+      "from": {
+        "day": "2026-10-23",
+        "by": "北原",
+        "said": "拡大して。"
+      },
+      "failure": "配信ソフトの画面録りで、ワンショットが小さく周りが黒い・2人の場面の左右に黒い帯",
+      "where": [
+        "backend/media_fill.py::detect",
+        "backend/media_fill.py::fill",
+        "backend/edit_job.py::Runner._fill"
+      ],
+      "tests": [
+        "backend/tests/test_media_fill.py::test_black_edges_are_found_and_filled_and_the_sound_is_kept",
+        "backend/tests/test_media_fill.py::test_a_job_with_raw_fill_joins_then_fills_and_keeps_the_scenes"
+      ],
+      "check": null
+    },
+    {
+      "id": "S35",
+      "group": "字幕の字",
+      "rule": "前の発話の尻尾と同じ字だけの発話（8字以上・1秒以内に続く）は前の発話に含め、同じ言葉を2回出さない",
+      "from": {
+        "day": "2026-10-24",
+        "by": "北原",
+        "said": "（朱入れ）「もう優しくって　全然怖くないですから／くって　全然怖くないですから」に印"
+      },
+      "failure": "語の途中で割れた発話を校閲（AI）が言い切りまで補い、次の発話にも同じ声が書かれていた",
+      "where": [
+        "backend/subtitle_engine/retold.py::absorb",
+        "backend/agents/workers/proofread_worker.py"
+      ],
+      "tests": [
+        "backend/tests/test_retold.py::test_a_repeat_of_the_tail_goes_into_the_utterance_before",
+        "backend/tests/test_retold.py::test_a_short_echoing_reply_is_kept"
+      ],
+      "check": null
+    },
+    {
+      "id": "S36",
+      "group": "カット",
+      "rule": "撮り終わりの合図（「はいOKです」のように OKです だけの発話）は段取りの声として切る",
+      "from": {
+        "day": "2026-10-24",
+        "by": "北原",
+        "said": "最後の「はいOKです」はカットしてください。"
+      },
+      "failure": "締めのあいさつの後の「はいOKです」が字幕付きで残った（AI は「お疲れです」と書いていた）",
+      "where": [
+        "backend/cut_plan.py::production_talk"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_the_take_end_call_after_the_closing_is_found"
+      ],
+      "check": null
     }
   ]
 }
