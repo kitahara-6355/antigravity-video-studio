@@ -713,6 +713,44 @@
         "backend/tests/test_media_fill.py::test_a_job_with_raw_fill_joins_then_fills_and_keeps_the_scenes"
       ],
       "check": null
+    },
+    {
+      "id": "S35",
+      "group": "字幕の字",
+      "rule": "前の発話の尻尾と同じ字だけの発話（8字以上・1秒以内に続く）は前の発話に含め、同じ言葉を2回出さない",
+      "from": {
+        "day": "2026-10-24",
+        "by": "北原",
+        "said": "（朱入れ）「もう優しくって　全然怖くないですから／くって　全然怖くないですから」に印"
+      },
+      "failure": "語の途中で割れた発話を校閲（AI）が言い切りまで補い、次の発話にも同じ声が書かれていた",
+      "where": [
+        "backend/subtitle_engine/retold.py::absorb",
+        "backend/agents/workers/proofread_worker.py"
+      ],
+      "tests": [
+        "backend/tests/test_retold.py::test_a_repeat_of_the_tail_goes_into_the_utterance_before",
+        "backend/tests/test_retold.py::test_a_short_echoing_reply_is_kept"
+      ],
+      "check": null
+    },
+    {
+      "id": "S36",
+      "group": "カット",
+      "rule": "撮り終わりの合図（「はいOKです」のように OKです だけの発話）は段取りの声として切る",
+      "from": {
+        "day": "2026-10-24",
+        "by": "北原",
+        "said": "最後の「はいOKです」はカットしてください。"
+      },
+      "failure": "締めのあいさつの後の「はいOKです」が字幕付きで残った（AI は「お疲れです」と書いていた）",
+      "where": [
+        "backend/cut_plan.py::production_talk"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_the_take_end_call_after_the_closing_is_found"
+      ],
+      "check": null
     }
   ]
 }

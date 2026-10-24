@@ -266,6 +266,15 @@ def test_the_misheard_cue_at_the_end_of_the_writing_scene_is_found():
     assert cut_plan.production_talk(segs, DEFAULT) == {1}
 
 
+def test_the_take_end_call_after_the_closing_is_found():
+    """2本目の対談の終わり（素材 19分07秒）。締めのあいさつの後の「はいOKです」（2026-10-24 北原さん
+    「最後の「はいOKです」はカットしてください」）。「OKです」だけの発話は撮り終わりの合図"""
+    segs = [_seg(1134.58, 1143.78, "本日のゲストは堀口記念病院院長の上野雅巳先生でした。先生どうもありがとうございました。"),
+            _seg(1144.38, 1145.28, "どうも。"), _seg(1147.28, 1148.28, "はい、OKです。")]
+    assert cut_plan.production_talk(segs, DEFAULT) == {2}
+    assert cut_plan.production_talk([_seg(5.0, 6.0, "それでOKですか？")], DEFAULT) == set()
+
+
 def test_the_same_words_inside_a_sentence_are_content():
     segs = [_seg(1495.44, 1498.04, "何か、大切にしていることって。"),
             _seg(1500.0, 1503.0, "その時に写真を撮ってもらったんです。"),

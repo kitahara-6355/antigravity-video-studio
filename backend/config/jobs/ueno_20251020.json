@@ -13,7 +13,8 @@
   },
   "material": "ueno_20251020_concat.mp4",
   "versions": [
-    {"key": "zero", "label": "ゼロからの版"}
+    {"key": "zero", "label": "ゼロからの版"},
+    {"key": "ledger", "label": "朱を足した版", "review": "backend/config/reviews/ueno_20251020.json"}
   ],
   "out": "/mnt/project-files/outputs/ueno_20251020"
 }
