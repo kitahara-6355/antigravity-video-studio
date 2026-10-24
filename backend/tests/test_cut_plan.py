@@ -750,3 +750,41 @@ def test_the_smartcut_stage_fits_the_captions_and_reports_a_flash_it_kept(monkey
     assert segs[0]["sourceStart"] == 10.395 and ctx.cut_ranges == [(10.395, 12.0)]
     assert "1秒未満だけ映る1か所（素材の 0:10ほか）は切り落とした" in note
     assert any("30:30" in w and "言葉があるので切っていません" in w for w in ctx.warnings)
+
+
+# ------------------------------------------------------------------
+# どの発話にも入らなかった声・人の指示（2026-10-24 北原さんの朱入れ）
+# ------------------------------------------------------------------
+
+def test_voice_between_utterances_is_not_cut_when_keeping_everything():
+    """2本目の対談 7分58秒: 「ナースは女神様に見えましたし」は文字起こしの区間の外（480.9〜483.1 秒）で、
+    すき間として切られていた。声の区間は実測（481.94〜482.63・482.82〜482.97）。"""
+    audio = _audio([(479.67, 480.8), (481.94, 482.63), (482.82, 482.97), (483.42, 484.81)])
+    kept = _snap([(470.0, 480.4), (483.3, 489.0)], audio, unclaimed_voice_sec=0.6)
+    assert kept == [(470.0, 489.0)]
+    # 中身を選んで削るときは今までどおり切る
+    assert len(_snap([(470.0, 480.4), (483.3, 489.0)], audio, cut_through_voice=True,
+                     unclaimed_voice_sec=0.6)) == 2
+    # 短い声（咳・息）だけのすき間は切る
+    short = _audio([(479.67, 480.8), (481.94, 482.1), (483.42, 484.81)])
+    assert len(_snap([(470.0, 480.4), (483.3, 489.0)], short, unclaimed_voice_sec=0.6)) == 2
+
+
+def test_human_cuts_pick_utterances_mostly_inside_the_marked_span():
+    segs = [_seg(781.3, 783.6, "はい、ではよろしくお願いします。"), _seg(783.7, 784.9, "はい。"),
+            _seg(787.4, 789.4, "はい、どうでしょうかこんな感じ。"), _seg(794.4, 795.4, "増えてます。"),
+            _seg(851.3, 852.5, "はい"), _seg(854.4, 860.0, "はい、じゃあ先生、今書いていただいたんですけど")]
+    cuts = [{"start": 784.37, "end": 796.54, "mode": "cut"}, {"start": 851.23, "end": 854.07, "mode": "hide"}]
+    # 文字起こしの「はい。」（783.7〜784.9）は区間に半分も入らないが、聞こえたのは 784.2〜784.63
+    assert cut_plan.human_cuts(segs, cuts)[0] == {2, 3}
+    cut, hide = cut_plan.human_cuts(segs, cuts, heard={(783.7, 784.9): (784.2, 784.63)})
+    assert cut == {1, 2, 3} and hide == {4}
+    # 聞こえた区間が無くても、区間に掛かっていて指示した字幕と同じ字なら切る
+    cuts[0]["text"] = "はい / すいません / はい　どうでしょうかこんな感じ"
+    assert cut_plan.human_cuts(segs, cuts)[0] == {1, 2, 3}
+
+
+def test_marked_spans_are_cut_out_and_kept_spans_added():
+    ranges = [(750.4, 785.0), (785.4, 851.9), (854.1, 864.1)]
+    assert cut_plan.subtract_spans(ranges, [(784.37, 796.54)]) == [(750.4, 784.37), (796.54, 851.9), (854.1, 864.1)]
+    assert cut_plan.add_spans([(0.0, 5.0), (8.0, 9.0)], [(4.0, 6.0)]) == [(0.0, 6.0), (8.0, 9.0)]

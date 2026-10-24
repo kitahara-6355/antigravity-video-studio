@@ -28,7 +28,8 @@ def test_the_sheet_carries_each_caption_with_its_output_and_source_seconds():
     assert sheet["run"] == "r53" and sheet["video"] == "raw4_concat_preview_360p.mp4"
     assert sheet["duration"] == round(216.59 + 132.39, 2)
     first = sheet["captions"][0]
-    assert first == {"i": 0, "s": 0.36, "e": 3.2, "src": 3.18, "t": "こんにちは　書家の北原美麗です"}
+    assert first == {"i": 0, "s": 0.36, "e": 3.2, "src": 3.18, "t": "こんにちは　書家の北原美麗です",
+                     "a": 1.76, "b": 4.6}  # 素材の秒の区間（カット・字幕なしの印に使う）
     # 字幕の真ん中（出来上がりの 217 秒）は、つないだ後ろの素材の秒
     assert sheet["captions"][1]["src"] == 219.03
 
@@ -172,3 +173,34 @@ def test_the_readings_beside_the_material_are_found_by_its_content_key(tmp_path)
     assert {k: [s["text"] for s in v] for k, v in got.items()} == \
         {"2回目": ["二回目"], "3回目": ["三回目"], "1回目": ["一回目"]}
     assert review_sheet.readings_beside(tmp_path / "missing.mp4") == {}
+
+
+# --- 映像ごとカット・字幕なしの印（2026-10-24 北原さんの朱入れ「映像字幕ともにカット」「字幕なしにして」） ---
+
+
+def _cut_mark(cap, text, note="", state="open", fix=""):
+    return {"cap": cap, "src": 780.0 + cap, "t": 760.0 + cap, "text": text, "fix": fix, "note": note, "state": state}
+
+
+def test_cut_marks_are_read_from_the_button_or_the_note():
+    assert review_sheet.cut_mode(_cut_mark(1, "はい", state="cut")) == "cut"
+    assert review_sheet.cut_mode(_cut_mark(1, "はい", note="映像字幕ともにカット")) == "cut"
+    assert review_sheet.cut_mode(_cut_mark(1, "増えてます", note="字幕なしにして")) == "hide"
+    assert review_sheet.cut_mode(_cut_mark(1, "増えてます", note="機械の要確認: カット")) is None
+    assert review_sheet.cut_mode(_cut_mark(1, "あ", note="カット", state="fixed", fix="い")) is None
+    # 切れた声の指摘は指示ではない（7分50秒「発話があるがカットされている疑惑がある」）
+    assert review_sheet.cut_mode(_cut_mark(1, "ナースは", note="発話があるがカットされている疑惑がある。")) is None
+
+
+def test_marks_next_to_each_other_become_one_span():
+    caps = {233: {"a": 784.37, "b": 785.0}, 234: {"a": 785.68, "b": 786.74}, 239: {"a": 801.03, "b": 801.93},
+            240: {"a": 851.23, "b": 854.07}}
+    marks = [_cut_mark(233, "はい", "映像字幕ともにカット"), _cut_mark(234, "すいません", "映像字幕ともにカット"),
+             _cut_mark(239, "増えてます", "字幕なしにして"), _cut_mark(240, "はい\nはは", "映像字幕ともにカット")]
+    cuts, lost = review_sheet.to_cuts(marks, caps, by="北原", day="2026-10-24", label="v2")
+    assert lost == []
+    assert [(c["start"], c["end"], c["mode"]) for c in cuts] == [
+        (784.37, 786.74, "cut"), (801.03, 801.93, "hide"), (851.23, 854.07, "cut")]
+    assert cuts[0]["text"] == "はい / すいません" and cuts[0]["id"] == "2026-10-24-c01"
+    review_ledger_ok = {"corrections": [], "cuts": cuts}
+    assert review_sheet.dump_ledger(review_ledger_ok).count("\n    {") == 3

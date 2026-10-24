@@ -144,6 +144,10 @@ DEFAULT_CUT_RULES = {
                             "大丈夫", "もう一回", "お願いします"],
     # 段取りの発話とこの秒数以内に続く発話だけを、同じやりとりとみなす
     "production_gap_sec": 3.0,
+    # 中身を全部残すとき、発話と発話のすき間にこの秒数以上の声があれば切らない。どの発話にも
+    # 入らなかった声（文字起こしの時刻が早く終わった言葉）で、すき間として切ると言葉が消える
+    # （2本目の対談 7分58秒「ナースは女神様に見えましたし」・2026-10-24 北原さんの朱入れ）
+    "unclaimed_voice_sec": 0.6,
     # 区間の端で、映像の切り替わり（収録の継ぎ目）の手前（後ろ）がこれより短く、そこに言葉が無ければ
     # 切り落とす。1秒に満たない映像は、見る人には別の場面が一瞬映ったように見える
     "min_shot_sec": 1.0,
@@ -360,6 +364,67 @@ def production_talk(segments, rules: dict) -> set[int]:
             drop[j] = True
             j += 1
     return {i for k, span in enumerate(spans) if drop[k] for i in groups[span]}
+
+
+# ------------------------------------------------------------------
+# 人の指示で切る・字幕だけ消す（校正台帳の cuts）
+# ------------------------------------------------------------------
+
+# 発話の区間のこの割合以上が指示の区間に入っていれば、その発話を指示の対象にする
+HUMAN_CUT_SHARE = 0.5
+
+
+def human_cuts(segments, cuts, heard: dict | None = None) -> tuple[set[int], set[int]]:
+    """人が字幕を見て指示した区間（`review_ledger` の cuts）に入る発話の番号。
+
+    返り値は (映像ごと切る発話, 字幕だけ消す発話)。指示の区間は画面で見た字幕の時刻（素材の秒）で、
+    文字起こしの区間とは 1 秒ほどずれる。聞こえた区間（`heard_spans`）があればそれで見る。
+    発話の区間の `HUMAN_CUT_SHARE` 以上が区間に入るか、区間に掛かっていて字が指示した字幕（``text`` を
+    「 / 」で区切ったもの）と同じなら対象（「はい」の文字起こしの区間は 783.7〜784.9 秒で、
+    指示の区間 784.37〜 に半分も入らず残った・2026-10-24 v3）。
+    """
+    cut, hide = set(), set()
+    seen = [{_plain(t) for t in str(c.get("text") or "").split(" / ")} - {""} for c in cuts]
+    for i, seg in enumerate(segments):
+        lo, hi = (heard or {}).get(_span(seg)) or _span(seg)
+        length = max(hi - lo, 1e-6)
+        body = _plain(_field(seg, "text", ""))
+        for c, texts in zip(cuts, seen):
+            a, b = float(c["start"]), float(c["end"])
+            inside = max(0.0, min(hi, b) - max(lo, a))
+            if inside / length >= HUMAN_CUT_SHARE or (inside > 0 and body in texts):
+                (cut if c.get("mode", "cut") == "cut" else hide).add(i)
+                break
+    return cut, hide
+
+
+def add_spans(ranges, spans) -> list[tuple[float, float]]:
+    """区間を足してつなぐ。"""
+    merged: list[list[float]] = []
+    for a, b in sorted([(float(a), float(b)) for a, b in ranges] + [(float(a), float(b)) for a, b in spans]):
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    return [(a, b) for a, b in merged]
+
+
+def subtract_spans(ranges, spans) -> list[tuple[float, float]]:
+    """区間から spans を除く。"""
+    out = [(float(a), float(b)) for a, b in ranges]
+    for c0, c1 in spans:
+        c0, c1 = float(c0), float(c1)
+        nxt = []
+        for a, b in out:
+            if c1 <= a or b <= c0:
+                nxt.append((a, b))
+                continue
+            if a < c0:
+                nxt.append((a, c0))
+            if c1 < b:
+                nxt.append((c1, b))
+        out = nxt
+    return out
 
 
 # ------------------------------------------------------------------
@@ -640,6 +705,16 @@ def _speech_start(audio: SourceAudio, t: float, chain_gap: float) -> float | Non
     return start
 
 
+def _voiced(speech, lo: float, hi: float) -> float:
+    """lo〜hi 秒の中にある声の長さの合計。"""
+    total = 0.0
+    i = max(0, bisect.bisect_right(speech.onsets, lo) - 1)
+    while i < len(speech.onsets) and speech.onsets[i] < hi:
+        total += max(0.0, min(hi, speech.offsets[i]) - max(lo, speech.onsets[i]))
+        i += 1
+    return total
+
+
 def _quietest(levels: np.ndarray, lo: float, hi: float) -> float:
     """lo〜hi 秒で一番静かな所（0.1 秒の平均で見る）。"""
     import numpy as np
@@ -722,6 +797,12 @@ def snap_to_pauses(ranges, audio: SourceAudio | None, rules: dict,
         if not walled and new_start - new_end < rules["min_cut_sec"]:
             prev[1] = max(prev[1], end)
             info["joined"] += 1
+            continue
+        if not walled and not cut_through_voice and \
+                _voiced(speech, new_end, new_start) >= rules.get("unclaimed_voice_sec", float("inf")):
+            prev[1] = max(prev[1], end)
+            info["joined"] += 1
+            info["voice_kept"] = info.get("voice_kept", 0) + 1
             continue
         new_start = max(new_start, new_end)
         info["extended_end"] += how_end == "moved"
@@ -920,7 +1001,7 @@ def fit_spans(segments, ranges, overhang: float = 0.5) -> int:
 
 
 def plan(segments, source_path=None, *, keep_all: bool = False,
-         rules: dict | None = None, exclude=()) -> tuple[list[tuple[float, float]], dict]:
+         rules: dict | None = None, exclude=(), cuts=(), keep=()) -> tuple[list[tuple[float, float]], dict]:
     """残す区間（素材の秒）と、決め方の記録を返す。
 
     keep_all: 中身（発話）を全部残すとき True。冒頭（最初の質問の文の前まで）とだれも話さない
@@ -935,6 +1016,8 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
     映像の切り替わりが読めれば、区間の端の短い映り込みを切り落とす（`trim_flashes`）。区間が発話の
     区間より短くなることがあるので、字幕を割り当てる前に `fit_spans` で発話の区間を収める。
     映像のフレームレートが読めれば、区間の端をフレームの境目に置く（`on_frames`）。
+    cuts・keep: 人が指示した、映像ごと切る区間と、字幕なしで残す区間（素材の秒・`human_cuts`）。
+    最後に keep を足し、cuts を除く。
     """
     rules = rules or cut_rules()
     info: dict = {}
@@ -978,14 +1061,17 @@ def plan(segments, source_path=None, *, keep_all: bool = False,
     info.update(moved)
     shots = read_shots(source_path) if audio is not None else None
     if shots:
-        cuts = [t for t, score in shots if score >= SHOT_CHANGE_SCORE]
-        snapped, flashes = trim_flashes(snapped, cuts, audio,
+        changes = [t for t, score in shots if score >= SHOT_CHANGE_SCORE]
+        snapped, flashes = trim_flashes(snapped, changes, audio,
                                         rules.get("min_shot_sec", DEFAULT_CUT_RULES["min_shot_sec"]))
-        info["shot_changes"] = len(cuts)
+        info["shot_changes"] = len(changes)
         if flashes["trimmed"]:
             info["flashes_trimmed"] = flashes["trimmed"]
         if flashes["kept"]:
             info["flashes_kept"] = flashes["kept"]
+    if keep or cuts:
+        snapped = subtract_spans(add_spans(snapped, keep), cuts)
+        info["human_cuts"] = len(list(cuts))
     rate, _ = read_rates(source_path)
     if rate is not None:
         snapped = on_frames(snapped, rate)

@@ -921,8 +921,12 @@ class Runner:
         build_review_files(preview, local)
         asr = material_cache(self.material, "_align_rz_")
         version = next(v for v in self.job["versions"] if v["key"] == key)
+        # 画面の印は run の名前ごとに残る（db の runs/<run>/marks）。印は字幕の番号に付くので、書き出し直したら
+        # 名前を変える。同じ名前だと前の版の印が、番号のずれた新しい字幕に付いて見える（2026-10-24 v3）
+        stamp = str(edit.get("run_id") or "")[:13]
+        run_name = f"{self.job['name']}-{key}" + (f"-{stamp}" if stamp else "")
         sheet = review_sheet.export(json.loads(sidecar_of(preview).read_text(encoding="utf-8")),
-                                    f"{self.job['name']}-{key}", version.get("label") or key, "full360.mp4",
+                                    run_name, version.get("label") or key, "full360.mp4",
                                     aligner.cached_tokens(str(asr)) if asr.is_file() else None,
                                     readings=review_sheet.readings_beside(self.material))
         (local / "review_captions.json").write_text(

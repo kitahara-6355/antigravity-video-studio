@@ -596,10 +596,12 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   }
   function renderCounts() {
     let open = 0, fixed = 0, ok = 0;
-    S.marks.forEach((m) => { if (m.state === "ok") ok++; else if (m.state === "fixed") fixed++; else open++; });
+    let cut = 0;
+    S.marks.forEach((m) => { if (m.state === "ok") ok++; else if (m.state === "fixed") fixed++; else if (CUTS[m.state]) cut++; else open++; });
     const box = $("counts"); box.textContent = "";
     const chip = (cls, text) => { const s = document.createElement("span"); s.className = "chip " + cls; s.textContent = text; box.appendChild(s); };
     chip("shu", "未記入 " + open); chip("matsu", "直しあり " + fixed); chip("", "問題なし " + ok);
+    if (cut) chip("gunjo", "カット・字幕なし " + cut);
     if (S.flags.length) chip("gunjo", "要確認 " + S.flags.length);
     $("nMarks").textContent = S.marks.size;
   }
@@ -630,8 +632,12 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   }
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   function button(text, fn, cls) { const b = el("button", cls || "", text); b.type = "button"; b.addEventListener("click", fn); return b; }
+  // 映像ごと切る・字幕だけ消す印（2026-10-24 北原さんの朱入れ「映像字幕ともにカット」「字幕なしにして」）。
+  // 取り込むと校正台帳の cuts になる（review_sheet.to_cuts）
+  const CUTS = { cut: "映像ごとカット", hide: "字幕だけ消す" };
   function chipFor(m) {
-    return m.state === "ok" ? ["", "問題なし"] : m.state === "fixed" ? ["matsu", "直しあり"] : ["shu", "未記入"];
+    return CUTS[m.state] ? ["gunjo", CUTS[m.state]]
+      : m.state === "ok" ? ["", "問題なし"] : m.state === "fixed" ? ["matsu", "直しあり"] : ["shu", "未記入"];
   }
   function buildItem(id) {
     const node = el("article", "item"); node.dataset.id = id;
@@ -646,7 +652,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     const note = el("input"); note.type = "text"; note.id = "note-" + id; noteLabel.appendChild(note);
     let timer = 0;
     const saveFix = () => { clearTimeout(timer); const m = S.marks.get(id); if (!m) return;
-      const v = fix.value; patchMark(id, { fix: v, state: m.state === "ok" ? "ok" : stateFor(m, v) }); };
+      const v = fix.value; patchMark(id, { fix: v, state: m.state === "ok" || CUTS[m.state] ? m.state : stateFor(m, v) }); };
     fix.addEventListener("focus", () => { const m = S.marks.get(id); if (m && !fix.value) fix.value = m.text; });
     fix.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(saveFix, 1200); });
     fix.addEventListener("blur", () => { const m = S.marks.get(id); if (m && fix.value === m.text && !m.fix) return; saveFix(); });
@@ -658,10 +664,15 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     const tools = el("div", "item-tools");
     const okBtn = button("問題なし", () => { const m = S.marks.get(id); if (!m) return;
       patchMark(id, { state: m.state === "ok" ? stateFor(m, m.fix) : "ok" }); });
+    const cutBtn = {};
+    for (const key of Object.keys(CUTS)) {
+      cutBtn[key] = button(CUTS[key], () => { const m = S.marks.get(id); if (!m) return;
+        patchMark(id, { state: m.state === key ? stateFor(m, m.fix) : key }); });
+    }
     tools.append(button("◀ 前の字幕", () => shiftMark(id, -1)), button("次の字幕 ▶", () => shiftMark(id, 1)), okBtn,
-                 button("印を取り消す", () => removeMark(id)));
+                 cutBtn.cut, cutBtn.hide, button("印を取り消す", () => removeMark(id)));
     node.append(head, orig, fixLabel, noteLabel, tools);
-    node._parts = { time, idx, chip, orig, fix, note, okBtn };
+    node._parts = { time, idx, chip, orig, fix, note, okBtn, cutBtn };
     return node;
   }
   function renderMarks() {
@@ -681,6 +692,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       p.chip.className = "chip plain " + cls; p.chip.textContent = label;
       p.orig.textContent = m.text;
       p.okBtn.textContent = m.state === "ok" ? "問題なしをやめる" : "問題なし";
+      for (const key of Object.keys(CUTS)) p.cutBtn[key].textContent = m.state === key ? CUTS[key] + "をやめる" : CUTS[key];
       if (document.activeElement !== p.fix && p.fix.value !== (m.fix || "")) p.fix.value = m.fix || "";
       if (document.activeElement !== p.note && p.note.value !== (m.note || "")) p.note.value = m.note || "";
     }
@@ -756,7 +768,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   // ── 文字でコピー ──
   function marksText() {
     const lines = sortedMarks().map(([, m]) => clock(m.t) + "（素材 " + clock(m.src) + "）「" + flat(m.text) + "」"
-      + (m.state === "ok" ? " → 問題なし" : m.fix && m.state === "fixed" ? " → 「" + flat(m.fix) + "」" : " → （未記入）")
+      + (CUTS[m.state] ? " → " + CUTS[m.state] : m.state === "ok" ? " → 問題なし"
+         : m.fix && m.state === "fixed" ? " → 「" + flat(m.fix) + "」" : " → （未記入）")
       + (m.note ? " メモ: " + m.note : ""));
     return ((S.sheet && S.sheet.label) || "") + " の印 " + lines.length + " 件\n" + lines.join("\n");
   }

@@ -751,6 +751,47 @@
         "backend/tests/test_cut_plan.py::test_the_take_end_call_after_the_closing_is_found"
       ],
       "check": null
+    },
+    {
+      "id": "S37",
+      "group": "カット",
+      "rule": "中身を全部残すとき、発話と発話のすき間に0.6秒以上の声があれば切らない（どの発話にも入らなかった言葉を消さない）",
+      "from": {
+        "day": "2026-10-24",
+        "by": "北原",
+        "said": "ナースの下りのところが、発話があるがカットされている疑惑がある。"
+      },
+      "failure": "文字起こしの区間が早く終わり、「ナースは女神様に見えましたし」の声（素材 7分58秒）がすき間として切られていた",
+      "where": [
+        "backend/cut_plan.py::snap_to_pauses",
+        "backend/cut_plan.py::_voiced"
+      ],
+      "tests": [
+        "backend/tests/test_cut_plan.py::test_voice_between_utterances_is_not_cut_when_keeping_everything"
+      ],
+      "check": null
+    },
+    {
+      "id": "S38",
+      "group": "カット",
+      "rule": "人が字幕を見て「映像ごとカット」「字幕なしにして」と指示した所は、校正台帳の cuts にして書き出しのたびに当てる",
+      "from": {
+        "day": "2026-10-24",
+        "by": "北原",
+        "said": "映像字幕ともにカット／字幕なしにして（朱入れのメモ）"
+      },
+      "failure": "収録の合間のスタッフの声（13分ごろ）が字幕付きで残っていた。字の直ししか台帳に入れられなかった",
+      "where": [
+        "backend/subtitle_engine/review_sheet.py::to_cuts",
+        "backend/cut_plan.py::human_cuts",
+        "backend/agents/workers/smartcut_worker.py::SmartCutWorker._apply_human_cuts"
+      ],
+      "tests": [
+        "backend/tests/test_review_sheet.py::test_marks_next_to_each_other_become_one_span",
+        "backend/tests/test_cut_plan.py::test_human_cuts_pick_utterances_mostly_inside_the_marked_span",
+        "backend/tests/test_cut_plan.py::test_marked_spans_are_cut_out_and_kept_spans_added"
+      ],
+      "check": null
     }
   ]
 }
