@@ -6,6 +6,9 @@
   "lock": "/mnt/project-files/outputs/raw4_repro_20261018/assets/r61.lock.json",
   "thumbnail": "backend/config/thumbnails/20250922_久木田ヒロノブ.json",
   "package": ".claude/skills/program-package/examples/20250922_久木田ヒロノブ_投稿パッケージ_v1.txt",
+  "program": "backend/config/program/美麗の書道対談.json",
+  "program_asset": null,
+  "program_note": "番組共通 OP は資産（backend/config/program と Drive 20_素材/共通/番組OP）。program_asset に資産の mp4（横）を指すと、それをそのまま頭に付ける。null ならここで作る",
   "note": "時刻はすべて完成版（v62）の時刻。source・raw・lock は作業場の場所なので、動かす所に合わせて書き換える",
   "title": {
     "series": "美麗の書道対談",
@@ -13,28 +16,6 @@
     "tag": "デザイン書道の第一人者",
     "guest": "久木田ヒロノブ",
     "host": "聞き手　書家 北原美麗"
-  },
-  "program_opening": {
-    "note": "番組専用 OP。どの回でも同じものを出す。収録の絵は使わない文字だけの映像（言葉が順に出て番組名で締める）。言葉は聞き手のあいさつから取った（2026-10-23 北原さん: カット集は今回のハイライトと役割が重なる）。言葉は一文字ずつ書き足す・背景に斜線なし（同日 北原さん。いずれ美麗さんの手書きの映像に差し替える）",
-    "name": "美麗の書道対談",
-    "slides": [
-      "書を通して 人々の心に触れ",
-      "各界でご活躍の方をお招きし",
-      "大切にされている言葉を 書いていただく"
-    ],
-    "slide_seconds": 3.5,
-    "char_seconds": 0.11,
-    "title_char_seconds": 0.24,
-    "title_seconds": 4.5,
-    "music": {
-      "path": "/home/user/work/music/milky_way.m4a",
-      "drive": "20_素材/共通/03. Milky Way.m4a（1nI4GC-doFSbRIOp3UoGVXlCCMhkC_cA6）",
-      "title": "Milky Way / Seimo Yamaguchi（アルバム Hikarihurubasho）",
-      "provisional": true,
-      "note": "仮の曲（北原さんのライブパフォーマンス用）。公開には使わない。北原さんがオリジナル曲を作ったら差し替える（2026-10-23）",
-      "start": 20.0,
-      "volume": 0.9
-    }
   },
   "opening": {
     "cuts": [
@@ -127,9 +108,24 @@
       "name": "久木田ヒロノブ",
       "right": 840,
       "avoid": [
-        [880, 125, 1030, 560],
-        [720, 205, 1040, 560],
-        [230, 175, 425, 560]
+        [
+          880,
+          125,
+          1030,
+          560
+        ],
+        [
+          720,
+          205,
+          1040,
+          560
+        ],
+        [
+          230,
+          175,
+          425,
+          560
+        ]
       ],
       "avoid_note": "この8秒に二人の頭が来る所（完成版のコマを1秒ごとに見て測った。上から久木田さん・身を乗り出した久木田さん・美麗さん）。2026-10-23 北原さん: 名前が頭に掛かる"
     }

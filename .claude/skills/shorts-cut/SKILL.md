@@ -82,6 +82,20 @@ python -m backend.program_package.shorts SPEC.json --raw RAW.mp4 --subs SUBS.jso
   （スレッドの添付は1回6件・1スレッド24件まで）
 - 決めてもらうこと: 出すもの・順番・ペース。決まったら指定ファイルの `post_order` に控える
 
+### 5. 投稿用フォルダにまとめる（2026-10-25 北原さん: Shorts を先に仕上げる）
+
+指定ファイルの `posts` に1本ずつ `title`・`body`・`tags`・`label` と、共通の `footer`（本編への誘導）・`tags` を書く。
+本編で言っていることだけを書く。本編の URL は公開後に `main_url` へ入れる（それまでは【本編の公開後に URL を入れる】と出る）。
+
+```
+python -m backend.program_package.shorts_kit SPEC.json --rendered <書き出したフォルダ> --out <投稿用フォルダ>
+```
+
+- `01_S1_鬼滅の刃.mp4` のように**投稿の順番の番号**を付けて写す（中身は変えない）。`投稿文.txt` に順番どおりのタイトル・説明・ハッシュタグ
+- **60秒を超える1本があると止まる**（2026-10-25 に S2 が60.2秒だったので詰めた）。投稿文の漏れ・タイトル100字超え・タグの重なりも止まる
+- Drive `40_完成/<収録ID>/Shorts_投稿用/` へ（`drive_layout put finished <フォルダ> --to "<収録ID>/Shorts_投稿用"`）
+- 投稿は北原さんが手で行う
+
 ## おすすめの出し方（2026-10-23 の判断の根拠）
 
 - 質が揃っていれば**本数は多いほうが登録者を集めやすい**ので、作った候補は基本すべて出す
@@ -102,3 +116,4 @@ python -m backend.program_package.shorts SPEC.json --raw RAW.mp4 --subs SUBS.jso
 | 10-23 | 8本とも出す。順番 S1 → S5 → S2 → S3 → S4 → S6 → S7 → S8、週2〜3本 |
 
 背景の案を比べた絵は `examples/背景の案_薄紫のまま分ける.jpg`。
+| 10-25 | Shorts を先に投稿用に仕上げる（投稿用フォルダと投稿文）。S2 を60秒以内に詰める |
