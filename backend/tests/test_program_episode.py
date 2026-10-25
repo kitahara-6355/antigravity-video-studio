@@ -3,7 +3,6 @@ import json
 from itertools import pairwise
 from pathlib import Path
 
-import numpy as np
 import pytest
 from PIL import ImageFont
 
@@ -27,11 +26,13 @@ def spec():
     return json.loads(SPEC.read_text(encoding="utf-8"))
 
 
-def test_op_length_counts_the_overlapping_joins():
+def test_op_length_counts_the_overlapping_joins(tmp_path):
     s = {"opening": {"cuts": [[0, 5], [10, 14]], "title_seconds": 3}}
     assert ep.op_length(s) == 5 + 4 + 3 - ep.FADE * 2
     # 番組 OP があれば前に足す（言葉3枚＋番組名、今回の OP とのつなぎ目も重ねる）
-    s["program_opening"] = {"slides": ["a", "b", "c"], "slide_seconds": 3, "title_seconds": 4.5}
+    prog = tmp_path / "program.json"
+    prog.write_text(json.dumps({"slides": ["a", "b", "c"], "slide_seconds": 3, "title_seconds": 4.5}))
+    s["program"] = str(prog)
     assert ep.program_length(s) == 3 * 3 + 4.5
     assert ep.op_length(s) == ep.program_length(s) + (5 + 4 + 3 - ep.FADE * 2) - ep.FADE
 
@@ -97,16 +98,6 @@ def test_first_chapter_heading_can_sit_at_the_top_right(fonts):
     x0, _, x1, _ = ep.chapter_card(1, "オープニング・ゲスト紹介", right=True).getbbox()
     assert x1 <= ep.th.FRAME[2] and x0 > ep.W / 2
     assert 1 in spec()["chapters_right"]
-
-
-def test_opening_words_are_written_in_from_the_left():
-    # 番組 OP の言葉は、きっちり一文字ずつでなくても書き足されていく感じに（2026-10-23 北原さん）
-    edges = [400.0 + 56 * i for i in range(9)]
-    early, mid, late = (ep.column_alpha(edges, t, 0.11)[0, :, 0] for t in (0.0, 0.5, 5.0))
-    assert early.max() == 0
-    assert mid[420] == 1 and mid[860] == 0  # 左は書き終わり、右はまだ
-    assert np.all(np.diff(mid) <= 1e-6)  # 左から右へ（逆戻りしない）
-    assert late.min() == 1
 
 
 def test_name_pops_stay_off_the_heads(fonts):

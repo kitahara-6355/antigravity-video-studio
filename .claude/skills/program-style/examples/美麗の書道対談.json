@@ -1,0 +1,60 @@
+{
+  "name": "美麗の書道対談",
+  "version": "v1",
+  "note": "番組共通の OP（どの回でも同じ）。資産として別に保存し、各回の本編はこの資産を頭に付ける。品質が上がったら version を上げて書き出し、各回の本編を書き出し直して差し替える（2026-10-25 北原さん）",
+  "made_from": "20250922_久木田ヒロノブ の v66（2026-10-23 北原さん「OK・とても良い感じ」）",
+  "asset": {
+    "drive": "30_AVS_作業/番組資産/美麗の書道対談/番組OP_{version}",
+    "forms": [
+      "横",
+      "縦"
+    ],
+    "why_here": "20_素材 は北原さんが置く所（AI は読むだけ）なので、AI が作る OP は 30_AVS_作業 に置く",
+    "v1": {
+      "横": "1_LYPDjL7RpHrJ0uX8Bd7C_Zt7BhoJQvC",
+      "縦": "1nBM3at0PPbS2fAW_2gCYYN7zLiGrQ0qR",
+      "md5_横": "0ddeda4995eef85117f2bed65e4cf2dd",
+      "md5_縦": "4e06ee47c9f5d70b0fda14c22c9343f2"
+    }
+  },
+  "theme": {
+    "light": [
+      214,
+      178,
+      196
+    ],
+    "deep": [
+      92,
+      52,
+      78
+    ],
+    "shade": [
+      52,
+      22,
+      44
+    ]
+  },
+  "slides": [
+    "書を通して 人々の心に触れ",
+    "各界でご活躍の方をお招きし",
+    "大切にされている言葉を 書いていただく"
+  ],
+  "slide_seconds": 3.5,
+  "char_seconds": 0.11,
+  "title_char_seconds": 0.24,
+  "title_seconds": 4.5,
+  "music": {
+    "path": "/home/user/work/music/milky_way.m4a",
+    "drive": "20_素材/共通/03. Milky Way.m4a（1nI4GC-doFSbRIOp3UoGVXlCCMhkC_cA6）",
+    "title": "Milky Way / Seimo Yamaguchi（アルバム Hikarihurubasho）",
+    "provisional": true,
+    "note": "仮の曲（北原さんのライブパフォーマンス用）。公開には使わない。北原さんがオリジナル曲を作ったら差し替える（2026-10-23）",
+    "start": 20.0,
+    "volume": 0.9
+  },
+  "history": [
+    "10-23 カット集は今回のハイライトと役割が重なる → 文字だけのタイトル映像",
+    "10-23 背景の斜線は不要。言葉は書き足されていく形に（一文字ずつきっちりでなくてよい）",
+    "10-23 後日、美麗さんの手書きを撮って差し替え、唯一無二の OP にする"
+  ]
+}

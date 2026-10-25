@@ -252,6 +252,26 @@
       ]
     },
     {
+      "id": "backend/program_package/opening.py::render",
+      "file": "backend/program_package/opening.py",
+      "symbol": "render",
+      "status": "intermediate",
+      "reason": "番組共通 OP（15秒の文字だけの映像）の部品を書く。各回の本編の頭に付ける素材で、これ単体を投稿する口は無い（縦の版を Shorts に出すときも北原さんが手で投稿する）。見本（style_picker）もこれを通る",
+      "tools": [
+        "Popen"
+      ]
+    },
+    {
+      "id": "backend/program_package/shorts_kit.py::build",
+      "file": "backend/program_package/shorts_kit.py",
+      "symbol": "build",
+      "status": "intermediate",
+      "reason": "書き出し済みの Shorts を投稿の順番の名前に写すだけ（中身は1バイトも変えない）。投稿は北原さんが手で行う。アップロードの口は無い",
+      "tools": [
+        "copyfile"
+      ]
+    },
+    {
       "id": "backend/program_package/thumbnail.py::main",
       "file": "backend/program_package/thumbnail.py",
       "symbol": "main",

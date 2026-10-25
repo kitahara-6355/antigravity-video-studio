@@ -72,3 +72,13 @@ def test_the_frame_surrounds_the_picture(fonts):
     gold = sh.GOLD_FRAME
     assert im.getpixel((x - 8, y + h // 2)) == gold and im.getpixel((x + w + 6, y + h // 2)) == gold
     assert im.getpixel((sh.W // 2, y - 8)) == gold
+
+
+def test_every_short_has_a_post_text_in_posting_order():
+    # Shorts を先に投稿用に仕上げる（2026-10-25 北原さん）。順番の全部に投稿文があり、YouTube の上限内
+    from backend.program_package import shorts_kit as kit
+    s = json.loads(SPEC.read_text(encoding="utf-8"))
+    assert not kit.problems(s)
+    t = kit.post_text(s, "S1")
+    assert "#Shorts" in t["description"] and "【本編の公開後に URL を入れる】" in t["description"]
+    assert kit.post_text({**s, "posts": {**s["posts"], "main_url": "https://youtu.be/x"}}, "S1")["description"].count("https://youtu.be/x") == 1

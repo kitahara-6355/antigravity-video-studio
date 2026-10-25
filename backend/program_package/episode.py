@@ -27,6 +27,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from backend.program_package import chapters as ch
+from backend.program_package import opening as opening_mod
 from backend.program_package import thumbnail as th
 
 W, H = 1280, 720
@@ -68,115 +69,6 @@ def title_card(spec: dict, board: Image.Image, theme: dict) -> Image.Image:
     th.gradient_text(im, (x, 520), t["guest"], th.font("mincho", 76), th.GOLD, stroke=9)
     outlined(d, (x, 610), t["host"], 34)
     return im
-
-
-def _ease(x: float) -> float:
-    x = min(max(x, 0.0), 1.0)
-    return 1 - (1 - x) ** 3
-
-
-def _layer(draw) -> np.ndarray:
-    """透明の1枚に描いて、RGBA の配列（0〜1）で返す。"""
-    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw(im)
-    return np.asarray(im, dtype=np.float32) / 255
-
-
-def char_edges(text: str, font, cx: float) -> list[float]:
-    """中央寄せの1行で、各文字の左端の x と最後の文字の右端（len+1 個）。"""
-    d = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-    x0 = cx - d.textlength(text, font=font) / 2
-    return [x0 + d.textlength(text[:i], font=font) for i in range(len(text) + 1)]
-
-
-def column_alpha(edges: list[float], lt: float, interval: float, fade: float = 0.22) -> np.ndarray:
-    """書き足していく文字の、画面の列ごとの濃さ（0〜1、形は (1, W, 1)）。
-
-    i 文字目の左端は i*interval 秒後、右端は (i+1)*interval 秒後に出始める。境目はぼかすので、
-    きっちり一文字ずつではなく、筆で左から書き足されていくように見える（2026-10-23 北原さん）。
-    縁取りの分は両端の文字に含める。
-    """
-    xs = np.arange(W, dtype=np.float32)
-    pos = np.interp(xs, edges, np.arange(len(edges), dtype=np.float32))  # 何文字目のどこか（端の外は端と同じ）
-    x = np.clip((lt - pos * interval) / fade, 0, 1)
-    return (1 - (1 - x) ** 3)[None, :, None]
-
-
-def title_sequence(spec: dict, theme: dict, dst: Path) -> float:
-    """番組 OP（どの回でも同じ）。収録の絵は使わず、言葉が順に出て番組名で締める文字だけの映像。
-
-    言葉は一文字ずつ書き足されていき、金の線が中央から伸びる。番組名も一文字ずつ大きく書き足し、
-    最後に光が一度だけ走る。背景は斜線なしの薄紫（2026-10-23 北原さん）。
-    いずれ美麗さんの手書きの映像に差し替える前提の試作。音は付けない（曲は書き出しのときに重ねる）。長さ（秒）を返す。
-    """
-    p = spec["program_opening"]
-    slides, sec, tsec, fps = p["slides"], p["slide_seconds"], p["title_seconds"], 30
-    step, tstep = p.get("char_seconds", 0.12), p.get("title_char_seconds", 0.24)
-    bg = np.asarray(th.background(theme, stripes=False), dtype=np.float32) / 255
-    sf, nf = th.font("mincho", 56), th.font("mincho", 116)
-    gold = np.array(GOLD_LINE, dtype=np.float32) / 255
-    cy = H / 2 + 20
-
-    slides = [sl if isinstance(sl, list) else [sl] for sl in slides]
-    texts, edges = [], []
-    for lines in slides:
-        ys = [cy + (i - (len(lines) - 1) / 2) * 78 for i in range(len(lines))]
-        texts.append([_layer(lambda im, s=s, y=y: outlined(ImageDraw.Draw(im), (W / 2, y), s, 56, anchor="ms"))
-                      for s, y in zip(lines, ys, strict=True)])
-        edges.append([char_edges(s, sf, W / 2) for s in lines])
-    widths = [max(e[-1] - e[0] for e in es) for es in edges]
-    title = _layer(lambda im: th.gradient_text(im, (W / 2, H / 2 + 40), p["name"], nf, th.GOLD, anchor="ms",
-                                               stroke=11))
-    tedges = char_edges(p["name"], nf, W / 2)
-    tw = tedges[-1] - tedges[0]
-    xs = np.arange(W, dtype=np.float32)[None, :]
-
-    def over(frame, layer, alpha):
-        a = layer[..., 3:4] * alpha
-        return frame * (1 - a) + layer[..., :3] * a
-
-    def gold_lines(frame, half, y1, y2, alpha):
-        x0, x1 = int(W / 2 - half), int(W / 2 + half)
-        for y in (y1, y2):
-            frame[y:y + 3, x0:x1] = frame[y:y + 3, x0:x1] * (1 - alpha) + gold * alpha
-        return frame
-
-    total = len(slides) * sec + tsec
-    n = round(total * fps)
-    proc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
-                             "-r", str(fps), "-i", "-", "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p",
-                             str(dst)], stdin=subprocess.PIPE)
-    for k in range(n):
-        t = k / fps
-        f = bg.copy()
-        i = int(t // sec)
-        if i < len(slides):
-            lt = t - i * sec
-            out = 1 - _ease((lt - (sec - 0.45)) / 0.45)
-            f = gold_lines(f, (widths[i] / 2 + 40) * _ease(lt / 0.9), H // 2 - 90, H // 2 + 80, out)
-            start = 0.15
-            for layer, e in zip(texts[i], edges[i], strict=True):  # 行が複数なら上の行から順に書き足す
-                lay = layer.copy()
-                lay[..., 3:4] *= column_alpha(e, lt - start, step)
-                f = over(f, lay, out)
-                start += (len(e) - 1) * step + 0.1
-        else:
-            lt = t - len(slides) * sec
-            f = gold_lines(f, (tw / 2 + 60) * _ease(lt / 1.2), H // 2 - 80, H // 2 + 72, 1.0)
-            lay = title.copy()
-            lay[..., 3:4] *= column_alpha(tedges, lt - 0.2, tstep, fade=0.3)
-            # 書き終わったあと、光が一度だけ左から右へ走る
-            done = 0.2 + (len(tedges) - 1) * tstep + 0.3
-            sweep = np.clip(1 - np.abs(xs - (-200 + (W + 400) * min(max((lt - done) / 0.9, 0), 1))) / 120, 0, 1)
-            lay[..., :3] = np.clip(lay[..., :3] + 0.45 * sweep[..., None], 0, 1)
-            f = over(f, lay, 1.0)
-            fade = _ease((lt - (tsec - 0.6)) / 0.6)  # 最後は少しだけ暗くして次へ
-            f = f * (1 - 0.25 * fade)
-        proc.stdin.write((np.clip(f, 0, 1) * 255).astype(np.uint8).tobytes())
-    proc.stdin.close()
-    if proc.wait():
-        raise SystemExit("番組 OP の書き出しに失敗")
-    return total
 
 
 def name_card(lines: list[str], name: str, y: int, right: int | None = None,
@@ -278,11 +170,14 @@ def shifted_chapters(spec: dict, op_len: float) -> list[tuple[int, str]]:
     return out
 
 
+def program_of(spec: dict) -> dict | None:
+    """番組共通 OP の指定（spec の program が指す番組の指定）。無ければ None。"""
+    return opening_mod.load(spec["program"]) if spec.get("program") else None
+
+
 def program_length(spec: dict) -> float:
-    p = spec.get("program_opening")
-    if not p:
-        return 0.0
-    return len(p["slides"]) * p["slide_seconds"] + p["title_seconds"]
+    p = program_of(spec)
+    return opening_mod.length(p) if p else 0.0
 
 
 def op_length(spec: dict) -> float:
@@ -321,7 +216,7 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
             im.save(tmp / f"{k}.png")
         spec = {**spec, "_theme": theme}
         graph, inputs = _graph(spec, body, dur, tmp)
-        music = (spec.get("program_opening") or {}).get("music") or {}
+        music = (program_of(spec) or {}).get("music") or {}
         # 仮の曲を入れた版は公開に使わない。名前で分かるようにする
         tag = "_仮曲入り" if music.get("provisional") else ""
         dst = out / f"{spec['recording']}_{spec['version']}{tag}.mp4"
@@ -350,7 +245,7 @@ def _chain(g: list[str], clips: list[tuple[str, str, float]], tag: str) -> tuple
 
 
 def _graph(spec: dict, body, dur: float, tmp: Path) -> tuple[str, list[str]]:
-    o, e, p = spec["opening"], spec["ending"], spec.get("program_opening")
+    o, e = spec["opening"], spec["ending"]
     src = spec["source"]
     inputs = ["-i", src, "-loop", "1", "-framerate", "30", "-t", str(o["title_seconds"]), "-i", str(tmp / "title.png"),
               "-loop", "1", "-framerate", "30", "-t", str(e["seconds"]), "-i", str(tmp / "ending.png")]
@@ -378,25 +273,21 @@ def _graph(spec: dict, body, dur: float, tmp: Path) -> tuple[str, list[str]]:
     clips = [cut(src, a, b, f"o{i}") for i, (a, b) in enumerate(o["cuts"])]
     g.append(f"[1:v]format=yuv420p,fps=30[tv];anullsrc=r=48000:cl=stereo,atrim=0:{o['title_seconds']}[ta]")
     op_v, op_a, op_l = _chain(g, [*clips, ("tv", "ta", o["title_seconds"])], "x")
-    # 番組 OP（どの回でも同じ。これまでの対談のシーン集 → 番組名）。音楽があれば音は音楽だけにする
+    # 番組 OP（どの回でも同じ）。資産の mp4（曲入り）をそのまま頭に付ける。資産が無ければここで作る
+    p = program_of(spec)
     if p:
-        seq = tmp / "program.mp4"
-        pl = title_sequence(spec, spec["_theme"], seq)
+        asset = spec.get("program_asset")
+        if asset:
+            seq = Path(asset)
+        else:
+            seq = tmp / "program.mp4"
+            opening_mod.render(p, seq, "横")
+        pl = opening_mod.length(p)
         inputs.extend(["-i", str(seq)])
-        g.append(f"[{n_in}:v]fps=30,format=yuv420p[pv];anullsrc=r=48000:cl=stereo,atrim=0:{pl:.3f}[pa0]")
+        g.append(f"[{n_in}:v]fps=30,format=yuv420p,scale={W}:{H}[pv];"
+                 f"[{n_in}:a]aformat=sample_rates=48000:channel_layouts=stereo[pa]")
         n_in += 1
-        pv, pa = "pv", "pa0"
-        music = p.get("music")
-        if music:
-            inputs.extend(["-i", music["path"]])
-            st = music.get("start", 0.0)  # 曲のどこから使うか（番組名で盛り上がる所に合わせる）
-            g.append(f"[{n_in}:a]atrim={st}:{st + pl:.3f},asetpts=PTS-STARTPTS,"
-                     f"aformat=sample_rates=48000:channel_layouts=stereo,volume={music.get('volume', 1.0)},"
-                     f"afade=t=in:d=0.3,afade=t=out:st={pl - 1.5:.3f}:d=1.5[pm]")
-            n_in += 1
-            g.append(f"[{pa}]anullsink")  # 収録の音は使わない（つないだ口を閉じないと ffmpeg が止まる）
-            pa = "pm"
-        op_v, op_a, op_l = _chain(g, [(pv, pa, pl), (op_v, op_a, op_l)], "z")
+        op_v, op_a, op_l = _chain(g, [("pv", "pa", pl), (op_v, op_a, op_l)], "z")
     # 本編: 章の見出し・テロップ・名前のポップを、時刻の所でふわっと出して消す
     g.append("[0:v]fps=30,format=yuv420p[m0]")
     m = "m0"
