@@ -31,8 +31,11 @@ from backend.logo_check import source_time
 W, H = 1280, 720
 FONT_DIR = Path(__file__).resolve().parents[1] / "data" / "fonts"
 # Google Fonts（SIL Open Font License）
-FONTS = {"mincho": "ShipporiMinchoB1.ttf", "gothic": "NotoSansJP-Black.ttf"}
-FONT_CSS = {"mincho": "Shippori+Mincho+B1:wght@800", "gothic": "Noto+Sans+JP:wght@900"}
+FONTS = {"mincho": "ShipporiMinchoB1.ttf", "gothic": "NotoSansJP-Black.ttf",
+         # 番組の雰囲気えらびの書体（2026-10-26）: 筆・装飾の明朝・手書きのペン
+         "fude": "YujiSyuku.ttf", "tokumin": "KaiseiTokumin-ExtraBold.ttf", "pen": "ZenKurenaido.ttf"}
+FONT_CSS = {"mincho": "Shippori+Mincho+B1:wght@800", "gothic": "Noto+Sans+JP:wght@900",
+            "fude": "Yuji+Syuku", "tokumin": "Kaisei+Tokumin:wght@800", "pen": "Zen+Kurenaido"}
 GOLD = ((255, 244, 196), (214, 164, 70), (255, 226, 140), (150, 100, 30))
 RED = ((255, 120, 120), (220, 20, 40), (150, 0, 20))
 FRAME = (24, 37, 1163, 683)  # 収録の絵がある所（黒い縁を除く）
@@ -46,6 +49,8 @@ def font_urls(css: str) -> list[str]:
 def fetch_fonts() -> None:
     FONT_DIR.mkdir(parents=True, exist_ok=True)
     for key, family in FONT_CSS.items():
+        if (FONT_DIR / FONTS[key]).exists():  # 入れ直すと字形が変わりうるので、ある物は触らない
+            continue
         with urllib.request.urlopen(f"https://fonts.googleapis.com/css2?family={family}") as r:
             url = font_urls(r.read().decode())[0]
         urllib.request.urlretrieve(url, FONT_DIR / FONTS[key])
@@ -118,11 +123,12 @@ def paste_board(im: Image.Image, board: Image.Image, cx: int, cy: int, angle: fl
     im.paste(b, (cx - b.width // 2, cy - b.height // 2), b)
 
 
-def gradient_text(im: Image.Image, xy, s: str, f, colors=GOLD, anchor: str = "ls", stroke: int = 8) -> None:
-    """黒い縁取りの上に、上から下へ色が移る文字を置く（金・赤）。"""
+def gradient_text(im: Image.Image, xy, s: str, f, colors=GOLD, anchor: str = "ls", stroke: int = 8,
+                  stroke_fill=(0, 0, 0)) -> None:
+    """縁取り（既定は黒）の上に、上から下へ色が移る文字を置く（金・赤）。"""
     d = ImageDraw.Draw(im)
     top, bot = d.textbbox(xy, s, font=f, anchor=anchor, stroke_width=stroke)[1::2]
-    d.text(xy, s, font=f, fill=(0, 0, 0), anchor=anchor, stroke_width=stroke, stroke_fill=(0, 0, 0))
+    d.text(xy, s, font=f, fill=stroke_fill, anchor=anchor, stroke_width=stroke, stroke_fill=stroke_fill)
     m = Image.new("L", im.size, 0)
     ImageDraw.Draw(m).text(xy, s, font=f, fill=255, anchor=anchor)
     ys = np.clip((np.arange(im.height) - top) / max(1, bot - top), 0, 1)

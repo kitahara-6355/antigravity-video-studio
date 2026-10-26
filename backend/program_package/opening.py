@@ -78,7 +78,8 @@ def output_name(program: dict, form: str) -> str:
     return f"番組OP_{program['version']}_{form}{tag}.mp4"
 
 
-STYLE = {"reveal": "brush", "background": "glow", "finish": "sweep"}  # 2026-10-23 北原さんが OK した形
+STYLE = {"reveal": "brush", "background": "glow", "finish": "sweep",  # 2026-10-23 北原さんが OK した形
+         "palette": "murasaki", "font": "mincho", "layout": "center"}
 CHOICES = {
     "reveal": {  # 言葉と番組名の現れ方
         "brush": "左から筆で書き足していく（境目をぼかす）",
@@ -87,7 +88,7 @@ CHOICES = {
         "stagger": "一文字ずつ小さく跳ねて出る",
     },
     "background": {  # 背景
-        "glow": "薄紫の中央が明るい（動かない）",
+        "glow": "中央が明るい（動かない）",
         "drift": "光がゆっくり漂う",
         "washi": "和紙の繊維の質感",
         "gold_dust": "金の粉がゆっくり舞い上がる",
@@ -98,7 +99,46 @@ CHOICES = {
         "brush_line": "金の筆線が下に引かれる",
         "halo": "金の光がふわっと灯る",
     },
+    # ここから下は 2026-10-26 に足した軸（北原さん: ほぼ同じ形からではなく、いろいろな形から選びたい）
+    "palette": {  # 色
+        "murasaki": "薄紫と金（今の形）",
+        "kinari": "生成りの紙と墨",
+        "ai": "藍と銀",
+        "yoru": "夜の黒と金",
+        "sakura": "桜色と金",
+    },
+    "font": {  # 書体（どれも Google Fonts・SIL OFL）
+        "mincho": "明朝（今の形）",
+        "fude": "毛筆",
+        "tokumin": "飾りのある明朝",
+        "pen": "手書きのペン字",
+        "gothic": "太いゴシック",
+    },
+    "layout": {  # 言葉の置き方
+        "center": "中央に横書き（今の形）",
+        "vertical": "縦書き（右から左へ）",
+        "left": "左に寄せて横書き",
+    },
 }
+PALETTES = {  # bg が None なら番組の指定の theme を使う
+    "murasaki": {"bg": None, "text": (255, 255, 255), "stroke": INK, "stroke_w": 5, "line": GOLD_LINE,
+                 "title": th.GOLD, "title_stroke": (0, 0, 0), "title_stroke_w": 11},
+    "kinari": {"bg": {"light": [250, 245, 234], "deep": [212, 196, 168]}, "text": (28, 22, 20),
+               "stroke": (250, 245, 234), "stroke_w": 3, "line": (160, 44, 36),
+               "title": ((74, 64, 58), (18, 14, 12), (54, 46, 42), (8, 6, 6)), "title_stroke": (250, 245, 234),
+               "title_stroke_w": 6},
+    "ai": {"bg": {"light": [78, 104, 160], "deep": [14, 24, 58]}, "text": (255, 255, 255), "stroke": (8, 14, 40),
+           "stroke_w": 5, "line": (200, 210, 226),
+           "title": ((255, 255, 255), (170, 182, 204), (232, 238, 248), (90, 100, 124)), "title_stroke": (6, 10, 28),
+           "title_stroke_w": 11},
+    "yoru": {"bg": {"light": [62, 50, 58], "deep": [8, 6, 10]}, "text": (250, 244, 232), "stroke": (0, 0, 0),
+             "stroke_w": 5, "line": GOLD_LINE, "title": th.GOLD, "title_stroke": (0, 0, 0), "title_stroke_w": 11},
+    "sakura": {"bg": {"light": [252, 236, 240], "deep": [226, 172, 192]}, "text": (96, 36, 66),
+               "stroke": (255, 246, 248), "stroke_w": 4, "line": (196, 148, 70), "title": th.GOLD,
+               "title_stroke": (110, 40, 74), "title_stroke_w": 9},
+}
+# 選んだ雰囲気への注文（注文カード）で動かす値。既定は 10-23 に OK した形のまま
+TUNE = {"text_scale": 1.0, "title_scale": 1.0, "pace": 1.0, "bright": 0, "lines": True, "frame": False, "seal": False}
 
 
 def style_of(program: dict) -> dict:
@@ -107,6 +147,23 @@ def style_of(program: dict) -> dict:
         if k in CHOICES and v not in CHOICES[k]:
             raise SystemExit(f"style.{k} に「{v}」はありません（{' / '.join(CHOICES[k])}）")
     return st
+
+
+def tune_of(program: dict) -> dict:
+    tu = {**TUNE, **program.get("tune", {})}
+    if set(tu) - set(TUNE):
+        raise SystemExit(f"tune に知らない値があります: {sorted(set(tu) - set(TUNE))}（{' / '.join(TUNE)}）")
+    return tu
+
+
+def theme_of(program: dict) -> dict:
+    """背景の色。色の軸と、注文の「明るく・暗く」を当てたもの。"""
+    st, tu = style_of(program), tune_of(program)
+    theme = PALETTES[st["palette"]]["bg"] or program["theme"]
+    if not tu["bright"]:
+        return theme
+    to, k = (255, 0.22 * tu["bright"]) if tu["bright"] > 0 else (0, -0.3 * tu["bright"])
+    return {key: [round(c + (to - c) * min(k, 0.9)) for c in theme[key]] for key in ("light", "deep")}
 
 
 def _glow(theme: dict, size: tuple[int, int], cx: float = 0.0, cy: float = 0.38) -> np.ndarray:
@@ -179,8 +236,14 @@ def _rows(lay: np.ndarray) -> tuple[int, int]:
 
 
 def _reveal(kind: str, lay0: np.ndarray, e: list[float], lt: float, step: float, w: int, pitch: float,
-            blurs: list[np.ndarray] | None = None, fade: float = 0.22) -> np.ndarray:
-    """1行の言葉を、選んだ現れ方で lt 秒目の姿にする（RGBA 0〜1）。"""
+            blurs: list[np.ndarray] | None = None, fade: float = 0.22, axis: str = "x") -> np.ndarray:
+    """1行の言葉を、選んだ現れ方で lt 秒目の姿にする（RGBA 0〜1）。
+
+    axis が "y" なら縦書きの1列（e は各文字の上端の y）。筆と一文字ずつは、縦横を入れ替えて同じ描き方をする。
+    """
+    if axis == "y" and kind in ("brush", "stagger"):
+        lay = _reveal(kind, lay0.transpose(1, 0, 2), e, lt, step, lay0.shape[0], pitch, blurs, fade)
+        return lay.transpose(1, 0, 2)
     if kind == "brush":
         lay = lay0.copy()
         lay[..., 3:4] *= column_alpha(e, lt, step, fade=fade, width=w)
@@ -188,7 +251,7 @@ def _reveal(kind: str, lay0: np.ndarray, e: list[float], lt: float, step: float,
     if kind == "rise":
         p = _ease(lt / 0.7)
         y0, y1 = _rows(lay0)
-        dy = round((1 - p) * (y1 - y0) * 0.9)
+        dy = round((1 - p) * (y1 - y0 if axis == "x" else min(y1 - y0, pitch)) * 0.9)  # 縦書きの列は1文字分だけ
         lay = np.zeros_like(lay0)
         lay[y0 + dy:y1] = lay0[y0:y1 - dy] if dy else lay0[y0:y1]
         lay[..., 3:4] *= p
@@ -221,20 +284,40 @@ def _reveal_length(kind: str, chars: int, step: float) -> float:
     return {"brush": chars * step, "rise": 0.5, "blur": 0.6, "stagger": chars * 0.06 + 0.2}[kind]
 
 
-def frames(program: dict, size: tuple[int, int]):
-    """OP のコマを順に返す（rgb の配列 0〜1）。"""
-    w, h = size
+def title_done(program: dict) -> float:
+    """番組名が出そろう時刻（番組名の場面の頭から数えた秒）。"""
     st = style_of(program)
+    n = len(program["name"])
+    return 0.2 + _reveal_length(st["reveal"], n, program.get("title_char_seconds", 0.24) * tune_of(program)["pace"]) + 0.3
+
+
+def painter(program: dict, size: tuple[int, int]):
+    """OP の t 秒目のコマを描く関数を返す（rgb の配列 0〜1）。
+
+    どの時刻からでも1枚だけ描けるので、絵コンテ（数コマの静止画）がすぐ作れる。
+    雰囲気は画像で先に決め、動画と曲は後で当てる（2026-10-26 北原さん）。
+    """
+    w, h = size
+    st, tu = style_of(program), tune_of(program)
+    pal = PALETTES[st["palette"]]
     slides, sec, tsec = program["slides"], program["slide_seconds"], program["title_seconds"]
-    step, tstep = program.get("char_seconds", 0.12), program.get("title_char_seconds", 0.24)
-    theme = program["theme"]
-    back = _Background(st["background"], theme, size)
+    step = program.get("char_seconds", 0.12) * tu["pace"]
+    tstep = program.get("title_char_seconds", 0.24) * tu["pace"]
+    back = _Background(st["background"], theme_of(program), size)
     scale = SCALE.get(size, 1.0)
-    sf = th.font("mincho", round(56 * scale))
-    probe = ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(program["name"], font=th.font("mincho", 116))
-    nf = th.font("mincho", round(116 * min(scale, (w - 120) / probe)))  # 番組名は画面の幅に収める
-    gold = np.array(GOLD_LINE, dtype=np.float32) / 255
-    cy, pitch = h / 2 + 20, 78 * scale
+    fk, layout = st["font"], st["layout"]
+    sf = th.font(fk, round(56 * scale * tu["text_scale"]))
+    d0 = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    probe = d0.textlength(program["name"], font=th.font(fk, 116))
+    nf = th.font(fk, round(116 * min(scale * tu["title_scale"], (w - 120) / probe)))  # 番組名は画面の幅に収める
+    gold = np.array(pal["line"], dtype=np.float32) / 255
+    cy, pitch = h / 2 + 20, 78 * scale * tu["text_scale"]
+    axis = "y" if layout == "vertical" else "x"
+    if layout == "vertical":  # 縦書きは、いちばん長い列が画面の高さに入る大きさにそろえる
+        longest = max(len(c) for sl in slides for s in (sl if isinstance(sl, list) else [sl]) for c in s.split(" "))
+        fit = min(round(56 * scale), int((h - 110) / (longest * 1.08)))
+        sf = th.font(fk, min(round(fit * tu["text_scale"]), int((h - 40) / (longest * 1.08))))
+    left_x = round(w * (0.16 if w > h else 0.1))
 
     def image(draw) -> Image.Image:
         im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -249,27 +332,50 @@ def frames(program: dict, size: tuple[int, int]):
             return None
         return [arr(im.filter(ImageFilter.GaussianBlur(r))) if r else arr(im) for r in (12, 8, 5, 3, 1.5, 0)]
 
-    def outlined(im, xy, s):
-        ImageDraw.Draw(im).text(xy, s, font=sf, fill="white", anchor="ms", stroke_width=5, stroke_fill=INK)
+    def outlined(im, xy, s, anchor="ms"):
+        ImageDraw.Draw(im).text(xy, s, font=sf, fill=pal["text"], anchor=anchor, stroke_width=pal["stroke_w"],
+                                stroke_fill=pal["stroke"])
 
-    texts, blurs, edges, widths = [], [], [], []
+    def column(im, x, top, c, cp):
+        for j, ch in enumerate(c):
+            outlined(im, (x, top + (j + 0.5) * cp), ch, "mm")
+
+    texts, blurs, edges, widths, boxes = [], [], [], [], []
     for sl in slides:
-        lines = wrap(sl if isinstance(sl, list) else [sl], sf, w - 120)
-        ys = [cy + (i - (len(lines) - 1) / 2) * pitch for i in range(len(lines))]
-        ims = [image(lambda im, s=s, y=y: outlined(im, (w / 2, y), s)) for s, y in zip(lines, ys, strict=True)]
+        raw = sl if isinstance(sl, list) else [sl]
+        if layout == "vertical":  # 空白の所で列を分け、右の列から読む
+            cols = [c for s in raw for c in s.split(" ") if c]
+            cp, gap = sf.size * 1.08, sf.size * 1.7
+            top = h / 2 - max(len(c) for c in cols) * cp / 2
+            xs_ = [w / 2 + ((len(cols) - 1) / 2 - j) * gap for j in range(len(cols))]
+            ims = [image(lambda im, c=c, x=x, top=top, cp=cp: column(im, x, top, c, cp))
+                   for c, x in zip(cols, xs_, strict=True)]
+            es = [[top + j * cp for j in range(len(c) + 1)] for c in cols]
+            boxes.append((min(xs_) - sf.size * 0.9, top, max(xs_) + sf.size * 0.9,
+                          top + max(len(c) for c in cols) * cp))
+        else:
+            lines = wrap(raw, sf, w - 120 if layout == "center" else w - left_x - 60)
+            ys = [cy + (i - (len(lines) - 1) / 2) * pitch for i in range(len(lines))]
+            cxs = [w / 2 if layout == "center" else left_x + d0.textlength(s, font=sf) / 2 for s in lines]
+            ims = [image(lambda im, s=s, y=y, x=x: outlined(im, (x, y), s))
+                   for s, y, x in zip(lines, ys, cxs, strict=True)]
+            es = [char_edges(s, sf, x) for s, x in zip(lines, cxs, strict=True)]
+            boxes.append((left_x, ys[0] - sf.size, max(e[-1] for e in es), ys[-1] + sf.size * 0.3))
         texts.append([arr(im) for im in ims])
         blurs.append([blur_stack(im) for im in ims])
-        edges.append([char_edges(s, sf, w / 2) for s in lines])
-        widths.append(max(e[-1] - e[0] for e in edges[-1]))
+        edges.append(es)
+        widths.append(max(e[-1] - e[0] for e in es))
     span = pitch * (max(len(t) for t in texts) - 1)  # 行が増えたら金の線も上下に開く
     ty = h / 2 + round(nf.size * 0.345)
-    title_im = image(lambda im: th.gradient_text(im, (w / 2, ty), program["name"], nf, th.GOLD, anchor="ms", stroke=11))
+    title_im = image(lambda im: th.gradient_text(im, (w / 2, ty), program["name"], nf, pal["title"], anchor="ms",
+                                                 stroke=pal["title_stroke_w"], stroke_fill=pal["title_stroke"]))
     title, tblurs = arr(title_im), blur_stack(title_im)
     tedges = char_edges(program["name"], nf, w / 2)
     tw = tedges[-1] - tedges[0]
     xs = np.arange(w, dtype=np.float32)[None, :]
-    tdone = 0.2 + _reveal_length(st["reveal"], len(tedges) - 1, tstep) + 0.3  # 番組名が出そろう時刻
-    if st["finish"] == "seal":
+    tdone = title_done(program)
+    use_seal = st["finish"] == "seal" or tu["seal"]
+    if use_seal:
         side = int(nf.size * 0.82)
         seal = Image.new("RGBA", (side, side), (0, 0, 0, 0))
         sd = ImageDraw.Draw(seal)
@@ -284,6 +390,11 @@ def frames(program: dict, size: tuple[int, int]):
             seal_xy = (int(w / 2 - side / 2), int(ty + nf.size * 0.55))
     if st["finish"] == "halo":
         halo = np.clip(arr(title_im.filter(ImageFilter.GaussianBlur(nf.size * 0.3)))[..., 3:4] * 1.8, 0, 1)
+    if tu["frame"]:  # 金の額縁（Shorts の I 案とそろえる）
+        m = round(24 * scale)
+        frame_lay = arr(image(lambda im: (
+            ImageDraw.Draw(im).rectangle([m, m, w - 1 - m, h - 1 - m], outline=(*pal["line"], 255), width=3),
+            ImageDraw.Draw(im).rectangle([m + 9, m + 9, w - 10 - m, h - 10 - m], outline=(*pal["line"], 170), width=1))))
 
     def over(frame, lay, alpha):
         a = lay[..., 3:4] * alpha
@@ -295,54 +406,75 @@ def frames(program: dict, size: tuple[int, int]):
             frame[y:y + 3, x0:x1] = frame[y:y + 3, x0:x1] * (1 - alpha) + gold * alpha
         return frame
 
-    for k in range(round(length(program) * FPS)):
-        t = k / FPS
+    def gold_rules(frame, box, p, alpha):
+        """縦書き・左寄せの金の線（縦の線。中央から上下に伸びる）。"""
+        x0, y0, x1, y1 = box
+        mid, half = (y0 + y1) / 2, (y1 - y0) / 2 * p
+        a, b = int(max(0, mid - half)), int(min(h, mid + half))
+        for x in ((int(x0), int(x1)) if layout == "vertical" else (int(x0 - 30 * scale),)):
+            frame[a:b, x:x + 3] = frame[a:b, x:x + 3] * (1 - alpha) + gold * alpha
+        return frame
+
+    def draw(t: float) -> np.ndarray:
         f = back.at(t).copy()
+        if tu["frame"]:
+            f = over(f, frame_lay, 1.0)
         i = int(t // sec)
         if i < len(slides):
             lt = t - i * sec
             out = 1 - _ease((lt - (sec - 0.45)) / 0.45)
-            f = gold_lines(f, (widths[i] / 2 + 40) * _ease(lt / 0.9), int(h // 2 - 90 * scale - span / 2),
-                           int(h // 2 + 80 * scale + span / 2), out)
+            if tu["lines"] and layout == "center":
+                f = gold_lines(f, (widths[i] / 2 + 40) * _ease(lt / 0.9), int(h // 2 - 90 * scale - span / 2),
+                               int(h // 2 + 80 * scale + span / 2), out)
+            elif tu["lines"]:
+                f = gold_rules(f, boxes[i], _ease(lt / 0.9), out)
             start = 0.15
             for lay0, bl, e in zip(texts[i], blurs[i], edges[i], strict=True):  # 行が複数なら上の行から順に出す
-                f = over(f, _reveal(st["reveal"], lay0, e, lt - start, step, w, pitch, bl), out)
+                f = over(f, _reveal(st["reveal"], lay0, e, lt - start, step, w, pitch, bl, axis=axis), out)
                 start += _reveal_length(st["reveal"], len(e) - 1, step) + 0.1
-        else:
-            lt = t - len(slides) * sec
-            if st["finish"] != "brush_line":
-                f = gold_lines(f, (tw / 2 + 60) * _ease(lt / 1.2), h // 2 - round(nf.size * 0.69),
-                               h // 2 + round(nf.size * 0.62), 1.0)
-            lay = _reveal(st["reveal"], title, tedges, lt - 0.2, tstep, w, nf.size * 0.7, tblurs, fade=0.3)
-            if st["finish"] == "sweep":  # 書き終わったあと、光が一度だけ左から右へ走る
-                sweep = np.clip(1 - np.abs(xs - (-200 + (w + 400) * min(max((lt - tdone) / 0.9, 0), 1))) / 120, 0, 1)
-                lay[..., :3] = np.clip(lay[..., :3] + 0.45 * sweep[..., None], 0, 1)
-            if st["finish"] == "halo":
-                a = 0.85 * _ease((lt - tdone) / 1.2)  # ふわっと灯って、そのまま残る
-                f = f * (1 - halo * a) + np.array([1.0, 0.84, 0.48], dtype=np.float32) * halo * a
-            if st["finish"] == "brush_line":  # 金の筆線が左から右へ。入りは太く、抜きは細く
-                p = _ease((lt - tdone + 0.4) / 0.7)
-                x0, x1 = w / 2 - tw / 2 - 30, w / 2 - tw / 2 - 30 + (tw + 60) * p
-                y = int(ty + nf.size * 0.28)
-                for x in range(int(x0), int(x1)):
-                    q = (x - x0) / (tw + 60)
-                    th_ = max(1, round(12 * (1 - q) + 3 * q))
-                    f[y - th_ // 2:y + (th_ + 1) // 2, x] = gold
-            f = over(f, lay, 1.0)
-            if st["finish"] == "seal" and lt >= tdone:
-                p = _ease((lt - tdone) / 0.25)
-                sc = 1.35 - 0.35 * p
-                s2 = seal.resize((max(1, int(side * sc)),) * 2)
-                sa = np.asarray(s2, dtype=np.float32) / 255
-                ox, oy = seal_xy[0] - (s2.width - side) // 2, seal_xy[1] - (s2.height - side) // 2
-                x0, y0 = max(0, ox), max(0, oy)
-                x1, y1 = min(w, ox + s2.width), min(h, oy + s2.height)
-                sub = sa[y0 - oy:y1 - oy, x0 - ox:x1 - ox]
-                a = sub[..., 3:4] * p
-                f[y0:y1, x0:x1] = f[y0:y1, x0:x1] * (1 - a) + sub[..., :3] * a
-            fade = _ease((lt - (tsec - 0.6)) / 0.6)  # 最後は少しだけ暗くして次へ
-            f = f * (1 - 0.25 * fade)
-        yield f
+            return f
+        lt = t - len(slides) * sec
+        if st["finish"] != "brush_line" and tu["lines"]:
+            f = gold_lines(f, (tw / 2 + 60) * _ease(lt / 1.2), h // 2 - round(nf.size * 0.69),
+                           h // 2 + round(nf.size * 0.62), 1.0)
+        lay = _reveal(st["reveal"], title, tedges, lt - 0.2, tstep, w, nf.size * 0.7, tblurs, fade=0.3)
+        if st["finish"] == "sweep":  # 書き終わったあと、光が一度だけ左から右へ走る
+            sweep = np.clip(1 - np.abs(xs - (-200 + (w + 400) * min(max((lt - tdone) / 0.9, 0), 1))) / 120, 0, 1)
+            lay[..., :3] = np.clip(lay[..., :3] + 0.45 * sweep[..., None], 0, 1)
+        if st["finish"] == "halo":
+            a = 0.85 * _ease((lt - tdone) / 1.2)  # ふわっと灯って、そのまま残る
+            f = f * (1 - halo * a) + np.array([1.0, 0.84, 0.48], dtype=np.float32) * halo * a
+        if st["finish"] == "brush_line":  # 金の筆線が左から右へ。入りは太く、抜きは細く
+            p = _ease((lt - tdone + 0.4) / 0.7)
+            x0, x1 = w / 2 - tw / 2 - 30, w / 2 - tw / 2 - 30 + (tw + 60) * p
+            y = int(ty + nf.size * 0.28)
+            for x in range(int(x0), int(x1)):
+                q = (x - x0) / (tw + 60)
+                th_ = max(1, round(12 * (1 - q) + 3 * q))
+                f[y - th_ // 2:y + (th_ + 1) // 2, x] = gold
+        f = over(f, lay, 1.0)
+        if use_seal and lt >= tdone:
+            p = _ease((lt - tdone) / 0.25)
+            sc = 1.35 - 0.35 * p
+            s2 = seal.resize((max(1, int(side * sc)),) * 2)
+            sa = np.asarray(s2, dtype=np.float32) / 255
+            ox, oy = seal_xy[0] - (s2.width - side) // 2, seal_xy[1] - (s2.height - side) // 2
+            x0, y0 = max(0, ox), max(0, oy)
+            x1, y1 = min(w, ox + s2.width), min(h, oy + s2.height)
+            sub = sa[y0 - oy:y1 - oy, x0 - ox:x1 - ox]
+            a = sub[..., 3:4] * p
+            f[y0:y1, x0:x1] = f[y0:y1, x0:x1] * (1 - a) + sub[..., :3] * a
+        fade = _ease((lt - (tsec - 0.6)) / 0.6)  # 最後は少しだけ暗くして次へ
+        return f * (1 - 0.25 * fade)
+
+    return draw
+
+
+def frames(program: dict, size: tuple[int, int]):
+    """OP のコマを順に返す（rgb の配列 0〜1）。"""
+    draw = painter(program, size)
+    for k in range(round(length(program) * FPS)):
+        yield draw(k / FPS)
 
 
 def render(program: dict, dst: Path, form: str = "横") -> float:

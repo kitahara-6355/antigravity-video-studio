@@ -2,17 +2,10 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
 <style>
-/* 番組の色（収録の壁の薄紫・金・朱）をそのまま画面に。上から下へ、見る→選ぶ→決める */
+/* 絵コンテで方向を選ぶ → 注文カードで手直し → 決める。音は無し（曲は後で当てる） */
 :root {
-  --bg: #f6eef3;
-  --panel: #fffafc;
-  --ink: #2a1426;
-  --muted: #6d5466;
-  --lilac: #b088a2;
-  --gold: #a87a26;
-  --shu: #b82a24;
-  --line: #e2d2dc;
-  --chosen: #fff3dc;
+  --bg: #f6eef3; --panel: #fffafc; --ink: #2a1426; --muted: #6d5466; --lilac: #b088a2;
+  --gold: #a87a26; --shu: #b82a24; --line: #e2d2dc; --chosen: #fff3dc;
   --display: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
 }
@@ -26,177 +19,204 @@
   --bg: #1d1219; --panel: #2a1b25; --ink: #f4e8ef; --muted: #c4a9ba; --lilac: #c79bb7;
   --gold: #e0b45c; --shu: #e0574f; --line: #4a3343; --chosen: #3b2a1c; color-scheme: dark;
 }
-body { background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.7; font-size: 15px; }
-.wrap { max-width: 1080px; margin: 0 auto; padding-block: 28px 120px;
+body { background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.7; font-size: 15px; margin: 0; overflow-wrap: anywhere; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 150px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: grid; gap: 36px; }
-header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(26px, 5vw, 38px); margin: 0; letter-spacing: .04em; text-wrap: balance; }
-header p { margin: 8px 0 0; color: var(--muted); max-width: 62ch; }
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; }
+header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(26px, 5vw, 38px); margin: 0; letter-spacing: .04em; }
+header p { margin: 8px 0 0; color: var(--muted); max-width: 66ch; }
 .eyebrow { font-size: 12px; letter-spacing: .14em; color: var(--gold); font-weight: 700; }
-section { display: grid; gap: 14px; }
-section h2 { font-family: var(--display); font-weight: 800; font-size: 22px; margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-section h2 small { font-family: var(--body); font-weight: 400; font-size: 13px; color: var(--muted); }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; cursor: pointer; }
-.card:has(input:checked) { border-color: var(--gold); background: var(--chosen); box-shadow: 0 0 0 2px var(--gold) inset; }
-.card video { width: 100%; aspect-ratio: 16 / 9; display: block; background: #2a1426; }
-.card label { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; padding: 10px 12px 12px; cursor: pointer; align-items: start; }
-.card input { margin-top: 5px; accent-color: var(--gold); width: 18px; height: 18px; }
-.card .name { font-weight: 700; }
-.card .meta { grid-column: 2; font-size: 12px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; }
+section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+section h2 { font-family: var(--display); font-weight: 800; font-size: 22px; margin: 0; }
+section h2 small { display: block; margin-top: 2px; }
+section h2 small { min-width: 0; font-family: var(--body); font-weight: 400; font-size: 13px; color: var(--muted); }
+.dirs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 16px; }
+.dir { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; display: grid; text-align: left; padding: 0; font: inherit; color: inherit; }
+.dir[aria-pressed="true"] { border-color: var(--gold); background: var(--chosen); box-shadow: 0 0 0 2px var(--gold) inset; }
+.shots { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px; background: #000; }
+.shots img { display: block; width: 100%; height: auto; }
+.shots .v { width: 80px; height: 100%; object-fit: contain; background: #000; }
+.dir .txt { padding: 10px 12px 12px; display: grid; gap: 4px; }
+.dir .name { font-weight: 700; font-size: 16px; }
+.dir .mood { font-size: 13px; color: var(--muted); }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .tag { border: 1px solid var(--lilac); color: var(--muted); border-radius: 99px; padding: 0 8px; font-size: 11px; }
 .tag.now { border-color: var(--gold); color: var(--gold); }
+.legend { font-size: 12px; color: var(--muted); margin: 0; }
+.orders { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 14px; }
+.order { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; padding: 0; font: inherit; color: inherit; text-align: left; }
+.order[aria-pressed="true"] { border-color: var(--shu); box-shadow: 0 0 0 2px var(--shu) inset; background: var(--chosen); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #000; }
+.tile { aspect-ratio: 16 / 9; background-repeat: no-repeat; position: relative; }
+.tile span { position: absolute; left: 4px; top: 4px; font-size: 10px; background: rgba(0,0,0,.6); color: #fff; padding: 0 6px; border-radius: 4px; }
+.order .lab { padding: 8px 12px 10px; font-weight: 700; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 8px; }
+.order .lab small { font-weight: 400; color: var(--muted); }
+.big { width: 100%; border-radius: 10px; display: block; }
+.preview { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.preview .vbig { width: min(160px, 28vw); border-radius: 8px; display: block; }
 .note { font-size: 13px; color: var(--muted); margin: 0; max-width: 70ch; }
+textarea { width: 100%; min-height: 70px; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-sizing: border-box; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+button.act { max-width: 100%; white-space: normal; font: inherit; font-weight: 700; background: var(--shu); color: #fff; border: 0; border-radius: 8px; padding: 10px 22px; cursor: pointer; }
+button.sub { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, textarea:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .decide { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line);
-  padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-.decide .in { max-width: 1080px; margin: 0 auto; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.decide .in { max-width: 1120px; margin: 0 auto; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .summary { flex: 1 1 260px; min-width: 0; font-size: 13px; }
 .summary b { color: var(--gold); }
-textarea { width: 100%; min-height: 70px; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-sizing: border-box; }
-button { font: inherit; font-weight: 700; background: var(--shu); color: #fff; border: 0; border-radius: 8px; padding: 10px 22px; cursor: pointer; }
-button:disabled { opacity: .5; cursor: default; }
-button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .status { font-size: 13px; color: var(--muted); }
-.last { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 13px; }
-@media (prefers-reduced-motion: reduce) { .card video { animation: none; } }
+#last { font-size: 13px; color: var(--muted); }
 </style>
 
 <div class="wrap">
   <header>
-    <div class="eyebrow">美麗の書道対談 ・ 番組共通OP</div>
+    <div class="eyebrow">美麗の書道対談 ・ 番組共通 OP ・ 絵コンテで選ぶ</div>
     <h1>番組の雰囲気えらび</h1>
-    <p>見本の動画を見て、気に入ったものを選んで「この形で決める」を押すだけです。選んだ形は番組の共通設定になり、Shorts と本編にも同じ雰囲気を当てます。どれも薄紫・金・明朝の今の方向性の中で変えています。</p>
-    <p class="note">見本は軽くするため小さく、音は「まとめて選ぶ」の4本だけに入っています（仮の曲）。下の3つの軸の見本は、ほかを今の形のまま、その軸だけを変えています。</p>
+    <p>① 方向を1つ選ぶ　② 注文カードで手直しを足す　③「この形で決める」。
+      どれも絵コンテ（4コマ）と縦の画面の1枚で見比べられます。動画と曲は、決まってから当てます。</p>
+    <p id="last" hidden></p>
   </header>
 
-  <div class="last" id="last" hidden></div>
-
-  <section aria-labelledby="h-preset">
-    <h2 id="h-preset">まとめて選ぶ <small>OP 全体（15秒）。気に入ったものがあれば、これだけで決まります</small></h2>
-    <div class="grid" id="g-preset"></div>
+  <section>
+    <h2>① 方向を選ぶ <small>色・書体・置き方がちがう 16 案。左上から 書き足す途中 → 言葉が出そろう → 番組名が出る途中 → 締め、右の細い1枚は縦の画面（Shorts）</small></h2>
+    <div class="dirs" id="dirs"></div>
   </section>
 
-  <section aria-labelledby="h-reveal">
-    <h2 id="h-reveal">言葉の現れ方 <small>あいさつの言葉と番組名がどう出てくるか</small></h2>
-    <div class="grid" id="g-reveal"></div>
+  <section id="s2">
+    <h2>② 注文カード <small>押すと選ばれます。左が今の案、右が注文を当てた姿。同じ種類（大きく／控えめに など）はどちらか1つ</small></h2>
+    <div class="preview">
+      <img class="big" id="bigBoard" alt="選んだ方向の絵コンテ">
+      <img class="vbig" id="bigV" alt="選んだ方向の縦の画面">
+    </div>
+    <div class="orders" id="orders"></div>
+    <p class="note">注文を2つ以上選んだ形は、決めたあと Claude が絵コンテと動画にしてお見せします。</p>
   </section>
 
-  <section aria-labelledby="h-background">
-    <h2 id="h-background">背景 <small>文字の後ろの薄紫</small></h2>
-    <div class="grid" id="g-background"></div>
-  </section>
-
-  <section aria-labelledby="h-finish">
-    <h2 id="h-finish">番組名の締め <small>「美麗の書道対談」が出そろった後</small></h2>
-    <div class="grid" id="g-finish"></div>
-  </section>
-
-  <section aria-labelledby="h-why">
-    <h2 id="h-why">ひとこと <small>選んだ理由や、もっとこうしたいこと（任意）。次の案づくりに使います</small></h2>
-    <textarea id="why" placeholder="例: 落款が書道らしくて良い。金の粉は少し多い"></textarea>
+  <section>
+    <h2>③ ひとこと <small>なくても大丈夫。理由は番組の判断の記録に残し、次の案づくりに使います</small></h2>
+    <textarea id="why" placeholder="例: 縦書きが書道らしい。もう少し文字を大きく"></textarea>
+    <div class="row">
+      <button class="act sub" id="more" type="button">どれも違う・ほかの案も見たい</button>
+    </div>
+    <p class="note">「ほかの案も見たい」は、ひとことに見たい方向（例: もっと明るく、筆の勢いを強く）を書いて押すと、Claude が新しい案を作ります。</p>
   </section>
 </div>
 
-<div class="decide">
-  <div class="in">
-    <div class="summary" id="summary"></div>
-    <button id="go" type="button">この形で決める</button>
-    <span class="status" id="status" role="status"></span>
-  </div>
-</div>
+<div class="decide"><div class="in">
+  <div class="summary" id="summary"></div>
+  <span class="status" id="status" role="status"></span>
+  <button class="act" id="go" type="button">この形で決める</button>
+</div></div>
 
 <script>
-const ITEMS = [
-  {id:"preset-now",axis:"preset",choice:"now",label:"今の形（10-23 に OK）",current:true,style:{reveal:"brush",background:"glow",finish:"sweep"}},
-  {id:"preset-quiet",axis:"preset",choice:"quiet",label:"静かな格調",style:{reveal:"rise",background:"washi",finish:"seal"}},
-  {id:"preset-festive",axis:"preset",choice:"festive",label:"華やか",style:{reveal:"stagger",background:"gold_dust",finish:"halo"}},
-  {id:"preset-cinema",axis:"preset",choice:"cinema",label:"映画のように",style:{reveal:"blur",background:"drift",finish:"brush_line"}},
-  {id:"reveal-brush",axis:"reveal",choice:"brush",label:"左から筆で書き足していく",current:true},
-  {id:"reveal-rise",axis:"reveal",choice:"rise",label:"行ごとに下から浮き上がる"},
-  {id:"reveal-blur",axis:"reveal",choice:"blur",label:"ぼんやりから焦点が合う"},
-  {id:"reveal-stagger",axis:"reveal",choice:"stagger",label:"一文字ずつ小さく跳ねて出る"},
-  {id:"background-glow",axis:"background",choice:"glow",label:"中央が明るい薄紫（動かない）",current:true},
-  {id:"background-drift",axis:"background",choice:"drift",label:"光がゆっくり漂う"},
-  {id:"background-washi",axis:"background",choice:"washi",label:"和紙の繊維の質感"},
-  {id:"background-gold_dust",axis:"background",choice:"gold_dust",label:"金の粉がゆっくり舞い上がる"},
-  {id:"finish-sweep",axis:"finish",choice:"sweep",label:"光が一度走る",current:true},
-  {id:"finish-seal",axis:"finish",choice:"seal",label:"朱の落款が押される"},
-  {id:"finish-brush_line",axis:"finish",choice:"brush_line",label:"金の筆線が下に引かれる"},
-  {id:"finish-halo",axis:"finish",choice:"halo",label:"金の光がふわっと灯る"},
-];
-const NAMES = {}; ITEMS.forEach(i => NAMES[i.axis + ":" + i.choice] = i.label);
-const pick = {reveal: "brush", background: "glow", finish: "sweep"};
+const DATA = __DATA__;
+const pick = {direction: DATA.directions[0].id, orders: []};
+const byId = Object.fromEntries(DATA.directions.map(d => [d.id, d]));
+const CUR = DATA.current;
+const isNow = d => Object.keys(d.style).every(k => d.style[k] === CUR[k]);
+const short = s => s.replace(/（.*?）/g, "");
 
-function card(it) {
-  const el = document.createElement("div");
-  el.className = "card";
-  const v = document.createElement("video");
-  v.src = "m/" + it.id + ".mp4"; v.poster = "m/" + it.id + ".jpg";
-  v.muted = true; v.loop = true; v.playsInline = true; v.preload = "none"; v.controls = true;
-  v.setAttribute("aria-label", it.label + " の見本");
-  const lab = document.createElement("label");
-  const inp = document.createElement("input");
-  inp.type = "radio"; inp.name = it.axis; inp.id = "r-" + it.id; inp.value = it.choice;
-  inp.checked = it.axis !== "preset" && pick[it.axis] === it.choice;
-  const nm = document.createElement("span"); nm.className = "name"; nm.textContent = it.label;
-  const meta = document.createElement("span"); meta.className = "meta";
-  if (it.current) { const t = document.createElement("span"); t.className = "tag now"; t.textContent = "今の形"; meta.append(t); }
-  if (it.style) {
-    ["reveal", "background", "finish"].forEach(a => { const t = document.createElement("span"); t.className = "tag"; t.textContent = NAMES[a + ":" + it.style[a]]; meta.append(t); });
+const dirs = document.getElementById("dirs");
+for (const d of DATA.directions) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "dir"; b.dataset.id = d.id;
+  b.innerHTML = `<div class="shots"><img loading="lazy" alt=""><img class="v" loading="lazy" alt=""></div>
+    <div class="txt"><div class="name"></div><div class="mood"></div><div class="tags"></div></div>`;
+  const [im, v] = b.querySelectorAll("img");
+  im.src = `b/${d.id}-board.jpg`; im.alt = `${d.label} の絵コンテ`;
+  v.src = `b/${d.id}-v.jpg`; v.alt = `${d.label} の縦の画面`;
+  b.querySelector(".name").textContent = d.label;
+  b.querySelector(".mood").textContent = d.mood;
+  const tags = b.querySelector(".tags");
+  if (isNow(d)) { const t = document.createElement("span"); t.className = "tag now"; t.textContent = "今の形"; tags.append(t); }
+  for (const k of ["palette", "font", "layout"]) {
+    const t = document.createElement("span"); t.className = "tag"; t.textContent = short(d.words[k]); tags.append(t);
   }
-  lab.htmlFor = inp.id; lab.append(inp, nm, meta);
-  el.append(v, lab);
-  inp.addEventListener("change", () => choose(it));
-  el.addEventListener("click", e => { if (e.target === v) return; inp.checked = true; choose(it); });
-  return el;
+  b.addEventListener("click", () => { pick.direction = d.id; render(); document.getElementById("s2").scrollIntoView({behavior: "smooth"}); });
+  dirs.append(b);
 }
-function choose(it) {
-  if (it.style) Object.assign(pick, it.style); else { pick[it.axis] = it.choice; const p = document.querySelector('input[name="preset"]:checked'); if (p) p.checked = false; }
-  ["reveal", "background", "finish"].forEach(a => { const r = document.getElementById("r-" + a + "-" + pick[a]); if (r) r.checked = true; });
-  summary();
-}
-function summary() {
-  const s = document.getElementById("summary");
-  s.textContent = "";
-  ["reveal", "background", "finish"].forEach((a, i) => {
-    if (i) s.append(" ・ ");
-    const b = document.createElement("b"); b.textContent = NAMES[a + ":" + pick[a]]; s.append(b);
+
+const orders = document.getElementById("orders");
+DATA.orders.forEach((o, i) => {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "order"; b.dataset.id = o.id;
+  b.innerHTML = `<div class="pair"><div class="tile before"><span>今</span></div><div class="tile after"><span>注文後</span></div></div>
+    <div class="lab"><span></span><small></small></div>`;
+  b.querySelector(".lab span").textContent = o.label;
+  b.querySelector(".lab small").textContent = DATA.moments[o.at];
+  b.addEventListener("click", () => {
+    const on = pick.orders.includes(o.id);
+    pick.orders = pick.orders.filter(x => x !== o.id && DATA.orders.find(y => y.id === x).group !== o.group);
+    if (!on) pick.orders.push(o.id);
+    render();
   });
+  orders.append(b);
+});
+
+function render() {
+  const d = byId[pick.direction];
+  for (const el of dirs.children) el.setAttribute("aria-pressed", el.dataset.id === d.id);
+  document.getElementById("bigBoard").src = `b/${d.id}-board.jpg`;
+  document.getElementById("bigV").src = `b/${d.id}-v.jpg`;
+  DATA.orders.forEach((o, i) => {
+    const el = orders.children[i];
+    el.setAttribute("aria-pressed", pick.orders.includes(o.id));
+    const be = el.querySelector(".before"), af = el.querySelector(".after");
+    be.style.backgroundImage = `url(b/${d.id}-board.jpg)`; be.style.backgroundSize = "200% 200%";
+    be.style.backgroundPosition = `${(o.at % 2) * 100}% ${Math.floor(o.at / 2) * 100}%`;
+    af.style.backgroundImage = `url(b/${d.id}-orders.jpg)`; af.style.backgroundSize = "500% 200%";
+    af.style.backgroundPosition = `${(i % 5) * 25}% ${Math.floor(i / 5) * 100}%`;
+  });
+  const names = pick.orders.map(x => DATA.orders.find(o => o.id === x).label);
+  document.getElementById("summary").innerHTML = "";
+  const s = document.getElementById("summary");
+  s.append("今の選択: ");
+  const bb = document.createElement("b"); bb.textContent = d.label; s.append(bb);
+  s.append(names.length ? "　注文: " + names.join("・") : "　注文なし");
 }
-ITEMS.forEach(it => document.getElementById("g-" + it.axis).append(card(it)));
-summary();
+render();
 
 let db = null, user = null;
-const go = document.getElementById("go"), status = document.getElementById("status");
+const go = document.getElementById("go"), more = document.getElementById("more"), status = document.getElementById("status");
 function showLast(d) {
   if (!d) return;
   const box = document.getElementById("last");
   box.hidden = false;
-  box.textContent = "前回決めた形: " + ["reveal", "background", "finish"].map(a => NAMES[a + ":" + d[a]] || d[a]).join(" ・ ") +
+  const label = (byId[d.direction] || {}).label || "（前の選び方）";
+  const ords = (d.orders || []).map(x => (DATA.orders.find(o => o.id === x) || {}).label || x);
+  box.textContent = "前回決めた形: " + label + (ords.length ? "＋" + ords.join("・") : "") +
     (d.note ? "　ひとこと: " + d.note : "") + (d.at ? "（" + new Date(d.at).toLocaleString("ja-JP") + "）" : "");
 }
 (async () => {
-  try {
-    db = await window.claude?.use?.("db");
-    user = await window.claude?.use?.("user");
-  } catch (e) { db = null; }
-  if (!db) { status.textContent = "この画面からは保存できません。選んだ組み合わせを Claude に伝えてください"; return; }
+  try { db = await window.claude?.use?.("db"); user = await window.claude?.use?.("user"); } catch (e) { db = null; }
+  if (!db) { status.textContent = "この画面からは保存できません。選んだ案を Claude に伝えてください"; return; }
   try { const snap = await db.doc("picks/latest").get(); if (snap && snap.exists) showLast(snap.data()); } catch (e) {}
 })();
-go.addEventListener("click", async () => {
-  if (!db) { status.textContent = "保存できない画面です。下の組み合わせを Claude に伝えてください"; return; }
-  go.disabled = true; status.textContent = "保存しています…";
-  const doc = {reveal: pick.reveal, background: pick.background, finish: pick.finish,
+async function save(kind) {
+  if (!db) { status.textContent = "保存できない画面です。選んだ案を Claude に伝えてください"; return; }
+  const btn = kind === "pick" ? go : more;
+  btn.disabled = true; status.textContent = "保存しています…";
+  const d = byId[pick.direction];
+  const doc = {direction: d.id, style: d.style, orders: pick.orders.slice(),
     note: document.getElementById("why").value.trim(), at: new Date().toISOString()};
   try { if (user) doc.by = await user.id(); } catch (e) {}
   try {
-    await db.doc("picks/latest").set(doc);
-    await db.collection("picks_log").doc(doc.at.replace(/[:.]/g, "-")).set(doc);
-    status.textContent = "決めました。Claude がこの形で OP を書き出します";
-    showLast(doc);
+    if (kind === "pick") {
+      await db.doc("picks/latest").set(doc);
+      await db.collection("picks_log").doc(doc.at.replace(/[:.]/g, "-")).set(doc);
+      status.textContent = "決めました。Claude がこの形で動画にします";
+      showLast(doc);
+    } else {
+      await db.collection("requests").doc(doc.at.replace(/[:.]/g, "-")).set({...doc, kind: "more"});
+      status.textContent = "伝えました。Claude が新しい案を作ります";
+    }
   } catch (e) {
     status.textContent = "保存できませんでした（" + (e && e.code || "エラー") + "）。もう一度押すか、Claude に伝えてください";
-  } finally { go.disabled = false; }
-});
+  } finally { btn.disabled = false; }
+}
+go.addEventListener("click", () => save("pick"));
+more.addEventListener("click", () => save("more"));
 </script>
