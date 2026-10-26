@@ -56,29 +56,56 @@ def test_long_words_break_at_the_space_on_the_vertical_screen(fonts):
 
 def test_style_choices_are_checked_and_the_default_is_what_was_approved():
     # 10-23 に北原さんが OK した形が既定。知らない選択肢は止める
-    assert op.style_of({}) == {"reveal": "brush", "background": "glow", "finish": "sweep"}
+    assert op.style_of({}) == {"reveal": "brush", "background": "glow", "finish": "sweep",
+                               "palette": "murasaki", "font": "mincho", "layout": "center"}
     with pytest.raises(SystemExit):
         op.style_of({"style": {"reveal": "spin"}})
 
 
-def test_picker_shows_every_choice_and_presets_stay_in_the_choices():
-    # 案を見て選ぶだけで雰囲気が決まる仕組み（2026-10-25 北原さん）。軸ごとに全部の選択肢の見本を出す
+def test_storyboard_directions_cover_every_choice_and_orders_stay_in_the_tune():
+    # いろいろな形から選べるように（2026-10-26 北原さん）。どの選択肢もどこかの方向で見られる
     from backend.program_package import style_picker as sp
-    vs = sp.variants(op.load(PROGRAM))
     for axis, choices in op.CHOICES.items():
-        assert {v["choice"] for v in vs if v["axis"] == axis} == set(choices)
-    for p in sp.PRESETS.values():
-        assert op.style_of({"style": p["style"]}) == p["style"]
-    assert sum(v["current"] for v in vs if v["axis"] == "preset") == 1  # 今の形がどれか分かる
+        assert {d["style"][axis] for d in sp.DIRECTIONS.values()} == set(choices), axis
+    for d in sp.DIRECTIONS.values():
+        assert op.style_of({"style": d["style"]}) == d["style"]
+    assert sum(d["style"] == op.STYLE for d in sp.DIRECTIONS.values()) == 1  # 今の形がどれか分かる
+    for o in sp.ORDERS.values():
+        assert set(o["tune"]) <= set(op.TUNE) and 0 <= o["at"] < len(sp.MOMENTS)
+    with pytest.raises(SystemExit):
+        sp.tune_from(["big_text", "small_text"])  # 同じ種類の注文は1つだけ
+    with pytest.raises(SystemExit):
+        op.tune_of({"tune": {"zoom": 2}})
 
 
-@pytest.mark.parametrize("style", [{"reveal": r} for r in op.CHOICES["reveal"]] +
-                         [{"background": b} for b in op.CHOICES["background"]] +
-                         [{"finish": f} for f in op.CHOICES["finish"]])
+def test_a_frame_can_be_drawn_alone_and_matches_the_movie(fonts):
+    # 絵コンテは1枚ずつ描く。動画の同じ時刻のコマと同じであること
+    prog = {"name": "美麗の書道対談", "slides": ["書を通して 人々の心に"], "slide_seconds": 1.0, "title_seconds": 1.0,
+            "theme": {"light": [214, 178, 196], "deep": [92, 52, 78]}}
+    movie = list(op.frames(prog, (320, 180)))
+    draw = op.painter(prog, (320, 180))
+    for k in (5, 29, 41):
+        assert np.array_equal(draw(k / op.FPS), movie[k])
+
+
+def test_storyboard_moments_run_in_order():
+    from backend.program_package import style_picker as sp
+    program = op.load(PROGRAM)
+    for d in sp.DIRECTIONS.values():
+        ts = sp.moments(sp.with_look(program, d["style"]))
+        assert ts == sorted(ts) and 0 < ts[0] and ts[-1] < op.length(program)
+
+
+@pytest.mark.parametrize("style", [{axis: c} for axis, cs in op.CHOICES.items() for c in cs] +
+                         [{"layout": "vertical", "reveal": r} for r in op.CHOICES["reveal"]] +
+                         [{"tune": {k: v}} for k, v in {"text_scale": 1.2, "title_scale": 1.2, "pace": 0.75,
+                                                        "bright": -1, "lines": False, "frame": True,
+                                                        "seal": True}.items()])
 def test_every_style_draws_frames_without_errors(fonts, style):
-    # 小さい画面で数コマだけ描いて、どの選択肢も落ちないことを確かめる（書き出しはしない）
-    prog = {"name": "美麗の書道対談", "slides": ["書を通して"], "slide_seconds": 1.0, "title_seconds": 2.0,
-            "theme": {"light": [214, 178, 196], "deep": [92, 52, 78]}, "style": style}
+    # 小さい画面で数コマだけ描いて、どの選択肢と注文も落ちないことを確かめる（書き出しはしない）
+    tune = style.pop("tune", {})
+    prog = {"name": "美麗の書道対談", "slides": ["書を通して 人々の心に"], "slide_seconds": 1.0, "title_seconds": 2.0,
+            "theme": {"light": [214, 178, 196], "deep": [92, 52, 78]}, "style": style, "tune": tune}
     frames = list(op.frames(prog, (320, 180)))
     assert len(frames) == 90 and all(f.shape == (180, 320, 3) for f in frames[::30])
 
@@ -102,8 +129,35 @@ def test_a_pick_is_written_to_the_program_and_kept_as_a_narrative(tmp_path):
     log = Log()
     out = sp.apply(prog, {"reveal": "rise", "background": "washi", "finish": "seal", "note": "落款が良い",
                           "at": "2026-10-25T14:00:00Z"}, log)
-    assert op.load(prog)["style"] == out["style"] == {"reveal": "rise", "background": "washi", "finish": "seal"}
+    assert op.load(prog)["style"] == out["style"] == {**op.STYLE, "reveal": "rise", "background": "washi",
+                                                      "finish": "seal"}
     assert "落款が良い" in out["history"][-1]
     assert log.synced and log.rec[0]["reason"] == "落款が良い" and log.rec[0]["decision"] == "modify"
     with pytest.raises(SystemExit):
         sp.apply(prog, {"reveal": "spin", "background": "glow", "finish": "sweep"}, log)
+
+
+def test_a_storyboard_pick_with_orders_is_written_as_style_and_tune(tmp_path):
+    # 絵コンテの方向＋注文カード（2026-10-26 北原さん）。注文は tune に入り、理由と一緒に記録に残る
+    from backend.program_package import style_picker as sp
+    prog = tmp_path / "p.json"
+    prog.write_text(PROGRAM.read_text(encoding="utf-8"), encoding="utf-8")
+
+    class Log:
+        def __init__(self):
+            self.rec = []
+
+        def record_decision(self, **kw):
+            self.rec.append(kw)
+
+        def sync_to_soul_narrative(self):
+            pass
+
+    log = Log()
+    d = sp.DIRECTIONS["sumi_tate"]
+    out = sp.apply(prog, {"direction": "sumi_tate", "style": d["style"], "orders": ["big_text", "frame"],
+                          "note": "縦書きが書道らしい", "at": "2026-10-26T01:00:00Z"}, log)
+    assert op.style_of(out) == {**op.STYLE, **d["style"]}
+    assert out["tune"] == {"text_scale": 1.2, "frame": True}
+    assert "墨と和紙の縦書き" in out["history"][-1] and "言葉を大きく" in out["history"][-1]
+    assert log.rec[0]["mood_settings"]["orders"] == ["big_text", "frame"] and "frame" in log.rec[0]["tags"]
