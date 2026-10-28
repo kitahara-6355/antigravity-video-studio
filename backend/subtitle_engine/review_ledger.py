@@ -14,6 +14,11 @@
   （同じ語の聞き違いが何度も出る固有名詞。ほかの素材には当てない — 全体の辞書は `proper_nouns.json`）。
   ``wrong`` が無い用語も書いてよい。用語はどの素材でも改行・字幕の切れ目で割らない（`terms`）。
 
+- ``cuts``: ``{"id", "start", "end", "mode", ...}``。人が字幕を見て指示した区間（素材の秒・画面の字幕の時刻）。
+  mode が ``cut`` なら映像ごと切り、``hide`` なら映像は残して字幕だけ出さない。当てるのは字の直しではなく
+  カット（`cut_plan.human_cuts`・`SmartCutWorker._apply_human_cuts`）。2026-10-24 北原さんの朱入れ
+  「映像字幕ともにカット」「字幕なしにして」から。
+
 当たらなかった直しは消さずに報告する。キャッシュ無しで起こし直すと、聞き違いが消えていたり
 （``to`` が既にある = already）、別の字に変わっていたり（missing）するので、人が見直す所になる。
 """
@@ -54,6 +59,13 @@ def load(path) -> dict | None:
     for g in data.get("glossary", []):
         if not g.get("term") or any(not w for w in g.get("wrong", [])):
             raise ValueError(f"校正台帳の用語が壊れています: {g}")
+    for c in data.get("cuts", []):
+        try:
+            ok = float(c["start"]) < float(c["end"]) and c.get("mode", "cut") in ("cut", "hide")
+        except (KeyError, TypeError, ValueError):
+            ok = False
+        if not ok:
+            raise ValueError(f"校正台帳のカットが壊れています（start < end・mode は cut か hide）: {c}")
     data.setdefault("corrections", [])
     data.setdefault("glossary", [])
     return data

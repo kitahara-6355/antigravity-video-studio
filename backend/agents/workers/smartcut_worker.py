@@ -230,12 +230,38 @@ class SmartCutWorker(PipelineStageWorker):
         logger.info("✂️ " + note)
         return kept, [segments[i] for i in sorted(drop)], f" / {note}"
 
+    def _apply_human_cuts(self, ctx: PipelineContext, segments: list) -> tuple[list, list, list, list, str]:
+        """校正台帳の cuts（人が字幕を見て「映像ごとカット」「字幕なしで残す」と指示した区間）を当てる。
+
+        返り値は (残す字幕, 切る発話, 切る区間, 字幕なしで残す区間, 結果の説明に足す文)。字幕なしで
+        残す区間は、品質ゲートが欠落と数えないよう `verified_quiet` に足す（人が確かめた所）。
+        """
+        path = getattr(ctx, "review_ledger", "")
+        if not path:
+            return segments, [], [], [], ""
+        from subtitle_engine import review_ledger
+        cuts = (review_ledger.load(path) or {}).get("cuts") or []
+        if not cuts:
+            return segments, [], [], [], ""
+        from cut_plan import heard_spans, human_cuts, read_heard
+        tokens = read_heard(getattr(ctx, "video_path", None))
+        cut, hide = human_cuts(segments, cuts, heard_spans(segments, tokens) if tokens else None)
+        kept = [seg for i, seg in enumerate(segments) if i not in cut and i not in hide]
+        cut_spans = [(float(c["start"]), float(c["end"])) for c in cuts if c.get("mode", "cut") == "cut"]
+        keep_spans = [(float(c["start"]), float(c["end"])) for c in cuts if c.get("mode", "cut") != "cut"]
+        if keep_spans:
+            ctx.verified_quiet = sorted({*(tuple(q) for q in (ctx.verified_quiet or [])), *keep_spans})
+        note = (f"人の指示で映像ごと切る{len(cut_spans)}か所（{len(cut)}発話）・"
+                f"字幕なしで残す{len(keep_spans)}か所（{len(hide)}発話）")
+        logger.info("✂️ " + note)
+        return kept, [segments[i] for i in sorted(cut)], cut_spans, keep_spans, f" / {note}"
+
     def _plan_cuts(self, ctx: PipelineContext, segments: list, keep_all: bool,
-                   rules: dict | None = None, exclude=()) -> str:
+                   rules: dict | None = None, exclude=(), cuts=(), keep=()) -> str:
         """残す区間を決めて ctx に置く（`cut_plan`）。返り値は結果の説明に足す文。"""
         from cut_plan import fit_spans, plan
         ranges, info = plan(segments, getattr(ctx, "video_path", None), keep_all=keep_all,
-                            rules=rules, exclude=exclude)
+                            rules=rules, exclude=exclude, cuts=cuts, keep=keep)
         # 映り込みを切り落とした区間からはみ出した発話は、区間の中に収める（字幕を落とさない）
         fit_spans(segments, ranges)
         ctx.cut_ranges = ranges
@@ -264,6 +290,8 @@ class SmartCutWorker(PipelineStageWorker):
                        f"あります（素材の {at}）。言葉があるので切っていません")
             ctx.warnings.append(warning)
             notes.append(warning)
+        if info.get("voice_kept"):
+            notes.append(f"発話のすき間に声がある{info['voice_kept']}か所は切らずにつないだ")
         if info.get("gaps"):
             notes.append(f"切れ目{info['gaps']}か所のうち声の途中で終わる{info['extended_end']}か所・"
                          f"途中から始まる{info['pulled_start']}か所を声の切れ目まで動かし、"
@@ -302,6 +330,9 @@ class SmartCutWorker(PipelineStageWorker):
         from cut_plan import cut_rules
         rules = cut_rules()
         segments, talk, talk_note = self._drop_production_talk(segments, rules)
+        segments, cut_segs, cut_spans, keep_spans, human_note = self._apply_human_cuts(ctx, segments)
+        talk = [*talk, *cut_segs, *cut_spans]
+        talk_note += human_note
         speech_seconds = planned_output_seconds(segments)
 
         # **発話が目標尺に収まるなら中身は削らない。削るのは間だけ。**（2026-10-13）
@@ -312,7 +343,8 @@ class SmartCutWorker(PipelineStageWorker):
         # 「音声は残す（カットしない）」と決めていた（template_constants の omit_standalone_words）
         if getattr(ctx, "target_auto", False) or speech_seconds <= target_seconds:
             ctx.selected_segments = segments
-            note = self._plan_cuts(ctx, segments, keep_all=True, rules=rules, exclude=talk)
+            note = self._plan_cuts(ctx, segments, keep_all=True, rules=rules, exclude=talk,
+                                   cuts=cut_spans, keep=keep_spans)
             reason = ("目標尺は素材の長さ" if getattr(ctx, "target_auto", False)
                       else f"発話{speech_seconds/60:.1f}分 ≤ 目標{ctx.target_minutes}分")
             return StageResult(
@@ -337,7 +369,7 @@ class SmartCutWorker(PipelineStageWorker):
         # 冒頭の発話も選ばれないことがあるので、冒頭のすき間はつながない（選ばなかった発話の
         # 声が字幕無しで入る）
         note = self._plan_cuts(ctx, selected_segments, keep_all=False, rules=rules,
-                               exclude=talk)
+                               exclude=talk, cuts=cut_spans, keep=keep_spans)
 
         estimated_duration = _unique_duration(selected_segments)
         cut_percent = (1.0 - len(selected_segments) / len(segments)) * 100.0

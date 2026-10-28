@@ -32,7 +32,9 @@ const STUB = `<script>
   const cache = {};
   const get = (p) => cache[p] || (cache[p] = fetch(p.endsWith(".json") ? "/f/sheet" : "/f/video").then((r) => r.arrayBuffer()));
   const files = {
+    // どの収録を選んでいても見つかるように、動画の名前を両方並べる
     list: async () => ({ entries: [{ path: DIR + "/raw4_concat_preview_360p.mp4", isDirectory: false },
+                                   { path: DIR + "/full360.mp4", isDirectory: false },
                                    { path: DIR + "/review_captions.json", isDirectory: false }] }),
     read: async (p, o) => { const buf = await get(p); const off = o.offset || 0, len = Math.min(o.length, buf.byteLength - off);
       return { bytes: new Uint8Array(buf.slice(off, off + len)), size: buf.byteLength, revision: "r1" }; },

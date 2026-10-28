@@ -222,6 +222,9 @@ class TranscribeWorker(PipelineStageWorker):
             if engine == "gemini":
                 result = await self._execute_gemini(ctx, checkpoint_path, start)
                 if result is not None:
+                    dropped = await self._drop_voiceless(ctx)
+                    if dropped is not None:
+                        result.data["voiceless"] = dropped
                     return result
                 # 落ちた → Whisper へ（切り替えた事実は _execute_gemini が警告に残した）
 
@@ -317,6 +320,42 @@ class TranscribeWorker(PipelineStageWorker):
                   "rechecked": tx.rechecked, "coverage": tx.coverage, "second_pass": fusion},
             duration_seconds=round(time.time() - start, 1),
         )
+
+    async def _drop_voiceless(self, ctx: PipelineContext) -> dict | None:
+        """声の無い区間（手元の認識が黙り・音も小さい）の字幕を外し、その区間を静かな区間に足す。
+
+        2026-10-23 上野さんの回: 揮毫の場面に Gemini が無い台詞を書き、欠落の数え方でも不合格になった
+        （`subtitle_engine.unheard`）。認識が使えなければ何もしない（None）。"""
+        from subtitle_engine import aligner, coverage, unheard
+        loop = asyncio.get_running_loop()
+        try:
+            tokens = await loop.run_in_executor(None, aligner.tokens_for, str(ctx.video_path))
+            speech, duration = await loop.run_in_executor(None, coverage.speech_intervals, str(ctx.video_path))
+            spans = await loop.run_in_executor(None, unheard.voiceless_spans, str(ctx.video_path), tokens, duration)
+        except Exception as e:  # noqa: BLE001 — 見分けられないときは今までどおり進む
+            logger.warning(f"声の無い区間を見分けられませんでした: {e}")
+            return None
+        heads = [0.0]
+        try:
+            from backend import media_concat
+            manifest = json.loads(media_concat.manifest_path(ctx.video_path).read_text(encoding="utf-8"))
+            heads += [float(p["start"]) for p in manifest.get("parts") or []]
+        except (OSError, ValueError, KeyError, TypeError, ImportError):
+            pass  # つないだ素材でなければ頭だけ
+        ctx.segments, counts = unheard.drop_countdowns(ctx.segments or [], heads)
+        for g in counts:
+            logger.warning(f"  🔢 撮り始めのカウントダウンを外しました: {g.get('start', 0):.1f}秒「{g.get('text', '')}」")
+        if not spans and not counts:
+            return {"spans": [], "dropped": []}
+        ctx.segments, gone = unheard.drop_inside(ctx.segments, spans)
+        gone = counts + gone
+        for g in gone:
+            logger.warning(f"  🔇 声の無い所の字幕を外しました: {g.get('start', 0):.1f}秒「{g.get('text', '')}」")
+        quiet = sorted({(float(a), float(b)) for a, b in [*(ctx.verified_quiet or []), *spans]})
+        ctx.verified_quiet = quiet
+        ctx.transcript_coverage = coverage.measure(ctx.segments, speech, duration, exclude=quiet).to_dict()
+        return {"spans": spans,
+                "dropped": [{"start": g.get("start"), "end": g.get("end"), "text": g.get("text")} for g in gone]}
 
     def _read_gemini_checkpoint(self, checkpoint: str) -> list[dict]:
         from subtitle_engine import gemini_transcriber

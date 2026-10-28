@@ -208,6 +208,8 @@ th, td { text-align: left; padding: 6px 10px 6px 0; border-top: 1px solid var(--
 th { font-size: .74rem; color: var(--ink-soft); font-weight: 500; border-top: 0; white-space: nowrap; }
 td.t { font-family: var(--font-time); white-space: nowrap; font-variant-numeric: tabular-nums; }
 td.err { color: var(--shu); }
+.jobpick { font-size: .85rem; color: var(--ink-soft); }
+.jobpick select { font: inherit; max-width: 100%; }
 .foot { color: var(--ink-soft); font-size: .78rem; }
 .foot code { overflow-wrap: anywhere; }
 </style>
@@ -217,6 +219,7 @@ td.err { color: var(--shu); }
     <div class="ttl">
       <h1>工程ライブ</h1>
       <p class="job" id="jobLabel">記録を読み込んでいます</p>
+      <label class="jobpick">収録 <select id="jobPick"></select></label>
     </div>
     <div class="meta">
       <span class="pill" id="statePill" data-state="loading">読み込み中</span>
@@ -281,11 +284,30 @@ td.err { color: var(--shu); }
 (() => {
   "use strict";
   const DEFAULT_JOB = "raw4_repro_20261018";
+  // 切り替えの選択肢。job を足したら1行足す（backend/config/jobs/<名前>.json の name と label）
+  const JOBS = [
+    { name: "raw4_repro_20261018", label: "2025-09-22 久木田ヒロノブさん（再現テスト）" },
+    { name: "ueno_20251020", label: "2025-10-20 上野雅巳さん（本番テスト）" },
+  ];
   const POLL_MS = 15000;
   const STALE_MS = 3 * 60 * 1000;   // 通しの間は15秒ごとに書かれる。これより古ければ止まったかもしれない
-  const JOB = ((location.hash || "").slice(1).replace(/[^\w.~-]/g, "") || DEFAULT_JOB);
-  const DIR = "outputs/" + JOB;
-  const STATUS = DIR + "/live/status.json";
+  // 選んだ収録は端末に覚えておく（アプリではリンクの # が落ちることがあるので、# だけに頼らない）
+  const PICK_KEY = "process-live-job";
+  const clean = (v) => String(v || "").replace(/[^\w.~-]/g, "");
+  let remembered = "";
+  try { remembered = clean(localStorage.getItem(PICK_KEY)); } catch (_) { remembered = ""; }
+  let JOB = clean((location.hash || "").slice(1)) || remembered || JOBS[JOBS.length - 1].name || DEFAULT_JOB;
+  let DIR = "outputs/" + JOB;
+  let STATUS = DIR + "/live/status.json";
+  function setJob(name) {
+    JOB = clean(name) || DEFAULT_JOB; DIR = "outputs/" + JOB; STATUS = DIR + "/live/status.json";
+    try { localStorage.setItem(PICK_KEY, JOB); } catch (_) { /* 覚えられなくても切り替えはできる */ }
+    S.status = null; S.images.clear(); S.loadingImg.clear();
+    ["axis", "versions", "notes", "stepsBody"].forEach((id) => { $(id).textContent = ""; });
+    $("jobLabel").textContent = JOB; banner("");
+    $("statePill").dataset.state = "loading"; $("statePill").textContent = STATE_TEXT.loading;
+    if (S.files) poll();
+  }
 
   const $ = (id) => document.getElementById(id);
   const S = { files: null, status: null, timer: null, ticker: null, images: new Map(), loadingImg: new Set() };
@@ -358,7 +380,9 @@ td.err { color: var(--shu); }
     clearTimeout(S.timer);
     let stop = false;
     try {
+      const job = JOB;
       const text = await new Blob(await readBytes(STATUS)).text();
+      if (job !== JOB) return;  // 読んでいる間に収録を切り替えた
       S.status = JSON.parse(text);
       render();
     } catch (e) {
@@ -367,6 +391,10 @@ td.err { color: var(--shu); }
         if (!S.status) {
           $("statePill").dataset.state = "waiting"; $("statePill").textContent = "始まる前";
           $("jobLabel").textContent = JOB;
+    const pick = $("jobPick");
+    const names = JOBS.some((j) => j.name === JOB) ? JOBS : [...JOBS, { name: JOB, label: JOB }];
+    names.forEach((j) => { const o = el("option", "", j.label); o.value = j.name; o.selected = j.name === JOB; pick.appendChild(o); });
+    pick.addEventListener("change", () => setJob(pick.value));
           banner("まだ始まっていません。通しを始めると、ここに手順が時間の軸で並びます（15秒ごとに読み直します）。", "wait",
                  "読み先: " + STATUS);
         }
@@ -691,6 +719,7 @@ td.err { color: var(--shu); }
     poll();
     S.ticker = setInterval(() => { if (S.status && !document.hidden) { const now = Date.now(); renderNow(S.status, now, overall(S.status, now)); renderAxis(S.status, now); } }, 5000);
   }
+  window.addEventListener("hashchange", () => { const h = clean(location.hash.slice(1)); if (h && h !== JOB) { $("jobPick").value = h; setJob(h); } });
   $("reload").addEventListener("click", () => { if (S.files) poll(); });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) clearTimeout(S.timer); else if (S.files) poll();

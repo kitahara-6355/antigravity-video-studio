@@ -478,6 +478,43 @@ def _summary(key: str, result: dict) -> str:
     return ""
 
 
+# 無くても本線は止まらずに質を落として進む部品（2026-10-23 上野さんの回の1回目で、新しいコンテナに
+# 入っておらず、字幕が語の途中で折れ・文字ごとの時刻合わせが飛んだ）。だから始める前に止める
+PINNED = ("budoux",)
+
+
+def _pins(repo: Path) -> dict[str, str]:
+    pins = {}
+    for line in (repo / "backend" / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\s*([A-Za-z0-9_.-]+)==([^\s#]+)", line)
+        if m:
+            pins[m.group(1).lower()] = m.group(2)
+    return pins
+
+
+def missing_libraries(repo: Path = REPO_ROOT) -> list[str]:
+    """字幕の質を決める部品が揃っているか。足りない物を「直し方つき」で返す。"""
+    from importlib import metadata
+
+    problems = []
+    pins = _pins(repo)
+    for name in PINNED:
+        want = pins.get(name)
+        try:
+            have = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            have = None
+        if have is None or (want and have != want):
+            problems.append(f"{name} が{'ありません' if have is None else f' {have} です'}（字幕の切れ目が変わる）。"
+                            f"pip install {name}=={want}" if want else f"{name} がありません")
+    from subtitle_engine import aligner
+
+    if not aligner.available():
+        problems.append("文字ごとの時刻合わせ（sherpa-onnx と ReazonSpeech のモデル）がありません。"
+                        "pip install sherpa-onnx の後 python -c 'from subtitle_engine import aligner; aligner.setup()'")
+    return problems
+
+
 class Runner:
     """job を1つ、手順どおりに通す。状態は作業場の state.json、見える化は置き場の live/。"""
 
@@ -713,6 +750,7 @@ class Runner:
         for tool in ("ffmpeg", "ffprobe", "git"):
             if shutil.which(tool) is None:
                 problems.append(f"{tool} がありません")
+        problems += missing_libraries(self.repo)
         for v in self.job["versions"]:
             if v.get("review") and not (self.repo / v["review"]).is_file():
                 problems.append(f"校正台帳がありません: {v['review']}")
@@ -777,11 +815,37 @@ class Runner:
                 manifest = saved  # 前の通しでつないだ物（同じ並び・同じ大きさ）
         if manifest is None:
             manifest = media_concat.join([self.work / "raw" / n for n in names], self.material)
+            if (self.job.get("raw") or {}).get("fill"):
+                manifest = self._fill(manifest)
         seconds = float(manifest["duration"])
         return {"mode": manifest["mode"], "duration": seconds,
+                "fill": [{k: s[k] for k in ("start", "end", "crop")} for s in (manifest.get("fill") or {}).get("scenes", [])],
                 "clock": f"{int(seconds) // 60}:{int(seconds) % 60:02d}",
                 "size": manifest["size"], "key": content_digest(self.material)[:8],
                 "parts": [{"name": p["name"], "start": p["start"]} for p in manifest["parts"]]}
+
+    def _fill(self, manifest: dict) -> dict:
+        """job の raw.fill: つないだ素材の黒い縁を拡大で埋め、場面の並びを控えに足す。"""
+        from backend import media_concat, media_fill
+
+        joined = self.material.with_name(f"{self.material.stem}.joined{self.material.suffix}")
+        self.material.replace(joined)
+        try:
+            plan = media_fill.detect(joined)
+            if media_fill.needs_fill(plan):
+                media_fill.fill(joined, self.material, plan)
+            else:
+                joined.replace(self.material)
+        except BaseException:
+            # 埋める前の素材を控えと一緒に残すと、次の run が「つないだ物」と見て拡大を飛ばす
+            joined.unlink(missing_ok=True)
+            media_concat.manifest_path(self.material).unlink(missing_ok=True)
+            raise
+        joined.unlink(missing_ok=True)
+        manifest = {**manifest, "size": self.material.stat().st_size, "fill": plan}
+        media_concat.manifest_path(self.material).write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return manifest
 
     # --- 書き出し ---------------------------------------------------------------------------
 
@@ -857,8 +921,12 @@ class Runner:
         build_review_files(preview, local)
         asr = material_cache(self.material, "_align_rz_")
         version = next(v for v in self.job["versions"] if v["key"] == key)
+        # 画面の印は run の名前ごとに残る（db の runs/<run>/marks）。印は字幕の番号に付くので、書き出し直したら
+        # 名前を変える。同じ名前だと前の版の印が、番号のずれた新しい字幕に付いて見える（2026-10-24 v3）
+        stamp = str(edit.get("run_id") or "")[:13]
+        run_name = f"{self.job['name']}-{key}" + (f"-{stamp}" if stamp else "")
         sheet = review_sheet.export(json.loads(sidecar_of(preview).read_text(encoding="utf-8")),
-                                    f"{self.job['name']}-{key}", version.get("label") or key, "full360.mp4",
+                                    run_name, version.get("label") or key, "full360.mp4",
                                     aligner.cached_tokens(str(asr)) if asr.is_file() else None,
                                     readings=review_sheet.readings_beside(self.material))
         (local / "review_captions.json").write_text(

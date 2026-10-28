@@ -85,7 +85,7 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet export <プ�
 
 ### 3. レビュー画面を公開・更新する
 
-- `caption_review.html` の `DIR`・`VIDEO`・`SHEET` を置き場に合わせる
+- `caption_review.html` の `JOBS` に収録を1行足す（`dir` は置き場・`video` は 360p の名前）。画面の上の選択で収録を切り替え、選んだ物は端末に覚える。印の保存先は控えの `run` ごとに分かれる
 - 画面は1画面に収める（43分を通して見るので、ページがスクロールしたりボタンが動いたりすると続かない）。
   伸び縮みするのは動画だけで、ボタンの帯と字幕の窓は高さを決めてある。画面を直したら、公開の前に
   `node .claude/skills/caption-review/layout_check.js <画面の控え>` を流す。14通りの大きさで、スクロール・はみ出し・
@@ -105,8 +105,17 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet export <プ�
 
 ```
 PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet import marks.json \
-    --ledger backend/config/reviews/<素材>.json --by 北原 --day YYYY-MM-DD --label 53回目
+    --ledger backend/config/reviews/<素材>.json --by 北原 --day YYYY-MM-DD --label 53回目 \
+    --sheet <置き場>/<版>/review_captions.json --sidecar <置き場>/assets/captions/<版>.subtitles.json
 ```
+
+- **映像ごとカット・字幕だけ消す**（2026-10-24 から）: 画面のボタン（状態 `cut`・`hide`）か、メモの
+  「カット」「字幕なし」から台帳の `cuts`（素材の秒の区間）になる。隣の字幕の印は1つの区間にまとめる。
+  「カットされている」のように指摘のメモは指示とみなさない（切れた声の指摘なので、聞いて直す）。
+  当てるのは `SmartCutWorker._apply_human_cuts`（区間に半分以上入る発話か、区間に掛かって字が同じ字幕を外す）
+- 印をまとめて直すときは、続く2つの印を1つの直しにする（印ごとに当てると、足した字に次の直しが当たる）。
+  画面に出ていない手前の行に同じ聞き違いがあれば、それも置き換える（10:18「紹介していただく」×3）
+- 書き出し直すと画面の `run` は `<job>-<版>-<書き出しの時刻>` に変わる（前の版の印が新しい字幕に付かない）
 
 - 「直しにならない印」（メモだけ・問題なし）は表示される。自分で聞いて決めるか、人に聞く
 - 同じ語の誤りが何度も出る固有名詞は、直しではなく `glossary` に書く（`wrong` で置き換え・改行で割らない）

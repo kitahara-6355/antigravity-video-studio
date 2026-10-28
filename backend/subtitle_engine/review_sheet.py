@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -58,7 +59,8 @@ def export(sidecar: dict, run: str, label: str, video: str, tokens: list | None 
     for i, s in enumerate(sidecar.get("segments") or []):
         a, b = float(s["start"]), float(s["end"])
         caps.append({"i": i, "s": round(a, 2), "e": round(b, 2),
-                     "src": source_time((a + b) / 2, ranges), "t": s.get("text", "")})
+                     "src": source_time((a + b) / 2, ranges), "t": s.get("text", ""),
+                     "a": source_time(a, ranges), "b": source_time(b, ranges)})
     sheet = {"version": 1, "run": run, "label": label, "video": video,
              "duration": round(sum(float(b) - float(a) for a, b in ranges), 2) if ranges else None,
              "captions": caps}
@@ -184,6 +186,71 @@ def to_corrections(marks: list[dict], *, by: str, day: str, label: str, start: i
     return out, rest
 
 
+# 印の状態（画面のボタン）。メモだけで指示された印は、メモの言葉で見分ける（2026-10-24 北原さんの朱入れ
+# 「映像字幕ともにカット」「字幕なしにして」）
+CUT_STATES = {"cut": "cut", "hide": "hide"}
+# 「カットされている疑惑がある」（7分50秒・切れた声の指摘）は指示ではないので、「カット」の後ろが
+# 「され」「しない」のものは見ない
+CUT_WORDS = ((re.compile(r"字幕(なし|無し|だけ消|を消)"), "hide"), (re.compile(r"カット(?!され|しな)"), "cut"))
+# 続けて指示された字幕の区間は、隣の字幕か、すき間がこれ以下なら1つの区間にする
+CUT_JOIN_SEC = 1.0
+
+
+def cut_mode(mark: dict) -> str | None:
+    """印が「映像ごと切る」（cut）か「字幕だけ消す」（hide）か。どちらでもなければ None。"""
+    state = str(mark.get("state") or "")
+    if state in CUT_STATES:
+        return CUT_STATES[state]
+    if state == "fixed" and str(mark.get("fix") or "").strip():
+        return None
+    note = str(mark.get("note") or "")
+    if note.startswith("機械の要確認"):
+        return None
+    return next((mode for word, mode in CUT_WORDS if word.search(note)), None)
+
+
+def to_cuts(marks: list[dict], captions: dict[int, dict], *, by: str, day: str, label: str,
+            start: int = 1) -> tuple[list, list]:
+    """印から台帳の cuts（素材の秒の区間と mode）を作る。返り値は（cuts, 区間が分からなかった印）。
+
+    区間は画面の字幕の素材の秒（控えの ``a``・``b``）。同じ mode で続く字幕はつなぐ。
+    """
+    rows, lost = [], []
+    for m in sorted(marks, key=lambda m: float(m.get("src") or 0.0)):
+        mode = cut_mode(m)
+        if not mode:
+            continue
+        cap = captions.get(int(m.get("cap", -1)))
+        if not cap or cap.get("a") is None or cap.get("b") is None:
+            lost.append(m)
+            continue
+        rows.append([float(cap["a"]), float(cap["b"]), mode, [m]])
+    merged: list[list] = []
+    for a, b, mode, ms in rows:
+        nextdoor = merged and int(ms[0].get("cap", -9)) == int(merged[-1][3][-1].get("cap", -9)) + 1
+        if merged and merged[-1][2] == mode and (nextdoor or a - merged[-1][1] <= CUT_JOIN_SEC):
+            merged[-1][1] = max(merged[-1][1], b)
+            merged[-1][3].extend(ms)
+        else:
+            merged.append([a, b, mode, ms])
+    out = []
+    for n, (a, b, mode, ms) in enumerate(merged, start):
+        text = " / ".join(str(m.get("text", "")).replace(_BREAKS, " ") for m in ms)
+        entry = {"id": f"{day}-c{n:02d}", "start": round(a, 2), "end": round(b, 2), "mode": mode,
+                 "text": text, "by": by, "seen": f"{label} {_clock(float(ms[0].get('t') or 0.0))}"}
+        notes = sorted({str(m.get("note") or "") for m in ms} - {""})
+        if notes:
+            entry["note"] = "／".join(notes)
+        out.append(entry)
+    return out, lost
+
+
+def _last_number(entries: list[dict], head: str) -> int:
+    """id が head＋番号の項目の、一番大きい番号（無ければ 0）。直しを手でまとめて番号が飛んでいても重ならない。"""
+    nums = [int(m.group(1)) for e in entries if (m := re.fullmatch(re.escape(head) + r"(\d+)", str(e.get("id", ""))))]
+    return max(nums, default=0)
+
+
 def dump_ledger(data: dict) -> str:
     """台帳を人が読み書きしやすい形で書く（直しと用語は1件1行）。"""
     lines = ["{"]
@@ -191,7 +258,7 @@ def dump_ledger(data: dict) -> str:
     for k, key in enumerate(keys):
         comma = "," if k < len(keys) - 1 else ""
         value = data[key]
-        if key in ("corrections", "glossary") and isinstance(value, list):
+        if key in ("corrections", "glossary", "cuts") and isinstance(value, list):
             lines.append(f'  "{key}": [')
             for j, item in enumerate(value):
                 tail = "," if j < len(value) - 1 else ""
@@ -251,6 +318,9 @@ def main(argv: list[str] | None = None) -> int:
     im.add_argument("--by", required=True)
     im.add_argument("--day", required=True, help="直しの id の頭（例 2026-10-18）")
     im.add_argument("--label", default="", help="seen に書く書き出しの名前（既定は印の run）")
+    im.add_argument("--sheet", default="", help="画面の控え（review_captions.json）。カット・字幕なしの印の区間を読む")
+    im.add_argument("--sidecar", default="", help="書き出しの字幕（*.subtitles.json）。控えに素材の秒が無いとき、"
+                    "その ranges で戻す")
     cp = sub.add_parser("compare", help="承認した書き出しと作り直した書き出しの字幕を比べる（違えば終了コード 1）")
     cp.add_argument("approved")
     cp.add_argument("again")
@@ -275,13 +345,32 @@ def main(argv: list[str] | None = None) -> int:
     marks = json.loads(Path(args.marks).read_text(encoding="utf-8"))
     ledger_path = Path(args.ledger)
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
-    taken = {c.get("id") for c in ledger.get("corrections", [])}
-    start = 1 + sum(1 for i in taken if str(i).startswith(args.day))
+    start = 1 + _last_number(ledger.get("corrections", []), f"{args.day}-")
     label = args.label or (marks[0].get("label", "") if marks else "")
-    new, rest = to_corrections(marks, by=args.by, day=args.day, label=label, start=start)
+    new, rest = to_corrections([m for m in marks if not cut_mode(m)], by=args.by, day=args.day, label=label,
+                               start=start)
     ledger.setdefault("corrections", []).extend(new)
+    cuts, lost = [], []
+    if any(cut_mode(m) for m in marks):
+        if not args.sheet:
+            print("カット・字幕なしの印があります。--sheet（画面の控え）を付けてください", file=sys.stderr)
+            return 2
+        sheet = json.loads(Path(args.sheet).read_text(encoding="utf-8"))
+        ranges = (json.loads(Path(args.sidecar).read_text(encoding="utf-8")).get("ranges") or []
+                  if args.sidecar else [])
+        captions = {}
+        for c in sheet.get("captions") or []:
+            if c.get("a") is None and ranges:
+                c = dict(c, a=source_time(float(c["s"]), ranges), b=source_time(float(c["e"]), ranges))
+            captions[int(c["i"])] = c
+        first = 1 + _last_number(ledger.get("cuts", []), f"{args.day}-c")
+        cuts, lost = to_cuts(marks, captions, by=args.by, day=args.day, label=label, start=first)
+        ledger.setdefault("cuts", []).extend(cuts)
     ledger_path.write_text(dump_ledger(ledger), encoding="utf-8")
-    print(f"直し {len(new)} 件を足しました → {ledger_path}")
+    print(f"直し {len(new)} 件・カット {sum(c['mode'] == 'cut' for c in cuts)} 区間・"
+          f"字幕なし {sum(c['mode'] == 'hide' for c in cuts)} 区間を足しました → {ledger_path}")
+    for m in lost:
+        print(f"  区間が分からない印（人が見る）: {_clock(float(m.get('t') or 0))} {m.get('text', '')!r}")
     for m in rest:
         print(f"  直しにならない印（人が見る）: {_clock(float(m.get('t') or 0))} {m.get('text', '')!r}"
               f" 状態={m.get('state')} メモ={m.get('note', '')!r}")
