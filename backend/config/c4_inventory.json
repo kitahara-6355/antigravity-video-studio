@@ -5264,8 +5264,9 @@
    "symbol": "write_proposal",
    "category": "品質スコア",
    "status": "marked",
-   "reason": "L91 `score = getattr(ctx, \"quality_score\", 0)` は既定 0 を持つが、**同じ辞書に L102 `scored`（旗）を並べて出所を名乗る**（R1.5-C4 の型）。未採点の 0 を「測った 0 点」と読めない。L92 `passed = score >= 90` も未採点では False 側に倒れ、L104 の書き出しモードは safe になる（安全側）。他の getattr 既定（metadata/session_id/skipped_features/warnings/preview_path/quality_scored）はいずれも空の器か文字列で、数字を作らない。",
+   "reason": "L91 `score = getattr(ctx, \"quality_score\", 0)` は既定 0 を持つが、**同じ辞書に L102 `scored`（旗）を並べて出所を名乗る**（R1.5-C4 の型）。未採点の 0 を「測った 0 点」と読めない。L92 `passed = score >= 90` も未採点では False 側に倒れ、L104 の書き出しモードは safe になる（安全側）。他の getattr 既定（metadata/session_id/skipped_features/warnings/preview_path/quality_scored）はいずれも空の器か文字列で、数字を作らない。 2026-11-10（V2・D-04）: `quality_loop` の getattr 既定 None を足した。None は『品質改善ループを回していない』で、回したときだけ coordinator が回数と点の推移（採点の結果そのもの）を入れる。数字を作らない。",
    "fingerprint": [
+    "getattr_default",
     "getattr_default",
     "getattr_default",
     "getattr_default",

@@ -1,0 +1,24 @@
+{
+  "_doc": "番組化の出力（仕上げ版・Shorts・サムネ）の品質ゲートの線。python -m backend.revenue.program_quality <種類> <ファイル> が実測して合否を出す。測れなかった項目は合格にしない。線の初期値は 2026-11-10 の見積もり（Shorts の 60 秒と yuv420p は北原さんの決まりと実害から）。変えるときはここだけ直す。",
+  "video": {
+    "codec": ["h264"],
+    "pix_fmt": ["yuv420p"],
+    "pix_fmt_why": "yuv444p になると Windows の標準プレーヤー・ブラウザ・スマホで映像が出ない（2026-10-05 北原さん報告）",
+    "av_gap_max_seconds": 0.5,
+    "loudness_lufs": [-24.0, -10.0],
+    "loudness_why": "本線の書き出しは -16 LUFS に揃える。YouTube は -14 LUFS より大きい音を下げる。大きく外れたら音量の事故",
+    "true_peak_max_dbfs": 1.0,
+    "true_peak_why": "0 dBFS を超えた音は再生のときに割れる。圧縮で 1 dB 未満はみ出すのはよくあり聞き分けにくいので、線は +1.0。v62 の確認用は最大 +5.8（7:34 付近）",
+    "black_max_seconds": 3.0,
+    "silence_max_seconds": 15.0,
+    "silence_floor_db": -50
+  },
+  "kinds": {
+    "episode": {"label": "仕上げ版（長尺）", "width": 1920, "height": 1080, "min_seconds": 60},
+    "short": {"label": "Shorts", "width": 1080, "height": 1920, "max_seconds": 60, "max_seconds_why": "北原さんの決まり（60秒以内）"},
+    "thumbnail": {"label": "サムネ", "width": 1280, "height": 720, "max_bytes": 2097152, "formats": ["PNG", "JPEG"], "max_bytes_why": "YouTube のサムネは 2MB まで"}
+  },
+  "review": {
+    "_doc": "確認用（縮小版）は大きさを問わない。中身（音・黒・無音・壊れていないか）だけ測る"
+  }
+}

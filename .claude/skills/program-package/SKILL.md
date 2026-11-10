@@ -80,6 +80,17 @@ P1（2026-10-23 北原さん決定）: 背景は**収録の壁の薄紫＝美麗
   ```
 
   仮決定のうちは名前に「仮決定」と入れる（例 `_サムネ_仮決定_P1_薄紫_B3_K1.png`）
+- **承認の流れ（2026-11-10・V2）**: サムネも投稿する物なので、候補（名前かフォルダ名に「候補」「確認用」）以外は
+  提案 → 北原さんの承認 の後でないと 40_完成 に置けない（`put finished` が断る）:
+
+  ```
+  python -m backend.revenue.program_gate propose --recording <収録ID> --kind thumbnail --key サムネ_P1_B3_K1 \
+      --publish OUT/サムネ_P1_B3_K1.png --spec backend/config/thumbnails/<収録ID>.json
+  python -m backend.revenue.program_gate approve --recording <収録ID> --key サムネ_P1_B3_K1 --by 北原 \
+      --synthetic no --evidence "<チャットの日時と言葉>"
+  ```
+
+  提案のときに 1280x720・2MB 以下・PNG/JPEG を実測する
 - 何を選んだか・誰が決めたかは指定ファイルの `decided` と `chosen` に残す
 
 ### 4. Shorts を切り出す（番組化の2段目）
