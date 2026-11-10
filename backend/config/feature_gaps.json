@@ -5,7 +5,8 @@
     "**kind は2種類。** `gap` は実装が足りていないもの。`intentional` は意図して止めているもので実装漏れではない。実行記録には両方が同じ顔で出るので、区別しないと点検が誤検知する",
     "**`surfaces_as` は実行記録の health.skipped_features / failed_stages に出るときの名前。**部分一致で照合する",
     "**`gate_checks` は品質ゲートで回さないプラグイン名。**本線に無い機能を減点し続けると、ゲートは原理的に閾値へ到達できない",
-    "**実装したらこの台帳から消す。**消し忘れは `--audit` が検出して FAIL する"
+    "**実装したらこの台帳から消す。**消し忘れは `--audit` が検出して FAIL する",
+    "**`triage_2026_11` は 2026-11-10 の仕分け（V0）。** lane は Fable / Opus / 後送。後送は優先度を下げただけで、消さない。再開のきっかけを resume_when に書く（「やめる」は使わない・2026-11-10 北原さん決定）"
   ],
   "gaps": [
     {
@@ -27,6 +28,13 @@
           ".jpeg",
           ".webp"
         ]
+      },
+      "triage_2026_11": {
+        "lane": "Opus",
+        "when": "2026-11-17 以降",
+        "state": "接続待ち",
+        "note": "道具は完成済み（backend/program_package/thumbnail.py・P1 構成で久木田回を作成）。本線から呼ぶ接続だけが残る。コマ選びは V1 の成果を使う",
+        "date": "2026-11-10"
       }
     },
     {
@@ -39,6 +47,13 @@
       "capability": "thumbnail",
       "done_when": {
         "kind": "run_record_clean"
+      },
+      "triage_2026_11": {
+        "lane": "Opus",
+        "when": "2026-11-17 以降",
+        "state": "接続待ち",
+        "note": "生成結果を下流（品質ゲート・YouTube 最適化）に渡す1か所の設定",
+        "date": "2026-11-10"
       }
     },
     {
@@ -46,13 +61,20 @@
       "title": "retention 分析（現在はモック）",
       "kind": "gap",
       "why": "実走ログに `[STUB] 現状は映像・音声解析をモック稼働` が出る。視聴維持率の分析は収益化の判断材料そのものなので、モックのままだと数字を信じられない",
-      "handled_in": "R1.5-C4",
+      "handled_in": "R3-C4",
       "surfaces_as": "retention",
       "done_when": {
         "kind": "marker_gone",
         "path": "backend/plugins/retention_map_plugin.py",
         "marker": "[STUB]"
-      }
+      },
+      "triage_2026_11": {
+        "lane": "Opus",
+        "when": "2026-11-24 以降",
+        "note": "YouTube Analytics の読み取り。北原さんの OAuth 許可が先（R3-C4）",
+        "date": "2026-11-10"
+      },
+      "handled_in_before": "R1.5-C4"
     },
     {
       "id": "bgm_mixing",
@@ -63,6 +85,12 @@
       "surfaces_as": "BGMミキシング",
       "done_when": {
         "kind": "run_record_clean"
+      },
+      "triage_2026_11": {
+        "lane": "Fable",
+        "when": "2026-11-14（V4）",
+        "note": "会話にかぶせない配置と音量の自動調整（ダッキング）。曲は北原さんから受け取る",
+        "date": "2026-11-10"
       }
     },
     {
@@ -70,13 +98,20 @@
       "title": "YouTube 投稿（placeholder を返す）",
       "kind": "gap",
       "why": "`youtube_uploader.upload_video()` が `placeholder_video_id` を返す。**投稿していないのに success を返す**ので、収益化の前提が崩れる。2026-08-26 のユーザー決定で「未実装として失敗させる」方針",
-      "handled_in": "R1.5-C4",
+      "handled_in": "R5-C1",
       "surfaces_as": "youtube_upload",
       "done_when": {
         "kind": "marker_gone",
         "path": "backend/services/youtube_uploader.py",
         "marker": "placeholder_video_id"
-      }
+      },
+      "triage_2026_11": {
+        "lane": "Opus",
+        "when": "最後（R5）",
+        "note": "当面は手動投稿と決定済み（2026-08-26）",
+        "date": "2026-11-10"
+      },
+      "handled_in_before": "R1.5-C4"
     },
     {
       "id": "pipeline_quality_gate_ui",
@@ -89,6 +124,12 @@
         "kind": "marker_gone",
         "path": "backend/routers/pipeline_router.py",
         "marker": "QUALITY_GATE_DATA_SOURCE"
+      },
+      "triage_2026_11": {
+        "lane": "後送",
+        "resume_when": "V2 で本物の品質ゲートができたら、その数字を画面に出す",
+        "date": "2026-11-10",
+        "note": "いまの『作り物の数字です』という印を付けたまま残す。優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）"
       }
     },
     {
@@ -96,13 +137,20 @@
       "title": "チャンネル統計（固定値）",
       "kind": "gap",
       "why": "`admin_channel_router` が `watch_time_hours: 15200` などの固定値を返す。**収益化の到達度をこの数字で判断すると嘘になる**。\n\n**出所は2つある**（gate-verifier 10周目 N-1）。もう1つは**Git 追跡下の `backend/branding/user_model.json` に焼き付いた `external_status`**（登録者150人・総再生4,500回・ライバル「TechStarter」）で、過去の `POST /api/analytics/sync` が書いたもの。6周目・8周目の印は `branding/analytics_manager.py` の**中**に付けたので、**sync を叩いた後にしか効かず、永続台帳を素で返す読み口には届いていなかった**。読み口は2つ — `GET /api/status`（`routers/trinity.py`）と `GET /api/settings`（`settings_manager.get_all_settings()`）。2026-08-29 に `backend/user_model_marks.py` へ印を集約し、`branding_manager.get_user_model_for_display()` を唯一の表示用読み口にした（`evolution_log_marks.py` と同じ形）。**保存側は素のまま**にして、印がファイルへ書き戻らないようにしている（R1.5-C4）",
-      "handled_in": "R1.5-C4",
+      "handled_in": "R3-C2",
       "surfaces_as": "channel_stats",
       "done_when": {
         "kind": "marker_gone",
         "path": "backend/routers/admin_channel_router.py",
         "marker": "15200"
-      }
+      },
+      "triage_2026_11": {
+        "lane": "Opus",
+        "when": "2026-11-24 以降",
+        "note": "同上（R3-C2）",
+        "date": "2026-11-10"
+      },
+      "handled_in_before": "R1.5-C4"
     },
     {
       "id": "dream_learning",
@@ -125,6 +173,12 @@
         "kind": "marker_gone",
         "path": "backend/routers/pipeline_router.py",
         "marker": "IMPROVEMENT_DATA_SOURCE"
+      },
+      "triage_2026_11": {
+        "lane": "後送",
+        "resume_when": "V2 でループの順序が直ったら（D-41）、実際の改善を画面に出す",
+        "date": "2026-11-10",
+        "note": "いまの『作り物の数字です』という印を付けたまま残す。優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）"
       }
     },
     {
@@ -138,6 +192,12 @@
         "kind": "marker_gone",
         "path": "backend/routers/admin_integration_router.py",
         "marker": "\"score\": 92"
+      },
+      "triage_2026_11": {
+        "lane": "後送",
+        "resume_when": "工程ごとの実測が実行記録に残るようになってから",
+        "date": "2026-11-10",
+        "note": "いまの『作り物の数字です』という印を付けたまま残す。優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）"
       }
     },
     {
@@ -151,6 +211,12 @@
         "kind": "marker_gone",
         "path": "backend/routers/admin_incident_router.py",
         "marker": "\"current_score\": 72"
+      },
+      "triage_2026_11": {
+        "lane": "後送",
+        "resume_when": "4週の運用（G2）で点数の推移がたまってから",
+        "date": "2026-11-10",
+        "note": "いまの『作り物の数字です』という印を付けたまま残す。優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）"
       }
     },
     {
@@ -164,6 +230,12 @@
         "kind": "marker_gone",
         "path": "backend/services/cross_media_service.py",
         "marker": "get_default_sns_data"
+      },
+      "triage_2026_11": {
+        "lane": "後送",
+        "resume_when": "投稿が複数 SNS に広がってから、SNS 運用ダッシュボード（kitahara-birei/sns-dashboard）の実データを受け取る形で",
+        "date": "2026-11-10",
+        "note": "いまの『作り物の数字です』という印を付けたまま残す。優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）"
       }
     },
     {
@@ -177,6 +249,12 @@
         "kind": "marker_gone",
         "path": "backend/routers/admin_quality_router.py",
         "marker": "QUALITY_SAMPLE"
+      },
+      "triage_2026_11": {
+        "lane": "後送",
+        "resume_when": "G2 のゲートのあと、CI の結果を読み込む形で",
+        "date": "2026-11-10",
+        "note": "いまの『作り物の数字です』という印を付けたまま残す。優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）"
       }
     },
     {
@@ -190,6 +268,12 @@
         "kind": "marker_gone",
         "path": "backend/services/post_publish_collector.py",
         "marker": "_generate_mock_data"
+      },
+      "triage_2026_11": {
+        "lane": "Opus",
+        "when": "2026-11-24 以降",
+        "note": "投稿が始まってから（R4-C3）",
+        "date": "2026-11-10"
       }
     },
     {
@@ -203,6 +287,12 @@
         "kind": "marker_gone",
         "path": "backend/routers/render.py",
         "marker": "_QUALITY_SIDECAR_DIR"
+      },
+      "triage_2026_11": {
+        "lane": "Fable",
+        "when": "2026-11-12（V2）",
+        "note": "本線の品質ゲートとつなぐ工事。D-41・D-47 と一体",
+        "date": "2026-11-10"
       }
     }
   ]

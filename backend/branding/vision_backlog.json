@@ -86,7 +86,8 @@
       "note": "採点: 方針のテスト通過=最大40 を当てた（前回の 55 は据え置かれていた値）。画面の表示は評議会の実行ではない",
       "confidence": "partial",
       "measured_at": "2026-09-19",
-      "evidence": "CI でテスト失敗0。画面の戦略会議室（/boardroom）に『未来評議会』が描ける。本番の評議会セッションは本線の実走に含まれず、実行されていない"
+      "evidence": "CI でテスト失敗0。画面の戦略会議室（/boardroom）に『未来評議会』が描ける。本番の評議会セッションは本線の実走に含まれず、実行されていない",
+      "status_2026_11": "検討中（凍結から戻した・roadmap.reconsider.trinity_council）。点は次の監査まで据え置き"
     },
     "quality_auto_improve": {
       "score": 50,
@@ -104,7 +105,8 @@
       "note": "採点: 方針のテスト通過=最大40 を当てた（前回の 75 は 2026-08-10 の方針改訂のとき据え置かれた値）。実走での観測は逆向き（記憶が消えた）なので上積みしない",
       "confidence": "partial",
       "measured_at": "2026-09-19",
-      "evidence": "CI run 35367812183 でテスト失敗0。学習を有効にした実走（CLI の本線）で DreamEngine は走った（dream_count 32）が、検証済みの事実を 10件 → 0件にした（D-44）。evolution_log.json は更新されない — 進化の発動は router の完了処理にだけあり、画面から走らせた実走は測っていない"
+      "evidence": "CI run 35367812183 でテスト失敗0。学習を有効にした実走（CLI の本線）で DreamEngine は走った（dream_count 32）が、検証済みの事実を 10件 → 0件にした（D-44）。evolution_log.json は更新されない — 進化の発動は router の完了処理にだけあり、画面から走らせた実走は測っていない",
+      "status_2026_11": "検討中（凍結から戻した・roadmap.reconsider.soul_auto_evolution）。点は次の監査まで据え置き"
     },
     "storage_auto_management": {
       "score": 40,
@@ -161,7 +163,13 @@
         "status": "open",
         "priority": "P1",
         "axis": "progressive_preview",
-        "created": "2026-04-18"
+        "created": "2026-04-18",
+        "triage_2026_11": {
+          "lane": "Fable",
+          "when": "2026-11-12（V2）",
+          "note": "承認フロー完全版と本物の品質ゲート。番組化の道具（仕上げ・Shorts・サムネ）を承認の門に通す",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-17",
@@ -169,7 +177,14 @@
         "status": "open",
         "priority": "P2",
         "axis": "ux_guarantee_owner",
-        "created": "2026-04-18"
+        "created": "2026-04-18",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "CRITICAL のまま、対象の画面が凍結されている間だけ順番を後ろにする",
+          "resume_when": "React 画面を作り直す段階（既存の画面は 2026-09-26 から凍結）。デザインの統一と一緒に実現する",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       }
     ],
     "major": [
@@ -178,14 +193,27 @@
         "title": "品質改善ループ実効性検証（本番動画必要）",
         "status": "tested",
         "priority": "P1",
-        "note": "テスト実装済み（C4-05〜C4-07）。本番E2Eは未実行。 ／ 2026-09-19 の再監査で実写素材の実走（20260919T002710800208-0000）に当てた: ループは3回回ったが 89点のままで改善しない（D-40・D-41）"
+        "note": "テスト実装済み（C4-05〜C4-07）。本番E2Eは未実行。 ／ 2026-09-19 の再監査で実写素材の実走（20260919T002710800208-0000）に当てた: ループは3回回ったが 89点のままで改善しない（D-40・D-41）",
+        "triage_2026_11": {
+          "lane": "Fable",
+          "when": "2026-11-12（V2）",
+          "note": "承認フロー完全版と本物の品質ゲート。番組化の道具（仕上げ・Shorts・サムネ）を承認の門に通す",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-05",
         "title": "Soul自動進化：閾値トリガー実装",
         "status": "tested",
         "priority": "P2",
-        "note": "68/68テストPASS。evolution_log自動更新確認。should_dream()のE2E実行は本番検品(Sprint 4.7.0)で検証予定。"
+        "note": "68/68テストPASS。evolution_log自動更新確認。should_dream()のE2E実行は本番検品(Sprint 4.7.0)で検証予定。",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "自動進化は凍結中で、実走では記憶を消した（D-44）",
+          "resume_when": "Soul の解凍設計（11/16 予備日）で D-44 を『消さず足す』に直した後。解凍を決めたら閾値トリガーをそこで作る",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-06",
@@ -199,7 +227,13 @@
         "id": "D-07",
         "title": "Progressive Preview承認フロー統合",
         "status": "open",
-        "priority": "P2"
+        "priority": "P2",
+        "triage_2026_11": {
+          "lane": "Fable",
+          "when": "2026-11-12（V2）",
+          "note": "承認フロー完全版と本物の品質ゲート。番組化の道具（仕上げ・Shorts・サムネ）を承認の門に通す",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-19",
@@ -226,7 +260,14 @@
         "priority": "P2",
         "axis": "ux_guarantee_owner",
         "created": "2026-08-02",
-        "note": "O-4/5/8/9/10/11 が『動くが5層未定義』のまま。画面表示の再確認は無料でできる（パイプライン起動だけが課金）。"
+        "note": "O-4/5/8/9/10/11 が『動くが5層未定義』のまま。画面表示の再確認は無料でできる（パイプライン起動だけが課金）。",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "既存の画面は凍結中",
+          "resume_when": "React 画面を作り直す段階（既存の画面は 2026-09-26 から凍結）。デザインの統一と一緒に実現する。UX 充足表もそのとき測り直す",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-22",
@@ -235,28 +276,55 @@
         "priority": "P1",
         "axis": "test_coverage",
         "created": "2026-08-02",
-        "note": "前回値 77% は branch、今回測れたのは line 75.4%。ci.yml に --cov-branch を足せば以後は比較できる。"
+        "note": "前回値 77% は branch、今回測れたのは line 75.4%。ci.yml に --cov-branch を足せば以後は比較できる。",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "テスト基盤",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-23",
         "title": "/api/review/* 7エンドポイントが定義のみで未登録",
         "detail": "backend/routers/review_router.py は APIRouter(prefix='/api/review') を定義しているが、routers/__init__.py にも main.py にも api_versioning.py にも登録が無く、呼んでも 404 になる。フロントエンドからの呼び出しは 0 件なので実害は出ていない。archives/ の E2E テストだけが参照しており、かつてはマウントされていたものが外れた形跡。登録するか削除するかの判断が要る。",
         "found_by": "P2 の API 契約実行系（unregistered 判定）",
-        "status": "open"
+        "status": "open",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "いまは使われていない。消さずに残す",
+          "resume_when": "承認画面を広げるとき（V2 以降）に review 経路をつなぐ",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-24",
         "title": "エントリから到達できないフロントエンド3ファイル",
         "detail": "ModelQuotaDashboard.jsx / RivalRadar.jsx / useSegments.js は frontend/src/main.jsx から import を辿って到達できない。いずれも data-testid を持たないため現在の UX 判定には影響しないが、ビルドには含まれる。",
         "found_by": "P1 の L1 実行系（reachability 判定）",
-        "status": "open"
+        "status": "open",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "いまは使われていない。消さずに残す",
+          "resume_when": "承認画面を広げるとき（V2 以降）に入口からつなぐ",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-25",
         "title": "backend/tests/e2e_results.json が現在地の根拠として腐っている",
         "detail": "初回コミット bb1bcde 以降1度も更新されていない。記録された FAIL 31件のうち15件が現在のストーリーに存在しない項目 ID を指す。gap_analyzer がこれを読んでv8_baseline.json を作っており、その『FAIL 16件』は消滅した項目を落とした残りかす。snapshots/quarantined/ と同じ隔離扱いにするのが一貫する。**削除は非推奨** — 唯一の過去記録なので由来を残すべき。詳細は docs/ux_l1_triage_20260802.md。",
         "found_by": "P1 C-5 の切り分け",
-        "status": "open"
+        "status": "open",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "静的検証は『これ以上磨かない』と決定済み。いまの限界として記録する",
+          "resume_when": "G2 のゲートで再判定する",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-27",
@@ -265,7 +333,14 @@
         "priority": "P2",
         "axis": "ux_guarantee_owner",
         "created": "2026-08-07",
-        "note": "L1 の FAIL 14件のうち、判定手段が原理的に無いものが6件（state_transition 1 / idempotency 2 / element_count 1 / parameter_coverage 1 / spec_incomplete 1）。いずれも『呼ぶ前と後で値が変わったか』『2回呼んで同じか』『実行時に何件描画されるか』で、動作中のバックエンドが要る（D-20 と同根）。残る8件は実装または宣言で埋まる。詳細は docs/ux_l1_description_grammar_20260807.md"
+        "note": "L1 の FAIL 14件のうち、判定手段が原理的に無いものが6件（state_transition 1 / idempotency 2 / element_count 1 / parameter_coverage 1 / spec_incomplete 1）。いずれも『呼ぶ前と後で値が変わったか』『2回呼んで同じか』『実行時に何件描画されるか』で、動作中のバックエンドが要る（D-20 と同根）。残る8件は実装または宣言で埋まる。詳細は docs/ux_l1_description_grammar_20260807.md",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "静的検証は『これ以上磨かない』と決定済み。いまの限界として記録する",
+          "resume_when": "G2 のゲートで再判定する（実走の記録がたまれば測れる主張が増える）",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-28",
@@ -276,7 +351,14 @@
         "created": "2026-09-19",
         "detail": "門は条件ごとに点数だけを変えた2回を比べるが、選んだ点数の対（合格 92/97・不合格 85/79）が品質ゲートの90点をまたがない（またぐと工程の分岐が変わって比べられなくなる）。そのため90点で分岐する表示は点数を変えても動かず、門に見えない。実例は pipeline_coordinator の render_mode（quality_score >= 90 由来）。条文は『点数だけを変えた2回』と定義しているので条文違反ではなく、limits #20(2) の一般形。塞ぐなら条文に『3点以上で比べる』か『品質ゲート以外の工程も進める』を足す",
         "found_by": "R1.5 28周目の gate-verifier（残った指摘 (a)）",
-        "note": "**R2 のバックログに置く**（2026-09-19 ユーザー決定。R1.5 では塞がない）。塞ぐときは C4b の条文を見直してから"
+        "note": "**R2 のバックログに置く**（2026-09-19 ユーザー決定。R1.5 では塞がない）。塞ぐときは C4b の条文を見直してから",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "静的検証は『これ以上磨かない』と決定済み。いまの限界として記録する",
+          "resume_when": "G2 のゲートで再判定する",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-29",
@@ -287,7 +369,13 @@
         "created": "2026-09-19",
         "detail": "同じ型が3回起きた。(1) 2026-08-26: コーディネータのテストが output/runs/ に記録238件。(2) 2026-08-27: autouse フィクスチャが output/ を丸ごと rmtree（実走の記録と C5 の素材が消えた）。(3) 2026-09-19 に発見: tests/ に実行記録の隔離が無く output/runs/ に68件（実走は2件）、test_batch19 の test_dm_04 が本物の vault-outputs/preview・merged の mp4 を全部消していた（最新の実走の preview が消え、成果物ゲートが最新の実走を確かめられなくなった）。いずれも場所ごとの手当てで塞いだ（コミット 3490468 ほか）。fs_guard は追跡ファイルへの書き込みしか見ず、無視されたファイルの作成・削除は検出できない",
         "found_by": "R1.5 ゲート報告の証拠集め（2026-09-19）",
-        "note": "仕組みの案: テストのセッションで ANTIGRAVITY_VAULT_OUTPUTS と AVS_RUNS_DIR を一時ディレクトリへ向ける／fs_guard を output/・vault-outputs/ の作成・削除まで広げる。D-30 と一緒にやる"
+        "note": "仕組みの案: テストのセッションで ANTIGRAVITY_VAULT_OUTPUTS と AVS_RUNS_DIR を一時ディレクトリへ向ける／fs_guard を output/・vault-outputs/ の作成・削除まで広げる。D-30 と一緒にやる",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "テスト基盤",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-31",
@@ -297,7 +385,13 @@
         "axis": "ui_api_connection",
         "created": "2026-09-19",
         "detail": "ルートの登録順で {preview_id} が先に一致し、sessions が preview_id として解釈される。C4b の path_values（一覧 API の値の出どころ）を書いたときに見つけた",
-        "found_by": "R1.5 27周目の準備（2026-09-17）"
+        "found_by": "R1.5 27周目の準備（2026-09-17）",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "画面と API の不具合",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-32",
@@ -308,7 +402,13 @@
         "created": "2026-09-19",
         "detail": "GET /api/journal・/api/models・/api/resolutions・/api/shorts/list・/api/usage/switch-history・/api/progressive-preview/report/{id}（C4b の面の台帳で status 500 に固定している）。うち4本は routers パッケージがサブモジュール名を APIRouter に再束縛する罠が原因と特定済み",
         "found_by": "R1.5-C4b の面の観測",
-        "note": "直すと C4b の『面の出口が変わりました』で門が落ちる。直した側で面の台帳を --write-faces で書き直し、差分を査読する ／ 2026-09-19 の再監査で原因を1つ特定: GET /api/usage/switch-history は QuotaManager に get_switch_history が無く AttributeError で 500。500 の応答に CORS のヘッダーが付かないので、画面（運用監視）では CORS エラーに見える"
+        "note": "直すと C4b の『面の出口が変わりました』で門が落ちる。直した側で面の台帳を --write-faces で書き直し、差分を査読する ／ 2026-09-19 の再監査で原因を1つ特定: GET /api/usage/switch-history は QuotaManager に get_switch_history が無く AttributeError で 500。500 の応答に CORS のヘッダーが付かないので、画面（運用監視）では CORS エラーに見える",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "画面と API の不具合",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-34",
@@ -318,7 +418,13 @@
         "created": "2026-09-19",
         "detail": "python -m backend.cost_guard --status が2つ警告する: .claude/budget.json の auto_reload が off と宣言されていない／spend_cap_usd と spend_cap_project が空。CLAUDE.md の方針は Spend Cap（月額・約10分遅れ）→ Tier 上限 → cost_guard の三重で、cost_guard は推定でしか止められない",
         "found_by": "R1.5 ゲート報告の証拠集め（2026-09-19）",
-        "note": "AI Studio の設定はユーザーの操作。設定済みなら台帳の記入漏れ。実走が増える R3 の前に埋める"
+        "note": "AI Studio の設定はユーザーの操作。設定済みなら台帳の記入漏れ。実走が増える R3 の前に埋める",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "台帳と CI",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-35",
@@ -329,7 +435,13 @@
         "created": "2026-09-19",
         "detail": "GET /api/pipeline/api-usage は当日の呼び出し元の内訳（sources）を返し、中身は追跡ファイル backend/usage_tracker/daily_usage.json から来る。2026-09-19 の実走で当日の項目（ai_proofreader: 1）が増え、同じ日に門を回すと新しい鍵 $.sources.ai_proofreader と条件つきの面10個が出て FAIL した（翌日には鍵が消えて『出なくなった鍵』の情報になる）。実走の使用量をコミットせずに戻して回避した（費用の正式な記録は .claude/cost_ledger.jsonl と budget.json）",
         "found_by": "R1.5 ゲート報告の証拠集め（2026-09-19）",
-        "note": "直し方の案: 実行時データ（usage_tracker の2ファイルなど）を追跡から外して初期値を置く／門が複製するときにこれらを HEAD の版で置く／sources を動的な鍵の写像として扱う。D-29 と同じく『実行時の状態が追跡ファイルに混ざる』問題"
+        "note": "直し方の案: 実行時データ（usage_tracker の2ファイルなど）を追跡から外して初期値を置く／門が複製するときにこれらを HEAD の版で置く／sources を動的な鍵の写像として扱う。D-29 と同じく『実行時の状態が追跡ファイルに混ざる』問題",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "台帳と CI",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-36",
@@ -340,7 +452,13 @@
         "created": "2026-09-19",
         "detail": "_check_disk_space を 0.5GB にすると、記録は status: failed / stages: [] / failed_stages: [] / all_features_active: true になり、--resume は『失敗した工程はありません（status=failed）』と出して exit 0 を返す。原因は API の戻り値にしか渡らない（pipeline_coordinator.py 612-617 行・863-878 行）。成果物ゲートは status=failed で落とすので C1c は無事。HANDOVER_20260827 §5 の積み残しで、正典にも limits にも入っていなかった",
         "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
-        "note": "うっかり型（verification_policy の分類）"
+        "note": "うっかり型（verification_policy の分類）",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "うっかり型の穴（原因と行番号が特定済み）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-37",
@@ -351,7 +469,13 @@
         "created": "2026-09-19",
         "detail": "render_final を禁じるガバナンスが無視される（pipeline_coordinator.py 1011-1042 行）。工程は実際に走るので C1b の『成功に数えない』には反しない。中間ゲートからの積み残し",
         "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
-        "note": "うっかり型"
+        "note": "うっかり型",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "うっかり型の穴（原因と行番号が特定済み）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-38",
@@ -362,7 +486,13 @@
         "created": "2026-09-19",
         "detail": "最新の記録の写しで proofread の model を 'standard' に書き換えても findings は 0。いま記録に実モデル ID が残るのは、記録器が model_policy.resolve() を通るから（C2 のテストが間接的に守っている）",
         "found_by": "R1.5 29周目の gate-verifier（2026-09-19）",
-        "note": "うっかり型"
+        "note": "うっかり型",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "うっかり型の穴（原因と行番号が特定済み）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-40",
@@ -372,7 +502,13 @@
         "axis": "quality_auto_improve",
         "created": "2026-09-19",
         "detail": "accessibility の点数が None（quality_gate_plugins.py 1370 行）のため、evaluator_optimizer.py 228 行の score < 70 が TypeError になり、pipeline_coordinator.py 1075 行が握りつぶす。output/runs の4件すべての traceback に出ている。初回コミットからで、退行ではない",
-        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外"
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "うっかり型の穴（原因と行番号が特定済み）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-41",
@@ -383,7 +519,13 @@
         "created": "2026-09-19",
         "detail": "pipeline_coordinator.py 634-637 行。ループで合格すると状態は completed になるが、最終 mp4 は不合格だったときの safe モードで作られたまま（verifier が scratch で実測）",
         "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外",
-        "note": "R2 の承認工程（承認した動画だけを書き出す・R2-C1）と一緒に直すのが自然 ／ 2026-09-19: R2-C1 の条件に入れた（ユーザー決定）"
+        "note": "R2 の承認工程（承認した動画だけを書き出す・R2-C1）と一緒に直すのが自然 ／ 2026-09-19: R2-C1 の条件に入れた（ユーザー決定）",
+        "triage_2026_11": {
+          "lane": "Fable",
+          "when": "2026-11-12（V2）",
+          "note": "承認フロー完全版と本物の品質ゲート。番組化の道具（仕上げ・Shorts・サムネ）を承認の門に通す",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-42",
@@ -393,7 +535,13 @@
         "axis": "quality_auto_improve",
         "created": "2026-09-19",
         "detail": "判定の材料は segments・selected・metadata の有無だけ（quality_gate_plugins.py 1139-1156 行）。AI なしの実走でも『全ステージ正常完走』と出て、stability が 100.0 になっていた",
-        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外"
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外",
+        "triage_2026_11": {
+          "lane": "Fable",
+          "when": "2026-11-12（V2）",
+          "note": "承認フロー完全版と本物の品質ゲート。番組化の道具（仕上げ・Shorts・サムネ）を承認の門に通す",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-43",
@@ -404,7 +552,14 @@
         "created": "2026-09-19",
         "detail": "ループの最後の通知が running /『品質再チェック...』で、不合格で終わったときに閉じる通知が無い（pipeline_coordinator.py 1142-1166 行）。C4b の変更前（1fe506c）から同じで、私の修正の退行ではないことを確かめた",
         "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外",
-        "note": "R2 の終了条件には入れない（2026-09-19 ユーザー決定）。バックログで扱う"
+        "note": "R2 の終了条件には入れない（2026-09-19 ユーザー決定）。バックログで扱う",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "既存の画面は凍結中",
+          "resume_when": "React 画面を作り直す段階（既存の画面は 2026-09-26 から凍結）。デザインの統一と一緒に実現する",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-44",
@@ -415,7 +570,13 @@
         "created": "2026-09-19",
         "detail": "再監査の実走 20260919T002710800208-0000（学習を有効にした CLI の本線）で、backend/agents/memory/VERIFIED_FACTS.md と verified_facts_index.json の事実が 10件 → 0件になった（dream_count 31 → 32）。消えた事実は 2026-06 の test.mp4 の実行などから学んだもので中身の価値は低いが、実走1回の学習で記憶が積み上がらずに消えるのは『自動進化』と逆向き。あわせて evolution_log.json は CLI の本線では更新されない（進化の発動は router の完了処理だけ）",
         "found_by": "2026-09-19 の再監査（/vision-audit）",
-        "note": "監査の実走が書き換えた記憶ファイルはコミットせずに戻した（自分の実走で記憶を消したまま残さない）"
+        "note": "監査の実走が書き換えた記憶ファイルはコミットせずに戻した（自分の実走で記憶を消したまま残さない）",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "整理（学習が記憶を消す件。Soul の解凍設計の前提なので、解凍を決めたら最初に直す）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-45",
@@ -425,7 +586,13 @@
         "axis": "ux_guarantee_owner",
         "created": "2026-09-24",
         "detail": "実キーの実走 20260924T051804461600-0000 で観測。youtube_opt が出すのは `titles`（候補の配列）・`tags`・`description`・`chapters` で、**`title` が無い**。手動投稿用サイドカー（`*.youtube.json`）も題が欠けたまま出る。今回は承認のときに人が `title` を入れて埋めたが、**毎回手で足すのは承認工程の意味が薄い。**候補から1つ選ぶのは人の判断なので、R2-C5 の承認画面で選ばせるのが筋",
-        "found_by": "2026-09-24 の R2-C1〜C3 実走確認"
+        "found_by": "2026-09-24 の R2-C1〜C3 実走確認",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "画面と API の不具合",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-46",
@@ -436,7 +603,13 @@
         "created": "2026-09-24",
         "detail": "`test_ai_proofreader.py` / `test_context_compressor.py` / `test_admin_channel_router.py` などが**モジュールの import 時に** `sys.modules['google']` などを MagicMock へ差し替えて戻さない。その後 `backend/tests/test_routers_health.py` が `import faster_whisper` を実行すると `pkg_resources.declare_namespace` が壊れたモックを辿って `TypeError: ('Not a package:', 'google')` になり、**収集の段で全体が止まる**（`Interrupted: 1 error during collection`）。CLAUDE.md は作業の締めに素の `pytest` を指示しているが、手元ではこれが通らない。`--continue-on-collection-errors` で回避できる。**CI は緑**（run 35409157620 の「Python テストスイート」）なので環境差（faster_whisper の有無）。D-29（テストの分離）の系列",
         "found_by": "2026-09-24 の R2-C1〜C3 の締めの全体実行",
-        "note": "origin/main でも同じ（2fa8087 で再現）。R2 の変更が原因ではない"
+        "note": "origin/main でも同じ（2fa8087 で再現）。R2 の変更が原因ではない",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "テスト基盤",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-47",
@@ -447,7 +620,13 @@
         "created": "2026-09-25",
         "detail": "提案と書き出しの記録には `render_mode: production | safe` が載り、90点以上なら production になる（D-41 の条件はここを見ている）。**ただし `RenderWorker` は `ctx.render_mode` をどこからも読んでいない** — `_encode_video_production_quality` は常に `_get_encode_args(\"balanced\")` を使うので、safe と production の書き出しは同一設定。**モードは記録上の区別でしかない。**直すには production 用のエンコード設定（CRF・プリセット）を決める必要があり、画質と書き出し時間のトレードオフはユーザー判断なので R3 の品質の話として切り出す",
         "found_by": "2026-09-24 の gate-verifier（R2-C1〜C3 の中間ゲート）",
-        "note": "2026-09-25 ユーザー決定: いまは直さず登録して先へ進む"
+        "note": "2026-09-25 ユーザー決定: いまは直さず登録して先へ進む",
+        "triage_2026_11": {
+          "lane": "Fable",
+          "when": "2026-11-12（V2）",
+          "note": "承認フロー完全版と本物の品質ゲート。番組化の道具（仕上げ・Shorts・サムネ）を承認の門に通す",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-48",
@@ -458,7 +637,13 @@
         "created": "2026-09-25",
         "detail": "`POST /api/shorts/render` は承認を1件も見ずに 1080x1920 の完成動画を `vault-outputs/shorts/` へ書いていた（2026-09-24 の gate-verifier が実生成）。R2-C1 と正面から衝突するので **2026-09-25 に 409 で閉じた**。**Shorts は収益化の主軸（登録者1,000人を集める側）なので、消したのではなく止めただけ。**本線の提案 → 承認 → 書き出しに Shorts を載せる（切り出し1本ごとに実行記録と提案を作る）工事が要る。画面側（`ShortsGenerator.jsx`）は `SettingsPage.jsx` に props 無しで置かれていて `videoPath` が空なので、**閉じた時点で画面からは動いていなかった**",
         "found_by": "2026-09-24 の gate-verifier（R2-C1〜C3 の中間ゲート）",
-        "note": "2026-09-25 ユーザー決定: 閉じる（承認の流れに載せるのは R3 以降）"
+        "note": "2026-09-25 ユーザー決定: 閉じる（承認の流れに載せるのは R3 以降）",
+        "triage_2026_11": {
+          "lane": "Fable",
+          "when": "2026-11-12（V2）",
+          "note": "承認フロー完全版と本物の品質ゲート。番組化の道具（仕上げ・Shorts・サムネ）を承認の門に通す",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-49",
@@ -469,7 +654,13 @@
         "created": "2026-09-26",
         "detail": "`quality_gate_ai`（品質ゲートの AIRuleCheck）が使う `model_governance.call()` は `GovernedModelsProxy` ではなく raw client で呼ぶため、cost_guard の予算チェックと台帳の行（課金・降格）が出ない。いま品質ゲートは `local:rule-based` 宣言なので R2-C5 には効かないが、AI を効かせた時点で (1) 課金の絞り口の外になる（憲法第3条・CLAUDE.md『本番の全モジュールは gemini_client_factory を通る』に反する）、(2) 実行記録が「未検証」と誤表示する。塞ぎ方: `call()` の呼び出しを proxy 経由にするか、`guard_before/after` を `call()` にも入れる",
         "found_by": "R2-C5 gate-verifier 2周目（2026-09-26）",
-        "note": "うっかり型。R2 の後（M2 の品質ゲート整備）で塞ぐ"
+        "note": "うっかり型。R2 の後（M2 の品質ゲート整備）で塞ぐ",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "うっかり型の穴（原因と行番号が特定済み）",
+          "date": "2026-11-10"
+        }
       }
     ],
     "structural": [
@@ -477,26 +668,51 @@
         "id": "D-09",
         "title": "レガシーコード二重構造の整理",
         "status": "open",
-        "priority": "P3"
+        "priority": "P3",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "整理（旧コードの二重構造）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-10",
         "title": "仕上げウィザードUI接続検証",
         "status": "open",
-        "priority": "P2"
+        "priority": "P2",
+        "triage_2026_11": {
+          "lane": "後送",
+          "why": "既存の画面は凍結中",
+          "resume_when": "React 画面を作り直す段階（既存の画面は 2026-09-26 から凍結）。デザインの統一と一緒に実現する",
+          "note": "優先度を下げるだけで、理想の形からは外さない（2026-11-10 北原さん承認）",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-11",
         "title": "GitHub Actions CI/CD設定確認",
         "status": "open",
-        "priority": "P2"
+        "priority": "P2",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "台帳と CI",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-26",
         "title": "CI のマージゲートが正典を読まない",
         "detail": "scripts/check_merge_gate.py は vision_backlog.json を一切読まず、参照資料である phase_state.json から『45フェーズ体系: Phase 2 / M2.1』を現在地として注釈なしで出力し続けている。正典を読む機械は SessionStart フック1つだけで、CI には無い。台帳が2つあると片方が腐る問題の再発経路。",
         "found_by": "Phase 0 の gate-verifier",
-        "status": "open"
+        "status": "open",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "台帳と CI",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-30",
@@ -507,7 +723,13 @@
         "created": "2026-09-19",
         "detail": "--import-mode=importlib の導入と、tests/ と backend/tests/ の同一相対パス92件（うち90件が内容ドリフト）の整理。テスト間汚染を潰して testpaths を手書きの許可リストからディレクトリ指定に戻し、outside_testpaths_guard.py と約1時間46分の CI ジョブを消す。run_test_batches.py を pytest-xdist --dist loadfile に置き換える。テスト間汚染の実例（2026-09-19）: 単独で流すと落ちるテストが2ファイルにある（test_batch14_pipeline_ws_补完.py の test_ws_04・test_ws_17、test_batch8_pipeline_asset_director.py の test_pr_d01〜d05。R1.5 前の main 8eef716 でも落ちる。CI の8分割では緑）",
         "found_by": "2026-09-12 のボトルネック調査",
-        "note": "ユーザー承認済み。R1.5 の完了後に着手する（2026-09-12 決定）。第1段（timeout = 60・-p no:randomly）は eae2de3 で実施済み"
+        "note": "ユーザー承認済み。R1.5 の完了後に着手する（2026-09-12 決定）。第1段（timeout = 60・-p no:randomly）は eae2de3 で実施済み",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "テスト基盤",
+          "date": "2026-11-10"
+        }
       },
       {
         "id": "D-33",
@@ -518,7 +740,13 @@
         "created": "2026-09-19",
         "detail": "テストの一部が本物の run_health_check() に届き、resource_governor.kill_zombie_test_processes が起動から180秒を超えた pytest プロセスを全部終了させる（Windows では終了コード15。コマンド行に pytest を含む親シェルも殺す）。backend/tests/test_generate_subagent_reports.py を含むバッチで起きる",
         "found_by": "R1.5-C4b の作業中（2026-09）",
-        "note": "直るまで長い pytest を2本並走させない"
+        "note": "直るまで長い pytest を2本並走させない",
+        "triage_2026_11": {
+          "lane": "Opus",
+          "when": "2026-11-17 以降",
+          "note": "テスト基盤",
+          "date": "2026-11-10"
+        }
       }
     ],
     "resolved": [
@@ -682,37 +910,68 @@
     "exit_criteria": [
       {
         "id": "R2.5-C1",
-        "met": false,
+        "met": true,
         "verify": "python -m backend.revenue.approval_gate --gate",
-        "condition": "raw 4本を結合した素材（約18分）から、**承認済みの完成品**が置き場に出る（`--gate` exit 0）。人が見て『見せられる』と言える"
+        "condition": "raw 4本を結合した素材（約18分）から、**承認済みの完成品**が置き場に出る（`--gate` exit 0）。人が見て『見せられる』と言える",
+        "rejudged_2026_11": {
+          "date": "2026-11-10",
+          "judgement": "達成（北原さんの目視）",
+          "evidence": "v61（2026-10-20）と v62 ロゴなし（2026-10-23）の確認用360pが Drive の 40_完成 に置かれ、北原さんが目視OK（qc_ledger.json・md5 つき）。承認した編集は edit_lock で固定済み",
+          "remaining": "`approval_gate --gate` は今回のクラウドでは走らせていない（実行記録 output/runs は git の外）。番組化の道具（仕上げ・Shorts・サムネ）の出力は承認の門を通っていない → V2（D-16・D-48）で門に通す"
+        }
       },
       {
         "id": "R2.5-C2",
         "met": false,
         "verify": "python -m backend.revenue.approval_gate --trace <run_id>",
-        "condition": "品質ゲートが **90 以上で合格**して production で書き出される（safe ではない）。未実装機能の固定減点は `feature_gaps` の `gate_checks` で除外し、**除外した事実を品質サイドカーに残す**"
+        "condition": "品質ゲートが **90 以上で合格**して production で書き出される（safe ではない）。未実装機能の固定減点は `feature_gaps` の `gate_checks` で除外し、**除外した事実を品質サイドカーに残す**",
+        "rejudged_2026_11": {
+          "date": "2026-11-10",
+          "judgement": "一部（点は届いた。書き出しモードとサイドカーは未確認）",
+          "evidence": "61回目とその作り直しの品質は 91 点（スキル interview-edit 手順6）",
+          "remaining": "production で書き出されたか（safe でないか）と、除外した固定減点が品質サイドカーに残るかは確かめていない。ループが最終書き出しの後に回る件（D-41）と書き出しモード（D-47）が残る → V2"
+        }
       },
       {
         "id": "R2.5-C3",
         "met": false,
         "verify": "python -m backend.revenue.artifact_gate --ai-effect",
-        "condition": "AI が編集に効いている（AI あり／なしの完成品の指紋が違い、差分が字幕とカットに出る）"
+        "condition": "AI が編集に効いている（AI あり／なしの完成品の指紋が違い、差分が字幕とカットに出る）",
+        "rejudged_2026_11": {
+          "date": "2026-11-10",
+          "judgement": "一部（字幕とカットに AI の出力が入っている。AI あり／なしの指紋の比較は未実行）",
+          "evidence": "Gemini の文字起こし・校閲の控え（_gemini_*・_proofread_*）から字幕が作られ、台帳の有無で版を比べた（job の zero／ledger）",
+          "remaining": "`artifact_gate --ai-effect` で AI あり／なしの完成品を比べた記録が無い → 11/17 以降 Opus"
+        }
       },
       {
         "id": "R2.5-C4",
         "met": false,
         "verify": "python -m backend.revenue.transcribe_check --gate",
-        "condition": "文字起こしが **Gemini 音声入力**で通り、Whisper との一致率（WER）が記録に残る。基準を下回ったら Whisper に切り替わる（切り替えの事実が記録に残る）"
+        "condition": "文字起こしが **Gemini 音声入力**で通り、Whisper との一致率（WER）が記録に残る。基準を下回ったら Whisper に切り替わる（切り替えの事実が記録に残る）",
+        "rejudged_2026_11": {
+          "date": "2026-11-10",
+          "judgement": "一部（主は Gemini 音声入力で通った。WER の記録と切り替えは未実装）",
+          "evidence": "本線を `--transcriber gemini` で走らせて完成（interview-edit）。ほかの聞き取りと食い違う字幕に印を付ける（review_flags の flag_with_readings）",
+          "remaining": "判定コマンド `backend.revenue.transcribe_check` がまだ無い。Whisper との一致率の記録と、基準割れでの切り替えも無い → 11/17 以降 Opus"
+        }
       },
       {
         "id": "R2.5-C5",
         "met": false,
         "verify": "python -m backend.verify_account --projects",
-        "condition": "**クラウドのセッションだけで** C1〜C4 が再現する（素材は GCS 等の読み口、実キーは環境シークレット。raw は読み取り専用）"
+        "condition": "**クラウドのセッションだけで** C1〜C4 が再現する（素材は GCS 等の読み口、実キーは環境シークレット。raw は読み取り専用）",
+        "rejudged_2026_11": {
+          "date": "2026-11-10",
+          "judgement": "一部（C1 の道はクラウドだけで再現した。C2〜C4 が未達なので全体は未達）",
+          "evidence": "raw を Drive から読み取り専用で取り（backend/raw_source.py）、クラウドの作業場で書き出して確認用ファイルを置いた（interview-edit・out は /mnt/project-files）",
+          "remaining": "C2〜C4 が満ちた後に、同じくクラウドだけで通ることを確かめる"
+        }
       }
     ],
     "condition_notes": [
-      "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は法人 Workspace の Google Drive（GCS on avs-prod-paid でも Cloudflare R2 でもない。環境の方針は「Workspace 優先・GCP は足りないときだけ・将来はスマホ1台で完結」）。C5 の『GCS 等の読み口』は Drive を指す。憲法の第1回仕分け表を承認し、環境の階層の条文を改訂に加える（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める"
+      "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は法人 Workspace の Google Drive（GCS on avs-prod-paid でも Cloudflare R2 でもない。環境の方針は「Workspace 優先・GCP は足りないときだけ・将来はスマホ1台で完結」）。C5 の『GCS 等の読み口』は Drive を指す。憲法の第1回仕分け表を承認し、環境の階層の条文を改訂に加える（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める",
+      "**2026-11-10 の判定し直し（V0）**: 10月の実績（qc_ledger の目視OK・edit_lock・品質 91 点）で C1〜C5 を判定し直した。条件文は変えていない。C1 は北原さんの目視で達成、C2〜C5 は一部。残りは V2（承認の門・書き出しモード）と 11/17 以降の Opus（transcribe_check・--ai-effect）で埋める。あわせて、範囲外としていた見出し・Shorts・サムネ・BGM のうち、見出し（番組の仕上げ）・Shorts 8本・サムネ P1 は10月に本線の外で作った（canon_repair_2026_11）"
     ],
     "note": "計画書 docs/plans/2026-09-26-master-plan-100.md の M2。判定コマンドが未実装のもの（transcribe_check・verify_account --projects）は、このフェーズの最初の作業として作る",
     "assumptions": [
@@ -1637,33 +1896,63 @@
         "exit_criteria": [
           {
             "id": "R2.5-C1",
-            "met": false,
+            "met": true,
             "verify": "python -m backend.revenue.approval_gate --gate",
-            "condition": "raw 4本を結合した素材（約18分）から、**承認済みの完成品**が置き場に出る（`--gate` exit 0）。人が見て『見せられる』と言える"
+            "condition": "raw 4本を結合した素材（約18分）から、**承認済みの完成品**が置き場に出る（`--gate` exit 0）。人が見て『見せられる』と言える",
+            "rejudged_2026_11": {
+              "date": "2026-11-10",
+              "judgement": "達成（北原さんの目視）",
+              "evidence": "v61（2026-10-20）と v62 ロゴなし（2026-10-23）の確認用360pが Drive の 40_完成 に置かれ、北原さんが目視OK（qc_ledger.json・md5 つき）。承認した編集は edit_lock で固定済み",
+              "remaining": "`approval_gate --gate` は今回のクラウドでは走らせていない（実行記録 output/runs は git の外）。番組化の道具（仕上げ・Shorts・サムネ）の出力は承認の門を通っていない → V2（D-16・D-48）で門に通す"
+            }
           },
           {
             "id": "R2.5-C2",
             "met": false,
             "verify": "python -m backend.revenue.approval_gate --trace <run_id>",
-            "condition": "品質ゲートが **90 以上で合格**して production で書き出される（safe ではない）。未実装機能の固定減点は `feature_gaps` の `gate_checks` で除外し、**除外した事実を品質サイドカーに残す**"
+            "condition": "品質ゲートが **90 以上で合格**して production で書き出される（safe ではない）。未実装機能の固定減点は `feature_gaps` の `gate_checks` で除外し、**除外した事実を品質サイドカーに残す**",
+            "rejudged_2026_11": {
+              "date": "2026-11-10",
+              "judgement": "一部（点は届いた。書き出しモードとサイドカーは未確認）",
+              "evidence": "61回目とその作り直しの品質は 91 点（スキル interview-edit 手順6）",
+              "remaining": "production で書き出されたか（safe でないか）と、除外した固定減点が品質サイドカーに残るかは確かめていない。ループが最終書き出しの後に回る件（D-41）と書き出しモード（D-47）が残る → V2"
+            }
           },
           {
             "id": "R2.5-C3",
             "met": false,
             "verify": "python -m backend.revenue.artifact_gate --ai-effect",
-            "condition": "AI が編集に効いている（AI あり／なしの完成品の指紋が違い、差分が字幕とカットに出る）"
+            "condition": "AI が編集に効いている（AI あり／なしの完成品の指紋が違い、差分が字幕とカットに出る）",
+            "rejudged_2026_11": {
+              "date": "2026-11-10",
+              "judgement": "一部（字幕とカットに AI の出力が入っている。AI あり／なしの指紋の比較は未実行）",
+              "evidence": "Gemini の文字起こし・校閲の控え（_gemini_*・_proofread_*）から字幕が作られ、台帳の有無で版を比べた（job の zero／ledger）",
+              "remaining": "`artifact_gate --ai-effect` で AI あり／なしの完成品を比べた記録が無い → 11/17 以降 Opus"
+            }
           },
           {
             "id": "R2.5-C4",
             "met": false,
             "verify": "python -m backend.revenue.transcribe_check --gate",
-            "condition": "文字起こしが **Gemini 音声入力**で通り、Whisper との一致率（WER）が記録に残る。基準を下回ったら Whisper に切り替わる（切り替えの事実が記録に残る）"
+            "condition": "文字起こしが **Gemini 音声入力**で通り、Whisper との一致率（WER）が記録に残る。基準を下回ったら Whisper に切り替わる（切り替えの事実が記録に残る）",
+            "rejudged_2026_11": {
+              "date": "2026-11-10",
+              "judgement": "一部（主は Gemini 音声入力で通った。WER の記録と切り替えは未実装）",
+              "evidence": "本線を `--transcriber gemini` で走らせて完成（interview-edit）。ほかの聞き取りと食い違う字幕に印を付ける（review_flags の flag_with_readings）",
+              "remaining": "判定コマンド `backend.revenue.transcribe_check` がまだ無い。Whisper との一致率の記録と、基準割れでの切り替えも無い → 11/17 以降 Opus"
+            }
           },
           {
             "id": "R2.5-C5",
             "met": false,
             "verify": "python -m backend.verify_account --projects",
-            "condition": "**クラウドのセッションだけで** C1〜C4 が再現する（素材は GCS 等の読み口、実キーは環境シークレット。raw は読み取り専用）"
+            "condition": "**クラウドのセッションだけで** C1〜C4 が再現する（素材は GCS 等の読み口、実キーは環境シークレット。raw は読み取り専用）",
+            "rejudged_2026_11": {
+              "date": "2026-11-10",
+              "judgement": "一部（C1 の道はクラウドだけで再現した。C2〜C4 が未達なので全体は未達）",
+              "evidence": "raw を Drive から読み取り専用で取り（backend/raw_source.py）、クラウドの作業場で書き出して確認用ファイルを置いた（interview-edit・out は /mnt/project-files）",
+              "remaining": "C2〜C4 が満ちた後に、同じくクラウドだけで通ることを確かめる"
+            }
           }
         ],
         "limits": [
@@ -1683,7 +1972,8 @@
         "started_at": "2026-09-27",
         "budget_id": "plan-M2",
         "condition_notes": [
-          "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は法人 Workspace の Google Drive（GCS on avs-prod-paid でも Cloudflare R2 でもない。環境の方針は「Workspace 優先・GCP は足りないときだけ・将来はスマホ1台で完結」）。C5 の『GCS 等の読み口』は Drive を指す。憲法の第1回仕分け表を承認し、環境の階層の条文を改訂に加える（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める"
+          "**2026-09-27 のユーザー決定（M1g・R2 ゲート）**: R2 を通して R2.5 に着手。保管場所は法人 Workspace の Google Drive（GCS on avs-prod-paid でも Cloudflare R2 でもない。環境の方針は「Workspace 優先・GCP は足りないときだけ・将来はスマホ1台で完結」）。C5 の『GCS 等の読み口』は Drive を指す。憲法の第1回仕分け表を承認し、環境の階層の条文を改訂に加える（改訂文は別 PR で提案）。C1〜C3 の本物の置き場の確認は R2.5 の最初のローカル実走に含める",
+          "**2026-11-10 の判定し直し（V0）**: 10月の実績（qc_ledger の目視OK・edit_lock・品質 91 点）で C1〜C5 を判定し直した。条件文は変えていない。C1 は北原さんの目視で達成、C2〜C5 は一部。残りは V2（承認の門・書き出しモード）と 11/17 以降の Opus（transcribe_check・--ai-effect）で埋める。あわせて、範囲外としていた見出し・Shorts・サムネ・BGM のうち、見出し（番組の仕上げ）・Shorts 8本・サムネ P1 は10月に本線の外で作った（canon_repair_2026_11）"
         ]
       }
     },
@@ -1691,7 +1981,7 @@
       "_comment": "**凍結＝作業しない。壊さない。** 既存の静的ゲート群は回帰防止としてそのまま CI で動かし続けるが、これ以上磨かない（各軸 50% が天井で、収益化に寄与しないため）。",
       "P6": "Admin UX 保証。収益化に寄与しないので凍結。運用で必要になったら解凍する",
       "static_gates": "P1〜P5 で作った claim_audit / executor / ui_api / ui_api_closure / dead_code のゲートとラチェットは CI で動かし続ける（回帰防止）。**新しい検証機構は作らない**",
-      "trinity_roadmap": "trigger_score 70 に対して current 71.2 だが、収益化とは独立。凍結"
+      "trinity_roadmap": "trigger_score 70 に対して current 71.2 だが、収益化とは独立。凍結 ／ **2026-11-10 に検討中へ戻した**（roadmap.reconsider.trinity_council）"
     },
     "plan": {
       "_comment": "**完成度 100% 計画書（2026-09-26 ユーザー承認）。** フェーズ M0〜M8 と正典の R の対応。計画書は説明と見積もりで、正典が勝つ",
@@ -1715,6 +2005,28 @@
       },
       "definition_of_100": "G1〜G3 が met、週に長尺1本＋Shorts 2本を4週連続で実測維持、憲法の全条文が『必達で met』か『後送／削除で承認済み』。G4（YPP 到達）は北極星として残し到達目標",
       "constitution_revision": "ゲートごとに達成度で改訂（M1g・M5g・M8）。§6 議長権限は『承認が要るのは完成品の書き出し・投稿・課金』へ絞る方向で承認済み（2026-09-26）。**第1回の仕分け表は 2026-09-27 に承認**（docs/specs/2026-09-26-constitution-triage-draft.md）。改訂文は docs/specs/2026-09-27-constitution-revision-1.md に置き、憲法本文への適用はユーザー承認の PR で行う。**2026-09-27 追加**: 「環境の階層」（目標: スマホ1台で完結・Workspace 優先・GCP は足りないときだけ／現段階: PC＋ローカル、開発はクラウド）を新条文とし、§11・§13.1・§19.2・§19.4 のローカル前提を現段階の記述に格下げする"
+    },
+    "reconsider": {
+      "_comment": "**凍結から「検討中」に戻したもの**（2026-11-10 北原さん決定「いま技術的にできるなら検討に戻してよい」）。凍結の理由は「技術的に難しい」ではなく「収益化に効かない」（2026-08-15）で、10月に前提が変わった。本当の壁は『作れない』ではなく『効いたかを測れない』で、測る材料は久木田回でそろった。**解凍そのもの（フェーズに入れる順番）は北原さんが決める**",
+      "decided_at": "2026-11-10",
+      "items": {
+        "soul_auto_evolution": {
+          "status": "検討中",
+          "was": "凍結（収益化に効かない・2026-08-15）。加えて実走で検証済みの事実を 10件 → 0件にした（D-44）。学習の副作用は AVS_SKIP_LEARNING_SIDE_EFFECTS=1 で止めてある（feature_gaps の dream_learning）",
+          "why_now": "学ぶ材料ができた: 編集の決まり30件（edit_standards.json）、字幕の校正台帳（reviews/）、見本から選んだ理由の記録（スキル program-style）",
+          "prerequisite": "D-44 を「消さず足すだけ」の学習に直す。直すまで学習は止めたまま",
+          "next": "11/16（予備日・Fable）に解凍設計を作る",
+          "measure": "2本目の対談で『1本目の直しが最初から効いている』か。物差しは北原さんの直しの回数と作業時間（1本目は61回の書き出し）"
+        },
+        "trinity_council": {
+          "status": "検討中",
+          "was": "凍結（trinity_roadmap: 収益化とは独立）。本線の実走に含まれず、本番では一度も実行されていない",
+          "why_now": "評議する対象ができた: Shorts の場面・キャッチ、サムネ案、題など『案から選ぶ』場面",
+          "role": "北原さんに見せる前に案を評議して絞る役として、V2 の承認フローの手前に置く案",
+          "next": "11/16（予備日・Fable）に、何を評議して何を北原さんに渡すかの設計を作る",
+          "billing": "実行のたびに AI を複数回呼ぶので無料枠の範囲で試す。課金が要る形になるなら先に予算を相談する（憲法第3条）"
+        }
+      }
     }
   },
   "verification_policy": {
@@ -1771,5 +2083,26 @@
       "why": "両方を実走させて決めた。agents 側は preview+final の2段レンダリング・カテゴリ別品質評価・7つの実 worker を持ち、HTTP API が呼ぶのもこちら。video_pipeline（R1 で硬化）は速い（53秒 vs 113秒）が作り込みが浅い。**R1 のガード（実行記録・_require_success・成果物ゲート）は本線へ移植する。**video_pipeline は検証用の基準実装として凍結する",
       "evidence": "agents 実走: 10工程完走 / 113.4秒 / final 23.17秒 video+audio 2.9MB + preview 6.6MB / 品質スコア50点（カテゴリ別内訳あり）/ **LLM は全て 404 で台帳の増分 0 bytes**"
     }
+  },
+  "canon_repair_2026_11": {
+    "_comment": "**2026-11-10 の正典の修復（V0）。** 最終監査（2026-09-19）のあと、10月の実績が正典に入っていなかった。憲法第5条（台帳が食い違ったら実装を止めて正典の修復を優先する）により、V1 の前に直す。**実現度スコアは再計算していない**（次の /vision-audit で測る）。条件文は変えていない。変えたのは判定・優先度・再開条件だけで、マージ＝北原さんの承認",
+    "date": "2026-11-10",
+    "source": "診断書「動画スタジオ 完成見込み診断（F1）」2026-11-10（main 3034371 を読んで作成）",
+    "approved_by": "北原さん（PR のマージで承認。未マージの間は案）",
+    "october_results": [
+      "久木田ヒロノブ回（raw 4本の結合・約43分）を 2026-10-05〜19 に61回書き出し、v61 を 2026-10-20、v62（ロゴなし）を 2026-10-23 に北原さんが目視OK（backend/config/qc_ledger.json）",
+      "承認した編集を固定し、AI を呼ばずに raw から同じ字幕で作り直せる（backend/subtitle_engine/edit_lock.py）。61回目を控えから作り直して字幕が1字も違わず、品質も同じ 91 点（スキル interview-edit 手順6）",
+      "編集の決まり30件を台帳とテストにした（backend/config/edit_standards.json）",
+      "番組の仕上げ v63〜v66（番組 OP・章の見出し・名前のポップ・補足テロップ・ED）、Shorts 8本と投稿順、サムネ P1 構成を AI なし・0円で作成（backend/program_package/）",
+      "手順を8つのスキルにした（interview-edit・caption-review・edit-standards・program-package・shorts-cut・episode-finish・program-style・drive-layout）",
+      "予算: 累計 ¥740 前後。R2.5 の枠（plan-M2・¥1,500）のうち ¥638.97 を使用（.claude/budget.json）"
+    ],
+    "gap_found": "10月の成果は本線（pipeline_coordinator と7つの worker）の外に、番組化の道具として積み上がった。道具の入力（backend/config/episode・shorts・thumbnails の指定ファイル）は、人と Claude が映像を見て手で書いている。ここを機械の目に置き換えるのが V1〜V5（2026-11-11〜15）",
+    "deferral_rule": "**「やめる」「削除で閉じる」は使わない**（2026-11-10 北原さん決定）。優先度を下げる（後送）のは可。後送には必ず再開のきっかけ（resume_when）を書き、理想の形・最高品質の目標からは何も外さない",
+    "triage_counts": {
+      "feature_gaps": "未実装14件 = Fable 2 / Opus 6 / 後送 6（intentional の dream_learning は数えない）",
+      "backlog": "未解決36件（open 34・tested 2）= Fable 7（V2）/ Opus 19 / 後送 10"
+    },
+    "next": "V1〜V5（Fable・2026-11-11〜15）→ 11/16 予備日に Soul と評議会の解凍設計 → 11/17 以降 Opus"
   }
 }
