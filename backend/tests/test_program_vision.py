@@ -20,9 +20,13 @@ ROOT = Path(__file__).resolve().parents[2]
 SPEC = ROOT / "backend" / "config" / "episode" / "20250922_久木田ヒロノブ.json"
 
 
+def real_fonts() -> bool:
+    return all((ep.th.FONT_DIR / f).exists() for f in ep.th.FONTS.values())
+
+
 @pytest.fixture
 def fonts(monkeypatch):
-    if not all((ep.th.FONT_DIR / f).exists() for f in ep.th.FONTS.values()):
+    if not real_fonts():
         monkeypatch.setattr(ep.th, "font", lambda key, size: ImageFont.load_default(size))
 
 
@@ -154,6 +158,9 @@ def test_measured_heads_overlap_the_hand_measured_ones():
 
 def test_the_approved_pops_do_not_cover_the_measured_heads(fonts):
     pytest.importorskip("cv2")
+    if not real_fonts():
+        # 承認済みの位置は本番の書体の字の形で決めたもの。代わりの書体では札の形が変わり、同じ位置でも別の絵になる
+        pytest.skip("本番の書体（backend/data/fonts）が無い所では、承認済みの札の形を再現できない")
     m = v.load(REAL)
     for pop in spec()["name_pops"]:
         alpha = np.asarray(ep.pop_card(pop))[..., 3]
