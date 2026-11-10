@@ -124,12 +124,12 @@ def head_box(face: list[int], marks: list[int] | None = None) -> list[int]:
     """
     x0, y0, x1, y1 = face
     w, h = x1 - x0, y1 - y0
-    l, t, r, b = HEAD_PAD
+    left, top, right, bottom = HEAD_PAD
     if marks:
         turn = (marks[4] - (x0 + x1) / 2) / max(1, w)  # 鼻が右に寄る＝右向き＝後ろ頭は左
-        l += BACK_PAD * min(1.0, max(0.0, turn * 4))
-        r += BACK_PAD * min(1.0, max(0.0, -turn * 4))
-    return [max(0, round(x0 - l * w)), max(0, round(y0 - t * h)), min(W, round(x1 + r * w)), min(H, round(y1 + b * h))]
+        left += BACK_PAD * min(1.0, max(0.0, turn * 4))
+        right += BACK_PAD * min(1.0, max(0.0, -turn * 4))
+    return [max(0, round(x0 - left * w)), max(0, round(y0 - top * h)), min(W, round(x1 + right * w)), min(H, round(y1 + bottom * h))]
 
 
 def motion_of(prev: np.ndarray | None, cur: np.ndarray) -> float:
