@@ -5292,6 +5292,57 @@
     "scored=?",
     "scored=?"
    ]
+  },
+  {
+   "id": "backend/program_package/vision.py::Eye.faces",
+   "file": "backend/program_package/vision.py",
+   "symbol": "Eye.faces",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "`score` は顔検出器（YuNet）が返す**検出の確からしさ**をそのまま載せているだけ。動画の品質スコアではなく、既定値も作らない（顔が無ければ空のリスト）。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::face_quality",
+   "file": "backend/program_package/vision.py",
+   "symbol": "face_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "サムネの人物コマの**候補を並べる順位づけ**の点。入力の顔の実測値（大きさ・向き・口の幅）から計算し、定数を返す経路は無い。動画の品質スコアとして外に出さず、選ぶのは人。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::main",
+   "file": "backend/program_package/vision.py",
+   "symbol": "main",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "コマンドの入口。定数の return は**終了コード**（0=できた・1=掛かる飾りや未決がある／VisionError）で、数字の成果を作らない。`except VisionError` はエラー文を出して 1 を返す（成功を装わない）。`score` は thumbs の候補の表示だけ。",
+   "fingerprint": [
+    "const_return",
+    "const_return",
+    "const_return",
+    "const_return",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/program_package/vision.py::steady_heads",
+   "file": "backend/program_package/vision.py",
+   "symbol": "steady_heads",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "`score` は顔検出の確からしさで、しきい値未満の顔を捨てるのに使うだけ。返すのは頭の矩形のリストで、品質の数字を作らない。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::thumb_candidates",
+   "file": "backend/program_package/vision.py",
+   "symbol": "thumb_candidates",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "サムネ候補の一覧を作る。`score` は face_quality の実測の点 × 動きの小ささで、地図に顔が無ければ空のリストを返す（既定の点は無い）。動画の品質スコアではない。",
+   "fingerprint": []
   }
  ]
 }

@@ -447,7 +447,7 @@ def face_quality(f: dict) -> float:
 
 def thumb_candidates(m: dict, side: str, n: int = 12, apart: float = 20.0) -> list[dict]:
     """左（left）か右（right）の人の、サムネ向きのコマの候補。時刻が近いものは1つにする。"""
-    scored = []
+    found = []
     rows = m["frames"]
     for i, r in enumerate(rows):
         if r.get("board") or r["motion"] >= CUT_MOTION:
@@ -456,9 +456,9 @@ def thumb_candidates(m: dict, side: str, n: int = 12, apart: float = 20.0) -> li
         for f in r["faces"]:
             cx = (f["box"][0] + f["box"][2]) / 2
             if (cx < W / 2) == (side == "left"):
-                scored.append({"t": r["t"], "score": round(face_quality(f) * (0.7 + 0.3 * still), 4), "box": f["box"]})
+                found.append({"t": r["t"], "score": round(face_quality(f) * (0.7 + 0.3 * still), 4), "box": f["box"]})
     picked: list[dict] = []
-    for c in sorted(scored, key=lambda c: -c["score"]):
+    for c in sorted(found, key=lambda c: -c["score"]):
         if all(abs(c["t"] - p["t"]) >= apart for p in picked):
             picked.append(c)
             if len(picked) == n:
