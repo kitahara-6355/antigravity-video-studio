@@ -37,7 +37,7 @@ description: 目視OKの対談の完成版に、番組の飾り（番組 OP・�
 | `chapters_skip` | 見出しを出さない章（エンディング） | **第1章も出す**（本編の頭から） |
 | `chapters_right` | 右上に寄せる章（番号） | 聞き手一人の場面は頭が左上に来るので、第1章は右上 |
 | `chapter_seconds` | 章の見出しを出す秒数 | **8秒**（4秒は短すぎると言われた） |
-| `name_pops` | `at`・`seconds`・`y`・`right`（右端の x）・`lines`（肩書き）・`name`・`pitch`（肩書きの行間）・`size`（名前の大きさ）・`avoid`（頭の来る所の四角） | 聞き手のあいさつ・ゲストの紹介の所。肩書きは**本編で紹介した言葉どおり**。**出している秒の間のコマを1秒ごとに並べ、カメラの寄り引きや身を乗り出す動きも含めて頭の来る所を測って `avoid` に書く**。ポップが1画素でも掛かるとテストが落ちる（`pop_hits`）。壁が狭ければ `pitch`・`size` で詰める |
+| `name_pops` | `at`・`seconds`・`y`・`right`（右端の x）・`lines`（肩書き）・`name`・`pitch`（肩書きの行間）・`size`（名前の大きさ）・`avoid`（頭の来る所の四角） | 聞き手のあいさつ・ゲストの紹介の所。肩書きは**本編で紹介した言葉どおり**。**頭の来る所（`avoid`）は映像から自動で測る**（下の「頭の来る所を自動で測る」。2026-11-10 までは、出している秒の間のコマを1秒ごとに並べて人が測っていた）。ポップが1画素でも掛かるとテストが落ちる（`pop_hits`）。壁が狭ければ `pitch`・`size` で詰める |
 | `telops` | `at`（秒）・`head`（言葉）・`body`（説明。改行可） | 知らないと分かりにくい固有名詞・専門語。字幕の言い方から外れない。**他社の画像・ロゴは使わない** |
 | `ending` | 秒数（20）・プレゼントの告知（`{deadline}` に締切が入る）・`publish_date`（公開日）・`deadline_days`（14）・登録の呼びかけ | **締切は公開日の2週間後**。公開日が決まったら `publish_date` を入れて書き出し直す。未定のうちは `【未定】` と出る（投稿用には書き出さない） |
 
@@ -79,6 +79,26 @@ python -m backend.program_package.episode SPEC.json --out OUT
 
 - 曲: 北原さんが作る YouTube・商用可のオリジナル曲 → `program_opening.music` を差し替え、曲の盛り上がりが番組名の出る所（言葉の枚数×`slide_seconds`）に来るよう `start` を合わせる
 - 番組 OP の文字: **美麗さんの手書きの映像**に差し替えて唯一無二の OP にする。今の OP（見本 `examples/番組OP_書き足し.jpg`）の流れ（1枚3.5秒・左から右へ書き進める・最後に番組名）に合わせて撮ると、そのまま置き換えられる
+
+
+## 頭の来る所を自動で測る（映像を見る目・0円）
+
+`backend/program_package/vision.py`。顔の検出（OpenCV の YuNet・CPU）で、完成版の全コマの頭の位置を
+「地図」に残し、そこから飾りの置き場を決める。AI は呼ばない。
+
+```
+python -m backend.program_package.vision scan 完成版.mp4 --out map.json     # 42分で1〜2分
+python -m backend.program_package.vision check SPEC.json --map map.json      # 頭に掛かる飾りの一覧（無ければ 0）
+python -m backend.program_package.vision place SPEC.json --map map.json      # 置き直しの案（--write で書き換え）
+python -m backend.program_package.vision sheet 完成版.mp4 --map map.json --at 45 --seconds 8 --out a.jpg
+python -m backend.program_package.vision thumbs --map map.json               # サムネの人物コマの候補（左右）
+```
+
+- `place` は、名前のポップの `avoid` を測った値に入れ替え、掛かるなら頭の近くの壁へ置き直す
+  （文字は大きいまま置ける所が先。無ければ `pitch`・`size` を詰める）。章の見出しは左上で頭に掛かれば右上へ
+- 置けなかったものは「未決」と出る。**無理に置かない。** `sheet` の一覧を見て人が決める
+- `sheet` は測った頭（緑）と頭の来る所（赤）をコマに重ねる。北原さんに見せる確認用
+- 確認用の 360p でも測れる（座標は 1280x720 に直る）
 
 ## 見本の絵
 
