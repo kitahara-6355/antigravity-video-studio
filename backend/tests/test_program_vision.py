@@ -49,16 +49,16 @@ def make_map(rows, fps=2.0):
 
 def test_head_box_covers_the_hair_above_and_beside_the_face():
     x0, y0, x1, y1 = v.head_box([500, 300, 600, 420])
-    assert x0 < 500 and x1 > 600 and y0 <= 300 - 60 and y1 >= 420
+    assert x0 < 500 and x1 > 600 and y0 <= 300 - 40 and y1 >= 420
 
 
 def test_head_box_widens_toward_the_back_of_a_turned_head():
     # 鼻が右に寄っている＝右向き。後ろ頭（髪）は左に出るので、左を広く取る
     front = v.head_box([500, 300, 600, 420])
     turned = v.head_box([500, 300, 600, 420], face(500, 300, 600, 420, nose=585)["marks"])
-    assert turned[0] < front[0] and turned[2] == front[2]
+    assert turned[0] < front[0] and turned[2] < front[2]  # 顔の向いている側は狭める
     other = v.head_box([500, 300, 600, 420], face(500, 300, 600, 420, nose=515)["marks"])
-    assert other[2] > front[2] and other[0] == front[0]
+    assert other[2] > front[2] and other[0] > front[0]
 
 
 # ---- 頭の来る所 ----
@@ -138,6 +138,41 @@ def test_place_leaves_a_pop_alone_when_no_face_is_seen(fonts):
     assert r["unplaced"]
 
 
+# ---- 実測（久木田回 v62 の地図の抜粋）----
+
+REAL = ROOT / "backend" / "tests" / "fixtures" / "vision" / "20250922_久木田ヒロノブ_v62_抜粋.json"
+
+
+def test_measured_heads_overlap_the_hand_measured_ones():
+    # 人が測った avoid（久木田さん・身を乗り出した久木田さん・美麗さん）のどれにも、機械の測った所が重なる
+    guest = next(p for p in spec()["name_pops"] if p["name"] == "久木田ヒロノブ")
+    zones = v.head_zones(v.load(REAL), guest["at"], guest["seconds"])
+    assert len(zones) == 2  # 左の人と右の人
+    for hand in guest["avoid"]:
+        assert any(v._iou(hand, z) > 0.2 for z in zones), hand
+
+
+def test_the_approved_pops_do_not_cover_the_measured_heads(fonts):
+    pytest.importorskip("cv2")
+    m = v.load(REAL)
+    for pop in spec()["name_pops"]:
+        alpha = np.asarray(ep.pop_card(pop))[..., 3]
+        assert v.covered(alpha, v.head_mask(m, pop["at"], pop.get("seconds", 7.0))) is None, pop["name"]
+
+
+def test_pops_placed_from_scratch_on_the_real_map_stay_off_the_heads(fonts):
+    pytest.importorskip("cv2")
+    m = v.load(REAL)
+    s = {"name_pops": [{k: x for k, x in p.items() if k not in ("avoid", "avoid_note", "right", "pitch", "size")} | {"y": 300}
+                       for p in spec()["name_pops"]]}
+    r = v.place(s, m, [])
+    assert not r["unplaced"]
+    for pop in r["spec"]["name_pops"]:
+        assert pop["avoid"] and not ep.pop_hits(pop), pop["name"]
+        alpha = np.asarray(ep.pop_card(pop))[..., 3]
+        assert v.covered(alpha, v.head_mask(m, pop["at"], pop.get("seconds", 7.0), v.NEAR_MARGIN)) is None
+
+
 # ---- 章の見出し・テロップ ----
 
 def test_chapter_heading_moves_to_the_right_when_a_head_is_at_the_top_left(fonts):
@@ -155,8 +190,18 @@ def test_check_lists_an_overlay_that_covers_a_head(fonts):
     s = {"telops": [{"at": 1.0, "head": "文房四宝", "body": "筆・墨・硯・紙の4つの道具"}]}
     rows = [[face(560, 70, 680, 210)] for _ in range(20)]  # 上の真ん中に頭
     bad = v.check(s, make_map(rows), [])
-    assert [b["kind"] for b in bad] == ["telop"]
+    assert [(b["kind"], b["level"]) for b in bad] == [("telop", "掛かる")]
     assert not v.check(s, make_map([[face(300, 300, 370, 400)] for _ in range(20)]), [])
+
+
+def test_check_tells_a_near_miss_from_a_real_overlap(fonts):
+    s = {"telops": [{"at": 1.0, "head": "文房四宝", "body": "筆・墨・硯・紙の4つの道具"}]}
+    bottom = ep.telop_card("文房四宝", "筆・墨・硯・紙の4つの道具").getbbox()[3]
+    top = bottom + 6  # 頭のてっぺんがテロップのすぐ下
+    rows = [[face(590, top + 42, 690, top + 142)] for _ in range(20)]
+    assert v.head_box([590, top + 42, 690, top + 142])[1] == top
+    found = v.check(s, make_map(rows), [])
+    assert [b["level"] for b in found] == ["近い"]
 
 
 # ---- 地図 ----

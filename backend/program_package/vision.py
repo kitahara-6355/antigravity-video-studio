@@ -39,7 +39,10 @@ SCAN_WIDTH = 960      # 顔を探すときの横幅。360p の確認用でも顔
 MIN_SCORE = 0.6
 FLOOR = 560           # 頭の来る所は、頭からこの高さまで（体）を含める。これより下は字幕の所
 CUT_MOTION = 0.12     # 動きがこれを超えたら場面の切れ目とみなす
-HEAD_PAD = (0.32, 0.62, 0.32, 0.12)  # 顔の矩形から頭（髪）へ広げる割合: 左・上・右・下
+HEAD_PAD = (0.22, 0.42, 0.22, 0.12)  # 顔の矩形から頭（髪）へ広げる割合: 左・上・右・下
+CHECK_MARGIN = 0                     # 掛かるかどうかは測った頭そのもので見る（置き場を探すときは 14 の余白）
+NEAR_MARGIN = 12                     # 頭までこの距離より近い飾りは「近い」として知らせる
+FRONT_TRIM = 0.14                    # 横向きのとき、顔の向いている側を狭める割合
 BACK_PAD = 0.35                      # 横向きのとき、後ろ頭の側へさらに広げる割合
 
 
@@ -127,8 +130,10 @@ def head_box(face: list[int], marks: list[int] | None = None) -> list[int]:
     left, top, right, bottom = HEAD_PAD
     if marks:
         turn = (marks[4] - (x0 + x1) / 2) / max(1, w)  # 鼻が右に寄る＝右向き＝後ろ頭は左
-        left += BACK_PAD * min(1.0, max(0.0, turn * 4))
-        right += BACK_PAD * min(1.0, max(0.0, -turn * 4))
+        back_left, back_right = min(1.0, max(0.0, turn * 4)), min(1.0, max(0.0, -turn * 4))
+        # 後ろ頭の側は広く、顔の向いている側は狭く（顔の矩形が鼻先まで含んでいる）
+        left += BACK_PAD * back_left - FRONT_TRIM * back_right
+        right += BACK_PAD * back_right - FRONT_TRIM * back_left
     return [max(0, round(x0 - left * w)), max(0, round(y0 - top * h)), min(W, round(x1 + right * w)), min(H, round(y1 + bottom * h))]
 
 
@@ -142,22 +147,21 @@ def motion_of(prev: np.ndarray | None, cur: np.ndarray) -> float:
 def board_box(bgr: np.ndarray) -> list[int] | None:
     """色紙や作品（白い紙に墨）が大きく映っていれば、その矩形（1280x720）。無ければ None。
 
-    白くて四角く、中に墨（暗い所）がある大きな面を探す。白い上着は四角くないので外れる。
+    白くて四角く、中に墨（暗い所）がある大きな面を探す。墨で欠けた所は面の内側として数える
+    （外側の輪郭で見る）。白い上着や明るい机は、四角くないか白さが足りないので外れる。
     """
     import cv2
     h, w = bgr.shape[:2]
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-    white = ((hsv[..., 2] > 185) & (hsv[..., 1] < 45)).astype(np.uint8)
-    white = cv2.morphologyEx(white, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
-    n, _, stats, _ = cv2.connectedComponentsWithStats(white, 8)
+    white = ((hsv[..., 2] > 200) & (hsv[..., 1] < 35)).astype(np.uint8)
+    white = cv2.morphologyEx(white, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    contours, _ = cv2.findContours(white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     best = None
-    for i in range(1, n):
-        x, y, bw, bh, area = (int(v) for v in stats[i])
+    for c in contours:
+        x, y, bw, bh = cv2.boundingRect(c)
         if bw * bh < 0.04 * w * h or bw < 0.12 * w or bh < 0.2 * h:
             continue
-        fill = area / (bw * bh)
-        aspect = bw / bh
-        if fill < 0.85 or not (0.45 <= aspect <= 2.2):
+        if cv2.contourArea(c) / (bw * bh) < 0.85 or not (0.45 <= bw / bh <= 2.2):
             continue
         gray = cv2.cvtColor(bgr[y:y + bh, x:x + bw], cv2.COLOR_BGR2GRAY)
         ink = float((gray < 90).mean())
@@ -280,6 +284,28 @@ def head_zones(m: dict, at: float, seconds: float, margin: int = 14, floor: int 
             for z in sorted(zones)]
 
 
+def head_mask(m: dict, at: float, seconds: float, margin: int = CHECK_MARGIN) -> np.ndarray:
+    """時刻 at から seconds 秒のあいだに頭が通る所（1280x720 の真偽の絵）。
+
+    頭は矩形ではなく丸いので、頭の矩形に内接する楕円で見る。矩形の角に文字の端が
+    触れただけのものを「掛かる」と言わないため。
+    """
+    import cv2
+    mask = np.zeros((H, W), np.uint8)
+    for x0, y0, x1, y1 in steady_heads(window(m, at, seconds)):
+        cv2.ellipse(mask, ((x0 + x1) // 2, (y0 + y1) // 2), ((x1 - x0) // 2 + margin, (y1 - y0) // 2 + margin),
+                    0, 0, 360, 255, -1)
+    return mask > 0
+
+
+def covered(alpha: np.ndarray, mask: np.ndarray) -> list[int] | None:
+    """飾り（透明度）が頭に掛かる所の矩形。掛からなければ None。"""
+    ys, xs = np.where((alpha > 0) & mask)
+    if len(xs) < 12:  # 縁取りの数画素は数えない
+        return None
+    return [int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1]
+
+
 def people(m: dict, at: float, seconds: float) -> dict[str, list[int]]:
     """区間にいる人の頭（まとめた矩形）。画面の左半分にいれば left、右半分なら right。"""
     out: dict[str, list[int]] = {}
@@ -364,15 +390,16 @@ def _bbox(im) -> list[int] | None:
 
 
 def check(spec: dict, m: dict, body: list[tuple[float, str]]) -> list[dict]:
-    """飾りが頭に掛かる所の一覧（空なら掛からない）。"""
-    bad = []
+    """飾りが頭に掛かる所（level「掛かる」）と、掛からないが頭のすぐそばの所（「近い」）の一覧。"""
+    out = []
     for o in overlay_times(spec, body):
-        zones = head_zones(m, o["at"], o["seconds"], floor=0)  # 掛かるかどうかは頭そのもので見る
-        a = np.asarray(o["card"]())[..., 3]
-        hits = [z for z in zones if a[z[1]:z[3], z[0]:z[2]].any()]
-        if hits:
-            bad.append({"kind": o["kind"], "label": o["label"], "at": o["at"], "hits": hits})
-    return bad
+        alpha = np.asarray(o["card"]())[..., 3]
+        for level, margin in (("掛かる", CHECK_MARGIN), ("近い", NEAR_MARGIN)):
+            hit = covered(alpha, head_mask(m, o["at"], o["seconds"], margin))
+            if hit:
+                out.append({"kind": o["kind"], "label": o["label"], "at": o["at"], "level": level, "hits": [hit]})
+                break
+    return out
 
 
 def place(spec: dict, m: dict, body: list[tuple[float, str]]) -> dict:
@@ -388,8 +415,8 @@ def place(spec: dict, m: dict, body: list[tuple[float, str]]) -> dict:
     # 章の見出し
     right = set(new.get("chapters_right", []))
     for o in [o for o in overlays if o["kind"] == "chapter"]:
-        zones = head_zones(m, o["at"], o["seconds"], floor=0)
-        free = {r: not _hit(np.asarray(o["card"](right=r))[..., 3], zones) for r in (False, True)}
+        heads = head_mask(m, o["at"], o["seconds"])
+        free = {r: covered(np.asarray(o["card"](right=r))[..., 3], heads) is None for r in (False, True)}
         want = (o["n"] in right)
         if not free[want] and free[not want]:
             (right.add if not want else right.discard)(o["n"])
@@ -420,6 +447,9 @@ def place(spec: dict, m: dict, body: list[tuple[float, str]]) -> dict:
             if measured.get("avoid") != pop.get("avoid"):
                 changes.append(f"{pop['name']}: avoid を測った値に（置き場はそのまま）")
             continue
+        if pop.get("avoid") and not _hit(np.asarray(ep.pop_card(pop))[..., 3], busy) and \
+                covered(np.asarray(ep.pop_card(pop))[..., 3], head_mask(m, at, sec)) is None:
+            continue  # 余白は狭いが、測った頭そのものには掛からない。人が決めた置き場を動かさない
         placed = place_pop(measured, zones, who.get(side) if side else None, busy)
         if placed:
             new["name_pops"][i] = placed
@@ -550,10 +580,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
         if a.cmd == "check":
-            bad = check(spec, m, _body(spec))
-            for b in bad:
-                print(f"掛かる: {b['label']}（{b['at']:.1f} 秒）{b['hits']}")
-            print("頭に掛かる飾りはありません" if not bad else f"{len(bad)} 件")
+            found = check(spec, m, _body(spec))
+            for b in found:
+                print(f"{b['level']}: {b['label']}（{b['at']:.1f} 秒）{b['hits']}")
+            bad = [b for b in found if b["level"] == "掛かる"]
+            print("頭に掛かる飾りはありません" if not bad else f"掛かる {len(bad)} 件")
             return 1 if bad else 0
         r = place(spec, m, _body(spec))
         for c in r["changes"]:
