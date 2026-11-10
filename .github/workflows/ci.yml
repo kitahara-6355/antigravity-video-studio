@@ -43,7 +43,7 @@ env:
 jobs:
   test:
     name: Python テストスイート
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 2026-11: ubuntu-latest が 26.04 になり ffmpeg の時刻テストが崩れたため固定
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -268,7 +268,7 @@ jobs:
 
   lint:
     name: コード品質ラチェット
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 2026-11: ubuntu-latest が 26.04 になり ffmpeg の時刻テストが崩れたため固定
     timeout-minutes: 10
 
     steps:
@@ -329,7 +329,7 @@ jobs:
 
   outside-testpaths:
     name: testpaths 外の退行検知
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 2026-11: ubuntu-latest が 26.04 になり ffmpeg の時刻テストが崩れたため固定
     # 1ファイルずつ×2版なので本体のテストジョブより長くなりうる。
     # 本体と並列に走るので、全体の所要は伸びない。
     timeout-minutes: 120
@@ -369,7 +369,7 @@ jobs:
 
   security:
     name: シークレットスキャン
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 2026-11: ubuntu-latest が 26.04 になり ffmpeg の時刻テストが崩れたため固定
     timeout-minutes: 10
 
     steps:
