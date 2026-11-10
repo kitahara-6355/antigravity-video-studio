@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import ImageFont
+from PIL import Image, ImageFont
 
 from backend.program_package import episode as ep
 from backend.program_package import vision as v
@@ -157,14 +157,15 @@ def test_measured_heads_overlap_the_hand_measured_ones():
 
 
 def test_the_approved_pops_do_not_cover_the_measured_heads(fonts):
+    """承認済みの札の形は本番の書体で決まる。書体の無い所でも確かめられるよう、本番の書体で描いた形を控えてある。"""
     pytest.importorskip("cv2")
-    if not real_fonts():
-        # 承認済みの位置は本番の書体の字の形で決めたもの。代わりの書体では札の形が変わり、同じ位置でも別の絵になる
-        pytest.skip("本番の書体（backend/data/fonts）が無い所では、承認済みの札の形を再現できない")
     m = v.load(REAL)
-    for pop in spec()["name_pops"]:
-        alpha = np.asarray(ep.pop_card(pop))[..., 3]
-        assert v.covered(alpha, v.head_mask(m, pop["at"], pop.get("seconds", 7.0))) is None, pop["name"]
+    for i, pop in enumerate(spec()["name_pops"]):
+        kept = np.asarray(Image.open(REAL.parent / f"pop_{i}.png").convert("L"))
+        assert v.covered(kept, v.head_mask(m, pop["at"], pop.get("seconds", 7.0))) is None, pop["name"]
+        if real_fonts():  # 控えが今の描き方とずれていないか
+            live = np.asarray(ep.pop_card(pop))[..., 3] > 0
+            assert (live != (kept > 0)).mean() < 0.001, pop["name"]
 
 
 def test_pops_placed_from_scratch_on_the_real_map_stay_off_the_heads(fonts):
