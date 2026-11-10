@@ -154,7 +154,8 @@ def test_解決器が食い違ったら点検が落ちる(monkeypatch, 枠は空
 
 def test_解決器を確かめられなければ点検が落ちる(monkeypatch, 枠は空いている):
     """**確かめられないことを緑にしない。**"""
-    monkeypatch.delattr(model_governance, "_resolve_declared", raising=False)
+    # 解決器はクラスのメソッドなので、クラスの側で消す（インスタンスの delattr は
+    # pytest 9 から「インスタンスに無い」と AttributeError になる）
     monkeypatch.setattr(type(model_governance), "_resolve_declared", None,
                         raising=False)
 
