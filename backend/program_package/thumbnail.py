@@ -256,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
     raw, out = Path(a.raw), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     if a.options:
-        options(spec, raw).save(out / "切り抜き候補.jpg", quality=90)
+        options(spec, raw).save(out / "切り抜き_候補.jpg", quality=90)
     picks = [a.pick] if a.pick else spec.get("chosen", [])
     s = spec["shikishi"]
     board = frame(spec, raw, s["at"]).crop(tuple(s["crop"]))
