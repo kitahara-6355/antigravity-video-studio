@@ -5,6 +5,8 @@
     "pix_fmt": ["yuv420p"],
     "pix_fmt_why": "yuv444p になると Windows の標準プレーヤー・ブラウザ・スマホで映像が出ない（2026-10-05 北原さん報告）",
     "av_gap_max_seconds": 0.5,
+    "review_gap_max_seconds": 1.0,
+    "review_gap_why": "確認用は同じ書き出しの縮小版のはず。長さが違えば別の版なので、承認の材料にしない",
     "loudness_lufs": [-24.0, -10.0],
     "loudness_why": "本線の書き出しは -16 LUFS に揃える。YouTube は -14 LUFS より大きい音を下げる。大きく外れたら音量の事故",
     "true_peak_max_dbfs": 1.0,

@@ -410,6 +410,11 @@ class RenderWorker(PipelineStageWorker):
                 from logo_overlay import LogoOverlay
                 overlay = LogoOverlay()
                 temp_logo_out = final_path + ".logo.mp4"
+                # ロゴを重ねると映像をもう一度焼く。書き出しと同じ設定で焼き、そのことを記録に残す（D-47）
+                used = getattr(ctx, "render_encode", None) or {}
+                logo_args = list(used.get("args") or []) or None
+                if used:
+                    used["logo"] = {"reencoded": True, "args": logo_args or "既定（medium・crf23）"}
                 overlay.apply_logo(
                     input_video=final_path,
                     logo_path=logo_path,
@@ -417,6 +422,7 @@ class RenderWorker(PipelineStageWorker):
                     position=logo_position,
                     opacity=logo_opacity,
                     target_height=logo_height,
+                    video_args=logo_args,
                 )
                 if Path(temp_logo_out).exists():
                     shutil.move(temp_logo_out, final_path)

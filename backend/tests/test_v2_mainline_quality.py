@@ -185,3 +185,38 @@ def test_proposal_and_trace_say_whether_the_loop_worked(tmp_path):
     plain = _run_with_proposal(tmp_path / "b")
     assert json.loads((plain / "proposal.json").read_text(encoding="utf-8"))["quality_loop"] is None
     assert "改善ループ" not in ag.trace(plain)[1]
+
+
+def test_logo_overlay_reencodes_with_the_mode_setting_and_records_it(monkeypatch, tmp_path):
+    """ロゴを重ねる焼き直しが、production の設定を medium/crf23 に戻さない（gate-verifier 1 周目の反例 4）。"""
+    import logo_overlay
+    import logo_policy
+    from agents.workers.render_worker import RenderWorker
+
+    calls = []
+
+    class FakeOverlay:
+        def apply_logo(self, **kw):
+            calls.append(kw)
+            Path(kw["output_path"]).write_bytes(b"x")
+            return kw["output_path"]
+
+    monkeypatch.setattr(logo_policy, "logo_enabled", lambda: True)
+    monkeypatch.setattr(logo_overlay, "LogoOverlay", FakeOverlay)
+    final = tmp_path / "final.mp4"
+    final.write_bytes(b"v")
+    args = ["-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p"]
+    ctx = SimpleNamespace(render_encode={"mode": "production", "encode": "quality", "args": args, "fallback": False})
+    RenderWorker()._overlay_logo(str(final), ctx)
+    if not calls:
+        pytest.skip("ロゴの画像が無い（branding/logos/brand_logo.png）")
+    assert calls[0]["video_args"] == args
+    assert ctx.render_encode["logo"] == {"reencoded": True, "args": args}
+
+
+def test_logo_overlay_default_encode_is_unchanged_for_other_callers():
+    import inspect
+
+    import logo_overlay
+
+    assert inspect.signature(logo_overlay.LogoOverlay.apply_logo).parameters["video_args"].default is None

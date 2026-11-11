@@ -699,6 +699,9 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
         if enc:
             lines.append("  エンコード    : " + ("**焼き直せず、プレビューの写し**" if enc.get("fallback")
                                               else f"{enc.get('encode')}（{' '.join(enc.get('args') or [])}）"))
+            if enc.get("logo"):
+                a = enc["logo"].get("args")
+                lines.append("  ロゴの焼き直し: " + (" ".join(a) if isinstance(a, list) else str(a)))
         else:
             lines.append("  エンコード    : （記録なし — D-47 より前の書き出し。safe も production も同じ設定だった）")
     else:

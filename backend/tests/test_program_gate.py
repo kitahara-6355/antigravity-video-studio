@@ -15,6 +15,7 @@ Google には接続しない。動画は ffmpeg でその場で作る。
 from __future__ import annotations
 
 import copy
+import datetime as dt
 import json
 import shutil
 import subprocess
@@ -30,6 +31,8 @@ from backend.revenue import program_quality as pq
 REC = "20250922_久木田ヒロノブ"
 LAYOUT = dl.load_layout()
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg が無い")
+
+TODAY = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date().isoformat()   # 日本の今日
 
 
 def make_video(path: Path, size: str = "1080x1920", seconds: float = 2.0, *, audio: bool = True,
@@ -163,9 +166,9 @@ def test_qc_label_counts_as_approval_only_for_the_same_bytes(ledger, clips):
     item = pg.propose(ledger, recording=REC, kind="short", key="S1", publish=clips["s1"], review=clips["s2"])
     review_md5 = next(f["md5"] for f in item["files"] if f["role"] == "review")
     qc = {"checked": [{"id": "x1", "name": "確認用.mp4", "md5": "0" * 32, "state": "目視OK",
-                       "checked_by": "北原克洋", "checked_on": "2026-11-12"},
+                       "checked_by": "北原克洋", "checked_on": TODAY},
                       {"id": "x2", "name": "確認用.mp4", "md5": review_md5, "state": "要直し",
-                       "checked_by": "北原克洋", "checked_on": "2026-11-12"}]}
+                       "checked_by": "北原克洋", "checked_on": TODAY}]}
     with pytest.raises(LookupError, match="同じ動画がありません"):
         pg.approve_from_qc(ledger, qc, recording=REC, key="S1", synthetic=False)
     qc["checked"][1]["state"] = "目視OK"
@@ -408,3 +411,62 @@ def test_moving_or_renaming_onto_the_publish_shelf_needs_approval(ledger, clips,
     # 見てもらう棚の中・40_完成 の外（90_保管）へは、承認が無くても動かせる
     org.rename(None, t, s2, "S2_直し.mp4")
     t.check_move(s2, t.get("90_保管"), None)
+
+
+# --- gate-verifier 1 周目の反例（うっかり型）-------------------------------------
+
+@pytest.mark.parametrize("name", ["S11_選挙の候補者.mp4", "S12_見本市の話.mp4", "S13_確認用紙の書き方.mp4",
+                                  "S14_候補.backup.mp4"])
+def test_a_topic_that_happens_to_contain_a_mark_is_not_review_material(ledger, clips, tmp_path, name):
+    """話題から付けた名前に印の字が入っても、投稿する棚では承認が要る（部分一致にしない）。"""
+    shutil.copy(clips["s1"], tmp_path / name)
+    assert pg.put_problems(tmp_path, f"{REC}/Shorts_投稿用", ledger)
+
+
+@pytest.mark.parametrize("parts", [["_v66_番組仕上げ_仮曲入り_確認用.mp4"], [f"{REC}_v62_ロゴなし_確認用360p.mp4"],
+                                   ["Shorts候補_I_額縁と明るい薄紫", "S1.mp4"], ["番組化の見本", "章見出しC2.jpg"]])
+def test_the_real_review_names_on_drive_still_count(ledger, parts):
+    assert pg.is_review(parts, ledger)
+
+
+def test_a_folder_named_after_a_topic_is_not_a_review_shelf(ledger):
+    assert not pg.is_review(["候補者の話", "S1.mp4"], ledger)
+    assert not pg.is_review(["Shorts_投稿用", "S11_選挙の候補者.mp4"], ledger)
+
+
+def test_review_copy_of_another_cut_cannot_back_a_proposal(ledger, clips, tmp_path):
+    """前の版の確認用（長さが違う）を付けた提案は断る — 見ていない投稿版に目視OK が付くのを防ぐ。"""
+    longer = make_video(tmp_path / "前の版_確認用360p.mp4", size="640x360", seconds=9)
+    with pytest.raises(pg.QualityError, match="長さが合いません"):
+        pg.propose(ledger, recording=REC, kind="short", key="S1", publish=clips["s1"], review=longer)
+    assert ledger["items"] == []
+
+
+def test_qc_label_older_than_the_proposal_does_not_count(ledger, clips):
+    item = pg.propose(ledger, recording=REC, kind="short", key="S1", publish=clips["s1"], review=clips["s2"])
+    md5 = {f["role"]: f["md5"] for f in item["files"]}
+    old = {"id": "x", "name": "確認用.mp4", "md5": md5["review"], "state": "目視OK",
+           "checked_by": "北原克洋", "checked_on": "2026-10-23"}
+    with pytest.raises(LookupError, match="より前です"):
+        pg.approve_from_qc(ledger, {"checked": [old]}, recording=REC, key="S1", synthetic=False)
+    # 投稿する物そのものを見た目視OK なら、日付は問わない
+    pg.approve_from_qc(ledger, {"checked": [dict(old, md5=md5["publish"])]}, recording=REC, key="S1",
+                       synthetic=False)
+
+
+def test_a_snapshot_without_kind_flags_still_asks_about_videos(ledger):
+    """種類の印（video / image）を書き忘れた控えで、未承認の動画が緑にならない。"""
+    data = {"id": "r", "name": "動画制作", "folder": True, "children": [
+        {"id": "f", "name": "40_完成", "folder": True, "children": [
+            {"id": "rec", "name": REC, "folder": True, "children": [
+                {"id": "sp", "name": "Shorts_投稿用", "folder": True, "children": [
+                    {"id": "NEW1", "name": "09_S9_新作.mp4", "size": 123, "md5": "deadbeef"},
+                    {"id": "T1", "name": "投稿文.txt", "size": 5},
+                    {"id": "G1", "name": "投稿の順番", "size": 0}]}]}]}]}
+    found = pg.drive_findings(pg.tree_from_json(data), LAYOUT, ledger)
+    assert [f["code"] for f in found] == ["unapproved"] and "09_S9_新作.mp4" in found[0]["path"]
+
+
+def test_snapshot_writes_the_kind_even_when_it_is_not_media():
+    node = pg.tree_from_json({"id": "z", "name": "資料.zip", "size": 9, "video": False, "image": False})
+    assert pg.tree_to_json(node)["video"] is False and not node.video

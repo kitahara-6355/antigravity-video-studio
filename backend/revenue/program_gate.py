@@ -22,7 +22,8 @@
 
 40_完成 には「見てもらう物」と「投稿する物」が並ぶ。**見てもらう物は承認の材料なので止めない**
 （本線の門でプレビューを止めないのと同じ）。名前か、収録ID より下のフォルダ名に
-`確認用`・`候補`・`見本` のどれかが入っていれば見てもらう物。**それ以外の動画と画像はすべて投稿する物**で、
+`確認用`・`候補`・`見本` の印があれば見てもらう物（印は `_` で区切った語として見る。
+話題に字が入っただけの名前は数えない — `_has_mark`）。**それ以外の動画と画像はすべて投稿する物**で、
 承認に辿れなければ置けない。入れ物（拡張子）は列挙しない — Drive が動画・画像と見る物すべてを問う。
 
 ## 守ること
@@ -42,6 +43,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import sys
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -110,6 +112,15 @@ def propose(ledger: dict, *, recording: str, kind: str, key: str, publish: str |
     if bad:
         lines = [ln for r in bad for ln in program_quality.format_report(r)]
         raise QualityError("品質ゲートが不合格なので、提案にしません（直して出し直す）:\n" + "\n".join(lines), reports)
+    if review and kind != "thumbnail":
+        # 確認用は「同じ書き出しの縮小版」でなければ承認の材料にならない。前の版の確認用を付けたまま
+        # 提案すると、人が見ていない投稿版に目視OK の承認が付く（gate-verifier 1 周目の反例 2）
+        secs = [next((c["value"] for c in r["checks"] if c["id"] == "duration"), None) for r in reports]
+        limit = (quality_cfg or program_quality.load_config())["video"].get("review_gap_max_seconds", 1.0)
+        if None in secs or abs(secs[0] - secs[1]) > limit:
+            raise QualityError(
+                f"確認用と投稿する物の長さが合いません（{secs[0]}秒 と {secs[1]}秒・差は {limit}秒まで）。"
+                "同じ書き出しの確認用を付けてください（前の版の確認用では承認の材料になりません）", reports)
 
     files = [dict(fingerprint(publish), role="publish")]
     if review:
@@ -188,6 +199,13 @@ def approve_from_qc(ledger: dict, qc: Mapping[str, Any], *, recording: str, key:
     if hit is None:
         raise LookupError("ラベル「品質確認」が目視OK の控えに、この提案の中身と同じ動画がありません"
                           "（python -m backend.drive_layout qc-sync で控えを新しくする）")
+    jst = dt.timezone(dt.timedelta(hours=9))
+    proposed_on = dt.datetime.fromisoformat(item["proposed_at"]).astimezone(jst).date().isoformat()
+    publish_md5 = {f["md5"] for f in item["files"] if f["role"] == "publish"}
+    if hit["md5"] not in publish_md5 and str(hit.get("checked_on") or "") < proposed_on:
+        # 投稿する物そのものを見た目視OK なら日付は問わない。確認用を見た目視OK は、この提案より前の物を数えない
+        raise LookupError(f"目視OK（{hit.get('checked_on')}）が、この提案（{proposed_on}）より前です。"
+                          "前の版を見たときの目視OK は使えません。北原さんに今の確認用を見てもらってください")
     return approve(ledger, recording=recording, key=key, by=hit["checked_by"], synthetic=synthetic,
                    on=hit["checked_on"], evidence=f"Drive のラベル「品質確認」目視OK（{hit['name']}・id {hit['id']}）")
 
@@ -195,10 +213,28 @@ def approve_from_qc(ledger: dict, qc: Mapping[str, Any], *, recording: str, key:
 # --- 置き場の規則 ---------------------------------------------------------------
 
 
+def _has_mark(name: str, marks: Iterable[str], *, folder: bool) -> bool:
+    """名前に「見てもらう物」の印があるか。**印は `_` で区切った語として見る**（部分一致にしない）。
+
+    話題から付けた名前（`S11_選挙の候補者.mp4`）に印の字がたまたま入っても、見てもらう物にしない。
+    - ファイル: 区切った語が印そのもの。画質の添え字だけ許す（`…_確認用.mp4`・`…_確認用360p.mp4`）
+    - フォルダ: 区切った語が印で終わる（`Shorts候補_I_…`・`番組化の見本`）
+    """
+    stem = name if folder else (name.rsplit(".", 1)[0] if "." in name else name)
+    for token in stem.split("_"):
+        for m in marks:
+            if token == m or (folder and token.endswith(m)):
+                return True
+            if not folder and token.startswith(m) and re.fullmatch(r"\d{3,4}p", token[len(m):]):
+                return True
+    return False
+
+
 def is_review(parts: Iterable[str], ledger: Mapping[str, Any]) -> bool:
-    """見てもらう物か。`parts` は収録ID より下のフォルダ名とファイル名。"""
+    """見てもらう物か。`parts` は収録ID より下のフォルダ名と、最後にファイル名。"""
+    parts = list(parts)
     marks = ledger.get("review_marks", [])
-    return any(m in p for p in parts for m in marks)
+    return any(_has_mark(p, marks, folder=i < len(parts) - 1) for i, p in enumerate(parts))
 
 
 def approved_files(ledger: Mapping[str, Any], recording: str) -> list[dict]:
@@ -310,11 +346,22 @@ def tree_from_json(data: Mapping[str, Any], path: str = "") -> Any:
     from backend.drive_layout import Node
 
     here = f"{path}/{data['name']}" if path else data["name"]
-    node = Node(id=str(data.get("id", "")), name=data["name"], folder=bool(data.get("folder")), path=here,
-                md5=data.get("md5"), size=int(data.get("size") or 0), video=bool(data.get("video")),
-                image=bool(data.get("image")))
+    folder = bool(data.get("folder"))
+    video, image = data.get("video"), data.get("image")
+    if not folder and video is None and image is None:
+        # 種類の印が無い控え（手で組んだ控えなど）は、名前から推す。**付属物と分かる物だけを外し、
+        # あとは問う側に倒す** — 印の書き忘れで未承認の動画が緑になるのを防ぐ（反例 3）
+        video = _asked_by_name(data["name"])
+    node = Node(id=str(data.get("id", "")), name=data["name"], folder=folder, path=here,
+                md5=data.get("md5"), size=int(data.get("size") or 0), video=bool(video), image=bool(image))
     node.children = [tree_from_json(c, here) for c in data.get("children", [])]
     return node
+
+
+def _asked_by_name(name: str) -> bool:
+    """種類の印が無いファイルを、名前だけで「問う物」と見るか。拡張子の無い物（Google ドキュメントなど）と付属物は外す。"""
+    suffix = Path(name).suffix.lower()
+    return bool(suffix) and suffix not in COMPANION_EXT
 
 
 def tree_to_json(node: Any) -> dict:
@@ -323,8 +370,9 @@ def tree_to_json(node: Any) -> dict:
         d["folder"] = True
         d["children"] = [tree_to_json(c) for c in node.children]
     else:
-        d.update({k: v for k, v in (("size", node.size), ("md5", node.md5), ("video", node.video),
-                                    ("image", getattr(node, "image", False))) if v})
+        d.update({k: v for k, v in (("size", node.size), ("md5", node.md5)) if v})
+        # 種類は「違う」も書く（書かないと、読み戻すときに名前から推すことになる）
+        d.update({"video": bool(node.video), "image": bool(getattr(node, "image", False))})
     return d
 
 

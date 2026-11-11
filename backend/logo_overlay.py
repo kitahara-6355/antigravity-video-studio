@@ -7,7 +7,7 @@ Phase 30 - Week 3 Implementation
 
 import subprocess
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import List, Tuple, Optional
 import logging
 import os
 
@@ -232,7 +232,8 @@ class LogoOverlay:
         output_path: str,
         position: Tuple[int, int] = (10, 10),
         opacity: float = 0.8,
-        target_height: int = 60
+        target_height: int = 60,
+        video_args: Optional[List[str]] = None,
     ) -> str:
         """
         動画にロゴをオーバーレイ
@@ -287,9 +288,9 @@ class LogoOverlay:
             "-map", "[v]",
             "-map", "0:a?",  # 音声をコピー
             "-c:a", "copy",  # 音声エンコードなし
-            "-c:v", "libx264",  # 動画エンコード
-            "-preset", "medium",  # エンコード速度
-            "-crf", "23",  # 品質
+            # 映像の設定。呼び出し側が渡せば、書き出しのモードと同じ設定で焼く（D-47 —
+            # ここが固定だと、production で書いた動画をロゴの焼き直しが medium/crf23 に戻す）
+            *(video_args or ["-c:v", "libx264", "-preset", "medium", "-crf", "23"]),
             "-y",  # 上書き
             output_path_str
         ]
