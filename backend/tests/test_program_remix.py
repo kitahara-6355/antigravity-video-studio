@@ -110,3 +110,18 @@ def test_clips_and_review_copy(tmp_path, episode):
     rv = remix.review_copy(dst)
     assert rv.name == "rec_v67_確認用360p.mp4"
     assert abs(remix.duration(rv) - remix.duration(dst)) < 0.2
+
+
+def test_a_short_song_is_looped_with_a_crossfade_not_a_hard_jump(tmp_path, episode):
+    """3 秒の曲（終わりの 0.5 秒で消える）を 5.8 秒の区間に敷くと、継ぎ目で重ねてつなぐ。
+    -stream_loop だと継ぎ目で急に頭へ戻る（消えた所がそのまま穴になる）。"""
+    song = tmp_path / "short.m4a"
+    _ff("-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000", "-t", "3", "-af", "afade=t=out:st=2.5:d=0.5",
+        "-c:a", "aac", str(song))
+    audio = {"bgm": {"path": str(song), "volume_db": -6, "fade": 0.5, "duck": False, "loop_crossfade": 1.0,
+                     "ranges": [[0.0, 5.8]]}}
+    _, g = remix.graph({**audio, "bgm": {**audio["bgm"], "_len": 3.0}}, TL, 12.0)
+    assert "acrossfade" in g and "stream_loop" not in g
+    dst = remix.remix(SPEC, episode, audio, "v67", tmp_path / "out")
+    # 曲の終わり（2.5〜3 秒で消える）を重ねてつなぐので、継ぎ目（本編 2.0〜2.5 秒＝仕上げ版 8.0〜8.5）でも鳴っている
+    assert level(dst, 8.0, 8.5, band=1000) > -40

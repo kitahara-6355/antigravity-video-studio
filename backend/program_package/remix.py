@@ -87,20 +87,42 @@ def graph(audio: dict, tl: dict, total: float) -> tuple[list[str], str]:
             if b - a <= 2 * fade:
                 raise ValueError(f"BGM の区間 {a}〜{b} が短すぎます（出し入れ {fade} 秒×2 より長く）")
             length = b - a
-            inputs += ["-stream_loop", "-1", "-ss", f"{float(bgm.get('start', 0.0)):.3f}", "-t", f"{length:.3f}",
-                       "-i", bgm["path"]]
+            start = float(bgm.get("start", 0.0))
+            song = bgm.get("_len")  # 曲の長さ（remix が測って入れる）
+            xf = float(bgm.get("loop_crossfade", 4.0))
+            if song and song - start > 2 * xf:
+                # 曲の終わりから頭へ、xf 秒かけて重ねてつなぐ（-stream_loop の急な継ぎ目は「リズムが止まる」と
+                # 聞こえた・2026-11-12 北原さん）。1 回目は start から、2 回目からは頭から
+                step = song - xf
+                reps = max(1, int((length + start) // step) + 1)
+                labels = []
+                for r in range(reps):
+                    inputs += (["-ss", f"{start:.3f}"] if r == 0 else []) + ["-i", bgm["path"]]
+                    g.append(f"[{n}:a]{_fmt('')}[b{k}r{r}]")
+                    labels.append(f"b{k}r{r}")
+                    n += 1
+                cur = labels[0]
+                for r, nxt in enumerate(labels[1:], start=1):
+                    g.append(f"[{cur}][{nxt}]acrossfade=d={xf}:c1=qsin:c2=qsin[b{k}x{r}]")
+                    cur = f"b{k}x{r}"
+                src = f"[{cur}]atrim=0:{length:.3f},asetpts=PTS-STARTPTS,"
+            else:
+                inputs += ["-stream_loop", "-1", "-ss", f"{start:.3f}", "-t", f"{length:.3f}", "-i", bgm["path"]]
+                src = f"[{n}:a]{_fmt('')},"
+                n += 1
             at = int(round((tl["body"] + a) * 1000))
-            g.append(f"[{n}:a]{_fmt('')},volume={float(bgm.get('volume_db', -22))}dB,afade=t=in:d={fade},"
+            g.append(f"{src}volume={float(bgm.get('volume_db', -22))}dB,afade=t=in:d={fade},"
                      f"afade=t=out:st={length - fade:.3f}:d={fade},adelay={at}:all=1[b{k}]")
             parts.append(f"[b{k}]")
-            n += 1
         if len(parts) > 1:
             g.append("".join(parts) + f"amix=inputs={len(parts)}:normalize=0:duration=longest[bg]")
         else:
             g.append(f"{parts[0]}anull[bg]")
         if bgm.get("duck", True):
             # 話し声（元の音）が出ている間だけ BGM を下げる。release を長めにして、言葉の切れ目で波打たせない
-            g.append("[bg][sc]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=800[bgd]")
+            # 下げ幅は ratio（既定 3）。強く速く下げると BGM が波打ち「リズムが止まる」と聞こえた（2026-11-12）
+            ratio = float(bgm.get("duck_ratio", 3))
+            g.append(f"[bg][sc]sidechaincompress=threshold=0.05:ratio={ratio}:attack=80:release=2000[bgd]")
         else:
             g.append("[sc]anullsink;[bg]anull[bgd]")
         mixes.append("[bgd]")
@@ -124,6 +146,8 @@ def remix(spec: dict, video: str | Path, audio: dict, version: str, out: str | P
     out.mkdir(parents=True, exist_ok=True)
     total = duration(video)
     tl = timeline(spec)
+    if audio.get("bgm") and Path(audio["bgm"]["path"]).exists():
+        audio = {**audio, "bgm": {**audio["bgm"], "_len": duration(audio["bgm"]["path"])}}
     extra, g = graph(audio, tl, total)
     dst = out / output_name(spec, audio, version)
     subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(video), *extra, "-filter_complex", g,
