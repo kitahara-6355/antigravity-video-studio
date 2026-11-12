@@ -125,3 +125,17 @@ def test_a_short_song_is_looped_with_a_crossfade_not_a_hard_jump(tmp_path, episo
     dst = remix.remix(SPEC, episode, audio, "v67", tmp_path / "out")
     # 曲の終わり（2.5〜3 秒で消える）を重ねてつなぐので、継ぎ目（本編 2.0〜2.5 秒＝仕上げ版 8.0〜8.5）でも鳴っている
     assert level(dst, 8.0, 8.5, band=1000) > -40
+
+
+def test_ed_music_sits_only_on_the_ending(tmp_path, episode, tone, monkeypatch):
+    """ED（最後の 3 秒＝9〜12 秒）だけに曲を敷く。BGM の既定の範囲は ED の手前で終わる。"""
+    tl = {**TL, "ed": 3.0}
+    monkeypatch.setattr(remix, "timeline", lambda spec: tl)
+    audio = {"ed_music": {"path": str(tone(1000, "ed.m4a")), "volume": 0.5, "fade_in": 0.3, "fade_out": 0.5}}
+    dst = remix.remix(SPEC, episode, audio, "v67", tmp_path / "out")
+    assert level(dst, 9.6, 11.0, band=1000) > -40      # ED に曲が入った
+    assert level(dst, 6.0, 8.5, band=1000) < level(episode, 6.0, 8.5, band=1000) + 2  # 本編には出ない
+    inputs, _ = remix.graph({"bgm": {"path": "b", "fade": 0.5}, "ed_music": {"path": "e"}}, tl, 12.0)
+    assert inputs[inputs.index("b") - 2] == "3.000"     # BGM は本編 0〜3 秒（12 − 6 − 3）
+    with pytest.raises(ValueError):
+        remix.graph({"ed_music": {"path": "e"}}, TL, 12.0)

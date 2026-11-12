@@ -7,6 +7,8 @@
   今回の名場面へのつなぎ目（FADE 秒）で、前の曲の残りを消して新しい曲を下げ切る
 - **BGM**: 本編の時刻（完成版 v62 の時刻）の区間に、曲を小さく敷く。話している間は自動で下げる
   （``sidechaincompress``・話し声を合図にする）。区間の頭と終わりはふわっと出し入れする
+- **ED の曲**: 最後の ED（``ending.seconds`` 秒）に曲を敷く。頭はふわっと入れ、最後で下げ切る。
+  ED の曲があるとき、BGM の既定の範囲は本編の終わりまで（ED の手前）
 - **音割れ止め**: 最後に全体の上限（既定 -1.5 dBFS・4 倍に上げて掛ける）を掛ける。v62 は 7:34 付近で +5.8 dBFS まで出ていた
 
 指定（``AUDIO.json``）::
@@ -14,9 +16,10 @@
     {"op_music": {"path": "OP曲.m4a", "start": 0.0, "volume": 0.9, "fade_out": 1.5, "provisional": false},
      "bgm": {"path": "BGM.m4a", "start": 0.0, "volume_db": -22, "duck": true, "fade": 3.0,
              "ranges": [[0, 2540]], "provisional": false},
+     "ed_music": {"path": "ED曲.m4a", "start": 0.0, "volume": 0.9, "fade_in": 1.0, "fade_out": 3.0},
      "peak_db": -1.5}
 
-``op_music``・``bgm`` はどちらも ``null`` でよい（音割れ止めだけ掛ける）。曲は短ければ繰り返す。
+``op_music``・``bgm``・``ed_music`` はどちらも ``null`` でよい（音割れ止めだけ掛ける）。曲は短ければ繰り返す。
 仮の曲（``provisional: true``）を使った版は、名前に「_仮曲入り」が付く（公開に使わない印）。
 
 使い方（リポジトリ直下で）::
@@ -47,7 +50,8 @@ def duration(path: str | Path) -> float:
 
 def timeline(spec: dict) -> dict:
     """仕上げ版の中の区切り（秒）。番組 OP の終わりと本編の頭。"""
-    return {"program": ep.program_length(spec), "body": ep.op_length(spec)}
+    return {"program": ep.program_length(spec), "body": ep.op_length(spec),
+            "ed": float((spec.get("ending") or {}).get("seconds", 0.0))}
 
 
 def _fmt(label: str) -> str:
@@ -59,7 +63,7 @@ def graph(audio: dict, tl: dict, total: float) -> tuple[list[str], str]:
     inputs: list[str] = []
     g: list[str] = []
     n = 1
-    op, bgm = audio.get("op_music"), audio.get("bgm")
+    op, bgm, ed = audio.get("op_music"), audio.get("bgm"), audio.get("ed_music")
     peak = 10 ** (float(audio.get("peak_db", -1.5)) / 20)
     g.append("[0:a]" + _fmt(",asplit=2[orig][sc]" if bgm else "[orig]"))
     mixes = []
@@ -79,7 +83,8 @@ def graph(audio: dict, tl: dict, total: float) -> tuple[list[str], str]:
     else:
         g.append("[orig]anull[base]")
     if bgm:
-        ranges = bgm.get("ranges") or [[0.0, total - tl["body"]]]
+        end = total - tl["body"] - (tl.get("ed", 0.0) if ed else 0.0)
+        ranges = bgm.get("ranges") or [[0.0, end]]
         fade = float(bgm.get("fade", 3.0))
         parts = []
         for k, (a, b) in enumerate(ranges):
@@ -126,6 +131,17 @@ def graph(audio: dict, tl: dict, total: float) -> tuple[list[str], str]:
         else:
             g.append("[sc]anullsink;[bg]anull[bgd]")
         mixes.append("[bgd]")
+    if ed:
+        e = tl.get("ed", 0.0)
+        if e <= 0:
+            raise ValueError("この回の指定には ED がありません（ed_music は使えない）")
+        st = total - e
+        fi, fo = float(ed.get("fade_in", 1.0)), float(ed.get("fade_out", 3.0))
+        inputs += ["-stream_loop", "-1", "-ss", f"{float(ed.get('start', 0.0)):.3f}", "-t", f"{e:.3f}", "-i", ed["path"]]
+        g.append(f"[{n}:a]{_fmt('')},volume={float(ed.get('volume', 0.9))},afade=t=in:d={fi},"
+                 f"afade=t=out:st={max(0.0, e - fo):.3f}:d={fo},adelay={int(round(st * 1000))}:all=1[edm]")
+        mixes.append("[edm]")
+        n += 1
     if mixes:
         g.append(f"[base]{''.join(mixes)}amix=inputs={1 + len(mixes)}:normalize=0:duration=first[mix]")
     else:
@@ -137,7 +153,7 @@ def graph(audio: dict, tl: dict, total: float) -> tuple[list[str], str]:
 
 
 def output_name(spec: dict, audio: dict, version: str) -> str:
-    prov = any((audio.get(k) or {}).get("provisional") for k in ("op_music", "bgm"))
+    prov = any((audio.get(k) or {}).get("provisional") for k in ("op_music", "bgm", "ed_music"))
     return f"{spec['recording']}_{version}{'_仮曲入り' if prov else ''}.mp4"
 
 

@@ -97,7 +97,9 @@ python -m backend.program_package.remix SPEC.json OUT/<収録ID>_v66_仮曲入�
 
 - `AUDIO.json`: `op_music`（番組 OP の頭 `program_length` 秒を入れ替え・`start`・`volume`・`fade_out`）、
   `bgm`（本編の時刻の `ranges`・`volume_db` 既定 -22・`duck` 既定 true＝話している間は下げる・`fade`）、
-  `peak_db`（既定 -1.5。4 倍に上げて上限を掛ける）。どちらの曲も `null` でよい（音割れ止めだけ）
+  `ed_music`（最後の ED `ending.seconds` 秒に敷く・`fade_in` 既定 1・`fade_out` 既定 3。あると BGM の既定の範囲は ED の手前まで）、
+  `peak_db`（既定 -1.5。4 倍に上げて上限を掛ける）。どの曲も `null` でよい（音割れ止めだけ）
+- BGM が短い曲なら、終わりと頭を `loop_crossfade`（既定 4 秒）重ねてつなぐ。`duck_ratio`（既定 3）を上げると話している間に深く下がる
 - v62 は 7:34 付近で +6.3 dBFS まで出ていて、品質ゲートの「音のピーク」で落ちる。remix を通すと +0.5 で通る（2026-11-12 実測）
 - `--clip 本編の秒 長さ` で聞き比べ用の短い切り出し（`-1` は番組 OP）。`--review` で承認の門に渡す確認用 360p
 - 仮の曲（`provisional: true`）を使うと名前に「_仮曲入り」が付く
