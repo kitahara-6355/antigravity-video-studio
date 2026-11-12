@@ -132,6 +132,10 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
         srt_path_escaped = str(temp_srt).replace("\\", "/").replace(":", "\\:")
         
         encode_args = ffmpeg_editor._get_encode_args("balanced")
+        try:
+            import subtitle_font as _sf
+        except ImportError:
+            from backend import subtitle_font as _sf
         
         # テンプレート基準の字幕スタイルを適用（ハードコード廃止）
         try:
@@ -144,7 +148,7 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
             # Alignment=2: 下部中央揃え
             # BorderStyle=4: 半透明背景帯（NHKテロップ風）
             # BackColour=&H80000000: 50%透明度の黒背景
-            subtitle_style = "FontSize=16,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BackColour=&H80000000,Outline=1,BorderStyle=4,FontName=Yu Gothic UI,MarginV=10,Alignment=2"
+            subtitle_style = f"FontSize={_sf.size(16)},PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BackColour=&H80000000,Outline=1,BorderStyle=4,FontName={_sf.family()},MarginV=10,Alignment=2"
         
         # ━━━ FIX-6A: ロゴオーバーレイ統合 ━━━
         logo_path = _get_logo_path()
@@ -165,12 +169,12 @@ def _burn_subtitles_ffmpeg(video_path: str, segments: list, output_path: str, ff
             vf_arg = (
                 f"[1:v]scale=-1:{logo_height}[logo];"
                 f"[0:v][logo]overlay=10:10:format=auto[with_logo];"
-                f"[with_logo]subtitles='{srt_path_escaped}':force_style='{subtitle_style}'"
+                f"[with_logo]subtitles='{srt_path_escaped}'{_sf.fontsdir_option()}:force_style='{subtitle_style}'"
             )
             filter_flag = "-filter_complex"
             logger.info(f"🏷️ ロゴ重畳有効: {Path(logo_path).name} (h={logo_height}px)")
         else:
-            vf_arg = f"subtitles='{srt_path_escaped}':force_style='{subtitle_style}'"
+            vf_arg = f"subtitles='{srt_path_escaped}'{_sf.fontsdir_option()}:force_style='{subtitle_style}'"
             filter_flag = "-vf"
             logger.info("🏷️ ロゴなし — 字幕のみ焼き込み")
         

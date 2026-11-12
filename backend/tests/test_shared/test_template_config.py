@@ -30,7 +30,7 @@ def test_template_config_provider_default():
     assert margins["MarginL"] == 25  # max(20, 1280 * 2 / 100) = max(20, 25.6) = 25
 
     style = provider.get_subtitle_style()
-    assert "Yu Gothic UI" in style
+    assert "FontName=BIZ UDPGothic" in style  # 2026-11-13 PC とクラウドで共通の無料書体に
 
 def test_template_config_provider_active():
     provider = TemplateConfigProvider()
