@@ -172,7 +172,11 @@ def shifted_chapters(spec: dict, op_len: float) -> list[tuple[int, str]]:
 
 def program_of(spec: dict) -> dict | None:
     """番組共通 OP の指定（spec の program が指す番組の指定）。無ければ None。"""
-    return opening_mod.load(spec["program"]) if spec.get("program") else None
+    if not spec.get("program"):
+        return None
+    p = opening_mod.load(spec["program"])
+    # 曲は後で remix が入れ替えるとき（finish）は、番組 OP を無音で作る（仮の曲のファイルが無くても通る）
+    return {**p, "music": None} if spec.get("program_silent") else p
 
 
 def program_length(spec: dict) -> float:

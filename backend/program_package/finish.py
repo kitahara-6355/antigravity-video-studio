@@ -63,6 +63,8 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
         body_seconds = rx.duration(spec["source"])
         audio = audio_of(spec, music_dir, audio_path, m, body_seconds)
 
+    if audio and audio.get("op_music"):
+        spec["program_silent"] = True  # OP の曲は remix が入れる
     base = ep.build(spec, out / "_飾りまで")
     note["steps"].append({"step": "飾り", "file": base.name, "inserts": len(items)})
     final = base

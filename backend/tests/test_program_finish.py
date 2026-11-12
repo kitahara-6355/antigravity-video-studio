@@ -120,6 +120,7 @@ def test_通しで作ると曲が入り確かめと控えが残る(tmp_path, son
     total = ep.op_length(spec) + 30 + spec["ending"]["seconds"]
 
     def fake_build(s, out, cards_only=False):  # 飾りの書き出し（8 分）の代わりに、同じ長さの絵を置く
+        assert ep.program_of(s)["music"] is None  # OP の曲は remix が入れるので、番組 OP は無音で作る
         out.mkdir(parents=True, exist_ok=True)
         return video(out / f"{s['recording']}_{s['version']}.mp4", total)
 

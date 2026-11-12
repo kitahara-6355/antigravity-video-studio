@@ -19,7 +19,15 @@ description: 対談の完成版に、話に合った絵（色紙・作品・写�
 2. **一覧の絵を北原さんに見せる**（`sheet --video 完成版.mp4 --out 案の一覧.jpg`）。素材待ちの一覧も一緒に渡す
 3. **北原さんがチャットで選んだ分を控える**（`approve` / `reject`。`--by 北原 --evidence "<日時と言葉>"`）。
    AI の名前では控えられない。案の置き場が変わるのでコミットする
-4. **承認した分だけ入れた版を書き出す**（`render --video 完成版.mp4 --out …`。OP 付きの版なら `--offset <OP の長さ>`）。
+4. **承認した分だけ入れた版を書き出す。** ふつうは通しの道具で、飾り・曲と一緒に入れる:
+
+   ```
+   python -m backend.program_package.finish backend/config/episode/<収録ID>.json --version v68 --out OUT \
+       --music-dir 曲の置き場 --map 地図.json --review
+   ```
+
+   `episode.py` も承認済みの案を自動で重ねる（案の置き場が無い回・`"inserts": false` の回は何もしない）。
+   出来上がった版にだけ後から重ねたいときは `inserts render --video … --offset <OP の長さ>`。
    できた版を 40_完成 の投稿する棚に置くには、いつもどおり `program_gate` の承認が要る
 
 ## 人が書く所（案の置き場の `setup`）
@@ -53,4 +61,10 @@ description: 対談の完成版に、話に合った絵（色紙・作品・写�
 ## まだ無いもの（後送）
 
 - Drive のラベルから素材の一覧を作る（今は一覧を手で渡す）。動画の B ロール。絵の下の説明文
-- 本線の書き出し（`episode.py`）に載せる — V5。`inserts.shows()` が飾りと同じ形を返す
+
+## 曲（`backend/program_package/music.py`・曲の台帳 `backend/config/music.json`）
+
+- 台帳に、番組ごとの OP・BGM・ED の曲と出どころを書く。曲のファイルはリポジトリに置かない（`--music-dir`）
+- `music plan AUDIO.json --program … --music-dir …` が remix の指定を作る。OP の使い始めは、曲の山の入りを番組名の出だしに合わせる
+- 出どころの無い曲・ファイルの決まっていない曲では、書き出す前に止まる
+- 打ち合わせで決めた音量をそのまま再現したいときは、`finish --audio AUDIO.json` でその指定を渡す
