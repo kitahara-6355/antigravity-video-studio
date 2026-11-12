@@ -85,6 +85,36 @@ python -m backend.program_package.episode SPEC.json --out OUT
   確認用は**その版の書き出しの縮小版**を付ける（長さが 1 秒より違うと提案を断る。前の版の確認用の目視OK は使えない）。
   「確認用」の名前を外す・投稿用の場所へ移す（`drive_organize`）のも、承認の後でないと止まる
 
+### 4.5 音だけ差し替える（OP の曲・インタビュー中の BGM・音割れ止め）— 映像は作り直さない
+
+`backend/program_package/remix.py`（2026-11-12）。仕上げ版（手順3の出力）の映像を写したまま、音だけ作り直す。
+42分で約2分（4コア）。打ち合わせの場で曲や音量を何度でも試せる。
+
+```
+python -m backend.program_package.remix SPEC.json OUT/<収録ID>_v66_仮曲入り.mp4 --audio AUDIO.json \
+    --version v67 --out OUT --clip -1 30 --clip 454 30 [--review]
+```
+
+- `AUDIO.json`: `op_music`（番組 OP の頭 `program_length` 秒を入れ替え・`start`・`volume`・`fade_out`）、
+  `bgm`（本編の時刻の `ranges`・`volume_db` 既定 -22・`duck` 既定 true＝話している間は下げる・`fade`）、
+  `peak_db`（既定 -1.5。4 倍に上げて上限を掛ける）。どちらの曲も `null` でよい（音割れ止めだけ）
+- v62 は 7:34 付近で +6.3 dBFS まで出ていて、品質ゲートの「音のピーク」で落ちる。remix を通すと +0.5 で通る（2026-11-12 実測）
+- `--clip 本編の秒 長さ` で聞き比べ用の短い切り出し（`-1` は番組 OP）。`--review` で承認の門に渡す確認用 360p
+- 仮の曲（`provisional: true`）を使うと名前に「_仮曲入り」が付く
+
+### 4.6 承認の後の字幕の直し
+
+字幕は焼き込みなので、直すには raw から作り直す。直しは固定（lock）に足す（区間は変えない・記録が残る）:
+
+```
+python -m backend.subtitle_engine.edit_lock amend r61.lock.json --fixes fixes.json --by 北原 \
+    --evidence "<日時と言葉>" --out r61a.lock.json
+PYTHONPATH=./backend:. python -m backend.subtitle_engine.edit_lock render r61a.lock.json --material raw4_concat.mp4 --out v62a.mp4
+```
+
+`fixes.json` は `[{"at": 完成版 v62 の秒, "from": "違う字", "to": "正しい字"}]`。当たらない直しがあれば何も変えずに止まる。
+作り直した本編を `SPEC.json` の `source` にして手順3 → 4.5。
+
 ### 5. 公開日が決まったら最終版を書き出す
 
 - 指定の `ending.publish_date` に公開日（YYYY-MM-DD）を入れ、`version` を上げて手順3をやり直す（締切は2週間後が自動で入る）
