@@ -262,7 +262,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     </div>
     <div class="list" id="marksList" role="tabpanel" aria-labelledby="tabMarks">
       <p class="empty" id="marksEmpty">まだ印はありません。動画を見ながら違和感があれば <b>違和感あり</b>（キーは M）を押すと、その字幕がここに入ります。
-        押すまでの遅れを見込んで、0.4秒前に出ていた字幕に印が付きます。あとで「印の所だけ再生」で順に聞き直し、「正しくは」に正しい字を書いてください。</p>
+        押すまでの遅れを見込んで、0.4秒前に出ていた字幕に印が付きます。あとで ▶ の時刻か「印の所だけ再生」を押すと、その所を止まりながらくり返し流します。聞きながら「正しくは」に正しい字を書き、「次へ」で次の印に進みます。</p>
     </div>
     <div class="list" id="flagsList" role="tabpanel" aria-labelledby="tabFlags" hidden></div>
     <div class="foot">
@@ -284,6 +284,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   const SHEET = "review_captions.json";
   const REACT_SEC = 0.4;              // 気づいてから押すまでの遅れ
   const LEAD_SEC = 1.0, TAIL_SEC = 0.4; // 印の所を再生するときの前後
+  const GAP_MS = 1200;                 // 印の所を流し終えてから、同じ所をもう一度流すまでの間（止まって見える時間）
+  const AWAY_SEC = 6;                  // 印の所からこれ以上離れた所へ動かしたら、くり返しをやめる
   const CHUNK = 25 * 1024 * 1024;
 
   const $ = (id) => document.getElementById(id);
@@ -478,37 +480,47 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     const body = Object.assign({}, m, { cap: c.i, t: c.s, src: c.src, text: c.t, fix: keepFix, state: keepFix ? m.state : "open" });
     S.marks.delete(id); S.marks.set(nid, body); renderAll();
     write(nid, (ref) => ref.set(body)).then(() => write(id, (ref) => ref.delete()));
-    playList([k]);
+    playMark(nid);
   }
 
   // ── 再生 ──
   function seek(t) { video.currentTime = Math.min(Math.max(0, t), (video.duration || duration()) - 0.05); }
-  // 印の所を続けて流している間は、ボタンの帯の右側が送りのボタンに替わる（帯の高さと「違和感あり」の位置は変わらない）。
-  // 何枚目かは字幕の枠の見出し行に出す（桁が増えてもボタンが横にずれない）
+  // 手で動かしたとき（3秒戻る・←→・前後の字幕）は、止まっている間の次のくり返しを待たない
+  function userSeek(t) { if (S.reel) { clearTimeout(S.reel.wait); S.reel.wait = 0; } seek(t); }
+  // 印の所を流している間は、ボタンの帯の右側が送りのボタンに替わる（帯の高さと「違和感あり」の位置は変わらない）。
+  // 何枚目か・何回目かは字幕の枠の見出し行に出す（桁が増えてもボタンが横にずれない）。
+  // 1つの印を流し終えたらいったん止まり、GAP_MS 後に同じ所をまた流す（次の印へは「次へ」で自分で進む）。
+  // Space で止めるとくり返しも止まり、もう一度 Space で続きから流す。印の所から AWAY_SEC 以上離れた所へ動かすと、くり返しをやめる
   function showReel(on) { $("reel").hidden = !on; $("normal").hidden = on; $("reelInfo").hidden = !on; }
-  function playList(ks, kind) {
+  function playList(ks, kind, start) {
     if (!ks.length || !video.src) return;
     clearTimeout(S.reel && S.reel.wait);
-    S.reel = { ks, n: 0, until: 0, wait: 0 };
+    S.reel = { ks, n: Math.min(Math.max(start || 0, 0), ks.length - 1), until: 0, from: 0, wait: 0, round: 0, auto: false };
     $("reelKind").textContent = kind === "flags" ? "要確認の所" : "印の所";
-    showReel(ks.length >= 2);
-    reelGo();
+    showReel(true);
+    reelGo(true);
   }
-  function reelGo() {
+  // 控えの ▶ の時刻: 印を時間順に並べた中のその印から流す（「前へ」「次へ」で隣の印に移れる）
+  function playMark(id) {
+    const order = sortedMarks(); const at = order.findIndex(([mid]) => mid === id); if (at < 0) return;
+    playList(order.map(([, m]) => kOfCap(m.cap)), "marks", at);
+  }
+  function reelGo(fresh) {
     const r = S.reel; if (!r) return;
+    clearTimeout(r.wait); r.wait = 0;
     const c = S.caps[r.ks[r.n]];
-    r.until = c.e + TAIL_SEC;
-    $("reelPos").textContent = (r.n + 1) + " / " + r.ks.length;
-    seek(c.s - LEAD_SEC);
+    r.round = fresh ? 1 : r.round + 1;
+    r.from = c.s - LEAD_SEC; r.until = c.e + TAIL_SEC;
+    $("reelPos").textContent = (r.n + 1) + " / " + r.ks.length + (r.round > 1 ? " · " + r.round + "回目" : "");
+    seek(r.from);
     video.play().catch(() => {});
     highlight(idOf(c.i));
   }
   function reelStep(d) {
     const r = S.reel; if (!r) return;
-    clearTimeout(r.wait);
     const n = r.n + d;
-    if (n < 0 || n >= r.ks.length) { stopReel(); return; }
-    r.n = n; reelGo();
+    if (n < 0 || n >= r.ks.length) { toast(n < 0 ? "最初の印です" : "最後の印です。「やめる」で通しの再生に戻ります"); return; }
+    r.n = n; reelGo(true);
   }
   function stopReel() {
     if (S.reel) clearTimeout(S.reel.wait);
@@ -518,24 +530,39 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     renderNow(false);
     const r = S.reel;
     if (r && !video.paused && video.currentTime >= r.until) {
-      video.pause();
-      if (r.ks.length > 1) r.wait = setTimeout(() => reelStep(1), 700); else stopReel();
+      r.auto = true; video.pause();
+      clearTimeout(r.wait); r.wait = setTimeout(() => { if (S.reel === r) reelGo(false); }, GAP_MS);
     }
     if (!video.paused) requestAnimationFrame(tick);
+  }
+  // 自分で止めた（Space・動画の操作）ときは、次のくり返しを待たない
+  // （pause の知らせは video.pause() の後から届くので、自分で止めた印 auto はここで下ろす）
+  video.addEventListener("pause", () => { const r = S.reel; if (!r) return; if (r.auto) { r.auto = false; return; } clearTimeout(r.wait); r.wait = 0; });
+  video.addEventListener("seeked", () => {
+    const r = S.reel; if (!r) return;
+    const t = video.currentTime;
+    if (t < r.from - AWAY_SEC || t > r.until + AWAY_SEC) stopReel();
+  });
+  function togglePlay() {
+    if (!video.src) return;
+    const r = S.reel;
+    // 印の所を流し終えて止まっている間に押したら、待たずに同じ所の頭から流す
+    if (r && video.paused && (r.wait || video.currentTime >= r.until - 0.05)) { reelGo(false); return; }
+    if (video.paused) video.play().catch(() => {}); else video.pause();
   }
   video.addEventListener("play", () => requestAnimationFrame(tick));
   video.addEventListener("seeked", () => renderNow(false));
   video.addEventListener("timeupdate", () => { if (video.paused) renderNow(false); });
   video.addEventListener("loadedmetadata", () => { renderStrip(); renderNow(true); });
   $("markBtn").addEventListener("click", markNow);
-  $("backBtn").addEventListener("click", () => seek(video.currentTime - 3));
+  $("backBtn").addEventListener("click", () => userSeek(video.currentTime - 3));
   $("reelBtn").addEventListener("click", () => {
     const ks = sortedMarks().filter(([, m]) => m.state !== "ok").map(([, m]) => kOfCap(m.cap)).filter((k) => k >= 0);
-    playList(ks);
+    playList(ks, "marks", 0);
   });
   $("reelPrev").addEventListener("click", () => reelStep(-1));
   $("reelNext").addEventListener("click", () => reelStep(1));
-  $("reelAgain").addEventListener("click", () => { if (S.reel) { clearTimeout(S.reel.wait); reelGo(); } });
+  $("reelAgain").addEventListener("click", () => reelGo(false));
   $("reelStop").addEventListener("click", () => { stopReel(); video.pause(); });
   function stripSeek(ev) {
     const box = $("strip").getBoundingClientRect();
@@ -556,14 +583,14 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     const key = ev.key;
     if (key === "m" || key === "M") { ev.preventDefault(); markNow(); }
     // Space はどこに焦点があっても再生と停止（押した直後のボタンをもう一度押してしまわないように）
-    else if (key === " ") { ev.preventDefault(); if (video.src) (video.paused ? video.play().catch(() => {}) : video.pause()); }
-    else if (key === "ArrowLeft" && ev.target.id !== "strip") { ev.preventDefault(); seek(video.currentTime - 3); }
-    else if (key === "ArrowRight" && ev.target.id !== "strip") { ev.preventDefault(); seek(video.currentTime + 3); }
+    else if (key === " ") { ev.preventDefault(); togglePlay(); }
+    else if (key === "ArrowLeft" && ev.target.id !== "strip") { ev.preventDefault(); userSeek(video.currentTime - 3); }
+    else if (key === "ArrowRight" && ev.target.id !== "strip") { ev.preventDefault(); userSeek(video.currentTime + 3); }
     else if (key === "," || key === ".") {
       ev.preventDefault();
       let k = capIndexAt(video.currentTime + 0.01) + (key === "," ? -1 : 1);
       if (key === "," && showingAt(video.currentTime) < 0) k += 1;
-      const c = S.caps[Math.min(Math.max(k, 0), S.caps.length - 1)]; if (c) seek(c.s);
+      const c = S.caps[Math.min(Math.max(k, 0), S.caps.length - 1)]; if (c) userSeek(c.s);
     }
   }, true);
   document.addEventListener("keyup", (ev) => { if (ev.key === " " && !typing(ev)) ev.preventDefault(); }, true);
@@ -617,7 +644,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function buildItem(id) {
     const node = el("article", "item"); node.dataset.id = id;
     const head = el("div", "item-head");
-    const time = button("▶ 0:00", () => { const m = S.marks.get(id); if (m) playList([kOfCap(m.cap)]); }, "time");
+    const time = button("▶ 0:00", () => playMark(id), "time");
     const idx = el("span", "idx"); const chip = el("span", "chip");
     head.append(time, idx, chip);
     const orig = el("p", "orig");
@@ -683,7 +710,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     lead.append(el("p", "empty", "機械が、字幕とほかの聞き取り（文字起こしの2回目・3回目・音声認識）が食い違う所に付けた要確認です。"
                  + "2つ以上が食い違う所を先に並べています。聞いて、正しい候補があれば押してください。字幕のままでよければ「このまま」、"
                  + "どれも違えば「朱を入れる」で字を書いてください。"),
-                button("要確認の所だけ再生（" + S.flags.length + "）", () => playList(flagKs(), "flags")));
+                button("要確認の所だけ再生（" + S.flags.length + "）", () => playList(flagKs(), "flags", 0)));
     list.appendChild(lead);
     for (const f of orderedFlags()) {
       const k = kOfCap(f.i); const c = S.caps[k]; if (!c) continue;
@@ -691,7 +718,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
       const node = el("article", "item is-flag"); node.dataset.id = id;
       const head = el("div", "item-head");
       const chip = el("span", "chip plain gunjo", "要確認");
-      head.append(button("▶ " + clock(c.s), () => playList([k]), "time"), el("span", "idx", "#" + c.i + " · 素材 " + clock(c.src)), chip);
+      head.append(button("▶ " + clock(c.s), () => { const ks = flagKs(); playList(ks, "flags", ks.indexOf(k)); }, "time"), el("span", "idx", "#" + c.i + " · 素材 " + clock(c.src)), chip);
       const opts = el("div", "options"); const optButtons = [];
       for (const o of (f.options || [])) {
         const b = button("", () => choose(k, o.t, "候補から選んだ（" + (o.by || []).join("・") + "）"));
