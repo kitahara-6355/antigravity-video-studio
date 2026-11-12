@@ -31,9 +31,15 @@
     ],
     "title": "久木田先生の書「縁」"
    },
-   "state": "proposed",
+   "state": "approved",
    "reason": "「縁」の話に合わせて小窓で出す",
-   "fingerprint": "ab2d79898d1d19aa"
+   "fingerprint": "ab2d79898d1d19aa",
+   "decision": {
+    "by": "北原",
+    "at": "2026-11-13T05:45:36+09:00",
+    "evidence": "2026-11-13 05:45 チャット「①小窓は入れて下さい」（見本24秒を見て）",
+    "fingerprint": "ab2d79898d1d19aa"
+   }
   }
  ],
  "wanted": [
