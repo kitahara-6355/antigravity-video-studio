@@ -7,7 +7,7 @@
  },
  "items": [
   {
-   "id": "i01",
+   "id": "board-3041",
    "at": 1841.73,
    "seconds": 8.0,
    "mode": "pip",
@@ -90,7 +90,7 @@
    "at": 722.56,
    "mentions": 7,
    "caption": "例えば　ユニクロの",
-   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+   "note": "絵はあるが使えない（ユニクロ UT（久木田先生の書「森羅万象」の T シャツ・商品写真））: 権利が未確認（rights: third_party。自社の物 own か、許可を得た物 permitted だけ）"
   },
   {
    "keyword": "フォント",
@@ -149,7 +149,18 @@
    "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
   }
  ],
- "excluded": [],
+ "excluded": [
+  {
+   "id": "uniqlo_ut",
+   "title": "ユニクロ UT（久木田先生の書「森羅万象」の T シャツ・商品写真）",
+   "reason": "権利が未確認（rights: third_party。自社の物 own か、許可を得た物 permitted だけ）"
+  },
+  {
+   "id": "uniqlo_worn",
+   "title": "ユニクロ着用画像（2人が T シャツを着ている絵）",
+   "reason": "AI が作った絵は使わない"
+  }
+ ],
  "skipped": [
   {
    "keyword": "縁",

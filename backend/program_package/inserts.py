@@ -16,8 +16,8 @@
 
     python -m backend.program_package.inserts propose SPEC.json --captions LOCK.json --map 地図.json
     python -m backend.program_package.inserts sheet SPEC.json --video 完成版.mp4 --out 案の一覧.jpg
-    python -m backend.program_package.inserts approve SPEC.json --ids i01,i03 --by 北原 --evidence "11/12 チャット「1と3を入れて」"
-    python -m backend.program_package.inserts reject SPEC.json --ids i02 --by 北原 --evidence "…"
+    python -m backend.program_package.inserts approve SPEC.json --ids board-3041 --by 北原 --evidence "11/13 チャット「小窓は入れて」"
+    python -m backend.program_package.inserts reject SPEC.json --ids uniqlo_ut-1223 --by 北原 --evidence "…"
     python -m backend.program_package.inserts render SPEC.json --video 完成版.mp4 --out 差し込み版.mp4
 
 案の置き場は ``backend/config/inserts/<収録ID>.json``（``setup`` は人が書く所、``items`` 以下は propose が書く）。
@@ -281,7 +281,8 @@ def propose(spec: dict, captions: list[dict], m: dict | None, setup: dict | None
         source = {k: src[k] for k in ("kind", "id", "at", "crop", "file", "title") if src.get(k) not in (None, "")}
         if src["kind"] == "material":
             source["sha256"] = _sha(_file(src, root))
-        item = {"id": f"i{len(items) + 1:02d}", "at": a, "seconds": round(b - a, 2), "mode": mode, "box": box,
+        # 名前は絵と時刻から付ける（素材が増えて案の並びが変わっても、承認した案の名前は変わらない）
+        item = {"id": f"{src['id']}-{int(a) // 60:02d}{int(a) % 60:02d}", "at": a, "seconds": round(b - a, 2), "mode": mode, "box": box,
                 "keyword": word, "caption": text.replace("\n", " "), "source": source, "state": PROPOSED,
                 "reason": f"「{word}」の話に合わせて{'小窓' if mode == 'pip' else '全画面（小窓の置ける壁が無い）'}で出す"}
         item["fingerprint"] = fingerprint(item)
@@ -289,6 +290,9 @@ def propose(spec: dict, captions: list[dict], m: dict | None, setup: dict | None
         last = b
 
     have = {norm(w) for s in sources for w in s.get("keywords", [])}
+    # 絵はあるが使えない言葉は、何が足りないかを書く（許可を取れば案になる）
+    held = {norm(w): f"絵はあるが使えない（{mt.get('title') or mt.get('id')}）: {unusable(mt)}"
+            for mt in reversed(materials or []) if unusable(mt) for w in mt.get("keywords", [])}
     wanted = []
     for word in topic_words(spec, package_text, setup):
         idx = mentions(captions, word)
@@ -297,7 +301,7 @@ def propose(spec: dict, captions: list[dict], m: dict | None, setup: dict | None
         c = captions[idx[0]]
         wanted.append({"keyword": word, "at": round(c["start"], 2), "mentions": len(idx),
                        "caption": c["text"].replace("\n", " "),
-                       "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"})
+                       "note": held.get(norm(word), "絵が無い。自社の物か、許可を得た物があれば materials に足す")})
     return {"items": items, "wanted": sorted(wanted, key=lambda w: w["at"]), "excluded": excluded, "skipped": skipped}
 
 

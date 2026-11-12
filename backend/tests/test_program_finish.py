@@ -49,7 +49,7 @@ def test_未承認の案は飾りに入らない(tmp_path, plan_file):
 def test_承認した案だけが飾りと同じ形で入る(tmp_path, plan_file):
     src = video(tmp_path / "v62.mp4", 80)
     plan = ins.load_plan(plan_file)
-    ins.decide(plan, ["i01"], ins.APPROVED, by="北原", evidence="チャット", people=["北原"])
+    ins.decide(plan, ["board-0110"], ins.APPROVED, by="北原", evidence="チャット", people=["北原"])
     ins.save_plan(plan_file, plan)
     got = ep._inserts({"recording": "x", "inserts": str(plan_file)}, src, tmp_path)
     assert [(at, sec) for _, at, sec in got] == [(70, 5.0)]

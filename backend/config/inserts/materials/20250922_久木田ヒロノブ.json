@@ -1,0 +1,8 @@
+[
+ {"id": "uniqlo_ut", "title": "ユニクロ UT（久木田先生の書「森羅万象」の T シャツ・商品写真）", "file": "ユニクロ01.jpg",
+  "drive": "1ta5sAgBo4vq1-TeCBmtWiMnD8YyKFbWN", "keywords": ["ユニクロ"], "rights": "third_party", "people": "none",
+  "note": "2025-10 の手作業の編集で用意された絵（Drive の「前編プロット01」と同じフォルダ）。ユニクロの商品写真なので、使うには許可が要る。許可が取れたら rights を permitted にする"},
+ {"id": "uniqlo_worn", "title": "ユニクロ着用画像（2人が T シャツを着ている絵）", "file": "ユニクロ着用画像.png",
+  "drive": "1w56-qG0o-FD6cErTP78ECBhDryZnCilU", "keywords": ["ユニクロ"], "rights": "unknown", "people": "unknown", "ai_generated": true,
+  "note": "AI が作った絵（右下に生成の印がある）。実在しない人が写っている。案には出さない"}
+]

@@ -96,20 +96,33 @@ def test_素材は話に合わせて出し絵が無い言葉は素材待ちに�
     assert [w["keyword"] for w in plan["wanted"]] == ["墨"]  # 絵のある言葉・人の名前・話に出ない言葉は出さない
 
 
+def test_絵はあるが使えない言葉は何が足りないかを素材待ちに書く(material, tmp_path):
+    spec = {"telops": [{"at": 300, "head": "剣閃", "body": "x"}]}
+    plan = ins.propose(spec, CAPS, the_map(), {}, [{**material, "rights": "third_party"}], root=tmp_path)
+    assert plan["items"] == [] and "権利" in plan["wanted"][0]["note"]
+
+
+def test_素材が増えても承認した案の名前は変わらない(material, tmp_path):
+    one = ins.propose({}, CAPS, the_map(), SETUP)
+    early = {**material, "keywords": ["聞いて"]}  # 色紙より前の時刻に入る素材
+    two = ins.propose({}, CAPS, the_map(), SETUP, [early], root=tmp_path)
+    assert len(two["items"]) == 2 and one["items"][0]["id"] in [it["id"] for it in two["items"]]
+
+
 def test_承認は人だけで証拠が要る():
     plan = ins.propose({}, CAPS, the_map(), SETUP)
     with pytest.raises(ins.InsertError, match="AI は承認しない"):
-        ins.decide(plan, ["i01"], ins.APPROVED, by="claude-code", evidence="x", people=PEOPLE)
+        ins.decide(plan, ["board-0110"], ins.APPROVED, by="claude-code", evidence="x", people=PEOPLE)
     with pytest.raises(ins.InsertError, match="evidence"):
-        ins.decide(plan, ["i01"], ins.APPROVED, by="北原", evidence=" ", people=PEOPLE)
+        ins.decide(plan, ["board-0110"], ins.APPROVED, by="北原", evidence=" ", people=PEOPLE)
     assert ins.approved(plan) == []
-    ins.decide(plan, ["i01"], ins.APPROVED, by="北原", evidence="11/12 チャット「入れて」", people=PEOPLE)
-    assert [it["id"] for it in ins.approved(plan)] == ["i01"]
+    ins.decide(plan, ["board-0110"], ins.APPROVED, by="北原", evidence="11/12 チャット「入れて」", people=PEOPLE)
+    assert [it["id"] for it in ins.approved(plan)] == ["board-0110"]
 
 
 def test_承認できない人の名前が書かれた案は入らない():
     plan = ins.propose({}, CAPS, the_map(), SETUP)
-    ins.decide(plan, ["i01"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    ins.decide(plan, ["board-0110"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
     plan["items"][0]["decision"]["by"] = "claude-code"  # 置き場を手で書き換えた場合
     assert ins.approved(plan) == []
 
@@ -120,14 +133,14 @@ def test_台帳の承認できる人にAIの名前は無い():
 
 def test_承認の後に中身が変わった案は入らない():
     plan = ins.propose({}, CAPS, the_map(), SETUP)
-    ins.decide(plan, ["i01"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    ins.decide(plan, ["board-0110"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
     plan["items"][0]["at"] += 3
     assert ins.approved(plan) == []
 
 
 def test_出し直しても同じ案の承認は残り変わった案は提案に戻る():
     old = ins.propose({}, CAPS, the_map(), SETUP)
-    ins.decide(old, ["i01"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    ins.decide(old, ["board-0110"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
     old["setup"] = SETUP
     same = ins.merge(old, ins.propose({}, CAPS, the_map(), SETUP))
     assert same["items"][0]["state"] == ins.APPROVED and same["setup"] == SETUP and ins.approved(same)
@@ -149,10 +162,10 @@ def test_承認した分だけ入った版を書き出す(material, tmp_path):
                     "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest", "-c:v", "libx264",
                     "-preset", "ultrafast", "-c:a", "aac", str(video)], check=True)
     plan = ins.propose({}, CAPS, the_map(), SETUP, [material], root=tmp_path)
-    assert [it["id"] for it in plan["items"]] == ["i01", "i02"]
+    assert [it["id"] for it in plan["items"]] == ["board-0110", "kensen-0140"]
     with pytest.raises(ins.InsertError, match="承認済みの案がありません"):
         ins.render(plan, video, tmp_path / "x.mp4", root=tmp_path)
-    ins.decide(plan, ["i02"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    ins.decide(plan, ["kensen-0140"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
     out = ins.render(plan, video, tmp_path / "out.mp4", root=tmp_path, preset="ultrafast")
 
     def pixel(t, box):
