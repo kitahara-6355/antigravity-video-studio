@@ -334,9 +334,11 @@ def decide(plan: dict, ids: list[str], state: str, *, by: str, evidence: str, pe
     return plan
 
 
-def approved(plan: dict) -> list[dict]:
-    """差し込んでよい案（承認済みで、承認の後に中身が変わっていない物）。"""
+def approved(plan: dict, people: list[str] | None = None) -> list[dict]:
+    """差し込んでよい案（承認できる人が承認し、承認の後に中身が変わっていない物）。"""
+    people = approvers() if people is None else people
     return [it for it in plan.get("items", []) if it.get("state") == APPROVED
+            and (it.get("decision") or {}).get("by") in people
             and (it.get("decision") or {}).get("fingerprint") == fingerprint(it)]
 
 

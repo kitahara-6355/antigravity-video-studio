@@ -107,6 +107,13 @@ def test_承認は人だけで証拠が要る():
     assert [it["id"] for it in ins.approved(plan)] == ["i01"]
 
 
+def test_承認できない人の名前が書かれた案は入らない():
+    plan = ins.propose({}, CAPS, the_map(), SETUP)
+    ins.decide(plan, ["i01"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    plan["items"][0]["decision"]["by"] = "claude-code"  # 置き場を手で書き換えた場合
+    assert ins.approved(plan) == []
+
+
 def test_台帳の承認できる人にAIの名前は無い():
     assert ins.approvers() and not any("claude" in a.lower() or "ai" == a.lower() for a in ins.approvers())
 

@@ -15,6 +15,9 @@
     python -m backend.program_package.music analyze 曲.m4a
     python -m backend.program_package.music fit 曲.m4a --program backend/config/program/美麗の書道対談.json [--write AUDIO.json]
     python -m backend.program_package.music check 番組OP.mp4 --program backend/config/program/美麗の書道対談.json
+    python -m backend.program_package.music plan AUDIO.json --program backend/config/program/美麗の書道対談.json --music-dir 曲の置き場
+
+``plan`` は曲の台帳（backend/config/music.json）から remix の指定を丸ごと作る（OP・BGM・ED）。
 """
 from __future__ import annotations
 
@@ -148,13 +151,75 @@ def check(path: str | Path, at: float, window: float = 2.5) -> dict:
     return {"at": at, "rise_db": round(rise, 1), "ok": rise >= CHECK_RISE_DB}
 
 
+LEDGER = Path(__file__).resolve().parents[1] / "config" / "music.json"
+ROLES = {"op": "op_music", "bgm": "bgm", "ed": "ed_music"}
+
+
+def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[list[float]] | None = None,
+         body_seconds: float | None = None) -> dict:
+    """曲の台帳から、この番組の音の指定（remix の AUDIO.json）を作る。
+
+    - OP: 台帳に start が無ければ、曲の山の入りを番組名の出だしに合わせる
+    - BGM: 本編の全体に敷く。quiet（曲を止める区間・本編の秒）があれば、そこを避けて区間を分ける
+    - 出どころ（source）の無い曲は使わない。provisional の曲は印を引き継ぐ（名前に「_仮曲入り」が付く）
+    """
+    from backend.program_package import opening
+    use = (ledger.get("programs") or {}).get(program["name"])
+    if not use:
+        raise MusicError(f"曲の台帳に番組「{program['name']}」がありません")
+    out: dict = {"op_music": None, "bgm": None, "ed_music": None, "peak_db": ledger.get("peak_db", -1.5), "tracks": {}}
+    for role, key in ROLES.items():
+        r = use.get(role)
+        if not r:
+            continue
+        t = (ledger.get("tracks") or {}).get(r["track"])
+        if not t:
+            raise MusicError(f"曲の台帳に曲「{r['track']}」がありません（{role}）")
+        if not (t.get("source") or "").strip():
+            raise MusicError(f"出どころ（source）の無い曲は使いません: {t.get('title', r['track'])}")
+        if not t.get("file"):
+            raise MusicError(f"曲のファイルが決まっていません: {t['title']}（曲の台帳の tracks.{r['track']}.file）")
+        if music_dir is None:
+            raise MusicError("曲の置き場が分かりません（--music-dir か環境変数 AVS_MUSIC_DIR）")
+        path = Path(music_dir) / t["file"]
+        if not path.exists():
+            raise MusicError(f"曲のファイルがありません: {path}")
+        item = {k: v for k, v in r.items() if k not in ("track", "start_note") and v is not None}
+        item.update(path=str(path), provisional=bool(t.get("provisional")))
+        if role == "op" and r.get("start") is None:
+            f = fit(analyze(path), title_at(program), opening.length(program))
+            item["start"] = f["start"]
+            item["start_note"] = f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）"
+        if role == "bgm" and quiet:
+            if body_seconds is None:
+                raise MusicError("曲を止める区間を使うには本編の長さが要ります")
+            item["ranges"] = bgm_ranges(body_seconds, quiet, float(item.get("fade", 3.0)))
+        out[key] = item
+        out["tracks"][role] = {k: t.get(k) for k in ("title", "artist", "source")}
+    return out
+
+
+def bgm_ranges(body_seconds: float, quiet: list[list[float]], fade: float = 3.0) -> list[list[float]]:
+    """本編のうち BGM を敷く区間。quiet の区間（揮毫など、曲を止めたい所）を避ける。短すぎる切れ端は捨てる。"""
+    out, t = [], 0.0
+    for a, b in sorted(quiet):
+        if a - t > 2 * fade + 4:
+            out.append([round(t, 2), round(a, 2)])
+        t = max(t, b)
+    if body_seconds - t > 2 * fade + 4:
+        out.append([round(t, 2), round(body_seconds, 2)])
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     from backend.program_package import opening
     p = argparse.ArgumentParser(description="曲を聞いて、番組 OP のどこから使うかを決める")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("analyze", "fit", "check"):
+    for name in ("analyze", "fit", "check", "plan"):
         s = sub.add_parser(name)
-        s.add_argument("path")
+        s.add_argument("path", help="曲（plan のときは書き出す AUDIO.json）")
+        if name == "plan":
+            s.add_argument("--music-dir")
         if name != "analyze":
             s.add_argument("--program", required=True)
         if name == "fit":
@@ -165,6 +230,13 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(analyze(a.path), ensure_ascii=False, indent=1))
             return 0
         program = opening.load(a.program)
+        if a.cmd == "plan":
+            import os
+            ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+            spec = plan(program, ledger, a.music_dir or os.environ.get("AVS_MUSIC_DIR"))
+            Path(a.path).write_text(json.dumps(spec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+            print(json.dumps(spec, ensure_ascii=False, indent=1))
+            return 0
         if a.cmd == "check":
             r = check(a.path, title_at(program))
             print(json.dumps(r, ensure_ascii=False))
