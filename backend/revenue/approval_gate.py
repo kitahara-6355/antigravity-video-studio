@@ -109,6 +109,8 @@ def write_proposal(run_dir: str | Path, ctx: Any, *, run_id: str,
         "degraded_stages": list(degraded_stages or []),
         "warnings": list(getattr(ctx, "warnings", None) or []),
         "quality_detail": dict(quality_detail or {}),
+        # 品質改善ループを回したか・効いたか（D-04）。回していなければ None
+        "quality_loop": getattr(ctx, "quality_loop", None),
         "ai_outputs": ai_outputs,
         "models_used": list(models_used),
     }
@@ -275,8 +277,12 @@ def export_allowed(run_dir: str | Path) -> tuple[bool, str]:
 
 def write_export(run_dir: str | Path, *, final_path: str | None,
                  metadata_sidecar: str | None, quality_sidecar: str | None,
-                 render_mode: str) -> dict:
-    """書き出した記録を残す — **どの承認で、何を書き出したか**（R2-C2 の証跡の最後の段）。"""
+                 render_mode: str, encode: dict | None = None) -> dict:
+    """書き出した記録を残す — **どの承認で、何を書き出したか**（R2-C2 の証跡の最後の段）。
+
+    `encode` は書き出しで**実際に使った**エンコードの設定（D-47）。モードの名前だけでは、
+    その設定で書いたかどうかが分からない（2026-11-10 までは safe も production も同じ設定だった）。
+    """
     run_dir = Path(run_dir)
     data = {
         "run_id": run_dir.name,
@@ -287,6 +293,7 @@ def write_export(run_dir: str | Path, *, final_path: str | None,
         "metadata_sidecar": str(metadata_sidecar) if metadata_sidecar else None,
         "quality_sidecar": str(quality_sidecar) if quality_sidecar else None,
         "render_mode": render_mode,
+        "encode": dict(encode) if encode else None,
     }
     _write_json(run_dir / EXPORT, data)
     return data
@@ -606,6 +613,12 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
              f"  プレビュー  : {(p.get('preview') or {}).get('path')}",
              f"  品質        : {q.get('score')} 点（{合否}）→ 書き出しのモード {p.get('render_mode')}",
              f"  使ったモデル: {', '.join(p.get('models_used') or []) or '(記録なし)'}"]
+    loop = p.get("quality_loop")
+    if loop:
+        点 = " → ".join(str(x) for x in loop.get("scores") or [])
+        lines.append(f"  改善ループ  : {loop.get('iterations')} 回（{点} 点）— "
+                     + ("**効いた**（合格まで上がった）" if loop.get("improved")
+                        else f"**効いていない**（{loop.get('stopped')}）"))
     # **工程ごとに、なぜそのモデルになったか**（D-39・R2-C5）。実行記録から読む
     run_path = run_dir / "run.json"
     if run_path.is_file():
@@ -682,6 +695,15 @@ def trace(run_dir: str | Path) -> tuple[bool, str]:
         lines += [f"  書き出した時刻: {ex.get('exported_at')}",
                   f"  動画          : {(ex.get('final') or {}).get('path')}",
                   f"  モード        : {ex.get('render_mode')}"]
+        enc = ex.get("encode")
+        if enc:
+            lines.append("  エンコード    : " + ("**焼き直せず、プレビューの写し**" if enc.get("fallback")
+                                              else f"{enc.get('encode')}（{' '.join(enc.get('args') or [])}）"))
+            if enc.get("logo"):
+                a = enc["logo"].get("args")
+                lines.append("  ロゴの焼き直し: " + (" ".join(a) if isinstance(a, list) else str(a)))
+        else:
+            lines.append("  エンコード    : （記録なし — D-47 より前の書き出し。safe も production も同じ設定だった）")
     else:
         lines.append("  まだ書き出していません")
     return True, "\n".join(lines)

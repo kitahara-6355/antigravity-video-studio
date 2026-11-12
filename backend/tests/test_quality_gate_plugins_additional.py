@@ -322,7 +322,41 @@ def test_pipeline_completion_check_success():
     )
     r = PipelineCompletionCheck().analyze(ctx)
     assert r["deductions"] == 0
-    assert "✅ 全ステージ正常完走" in r["feedback"]
+    # 工程の成否の記録が無いときは「正常完走」と言わない（D-42）
+    assert not any("正常完走" in f for f in r["feedback"])
+    assert any("見ていません" in f for f in r["feedback"])
+
+
+def test_pipeline_completion_check_looks_at_stage_outcomes():
+    """D-42: 成果物がそろっていても、工程が落ちていれば「正常完走」ではない。"""
+    from types import SimpleNamespace as R
+
+    def ctx_with(*results, skipped=()):
+        c = _MockCtx(segments=[{"text": "ok"}], selected_segments=[{"text": "ok"}],
+                     metadata={"titles": ["ok"]}, thumbnail_path="ok.png")
+        c.stage_results = list(results)
+        c.skipped_features = list(skipped)
+        return c
+
+    ok = PipelineCompletionCheck().analyze(ctx_with(R(stage_name="文字起こし", success=True),
+                                                    R(stage_name="校閲", success=True)))
+    assert ok["deductions"] == 0 and any("全ステージ正常完走（ここまでの 2 工程" in f for f in ok["feedback"])
+
+    bad = PipelineCompletionCheck().analyze(ctx_with(R(stage_name="文字起こし", success=True),
+                                                     R(stage_name="校閲", success=False)))
+    assert bad["deductions"] == 15 and bad["stages_failed"] == ["校閲"]
+    assert not any("正常完走" in f for f in bad["feedback"])
+
+    # 同じ工程は最後の試行が答え。品質チェック自身の結果は数えない
+    retried = PipelineCompletionCheck().analyze(ctx_with(R(stage_name="校閲", success=False),
+                                                         R(stage_name="校閲", success=True),
+                                                         R(stage_name="品質チェック", success=False)))
+    assert retried["deductions"] == 0 and retried["stages_seen"] == 1
+
+    # 飛ばした機能があれば、減点はしないが「正常完走」とは言わない
+    skipped = PipelineCompletionCheck().analyze(ctx_with(R(stage_name="校閲", success=True), skipped=["BGM"]))
+    assert skipped["deductions"] == 0 and not any("正常完走" in f for f in skipped["feedback"])
+    assert any("飛ばした機能" in f for f in skipped["feedback"])
 
 def test_gpu_health_check_success():
     ctx = _MockCtx(segments=[{"text": "abcdefghij"}] * 10) # 100 chars

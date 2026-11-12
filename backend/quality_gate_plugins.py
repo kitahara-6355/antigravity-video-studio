@@ -1383,10 +1383,32 @@ class PipelineCompletionCheck(QualityCheckPlugin):
                 deductions += pts
                 feedback.append(f"🔴 {label}が未生成 — パイプライン中断の可能性")
 
-        if deductions == 0:
-            feedback.append("✅ 全ステージ正常完走")
+        # **工程の成否そのものを見る**（D-42）。以前の材料は成果物の有無だけで、工程が落ちても
+        # 既定の出力で埋まっていれば「全ステージ正常完走」と出ていた（AI なしの実走で stability 100）。
+        # 同じ工程が何度か走ったときは最後の試行が答え。品質ゲート自身の結果は数えない
+        last: dict = {}
+        for r in getattr(ctx, "stage_results", None) or []:
+            name = getattr(r, "stage_name", None)
+            if name and name != "品質チェック":   # QualityGateWorker の名前
+                last[name] = bool(getattr(r, "success", False))
+        failed = [n for n, ok in last.items() if not ok]
+        for n in failed:
+            deductions += 15
+            feedback.append(f"🔴 工程が落ちています: {n}")
+        skipped = [str(x) for x in (getattr(ctx, "skipped_features", None) or [])]
+        if skipped:
+            # 減点はしない（未実装の機能は台帳で扱う）。ただし「正常完走」とは言わない
+            feedback.append(f"🟡 飛ばした機能があります: {'、'.join(skipped)}")
 
-        return {"deductions": deductions, "feedback": feedback}
+        if deductions == 0 and not skipped:
+            if last:
+                # 測ったことだけを言う。**「正常完走」は、工程の成否を見たときだけ**
+                feedback.append(f"✅ 全ステージ正常完走（ここまでの {len(last)} 工程が成功・必須の成果物あり）")
+            else:
+                feedback.append("✅ 必須の成果物はそろっています（工程の成否は記録が無く、見ていません）")
+
+        return {"deductions": deductions, "feedback": feedback,
+                "stages_seen": len(last), "stages_failed": failed, "skipped": skipped}
 
 
 class GPUHealthCheck(QualityCheckPlugin):

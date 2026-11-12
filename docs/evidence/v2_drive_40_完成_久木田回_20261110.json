@@ -1,0 +1,241 @@
+{
+ "id": "",
+ "name": "動画制作",
+ "folder": true,
+ "_doc": "2026-11-10 13:40 UTC に Drive のコネクタで読んだ 40_完成/20250922_久木田ヒロノブ の姿（id・名前・大きさ。md5 はコネクタからは読めない）。他のフォルダは省いた。python -m backend.revenue.program_gate gate --tree <このファイル> で使う",
+ "children": [
+  {
+   "id": "",
+   "name": "40_完成",
+   "folder": true,
+   "children": [
+    {
+     "id": "1SsDAtMv_qSQWkLpiNVUEyWufrf5uCdPx",
+     "name": "20250922_久木田ヒロノブ",
+     "folder": true,
+     "children": [
+      {
+       "id": "1RG1TIZnKzZXaPOl6yXARoqvzEYRfykfJ",
+       "name": "_v66_番組仕上げ_仮曲入り_確認用.mp4",
+       "size": 281364065,
+       "video": true
+      },
+      {
+       "id": "1rneB0gVDVQ7GPYpF_bd8tJ0ZCKh8dK7O",
+       "name": "_v65_番組仕上げ_仮曲入り_確認用.mp4",
+       "size": 269212049,
+       "video": true
+      },
+      {
+       "id": "1iAn1lFNT4utDQ5suazGEWhsi8a6dvce5",
+       "name": "_v64_番組仕上げ_仮曲入り_確認用.mp4",
+       "size": 270365698,
+       "video": true
+      },
+      {
+       "id": "1bLxzmBHINLbh42o947sFJCbvDmZnm4TW",
+       "name": "_v63_番組仕上げ_確認用.mp4",
+       "size": 267873047,
+       "video": true
+      },
+      {
+       "id": "156ubDEazwDeNzQ2f2LEEuRVCtM0U1BAR",
+       "name": "_v66_チャプター.txt",
+       "size": 919
+      },
+      {
+       "id": "1Iiu5R9LdmOhi9loQWhHSpwo7RM-LwU5O",
+       "name": "_v65_チャプター.txt",
+       "size": 919
+      },
+      {
+       "id": "1RyXYANRX3eRBaq4oo7riNV0-oGA8hJqc",
+       "name": "_v64_チャプター.txt",
+       "size": 919
+      },
+      {
+       "id": "19WBLG9KzdgiQRxjuBJgRkEHGwwkgQW9v",
+       "name": "_v63_チャプター.txt",
+       "size": 910
+      },
+      {
+       "id": "1QAL_8hQofqYCbIVYymgGQh1epFN0TWuT",
+       "name": "20250922_久木田ヒロノブ_v62_ロゴなし.mp4",
+       "size": 212656654,
+       "video": true
+      },
+      {
+       "id": "1DOm5Zg2ZCCQDGPGXJkNoENKb5f8PsOLC",
+       "name": "20250922_久木田ヒロノブ_v62_ロゴなし_確認用360p.mp4",
+       "size": 55571093,
+       "video": true
+      },
+      {
+       "id": "1AoCGNVfA-r900oPAn7WqBpZRNs4WU79I",
+       "name": "20250922_久木田ヒロノブ_v62_ロゴなし.subtitles.json",
+       "size": 175890
+      },
+      {
+       "id": "1nhCsQ-YTs_4XezeBdHJH-ma-8MZp8Kii",
+       "name": "20250922_久木田ヒロノブ_v61_確認用360p.mp4",
+       "size": 55275094,
+       "video": true
+      },
+      {
+       "id": "1ZdpWp4QfNlzaExxgVkK7KhWjrCUT12Wk",
+       "name": "20250922_久木田ヒロノブ_v60_確認用360p.mp4",
+       "size": 55274232,
+       "video": true
+      },
+      {
+       "id": "1segGqJvfW9iLhpJgb7BpXiKb4uUhte3f",
+       "name": "_サムネ_仮決定_P1_薄紫_B3_K1.png",
+       "size": 1066713,
+       "image": true
+      },
+      {
+       "id": "18JFtqn73CZDZbILHIzXloDIFaxaKlNrb",
+       "name": "_サムネ_P1_薄紫_B5_K4.png",
+       "size": 1060064,
+       "image": true
+      },
+      {
+       "id": "1_-3yhnXlvX3324d9w3Qx_-U1ybAJOFC3",
+       "name": "Shorts候補_I_額縁と明るい薄紫",
+       "folder": true,
+       "children": [
+        {
+         "id": "1CHeHt0_KfbnCK4jpkY9dkSFb2tdpqYDb",
+         "name": "Shorts_I_S1_鬼滅の刃.mp4",
+         "size": 7924923,
+         "video": true
+        },
+        {
+         "id": "1Ouyfog7iexIGjmQIIHIv3WvbrsJ0l5tM",
+         "name": "Shorts_I_S2_テイク23.mp4",
+         "size": 8575669,
+         "video": true
+        },
+        {
+         "id": "1tu1p3yxv-XS7zz2ctL1w3gXMpRmVHZ8_",
+         "name": "Shorts_I_S3_考えながら書かない.mp4",
+         "size": 7535348,
+         "video": true
+        },
+        {
+         "id": "12q63iw5PXGEOmDhkEVtutr2WUbOeN6Gk",
+         "name": "Shorts_I_S4_丁寧に書いた字.mp4",
+         "size": 5326814,
+         "video": true
+        },
+        {
+         "id": "1_aDu_mByVGK_7_4Itq7uKlzJHHCcYBm7",
+         "name": "Shorts_I_S5_揮毫の縁.mp4",
+         "size": 7553042,
+         "video": true
+        },
+        {
+         "id": "1jUh70whLW7uRcnC8mPrib75CfoLr1DuD",
+         "name": "Shorts_I_S6_ユニクロ.mp4",
+         "size": 5957037,
+         "video": true
+        },
+        {
+         "id": "1kQ71ZDHbY7BAXmJC4p2EqLNKobVpEEkx",
+         "name": "Shorts_I_S7_筆の危機.mp4",
+         "size": 8277366,
+         "video": true
+        },
+        {
+         "id": "1IsjR6_-Ecb7qJnkZTrogSJ--FPpykq7Q",
+         "name": "Shorts_I_S8_デビューは菓子折り.mp4",
+         "size": 5111031,
+         "video": true
+        }
+       ]
+      },
+      {
+       "id": "1dorXbQODS_gpN614pihKZM-O2iuQx1V6",
+       "name": "Shorts_投稿用",
+       "folder": true,
+       "children": [
+        {
+         "id": "1fjUc3AvcaEZ4cFEsgRIfZgPFj8_OjME-",
+         "name": "01_S1_鬼滅の刃.mp4",
+         "size": 7919048,
+         "video": true
+        },
+        {
+         "id": "1AmwRutLC7IrpJ6i2gPJs2O143hkAVUy-",
+         "name": "02_S5_揮毫_縁.mp4",
+         "size": 7547167,
+         "video": true
+        },
+        {
+         "id": "14hjLULjtLQ3hWEDfOetLPanlUye8vrcb",
+         "name": "03_S2_テイク23.mp4",
+         "size": 8217393,
+         "video": true
+        },
+        {
+         "id": "1Vvq6zZoyQh59-mWa0DPQkhERvISMzMDL",
+         "name": "04_S3_考えながら書かない.mp4",
+         "size": 7529473,
+         "video": true
+        },
+        {
+         "id": "1Ek0UoWXbaQUGNrkKWmHSMAlgBhf_yr0o",
+         "name": "05_S4_丁寧に書いた字.mp4",
+         "size": 5320939,
+         "video": true
+        },
+        {
+         "id": "1OJxlKLVPWVTqq8xV17kMlPRa6oTQheau",
+         "name": "06_S6_ユニクロと中国.mp4",
+         "size": 5951162,
+         "video": true
+        },
+        {
+         "id": "1to7UYWhsDcS6WEXuGyzeL5vBlgkGoZVa",
+         "name": "07_S7_イタチの毛.mp4",
+         "size": 8271491,
+         "video": true
+        },
+        {
+         "id": "177whEUSZmXjzvHgDNfmhX_a34q9Sod19",
+         "name": "08_S8_デビューは菓子折り.mp4",
+         "size": 5105156,
+         "video": true
+        },
+        {
+         "id": "1AqGQh4cxEk0fKd8S8bzQSgRvZkpQLzXH",
+         "name": "投稿文.txt",
+         "size": 4075
+        }
+       ]
+      },
+      {
+       "id": "1JTHFPQSMX0bdlwPTWWsGvCP1_E2P6bLA",
+       "name": "番組化の見本",
+       "folder": true,
+       "children": [
+        {
+         "id": "1S-PG5oST1lhchJzlhftAoDNXF8TBuJT9",
+         "name": "章見出しC2_上に詰めた見本.jpg",
+         "size": 202711,
+         "image": true
+        },
+        {
+         "id": "16gg6g0Zve2_Z0sIg4GyQt9rDUDhcKfhA",
+         "name": "OPと章見出しの見本.jpg",
+         "size": 195299,
+         "image": true
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -896,7 +896,8 @@ class PipelineCoordinator:
             write_export(run_dir, final_path=ctx.final_path,
                          metadata_sidecar=self._sidecar_path,
                          quality_sidecar=self._quality_sidecar_path,
-                         render_mode=ctx.render_mode)
+                         render_mode=ctx.render_mode,
+                         encode=ctx.render_encode)
         finally:
             self._intermediates_before = None
             self._failed_before = None
@@ -1393,7 +1394,18 @@ class PipelineCoordinator:
             logger.error("品質改善ループ: PreviewWorker/QualityGateWorker が見つかりません")
             return False
 
+        # **回した結果を残す**（D-04）。このループはプレビューを作り直して採点し直すだけで、
+        # 動画を直す操作を持たない。2026-09-19 の実走では 3 回回って 89 点のままだった。
+        # 何も変わらなかった回で止め、「効いたか」を提案に載せる（画面の +4 点のような見せかけを作らない）
+        report = {"ran": True, "scores": [ctx.quality_score], "iterations": 0,
+                  "improved": False, "stopped": ""}
+        ctx.quality_loop = report
+
         for qi in range(1, self.MAX_QUALITY_RETRIES + 1):
+            前の採点 = next((r for r in reversed(ctx.stage_results)
+                            if r.stage_name == quality_worker.name), None)
+            前の点, 前の講評 = ctx.quality_score, list(
+                (前の採点.data.get("feedback") or []) if 前の採点 else [])
             # 前回の品質フィードバックを記録
             last_result = ctx.stage_results[-1] if ctx.stage_results else None
             if last_result and last_result.data.get("feedback"):
@@ -1418,6 +1430,7 @@ class PipelineCoordinator:
                 perf_manager.record_worker_time(preview_worker.name, _ql_preview_dur)
             if not preview_result.success:
                 logger.warning(f"品質改善ループ: Preview再生成失敗 — {preview_result.detail}")
+                report["iterations"] = qi
                 continue
 
             # QualityGate 再チェック (BUG-02修正: 計測フック追加)
@@ -1430,8 +1443,12 @@ class PipelineCoordinator:
             if perf_manager:
                 perf_manager.record_worker_time(quality_worker.name, _ql_quality_dur)
             ctx.stage_results.append(quality_result)
+            report["iterations"] = qi
+            report["scores"].append(ctx.quality_score)
 
             if quality_worker.verify(quality_result):
+                report["improved"] = True
+                report["stopped"] = "合格"
                 logger.info(
                     f"✅ 品質改善成功: {ctx.quality_score}点 "
                     f"({qi}回目のリトライ)"
@@ -1446,6 +1463,14 @@ class PipelineCoordinator:
                 f"品質改善ループ {qi}: まだ不合格 "
                 f"({ctx.quality_score}点)"
             )
+            if (ctx.quality_score == 前の点
+                    and list(quality_result.data.get("feedback") or []) == 前の講評):
+                # 点も講評も同じ = 作り直しても何も変わっていない。同じことを繰り返さない
+                report["stopped"] = "作り直しても点も講評も変わらない（このループは動画を直す操作を持たない）"
+                logger.warning(f"品質改善ループ: {report['stopped']} — {qi} 回で止めます")
+                break
+        else:
+            report["stopped"] = "上限まで回した"
 
         return False
 

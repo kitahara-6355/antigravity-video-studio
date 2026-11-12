@@ -141,6 +141,20 @@ class Tree:
         if new_name is not None:
             self.check_name(src, new_name)
         self._name_free(dest, new_name or src.name)
+        self.check_shelf(src, f"{dest.path}/{new_name or src.name}")
+
+    def check_shelf(self, node: Node, path_after: str) -> None:
+        """**承認していない物を、移す・名前を変えることで投稿する棚に出さない**（番組化の承認の門・V2）。
+
+        見てもらう棚（確認用・候補）から投稿する棚へ移すのも、名前から「確認用」を外すのも、
+        `put finished` で置くのと同じ「置き場に出す」。承認（か門の前からの基準線）に辿れなければ止める。
+        """
+        from backend.revenue import program_gate
+
+        problems = program_gate.move_problems(node, path_after, self.layout)
+        if problems:
+            raise GuardError("承認の門が断りました: " + "／".join(
+                f"{p['path']} — {p['message']}" for p in problems))
 
     def check_name(self, node: Node, new_name: str) -> None:
         self._fixed(node, "名前を変えられ")
@@ -202,6 +216,7 @@ def rename(service: Any, tree: Tree, node: Node, new_name: str, *,
            apply: bool = False, journal: Path = DEFAULT_JOURNAL) -> str:
     tree.check_name(node, new_name)
     tree._name_free(tree.parent[node.id], new_name)
+    tree.check_shelf(node, f"{tree.parent[node.id].path}/{new_name}")
     line = f"名前を変える: {node.path} → {new_name}"
     if not apply:
         return "（下見）" + line

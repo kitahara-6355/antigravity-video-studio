@@ -69,6 +69,21 @@ python -m backend.program_package.episode SPEC.json --out OUT
 - 確認用は Drive `40_完成/<収録ID>/` へ（スキル `drive-layout` の `put finished`）。返信にはリンクを貼る
 - 概要欄のチャプターは `_チャプター.txt` に差し替える（OP の分ずれる）
 - 目視OK のラベルは北原さんが付ける（AI は付けない）
+- **承認の流れ（2026-11-10・V2）**: 名前に「確認用」が入った版は見てもらう物なので置ける。
+  投稿する版（「確認用」の付かない名前）は、提案 → 北原さんの承認 の後でないと 40_完成 に置けない:
+
+  ```
+  python -m backend.revenue.program_gate propose --recording <収録ID> --kind episode --key v67 \
+      --publish OUT/<収録ID>_v67.mp4 --review OUT/<収録ID>_v67_確認用360p.mp4 --spec SPEC.json
+  （北原さんが確認用にラベル「品質確認」= 目視OK を付けたら）
+  python -m backend.drive_layout qc-sync
+  python -m backend.revenue.program_gate approve --recording <収録ID> --key v67 --from-qc --synthetic no
+  ```
+
+  提案のときに実測の品質ゲートが走る（1920x1080・yuv420p・音の大きさとピーク・黒い画面・無音・壊れ）。
+  チャットで承認をもらったときは `--from-qc` の代わりに `--by 北原 --evidence "<日時と言葉>"`。
+  確認用は**その版の書き出しの縮小版**を付ける（長さが 1 秒より違うと提案を断る。前の版の確認用の目視OK は使えない）。
+  「確認用」の名前を外す・投稿用の場所へ移す（`drive_organize`）のも、承認の後でないと止まる
 
 ### 5. 公開日が決まったら最終版を書き出す
 

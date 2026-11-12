@@ -166,9 +166,11 @@ class RenderWorker(PipelineStageWorker):
                 成功 = True
                 return StageResult(
                     stage_name=self.name, success=True,
-                    detail=f"最終出力: {size_mb:.1f}MB (本番品質)",
+                    detail=f"最終出力: {size_mb:.1f}MB（{self._encode_label(ctx)}）",
                     data={"path": final_path, "size_mb": round(size_mb, 1),
-                          "quality": "production"},
+                          # **実際に使った設定を名乗る**（D-47）。以前は何で書いても "production" だった
+                          "quality": (getattr(ctx, "render_encode", None) or {}).get("mode"),
+                          "encode": getattr(ctx, "render_encode", None)},
                     duration_seconds=round(time.time() - start, 1),
                 )
             finally:
@@ -220,14 +222,44 @@ class RenderWorker(PipelineStageWorker):
 
         return await loop.run_in_executor(None, _do_render)
 
+    @staticmethod
+    def _encode_setting(ctx: PipelineContext = None) -> tuple[str, str]:
+        """**書き出しのモードから、エンコードの設定の名前を引く**（D-47）。
+
+        以前は `ctx.render_mode` をどこからも読まず、safe でも production でも "balanced" で
+        書いていた（モードは記録上の区別でしかなかった）。設定は `backend/config/render_modes.json`。
+        知らないモード・読めない設定は、控えめな側（fallback_mode）に倒す。
+        """
+        import json
+
+        mode = getattr(ctx, "render_mode", None) or "production"
+        try:
+            cfg = json.loads((Path(__file__).resolve().parents[2] / "config" / "render_modes.json")
+                             .read_text(encoding="utf-8"))
+            modes = cfg["modes"]
+            if mode not in modes:
+                mode = cfg.get("fallback_mode", "safe")
+            return mode, str(modes[mode]["encode"])
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            logger.warning(f"書き出しのモードの設定を読めません（balanced で書く）: {e}")
+            return "safe", "balanced"
+
+    @staticmethod
+    def _encode_label(ctx: PipelineContext = None) -> str:
+        used = getattr(ctx, "render_encode", None) or {}
+        if used.get("fallback"):
+            return f"{used.get('mode')}・焼き直せずプレビューの写し"
+        return f"{used.get('mode')}・{used.get('encode')}" if used else "設定の記録なし"
+
     def _encode_video_production_quality(self, preview_path: str, final_path: str,
                                           ctx: PipelineContext = None) -> None:
         """
-        プレビュー動画を本番品質で再エンコードします。
+        プレビュー動画を、書き出しのモードに合わせた設定で再エンコードします（D-47）。
 
-        FFmpegEditorの "balanced" プリセットを使用してエンコードします。
+        production は "quality"、safe は "balanced"（`backend/config/render_modes.json`）。
+        実際に使った設定は `ctx.render_encode` に残し、書き出しの記録に載せます。
         FFmpegが利用できない、またはエンコードに失敗した場合は、フォールバックとして
-        プレビュー動画をコピーします。
+        プレビュー動画をコピーします（そのことも `render_encode.fallback` に残る）。
 
         Args:
             preview_path (str): 入力プレビュー動画のパス。
@@ -238,8 +270,13 @@ class RenderWorker(PipelineStageWorker):
             from video_editor_engine import video_editor
             ffmpeg = video_editor.ffmpeg
 
+            mode, encode = self._encode_setting(ctx)
+            used = {"mode": mode, "encode": encode, "fallback": False}
+            if ctx is not None:
+                ctx.render_encode = used
             if ffmpeg.is_available():
-                encode_args = ffmpeg._get_encode_args("balanced")
+                encode_args = ffmpeg._get_encode_args(encode)
+                used["args"] = [a for a in encode_args if a not in ("-c:a", "aac")]
                 cmd = [
                     "-y",
                     "-i", preview_path,
@@ -252,12 +289,16 @@ class RenderWorker(PipelineStageWorker):
                     logger.warning(f"本番品質エンコード失敗、フォールバック: {output[:200]}")
                     if ctx:
                         ctx.skipped_features.append("本番品質エンコード")
+                    used["fallback"] = True
                     shutil.copy(preview_path, final_path)
             else:
                 logger.warning("FFmpeg未検出 — 再エンコードなしでコピー")
+                used["fallback"] = True
                 shutil.copy(preview_path, final_path)
         except ImportError:
             logger.warning("video_editor_engine未利用可 — コピーフォールバック")
+            if ctx is not None:
+                ctx.render_encode = {"mode": getattr(ctx, "render_mode", None), "encode": None, "fallback": True}
             shutil.copy(preview_path, final_path)
 
     def _mix_bgm(self, final_path: str, ctx: PipelineContext = None) -> None:
@@ -369,6 +410,11 @@ class RenderWorker(PipelineStageWorker):
                 from logo_overlay import LogoOverlay
                 overlay = LogoOverlay()
                 temp_logo_out = final_path + ".logo.mp4"
+                # ロゴを重ねると映像をもう一度焼く。書き出しと同じ設定で焼き、そのことを記録に残す（D-47）
+                used = getattr(ctx, "render_encode", None) or {}
+                logo_args = list(used.get("args") or []) or None
+                if used:
+                    used["logo"] = {"reencoded": True, "args": logo_args or "既定（medium・crf23）"}
                 overlay.apply_logo(
                     input_video=final_path,
                     logo_path=logo_path,
@@ -376,6 +422,7 @@ class RenderWorker(PipelineStageWorker):
                     position=logo_position,
                     opacity=logo_opacity,
                     target_height=logo_height,
+                    video_args=logo_args,
                 )
                 if Path(temp_logo_out).exists():
                     shutil.move(temp_logo_out, final_path)

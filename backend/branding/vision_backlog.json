@@ -158,10 +158,12 @@
       {
         "id": "D-16",
         "title": "Progressive Preview承認フロー完全版未実装（§9違反）",
-        "status": "open",
+        "status": "resolved",
         "priority": "P1",
         "axis": "progressive_preview",
-        "created": "2026-04-18"
+        "created": "2026-04-18",
+        "resolved_date": "2026-11-12",
+        "note": "2026-11-12: 10 月の番組化（仕上げ版・Shorts・サムネ）が本線の門の外だったのを、番組化の承認の門（backend/revenue/program_gate.py）で 提案 → 人の承認 → 置く → 点検 に載せた。未承認の物は 40_完成 の投稿する棚に出せない。久木田回の置き場の控えで gate が緑。画面（/r2/approve）に番組化の提案を出すのは後送（V2・PR #109・docs/specs/2026-11-10-v2-program-approval.md・gate-verifier 2 周で ready）"
       },
       {
         "id": "D-17",
@@ -176,9 +178,10 @@
       {
         "id": "D-04",
         "title": "品質改善ループ実効性検証（本番動画必要）",
-        "status": "tested",
+        "status": "resolved",
         "priority": "P1",
-        "note": "テスト実装済み（C4-05〜C4-07）。本番E2Eは未実行。 ／ 2026-09-19 の再監査で実写素材の実走（20260919T002710800208-0000）に当てた: ループは3回回ったが 89点のままで改善しない（D-40・D-41）"
+        "note": "テスト実装済み（C4-05〜C4-07）。本番E2Eは未実行。 ／ 2026-09-19 の再監査で実写素材の実走（20260919T002710800208-0000）に当てた: ループは3回回ったが 89点のままで改善しない（D-40・D-41） ／ 2026-11-12: 実効性は検証済み — ループは動画を直す操作を持たず、同じ点を繰り返していた。変化が無ければ止まり、回数・点の推移・効いたかを提案（quality_loop）と --trace に出すようにした。**ループが実際に動画を直すことは D-40 に残る**（実走と一緒に行う）（V2・PR #109・docs/specs/2026-11-10-v2-program-approval.md・gate-verifier 2 周で ready）",
+        "resolved_date": "2026-11-12"
       },
       {
         "id": "D-05",
@@ -198,8 +201,10 @@
       {
         "id": "D-07",
         "title": "Progressive Preview承認フロー統合",
-        "status": "open",
-        "priority": "P2"
+        "status": "resolved",
+        "priority": "P2",
+        "resolved_date": "2026-11-12",
+        "note": "2026-11-12: D-16 と同じ門で、番組化の道具の出力が承認の流れに載った（test_program_gate.py）（V2・PR #109・docs/specs/2026-11-10-v2-program-approval.md・gate-verifier 2 周で ready）"
       },
       {
         "id": "D-19",
@@ -377,23 +382,26 @@
       {
         "id": "D-41",
         "title": "品質改善ループが最終レンダリングの後に回る（合格しても最終 mp4 は safe モードのまま）",
-        "status": "open",
+        "status": "resolved",
         "priority": "P1",
         "axis": "quality_auto_improve",
         "created": "2026-09-19",
         "detail": "pipeline_coordinator.py 634-637 行。ループで合格すると状態は completed になるが、最終 mp4 は不合格だったときの safe モードで作られたまま（verifier が scratch で実測）",
         "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外",
-        "note": "R2 の承認工程（承認した動画だけを書き出す・R2-C1）と一緒に直すのが自然 ／ 2026-09-19: R2-C1 の条件に入れた（ユーザー決定）"
+        "note": "R2 の承認工程（承認した動画だけを書き出す・R2-C1）と一緒に直すのが自然 ／ 2026-09-19: R2-C1 の条件に入れた（ユーザー決定） ／ 2026-11-12: 9 月に直っていた（改善ループは提案の前に回る。pipeline_coordinator.execute・test_approval_flow.py）。状態だけが open のままだったのを合わせた（V2・PR #109・docs/specs/2026-11-10-v2-program-approval.md・gate-verifier 2 周で ready）",
+        "resolved_date": "2026-11-12"
       },
       {
         "id": "D-42",
         "title": "品質サイドカーの『全ステージ正常完走』が実態と合わない",
-        "status": "open",
+        "status": "resolved",
         "priority": "P2",
         "axis": "quality_auto_improve",
         "created": "2026-09-19",
         "detail": "判定の材料は segments・selected・metadata の有無だけ（quality_gate_plugins.py 1139-1156 行）。AI なしの実走でも『全ステージ正常完走』と出て、stability が 100.0 になっていた",
-        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外"
+        "found_by": "R1.5 29周目の gate-verifier（2026-09-19）・範囲外",
+        "resolved_date": "2026-11-12",
+        "note": "2026-11-12: 完走の判定が工程の成否（ctx.stage_results）を見る。落ちた工程は減点し、「全ステージ正常完走」は成否を見たときだけ言う（V2・PR #109・docs/specs/2026-11-10-v2-program-approval.md・gate-verifier 2 周で ready）"
       },
       {
         "id": "D-43",
@@ -441,24 +449,26 @@
       {
         "id": "D-47",
         "title": "`render_mode` がラベルだけ（safe と production で同じエンコード設定）",
-        "status": "open",
+        "status": "resolved",
         "priority": "P2",
         "axis": "quality_assurance",
         "created": "2026-09-25",
         "detail": "提案と書き出しの記録には `render_mode: production | safe` が載り、90点以上なら production になる（D-41 の条件はここを見ている）。**ただし `RenderWorker` は `ctx.render_mode` をどこからも読んでいない** — `_encode_video_production_quality` は常に `_get_encode_args(\"balanced\")` を使うので、safe と production の書き出しは同一設定。**モードは記録上の区別でしかない。**直すには production 用のエンコード設定（CRF・プリセット）を決める必要があり、画質と書き出し時間のトレードオフはユーザー判断なので R3 の品質の話として切り出す",
         "found_by": "2026-09-24 の gate-verifier（R2-C1〜C3 の中間ゲート）",
-        "note": "2026-09-25 ユーザー決定: いまは直さず登録して先へ進む"
+        "note": "2026-09-25 ユーザー決定: いまは直さず登録して先へ進む ／ 2026-11-12: RenderWorker が render_mode を読む（production=quality、safe=balanced・backend/config/render_modes.json）。使った設定は export.json の encode と --trace に残る。ロゴの焼き直しも同じ設定。実測は docs/evidence/v2_render_modes_20261110.json（V2・PR #109・docs/specs/2026-11-10-v2-program-approval.md・gate-verifier 2 周で ready）",
+        "resolved_date": "2026-11-12"
       },
       {
         "id": "D-48",
         "title": "Shorts の書き出しを承認の流れに載せ直す（いまは 409 で止めている）",
-        "status": "open",
+        "status": "resolved",
         "priority": "P1",
         "axis": "ux_guarantee_owner",
         "created": "2026-09-25",
         "detail": "`POST /api/shorts/render` は承認を1件も見ずに 1080x1920 の完成動画を `vault-outputs/shorts/` へ書いていた（2026-09-24 の gate-verifier が実生成）。R2-C1 と正面から衝突するので **2026-09-25 に 409 で閉じた**。**Shorts は収益化の主軸（登録者1,000人を集める側）なので、消したのではなく止めただけ。**本線の提案 → 承認 → 書き出しに Shorts を載せる（切り出し1本ごとに実行記録と提案を作る）工事が要る。画面側（`ShortsGenerator.jsx`）は `SettingsPage.jsx` に props 無しで置かれていて `videoPath` が空なので、**閉じた時点で画面からは動いていなかった**",
         "found_by": "2026-09-24 の gate-verifier（R2-C1〜C3 の中間ゲート）",
-        "note": "2026-09-25 ユーザー決定: 閉じる（承認の流れに載せるのは R3 以降）"
+        "note": "2026-09-25 ユーザー決定: 閉じる（承認の流れに載せるのは R3 以降） ／ 2026-11-12: Shorts は番組化の道具で切り出し、1 本ごとに 提案 → 承認 → 投稿用フォルダ。/api/shorts/render は閉じたまま、409 の案内をこの流れに変えた（V2・PR #109・docs/specs/2026-11-10-v2-program-approval.md・gate-verifier 2 周で ready）",
+        "resolved_date": "2026-11-12"
       },
       {
         "id": "D-49",

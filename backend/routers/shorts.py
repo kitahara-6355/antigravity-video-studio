@@ -294,16 +294,18 @@ async def render_short(req: RenderShortRequest) -> Dict[str, Any]:
     ここは承認を1件も見ずに 1080x1920 の完成動画を `vault-outputs/shorts/` へ書いていた
     （2026-09-24 の gate-verifier が 671,403 byte の mp4 を実生成して反証した）。
 
-    **Shorts は収益化の主軸（登録者集め）なので、消すのではなく本線に載せ直す。**
-    提案 → 承認 → 書き出しの流れに Shorts を載せるのは R3 以降。それまでは止める。
-    候補の抽出（`/candidates`）は分析なので通す。
+    **Shorts は収益化の主軸（登録者集め）なので、消したのではなく承認の流れに載せ直した**
+    （D-48・2026-11-10）。Shorts は番組化の道具（`backend/program_package/shorts.py`）で切り出し、
+    1本ごとに 提案 → 北原さんの承認 → 投稿用フォルダ の順で出す（`backend/revenue/program_gate.py`）。
+    この経路（承認を見ない書き出し）は閉じたままにする。候補の抽出（`/candidates`）は分析なので通す。
     """
     raise HTTPException(
         status_code=409,
-        detail="承認していない動画は書き出せません（R2-C1）。Shorts の書き出しは、"
-               "本線（agents）の提案を承認する流れに載せるまで止めています: "
-               "python -m backend.agents.pipeline_coordinator <動画> → "
-               "python -m backend.revenue.approval_gate --approve <run_id> --synthetic yes|no → --export <run_id>",
+        detail="承認していない動画は書き出せません（R2-C1）。Shorts は切り出し1本ごとに承認の流れで出します"
+               "（スキル shorts-cut）: python -m backend.program_package.shorts <指定> … で切り出す → "
+               "python -m backend.revenue.program_gate propose --kind short … → 北原さんの承認を "
+               "program_gate approve で控える → python -m backend.drive_layout put finished <フォルダ> "
+               "--to \"<収録ID>/Shorts_投稿用\"（承認済みだけが通る）",
     )
 
 
