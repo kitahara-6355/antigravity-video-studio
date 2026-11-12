@@ -58,6 +58,11 @@ h1 { font-family: var(--font-head); font-size: 1.12rem; font-weight: 700; margin
 .sub { margin: 0; color: var(--ink-soft); font-size: .8rem; flex: 1 1 auto; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .counts { display: flex; gap: 6px; flex: none; }
+/* 一緒に見る（ウェブアプリの時だけ出す）: 進める人の再生位置と印に、もう片方の画面がついていく */
+.top:has(.together:not([hidden])) { flex-wrap: wrap; }
+.together { flex: none; margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--ink-soft); }
+.together select { font: inherit; font-size: .78rem; height: 28px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); color: var(--ink); }
+.together.on select { border-color: var(--gunjo); color: var(--gunjo); }
 .chip { font-size: .76rem; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet);
   white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
 .chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--sw, var(--ink-soft)); }
@@ -81,6 +86,7 @@ h1 { font-family: var(--font-head); font-size: 1.12rem; font-weight: 700; margin
 .bar { width: min(320px, 70%); height: 4px; background: var(--on-screen-dim); border-radius: 2px; overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: var(--on-screen); transition: width .2s; }
 .loader .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.loader .pack-link { display: block; padding: 10px 14px; border-radius: 8px; background: var(--sheet); color: var(--ink); text-decoration: none; border: 1px solid var(--rule); }
 .loader button { background: transparent; color: var(--on-screen); border-color: var(--on-screen-dim); }
 .strip { flex: none; position: relative; height: 22px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
   cursor: pointer; touch-action: manipulation; }
@@ -213,6 +219,10 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   <h1>字幕の朱入れ</h1>
   <p class="sub" id="runLabel">美麗チャンネル 対談 第1回 · 字幕を読み込んでいます</p>
   <div class="counts" id="counts" aria-live="polite"></div>
+  <div class="together" id="together" hidden>
+    <select id="who" aria-label="見ている人"><option value="北原">北原</option><option value="美麗">美麗</option></select>
+    <select id="togetherMode" aria-label="一緒に見る"><option value="off">ひとりで見る</option><option value="lead">一緒に（進める）</option><option value="follow">一緒に（ついていく）</option></select>
+  </div>
 </header>
 
 <main class="desk">
@@ -235,7 +245,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     <div class="actions">
       <button type="button" class="btn-mark" id="markBtn" disabled>違和感あり<kbd>M</kbd></button>
       <div class="grp" id="normal">
-        <button type="button" id="backBtn" disabled>3秒戻る<kbd>←</kbd></button>
+        <button type="button" id="backBtn" aria-label="3秒戻る" disabled>−3秒<kbd>←</kbd></button>
+        <button type="button" id="fwdBtn" aria-label="3秒進む" disabled>＋3秒<kbd>→</kbd></button>
         <button type="button" id="reelBtn" disabled>印の所だけ再生</button>
       </div>
       <div class="grp" id="reel" hidden>
@@ -310,6 +321,125 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function kOfCap(i) { return S.caps[i] && S.caps[i].i === i ? i : S.caps.findIndex((c) => c.i === i); }
   const duration = () => (S.sheet && S.sheet.duration) || video.duration || 1;
 
+  // ── info@ の Apps Script ウェブアプリで開いたとき（スマホ・2人で同時に） ──
+  // 動画は Drive の小分け（HLS）を要る所だけ取って流す。印はシート、一緒に見る位置はキャッシュ（どちらも定額内）
+  const GAS = !!(window.google && google.script && google.script.run);
+  const POLL_MS = 2000, LIVE_MS = 1000, DRIFT_SEC = 1.5, LIVE_STALE_MS = 15000;
+  const G = { pack: "", ver: -1, hls: null, mode: "off", lastLive: 0, liveSeen: "" };
+  const gas = (fn, ...args) => new Promise((ok, ng) =>
+    google.script.run.withSuccessHandler(ok).withFailureHandler((e) => ng({ code: "gas", message: String(e && e.message || e) }))[fn](...args));
+  function who() { try { return localStorage.getItem("avs.who") || "北原"; } catch (_) { return "北原"; } }
+  async function gasStart() {
+    $("together").hidden = false; $("who").value = who();
+    $("pickBtn").hidden = true;
+    try {
+      const loc = await new Promise((ok) => google.script.url.getLocation(ok));
+      G.pack = (loc.parameter && loc.parameter.pack) || "";
+      if (!G.pack) return gasChoose();
+      setLoader("字幕の控えを読み込んでいます", null, false);
+      const pack = JSON.parse(await gas("getPack", G.pack));
+      loadSheet(pack);
+      setLoader("動画の準備をしています", null, false);
+      await gasVideo(pack);
+    } catch (e) { setLoader("読み込めませんでした（" + ((e && e.message) || e) + "）。もう一度読み込んでください。", null, true); }
+  }
+  async function gasChoose() {
+    const list = await gas("listPacks");
+    if (!list.length) { setLoader("確認用の小分けがまだ Drive にありません。Claude に「確認用を置いて」と頼んでください。", null, true); return; }
+    $("loaderText").textContent = "どの回を見ますか";
+    $("loaderBar").hidden = true;
+    const row = $("loaderButtons"); row.hidden = false; row.textContent = "";
+    list.forEach((p) => { const a = el("a", "", p.name); a.href = p.url; a.target = "_top"; a.className = "pack-link"; row.appendChild(a); });
+  }
+  function loadScript(src) {
+    return new Promise((ok, ng) => { const t = document.createElement("script"); t.src = src; t.onload = ok; t.onerror = ng; document.head.appendChild(t); });
+  }
+  async function gasVideo(pack) {
+    if (!window.Hls) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.20/hls.min.js");
+    if (!Hls.isSupported()) { setLoader("この端末のブラウザでは小分けの動画を流せません（iPhone は iOS 17.1 以降が要ります）。", null, true); return; }
+    const segs = pack.segments || [];
+    const top = Math.ceil(Math.max(...segs.map((x) => x.dur || 6)));
+    const m3u8 = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:" + top + "\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n"
+      + segs.map((x) => "#EXTINF:" + x.dur + ",\nhttps://gas.invalid/" + x.id).join("\n") + "\n#EXT-X-ENDLIST\n";
+    const b64 = (str) => { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+    class GasLoader {
+      constructor() { this.stats = { aborted: false, loaded: 0, retry: 0, total: 0, chunkCount: 0, bwEstimate: 0,
+        loading: { start: 0, first: 0, end: 0 }, parsing: { start: 0, end: 0 }, buffering: { start: 0, first: 0, end: 0 } }; this.gone = false; }
+      destroy() { this.gone = true; } abort() { this.gone = true; this.stats.aborted = true; }
+      load(context, config, cb) {
+        const st = this.stats; st.loading.start = performance.now();
+        const done = (data) => { if (this.gone) return; st.loading.first = st.loading.end = performance.now();
+          st.loaded = st.total = (data.byteLength != null ? data.byteLength : data.length);
+          cb.onSuccess({ url: context.url, data }, st, context, null); };
+        const fail = (e) => { if (!this.gone) cb.onError({ code: 0, text: String(e && e.message || e) }, context, null, st); };
+        if (/\.m3u8$/.test(context.url)) { setTimeout(() => done(m3u8), 0); return; }
+        const id = context.url.split("/").pop();
+        (async () => { for (let k = 0; ; k++) { try { return await gas("getSeg", G.pack, id); } catch (e) { if (k >= 2) throw e; await sleep(800 * (k + 1)); } } })()
+          .then((s) => done(b64(s)), fail);
+      }
+    }
+    const hls = new Hls({ loader: GasLoader, maxBufferLength: 20, maxMaxBufferLength: 40, startFragPrefetch: true,
+      fragLoadingMaxRetry: 4, manifestLoadingMaxRetry: 1 });
+    G.hls = hls;
+    hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) { if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError(); else hls.startLoad(); } });
+    const parsed = new Promise((ok) => hls.once(Hls.Events.MANIFEST_PARSED, ok));
+    hls.attachMedia(video);
+    hls.loadSource("https://gas.invalid/index.m3u8");
+    await parsed;
+    $("loader").hidden = true;
+    ["markBtn", "backBtn", "fwdBtn"].forEach((id) => { $(id).disabled = false; });
+    updateReelButton();
+  }
+  // 印のシート（db と同じ形: doc(id).set/update/delete と onSnapshot）
+  function gasMarks() {
+    let listener = null, onErr = null, timer = 0, fails = 0;
+    const snap = (marks) => ({ docs: Object.keys(marks).map((id) => ({ id, exists: true, data: () => marks[id] })) });
+    async function pull() {
+      try {
+        const r = await gas("poll", G.pack, G.ver, G.mode === "follow");
+        fails = 0;
+        if (r.marks && r.ver !== G.ver) { G.ver = r.ver; if (listener) listener(snap(r.marks)); }
+        if (r.live) follow(r.live);
+      } catch (e) { if (++fails >= 5 && onErr) onErr(e); }
+      timer = setTimeout(pull, G.mode === "follow" ? LIVE_MS : POLL_MS);
+    }
+    const op = (id, kind, body) => gas("saveMark", G.pack, id, kind, body ? JSON.stringify(body) : "", who())
+      .then((ver) => { G.ver = Math.max(G.ver, ver); });
+    return {
+      doc: (id) => ({ set: (b) => op(id, "set", b), update: (p) => op(id, "update", p), delete: () => op(id, "delete", null) }),
+      onSnapshot: (fn, err) => { listener = fn; onErr = err; clearTimeout(timer); pull(); },
+    };
+  }
+  // 一緒に見る: 進める人は再生位置・再生中か・流している印を送り、ついていく人はそれに合わせる
+  function liveState() {
+    const r = S.reel, c = r ? S.caps[r.ks[r.n]] : null;
+    return { by: who(), t: video.currentTime, playing: !video.paused, mark: c ? idOf(c.i) : "", at: Date.now() };
+  }
+  function sendLive(force) {
+    if (G.mode !== "lead" || !G.pack) return;
+    const now = Date.now(); if (!force && now - G.lastLive < LIVE_MS) return;
+    G.lastLive = now; gas("setLive", G.pack, JSON.stringify(liveState())).catch(() => {});
+  }
+  function follow(live) {
+    if (G.mode !== "follow" || !live || live.by === who() || Date.now() - live.at > LIVE_STALE_MS || !video.src) return;
+    const mine = S.reel ? idOf(S.caps[S.reel.ks[S.reel.n]].i) : "";
+    if (live.mark && live.mark !== mine && S.marks.has(live.mark)) { playMark(live.mark); return; }
+    if (!live.mark && S.reel) stopReel();
+    const target = live.t + (live.playing ? (Date.now() - live.at) / 1000 : 0);
+    if (Math.abs(video.currentTime - target) > DRIFT_SEC) seek(target);
+    if (live.playing && video.paused && !S.reel) video.play().catch(() => {});
+    if (!live.playing && !video.paused) video.pause();
+  }
+  if (GAS) {
+    ["play", "pause", "seeked"].forEach((ev) => video.addEventListener(ev, () => sendLive(true)));
+    video.addEventListener("timeupdate", () => sendLive(false));
+    document.addEventListener("change", (ev) => {
+      if (ev.target.id === "who") { try { localStorage.setItem("avs.who", ev.target.value); } catch (_) {} S.uid = ev.target.value; }
+      if (ev.target.id === "togetherMode") { G.mode = ev.target.value; $("together").classList.toggle("on", G.mode !== "off");
+        toast(G.mode === "lead" ? "あなたの再生にもう片方の画面がついてきます" : G.mode === "follow" ? "進める人の再生についていきます" : "ひとりで見ます"); sendLive(true); }
+    });
+  }
+
   // ── 読み込み ──
   function setLoader(text, pct, buttons) {
     $("loader").hidden = false; $("loaderText").textContent = text;
@@ -359,6 +489,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     setLoader(msg, null, true);
   }
   async function start() {
+    if (GAS) return gasStart();
     const c = window.claude;
     let files = null;
     try { files = c && c.use ? await c.use("files") : null; } catch (_) { files = null; }
@@ -377,7 +508,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function useVideo(blob) {
     video.src = URL.createObjectURL(blob);
     $("loader").hidden = true;
-    ["markBtn", "backBtn"].forEach((id) => { $(id).disabled = false; });
+    ["markBtn", "backBtn", "fwdBtn"].forEach((id) => { $(id).disabled = false; });
     updateReelButton();
   }
   $("retry").addEventListener("click", () => start());
@@ -408,6 +539,9 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     setSave("この画面では印を保存できません（書き込みの権限がありません）。「印を文字でコピー」でチャットに貼ってください。", "warn");
   }
   async function connectDb(run) {
+    if (GAS) { S.uid = who(); S.col = gasMarks(); S.col.onSnapshot((snap) => {
+      S.marks = new Map(snap.docs.filter((d) => d.exists).map((d) => [d.id, d.data()])); renderAll();
+    }, (e) => setSave("印の読み込みが止まりました（" + (e && e.code) + "）。画面を開き直してください。", "warn")); return; }
     const c = window.claude; let db = null, user = null;
     try { db = c && c.use ? await c.use("db") : null; } catch (_) { db = null; }
     try { user = c && c.use ? await c.use("user") : null; } catch (_) { user = null; }
@@ -556,6 +690,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   video.addEventListener("loadedmetadata", () => { renderStrip(); renderNow(true); });
   $("markBtn").addEventListener("click", markNow);
   $("backBtn").addEventListener("click", () => userSeek(video.currentTime - 3));
+  $("fwdBtn").addEventListener("click", () => userSeek(video.currentTime + 3));
   $("reelBtn").addEventListener("click", () => {
     const ks = sortedMarks().filter(([, m]) => m.state !== "ok").map(([, m]) => kOfCap(m.cap)).filter((k) => k >= 0);
     playList(ks, "marks", 0);
