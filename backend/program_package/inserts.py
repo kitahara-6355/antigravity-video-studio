@@ -118,8 +118,9 @@ SLACK = 0.5  # 字幕の切れ目で終われるなら、8 秒をこれだけ超
 def slot(captions: list[dict], i: int, breaks: list[float]) -> tuple[float, float] | None:
     """字幕 i から始まる差し込みの区間。
 
-    始まりは字幕の出だし。終わりは字幕の切れ目。ただし 4 秒に満たなければ、次の字幕に掛からない範囲で
-    4 秒まで延ばす（話の後の間に残す）。8 秒を超える 1 枚の字幕は 8 秒で切る。場面の切れ目はまたがない。
+    始まりは字幕の出だし。終わりは字幕の切れ目（4〜8.5 秒の中にあれば）。切れ目がその中に無いときだけ、
+    4 秒まで残す・8 秒で切る（このときは次の字幕の途中で消える。久木田回の字幕では 736 か所中 36 か所）。
+    場面の切れ目はまたがない。
     """
     start, end, j = captions[i]["start"], captions[i]["end"], i
     # 4 秒に届くまで、続く字幕を取り込む（4 秒の中に出だしが来る字幕は、途中で切らずに終わりまで）
@@ -341,7 +342,9 @@ def ready(plan: dict, spec: dict, people: list[str] | None = None) -> list[dict]
     if bad:
         raise InsertError("承認の後に飾りが変わり、差し込みと重なっています（propose からやり直す）: " + " / ".join(bad))
     lock = Path(spec["lock"]) if spec.get("lock") else None
-    if plan.get("base") and lock and lock.exists():
+    if plan.get("base"):
+        if not (lock and lock.exists()):
+            raise InsertError("字幕（spec の lock）が見つからないので、案を出したときと同じ字幕か確かめられません")
         now = captions_sha(json.loads(lock.read_text(encoding="utf-8"))["segments"])
         if now != plan["base"]["captions"]:
             raise InsertError("案を出したときと字幕（完成版）が違います。時刻がずれるので propose からやり直す")
@@ -362,11 +365,12 @@ def head_hits(items: list[dict], m: dict) -> list[str]:
     return out
 
 
-def merge(old: dict | None, new: dict) -> dict:
+def merge(old: dict | None, new: dict, valid=None) -> dict:
     """前の案の承認・見送りを引き継ぐ。
 
     中身が同じ案はそのまま。絵が同じで出し方（秒・位置）だけが変わった案は、人が見て決めた方の案を残す
-    （決まりを直しても、見て決めた物を黙って別の物に替えない）。絵が変わった案は「提案」に戻る。
+    （決まりを直しても、見て決めた物を黙って別の物に替えない）。ただし残すのは、出だしの時刻が同じで、
+    今の字幕・地図・飾りに照らしても通る案（valid）だけ。絵が変わった案・通らなくなった案は「提案」に戻る。
     """
     decided = [it for it in (old or {}).get("items", []) if it.get("state") != PROPOSED]
     kept = {it["fingerprint"]: it for it in decided}
@@ -377,7 +381,8 @@ def merge(old: dict | None, new: dict) -> dict:
             it["state"], it["decision"] = prev["state"], prev.get("decision")
             continue
         prev = same_picture.get(it["id"])
-        if prev and prev.get("source") == it.get("source") and prev.get("mode") == it.get("mode"):
+        if (prev and prev.get("source") == it.get("source") and prev.get("mode") == it.get("mode")
+                and abs(prev["at"] - it["at"]) < 0.005 and (valid is None or valid(prev))):
             new["items"][n] = prev
     return {"setup": (old or {}).get("setup", {}), **new}
 
@@ -459,9 +464,9 @@ def shows(items: list[dict], video: Path | None, tmp: Path, offset: float = 0.0,
 
 
 def render(plan: dict, video: Path, out: Path, offset: float = 0.0, root: Path | None = None,
-           crf: int = 18, preset: str = "medium") -> Path:
+           crf: int = 18, preset: str = "medium", items: list[dict] | None = None) -> Path:
     """承認した案だけを重ねた版を書き出す。音はそのまま写す。"""
-    items = approved(plan)
+    items = approved(plan) if items is None else items
     if not items:
         raise InsertError("承認済みの案がありません（approve で控えてから）")
     vw, vh, _ = vision.probe(video)
@@ -575,7 +580,19 @@ def main(argv: list[str] | None = None) -> int:
             pkg = Path(spec["package"]).read_text(encoding="utf-8") if spec.get("package") else ""
             m = vision.load(a.map) if a.map else None
             root = Path(a.materials).parent if a.materials else None
-            plan = merge(plan, propose(spec, caps, m, plan.get("setup"), mats, pkg, root))
+            breaks = sorted(set((vision.cuts(m) if m else []) + list((plan.get("setup") or {}).get("cut_points", []))))
+            starts = [c["start"] for c in caps]
+
+            def valid(prev: dict) -> bool:
+                """人が決めた前の案が、今の字幕・地図・飾りでも通るか。"""
+                end = prev["at"] + prev["seconds"]
+                return (any(abs(prev["at"] - x) < 0.005 for x in starts)
+                        and not any(prev["at"] < b < end for b in breaks)
+                        and (m is not None or prev["mode"] != "pip")
+                        and not (m and head_hits([prev], m))
+                        and not conflicts([prev], spec))
+
+            plan = merge(plan, propose(spec, caps, m, plan.get("setup"), mats, pkg, root), valid)
             plan["base"] = {"captions": captions_sha(caps), "from": Path(a.captions).name}
             save_plan(path, plan)
         elif a.cmd in ("approve", "reject"):
@@ -585,7 +602,8 @@ def main(argv: list[str] | None = None) -> int:
             print(sheet(plan, Path(a.video), Path(a.out), a.offset, Path(a.materials_root) if a.materials_root else None))
             return 0
         elif a.cmd == "render":
-            print(render(plan, Path(a.video), Path(a.out), a.offset, Path(a.materials_root) if a.materials_root else None))
+            print(render(plan, Path(a.video), Path(a.out), a.offset, Path(a.materials_root) if a.materials_root else None,
+                         items=ready(plan, spec)))
             return 0
     except (InsertError, vision.VisionError) as e:
         print(f"止めました: {e}", file=sys.stderr)

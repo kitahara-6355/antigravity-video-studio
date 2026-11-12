@@ -251,3 +251,21 @@ def test_決まりが変わって秒だけ違う案は人が見て決めた方�
     new["items"][0]["fingerprint"] = ins.fingerprint(new["items"][0])
     plan = ins.merge(old, new)
     assert plan["items"][0]["seconds"] == old["items"][0]["seconds"] and ins.approved(plan, PEOPLE)
+
+
+def test_前の案が今の地図や字幕で通らなければ提案に戻る():
+    old = ins.propose({}, CAPS, the_map(), SETUP)
+    ins.decide(old, ["board-0110"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    new = ins.propose({}, CAPS, the_map(), SETUP)
+    new["items"][0]["seconds"] -= 1
+    new["items"][0]["fingerprint"] = ins.fingerprint(new["items"][0])
+    plan = ins.merge(old, new, valid=lambda prev: False)
+    assert plan["items"][0]["state"] == ins.PROPOSED and not ins.approved(plan, PEOPLE)
+
+
+def test_字幕が見つからなければ確かめられないので止まる(tmp_path):
+    plan = ins.propose({}, CAPS, the_map(), SETUP)
+    ins.decide(plan, ["board-0110"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    plan["base"] = {"captions": ins.captions_sha(CAPS)}
+    with pytest.raises(ins.InsertError, match="見つからない"):
+        ins.ready(plan, {"lock": str(tmp_path / "none.json")}, PEOPLE)
