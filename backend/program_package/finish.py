@@ -33,7 +33,12 @@ from backend.program_package import vision
 def audio_of(spec: dict, music_dir: str | None, audio_path: str | None, m: dict | None, body_seconds: float) -> dict:
     """音の指定。--audio があればそれ。無ければ曲の台帳から作る（色紙の場面は BGM を止めない — 人が決める所）。"""
     if audio_path:
-        return json.loads(Path(audio_path).read_text(encoding="utf-8"))
+        audio = json.loads(Path(audio_path).read_text(encoding="utf-8"))
+        gone = [str((audio.get(k) or {}).get("path")) for k in mu.ROLES.values()
+                if audio.get(k) and not Path(str(audio[k].get("path", ""))).is_file()]
+        if gone:  # 長い書き出しの前に分かる事は先に止める
+            raise mu.MusicError("音の指定の曲のファイルがありません: " + " / ".join(gone))
+        return audio
     program = ep.program_of(spec)
     if not program:
         raise mu.MusicError("この回の指定に番組（program）がありません")
@@ -51,13 +56,16 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
 
     # 先に確かめられる物は書き出す前に確かめる（書き出しは長い）
     plan_path = Path(spec["inserts"]) if spec.get("inserts") else ins.store_of(spec)
-    items = ins.approved(ins.load_plan(plan_path)) if spec.get("inserts") is not False and plan_path.exists() else []
+    items = ins.ready(ins.load_plan(plan_path), spec) if spec.get("inserts") is not False and plan_path.exists() else []
     note["inserts"] = [{k: it[k] for k in ("id", "at", "seconds", "mode", "keyword")} |
                        {"approved_by": it["decision"]["by"], "evidence": it["decision"]["evidence"]} for it in items]
     if m:
-        bad = [b for b in vision.check(spec, m, vision._body(spec)) if b["level"] == "掛かる"]
-        note["checks"].append({"id": "heads", "label": "飾りが頭に掛かっていない", "ok": not bad,
-                               "detail": [f"{b.get('label')} {b.get('at')}" for b in bad]})
+        bad = [f"{b.get('label')} {b.get('at')}" for b in vision.check(spec, m, vision._body(spec)) if b["level"] == "掛かる"]
+        bad += [f"差し込み {i}" for i in ins.head_hits(items, m)]
+        note["checks"].append({"id": "heads", "label": "飾りと差し込みが頭に掛かっていない", "ok": not bad, "detail": bad})
+    else:
+        note["checks"].append({"id": "heads", "label": "飾りと差し込みが頭に掛かっていない", "ok": False,
+                               "detail": "地図（--map）が無いので確かめていない"})
     audio = None
     if music:
         body_seconds = rx.duration(spec["source"])
@@ -86,7 +94,8 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
     if review:
         note["review"] = rx.review_copy(final).name
     note["file"] = final.name
-    note["state"] = "承認待ち（program_gate propose → 北原さんの承認 → 置く）"
+    note["music"] = bool(audio)
+    note["state"] = "承認待ち（program_gate propose → 北原さんの承認 → 置く）" + ("" if audio else "。曲は入っていない")
     (out / f"{spec['recording']}_{version}_仕上げの控え.json").write_text(
         json.dumps(note, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     return note

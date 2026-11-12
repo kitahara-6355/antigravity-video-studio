@@ -133,8 +133,20 @@ def test_通しで作ると曲が入り確かめと控えが残る(tmp_path, son
     checks = {c["id"]: c for c in note["checks"]}
     assert checks["op_climax"]["ok"], checks["op_climax"]
     assert "quality" in checks and note["state"].startswith("承認待ち")
+    assert not checks["heads"]["ok"] and "地図" in checks["heads"]["detail"]  # 地図なしは「確かめていない」と残す
     assert [s["step"] for s in note["steps"]] == ["飾り", "曲"]
     assert (tmp_path / "out" / "20250922_久木田ヒロノブ_v99_仕上げの控え.json").exists()
+
+
+def test_渡した音の指定の曲が無ければ書き出す前に止まる(tmp_path, monkeypatch):
+    spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec.update(source=str(video(tmp_path / "v62.mp4", 5)), inserts=False,
+                package=str(ROOT / spec["package"]), program=str(PROGRAM))
+    audio = tmp_path / "AUDIO.json"
+    audio.write_text(json.dumps({"op_music": {"path": str(tmp_path / "無い.m4a")}, "bgm": None}), encoding="utf-8")
+    monkeypatch.setattr(ep, "build", lambda *a, **k: pytest.fail("書き出しまで進んだ"))
+    with pytest.raises(mu.MusicError, match="ありません"):
+        fin.finish(spec, tmp_path / "out", "v99", audio_path=str(audio))
 
 
 def test_曲のファイルが決まっていなければ書き出す前に止まる(tmp_path, monkeypatch):

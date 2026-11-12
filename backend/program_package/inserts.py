@@ -3,10 +3,11 @@
 - 話の内容（承認済みの字幕）から、差し込む絵と時刻・長さ・入れ方（小窓か全画面）を決める
 - 絵は2種類: **収録の中の絵**（色紙や作品が大きく映ったコマ。映像を見る目の地図から自動で拾う）と、
   **素材**（写真・資料・作品。素材の一覧 materials に、権利と人の写り込みを書いた物だけ）
-- 使えない素材は案に出さない: 権利が未確認・他社の物、人の写り込みが未確認、AI が作った絵、動画
+- 使えない素材は案に出さない: 権利が未確認・他社の物、人の写り込みが未確認、AI が作った絵（未記入も）、動画
 - 小窓は頭に掛からない所へ置く（地図の「頭の来る所」と字幕の帯を避ける）。置けなければ全画面
   （字幕の帯は残す）
-- 始まりと終わりは字幕の切れ目。場面の切れ目・章の見出し・テロップ・名前のポップとは重ねない
+- 始まりは字幕の出だし、終わりは字幕の切れ目（4 秒に満たなければ次の字幕に掛からない範囲で 4 秒まで、
+  8 秒を超える 1 枚の字幕は 8 秒で切る）。場面の切れ目・章の見出し・テロップ・名前のポップとは重ねない
 - 収録の中の絵は、それが映った後の話にだけ出す（先に見せない）
 - 絵が無い言葉は「素材待ち」に出す（撮る・借りる物の一覧になる）
 - **案は承認されるまで入らない。** 承認は人だけ（承認できる人は program_approvals.json の approvers）。
@@ -111,15 +112,24 @@ def clusters(idx: list[int], captions: list[dict], gap: float = CLUSTER_GAP) -> 
     return out
 
 
+SLACK = 0.5  # 字幕の切れ目で終われるなら、8 秒をこれだけ超えてよい
+
+
 def slot(captions: list[dict], i: int, breaks: list[float]) -> tuple[float, float] | None:
-    """字幕 i から始まる差し込みの区間。字幕の切れ目で終え、場面の切れ目はまたがない。"""
-    start = captions[i]["start"]
-    end = captions[i]["end"]
-    j = i
-    while end - start < MIN_SECONDS and j + 1 < len(captions) and captions[j + 1]["start"] - end < 1.0:
+    """字幕 i から始まる差し込みの区間。
+
+    始まりは字幕の出だし。終わりは字幕の切れ目。ただし 4 秒に満たなければ、次の字幕に掛からない範囲で
+    4 秒まで延ばす（話の後の間に残す）。8 秒を超える 1 枚の字幕は 8 秒で切る。場面の切れ目はまたがない。
+    """
+    start, end, j = captions[i]["start"], captions[i]["end"], i
+    # 4 秒に届くまで、続く字幕を取り込む（4 秒の中に出だしが来る字幕は、途中で切らずに終わりまで）
+    while end - start < MIN_SECONDS and j + 1 < len(captions) and captions[j + 1]["start"] < start + MIN_SECONDS:
         j += 1
         end = captions[j]["end"]
-    end = min(max(end, start + MIN_SECONDS), start + MAX_SECONDS)
+    if end - start > MAX_SECONDS + SLACK:
+        ends = [c["end"] for c in captions[i:j + 1] if SHORTEST <= c["end"] - start <= MAX_SECONDS + SLACK]
+        end = ends[-1] if ends else start + MAX_SECONDS
+    end = max(end, start + MIN_SECONDS) if end - start < MIN_SECONDS else end
     for b in breaks:
         if start < b < end:
             end = b - 0.2
@@ -130,8 +140,9 @@ def slot(captions: list[dict], i: int, breaks: list[float]) -> tuple[float, floa
 
 def unusable(mat: dict) -> str | None:
     """素材が案に出せない理由。出せるなら None。"""
-    if mat.get("ai_generated"):
-        return "AI が作った絵は使わない"
+    if mat.get("ai_generated") is not False:
+        return ("AI が作った絵は使わない" if mat.get("ai_generated")
+                else "AI が作った絵かどうかが未記入（ai_generated: false と書いた物だけ）")
     if mat.get("kind", "image") != "image":
         return "動画の素材はまだ扱わない（後送）"
     if mat.get("rights") not in OK_RIGHTS:
@@ -156,7 +167,7 @@ def board_sources(m: dict, setup: dict) -> list[dict]:
 
 def extra_sources(setup: dict) -> list[dict]:
     """人が指した収録の中の絵（setup.recording_sources: id・at・crop・keywords）。"""
-    return [{"kind": "recording", "visible_from": s["at"], "spans": [[s["at"], s["at"]]], **s}
+    return [{"visible_from": s["at"], "spans": [[s["at"], s["at"]]], **s, "kind": "recording"}
             for s in setup.get("recording_sources", [])]
 
 
@@ -276,15 +287,17 @@ def propose(spec: dict, captions: list[dict], m: dict | None, setup: dict | None
         if a < last + APART:
             skipped.append({"keyword": word, "source": src["id"], "at": a, "reason": f"前の差し込みから {APART:.0f} 秒以内"})
             continue
-        zones = vision.head_zones(m, a, b - a) if m else []
-        mode, box = place(zones, aspect_of(src, root))
+        if m:
+            mode, box = place(vision.head_zones(m, a, b - a), aspect_of(src, root))
+        else:  # 地図が無ければ頭の場所が分からないので、小窓にはしない
+            mode, box = "full", full_box(aspect_of(src, root))
         source = {k: src[k] for k in ("kind", "id", "at", "crop", "file", "title") if src.get(k) not in (None, "")}
         if src["kind"] == "material":
             source["sha256"] = _sha(_file(src, root))
         # 名前は絵と時刻から付ける（素材が増えて案の並びが変わっても、承認した案の名前は変わらない）
         item = {"id": f"{src['id']}-{int(a) // 60:02d}{int(a) % 60:02d}", "at": a, "seconds": round(b - a, 2), "mode": mode, "box": box,
                 "keyword": word, "caption": text.replace("\n", " "), "source": source, "state": PROPOSED,
-                "reason": f"「{word}」の話に合わせて{'小窓' if mode == 'pip' else '全画面（小窓の置ける壁が無い）'}で出す"}
+                "reason": f"「{word}」の話に合わせて{'小窓' if mode == 'pip' else '全画面（小窓の置ける壁が無い・地図が無い）'}で出す"}
         item["fingerprint"] = fingerprint(item)
         items.append(item)
         last = b
@@ -305,13 +318,67 @@ def propose(spec: dict, captions: list[dict], m: dict | None, setup: dict | None
     return {"items": items, "wanted": sorted(wanted, key=lambda w: w["at"]), "excluded": excluded, "skipped": skipped}
 
 
+def captions_sha(captions: list[dict]) -> str:
+    """案を出した字幕の鍵。完成版を作り直して時刻が変わったら、案は出し直す。"""
+    return hashlib.sha256(json.dumps(captions, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def conflicts(items: list[dict], spec: dict) -> list[str]:
+    """承認した案のうち、今の飾り（章の見出し・テロップ・名前のポップ）と時刻が重なる物。"""
+    if not spec.get("package"):
+        return []
+    busy = [(o["at"], o["at"] + o["seconds"], o["label"]) for o in vision.overlay_times(spec, vision._body(spec))]
+    return [f"{it['id']} が {lab} と重なる" for it in items for a, b, lab in busy
+            if it["at"] < b + 0.5 and a - 0.5 < it["at"] + it["seconds"]]
+
+
+def ready(plan: dict, spec: dict, people: list[str] | None = None) -> list[dict]:
+    """書き出しに入れてよい案。承認の後に飾りや字幕（完成版）が変わっていたら、入れずに止める。"""
+    items = approved(plan, people)
+    if not items:
+        return []
+    bad = conflicts(items, spec)
+    if bad:
+        raise InsertError("承認の後に飾りが変わり、差し込みと重なっています（propose からやり直す）: " + " / ".join(bad))
+    lock = Path(spec["lock"]) if spec.get("lock") else None
+    if plan.get("base") and lock and lock.exists():
+        now = captions_sha(json.loads(lock.read_text(encoding="utf-8"))["segments"])
+        if now != plan["base"]["captions"]:
+            raise InsertError("案を出したときと字幕（完成版）が違います。時刻がずれるので propose からやり直す")
+    return items
+
+
+def head_hits(items: list[dict], m: dict) -> list[str]:
+    """差し込みが頭に掛かる案（書き出す前の確かめ）。全画面は絵を覆う物なので見ない。"""
+    import numpy as np
+    out = []
+    for it in items:
+        if it["mode"] != "pip":
+            continue
+        x0, y0, x1, y1 = it["box"]
+        mask = vision.head_mask(m, it["at"], it["seconds"])
+        if np.asarray(mask)[max(0, y0 - 6):y1 + 6, max(0, x0 - 6):x1 + 6].any():
+            out.append(it["id"])
+    return out
+
+
 def merge(old: dict | None, new: dict) -> dict:
-    """前の案の承認・見送りを、中身が同じ案にだけ引き継ぐ。変わった案は「提案」に戻る。"""
-    kept = {it["fingerprint"]: it for it in (old or {}).get("items", []) if it.get("state") != PROPOSED}
-    for it in new["items"]:
+    """前の案の承認・見送りを引き継ぐ。
+
+    中身が同じ案はそのまま。絵が同じで出し方（秒・位置）だけが変わった案は、人が見て決めた方の案を残す
+    （決まりを直しても、見て決めた物を黙って別の物に替えない）。絵が変わった案は「提案」に戻る。
+    """
+    decided = [it for it in (old or {}).get("items", []) if it.get("state") != PROPOSED]
+    kept = {it["fingerprint"]: it for it in decided}
+    same_picture = {it["id"]: it for it in decided}
+    for n, it in enumerate(new["items"]):
         prev = kept.get(it["fingerprint"])
         if prev:
             it["state"], it["decision"] = prev["state"], prev.get("decision")
+            continue
+        prev = same_picture.get(it["id"])
+        if prev and prev.get("source") == it.get("source") and prev.get("mode") == it.get("mode"):
+            new["items"][n] = prev
     return {"setup": (old or {}).get("setup", {}), **new}
 
 
@@ -509,6 +576,7 @@ def main(argv: list[str] | None = None) -> int:
             m = vision.load(a.map) if a.map else None
             root = Path(a.materials).parent if a.materials else None
             plan = merge(plan, propose(spec, caps, m, plan.get("setup"), mats, pkg, root))
+            plan["base"] = {"captions": captions_sha(caps), "from": Path(a.captions).name}
             save_plan(path, plan)
         elif a.cmd in ("approve", "reject"):
             decide(plan, a.ids.split(","), APPROVED if a.cmd == "approve" else REJECTED, by=a.by, evidence=a.evidence)

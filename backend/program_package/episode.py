@@ -250,7 +250,10 @@ def _inserts(spec: dict, src: Path, tmp: Path) -> list[tuple[Path, float, float]
     path = Path(where) if where else ins.store_of(spec)
     if not path.exists():
         return []
-    items = ins.approved(ins.load_plan(path))
+    try:
+        items = ins.ready(ins.load_plan(path), spec)
+    except ins.InsertError as e:
+        raise SystemExit(f"止めました: {e}") from e
     root = Path(spec["materials_root"]) if spec.get("materials_root") else None
     return ins.shows(items, src, tmp, 0.0, root)
 
