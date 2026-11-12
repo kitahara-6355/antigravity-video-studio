@@ -112,7 +112,7 @@ def climaxes(db: np.ndarray, on: np.ndarray, top: int = 5) -> list[dict]:
             continue
         w = int(SNAP * FPS)
         j = max(0, i - w) + int(on[max(0, i - w):i + w + 1].argmax())  # いちばん近い強い立ち上がり（拍）へ
-        out.append({"_i": int(i), "at": round(j / FPS, 2), "rise_db": round(float(rise[i]), 1),
+        out.append({"_i": int(i), "at": round(float(j / FPS), 2), "rise_db": round(float(rise[i]), 1),
                     "after_db": round(_mean_db(db, j, j + na), 1)})
     for c in out:
         del c["_i"]
