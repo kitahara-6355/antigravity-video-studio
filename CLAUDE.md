@@ -283,6 +283,8 @@ pytest tests/test_ux_ratchet.py     # UX検証ラチェット（連動率85%以�
    **次のフェーズには入らない。**
 3. **自律の対象外は課金判断のみ。** それ以外は main への push も含めて私が単独で実行してよい。
    **1円でも請求されるものはすべて対象。**
+   **ただし PR のマージは、北原さんのチャットでの承認の後**（2026-10-31 北原さん。PR は draft で出し、
+   チャットで OK が出たら Claude が draft を外してマージする）。
 
    **相談は「計画段階」でする。実行の直前ではない。**
    フェーズを設計する時点で有料利用を洗い出し、内訳と上限を示して予算を取る。
@@ -316,6 +318,15 @@ pytest tests/test_ux_ratchet.py     # UX検証ラチェット（連動率85%以�
    `phase_state.json` と `docs/BACKLOG_MASTER.md` は参照資料。
    **台帳が食い違ったら実装を止めて正典の修復を優先する。**
 6. **実装は Claude Code に一本化。** `.agent/` と `GEMINI.md` は読むが書かない。
+7. **クラウド優先**（2026-11-13 北原さん・dev-records 0012）。北原さんはスマホで確認・指示・判断だけを行う。
+   正本は GitHub と Google Drive に置き、**PC にしか無い状態を作らない**。PC を使うのはクラウドでできないときだけ。
+   PC 待ちになりそうなら、待ち時間とクラウドでの代わりの道を北原さんに一言出す。
+   - **権限は広く、記録は必ず残す。** Drive と Apps Script は全体の権限で触ってよい。変更は台帳・GitHub・
+     Drive の版に必ず残し、削除はゴミ箱まで（完全削除はしない）。課金と外部への送信は北原さん
+   - 鍵（OAuth トークン）は**クラウド環境の秘密の設定**と PC の `.env` だけ。ファイルに書き出さず環境変数から読む
+   - Apps Script は `python -m backend.gas_deploy push|deploy <名前>`（台帳 `backend/config/gas_projects.json`、
+     鍵 `AVS_SCRIPT_TOKEN_JSON`）。PC の clasp は予備
+   - 動画の本番書き出しはクラウドで作った物を正とする（ffmpeg 7.1.1・BIZ UDPゴシック）。PC は予備
 
 手順の本体は `.claude/skills/`（`/phase-run`・`/vision-audit`・`/gate-report`）にある。
 
