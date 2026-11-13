@@ -374,8 +374,8 @@ def same_source(a: dict | None, b: dict | None) -> bool:
         return a == b
     ca, cb = a.get("crop"), b.get("crop")
     if ca and cb and len(ca) == len(cb):
-        rest = lambda d: {k: v for k, v in d.items() if k != "crop"}
-        return rest(a) == rest(b) and max(abs(x - y) for x, y in zip(ca, cb)) <= CROP_SLACK
+        rest = [{k: v for k, v in d.items() if k != "crop"} for d in (a, b)]
+        return rest[0] == rest[1] and max(abs(x - y) for x, y in zip(ca, cb)) <= CROP_SLACK
     return a == b
 
 
