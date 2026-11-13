@@ -49,6 +49,10 @@ python -m backend.program_package.taste put OUT --dest 好みカルテ/OP曲え�
 - 番組 OP の絵は資産の `番組OP_<version>_横`（音は捨てる）。Drive id は番組の指定の `asset`
 - 1 本 15 秒・幅 640・数百 KB。12 本でクラウド 1 分ほど
 - 出力の各行で「番組名で何 dB 上がるか」を見る。0 に近い曲は山が合っていない
+- `put` は drive.file のトークンで書くので、**PC で作ったフォルダ（候補曲の親など）は見えない**（同じ名前のフォルダが別にできる）。
+  候補曲と同じ親に置くときは、Drive 全体のトークン（AVS_DRIVE_ORGANIZER_TOKEN_JSON）で親の id を指して置く。
+  2026-11-13 の初回はこの方法で `OP曲えらび_20261113/見本`（id 1UTCkiyVpE5hfnIMVieLc6DbFbWeuYc_W）に置いた
+- 速さ（bpm）は 70〜150 に寄せる（拍の細分を倍の速さと数えない）。ページの BPM と照らすと New Departure 95 → 92、South Wind 120 → 120
 
 ### 3. 美麗さんに送る
 

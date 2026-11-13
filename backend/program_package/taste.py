@@ -74,8 +74,11 @@ def features(x: np.ndarray) -> dict:
     blocks = [on[i:i + per].sum() for i in range(0, max(0, len(on) - per + 1), per)]
     blocks = np.array(blocks) if blocks else np.array([0.0])
     steady = float(1 - min(1.0, blocks.std() / (blocks.mean() + 1e-9))) if blocks.mean() > 0 else 0.0
+    bpm = music.tempo(on)
+    while bpm > 150:   # 人が感じる速さ（70〜150）に寄せる。拍の細分を速さと数えない
+        bpm = round(bpm / 2, 1)
     return {
-        "bpm": music.tempo(on),
+        "bpm": bpm,
         "brightness": round(float(np.median(cent)), 0),
         "density": round(len(peaks) / seconds, 2) if seconds else 0.0,
         "steadiness": round(steady, 2),
@@ -357,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if a.cmd == "clips":
             src = json.loads(Path(a.sources).read_text(encoding="utf-8-sig"))
-            src = src.get("tracks", src) if isinstance(src, dict) else src
+            src = (src.get("songs") or src.get("tracks") or []) + [{"skipped": True, **x} for x in src.get("skipped") or []] if isinstance(src, dict) else src
             pack = make_clips(a.base, a.songs, src, opening.load(a.program), a.out, a.name, a.question)
             for it in pack["items"]:
                 print(f"{it['id']}: start {it['start']}秒（{it['start_how']}）・番組名で {it['title_rise_db']} dB 上がる・"
