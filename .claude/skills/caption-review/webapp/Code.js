@@ -58,6 +58,12 @@ function getSeg(packId, fileId) {
   return Utilities.base64Encode(DriveApp.getFileById(fileId).getBlob().getBytes());
 }
 
+/** 小分けをまとめて（base64 の配列）。1 回の往復で数個取って待ち時間を減らす */
+function getSegs(packId, fileIds) {
+  if (!fileIds || fileIds.length > 12) throw new Error('一度に取れるのは 12 個までです');
+  return fileIds.map(function (id) { return getSeg(packId, id); });
+}
+
 function sheet_(packId) {
   var props = PropertiesService.getScriptProperties();
   var key = 'sheet_' + packId, id = props.getProperty(key);

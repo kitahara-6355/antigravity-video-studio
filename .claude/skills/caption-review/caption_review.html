@@ -63,6 +63,8 @@ h1 { font-family: var(--font-head); font-size: 1.12rem; font-weight: 700; margin
 .together { flex: none; margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--ink-soft); }
 .together select { font: inherit; font-size: .78rem; height: 28px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); color: var(--ink); }
 .together.on select { border-color: var(--gunjo); color: var(--gunjo); }
+.prefetch { font-size: .74rem; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prefetch.ok { color: var(--matsu); }
 .chip { font-size: .76rem; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet);
   white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
 .chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--sw, var(--ink-soft)); }
@@ -220,6 +222,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   <p class="sub" id="runLabel">美麗チャンネル 対談 第1回 · 字幕を読み込んでいます</p>
   <div class="counts" id="counts" aria-live="polite"></div>
   <div class="together" id="together" hidden>
+    <span class="prefetch" id="prefetch" hidden aria-live="polite"></span>
     <select id="who" aria-label="見ている人"><option value="北原">北原</option><option value="美麗">美麗</option></select>
     <select id="togetherMode" aria-label="一緒に見る"><option value="off">ひとりで見る</option><option value="lead">一緒に（進める）</option><option value="follow">一緒に（ついていく）</option></select>
   </div>
@@ -354,6 +357,81 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function loadScript(src) {
     return new Promise((ok, ng) => { const t = document.createElement("script"); t.src = src; t.onload = ok; t.onerror = ng; document.head.appendChild(t); });
   }
+  // 小分けの先読み: 1 回の往復で数個ずつまとめて取り、手元（メモリと端末の保存）に貯める。
+  // 見ている所の周り → 印の所 → 頭から全部、の順。貯まった所はシークも印のくり返しも待たずに流れる。
+  // 端末の保存（IndexedDB）は開き直しを速くするためだけで、無くても動く
+  const PREFETCH_BATCH = 8, PREFETCH_LANES = 4;
+  function makeSegStore(segs, b64) {
+    const mem = new Map(), wait = new Map(), ids = segs.map((x) => x.id);
+    const starts = []; let acc = 0; segs.forEach((x) => { starts.push(acc); acc += x.dur || 0; });
+    let db = null, running = false, done = 0;
+    const dbName = "avs-review-" + G.pack;
+    const idb = (mode, fn) => new Promise((ok, ng) => { try { const tx = db.transaction("s", mode); const r = fn(tx.objectStore("s")); tx.oncomplete = () => ok(r && r.result); tx.onerror = () => ng(tx.error); } catch (e) { ng(e); } });
+    async function openDb() {
+      try { db = await new Promise((ok, ng) => { const r = indexedDB.open(dbName, 1); r.onupgradeneeded = () => r.result.createObjectStore("s"); r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); }); }
+      catch (_) { db = null; }
+    }
+    function put(id, buf) {
+      if (!mem.has(id)) { mem.set(id, buf); done++; showProgress(); }
+      if (db) idb("readwrite", (st) => st.put(buf, id)).catch(() => {});
+    }
+    function showProgress() {
+      const el = $("prefetch"); if (!el) return;
+      el.hidden = false;
+      el.textContent = done >= ids.length ? "動画を全部読み込みました" : "動画を読み込み中 " + Math.floor(done * 100 / ids.length) + "%";
+      el.classList.toggle("ok", done >= ids.length);
+    }
+    async function fetchBatch(batch) {
+      batch = batch.filter((id) => !mem.has(id) && !wait.has(id)); if (!batch.length) return;
+      const p = (async () => {
+        for (let k = 0; ; k++) {
+          try { const arr = await gas("getSegs", G.pack, batch); arr.forEach((x, i) => put(batch[i], b64(x))); return; }
+          catch (e) { if (k >= 2) throw e; await sleep(800 * (k + 1)); }
+        }
+      })();
+      batch.forEach((id) => wait.set(id, p));
+      try { await p; } finally { batch.forEach((id) => wait.delete(id)); }
+    }
+    const indexAt = (t) => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (starts[m] <= t) lo = m; else hi = m - 1; } return lo; };
+    function nextBatch() {
+      // 見ている所の少し前から先、印の所、残り全部
+      const want = [], here = indexAt(video.currentTime || 0);
+      for (let i = Math.max(0, here - 1); i < Math.min(ids.length, here + 12); i++) want.push(i);
+      sortedMarks().forEach(([, m]) => { const k = indexAt(Math.max(0, m.t - LEAD_SEC)); want.push(k, k + 1); });
+      for (let i = 0; i < ids.length; i++) want.push(i);
+      const out = [];
+      for (const i of want) { const id = ids[i]; if (id && !mem.has(id) && !wait.has(id) && !out.includes(id)) { out.push(id); if (out.length >= PREFETCH_BATCH) break; } }
+      return out;
+    }
+    async function lane() {
+      while (running) {
+        const b = nextBatch(); if (!b.length) { await sleep(400); if (done >= ids.length) return; continue; }
+        try { await fetchBatch(b); } catch (_) { await sleep(3000); }
+      }
+    }
+    async function warmFromDb() {
+      if (!db) return;
+      try {
+        const keys = await idb("readonly", (st) => st.getAllKeys());
+        for (const id of keys || []) { if (!ids.includes(id) || mem.has(id)) continue;
+          const buf = await idb("readonly", (st) => st.get(id)); if (buf) { mem.set(id, buf); done++; } }
+        showProgress();
+      } catch (_) { /* 端末の保存が使えなくても動く */ }
+    }
+    return {
+      async get(id) {
+        if (mem.has(id)) { await null; return mem.get(id); }
+        if (db) { try { const buf = await idb("readonly", (st) => st.get(id)); if (buf) { mem.set(id, buf); done++; return buf; } } catch (_) {} }
+        if (!wait.has(id)) { const k = ids.indexOf(id); fetchBatch(ids.slice(k, k + 3)).catch(() => {}); }
+        try { await wait.get(id); } catch (_) {}
+        if (mem.has(id)) return mem.get(id);
+        throw new Error("動画の一部を読めませんでした");
+      },
+      async start() { await openDb(); await warmFromDb(); running = true; for (let i = 0; i < PREFETCH_LANES; i++) lane(); },
+      stats: () => ({ done, total: ids.length }),
+    };
+  }
+
   async function gasVideo(pack) {
     if (!window.Hls) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.20/hls.min.js");
     if (!Hls.isSupported()) { setLoader("この端末のブラウザでは小分けの動画を流せません（iPhone は iOS 17.1 以降が要ります）。", null, true); return; }
@@ -374,11 +452,12 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
         const fail = (e) => { if (!this.gone) cb.onError({ code: 0, text: String(e && e.message || e) }, context, null, st); };
         if (/\.m3u8$/.test(context.url)) { setTimeout(() => done(m3u8), 0); return; }
         const id = context.url.split("/").pop();
-        (async () => { for (let k = 0; ; k++) { try { return await gas("getSeg", G.pack, id); } catch (e) { if (k >= 2) throw e; await sleep(800 * (k + 1)); } } })()
-          .then((s) => done(b64(s)), fail);
+        segStore.get(id).then(done, fail);
       }
     }
-    const hls = new Hls({ loader: GasLoader, maxBufferLength: 20, maxMaxBufferLength: 40, startFragPrefetch: true,
+    const segStore = makeSegStore(segs, b64);
+    G.segStore = segStore;
+    const hls = new Hls({ loader: GasLoader, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: Infinity, startFragPrefetch: true,
       fragLoadingMaxRetry: 4, manifestLoadingMaxRetry: 1 });
     G.hls = hls;
     hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) { if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError(); else hls.startLoad(); } });
@@ -386,6 +465,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     hls.attachMedia(video);
     hls.loadSource("https://gas.invalid/index.m3u8");
     await parsed;
+    segStore.start();
     $("loader").hidden = true;
     ["markBtn", "backBtn", "fwdBtn"].forEach((id) => { $(id).disabled = false; });
     updateReelButton();
