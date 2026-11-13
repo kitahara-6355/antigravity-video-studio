@@ -365,6 +365,20 @@ def head_hits(items: list[dict], m: dict) -> list[str]:
     return out
 
 
+CROP_SLACK = 4  # 地図を作り直すと、収録の中の絵の切り抜きが数 px 動く。これ以内は同じ絵
+
+
+def same_source(a: dict | None, b: dict | None) -> bool:
+    """同じ絵か。収録の中の絵は切り抜きの数 px の差を許す（ほかは全部同じ）。素材は中身（sha）まで同じ。"""
+    if not a or not b:
+        return a == b
+    ca, cb = a.get("crop"), b.get("crop")
+    if ca and cb and len(ca) == len(cb):
+        rest = lambda d: {k: v for k, v in d.items() if k != "crop"}
+        return rest(a) == rest(b) and max(abs(x - y) for x, y in zip(ca, cb)) <= CROP_SLACK
+    return a == b
+
+
 def merge(old: dict | None, new: dict, valid=None) -> dict:
     """前の案の承認・見送りを引き継ぐ。
 
@@ -381,7 +395,7 @@ def merge(old: dict | None, new: dict, valid=None) -> dict:
             it["state"], it["decision"] = prev["state"], prev.get("decision")
             continue
         prev = same_picture.get(it["id"])
-        if (prev and prev.get("source") == it.get("source") and prev.get("mode") == it.get("mode")
+        if (prev and same_source(prev.get("source"), it.get("source")) and prev.get("mode") == it.get("mode")
                 and abs(prev["at"] - it["at"]) < 0.005 and (valid is None or valid(prev))):
             new["items"][n] = prev
     return {"setup": (old or {}).get("setup", {}), **new}
