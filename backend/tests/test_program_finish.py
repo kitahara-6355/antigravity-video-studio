@@ -149,10 +149,10 @@ def test_渡した音の指定の曲が無ければ書き出す前に止まる(t
         fin.finish(spec, tmp_path / "out", "v99", audio_path=str(audio))
 
 
-def test_曲のファイルが決まっていなければ書き出す前に止まる(tmp_path, monkeypatch):
+def test_曲のファイルが置き場に無ければ書き出す前に止まる(tmp_path, monkeypatch):
     spec = json.loads(SPEC.read_text(encoding="utf-8"))
     spec.update(source=str(video(tmp_path / "v62.mp4", 5)), inserts=False,
                 package=str(ROOT / spec["package"]), program=str(PROGRAM))
     monkeypatch.setattr(ep, "build", lambda *a, **k: pytest.fail("書き出しまで進んだ"))
-    with pytest.raises(mu.MusicError, match="決まっていません"):
+    with pytest.raises(mu.MusicError, match="曲のファイルがありません"):
         fin.finish(spec, tmp_path / "out", "v99", music_dir=str(tmp_path))
