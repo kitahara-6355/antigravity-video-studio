@@ -196,7 +196,10 @@ def read_answers(path: str | Path) -> list[dict]:
     if p.suffix.lower() == ".json":
         rows = json.loads(text)
     else:
-        rows = [json.loads(r["json"]) for r in csv.DictReader(text.splitlines()) if (r.get("json") or "").strip()]
+        reader = csv.DictReader(text.splitlines())
+        if "json" not in (reader.fieldnames or []):
+            raise TasteError(f"答えのシートに json の列がありません: {path}")
+        rows = [json.loads(r["json"]) for r in reader if r["json"] and r["json"].strip()]
     out = [r for r in rows if r.get("a") and r.get("b") and r.get("pick") in ("a", "b", "both", "neither")]
     if not out:
         raise TasteError(f"答えがありません: {path}")
