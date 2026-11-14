@@ -152,3 +152,6 @@ c4b-observed-faces.json
 
 # 番組のサムネ用フォント（python -m backend.program_package.thumbnail --fetch-fonts で取る）
 backend/data/fonts/
+
+# gas_deploy が送る前に控える Apps Script の中身（版は Apps Script 側と git に残る）
+backend/data/gas_backups/
