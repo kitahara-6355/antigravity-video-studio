@@ -2,6 +2,7 @@
 
 曲そのものはリポジトリに置かないので、作った音（拍と、途中から大きくなる山）で確かめる。
 """
+import json
 import re
 import shutil
 import subprocess
@@ -352,3 +353,50 @@ def test_同じ名前で中身の違う曲が2つあれば_決めずに止まる
     with pytest.raises(mu.MusicError, match="中身ちがい"):
         mu.fetch(LEDGER, tmp_path, service=svc, env=ENV)
     assert not (tmp_path / "bed.m4a").exists()
+
+
+def test_AIで作った曲は道具と指示文を残して台帳に足し仮の曲として扱う():
+    led = {"tracks": {}}
+    with pytest.raises(mu.MusicError, match="指示文"):
+        mu.add_track(led, "op_vids_01", title="OP 案1", file="a.mp4", source="Google Vids", by="北原", ai_generated=True)
+    t = mu.add_track(led, "op_vids_01", title="OP 案1", file="a.mp4", source="Google Vids（info@）", by="北原",
+                     ai_generated=True, made_with="Google Vids", prompt="和の雰囲気、ピアノと箏", today="2026-11-14")
+    assert t["provisional"] and t["ai_generated"] and t["prompt"] and t["added"] == {"by": "北原", "on": "2026-11-14"}
+    with pytest.raises(mu.MusicError, match="もうあります"):
+        mu.add_track(led, "op_vids_01", title="x", file="b.mp4", source="s", by="北原")
+    ok = mu.add_track(led, "op_free_01", title="無料曲", file="c.mp3", source="OpenTracks", by="北原", cleared="利用規約 2026-11-14 確認")
+    assert ok["provisional"] is False and "ai_generated" not in ok
+
+
+def test_AIで作った曲を公開に使えるのは法人のWorkspaceで作った曲だけ():
+    led = {"tracks": {}}
+    kw = {"title": "OP 案1", "file": "a.mp3", "source": "Google Vids", "by": "北原", "ai_generated": True,
+          "made_with": "Google Vids", "prompt": "ピアノとストリングス"}
+    with pytest.raises(mu.MusicError, match="法人"):  # 個人で作った曲は根拠を書いても仮のまま
+        mu.add_track(led, "op_vids_01", account="someone@gmail.com", cleared="規約を読んだ", **kw)
+    t = mu.add_track(led, "op_vids_02", account="info@kitahara-birei.com", original="Vids/曲_OP_02.mp4", **kw)
+    assert t["provisional"] and t["account"].endswith("kitahara-birei.com") and t["original"].endswith(".mp4")
+    mu.clear_track(led, "op_vids_02", "Workspace サービス固有規約 12.4・12.10・12.12（2026-11-14 確認）")
+    assert led["tracks"]["op_vids_02"]["provisional"] is False
+    mu.add_track(led, "op_vids_03", account="someone@gmail.com", **kw)
+    with pytest.raises(mu.MusicError, match="法人"):
+        mu.clear_track(led, "op_vids_03", "規約を読んだ")
+
+
+def test_Vidsの書き出しから音を取り出して台帳に足す(tmp_path):
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg が無い")
+    mp4 = tmp_path / "曲_OP_01.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x180:r=5:d=3",
+                    "-f", "lavfi", "-i", "sine=f=440:r=48000:d=3", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-c:a", "aac", "-shortest", str(mp4)], check=True)
+    led = tmp_path / "music.json"
+    led.write_text(json.dumps({"tracks": {}}), encoding="utf-8")
+    assert mu.main(["add", "op_vids_01", "--title", "OP 案1", "--file", "op_vids_01.mp3", "--source", "Google Vids",
+                    "--by", "北原", "--ai", "--made-with", "Google Vids", "--prompt", "ピアノ", "--ledger", str(led),
+                    "--account", "info@kitahara-birei.com", "--from-video", str(mp4),
+                    "--music-dir", str(tmp_path / "曲")]) == 0
+    assert (tmp_path / "曲" / "op_vids_01.mp3").stat().st_size > 1000
+    assert json.loads(led.read_text(encoding="utf-8"))["tracks"]["op_vids_01"]["provisional"] is True
+    with pytest.raises(mu.MusicError, match="もうあります"):  # 前の曲を上書きしない
+        mu.extract_audio(mp4, tmp_path / "曲" / "op_vids_01.mp3")

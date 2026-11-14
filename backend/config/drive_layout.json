@@ -99,5 +99,29 @@
     "ok_choice": "4635B4D0E6",
     "ok_state": "目視OK",
     "other_state": "要直し"
+  },
+  "vids": {
+    "_doc": "Google Vids（定額・手作業）で作った物の置き場。スキル vids-assist。2026-11-14 案、北原さんの OK 待ち",
+    "song_exports": {
+      "path": "20_素材/共通/Vids曲",
+      "put_by": "北原さん",
+      "name": "曲_<役>_<連番>（例 曲_OP_01）"
+    },
+    "songs": {
+      "path": "30_AVS_作業/番組資産/曲",
+      "put_by": "AI",
+      "note": "mp4 から取り出した mp3。台帳は backend/config/music.json"
+    },
+    "short_edits": {
+      "path": "40_完成/{id}/Vids",
+      "put_by": "北原さん",
+      "note": "Vids で手直しした Shorts・OP"
+    },
+    "ledger": {
+      "path": "30_AVS_作業/Vids台帳",
+      "put_by": "AI",
+      "note": "曲以外の Vids の作品の控え（シート）"
+    },
+    "account": "番組で使う物は info@（Workspace の規約・補償の対象）で作る"
   }
 }
