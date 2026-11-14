@@ -432,14 +432,18 @@ class TemplateConfigProvider:
 
     def _format_subtitle_style(self, style_params: Dict[str, Any]) -> str:
         """スタイルパラメータから FFmpeg subtitles フィルタの force_style 文字列を組み立てる"""
+        try:
+            import subtitle_font
+        except ImportError:  # backend. から読まれたとき
+            from backend import subtitle_font
         return (
-            f"FontSize={style_params['font_size']},"
+            f"FontSize={subtitle_font.size(style_params['font_size'])},"
             f"PrimaryColour=&HFFFFFF,"
             f"OutlineColour=&H000000,"
             f"BackColour=&H80000000,"     # 半透明黒背景
             f"Outline={style_params['outline']},"
             f"BorderStyle={style_params['border_style']},"  # 4=背景ボックス
-            f"FontName=Yu Gothic UI,"
+            f"FontName={subtitle_font.family()},"
             f"MarginV={style_params['margin_v']},"
             f"MarginL={style_params['margin_l']},"
             f"MarginR={style_params['margin_r']},"

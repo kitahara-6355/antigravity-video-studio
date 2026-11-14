@@ -40,7 +40,7 @@ def test_template_config_default():
     assert margins["MarginL"] == 25  # 1280 * 2 / 100 = 25.6 -> max(20, 25) -> 25
     
     style = provider.get_subtitle_style()
-    assert "FontSize=16" in style
+    assert "FontSize=11" in style  # 16 を BIZ UDPゴシックで同じ見た目にした値（subtitle_font.size）
     
     # 2パス音声ノーマライズ
     assert "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json" == provider.get_loudnorm_pass1_filter()

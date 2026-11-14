@@ -58,6 +58,13 @@ h1 { font-family: var(--font-head); font-size: 1.12rem; font-weight: 700; margin
 .sub { margin: 0; color: var(--ink-soft); font-size: .8rem; flex: 1 1 auto; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .counts { display: flex; gap: 6px; flex: none; }
+/* 一緒に見る（ウェブアプリの時だけ出す）: 進める人の再生位置と印に、もう片方の画面がついていく */
+.top:has(.together:not([hidden])) { flex-wrap: wrap; }
+.together { flex: none; margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--ink-soft); }
+.together select { font: inherit; font-size: .78rem; height: 28px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); color: var(--ink); }
+.together.on select { border-color: var(--gunjo); color: var(--gunjo); }
+.prefetch { font-size: .74rem; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prefetch.ok { color: var(--matsu); }
 .chip { font-size: .76rem; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet);
   white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
 .chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--sw, var(--ink-soft)); }
@@ -81,6 +88,7 @@ h1 { font-family: var(--font-head); font-size: 1.12rem; font-weight: 700; margin
 .bar { width: min(320px, 70%); height: 4px; background: var(--on-screen-dim); border-radius: 2px; overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: var(--on-screen); transition: width .2s; }
 .loader .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.loader .pack-link { display: block; padding: 10px 14px; border-radius: 8px; background: var(--sheet); color: var(--ink); text-decoration: none; border: 1px solid var(--rule); }
 .loader button { background: transparent; color: var(--on-screen); border-color: var(--on-screen-dim); }
 .strip { flex: none; position: relative; height: 22px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
   cursor: pointer; touch-action: manipulation; }
@@ -173,6 +181,22 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 
 /* 縦長か狭い画面: 縦に積む（正方形に近い画面は2列のほうが控えが広い）。見出しは1行のまま、数の札は横に送れる */
 @media (max-width: 599px), (max-aspect-ratio: 9/10) {
+  /* ウェブアプリ（スマホ）で印の所を流している間と、直しを書いている間は、字幕の枠を見出し1行に畳み、
+     空いた高さを控えに回す（流している字幕は控えの印に同じ字が出ている）。書いている間はボタンの帯も畳む */
+  body.gas.reeling .now .now-side, body.gas.reeling .now .now-text,
+  body.gas:has(.ledger :is(textarea, input):focus) .now .now-side,
+  body.gas:has(.ledger :is(textarea, input):focus) .now .now-text { display: none; }
+  body.gas:has(.ledger :is(textarea, input):focus) .actions,
+  body.gas:has(.ledger :is(textarea, input):focus) .strip,
+  body.gas:has(.ledger :is(textarea, input):focus) .top,
+  body.gas:has(.ledger :is(textarea, input):focus) .now,
+  body.gas:has(.ledger :is(textarea, input):focus) .ledger .foot { display: none; }
+  /* 元の字幕は入力欄に同じ字が入っているので、書いている間は小さな1行の控えにして入力欄を主役にする */
+  body.gas .item:focus-within .orig { font-size: .76rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  body.gas .item:focus-within textarea { font-size: 1rem; min-height: 4.4em; }
+  /* 書いている間は動画を小さくして（キーボードで画面が半分になっても）入力欄とボタンが見えるようにする */
+  body.gas:has(.ledger :is(textarea, input):focus) .screen { flex-basis: min(calc(100cqw * 9 / 16), 24dvh); min-height: 90px; }
   .sub { display: none; }
   h1 { font-size: 1rem; }
   .counts { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
@@ -213,6 +237,11 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   <h1>字幕の朱入れ</h1>
   <p class="sub" id="runLabel">美麗チャンネル 対談 第1回 · 字幕を読み込んでいます</p>
   <div class="counts" id="counts" aria-live="polite"></div>
+  <div class="together" id="together" hidden>
+    <span class="prefetch" id="prefetch" hidden aria-live="polite"></span>
+    <select id="who" aria-label="見ている人"><option value="北原">北原</option><option value="美麗">美麗</option></select>
+    <select id="togetherMode" aria-label="一緒に見る"><option value="off">ひとりで見る</option><option value="lead">一緒に（進める）</option><option value="follow">一緒に（ついていく）</option></select>
+  </div>
 </header>
 
 <main class="desk">
@@ -235,7 +264,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     <div class="actions">
       <button type="button" class="btn-mark" id="markBtn" disabled>違和感あり<kbd>M</kbd></button>
       <div class="grp" id="normal">
-        <button type="button" id="backBtn" disabled>3秒戻る<kbd>←</kbd></button>
+        <button type="button" id="backBtn" aria-label="3秒戻る" disabled>−3秒<kbd>←</kbd></button>
+        <button type="button" id="fwdBtn" aria-label="3秒進む" disabled>＋3秒<kbd>→</kbd></button>
         <button type="button" id="reelBtn" disabled>印の所だけ再生</button>
       </div>
       <div class="grp" id="reel" hidden>
@@ -310,6 +340,203 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function kOfCap(i) { return S.caps[i] && S.caps[i].i === i ? i : S.caps.findIndex((c) => c.i === i); }
   const duration = () => (S.sheet && S.sheet.duration) || video.duration || 1;
 
+  // ── info@ の Apps Script ウェブアプリで開いたとき（スマホ・2人で同時に） ──
+  // 動画は Drive の小分け（HLS）を要る所だけ取って流す。印はシート、一緒に見る位置はキャッシュ（どちらも定額内）
+  const GAS = !!(window.google && google.script && google.script.run);
+  const POLL_MS = 2000, LIVE_MS = 1000, DRIFT_SEC = 1.5, LIVE_STALE_MS = 15000;
+  const G = { pack: "", ver: -1, hls: null, mode: "off", lastLive: 0, liveSeen: "" };
+  const gas = (fn, ...args) => new Promise((ok, ng) =>
+    google.script.run.withSuccessHandler(ok).withFailureHandler((e) => ng({ code: "gas", message: String(e && e.message || e) }))[fn](...args));
+  function who() { try { return localStorage.getItem("avs.who") || "北原"; } catch (_) { return "北原"; } }
+  async function gasStart() {
+    $("together").hidden = false; $("who").value = who();
+    document.body.classList.add("gas");
+    $("pickBtn").hidden = true;
+    try {
+      const loc = await new Promise((ok) => google.script.url.getLocation(ok));
+      G.pack = (loc.parameter && loc.parameter.pack) || "";
+      if (!G.pack) return gasChoose();
+      setLoader("字幕の控えを読み込んでいます", null, false);
+      const pack = JSON.parse(await gas("getPack", G.pack));
+      loadSheet(pack);
+      setLoader("動画の準備をしています", null, false);
+      await gasVideo(pack);
+    } catch (e) { setLoader("読み込めませんでした（" + ((e && e.message) || e) + "）。もう一度読み込んでください。", null, true); }
+  }
+  async function gasChoose() {
+    const list = await gas("listPacks");
+    if (!list.length) { setLoader("確認用の小分けがまだ Drive にありません。Claude に「確認用を置いて」と頼んでください。", null, true); return; }
+    $("loaderText").textContent = "どの回を見ますか";
+    $("loaderBar").hidden = true;
+    const row = $("loaderButtons"); row.hidden = false; row.textContent = "";
+    list.forEach((p) => { const a = el("a", "", p.name); a.href = p.url; a.target = "_top"; a.className = "pack-link"; row.appendChild(a); });
+  }
+  function loadScript(src) {
+    return new Promise((ok, ng) => { const t = document.createElement("script"); t.src = src; t.onload = ok; t.onerror = ng; document.head.appendChild(t); });
+  }
+  // 小分けの先読み: 1 回の往復で数個ずつまとめて取り、手元（メモリと端末の保存）に貯める。
+  // 見ている所の周り → 印の所 → 頭から全部、の順。貯まった所はシークも印のくり返しも待たずに流れる。
+  // 端末の保存（IndexedDB）は開き直しを速くするためだけで、無くても動く
+  const PREFETCH_BATCH = 8, PREFETCH_LANES = 4;
+  function makeSegStore(segs, b64) {
+    const mem = new Map(), wait = new Map(), ids = segs.map((x) => x.id);
+    const starts = []; let acc = 0; segs.forEach((x) => { starts.push(acc); acc += x.dur || 0; });
+    let db = null, running = false, done = 0;
+    const dbName = "avs-review-" + G.pack;
+    const idb = (mode, fn) => new Promise((ok, ng) => { try { const tx = db.transaction("s", mode); const r = fn(tx.objectStore("s")); tx.oncomplete = () => ok(r && r.result); tx.onerror = () => ng(tx.error); } catch (e) { ng(e); } });
+    async function openDb() {
+      try { db = await new Promise((ok, ng) => { const r = indexedDB.open(dbName, 1); r.onupgradeneeded = () => r.result.createObjectStore("s"); r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); }); }
+      catch (_) { db = null; }
+    }
+    function put(id, buf) {
+      if (!mem.has(id)) { mem.set(id, buf); done++; showProgress(); }
+      if (db) idb("readwrite", (st) => st.put(buf, id)).catch(() => {});
+    }
+    function showProgress() {
+      const el = $("prefetch"); if (!el) return;
+      el.hidden = false;
+      el.textContent = done >= ids.length ? "動画を全部読み込みました" : "動画を読み込み中 " + Math.floor(done * 100 / ids.length) + "%";
+      el.classList.toggle("ok", done >= ids.length);
+    }
+    async function fetchBatch(batch) {
+      batch = batch.filter((id) => !mem.has(id) && !wait.has(id)); if (!batch.length) return;
+      const p = (async () => {
+        for (let k = 0; ; k++) {
+          try { const arr = await gas("getSegs", G.pack, batch); arr.forEach((x, i) => put(batch[i], b64(x))); return; }
+          catch (e) { if (k >= 2) throw e; await sleep(800 * (k + 1)); }
+        }
+      })();
+      batch.forEach((id) => wait.set(id, p));
+      try { await p; } finally { batch.forEach((id) => wait.delete(id)); }
+    }
+    const indexAt = (t) => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (starts[m] <= t) lo = m; else hi = m - 1; } return lo; };
+    function nextBatch() {
+      // 見ている所の少し前から先、印の所、残り全部
+      const want = [], here = indexAt(video.currentTime || 0);
+      for (let i = Math.max(0, here - 1); i < Math.min(ids.length, here + 12); i++) want.push(i);
+      sortedMarks().forEach(([, m]) => { const k = indexAt(Math.max(0, m.t - LEAD_SEC)); want.push(k, k + 1); });
+      for (let i = 0; i < ids.length; i++) want.push(i);
+      const out = [];
+      for (const i of want) { const id = ids[i]; if (id && !mem.has(id) && !wait.has(id) && !out.includes(id)) { out.push(id); if (out.length >= PREFETCH_BATCH) break; } }
+      return out;
+    }
+    async function lane() {
+      while (running) {
+        const b = nextBatch(); if (!b.length) { await sleep(400); if (done >= ids.length) return; continue; }
+        try { await fetchBatch(b); } catch (_) { await sleep(3000); }
+      }
+    }
+    async function warmFromDb() {
+      if (!db) return;
+      try {
+        const keys = await idb("readonly", (st) => st.getAllKeys());
+        for (const id of keys || []) { if (!ids.includes(id) || mem.has(id)) continue;
+          const buf = await idb("readonly", (st) => st.get(id)); if (buf) { mem.set(id, buf); done++; } }
+        showProgress();
+      } catch (_) { /* 端末の保存が使えなくても動く */ }
+    }
+    return {
+      async get(id) {
+        if (mem.has(id)) { await null; return mem.get(id); }
+        if (db) { try { const buf = await idb("readonly", (st) => st.get(id)); if (buf) { mem.set(id, buf); done++; return buf; } } catch (_) {} }
+        if (!wait.has(id)) { const k = ids.indexOf(id); fetchBatch(ids.slice(k, k + 3)).catch(() => {}); }
+        try { await wait.get(id); } catch (_) {}
+        if (mem.has(id)) return mem.get(id);
+        throw new Error("動画の一部を読めませんでした");
+      },
+      async start() { await openDb(); await warmFromDb(); running = true; for (let i = 0; i < PREFETCH_LANES; i++) lane(); },
+      stats: () => ({ done, total: ids.length }),
+    };
+  }
+
+  async function gasVideo(pack) {
+    if (!window.Hls) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.20/hls.min.js");
+    if (!Hls.isSupported()) { setLoader("この端末のブラウザでは小分けの動画を流せません（iPhone は iOS 17.1 以降が要ります）。", null, true); return; }
+    const segs = pack.segments || [];
+    const top = Math.ceil(Math.max(...segs.map((x) => x.dur || 6)));
+    const m3u8 = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:" + top + "\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n"
+      + segs.map((x) => "#EXTINF:" + x.dur + ",\nhttps://gas.invalid/" + x.id).join("\n") + "\n#EXT-X-ENDLIST\n";
+    const b64 = (str) => { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+    class GasLoader {
+      constructor() { this.stats = { aborted: false, loaded: 0, retry: 0, total: 0, chunkCount: 0, bwEstimate: 0,
+        loading: { start: 0, first: 0, end: 0 }, parsing: { start: 0, end: 0 }, buffering: { start: 0, first: 0, end: 0 } }; this.gone = false; }
+      destroy() { this.gone = true; } abort() { this.gone = true; this.stats.aborted = true; }
+      load(context, config, cb) {
+        const st = this.stats; st.loading.start = performance.now();
+        const done = (data) => { if (this.gone) return; st.loading.first = st.loading.end = performance.now();
+          st.loaded = st.total = (data.byteLength != null ? data.byteLength : data.length);
+          cb.onSuccess({ url: context.url, data }, st, context, null); };
+        const fail = (e) => { if (!this.gone) cb.onError({ code: 0, text: String(e && e.message || e) }, context, null, st); };
+        if (/\.m3u8$/.test(context.url)) { setTimeout(() => done(m3u8), 0); return; }
+        const id = context.url.split("/").pop();
+        segStore.get(id).then(done, fail);
+      }
+    }
+    const segStore = makeSegStore(segs, b64);
+    G.segStore = segStore;
+    const hls = new Hls({ loader: GasLoader, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: Infinity, startFragPrefetch: true,
+      fragLoadingMaxRetry: 4, manifestLoadingMaxRetry: 1 });
+    G.hls = hls;
+    hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) { if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError(); else hls.startLoad(); } });
+    const parsed = new Promise((ok) => hls.once(Hls.Events.MANIFEST_PARSED, ok));
+    hls.attachMedia(video);
+    hls.loadSource("https://gas.invalid/index.m3u8");
+    await parsed;
+    segStore.start();
+    $("loader").hidden = true;
+    ["markBtn", "backBtn", "fwdBtn"].forEach((id) => { $(id).disabled = false; });
+    updateReelButton();
+  }
+  // 印のシート（db と同じ形: doc(id).set/update/delete と onSnapshot）
+  function gasMarks() {
+    let listener = null, onErr = null, timer = 0, fails = 0;
+    const snap = (marks) => ({ docs: Object.keys(marks).map((id) => ({ id, exists: true, data: () => marks[id] })) });
+    async function pull() {
+      try {
+        const r = await gas("poll", G.pack, G.ver, G.mode === "follow");
+        fails = 0;
+        if (r.marks && r.ver !== G.ver) { G.ver = r.ver; if (listener) listener(snap(r.marks)); }
+        if (r.live) follow(r.live);
+      } catch (e) { if (++fails >= 5 && onErr) onErr(e); }
+      timer = setTimeout(pull, G.mode === "follow" ? LIVE_MS : POLL_MS);
+    }
+    const op = (id, kind, body) => gas("saveMark", G.pack, id, kind, body ? JSON.stringify(body) : "", who())
+      .then((ver) => { G.ver = Math.max(G.ver, ver); });
+    return {
+      doc: (id) => ({ set: (b) => op(id, "set", b), update: (p) => op(id, "update", p), delete: () => op(id, "delete", null) }),
+      onSnapshot: (fn, err) => { listener = fn; onErr = err; clearTimeout(timer); pull(); },
+    };
+  }
+  // 一緒に見る: 進める人は再生位置・再生中か・流している印を送り、ついていく人はそれに合わせる
+  function liveState() {
+    const r = S.reel, c = r ? S.caps[r.ks[r.n]] : null;
+    return { by: who(), t: video.currentTime, playing: !video.paused, mark: c ? idOf(c.i) : "", at: Date.now() };
+  }
+  function sendLive(force) {
+    if (G.mode !== "lead" || !G.pack) return;
+    const now = Date.now(); if (!force && now - G.lastLive < LIVE_MS) return;
+    G.lastLive = now; gas("setLive", G.pack, JSON.stringify(liveState())).catch(() => {});
+  }
+  function follow(live) {
+    if (G.mode !== "follow" || !live || live.by === who() || Date.now() - live.at > LIVE_STALE_MS || !video.src) return;
+    const mine = S.reel ? idOf(S.caps[S.reel.ks[S.reel.n]].i) : "";
+    if (live.mark && live.mark !== mine && S.marks.has(live.mark)) { playMark(live.mark); return; }
+    if (!live.mark && S.reel) stopReel();
+    const target = live.t + (live.playing ? (Date.now() - live.at) / 1000 : 0);
+    if (Math.abs(video.currentTime - target) > DRIFT_SEC) seek(target);
+    if (live.playing && video.paused && !S.reel) video.play().catch(() => {});
+    if (!live.playing && !video.paused) video.pause();
+  }
+  if (GAS) {
+    ["play", "pause", "seeked"].forEach((ev) => video.addEventListener(ev, () => sendLive(true)));
+    video.addEventListener("timeupdate", () => sendLive(false));
+    document.addEventListener("change", (ev) => {
+      if (ev.target.id === "who") { try { localStorage.setItem("avs.who", ev.target.value); } catch (_) {} S.uid = ev.target.value; }
+      if (ev.target.id === "togetherMode") { G.mode = ev.target.value; $("together").classList.toggle("on", G.mode !== "off");
+        toast(G.mode === "lead" ? "あなたの再生にもう片方の画面がついてきます" : G.mode === "follow" ? "進める人の再生についていきます" : "ひとりで見ます"); sendLive(true); }
+    });
+  }
+
   // ── 読み込み ──
   function setLoader(text, pct, buttons) {
     $("loader").hidden = false; $("loaderText").textContent = text;
@@ -359,6 +586,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     setLoader(msg, null, true);
   }
   async function start() {
+    if (GAS) return gasStart();
     const c = window.claude;
     let files = null;
     try { files = c && c.use ? await c.use("files") : null; } catch (_) { files = null; }
@@ -377,7 +605,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function useVideo(blob) {
     video.src = URL.createObjectURL(blob);
     $("loader").hidden = true;
-    ["markBtn", "backBtn"].forEach((id) => { $(id).disabled = false; });
+    ["markBtn", "backBtn", "fwdBtn"].forEach((id) => { $(id).disabled = false; });
     updateReelButton();
   }
   $("retry").addEventListener("click", () => start());
@@ -408,6 +636,9 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     setSave("この画面では印を保存できません（書き込みの権限がありません）。「印を文字でコピー」でチャットに貼ってください。", "warn");
   }
   async function connectDb(run) {
+    if (GAS) { S.uid = who(); S.col = gasMarks(); S.col.onSnapshot((snap) => {
+      S.marks = new Map(snap.docs.filter((d) => d.exists).map((d) => [d.id, d.data()])); renderAll();
+    }, (e) => setSave("印の読み込みが止まりました（" + (e && e.code) + "）。画面を開き直してください。", "warn")); return; }
     const c = window.claude; let db = null, user = null;
     try { db = c && c.use ? await c.use("db") : null; } catch (_) { db = null; }
     try { user = c && c.use ? await c.use("user") : null; } catch (_) { user = null; }
@@ -491,7 +722,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   // 何枚目か・何回目かは字幕の枠の見出し行に出す（桁が増えてもボタンが横にずれない）。
   // 1つの印を流し終えたらいったん止まり、GAP_MS 後に同じ所をまた流す（次の印へは「次へ」で自分で進む）。
   // Space で止めるとくり返しも止まり、もう一度 Space で続きから流す。印の所から AWAY_SEC 以上離れた所へ動かすと、くり返しをやめる
-  function showReel(on) { $("reel").hidden = !on; $("normal").hidden = on; $("reelInfo").hidden = !on; }
+  function showReel(on) { $("reel").hidden = !on; $("normal").hidden = on; $("reelInfo").hidden = !on; document.body.classList.toggle("reeling", on); }
   function playList(ks, kind, start) {
     if (!ks.length || !video.src) return;
     clearTimeout(S.reel && S.reel.wait);
@@ -512,7 +743,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     r.round = fresh ? 1 : r.round + 1;
     r.from = c.s - LEAD_SEC; r.until = c.e + TAIL_SEC;
     $("reelPos").textContent = (r.n + 1) + " / " + r.ks.length + (r.round > 1 ? " · " + r.round + "回目" : "");
-    seek(r.from);
+    if (Math.abs(video.currentTime - r.from) > 0.05) seek(r.from);
     video.play().catch(() => {});
     highlight(idOf(c.i));
   }
@@ -531,6 +762,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     const r = S.reel;
     if (r && !video.paused && video.currentTime >= r.until) {
       r.auto = true; video.pause();
+      // 止まっている間に頭へ戻して絵を用意しておく（次のくり返しは再生を押すだけで、シークの待ちが出ない）
+      seek(r.from);
       clearTimeout(r.wait); r.wait = setTimeout(() => { if (S.reel === r) reelGo(false); }, GAP_MS);
     }
     if (!video.paused) requestAnimationFrame(tick);
@@ -556,6 +789,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   video.addEventListener("loadedmetadata", () => { renderStrip(); renderNow(true); });
   $("markBtn").addEventListener("click", markNow);
   $("backBtn").addEventListener("click", () => userSeek(video.currentTime - 3));
+  $("fwdBtn").addEventListener("click", () => userSeek(video.currentTime + 3));
   $("reelBtn").addEventListener("click", () => {
     const ks = sortedMarks().filter(([, m]) => m.state !== "ok").map(([, m]) => kOfCap(m.cap)).filter((k) => k >= 0);
     playList(ks, "marks", 0);
@@ -623,7 +857,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     $("nowTime").textContent = clock(t) + " / " + clock(duration());
     $("head").style.left = (100 * t / duration()).toFixed(3) + "%";
     $("strip").setAttribute("aria-valuenow", String(Math.round(t)));
-    const k = showingAt(t);
+    // くり返しの合間は頭へ戻して止めているので、流していた字幕を出したままにする
+    const k = S.reel && S.reel.wait ? S.reel.ks[S.reel.n] : showingAt(t);
     if (k === S.current && !force) return;
     S.current = k;
     const c = k >= 0 ? S.caps[k] : null;
@@ -750,8 +985,20 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function highlight(id) {
     for (const map of [S.nodes, S.flagNodes]) map.forEach((node, nid) => node.classList.toggle("is-playing", nid === id));
     const node = id && ($("marksList").hidden ? S.flagNodes : S.nodes).get(id);
-    if (node) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (node) node.scrollIntoView({ block: narrowEdit() ? "start" : "nearest", behavior: "smooth" });
   }
+  // スマホ（縦長）のウェブアプリで印の所を流している間は、控えの印を上に寄せて「正しくは」まで見せる
+  function narrowEdit() { return document.body.classList.contains("gas") && document.body.classList.contains("reeling")
+    && matchMedia("(max-width: 599px), (max-aspect-ratio: 9/10)").matches; }
+  document.addEventListener("focusin", (ev) => {
+    const item = ev.target.closest && ev.target.closest(".ledger .item");
+    if (item && document.body.classList.contains("gas")) setTimeout(() => item.scrollIntoView({ block: "start", behavior: "smooth" }), 250);
+  });
+  // キーボードが出て見える高さが変わったら、書いている印をもう一度上に寄せる
+  if (window.visualViewport) visualViewport.addEventListener("resize", () => {
+    const el = document.activeElement, item = el && el.closest && el.closest(".ledger .item");
+    if (item && document.body.classList.contains("gas")) item.scrollIntoView({ block: "start" });
+  });
   function focusItem(id) { selectTab("marks"); highlight(id); }
   function selectTab(which) {
     const marks = which === "marks";
