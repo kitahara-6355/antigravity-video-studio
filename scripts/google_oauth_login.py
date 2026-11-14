@@ -66,6 +66,23 @@ backend/data/google/token_drive_organizer.json に **1行の JSON** で保存す
 クラウドでは中身を環境変数 `AVS_DRIVE_ORGANIZER_TOKEN_JSON` に貼る。
 法人アカウント（info@kitahara-birei.com）で許可する。
 
+## Apps Script を送り込むトークン（script.projects・script.deployments・2026-11-13）
+
+    python scripts/google_oauth_login.py --script
+
+PC の clasp の代わりに、クラウドの Claude が Apps Script のコードを書き換え・公開するための口
+（dev-records 0012「クラウド優先」）。使うのは `backend/gas_deploy.py` だけ。
+backend/data/google/token_apps_script.json に **1行の JSON** で保存する。
+
+一度だけの手順（これが最後の PC 作業の見込み）:
+
+1. Cloud Console で avs-prod-free-kb の「Apps Script API」を有効にする（無料・請求先なしのまま）
+2. 同意画面（`avs-raw-reader`・内部）のスコープに script.projects と script.deployments を足す
+3. 法人アカウント（info@kitahara-birei.com）でブラウザにログインしておき、上のコマンドを実行して許可する
+4. ファイルの中身（1行）をプロジェクトの設定のクラウド環境の `AVS_SCRIPT_TOKEN_JSON` に貼る
+   （チャットには貼らない）。ローカルのファイルは貼ったら消してよい
+5. クラウドで `python -m backend.gas_deploy check` が OK になれば完了
+
 ## 注意
 
 公開ステータスが「テスト」の間、リフレッシュトークンは **7日で失効する**。
@@ -89,11 +106,14 @@ from backend.services.google_oauth import (
     DRIVE_READONLY_SCOPES,
     DRIVE_SCOPES,
     ORGANIZER_TOKEN_JSON_ENV,
+    SCRIPT_SCOPES,
+    SCRIPT_TOKEN_JSON_ENV,
     SHEETS_SCOPES,
     TOKEN_JSON_ENV,
     assets_token_path,
     client_secret_path,
     organizer_token_path,
+    script_token_path,
     token_path,
 )
 
@@ -116,6 +136,10 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--organize", action="store_true",
         help="drive だけを要求する（動画制作を整理する口・移す/名前を変える・クラウド用）",
     )
+    mode.add_argument(
+        "--script", action="store_true",
+        help="script.projects・script.deployments だけを要求する（Apps Script をクラウドから送り込む口）",
+    )
     parser.add_argument(
         "--token", type=Path, default=None,
         help="トークンの保存先（既定: 通常は token.json、--readonly なら token_raw_readonly.json、"
@@ -125,15 +149,18 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def resolve_plan(readonly: bool, token: Path | None,
-                 assets: bool = False, organize: bool = False) -> tuple[list[str], Path]:
+                 assets: bool = False, organize: bool = False,
+                 script: bool = False) -> tuple[list[str], Path]:
     """要求するスコープと保存先を決める。
 
     `--readonly` で読み書きのスコープが混ざることはない。混ざると
     クラウドのセッションに raw を消せるトークンを渡すことになる。
     `--assets` も drive.file だけ。読み取りの口と同じトークンにしない。
     """
-    if sum((readonly, assets, organize)) > 1:
-        raise ValueError("--readonly・--assets・--organize は同時に使えません（トークンを分ける）")
+    if sum((readonly, assets, organize, script)) > 1:
+        raise ValueError("--readonly・--assets・--organize・--script は同時に使えません（トークンを分ける）")
+    if script:
+        return list(SCRIPT_SCOPES), token or script_token_path()
     if organize:
         return list(DRIVE_SCOPES), token or organizer_token_path()
     if readonly:
@@ -153,8 +180,9 @@ def serialize_token(credentials_json: str, *, one_line: bool) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    scopes, out = resolve_plan(args.readonly, args.token, assets=args.assets, organize=args.organize)
-    one_line = args.readonly or args.assets or args.organize
+    scopes, out = resolve_plan(args.readonly, args.token, assets=args.assets,
+                               organize=args.organize, script=args.script)
+    one_line = args.readonly or args.assets or args.organize or args.script
 
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -189,6 +217,9 @@ def main(argv: list[str] | None = None) -> int:
         print("（動画制作を整理するトークンです。Drive 全体に届きます。"
               "法人アカウントで同意してください）")
 
+    if args.script:
+        print("（Apps Script を送り込むトークンです。info@kitahara-birei.com で同意してください）")
+
     flow = InstalledAppFlow.from_client_secrets_file(str(secret), scopes)
     credentials = flow.run_local_server(port=0)
 
@@ -204,7 +235,8 @@ def main(argv: list[str] | None = None) -> int:
     print("このファイルは秘密です。共有しないでください。")
     if one_line:
         env_name = (ASSETS_TOKEN_JSON_ENV if args.assets else
-                    ORGANIZER_TOKEN_JSON_ENV if args.organize else TOKEN_JSON_ENV)
+                    ORGANIZER_TOKEN_JSON_ENV if args.organize else
+                    SCRIPT_TOKEN_JSON_ENV if args.script else TOKEN_JSON_ENV)
         print(
             f"\nクラウドのセッションで使うには、このファイルの中身（1行）を\n"
             f"環境変数 {env_name} に貼ってください。チャットには貼らないでください。"

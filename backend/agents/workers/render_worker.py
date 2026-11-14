@@ -6,6 +6,8 @@ RenderWorker — 最終レンダリングステージ
 
 import logging
 import asyncio
+import os
+import subprocess
 import time
 import shutil
 import uuid
@@ -15,6 +17,13 @@ from datetime import datetime
 from agents.pipeline_types import PipelineStageWorker, PipelineContext, StageResult
 
 logger = logging.getLogger(__name__)
+
+# 既定の曲の置き場（置いてあればそれを使う。無ければ曲の台帳から引く）
+DEFAULT_BGM = Path(__file__).parent.parent.parent / "branding" / "bgm" / "default_bgm.mp3"
+# テンプレート・既定の曲を敷くときの音量と下げ方（曲の台帳の「美麗の書道対談」の BGM と同じ・2026-11-12 北原さん）
+MAINLINE_BGM_DEFAULTS = {"volume_db": -22, "duck": True, "duck_ratio": 3, "fade": 3.0, "loop_crossfade": 4.0}
+# 曲の繰り返しを重ねてつなぐのは、この回数まで（入力が増えすぎるので、超えたら単純な繰り返し）
+MAX_BGM_REPEATS = 40
 
 
 class RenderWorker(PipelineStageWorker):
@@ -301,73 +310,108 @@ class RenderWorker(PipelineStageWorker):
                 ctx.render_encode = {"mode": getattr(ctx, "render_mode", None), "encode": None, "fallback": True}
             shutil.copy(preview_path, final_path)
 
+    def _bgm_spec(self) -> tuple[dict | None, dict | None]:
+        """敷く BGM の指定（remix と同じ形）と、何の曲かの控え。曲が無ければ (None, None)。
+
+        探す順: テンプレートの bgm_path → 既定の曲（branding/bgm/default_bgm.mp3）→
+        曲の台帳（backend/config/music.json の mainline。曲は環境変数 AVS_MUSIC_DIR の場所から）。
+        """
+        from backend.program_package import music as mu
+
+        bgm_path, origin = None, None
+        try:
+            from template_config import template_config as _tc
+            if _tc.is_active:
+                bgm_path, origin = _tc.get_branding_config().get("bgm_path"), "テンプレート"
+        except (ImportError, AttributeError, KeyError, RuntimeError) as e:
+            logger.debug(f"テンプレートBGM取得スキップ ({type(e).__name__}): {e}")
+        if not (bgm_path and Path(bgm_path).exists()):
+            bgm_path, origin = (str(DEFAULT_BGM), "既定の曲") if DEFAULT_BGM.exists() else (None, None)
+        if bgm_path:
+            spec = {"op_music": None, "ed_music": None, "peak_db": -1.5,
+                    "bgm": {**MAINLINE_BGM_DEFAULTS, "path": str(bgm_path), "provisional": False}}
+            return spec, {"from": origin, "file": Path(bgm_path).name, "title": None, "artist": None,
+                          "source": None, "provisional": False}
+        try:
+            spec = mu.mainline_bgm(mu.load_ledger(), os.environ.get("AVS_MUSIC_DIR"))
+        except (mu.MusicError, OSError, ValueError, KeyError) as e:
+            logger.info(f"🎵 曲の台帳の BGM は使えません: {e}")
+            return None, None
+        track = (spec.get("tracks") or {}).get("bgm") or {}
+        return spec, {"from": "曲の台帳", "file": Path(spec["bgm"]["path"]).name, "title": track.get("title"),
+                      "artist": track.get("artist"), "source": track.get("source"),
+                      "provisional": bool(spec["bgm"].get("provisional"))}
+
     def _mix_bgm(self, final_path: str, ctx: PipelineContext = None) -> None:
         """
-        動画にBGMを合成し、音声がある部分でBGMを下げるサイドチェインダッキングを適用します。
+        動画の全体に BGM を小さく敷き、話している間は自動で下げます（サイドチェイン）。
 
-        BGMはテンプレート設定から取得するか、デフォルトのBGM（branding/bgm/default_bgm.mp3）
-        を使用します。BGMが存在しない、またはミキシングに失敗した場合は処理をスキップします。
+        音の組み立ては番組の仕上げ（backend/program_package/remix.py）と同じ物を使います
+        （曲の繰り返しは重ねてつなぐ・最後に音割れ止め）。映像は写すだけです。
+        曲が無い、またはミキシングに失敗した場合は、記録（skipped_features）に出して曲なしで続けます。
+        入れた曲は `ctx.render_bgm` に残り、書き出しの記録に載ります。
 
         Args:
             final_path (str): 対象となる動画のパス。
             ctx (PipelineContext, optional): パイプラインのコンテキスト。
         """
+        temp_bgm_mixed = final_path + ".bgm.mp4"
         try:
-            bgm_path = None
-            try:
-                from template_config import template_config as _tc
-                if _tc.is_active:
-                    bgm_path = _tc.get_branding_config().get("bgm_path")
-            except (ImportError, AttributeError, KeyError, RuntimeError) as e:
-                logger.debug(f"テンプレートBGM取得スキップ ({type(e).__name__}): {e}")
-
-            if not bgm_path:
-                default_bgm = Path(__file__).parent.parent.parent / "branding" / "bgm" / "default_bgm.mp3"
-                if default_bgm.exists():
-                    bgm_path = str(default_bgm)
-
-            if bgm_path and Path(bgm_path).exists():
-                from video_editor_engine import video_editor
-                ffmpeg = video_editor.ffmpeg
-
-                if ffmpeg.is_available():
-                    temp_bgm_mixed = final_path + ".bgm.mp4"
-                    bgm_filter = (
-                        "[1:a]volume=0.3[bgm_v];"
-                        "[bgm_v][0:a]sidechaincompress="
-                        "threshold=0.1:ratio=4:attack=20:release=250[bgm_ducked];"
-                        "[0:a][bgm_ducked]amix=inputs=2:duration=first[a_out]"
-                    )
-                    cmd = [
-                        "-y",
-                        "-i", final_path,
-                        "-i", bgm_path,
-                        "-filter_complex", bgm_filter,
-                        "-map", "0:v",
-                        "-map", "[a_out]",
-                        "-c:v", "copy",
-                        "-c:a", "aac",
-                        "-b:a", "192k",
-                        temp_bgm_mixed,
-                    ]
-                    success, _ = ffmpeg.run_command(cmd, timeout=600)
-                    if success and Path(temp_bgm_mixed).exists():
-                        shutil.move(temp_bgm_mixed, final_path)
-                        logger.info(f"🎵 BGMダッキング・ミキシング完了: {Path(bgm_path).name}")
-                    else:
-                        logger.warning("BGMミキシングスキップ（FFmpeg失敗）")
-                        if Path(temp_bgm_mixed).exists():
-                            Path(temp_bgm_mixed).unlink()
-                        if ctx:
-                            ctx.skipped_features.append("BGMミキシング")
-            else:
+            spec, used = self._bgm_spec()
+            if not spec:
                 logger.info("🎵 BGMファイルなし — スキップ")
                 if ctx:
                     ctx.skipped_features.append("BGMミキシング(ファイルなし)")
-        except (ImportError, FileNotFoundError, OSError, ValueError, RuntimeError) as e:
+                return
+
+            from video_editor_engine import video_editor
+
+            from backend.program_package import remix as rx
+            ffmpeg = video_editor.ffmpeg
+            if not ffmpeg.is_available():
+                logger.warning("BGMミキシングスキップ（FFmpeg が使えない）")
+                if ctx:
+                    ctx.skipped_features.append("BGMミキシング")
+                return
+
+            total = rx.duration(final_path)
+            bgm = dict(spec["bgm"])
+            bgm["fade"] = min(float(bgm.get("fade", 3.0)), total / 4)   # 短い動画でも出し入れが収まるように
+            song = rx.duration(bgm["path"])
+            step = song - float(bgm.get("loop_crossfade", 4.0))
+            if step > 0 and total / step <= MAX_BGM_REPEATS:
+                bgm["_len"] = song   # 曲の繰り返しを重ねてつなぐ（多すぎるときは単純な繰り返し）
+            extra, graph = rx.graph({**spec, "bgm": bgm}, {"program": 0.0, "body": 0.0, "ed": 0.0}, total)
+            cmd = [
+                "-y",
+                "-i", final_path,
+                *extra,
+                "-filter_complex", graph,
+                "-map", "0:v:0",
+                "-map", "[a]",
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-t", f"{total:.3f}",
+                temp_bgm_mixed,
+            ]
+            success, _ = ffmpeg.run_command(cmd, timeout=600)
+            if success and Path(temp_bgm_mixed).exists():
+                shutil.move(temp_bgm_mixed, final_path)
+                if ctx:
+                    ctx.render_bgm = used
+                logger.info(f"🎵 BGMダッキング・ミキシング完了: {used['file']}（{used['from']}）")
+            else:
+                logger.warning("BGMミキシングスキップ（FFmpeg失敗）")
+                if ctx:
+                    ctx.skipped_features.append("BGMミキシング")
+        except (ImportError, FileNotFoundError, OSError, ValueError, RuntimeError,
+                subprocess.SubprocessError) as e:
             logger.warning(f"BGMミキシングスキップ ({type(e).__name__}): {e}")
             if ctx:
                 ctx.skipped_features.append("BGMミキシング")
+        finally:
+            Path(temp_bgm_mixed).unlink(missing_ok=True)
 
     def _overlay_logo(self, final_path: str, ctx: PipelineContext = None) -> None:
         """

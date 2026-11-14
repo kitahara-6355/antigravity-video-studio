@@ -897,7 +897,8 @@ class PipelineCoordinator:
                          metadata_sidecar=self._sidecar_path,
                          quality_sidecar=self._quality_sidecar_path,
                          render_mode=ctx.render_mode,
-                         encode=ctx.render_encode)
+                         encode=ctx.render_encode,
+                         bgm=ctx.render_bgm)
         finally:
             self._intermediates_before = None
             self._failed_before = None

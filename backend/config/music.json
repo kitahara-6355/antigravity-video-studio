@@ -14,5 +14,6 @@
    "ed": {"track": "new_departure", "volume": 0.72, "fade_in": 1.0, "fade_out": 5.5}
   }
  },
+ "mainline": {"program": "美麗の書道対談", "note": "本線（render_worker の最終レンダリング）が全体に敷く BGM は、この番組の bgm。本線の動画には番組 OP も ED も無いので op・ed は使わない。曲は環境変数 AVS_MUSIC_DIR の場所から探す（クラウドでは music fetch で Drive の 20_素材/共通 か 30_AVS_作業/番組資産/曲 から持ってくる）"},
  "peak_db": -1.5
 }
