@@ -99,11 +99,11 @@ def test_fitはremixの指定に書く(tmp_path):
 
 # ════ 本線（render_worker）が曲の台帳の BGM を混ぜる ════
 # 本線（render_worker）が曲の台帳の BGM を混ぜる（2026-11-14）。
-# 
+#
 # これまで本線は `branding/bgm/default_bgm.mp3` しか見ず、曲が置かれていないので
 # 毎回 `BGMミキシング(ファイルなし)` を記録に出していた（feature_gaps の bgm_mixing）。
 # 曲の台帳（backend/config/music.json）と remix の音の組み立てを本線からも使う。
-# 
+#
 # 曲そのものはリポジトリに置かないので、作った音で確かめる:
 # 話し声の代わりは 300Hz（鳴る・止まるを繰り返す）、曲の代わりは 2000Hz（鳴りっぱなし）。
 #
