@@ -20,7 +20,7 @@
 ``plan`` は曲の台帳（backend/config/music.json）から remix の指定を丸ごと作る（OP・BGM・ED）。
 
 本線（render_worker）も同じ台帳から BGM を引く（``mainline_bgm``）。曲をクラウドの作業場に持ってくるのは
-``fetch``（Drive の 20_素材/共通 から、台帳の file の名前で落とす・読み取り専用）::
+``fetch``（Drive の 20_素材/共通 か 30_AVS_作業/番組資産/曲 から、台帳の file の名前で落とす・読み取り専用）::
 
     python -m backend.program_package.music fetch 曲の置き場
 """
@@ -224,6 +224,10 @@ def mainline_bgm(ledger: dict, music_dir: str | Path | None) -> dict:
     return spec
 
 
+# 曲を探す Drive の場所（「動画制作」の中）。20_素材 は北原さんが置く所、30_AVS_作業 は AI が置く所
+DRIVE_PLACES = ("20_素材/共通", "30_AVS_作業/番組資産/曲")
+
+
 def missing(ledger: dict, music_dir: str | Path) -> list[str]:
     """台帳の番組で使う曲のうち、置き場に無いファイルの名前。"""
     used = {r["track"] for p in (ledger.get("programs") or {}).values() for r in p.values()
@@ -233,7 +237,7 @@ def missing(ledger: dict, music_dir: str | Path) -> list[str]:
 
 
 def fetch(ledger: dict, music_dir: str | Path, service=None, env=None) -> dict:
-    """置き場に無い曲を Drive の 20_素材/共通（その下のフォルダも）から、台帳の file の名前で落とす。
+    """置き場に無い曲を Drive（DRIVE_PLACES・その下のフォルダも）から、台帳の file の名前で落とす。
 
     読み取り専用の鍵で読む（raw を読むのと同じ鍵）。同じ名前が 2 つあるときは、どちらか決めずに止まる。
     """
@@ -252,11 +256,17 @@ def fetch(ledger: dict, music_dir: str | Path, service=None, env=None) -> dict:
     if not raw:
         raise MusicError("Drive の場所が分かりません（環境変数 AVS_RAW_DRIVE_FOLDER_ID）")
     base = (service.files().get(fileId=raw, fields="parents", supportsAllDrives=True).execute().get("parents") or [None])[0]
-    try:
-        top = rs.find_folder(service, base, "20_素材")
-        todo, found = [rs.find_folder(service, top, "共通")], {}
-    except rs.FolderError as e:
-        raise MusicError(f"Drive に曲の置き場がありません（20_素材/共通）: {e}") from e
+    todo, found = [], {}
+    for place in ledger.get("drive") or DRIVE_PLACES:   # 無い場所は飛ばす（どこにも無ければ止まる）
+        try:
+            folder = base
+            for name in place.split("/"):
+                folder = rs.find_folder(service, folder, name)
+            todo.append(folder)
+        except rs.FolderError:
+            continue
+    if not todo:
+        raise MusicError(f"Drive に曲の置き場がありません（{'・'.join(ledger.get('drive') or DRIVE_PLACES)}）")
     while todo:
         folder = todo.pop()
         todo += [f["id"] for f in rs.list_folders(service, folder)]

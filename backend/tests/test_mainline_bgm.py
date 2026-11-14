@@ -209,7 +209,9 @@ def _drive(monkeypatch, files):
     import hashlib
 
     from backend import raw_source as rs
-    tree = {"base": ["20_素材"], "20_素材": ["共通"], "共通": ["曲"], "曲": []}
+    tree = {"base": ["20_素材", "30_AVS_作業"], "20_素材": ["共通"], "共通": ["曲"], "曲": [],
+            "30_AVS_作業": ["番組資産"], "番組資産": ["AIの曲"]}
+    monkeypatch.setattr(mu, "DRIVE_PLACES", ("20_素材/共通", "30_AVS_作業/番組資産/AIの曲", "無い場所"))
     body = {f"{folder}/{name}": data for folder, items in files.items() for name, data in items}
     monkeypatch.setattr(rs, "list_folders", lambda s, parent: [{"id": n, "name": n} for n in tree.get(parent, [])])
     monkeypatch.setattr(rs, "_list_files", lambda s, q, fields: [
@@ -241,6 +243,12 @@ def test_置き場に無い曲だけをDriveから落とす(tmp_path, monkeypatc
     assert (tmp_path / "op.mp3").read_bytes() == b"already here"     # ある曲は触らない
     assert not (tmp_path / "other.mp3").exists()                     # 台帳に無い曲は落とさない
     assert mu.fetch(LEDGER, tmp_path, service=svc, env=ENV)["already"] is True
+
+
+def test_AIが置く場所の曲も落とす(tmp_path, monkeypatch):
+    svc = _drive(monkeypatch, {"AIの曲": [("op.mp3", b"OP"), ("bed.m4a", b"BED")]})
+    r = mu.fetch(LEDGER, tmp_path, service=svc, env=ENV)
+    assert sorted(r["fetched"]) == ["bed.m4a", "op.mp3"]
 
 
 def test_Driveに無い曲は名前を返す(tmp_path, monkeypatch):

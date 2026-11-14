@@ -12,7 +12,7 @@
 
 曲そのものはリポジトリに置きません（公開リポジトリのため）。クラウドの作業場では次で持ってきます。
 
-    python -m backend.program_package.music fetch 曲の置き場      # Drive の 20_素材/共通 から落とす
+    python -m backend.program_package.music fetch 曲の置き場      # Drive の 20_素材/共通 か 30_AVS_作業/番組資産/曲 から落とす
     export AVS_MUSIC_DIR=曲の置き場
 
 どこにも曲が無ければ、記録に `BGMミキシング(ファイルなし)` が出て、曲なしで書き出します。
