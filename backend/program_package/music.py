@@ -295,29 +295,40 @@ def fetch(ledger: dict, music_dir: str | Path, service=None, env=None) -> dict:
     return out
 
 
-# AI で作った曲を公開に使ってよいのは、Google Workspace の規約の下で作った曲だけ（2026-11-14 一次情報で確認）:
-# サービス固有規約 12.12 で生成物は顧客のデータ・Google は権利を主張しない、12.4 に商用の制限なし、
-# 12.10 の補償の対象に Google Vids（有料の契約のみ）。個人の Google AI Pro は Workspace の規約の外。
+# AI で作った曲を公開に使う条件（2026-11-14 一次情報で確認）:
+# - 法人の Workspace: サービス固有規約 12.12 で生成物は顧客のデータ・Google は権利を主張しない、12.4 に商用の制限なし、
+#   12.10 の補償の対象に Google Vids（有料の契約のみ）
+# - 個人（Google AI Pro）: Google 利用規約（2026-07-30 版）で Google は生成物の所有権を主張しない・商用の制限なし。
+#   ただし補償は無く、持ち主は作った個人。法人の動画に使うには、作った人から法人への利用許諾の控え（transfer）を残す
+#   （info@ の Workspace では Vids が使えないため、2026-11-14 時点は個人で作る — 北原さん）
 AI_CLEAR_DOMAINS = ("kitahara-birei.com",)
 AI_PUBLISH_TODO = ("AI で作った曲が入っている。投稿のときに YouTube の「改変・合成コンテンツ」を「はい」にする"
                    "（YouTube ヘルプ 14328491 で「AI で作った音楽」は開示が要る例）")
 
 
-def _clear_ok(t: dict, account: str | None) -> None:
-    if t.get("ai_generated") and (account or "").rsplit("@", 1)[-1] not in AI_CLEAR_DOMAINS:
-        raise MusicError("AI で作った曲を公開に使えるのは法人の Workspace（info@ など）で作った曲だけ。"
-                         f"作ったアカウント: {account or '書いていない'}（個人で作った曲は聞き比べ用の仮のまま）")
+def _clear_ok(t: dict, account: str | None, transfer: str | None = None) -> None:
+    if not t.get("ai_generated") or (account or "").rsplit("@", 1)[-1] in AI_CLEAR_DOMAINS:
+        return
+    if not (account or "").strip():
+        raise MusicError("AI で作った曲は、作ったアカウント（--account）を書いてから公開に使う")
+    if not (transfer or t.get("transfer") or "").strip():
+        raise MusicError(f"個人のアカウント（{account}）で作った曲を法人の動画に使うには、作った人から法人への"
+                         "利用許諾の控え（--transfer、例「2026-11-14 北原（作った人）が美麗書院に利用を許諾・チャット」）が要る")
 
 
-def clear_track(ledger: dict, key: str, cleared: str) -> dict:
-    """使ってよい根拠を書いて、仮の曲を公開に使える曲にする。AI で作った曲は法人のアカウントで作った物だけ。"""
+def clear_track(ledger: dict, key: str, cleared: str, transfer: str | None = None) -> dict:
+    """使ってよい根拠を書いて、仮の曲を公開に使える曲にする。AI で作った曲は、法人のアカウントで作った物か、
+    個人で作って法人への利用許諾の控え（transfer）がある物だけ。"""
     t = (ledger.get("tracks") or {}).get(key)
     if not t:
         raise MusicError(f"曲の台帳に曲「{key}」がありません")
     if not cleared.strip():
         raise MusicError("使ってよい根拠（--cleared）を書いてください")
-    _clear_ok(t, t.get("account"))
+    _clear_ok(t, t.get("account"), transfer)
     t.update(cleared=cleared.strip(), provisional=False)
+    if (transfer or "").strip():
+        t["transfer"] = transfer.strip()
+    t["indemnified"] = (t.get("account") or "").rsplit("@", 1)[-1] in AI_CLEAR_DOMAINS if t.get("ai_generated") else None
     return t
 
 
@@ -335,7 +346,7 @@ def extract_audio(video: str | Path, dest: str | Path) -> Path:
 def add_track(ledger: dict, key: str, *, title: str, file: str, source: str, by: str, artist: str | None = None,
               ai_generated: bool = False, made_with: str | None = None, prompt: str | None = None,
               cleared: str | None = None, today: str | None = None, account: str | None = None,
-              original: str | None = None) -> dict:
+              original: str | None = None, transfer: str | None = None) -> dict:
     """曲を台帳に足す（人が作った・選んだ曲の控え）。
 
     Vids などで作った曲は ai_generated と、作った道具・指示文（prompt）を残す。指示文が資産になる。
@@ -358,8 +369,10 @@ def add_track(ledger: dict, key: str, *, title: str, file: str, source: str, by:
             t["account"] = account
         if original:  # Vids の書き出し（mp4）の置き場。指示文と並ぶ資産
             t["original"] = original
+        if (transfer or "").strip():
+            t["transfer"] = transfer.strip()
         if (cleared or "").strip():
-            _clear_ok(t, account)
+            _clear_ok(t, account, transfer)
     if (cleared or "").strip():
         t["cleared"] = cleared.strip()
     ledger.setdefault("tracks", {})[key] = t
@@ -386,7 +399,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("key")
     for flag in ("--title", "--file", "--source", "--by"):
         s.add_argument(flag, required=True)
-    for flag in ("--artist", "--made-with", "--prompt", "--cleared", "--ledger", "--account", "--original"):
+    for flag in ("--artist", "--made-with", "--prompt", "--cleared", "--ledger", "--account", "--original", "--transfer"):
         s.add_argument(flag)
     s.add_argument("--ai", action="store_true")
     s.add_argument("--from-video", help="Vids で書き出した mp4。音だけ取り出して --music-dir に --file の名前で置く")
@@ -394,6 +407,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("clear", help="使ってよい根拠を書いて、仮の曲を公開に使える曲にする")
     s.add_argument("key")
     s.add_argument("--cleared", required=True)
+    s.add_argument("--transfer", help="個人で作った曲を法人で使う利用許諾の控え")
     s.add_argument("--ledger")
     for name in ("analyze", "fit", "check", "plan", "fetch"):
         s = sub.add_parser(name)
@@ -409,7 +423,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd == "clear":
             where = Path(a.ledger) if a.ledger else LEDGER
             ledger = json.loads(where.read_text(encoding="utf-8"))
-            t = clear_track(ledger, a.key, a.cleared)
+            t = clear_track(ledger, a.key, a.cleared, a.transfer)
             where.write_text(json.dumps(ledger, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             print(json.dumps({a.key: t}, ensure_ascii=False, indent=1))
             return 0
@@ -418,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
             ledger = json.loads(where.read_text(encoding="utf-8"))
             t = add_track(ledger, a.key, title=a.title, file=a.file, source=a.source, by=a.by, artist=a.artist,
                           ai_generated=a.ai, made_with=a.made_with, prompt=a.prompt, cleared=a.cleared,
-                          account=a.account, original=a.original or a.from_video)
+                          account=a.account, original=a.original or a.from_video, transfer=a.transfer)
             if a.from_video:  # 台帳の確かめが通ってから音を取り出す
                 import os
                 d = a.music_dir or os.environ.get("AVS_MUSIC_DIR")

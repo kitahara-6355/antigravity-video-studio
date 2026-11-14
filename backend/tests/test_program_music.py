@@ -368,19 +368,22 @@ def test_AIで作った曲は道具と指示文を残して台帳に足し仮の
     assert ok["provisional"] is False and "ai_generated" not in ok
 
 
-def test_AIで作った曲を公開に使えるのは法人のWorkspaceで作った曲だけ():
+def test_AIで作った曲は法人で作るか個人から法人への利用許諾の控えがあれば公開に使える():
     led = {"tracks": {}}
     kw = {"title": "OP 案1", "file": "a.mp3", "source": "Google Vids", "by": "北原", "ai_generated": True,
           "made_with": "Google Vids", "prompt": "ピアノとストリングス"}
-    with pytest.raises(mu.MusicError, match="法人"):  # 個人で作った曲は根拠を書いても仮のまま
+    with pytest.raises(mu.MusicError, match="利用許諾"):  # 個人で作った曲は許諾の控えが無いと仮のまま
         mu.add_track(led, "op_vids_01", account="someone@gmail.com", cleared="規約を読んだ", **kw)
-    t = mu.add_track(led, "op_vids_02", account="info@kitahara-birei.com", original="Vids/曲_OP_02.mp4", **kw)
-    assert t["provisional"] and t["account"].endswith("kitahara-birei.com") and t["original"].endswith(".mp4")
-    mu.clear_track(led, "op_vids_02", "Workspace サービス固有規約 12.4・12.10・12.12（2026-11-14 確認）")
-    assert led["tracks"]["op_vids_02"]["provisional"] is False
-    mu.add_track(led, "op_vids_03", account="someone@gmail.com", **kw)
-    with pytest.raises(mu.MusicError, match="法人"):
-        mu.clear_track(led, "op_vids_03", "規約を読んだ")
+    mu.add_track(led, "op_vids_02", account="someone@gmail.com", original="Vids曲/曲_OP_02.mp4", **kw)
+    with pytest.raises(mu.MusicError, match="利用許諾"):
+        mu.clear_track(led, "op_vids_02", "Google 利用規約（2026-07-30 版）")
+    t = mu.clear_track(led, "op_vids_02", "Google 利用規約（2026-07-30 版）", transfer="2026-11-14 北原が美麗書院に許諾")
+    assert t["provisional"] is False and t["transfer"] and t["indemnified"] is False
+    mu.add_track(led, "op_vids_03", account="info@kitahara-birei.com", **kw)
+    assert mu.clear_track(led, "op_vids_03", "Workspace サービス固有規約 12.4・12.10・12.12")["indemnified"] is True
+    mu.add_track(led, "op_vids_04", **kw)
+    with pytest.raises(mu.MusicError, match="アカウント"):
+        mu.clear_track(led, "op_vids_04", "規約を読んだ", transfer="許諾")
 
 
 def test_Vidsの書き出しから音を取り出して台帳に足す(tmp_path):
