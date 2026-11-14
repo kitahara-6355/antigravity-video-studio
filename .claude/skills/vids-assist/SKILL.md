@@ -23,7 +23,7 @@ description: Google Vids（定額・手作業）を自動編集と並べて使�
 
 | 物 | 置き場（「動画制作」の中） | 置く人 |
 |---|---|---|
-| Vids の作品そのもの・曲の書き出し（mp4） | `20_素材/共通/Vids曲/` | 北原さん（名前は `曲_<役>_<連番>`） |
+| 曲の書き出し（mp4） | `20_素材/共通/Vids曲/` | 北原さん（個人の Drive に書き出して info@ に共有 → Claude がここへ写す。名前は `曲_<役>_<連番>`） |
 | 取り出した曲（mp3） | `30_AVS_作業/番組資産/曲/`（`music fetch` が探す所） | AI |
 | Vids で手直しした短尺（Shorts・OP） | `40_完成/<収録ID>/Vids/` | 北原さん |
 | 何を・どの指示文で・どのアカウントで作ったか | 曲は `backend/config/music.json`。曲以外は `30_AVS_作業/Vids台帳`（シート） | AI |
@@ -32,17 +32,19 @@ description: Google Vids（定額・手作業）を自動編集と並べて使�
 ## 曲を作って本編に入れる流れ
 
 1. Claude が指示書を書く（指示文 3〜5 案。日本語の説明と、Vids に貼る文）。北原さんの「こういう曲」の言葉は、そのまま指示書に残す
-2. 北原さんが **info@** の Vids で作り、気に入った案を **曲だけ入れた作品として mp4 で書き出す**。作品の名前は `曲_<役>_<連番>`（例 `曲_OP_01`）
+2. 北原さんが **個人アカウント（Google AI Pro）** の Vids で作り、気に入った案を **曲だけ入れた作品として mp4 で書き出す**。作品の名前は `曲_<役>_<連番>`（例 `曲_OP_01`）。
+   info@（Business Standard）の Workspace では Vids が使えない（2026-11-14 北原さん）。書き出しは個人の Drive に置き、info@ に共有してもらって Claude が `Vids曲` へ写す
 3. Claude が台帳に足しながら音を取り出す。**指示文が資産**なので必ず残す
 
        python -m backend.program_package.music add op_vids_01 --title "OP 案1" --file op_vids_01.mp3 \
            --source "Google Vids（2026-11-14）" --by 北原 --ai --made-with "Google Vids" --prompt "<貼った文>" \
-           --account info@kitahara-birei.com --original "20_素材/共通/Vids曲/曲_OP_01.mp4" \
+           --account <作った個人のアカウント> --original "20_素材/共通/Vids曲/曲_OP_01.mp4" \
            --from-video 曲_OP_01.mp4 --music-dir 曲の置き場
 
    - 足した曲は `provisional`（仮）。出力名に「_仮曲入り」が付き、公開には使わない
-   - 選ばれたら `music clear op_vids_01 --cleared "Workspace サービス固有規約 12.4・12.10・12.12（2026-11-14 確認）"` で仮を外す。
-     **個人アカウントで作った曲は外せない**（Workspace の規約の外・補償なし。聞き比べ用のまま）
+   - 選ばれたら仮を外す。個人で作った曲は、作った人から法人への利用許諾の控えが要る:
+     `music clear op_vids_01 --cleared "Google 利用規約（2026-07-30 版）: 所有権を主張しない・商用の制限なし" --transfer "2026-11-14 北原が美麗書院に利用を許諾（チャット）"`
+   - 法人の Workspace で作った曲なら `--transfer` は要らず、Google の補償も付く（`indemnified`）
 4. 聞き比べ: OP の使い始めは **山合わせが既定**（台帳でも `--audio` でも `start` が無ければ、曲の山の入りを番組名 10.5 秒に合わせる）。
    頭から流したいときだけ `"start": 0.0` と書く。好みを聞く画面は taste-picker（候補曲の置き場に写す）
 5. 決まったら曲の台帳の `programs.<番組>.op.track` を替えて `finish` を流す。控え（`_仕上げの控え.json`）の `ai_music` に、
@@ -50,11 +52,20 @@ description: Google Vids（定額・手作業）を自動編集と並べて使�
 
 ## 使ってよい条件（2026-11-14 一次情報で確認）
 
-- 生成物は顧客のデータで、Google は権利を主張しない（[Workspace サービス固有規約](https://workspace.google.com/intl/en/terms/service-terms/) 12.12、2026-10-12 版）
-- 商用の制限は無い。禁止は「競合する AI の学習に使う」「解析して取り出す」だけ（同 12.4）
-- 他人の権利の侵害を言われたら Google が補償する対象に Google Vids が入る。**有料の契約だけ**（同 12.10、[対象一覧](https://cloud.google.com/terms/generative-ai-indemnified-services)）→ info@ で作る
-- 指示文に実在のアーティスト名・ブランド名を入れない（[Vids ヘルプ](https://support.google.com/docs/answer/16855124)）
-- YouTube: 「AI で作った音楽」は開示が要る例に載っている（[YouTube ヘルプ](https://support.google.com/youtube/answer/14328491)）。OP・ED だけでも投稿のときに「改変・合成コンテンツ」を「はい」にする。曲は自動判定の対象外なので、付け忘れは控えで防ぐ
+**個人アカウント（Google AI Pro）で作る場合 — いまの形**
+
+- Google は生成物の所有権を主張しない。商用の制限は無く、事業での利用も想定されている（[Google 利用規約](https://policies.google.com/terms)、2026-07-30 版）。禁止は生成物で AI を作ること・[生成 AI の禁止事項](https://policies.google.com/terms/generative-ai/use-policy)
+- **補償は無い。** 他人の曲に似ていると言われたら自分で対応する → 指示文に実在の曲名・アーティスト名を入れない（[Vids ヘルプ](https://support.google.com/docs/answer/16855124)）。公開前に耳で既存曲に似ていないか確かめる
+- **持ち主は作った個人。** 法人の動画に使うので、作った人から法人への利用許諾を台帳に残す（`--transfer`）
+- AI だけで作った曲は著作物と認められにくい（文化庁「AIと著作権に関する考え方」）。同じような曲を他の人も作れる前提で、Content ID には登録しない
+
+**法人の Workspace で作れるようになった場合**
+
+- 生成物は顧客のデータ・商用の制限なし・Google Vids は補償の対象（[Workspace サービス固有規約](https://workspace.google.com/intl/en/terms/service-terms/) 12.4・12.10・12.12、[対象一覧](https://cloud.google.com/terms/generative-ai-indemnified-services)、有料の契約のみ）
+
+**どちらでも**
+
+- YouTube: 「AI で作った音楽」は開示が要る例（[YouTube ヘルプ](https://support.google.com/youtube/answer/14328491)）。投稿で「改変・合成コンテンツ」を「はい」にする。控えの `ai_music` で付け忘れを防ぐ
 - 曲には聞こえない印（SynthID）が入る前提で扱う
 
 ## Vids の上限（2026-11 の公式ヘルプ）
