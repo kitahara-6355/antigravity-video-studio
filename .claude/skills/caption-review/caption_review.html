@@ -181,6 +181,22 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
 
 /* 縦長か狭い画面: 縦に積む（正方形に近い画面は2列のほうが控えが広い）。見出しは1行のまま、数の札は横に送れる */
 @media (max-width: 599px), (max-aspect-ratio: 9/10) {
+  /* ウェブアプリ（スマホ）で印の所を流している間と、直しを書いている間は、字幕の枠を見出し1行に畳み、
+     空いた高さを控えに回す（流している字幕は控えの印に同じ字が出ている）。書いている間はボタンの帯も畳む */
+  body.gas.reeling .now .now-side, body.gas.reeling .now .now-text,
+  body.gas:has(.ledger :is(textarea, input):focus) .now .now-side,
+  body.gas:has(.ledger :is(textarea, input):focus) .now .now-text { display: none; }
+  body.gas:has(.ledger :is(textarea, input):focus) .actions,
+  body.gas:has(.ledger :is(textarea, input):focus) .strip,
+  body.gas:has(.ledger :is(textarea, input):focus) .top,
+  body.gas:has(.ledger :is(textarea, input):focus) .now,
+  body.gas:has(.ledger :is(textarea, input):focus) .ledger .foot { display: none; }
+  /* 元の字幕は入力欄に同じ字が入っているので、書いている間は小さな1行の控えにして入力欄を主役にする */
+  body.gas .item:focus-within .orig { font-size: .76rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  body.gas .item:focus-within textarea { font-size: 1rem; min-height: 4.4em; }
+  /* 書いている間は動画を小さくして（キーボードで画面が半分になっても）入力欄とボタンが見えるようにする */
+  body.gas:has(.ledger :is(textarea, input):focus) .screen { flex-basis: min(calc(100cqw * 9 / 16), 24dvh); min-height: 90px; }
   .sub { display: none; }
   h1 { font-size: 1rem; }
   .counts { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
@@ -334,6 +350,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function who() { try { return localStorage.getItem("avs.who") || "北原"; } catch (_) { return "北原"; } }
   async function gasStart() {
     $("together").hidden = false; $("who").value = who();
+    document.body.classList.add("gas");
     $("pickBtn").hidden = true;
     try {
       const loc = await new Promise((ok) => google.script.url.getLocation(ok));
@@ -705,7 +722,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   // 何枚目か・何回目かは字幕の枠の見出し行に出す（桁が増えてもボタンが横にずれない）。
   // 1つの印を流し終えたらいったん止まり、GAP_MS 後に同じ所をまた流す（次の印へは「次へ」で自分で進む）。
   // Space で止めるとくり返しも止まり、もう一度 Space で続きから流す。印の所から AWAY_SEC 以上離れた所へ動かすと、くり返しをやめる
-  function showReel(on) { $("reel").hidden = !on; $("normal").hidden = on; $("reelInfo").hidden = !on; }
+  function showReel(on) { $("reel").hidden = !on; $("normal").hidden = on; $("reelInfo").hidden = !on; document.body.classList.toggle("reeling", on); }
   function playList(ks, kind, start) {
     if (!ks.length || !video.src) return;
     clearTimeout(S.reel && S.reel.wait);
@@ -726,7 +743,7 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     r.round = fresh ? 1 : r.round + 1;
     r.from = c.s - LEAD_SEC; r.until = c.e + TAIL_SEC;
     $("reelPos").textContent = (r.n + 1) + " / " + r.ks.length + (r.round > 1 ? " · " + r.round + "回目" : "");
-    seek(r.from);
+    if (Math.abs(video.currentTime - r.from) > 0.05) seek(r.from);
     video.play().catch(() => {});
     highlight(idOf(c.i));
   }
@@ -745,6 +762,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     const r = S.reel;
     if (r && !video.paused && video.currentTime >= r.until) {
       r.auto = true; video.pause();
+      // 止まっている間に頭へ戻して絵を用意しておく（次のくり返しは再生を押すだけで、シークの待ちが出ない）
+      seek(r.from);
       clearTimeout(r.wait); r.wait = setTimeout(() => { if (S.reel === r) reelGo(false); }, GAP_MS);
     }
     if (!video.paused) requestAnimationFrame(tick);
@@ -838,7 +857,8 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
     $("nowTime").textContent = clock(t) + " / " + clock(duration());
     $("head").style.left = (100 * t / duration()).toFixed(3) + "%";
     $("strip").setAttribute("aria-valuenow", String(Math.round(t)));
-    const k = showingAt(t);
+    // くり返しの合間は頭へ戻して止めているので、流していた字幕を出したままにする
+    const k = S.reel && S.reel.wait ? S.reel.ks[S.reel.n] : showingAt(t);
     if (k === S.current && !force) return;
     S.current = k;
     const c = k >= 0 ? S.caps[k] : null;
@@ -965,8 +985,20 @@ kbd { font-family: var(--font-time); font-size: .74em; border: 1px solid current
   function highlight(id) {
     for (const map of [S.nodes, S.flagNodes]) map.forEach((node, nid) => node.classList.toggle("is-playing", nid === id));
     const node = id && ($("marksList").hidden ? S.flagNodes : S.nodes).get(id);
-    if (node) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (node) node.scrollIntoView({ block: narrowEdit() ? "start" : "nearest", behavior: "smooth" });
   }
+  // スマホ（縦長）のウェブアプリで印の所を流している間は、控えの印を上に寄せて「正しくは」まで見せる
+  function narrowEdit() { return document.body.classList.contains("gas") && document.body.classList.contains("reeling")
+    && matchMedia("(max-width: 599px), (max-aspect-ratio: 9/10)").matches; }
+  document.addEventListener("focusin", (ev) => {
+    const item = ev.target.closest && ev.target.closest(".ledger .item");
+    if (item && document.body.classList.contains("gas")) setTimeout(() => item.scrollIntoView({ block: "start", behavior: "smooth" }), 250);
+  });
+  // キーボードが出て見える高さが変わったら、書いている印をもう一度上に寄せる
+  if (window.visualViewport) visualViewport.addEventListener("resize", () => {
+    const el = document.activeElement, item = el && el.closest && el.closest(".ledger .item");
+    if (item && document.body.classList.contains("gas")) item.scrollIntoView({ block: "start" });
+  });
   function focusItem(id) { selectTab("marks"); highlight(id); }
   function selectTab(which) {
     const marks = which === "marks";
