@@ -95,6 +95,10 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
         note["review"] = rx.review_copy(final).name
     note["file"] = final.name
     note["music"] = bool(audio)
+    ai = [f"{role}: {t.get('title')}（{t.get('made_with')}）" for role, t in ((audio or {}).get("tracks") or {}).items()
+          if isinstance(t, dict) and t.get("ai_generated")]
+    if ai:  # 止めはしない。公開のときに人が決める事を控えに出す
+        note["ai_music"] = {"tracks": ai, "todo": "AI で作った曲が入っている。公開の前に、使ってよい条件と YouTube の開示の要否を確かめる"}
     note["state"] = "承認待ち（program_gate propose → 北原さんの承認 → 置く）" + ("" if audio else "。曲は入っていない")
     (out / f"{spec['recording']}_{version}_仕上げの控え.json").write_text(
         json.dumps(note, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
