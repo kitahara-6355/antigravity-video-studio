@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -196,7 +197,36 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
             item["ranges"] = bgm_ranges(body_seconds, quiet, float(item.get("fade", 3.0)))
         out[key] = item
         out["tracks"][role] = {k: t.get(k) for k in ("title", "artist", "source")}
+        if t.get("ai_generated"):  # 公開のときに開示を考える印。控えまで運ぶ
+            out["tracks"][role].update(ai_generated=True, made_with=t.get("made_with"))
     return out
+
+
+def add_track(ledger: dict, key: str, *, title: str, file: str, source: str, by: str, artist: str | None = None,
+              ai_generated: bool = False, made_with: str | None = None, prompt: str | None = None,
+              cleared: str | None = None, today: str | None = None) -> dict:
+    """曲を台帳に足す（人が作った・選んだ曲の控え）。
+
+    Vids などで作った曲は ai_generated と、作った道具・指示文（prompt）を残す。指示文が資産になる。
+    使ってよい根拠（cleared）を書くまでは provisional（公開に使わない・名前に「_仮曲入り」が付く）。
+    """
+    import datetime as dt
+    if not re.fullmatch(r"[a-z0-9_]+", key):
+        raise MusicError(f"曲の名前（key）は半角の小文字・数字・_ だけ: {key}")
+    if key in (ledger.get("tracks") or {}):
+        raise MusicError(f"同じ名前の曲がもうあります: {key}（別の名前で足す。前の曲は消さない）")
+    if not source.strip() or not by.strip():
+        raise MusicError("出どころ（--source）と、足した人（--by）を書いてください")
+    if ai_generated and not ((made_with or "").strip() and (prompt or "").strip()):
+        raise MusicError("AI で作った曲は、作った道具（--made-with）と指示文（--prompt）を残してください")
+    t = {"title": title, "artist": artist, "source": source, "file": file, "provisional": not (cleared or "").strip(),
+         "added": {"by": by, "on": today or dt.date.today().isoformat()}}
+    if ai_generated:
+        t.update(ai_generated=True, made_with=made_with, prompt=prompt)
+    if (cleared or "").strip():
+        t["cleared"] = cleared.strip()
+    ledger.setdefault("tracks", {})[key] = t
+    return t
 
 
 def bgm_ranges(body_seconds: float, quiet: list[list[float]], fade: float = 3.0) -> list[list[float]]:
@@ -215,6 +245,13 @@ def main(argv: list[str] | None = None) -> int:
     from backend.program_package import opening
     p = argparse.ArgumentParser(description="曲を聞いて、番組 OP のどこから使うかを決める")
     sub = p.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("add", help="曲を台帳に足す（Vids で作った曲は --ai と指示文つき）")
+    s.add_argument("key")
+    for flag in ("--title", "--file", "--source", "--by"):
+        s.add_argument(flag, required=True)
+    for flag in ("--artist", "--made-with", "--prompt", "--cleared", "--ledger"):
+        s.add_argument(flag)
+    s.add_argument("--ai", action="store_true")
     for name in ("analyze", "fit", "check", "plan"):
         s = sub.add_parser(name)
         s.add_argument("path", help="曲（plan のときは書き出す AUDIO.json）")
@@ -226,6 +263,14 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("--write", help="remix の指定（AUDIO.json）の op_music.path と start を書き換える")
     a = p.parse_args(argv)
     try:
+        if a.cmd == "add":
+            where = Path(a.ledger) if a.ledger else LEDGER
+            ledger = json.loads(where.read_text(encoding="utf-8"))
+            t = add_track(ledger, a.key, title=a.title, file=a.file, source=a.source, by=a.by, artist=a.artist,
+                          ai_generated=a.ai, made_with=a.made_with, prompt=a.prompt, cleared=a.cleared)
+            where.write_text(json.dumps(ledger, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+            print(json.dumps({a.key: t}, ensure_ascii=False, indent=1))
+            return 0
         if a.cmd == "analyze":
             print(json.dumps(analyze(a.path), ensure_ascii=False, indent=1))
             return 0

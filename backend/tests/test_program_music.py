@@ -90,3 +90,16 @@ def test_fitはremixの指定に書く(tmp_path):
     w = json.loads(out.read_text(encoding="utf-8"))
     assert w["op_music"]["path"] == str(s) and w["op_music"]["start"] == pytest.approx(19.5, abs=0.1)
     assert w["op_music"]["volume"] == 0.7 and w["peak_db"] == -1.5
+
+
+def test_AIで作った曲は道具と指示文を残して台帳に足し仮の曲として扱う():
+    led = {"tracks": {}}
+    with pytest.raises(mu.MusicError, match="指示文"):
+        mu.add_track(led, "op_vids_01", title="OP 案1", file="a.mp4", source="Google Vids", by="北原", ai_generated=True)
+    t = mu.add_track(led, "op_vids_01", title="OP 案1", file="a.mp4", source="Google Vids（info@）", by="北原",
+                     ai_generated=True, made_with="Google Vids", prompt="和の雰囲気、ピアノと箏", today="2026-11-14")
+    assert t["provisional"] and t["ai_generated"] and t["prompt"] and t["added"] == {"by": "北原", "on": "2026-11-14"}
+    with pytest.raises(mu.MusicError, match="もうあります"):
+        mu.add_track(led, "op_vids_01", title="x", file="b.mp4", source="s", by="北原")
+    ok = mu.add_track(led, "op_free_01", title="無料曲", file="c.mp3", source="OpenTracks", by="北原", cleared="利用規約 2026-11-14 確認")
+    assert ok["provisional"] is False and "ai_generated" not in ok
