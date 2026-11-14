@@ -14,6 +14,8 @@
         --music-dir 曲の置き場 [--map 地図.json] [--audio AUDIO.json] [--no-music] [--review]
 
 ``--audio`` を渡すと、曲の台帳ではなくその指定をそのまま使う（打ち合わせで決めた音量を再現するとき）。
+OP の曲の ``start`` が無い・null のときは、台帳のときと同じく曲の山の入りを番組名の出だしに合わせる（既定）。
+頭から流したいときだけ ``"start": 0.0`` と書く。
 """
 from __future__ import annotations
 
@@ -38,6 +40,14 @@ def audio_of(spec: dict, music_dir: str | None, audio_path: str | None, m: dict 
                 if audio.get(k) and not Path(str(audio[k].get("path", ""))).is_file()]
         if gone:  # 長い書き出しの前に分かる事は先に止める
             raise mu.MusicError("音の指定の曲のファイルがありません: " + " / ".join(gone))
+        op = audio.get("op_music")
+        if op and op.get("start") is None:  # 山合わせが既定（2026-11-14 北原さん: 聞き比べで B が圧倒的に良い）
+            program = ep.program_of(spec)
+            if not program:
+                raise mu.MusicError("OP の使い始めを山に合わせるには番組（program）が要ります")
+            from backend.program_package import opening
+            f = mu.fit(mu.analyze(op["path"]), mu.title_at(program), opening.length(program))
+            op.update(start=f["start"], start_note=f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）")
         return audio
     program = ep.program_of(spec)
     if not program:
@@ -95,6 +105,10 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
         note["review"] = rx.review_copy(final).name
     note["file"] = final.name
     note["music"] = bool(audio)
+    ai = [f"{role}: {t.get('title')}（{t.get('made_with')}）" for role, t in ((audio or {}).get("tracks") or {}).items()
+          if isinstance(t, dict) and t.get("ai_generated")]
+    if ai:  # 止めはしない。公開のときに人が決める事を控えに出す
+        note["ai_music"] = {"tracks": ai, "todo": mu.AI_PUBLISH_TODO}
     note["state"] = "承認待ち（program_gate propose → 北原さんの承認 → 置く）" + ("" if audio else "。曲は入っていない")
     (out / f"{spec['recording']}_{version}_仕上げの控え.json").write_text(
         json.dumps(note, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

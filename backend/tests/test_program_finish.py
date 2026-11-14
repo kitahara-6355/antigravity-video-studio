@@ -156,3 +156,14 @@ def test_曲のファイルが置き場に無ければ書き出す前に止ま�
     monkeypatch.setattr(ep, "build", lambda *a, **k: pytest.fail("書き出しまで進んだ"))
     with pytest.raises(mu.MusicError, match="曲のファイルがありません"):
         fin.finish(spec, tmp_path / "out", "v99", music_dir=str(tmp_path))
+
+
+def test_渡した音の指定でもOPの使い始めが無ければ山に合わせる(tmp_path, songs):
+    spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    spec.update(program=str(PROGRAM))
+    audio = tmp_path / "AUDIO.json"
+    audio.write_text(json.dumps({"op_music": {"path": str(songs / "a.wav"), "volume": 0.9}, "bgm": None}), encoding="utf-8")
+    a = fin.audio_of(spec, None, str(audio), None, 30.0)
+    assert a["op_music"]["start"] == pytest.approx(19.5, abs=0.1) and "山の入り" in a["op_music"]["start_note"]
+    audio.write_text(json.dumps({"op_music": {"path": str(songs / "a.wav"), "start": 0.0}}), encoding="utf-8")
+    assert fin.audio_of(spec, None, str(audio), None, 30.0)["op_music"]["start"] == 0.0  # 書いた数はそのまま
