@@ -18,6 +18,11 @@
     python -m backend.program_package.music plan AUDIO.json --program backend/config/program/美麗の書道対談.json --music-dir 曲の置き場
 
 ``plan`` は曲の台帳（backend/config/music.json）から remix の指定を丸ごと作る（OP・BGM・ED）。
+
+本線（render_worker）も同じ台帳から BGM を引く（``mainline_bgm``）。曲をクラウドの作業場に持ってくるのは
+``fetch``（Drive の 20_素材/共通 から、台帳の file の名前で落とす・読み取り専用）::
+
+    python -m backend.program_package.music fetch 曲の置き場
 """
 from __future__ import annotations
 
@@ -155,13 +160,18 @@ LEDGER = Path(__file__).resolve().parents[1] / "config" / "music.json"
 ROLES = {"op": "op_music", "bgm": "bgm", "ed": "ed_music"}
 
 
+def load_ledger() -> dict:
+    return json.loads(LEDGER.read_text(encoding="utf-8"))
+
+
 def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[list[float]] | None = None,
-         body_seconds: float | None = None) -> dict:
+         body_seconds: float | None = None, roles: tuple[str, ...] | None = None) -> dict:
     """曲の台帳から、この番組の音の指定（remix の AUDIO.json）を作る。
 
     - OP: 台帳に start が無ければ、曲の山の入りを番組名の出だしに合わせる
     - BGM: 本編の全体に敷く。quiet（曲を止める区間・本編の秒）があれば、そこを避けて区間を分ける
     - 出どころ（source）の無い曲は使わない。provisional の曲は印を引き継ぐ（名前に「_仮曲入り」が付く）
+    - roles を渡すと、その役（op・bgm・ed）だけを作る（本線は bgm だけ）
     """
     from backend.program_package import opening
     use = (ledger.get("programs") or {}).get(program["name"])
@@ -170,7 +180,7 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
     out: dict = {"op_music": None, "bgm": None, "ed_music": None, "peak_db": ledger.get("peak_db", -1.5), "tracks": {}}
     for role, key in ROLES.items():
         r = use.get(role)
-        if not r:
+        if not r or (roles is not None and role not in roles):
             continue
         t = (ledger.get("tracks") or {}).get(r["track"])
         if not t:
@@ -199,6 +209,79 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
     return out
 
 
+def mainline_bgm(ledger: dict, music_dir: str | Path | None) -> dict:
+    """本線（render_worker の最終レンダリング）が敷く BGM の指定。remix と同じ形（bgm だけ）。
+
+    本線の動画には番組 OP も ED も無いので、台帳の ``mainline.program`` の番組の BGM を全体に敷く。
+    曲が使えないときは理由つきの MusicError（本線はそれを記録に出して、曲なしで書き出す）。
+    """
+    name = (ledger.get("mainline") or {}).get("program")
+    if not name:
+        raise MusicError("曲の台帳に本線の番組（mainline.program）が書いてありません")
+    spec = plan({"name": name}, ledger, music_dir, roles=("bgm",))
+    if not spec["bgm"]:
+        raise MusicError(f"曲の台帳の番組「{name}」に BGM がありません")
+    return spec
+
+
+def missing(ledger: dict, music_dir: str | Path) -> list[str]:
+    """台帳の番組で使う曲のうち、置き場に無いファイルの名前。"""
+    used = {r["track"] for p in (ledger.get("programs") or {}).values() for r in p.values()
+            if isinstance(r, dict) and r.get("track")}
+    names = sorted({t["file"] for k, t in (ledger.get("tracks") or {}).items() if k in used and t.get("file")})
+    return [n for n in names if not (Path(music_dir) / n).exists()]
+
+
+def fetch(ledger: dict, music_dir: str | Path, service=None, env=None) -> dict:
+    """置き場に無い曲を Drive の 20_素材/共通（その下のフォルダも）から、台帳の file の名前で落とす。
+
+    読み取り専用の鍵で読む（raw を読むのと同じ鍵）。同じ名前が 2 つあるときは、どちらか決めずに止まる。
+    """
+    import os
+
+    from backend import raw_source as rs
+    env = os.environ if env is None else env
+    music_dir = Path(music_dir)
+    music_dir.mkdir(parents=True, exist_ok=True)
+    want = missing(ledger, music_dir)
+    out: dict = {"dir": str(music_dir), "fetched": [], "not_found": [], "already": len(want) == 0}
+    if not want:
+        return out
+    service = service or rs._build_drive()
+    raw = env.get("AVS_RAW_DRIVE_FOLDER_ID")
+    if not raw:
+        raise MusicError("Drive の場所が分かりません（環境変数 AVS_RAW_DRIVE_FOLDER_ID）")
+    base = (service.files().get(fileId=raw, fields="parents", supportsAllDrives=True).execute().get("parents") or [None])[0]
+    try:
+        top = rs.find_folder(service, base, "20_素材")
+        todo, found = [rs.find_folder(service, top, "共通")], {}
+    except rs.FolderError as e:
+        raise MusicError(f"Drive に曲の置き場がありません（20_素材/共通）: {e}") from e
+    while todo:
+        folder = todo.pop()
+        todo += [f["id"] for f in rs.list_folders(service, folder)]
+        for f in rs._list_files(service, f"'{folder}' in parents and trashed = false "
+                                         f"and mimeType != '{rs.FOLDER_MIME}'", "id, name, md5Checksum"):
+            if f["name"] in want:
+                found.setdefault(f["name"], []).append(f)
+    for name in want:
+        hits = found.get(name) or []
+        if len({h.get("md5Checksum") for h in hits}) > 1:
+            raise MusicError(f"Drive に「{name}」が中身ちがいで {len(hits)} つあります。1 つにしてください")
+        if not hits:
+            out["not_found"].append(name)
+            continue
+        dest = music_dir / name
+        part = dest.with_name(dest.name + ".part")
+        rs._download(service, hits[0]["id"], part)
+        if hits[0].get("md5Checksum") and rs._md5_of(part) != hits[0]["md5Checksum"]:
+            part.unlink(missing_ok=True)
+            raise MusicError(f"落とした「{name}」の中身が Drive と合いません")
+        part.replace(dest)
+        out["fetched"].append(name)
+    return out
+
+
 def bgm_ranges(body_seconds: float, quiet: list[list[float]], fade: float = 3.0) -> list[list[float]]:
     """本編のうち BGM を敷く区間。quiet の区間（揮毫など、曲を止めたい所）を避ける。短すぎる切れ端は捨てる。"""
     out, t = [], 0.0
@@ -215,12 +298,12 @@ def main(argv: list[str] | None = None) -> int:
     from backend.program_package import opening
     p = argparse.ArgumentParser(description="曲を聞いて、番組 OP のどこから使うかを決める")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("analyze", "fit", "check", "plan"):
+    for name in ("analyze", "fit", "check", "plan", "fetch"):
         s = sub.add_parser(name)
-        s.add_argument("path", help="曲（plan のときは書き出す AUDIO.json）")
+        s.add_argument("path", help="曲（plan のときは書き出す AUDIO.json・fetch のときは曲の置き場）")
         if name == "plan":
             s.add_argument("--music-dir")
-        if name != "analyze":
+        if name not in ("analyze", "fetch"):
             s.add_argument("--program", required=True)
         if name == "fit":
             s.add_argument("--write", help="remix の指定（AUDIO.json）の op_music.path と start を書き換える")
@@ -229,10 +312,14 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd == "analyze":
             print(json.dumps(analyze(a.path), ensure_ascii=False, indent=1))
             return 0
+        if a.cmd == "fetch":
+            r = fetch(load_ledger(), a.path)
+            print(json.dumps(r, ensure_ascii=False, indent=1))
+            return 1 if r["not_found"] else 0
         program = opening.load(a.program)
         if a.cmd == "plan":
             import os
-            ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+            ledger = load_ledger()
             spec = plan(program, ledger, a.music_dir or os.environ.get("AVS_MUSIC_DIR"))
             Path(a.path).write_text(json.dumps(spec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             print(json.dumps(spec, ensure_ascii=False, indent=1))

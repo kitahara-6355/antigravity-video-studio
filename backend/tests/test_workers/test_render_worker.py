@@ -2011,11 +2011,12 @@ class TestRenderWorkerCoverageExpansion:
 
             vid_mod.video_editor.ffmpeg.run_command.side_effect = _run_cmd
 
+            # 中身の無いファイルなので、長さは測らずに決める（音の組み立ては remix と同じ物）
             with patch.dict("sys.modules", {
                 "video_editor_engine": vid_mod,
                 "template_config": mock_tc_mod,
                 "logo_overlay": MagicMock(),
-            }):
+            }), patch("backend.program_package.remix.duration", return_value=30.0):
                 worker = RenderWorker()
                 result = await worker.execute(ctx)
 
