@@ -172,7 +172,11 @@ def shifted_chapters(spec: dict, op_len: float) -> list[tuple[int, str]]:
 
 def program_of(spec: dict) -> dict | None:
     """番組共通 OP の指定（spec の program が指す番組の指定）。無ければ None。"""
-    return opening_mod.load(spec["program"]) if spec.get("program") else None
+    if not spec.get("program"):
+        return None
+    p = opening_mod.load(spec["program"])
+    # 曲は後で remix が入れ替えるとき（finish）は、番組 OP を無音で作る（仮の曲のファイルが無くても通る）
+    return {**p, "music": None} if spec.get("program_silent") else p
 
 
 def program_length(spec: dict) -> float:
@@ -214,7 +218,7 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
         tmp = Path(tmp)
         for k, im in cards.items():
             im.save(tmp / f"{k}.png")
-        spec = {**spec, "_theme": theme}
+        spec = {**spec, "_theme": theme, "_inserts": _inserts(spec, src, tmp)}
         graph, inputs = _graph(spec, body, dur, tmp)
         music = (program_of(spec) or {}).get("music") or {}
         # 仮の曲を入れた版は公開に使わない。名前で分かるようにする
@@ -232,6 +236,26 @@ def build(spec: dict, out: Path, cards_only: bool = False) -> Path:
     if bad:
         raise SystemExit("チャプターが YouTube の決まりに合わない: " + " / ".join(bad))
     return dst
+
+
+def _inserts(spec: dict, src: Path, tmp: Path) -> list[tuple[Path, float, float]]:
+    """この回の画像インサートのうち、人が承認した分（backend/config/inserts/<収録ID>.json）。無ければ空。
+
+    spec の inserts に案の置き場を書けばそれを読む。false なら入れない。
+    """
+    from backend.program_package import inserts as ins
+    where = spec.get("inserts")
+    if where is False:
+        return []
+    path = Path(where) if where else ins.store_of(spec)
+    if not path.exists():
+        return []
+    try:
+        items = ins.ready(ins.load_plan(path), spec)
+    except ins.InsertError as e:
+        raise SystemExit(f"止めました: {e}") from e
+    root = Path(spec["materials_root"]) if spec.get("materials_root") else None
+    return ins.shows(items, src, tmp, 0.0, root)
 
 
 def _chain(g: list[str], clips: list[tuple[str, str, float]], tag: str) -> tuple[str, str, float]:
@@ -299,6 +323,8 @@ def _graph(spec: dict, body, dur: float, tmp: Path) -> tuple[str, list[str]]:
         shows.append((tmp / f"tp{i:02d}.png", tp["at"], tp.get("seconds", 5.0)))
     for i, pop in enumerate(spec.get("name_pops", [])):
         shows.append((tmp / f"np{i:02d}.png", pop["at"], pop.get("seconds", 7.0)))
+    # 承認済みの画像インサート（B ロール）。build が絵にして渡す。飾りと同じ出し方
+    shows += [(Path(png), at, sec) for png, at, sec in spec.get("_inserts", [])]
     for k, (png, at, sec) in enumerate(shows):
         inputs += ["-loop", "1", "-framerate", "30", "-t", f"{sec:.2f}", "-i", str(png)]
         g.append(f"[{n_in}:v]format=rgba,fade=in:st=0:d={FADE}:alpha=1,fade=out:st={sec - FADE:.2f}:d={FADE}:alpha=1,"

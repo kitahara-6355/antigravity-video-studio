@@ -165,6 +165,9 @@ class PipelineContext:
     # D-47: 書き出しで**実際に使った**エンコードの設定（mode・encode・args・fallback）。
     # 立てるのは RenderWorker だけ。書き出しの記録（export.json）に載る
     render_encode: Optional[Dict] = None
+    # 書き出しで**実際に敷いた** BGM（どこから・ファイル名・曲名・出どころ・仮の曲か）。敷いていなければ None。
+    # 立てるのは RenderWorker だけ。書き出しの記録（export.json）に載る
+    render_bgm: Optional[Dict] = None
     # D-04: 品質改善ループを回した結果（回数・点の推移・効いたか・止めた理由）。提案に載る
     quality_loop: Optional[Dict] = None
     quality_gate_report: Optional[Dict] = None

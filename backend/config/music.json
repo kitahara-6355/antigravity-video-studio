@@ -1,0 +1,19 @@
+{
+ "_doc": "曲の台帳。どの番組のどこ（OP・インタビュー中の BGM・ED）にどの曲を使うかと、曲の出どころ。python -m backend.program_package.music plan が読み、remix の指定（AUDIO.json）を作る。曲のファイルはリポジトリに置かない（--music-dir か環境変数 AVS_MUSIC_DIR の場所から file の名前で探す）。出どころ（source）が書いていない曲と provisional の曲は公開に使わない。",
+ "tracks": {
+  "sakura": {"title": "桜色に染めて", "artist": "田中芳典", "source": "Drive 40_完成/20250922_久木田ヒロノブ の「曲の出どころ」を見る", "file": "sakurairo_tr2.mp3", "provisional": false},
+  "white_cocktail": {"title": "White cocktail", "artist": "Maniira", "source": "OpenTracks（旧 DOVA-SYNDROME）", "file": "white_cocktail.mp3", "provisional": false},
+  "new_departure": {"title": "New Departure", "artist": "FLASH BEAT", "source": "Drive 40_完成/20250922_久木田ヒロノブ の「曲の出どころ」を見る", "file": "new_departure.mp3", "provisional": false}
+ },
+ "file_note": "file は曲のファイル名（例 \"white_cocktail.mp3\"）。2026-11-12 の仕上げ（v67）で使った実物は PC の作業場にある。名前を確かめて入れるまで plan は「ファイルが決まっていない」で止まる",
+ "programs": {
+  "美麗の書道対談": {
+   "decided": "2026-11-12 北原さん（21時の打ち合わせ）",
+   "op": {"track": "sakura", "volume": 0.9, "fade_out": 1.5, "start": null, "start_note": "null なら曲の山の入りを番組名の出だしに合わせて決める（music fit）"},
+   "bgm": {"track": "white_cocktail", "volume_db": -22, "duck": true, "duck_ratio": 3, "fade": 3.0, "loop_crossfade": 4.0},
+   "ed": {"track": "new_departure", "volume": 0.72, "fade_in": 1.0, "fade_out": 5.5}
+  }
+ },
+ "mainline": {"program": "美麗の書道対談", "note": "本線（render_worker の最終レンダリング）が全体に敷く BGM は、この番組の bgm。本線の動画には番組 OP も ED も無いので op・ed は使わない。曲は環境変数 AVS_MUSIC_DIR の場所から探す（クラウドでは music fetch で Drive の 20_素材/共通 か 30_AVS_作業/番組資産/曲 から持ってくる）"},
+ "peak_db": -1.5
+}
