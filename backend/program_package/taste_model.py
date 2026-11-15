@@ -267,7 +267,7 @@ def narrow_pack(post: Posterior, z: np.ndarray, heard: set[int], m: int = 8, exp
 
 def dropped_songs(post: Posterior, record: dict[int, list[int]]) -> set[int]:
     """落とす曲: 0勝2敗以上か、平均が合格ラインより幅1つ分以上下。record は {曲: [勝ち, 負け]}。"""
-    out = {i for i, (w, l) in record.items() if w == 0 and l >= 2}
+    out = {i for i, (wins, losses) in record.items() if wins == 0 and losses >= 2}
     out |= {i for i in record if post.mu[i] + post.sd[i] < 0}
     return out
 
