@@ -48,7 +48,12 @@ P1（2026-10-23 北原さん決定）: 背景は**収録の壁の薄紫＝美麗
    - `text`: 肩書き・キャッチ2つ・左右の名前。**名前は北原さんが決めたまま変えない**
    - `shikishi`: 揮毫の場面で色紙が手で隠れていない時刻と、色紙の所（俯瞰のコマ）
    - `left` / `right`: 切り抜きの候補（本編の時刻）。**表情優先・明るい笑顔**。3秒おきにコマを並べて探し、
-     よい所を0.5秒おきに見直して決める
+     よい所を0.5秒おきに見直して決める。
+     **2026-11-15 から候補は機械が出す**: `vision scan つないだraw.mp4 --out map.json --expr` →
+     `vision thumbs --map map.json --spec opts.json`。笑顔の山ごとに左右12コマずつ（1つの山から2コマ・
+     1分に3コマまで・場面の切れ目と色紙のコマは除く）。`opts.json` の `left`/`right` をそのまま入れて
+     `--options` で並べ、**選ぶのは人**。「二人とも:」の行は二人が同時に笑っている組。
+     久木田回の実測（右=ゲスト）: 上位12に正解6中5・上位18で6中6。左（美麗さん）は6中2なので見直しを足す
 2. フォントを取る（初回だけ。Google Fonts・OFL）
 
    ```
@@ -61,7 +66,7 @@ P1（2026-10-23 北原さん決定）: 背景は**収録の壁の薄紫＝美麗
    python -m backend.program_package.thumbnail SPEC.json --raw RAW.mp4 --out OUT --options
    ```
 
-   `OUT/切り抜き候補.jpg` を返信に添付し、「B3とK1」のように選んでもらう。
+   `OUT/切り抜き_候補.jpg` を返信に添付し、「B3とK1」のように選んでもらう。
 4. 選ばれた組み合わせで組む（`chosen` にある組をすべて、または `--pick B3 K1`）
 
    ```
@@ -80,6 +85,17 @@ P1（2026-10-23 北原さん決定）: 背景は**収録の壁の薄紫＝美麗
   ```
 
   仮決定のうちは名前に「仮決定」と入れる（例 `_サムネ_仮決定_P1_薄紫_B3_K1.png`）
+- **承認の流れ（2026-11-10・V2）**: サムネも投稿する物なので、候補（`_` で区切った語として「候補」「確認用」が入る名前。例 `切り抜き_候補.jpg`・`_サムネ_候補_P1.png`、またはフォルダ名が「…候補」）以外は
+  提案 → 北原さんの承認 の後でないと 40_完成 に置けない（`put finished` が断る）:
+
+  ```
+  python -m backend.revenue.program_gate propose --recording <収録ID> --kind thumbnail --key サムネ_P1_B3_K1 \
+      --publish OUT/サムネ_P1_B3_K1.png --spec backend/config/thumbnails/<収録ID>.json
+  python -m backend.revenue.program_gate approve --recording <収録ID> --key サムネ_P1_B3_K1 --by 北原 \
+      --synthetic no --evidence "<チャットの日時と言葉>"
+  ```
+
+  提案のときに 1280x720・2MB 以下・PNG/JPEG を実測する
 - 何を選んだか・誰が決めたかは指定ファイルの `decided` と `chosen` に残す
 
 ### 4. Shorts を切り出す（番組化の2段目）

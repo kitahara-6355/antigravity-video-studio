@@ -1,0 +1,176 @@
+{
+ "setup": {
+  "board_keywords": [
+   "縁"
+  ],
+  "board_title": "久木田先生の書「縁」"
+ },
+ "items": [
+  {
+   "id": "board-3041",
+   "at": 1841.73,
+   "seconds": 8.0,
+   "mode": "pip",
+   "box": [
+    500,
+    49,
+    798,
+    379
+   ],
+   "keyword": "縁",
+   "caption": "「縁」の字ができました　はい",
+   "source": {
+    "kind": "recording",
+    "id": "board",
+    "at": 1816.0,
+    "crop": [
+     200,
+     149,
+     524,
+     508
+    ],
+    "title": "久木田先生の書「縁」"
+   },
+   "state": "approved",
+   "reason": "「縁」の話に合わせて小窓で出す",
+   "fingerprint": "ab2d79898d1d19aa",
+   "decision": {
+    "by": "北原",
+    "at": "2026-11-13T05:45:36+09:00",
+    "evidence": "2026-11-13 05:45 チャット「①小窓は入れて下さい」（見本24秒を見て）",
+    "fingerprint": "ab2d79898d1d19aa"
+   }
+  }
+ ],
+ "wanted": [
+  {
+   "keyword": "日本デザイン書道作家協会",
+   "at": 31.07,
+   "mentions": 2,
+   "caption": "記念すべき第1回目のゲストは 日本デザイン書道作家協会理事長で",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "筆文字",
+   "at": 67.03,
+   "mentions": 12,
+   "caption": "著者としても筆文字デザインの書籍が 多数おありだということです",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "商業書道",
+   "at": 241.56,
+   "mentions": 2,
+   "caption": "その広告業界っていうか 商業書道っていう",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "シーチキン",
+   "at": 342.75,
+   "mentions": 3,
+   "caption": "シーチキンだった",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "シャープ",
+   "at": 394.15,
+   "mentions": 7,
+   "caption": "シャープのVPかな？",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "Be Original",
+   "at": 451.22,
+   "mentions": 4,
+   "caption": "Be Original って書くんです",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "ユニクロ",
+   "at": 722.56,
+   "mentions": 7,
+   "caption": "例えば　ユニクロの",
+   "note": "絵はあるが使えない（ユニクロ UT（久木田先生の書「森羅万象」の T シャツ・商品写真））: 権利が未確認（rights: third_party。自社の物 own か、許可を得た物 permitted だけ）"
+  },
+  {
+   "keyword": "フォント",
+   "at": 893.02,
+   "mentions": 3,
+   "caption": "ちょっと有名なフォントが あるじゃないですか先生",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "剣閃",
+   "at": 902.24,
+   "mentions": 3,
+   "caption": "その前の剣閃っていうフォントが あるですよね",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "鬼滅の刃",
+   "at": 928.75,
+   "mentions": 3,
+   "caption": "「鬼滅の刃」やってますけど",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "筆文字で伝えたいことば大賞",
+   "at": 1023.31,
+   "mentions": 2,
+   "caption": "主催されている「筆文字で伝えたい ことば大賞」っていうのがね",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "美麗書院",
+   "at": 1029.53,
+   "mentions": 1,
+   "caption": "私のこの美麗書院の生徒さんたちも 毎年応募させていただいてて",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "文房四宝",
+   "at": 1364.19,
+   "mentions": 2,
+   "caption": "筆・墨・硯・紙　文房四宝のね",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "墨",
+   "at": 1364.19,
+   "mentions": 4,
+   "caption": "筆・墨・硯・紙　文房四宝のね",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  },
+  {
+   "keyword": "イタチの毛",
+   "at": 2252.12,
+   "mentions": 2,
+   "caption": "イタチの毛が",
+   "note": "絵が無い。自社の物か、許可を得た物があれば materials に足す"
+  }
+ ],
+ "excluded": [
+  {
+   "id": "uniqlo_ut",
+   "title": "ユニクロ UT（久木田先生の書「森羅万象」の T シャツ・商品写真）",
+   "reason": "権利が未確認（rights: third_party。自社の物 own か、許可を得た物 permitted だけ）"
+  },
+  {
+   "id": "uniqlo_worn",
+   "title": "ユニクロ着用画像（2人が T シャツを着ている絵）",
+   "reason": "AI が作った絵は使わない"
+  }
+ ],
+ "skipped": [
+  {
+   "keyword": "縁",
+   "source": "board",
+   "at": 1624.93,
+   "reason": "まだ映っていない絵は先に見せない"
+  }
+ ],
+ "base": {
+  "captions": "366795d16966f1bb",
+  "from": "r61.lock.json"
+ }
+}

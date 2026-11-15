@@ -111,7 +111,7 @@ def test_shorts_の書き出しは承認を通していないと断る(shorts_cl
     assert r.status_code == 409, r.text
     assert 呼ばれた == [], "ffmpeg を呼んでいます（書き出している）"
     detail = r.json()["detail"]
-    assert "承認" in detail and "approval_gate" in detail
+    assert "承認" in detail and "program_gate" in detail, "番組化の承認の流れ（D-48）を案内していません"
 
 
 def test_shorts_の候補抽出は閉じない(shorts_client):

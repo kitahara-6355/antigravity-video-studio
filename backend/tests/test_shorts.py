@@ -300,7 +300,7 @@ def test_render_short_は承認を通していないと断る():
     )
     assert response.status_code == 409
     detail = response.json()["detail"]
-    assert "承認" in detail and "approval_gate" in detail
+    assert "承認" in detail and "program_gate" in detail  # D-48: 案内先は番組化の承認の流れ
 
 
 def test_render_short_は入力の良し悪しで挙動を変えない():

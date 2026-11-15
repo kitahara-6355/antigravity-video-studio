@@ -1,0 +1,53 @@
+{
+  "video": "20250922_久木田ヒロノブ_v62_ロゴなし_確認用360p.mp4",
+  "start": 600.0,
+  "seconds": 90.0,
+  "scale": "1920x1080",
+  "rows": [
+    {
+      "encode": "fast",
+      "preset": "ultrafast",
+      "crf": 28,
+      "seconds": 11.4,
+      "speed_x": 7.87,
+      "mbps": 1.51,
+      "ssim": 0.9927
+    },
+    {
+      "encode": "balanced",
+      "preset": "veryfast",
+      "crf": 23,
+      "seconds": 16.9,
+      "speed_x": 5.32,
+      "mbps": 0.61,
+      "ssim": 0.9951
+    },
+    {
+      "encode": "—",
+      "preset": "medium",
+      "crf": 20,
+      "seconds": 39.1,
+      "speed_x": 2.3,
+      "mbps": 0.95,
+      "ssim": 0.9975
+    },
+    {
+      "encode": "—",
+      "preset": "medium",
+      "crf": 18,
+      "seconds": 40.0,
+      "speed_x": 2.25,
+      "mbps": 1.16,
+      "ssim": 0.9979
+    },
+    {
+      "encode": "quality",
+      "preset": "slow",
+      "crf": 18,
+      "seconds": 50.9,
+      "speed_x": 1.77,
+      "mbps": 1.14,
+      "ssim": 0.998
+    }
+  ]
+}

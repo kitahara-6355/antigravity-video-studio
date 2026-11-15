@@ -5264,8 +5264,9 @@
    "symbol": "write_proposal",
    "category": "品質スコア",
    "status": "marked",
-   "reason": "L91 `score = getattr(ctx, \"quality_score\", 0)` は既定 0 を持つが、**同じ辞書に L102 `scored`（旗）を並べて出所を名乗る**（R1.5-C4 の型）。未採点の 0 を「測った 0 点」と読めない。L92 `passed = score >= 90` も未採点では False 側に倒れ、L104 の書き出しモードは safe になる（安全側）。他の getattr 既定（metadata/session_id/skipped_features/warnings/preview_path/quality_scored）はいずれも空の器か文字列で、数字を作らない。",
+   "reason": "L91 `score = getattr(ctx, \"quality_score\", 0)` は既定 0 を持つが、**同じ辞書に L102 `scored`（旗）を並べて出所を名乗る**（R1.5-C4 の型）。未採点の 0 を「測った 0 点」と読めない。L92 `passed = score >= 90` も未採点では False 側に倒れ、L104 の書き出しモードは safe になる（安全側）。他の getattr 既定（metadata/session_id/skipped_features/warnings/preview_path/quality_scored）はいずれも空の器か文字列で、数字を作らない。 2026-11-10（V2・D-04）: `quality_loop` の getattr 既定 None を足した。None は『品質改善ループを回していない』で、回したときだけ coordinator が回数と点の推移（採点の結果そのもの）を入れる。数字を作らない。",
    "fingerprint": [
+    "getattr_default",
     "getattr_default",
     "getattr_default",
     "getattr_default",
@@ -5292,6 +5293,75 @@
     "scored=?",
     "scored=?"
    ]
+  },
+  {
+   "id": "backend/program_package/vision.py::Eye.faces",
+   "file": "backend/program_package/vision.py",
+   "symbol": "Eye.faces",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "`score` は顔検出器（YuNet）が返す**検出の確からしさ**をそのまま載せているだけ。動画の品質スコアではなく、既定値も作らない（顔が無ければ空のリスト）。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::face_quality",
+   "file": "backend/program_package/vision.py",
+   "symbol": "face_quality",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "サムネの人物コマの**候補を並べる順位づけ**の点。入力の顔の実測値（大きさ・向き・口の幅）から計算し、定数を返す経路は無い。動画の品質スコアとして外に出さず、選ぶのは人。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::main",
+   "file": "backend/program_package/vision.py",
+   "symbol": "main",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "コマンドの入口。定数の return は**終了コード**（0=できた・1=掛かる飾りや未決がある／VisionError）で、数字の成果を作らない。`except VisionError` はエラー文を出して 1 を返す（成功を装わない）。`score` は thumbs の候補の表示だけ。",
+   "fingerprint": [
+    "const_return",
+    "const_return",
+    "const_return",
+    "const_return",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/program_package/vision.py::steady_heads",
+   "file": "backend/program_package/vision.py",
+   "symbol": "steady_heads",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "`score` は顔検出の確からしさで、しきい値未満の顔を捨てるのに使うだけ。返すのは頭の矩形のリストで、品質の数字を作らない。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::thumb_candidates",
+   "file": "backend/program_package/vision.py",
+   "symbol": "thumb_candidates",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "サムネ候補の一覧を作る。`score` は face_quality の実測の点 × 動きの小ささで、地図に顔が無ければ空のリストを返す（既定の点は無い）。動画の品質スコアではない。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::pairs",
+   "file": "backend/program_package/vision.py",
+   "symbol": "pairs",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "左右の候補のうち時刻が近い組を並べるだけ。点は smile_candidates の実測の和で、候補が無ければ空のリスト。動画の品質スコアではない。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::smile_candidates",
+   "file": "backend/program_package/vision.py",
+   "symbol": "smile_candidates",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "サムネ候補の一覧を作る。`score` は表情モデルの実測（笑顔の差・くっきり・目）の順位から計算し、表情を測った顔が無ければ空のリストを返す（既定の点は無い）。動画の品質スコアではなく、選ぶのは人。",
+   "fingerprint": []
   }
  ]
 }

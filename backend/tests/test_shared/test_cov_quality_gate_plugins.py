@@ -960,7 +960,8 @@ class TestPipelineAndGPUHealthSuccess:
         ctx.thumbnail_path = "a"
         result = PipelineCompletionCheck().analyze(ctx)
         assert result["deductions"] == 0
-        assert "正常完走" in result["feedback"][0]
+        # 工程の成否の記録が無いときは「正常完走」と言わない（D-42）
+        assert "成果物はそろっています" in result["feedback"][0]
 
     def test_gpu_health_success(self):
         from quality_gate_plugins import GPUHealthCheck

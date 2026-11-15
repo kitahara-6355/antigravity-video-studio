@@ -158,3 +158,17 @@ def test_organize_cannot_be_combined(login, capsys):
     with pytest.raises(ValueError):
         login.resolve_plan(readonly=False, token=None, assets=True, organize=True)
     assert login._parse_args(["--organize"]).organize is True
+
+
+def test_script_requests_only_apps_script_scopes(login, monkeypatch, tmp_path):
+    """Apps Script を送り込む口（2026-11-13）。Drive や cloud-platform を混ぜない。"""
+    monkeypatch.setenv("ANTIGRAVITY_GOOGLE_TOKEN", str(tmp_path / "token.json"))
+    scopes, out = login.resolve_plan(readonly=False, token=None, script=True)
+    assert scopes == ["https://www.googleapis.com/auth/script.projects",
+                      "https://www.googleapis.com/auth/script.deployments"]
+    assert out == tmp_path / "token_apps_script.json"
+
+
+def test_script_cannot_be_combined(login):
+    with pytest.raises(ValueError):
+        login.resolve_plan(readonly=False, token=None, organize=True, script=True)

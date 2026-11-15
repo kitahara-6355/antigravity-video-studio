@@ -1,0 +1,9 @@
+{
+  "_doc": "書き出しのモードごとのエンコード設定（D-47）。RenderWorker が ctx.render_mode で引く。encode は video_editor_engine の _get_encode_args の名前（fast / balanced / quality）。品質ゲートに合格（90点以上）なら production、不合格なら safe。実際に使った設定は書き出しの記録（export.json の encode）に残る。",
+  "modes": {
+    "production": {"encode": "quality", "why": "合格した動画は、時間をかけて画質を取る（CPU なら libx264 slow・crf 18）"},
+    "safe": {"encode": "balanced", "why": "不合格の動画は、見直し用に速く出す（CPU なら libx264 veryfast・crf 23。2026-11-10 までは両方ともこの設定だった）"}
+  },
+  "fallback_mode": "safe",
+  "decided": "2026-11-10 の初期値（実測は docs/evidence/v2_render_modes_20261110.json）。画質と時間のどこを取るかは北原さんが決める"
+}

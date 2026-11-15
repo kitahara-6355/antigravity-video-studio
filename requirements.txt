@@ -24,3 +24,6 @@ python-multipart
 # 字幕の時刻合わせ（文字ごとの時刻を取る・CPU・無料）。モデルは
 # python -m backend.subtitle_engine.aligner --setup で取得する
 sherpa-onnx
+# 映像を見る目（backend/program_package/vision.py）。顔の検出（YuNet）とコマの比較。
+# CPU で動く。画面を出さないので headless 版
+opencv-python-headless

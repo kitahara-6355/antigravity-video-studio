@@ -763,7 +763,8 @@ async def test_quality_improvement_loop_max_retries():
     quality_worker = coordinator._find_worker(QualityGateWorker)
     preview_worker = coordinator._find_worker(PreviewWorker)
     
-    # 改善ループが最大回数 (3回) 回っても不合格なケース
+    # 作り直しても点も講評も同じなら、同じことを繰り返さずに止まる（D-04・2026-11-10）。
+    # 1回目は前の講評が無いので比べられず、2回目で「変わらない」と分かって止まる
     preview_worker.execute = AsyncMock(return_value=StageResult(stage_name=preview_worker.name, success=True, detail="preview ok"))
     quality_worker.execute = AsyncMock(return_value=StageResult(stage_name=quality_worker.name, success=False, detail="still bad", data={"feedback": ["feedback_msg"]}))
     quality_worker.verify = MagicMock(return_value=False)
@@ -771,9 +772,9 @@ async def test_quality_improvement_loop_max_retries():
     # 改善ループ呼び出し
     res = await coordinator._quality_improvement_loop(ctx, None)
     assert res is False
-    # execute は 3回 呼び出されるはず
-    assert preview_worker.execute.call_count == 3
-    assert quality_worker.execute.call_count == 3
+    assert preview_worker.execute.call_count == 2
+    assert quality_worker.execute.call_count == 2
+    assert ctx.quality_loop["improved"] is False and "変わらない" in ctx.quality_loop["stopped"]
 
 # ===========================================================================
 # 8. build_result & 改善提案のテスト
@@ -1155,7 +1156,9 @@ async def test_optimize_quality_fallback_loop_still_failed():
     
     with patch.dict("sys.modules", {"harness.evaluator_optimizer": None}):
         await coordinator._optimize_quality(ctx, None, None)
-        assert quality_worker.verify.call_count >= 3
+        # 入口の判定 1 回 + ループ 1 回。点も講評も変わらないので 1 回で止まる（D-04・2026-11-10）
+        assert quality_worker.verify.call_count == 2
+        assert preview_worker.execute.call_count == 1
 
 @pytest.mark.asyncio
 async def test_quality_improvement_loop_workers_not_found():

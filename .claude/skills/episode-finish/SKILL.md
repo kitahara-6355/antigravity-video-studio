@@ -37,7 +37,7 @@ description: 目視OKの対談の完成版に、番組の飾り（番組 OP・�
 | `chapters_skip` | 見出しを出さない章（エンディング） | **第1章も出す**（本編の頭から） |
 | `chapters_right` | 右上に寄せる章（番号） | 聞き手一人の場面は頭が左上に来るので、第1章は右上 |
 | `chapter_seconds` | 章の見出しを出す秒数 | **8秒**（4秒は短すぎると言われた） |
-| `name_pops` | `at`・`seconds`・`y`・`right`（右端の x）・`lines`（肩書き）・`name`・`pitch`（肩書きの行間）・`size`（名前の大きさ）・`avoid`（頭の来る所の四角） | 聞き手のあいさつ・ゲストの紹介の所。肩書きは**本編で紹介した言葉どおり**。**出している秒の間のコマを1秒ごとに並べ、カメラの寄り引きや身を乗り出す動きも含めて頭の来る所を測って `avoid` に書く**。ポップが1画素でも掛かるとテストが落ちる（`pop_hits`）。壁が狭ければ `pitch`・`size` で詰める |
+| `name_pops` | `at`・`seconds`・`y`・`right`（右端の x）・`lines`（肩書き）・`name`・`pitch`（肩書きの行間）・`size`（名前の大きさ）・`avoid`（頭の来る所の四角） | 聞き手のあいさつ・ゲストの紹介の所。肩書きは**本編で紹介した言葉どおり**。**頭の来る所（`avoid`）は映像から自動で測る**（下の「頭の来る所を自動で測る」。2026-11-10 までは、出している秒の間のコマを1秒ごとに並べて人が測っていた）。ポップが1画素でも掛かるとテストが落ちる（`pop_hits`）。壁が狭ければ `pitch`・`size` で詰める |
 | `telops` | `at`（秒）・`head`（言葉）・`body`（説明。改行可） | 知らないと分かりにくい固有名詞・専門語。字幕の言い方から外れない。**他社の画像・ロゴは使わない** |
 | `ending` | 秒数（20）・プレゼントの告知（`{deadline}` に締切が入る）・`publish_date`（公開日）・`deadline_days`（14）・登録の呼びかけ | **締切は公開日の2週間後**。公開日が決まったら `publish_date` を入れて書き出し直す。未定のうちは `【未定】` と出る（投稿用には書き出さない） |
 
@@ -69,6 +69,53 @@ python -m backend.program_package.episode SPEC.json --out OUT
 - 確認用は Drive `40_完成/<収録ID>/` へ（スキル `drive-layout` の `put finished`）。返信にはリンクを貼る
 - 概要欄のチャプターは `_チャプター.txt` に差し替える（OP の分ずれる）
 - 目視OK のラベルは北原さんが付ける（AI は付けない）
+- **承認の流れ（2026-11-10・V2）**: 名前に「確認用」が入った版は見てもらう物なので置ける。
+  投稿する版（「確認用」の付かない名前）は、提案 → 北原さんの承認 の後でないと 40_完成 に置けない:
+
+  ```
+  python -m backend.revenue.program_gate propose --recording <収録ID> --kind episode --key v67 \
+      --publish OUT/<収録ID>_v67.mp4 --review OUT/<収録ID>_v67_確認用360p.mp4 --spec SPEC.json
+  （北原さんが確認用にラベル「品質確認」= 目視OK を付けたら）
+  python -m backend.drive_layout qc-sync
+  python -m backend.revenue.program_gate approve --recording <収録ID> --key v67 --from-qc --synthetic no
+  ```
+
+  提案のときに実測の品質ゲートが走る（1920x1080・yuv420p・音の大きさとピーク・黒い画面・無音・壊れ）。
+  チャットで承認をもらったときは `--from-qc` の代わりに `--by 北原 --evidence "<日時と言葉>"`。
+  確認用は**その版の書き出しの縮小版**を付ける（長さが 1 秒より違うと提案を断る。前の版の確認用の目視OK は使えない）。
+  「確認用」の名前を外す・投稿用の場所へ移す（`drive_organize`）のも、承認の後でないと止まる
+
+### 4.5 音だけ差し替える（OP の曲・インタビュー中の BGM・音割れ止め）— 映像は作り直さない
+
+`backend/program_package/remix.py`（2026-11-12）。仕上げ版（手順3の出力）の映像を写したまま、音だけ作り直す。
+42分で約2分（4コア）。打ち合わせの場で曲や音量を何度でも試せる。
+
+```
+python -m backend.program_package.remix SPEC.json OUT/<収録ID>_v66_仮曲入り.mp4 --audio AUDIO.json \
+    --version v67 --out OUT --clip -1 30 --clip 454 30 [--review]
+```
+
+- `AUDIO.json`: `op_music`（番組 OP の頭 `program_length` 秒を入れ替え・`start`・`volume`・`fade_out`）、
+  `bgm`（本編の時刻の `ranges`・`volume_db` 既定 -22・`duck` 既定 true＝話している間は下げる・`fade`）、
+  `ed_music`（最後の ED `ending.seconds` 秒に敷く・`fade_in` 既定 1・`fade_out` 既定 3。あると BGM の既定の範囲は ED の手前まで）、
+  `peak_db`（既定 -1.5。4 倍に上げて上限を掛ける）。どの曲も `null` でよい（音割れ止めだけ）
+- BGM が短い曲なら、終わりと頭を `loop_crossfade`（既定 4 秒）重ねてつなぐ。`duck_ratio`（既定 3）を上げると話している間に深く下がる
+- v62 は 7:34 付近で +6.3 dBFS まで出ていて、品質ゲートの「音のピーク」で落ちる。remix を通すと +0.5 で通る（2026-11-12 実測）
+- `--clip 本編の秒 長さ` で聞き比べ用の短い切り出し（`-1` は番組 OP）。`--review` で承認の門に渡す確認用 360p
+- 仮の曲（`provisional: true`）を使うと名前に「_仮曲入り」が付く
+
+### 4.6 承認の後の字幕の直し
+
+字幕は焼き込みなので、直すには raw から作り直す。直しは固定（lock）に足す（区間は変えない・記録が残る）:
+
+```
+python -m backend.subtitle_engine.edit_lock amend r61.lock.json --fixes fixes.json --by 北原 \
+    --evidence "<日時と言葉>" --out r61a.lock.json
+PYTHONPATH=./backend:. python -m backend.subtitle_engine.edit_lock render r61a.lock.json --material raw4_concat.mp4 --out v62a.mp4
+```
+
+`fixes.json` は `[{"at": 完成版 v62 の秒, "from": "違う字", "to": "正しい字"}]`。当たらない直しがあれば何も変えずに止まる。
+作り直した本編を `SPEC.json` の `source` にして手順3 → 4.5。
 
 ### 5. 公開日が決まったら最終版を書き出す
 
@@ -79,6 +126,30 @@ python -m backend.program_package.episode SPEC.json --out OUT
 
 - 曲: 北原さんが作る YouTube・商用可のオリジナル曲 → `program_opening.music` を差し替え、曲の盛り上がりが番組名の出る所（言葉の枚数×`slide_seconds`）に来るよう `start` を合わせる
 - 番組 OP の文字: **美麗さんの手書きの映像**に差し替えて唯一無二の OP にする。今の OP（見本 `examples/番組OP_書き足し.jpg`）の流れ（1枚3.5秒・左から右へ書き進める・最後に番組名）に合わせて撮ると、そのまま置き換えられる
+
+
+## 頭の来る所を自動で測る（映像を見る目・0円）
+
+`backend/program_package/vision.py`。顔の検出（OpenCV の YuNet・CPU）で、完成版の全コマの頭の位置を
+「地図」に残し、そこから飾りの置き場を決める。AI は呼ばない。
+
+```
+python -m backend.program_package.vision scan 完成版.mp4 --out map.json     # 42分で1〜2分
+python -m backend.program_package.vision check SPEC.json --map map.json      # 頭に掛かる飾りの一覧（無ければ 0）
+python -m backend.program_package.vision place SPEC.json --map map.json      # 置き直しの案（--write で書き換え）
+python -m backend.program_package.vision sheet 完成版.mp4 --map map.json --at 45 --seconds 8 --out a.jpg
+python -m backend.program_package.vision thumbs --map map.json               # サムネの人物コマの候補（左右）
+python -m backend.program_package.vision scan 完成版.mp4 --out map.json --expr  # 表情も測る（サムネの候補を笑顔の山から選ぶ）
+python -m backend.program_package.vision thumbs --map map.json --spec opts.json  # 候補を thumbnail.py --options の形で書き出す
+```
+
+- `place` は、名前のポップの `avoid` を測った値に入れ替え、掛かるなら頭の近くの壁へ置き直す
+  （文字は大きいまま置ける所が先。無ければ `pitch`・`size` を詰める）。章の見出しは左上で頭に掛かれば右上へ
+- `check` は「掛かる」（測った頭に文字が重なる。終了コード 1）と「近い」（重ならないが 12px 以内）を分けて出す。
+  頭は丸いので、矩形ではなく楕円で見る
+- 置けなかったものは「未決」と出る。**無理に置かない。** `sheet` の一覧を見て人が決める
+- `sheet` は測った頭（緑）と頭の来る所（赤）をコマに重ねる。北原さんに見せる確認用
+- 確認用の 360p でも測れる（座標は 1280x720 に直る）
 
 ## 見本の絵
 

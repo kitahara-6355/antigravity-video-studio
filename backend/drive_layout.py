@@ -130,6 +130,8 @@ class Node:
     md5: str | None = None
     size: int = 0
     video: bool = False
+    # 画像（サムネなど）。40_完成 では動画と同じく「承認に辿れるか」を問う（program_gate）
+    image: bool = False
     children: list[Node] = field(default_factory=list)
     # 根（動画制作）だけが持つ。raw のフォルダの id。名前を変える前（01-input）でも raw と分かる
     raw_id: str | None = None
@@ -154,7 +156,8 @@ def read_tree(service: Any, base_id: str, base_name: str = "動画制作",
             child = Node(id=str(f["id"]), name=str(f.get("name", "?")), folder=is_folder,
                          path=f"{node.path}/{f.get('name', '?')}", md5=f.get("md5Checksum"),
                          size=int(f.get("size") or 0),
-                         video=str(f.get("mimeType", "")).startswith("video/"))
+                         video=str(f.get("mimeType", "")).startswith("video/"),
+                         image=str(f.get("mimeType", "")).startswith("image/"))
             node.children.append(child)
             if is_folder and depth < MAX_DEPTH:
                 fill(child, depth + 1)
@@ -527,6 +530,14 @@ def put_to(service: Any, layout: Mapping[str, Any], key: str, local_dir: str | P
     if spec is None or spec["ai"] != "write" or key == "work":
         allowed = [f["key"] for f in layout["folders"] if f["ai"] == "write" and f["key"] != "work"]
         raise ValueError(f"「{key}」へは送れません（送れるのは {', '.join(allowed)}）")
+    if key == "finished":
+        # **承認していない物は置き場に出さない**（番組化の承認の門・V2）。Drive に触る前に確かめ、
+        # 1つでも断る物があれば何も送らない。確認用・候補（見てもらう物）と文章の付属物は通る
+        from backend.revenue import program_gate
+
+        problems = program_gate.put_problems(local_dir, sub)
+        if problems:
+            raise ValueError("承認の門が断りました（何も送っていません）:\n  " + "\n  ".join(problems))
     work_id = asset_store.ensure_root(service)
     folder_id, _ = ensure_marked_folder(service, key, spec["name"], work_id)
     return asset_store.put_tree(service, local_dir, sub, root_id=folder_id)
@@ -569,7 +580,11 @@ def run_audit(env: Mapping[str, str], json_path: str | None) -> int:
     except _errors() as e:
         print(f"🚫 {e}", file=sys.stderr)
         return 1
-    findings = audit(root, layout) + qc_findings(root, load_qc())
+    from backend.revenue import program_gate
+
+    findings = audit(root, layout) + qc_findings(root, load_qc()) + [
+        Finding("FAIL", "program_" + f["code"], f["path"], f["message"])
+        for f in program_gate.drive_findings(root, layout)]
     fails = [f for f in findings if f.level == "FAIL"]
     for f in findings:
         print(f"{'❌' if f.level == 'FAIL' else '⚠️ '} [{f.code}] {f.path}\n     {f.message}")

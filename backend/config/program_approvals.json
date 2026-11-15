@@ -1,0 +1,94 @@
+{
+  "_doc": "番組化の承認の台帳（仕上げ版・Shorts・サムネ）。python -m backend.revenue.program_gate が読み書きする。approvers は承認できる人（AI の名前は入れない）。review_marks が名前かフォルダ名に入る物は「見てもらう物」で、承認の前でも 40_完成 に置ける。baseline は門ができる前（2026-11-10 より前）から 40_完成 の投稿する棚にあった物 — id と大きさ（読めれば md5）が同じ間だけ通す。",
+  "approvers": [
+    "北原",
+    "北原克洋",
+    "北原美麗"
+  ],
+  "review_marks": [
+    "確認用",
+    "候補",
+    "見本"
+  ],
+  "baseline_read": "2026-11-10 13:40 UTC・Drive のコネクタ（docs/evidence/v2_drive_40_完成_久木田回_20261110.json）。md5 は鍵のある所で snapshot を取り直したときに足す",
+  "baseline": [
+    {
+      "id": "1QAL_8hQofqYCbIVYymgGQh1epFN0TWuT",
+      "name": "20250922_久木田ヒロノブ_v62_ロゴなし.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/20250922_久木田ヒロノブ_v62_ロゴなし.mp4",
+      "size": 212656654,
+      "why": "目視OK の確認用360p（qc_ledger・2026-10-23 北原克洋）と同じ書き出しの本体"
+    },
+    {
+      "id": "1segGqJvfW9iLhpJgb7BpXiKb4uUhte3f",
+      "name": "_サムネ_仮決定_P1_薄紫_B3_K1.png",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/_サムネ_仮決定_P1_薄紫_B3_K1.png",
+      "size": 1066713,
+      "why": "2026-10-23 のサムネ（P1 構成）。仮決定と別案"
+    },
+    {
+      "id": "18JFtqn73CZDZbILHIzXloDIFaxaKlNrb",
+      "name": "_サムネ_P1_薄紫_B5_K4.png",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/_サムネ_P1_薄紫_B5_K4.png",
+      "size": 1060064,
+      "why": "2026-10-23 のサムネ（P1 構成）。仮決定と別案"
+    },
+    {
+      "id": "1fjUc3AvcaEZ4cFEsgRIfZgPFj8_OjME-",
+      "name": "01_S1_鬼滅の刃.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/01_S1_鬼滅の刃.mp4",
+      "size": 7919048,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    },
+    {
+      "id": "1AmwRutLC7IrpJ6i2gPJs2O143hkAVUy-",
+      "name": "02_S5_揮毫_縁.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/02_S5_揮毫_縁.mp4",
+      "size": 7547167,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    },
+    {
+      "id": "14hjLULjtLQ3hWEDfOetLPanlUye8vrcb",
+      "name": "03_S2_テイク23.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/03_S2_テイク23.mp4",
+      "size": 8217393,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    },
+    {
+      "id": "1Vvq6zZoyQh59-mWa0DPQkhERvISMzMDL",
+      "name": "04_S3_考えながら書かない.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/04_S3_考えながら書かない.mp4",
+      "size": 7529473,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    },
+    {
+      "id": "1Ek0UoWXbaQUGNrkKWmHSMAlgBhf_yr0o",
+      "name": "05_S4_丁寧に書いた字.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/05_S4_丁寧に書いた字.mp4",
+      "size": 5320939,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    },
+    {
+      "id": "1OJxlKLVPWVTqq8xV17kMlPRa6oTQheau",
+      "name": "06_S6_ユニクロと中国.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/06_S6_ユニクロと中国.mp4",
+      "size": 5951162,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    },
+    {
+      "id": "1to7UYWhsDcS6WEXuGyzeL5vBlgkGoZVa",
+      "name": "07_S7_イタチの毛.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/07_S7_イタチの毛.mp4",
+      "size": 8271491,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    },
+    {
+      "id": "177whEUSZmXjzvHgDNfmhX_a34q9Sod19",
+      "name": "08_S8_デビューは菓子折り.mp4",
+      "path": "動画制作/40_完成/20250922_久木田ヒロノブ/Shorts_投稿用/08_S8_デビューは菓子折り.mp4",
+      "size": 5105156,
+      "why": "2026-10-23 に北原さんが選び、順番を決めた 8 本（backend/config/shorts の post_order）。2026-10-25 に投稿用フォルダへ"
+    }
+  ],
+  "items": []
+}

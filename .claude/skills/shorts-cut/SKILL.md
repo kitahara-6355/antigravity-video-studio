@@ -72,6 +72,26 @@ python -m backend.program_package.shorts SPEC.json --raw RAW.mp4 --subs SUBS.jso
 
 ### 4. 北原さんに選んでもらう
 
+**承認の流れ（2026-11-10・V2）**: Shorts は切り出し1本ごとに 提案 → 北原さんの承認 → 投稿用フォルダ の順で出す。
+承認していない1本は `Shorts_投稿用` に置けない（`put finished` が断り、何も送らない）。候補のフォルダは見てもらう物なので置ける。
+
+```
+python -m backend.revenue.program_gate propose --recording <収録ID> --kind short --key S1 \
+    --publish <書き出したフォルダ>/<収録ID>_S1.mp4 --spec backend/config/shorts/<収録ID>.json
+```
+
+- 提案のときに実測の品質ゲートが走る（1080x1920・60秒以下・yuv420p・音の大きさとピーク・黒い画面・無音）。
+  不合格は提案にならないので、直して出し直す
+- 北原さんがチャットで「出す」と決めたら、**その言葉と日時を根拠に**控える（AI の名前では承認できない）:
+
+  ```
+  python -m backend.revenue.program_gate approve --recording <収録ID> --key S1 --by 北原 --synthetic no \
+      --evidence "チャット 2026-11-12「S1 と S5 を出す」"
+  ```
+
+  合成メディアを含むか（`--synthetic`）は北原さんに聞く。AI 生成の絵や声を足していなければ no
+- 台帳 `backend/config/program_approvals.json` が変わるので、コミットする
+
 - 分かりやすい名前に写して（例 `Shorts_S1_鬼滅の刃.mp4`）、Drive `40_完成/<収録ID>/Shorts候補_<案>/` に置く:
 
   ```
@@ -93,7 +113,9 @@ python -m backend.program_package.shorts_kit SPEC.json --rendered <書き出し�
 
 - `01_S1_鬼滅の刃.mp4` のように**投稿の順番の番号**を付けて写す（中身は変えない）。`投稿文.txt` に順番どおりのタイトル・説明・ハッシュタグ
 - **60秒を超える1本があると止まる**（2026-10-25 に S2 が60.2秒だったので詰めた）。投稿文の漏れ・タイトル100字超え・タグの重なりも止まる
-- Drive `40_完成/<収録ID>/Shorts_投稿用/` へ（`drive_layout put finished <フォルダ> --to "<収録ID>/Shorts_投稿用"`）
+- Drive `40_完成/<収録ID>/Shorts_投稿用/` へ（`drive_layout put finished <フォルダ> --to "<収録ID>/Shorts_投稿用"`）。
+  **承認済みの中身だけが通る**（番号を付けた写しは中身が同じなので通る）。下見は
+  `python -m backend.revenue.program_gate check-put <フォルダ> --to "<収録ID>/Shorts_投稿用"`
 - 投稿は北原さんが手で行う
 
 ## おすすめの出し方（2026-10-23 の判断の根拠）

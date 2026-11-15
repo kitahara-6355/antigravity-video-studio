@@ -1,0 +1,102 @@
+{
+  "kind": "episode",
+  "review": true,
+  "file": "20250922_久木田ヒロノブ_v62_ロゴなし_確認用360p.mp4",
+  "checks": [
+    {
+      "id": "codec",
+      "label": "映像の形式",
+      "value": "h264",
+      "limit": "h264",
+      "ok": true,
+      "measured": true
+    },
+    {
+      "id": "pix_fmt",
+      "label": "色の形式",
+      "value": "yuv420p",
+      "limit": "yuv420p",
+      "ok": true,
+      "measured": true,
+      "note": "yuv444p になると Windows の標準プレーヤー・ブラウザ・スマホで映像が出ない（2026-10-05 北原さん報告）"
+    },
+    {
+      "id": "size",
+      "label": "大きさ",
+      "value": "640x360",
+      "limit": "確認用は問わない",
+      "ok": true,
+      "measured": true
+    },
+    {
+      "id": "duration",
+      "label": "長さ",
+      "value": 2558.38,
+      "limit": "60秒以上",
+      "ok": true,
+      "measured": true
+    },
+    {
+      "id": "audio",
+      "label": "音声",
+      "value": "あり",
+      "limit": "あり",
+      "ok": true,
+      "measured": true
+    },
+    {
+      "id": "av_gap",
+      "label": "映像と音の長さの差",
+      "value": 0.011,
+      "limit": "0.5秒以下",
+      "ok": true,
+      "measured": true
+    },
+    {
+      "id": "decode",
+      "label": "最後まで壊れずに再生できる",
+      "value": "できる",
+      "limit": "できる",
+      "ok": true,
+      "measured": true
+    },
+    {
+      "id": "loudness",
+      "label": "全体の音の大きさ",
+      "value": "-13.9 LUFS",
+      "limit": "-24.0〜-10.0 LUFS",
+      "ok": true,
+      "measured": true,
+      "note": "本線の書き出しは -16 LUFS に揃える。YouTube は -14 LUFS より大きい音を下げる。大きく外れたら音量の事故"
+    },
+    {
+      "id": "peak",
+      "label": "音のピーク",
+      "value": "6.3 dBFS",
+      "limit": "1.0 dBFS 以下",
+      "ok": false,
+      "measured": true,
+      "note": "0 dBFS を超えた音は再生のときに割れる。圧縮で 1 dB 未満はみ出すのはよくあり聞き分けにくいので、線は +1.0。v62 の確認用は最大 +5.8（7:34 付近）"
+    },
+    {
+      "id": "silence",
+      "label": "無音",
+      "value": "なし",
+      "limit": "15.0秒以上の無音がない",
+      "ok": true,
+      "measured": true
+    },
+    {
+      "id": "black",
+      "label": "黒い画面",
+      "value": "なし",
+      "limit": "3.0秒以上の黒がない",
+      "ok": true,
+      "measured": true
+    }
+  ],
+  "passed": false,
+  "failed": [
+    "peak"
+  ]
+}

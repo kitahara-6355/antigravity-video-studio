@@ -15,6 +15,11 @@ AI は呼ばない（課金なし）。素材が違えば（中身の鍵が違�
     python -m backend.subtitle_engine.edit_lock make APPROVED.subtitles.json --material RAW.mp4 \\
         --run r61 --label 61回目 --out LOCK.json
     python -m backend.subtitle_engine.edit_lock render LOCK.json --material RAW.mp4 --out OUT.mp4
+    python -m backend.subtitle_engine.edit_lock amend LOCK.json --fixes FIXES.json --by 北原 \\
+        --evidence "<日時と言葉>" --out LOCK2.json
+
+- ``amend``: 承認した後の字幕の直し（人の指示）を固定に足す。直しは完成版の時刻と「違う字だけ」。
+  区間（カット）は変えない。直しの記録（誰が・いつ・何を）と、直す前の固定の鍵が残る
 """
 from __future__ import annotations
 
@@ -93,6 +98,49 @@ def render(lock: dict, material: str | Path, out: str | Path, ffmpeg=None) -> Pa
     return side
 
 
+def _find_segment(segments: list[dict], at: float, old: str) -> int:
+    """``at`` 秒に出ている字幕のうち、``old`` を含むもの。無ければ前後 3 秒の中で一番近いもの。"""
+    hits = [(0.0 if s["start"] <= at <= s["end"] else min(abs(at - s["start"]), abs(at - s["end"])), i)
+            for i, s in enumerate(segments) if old in s["text"].replace("\n", "") or old in s["text"]]
+    hits = [h for h in hits if h[0] <= 3.0]
+    if not hits:
+        raise LockError(f"{at:.1f} 秒の前後 3 秒に「{old}」を含む字幕がありません")
+    return min(hits)[1]
+
+
+def amend(lock: dict, fixes: list[dict], *, by: str, evidence: str) -> dict:
+    """承認済みの固定の字幕を、人の直し ``fixes``（``at``・``from``・``to``）で直した新しい固定を返す。
+
+    ``from`` は字幕の中の違う字だけ（改行をまたいでもよい）。``to`` が空なら消す。区間は変えない。
+    当たらない直しがあれば何も変えずに止まる（黙って捨てない）。
+    """
+    if not by or not evidence:
+        raise LockError("直しには、指示した人（--by）と証拠（--evidence）が要ります")
+    segments = [dict(s) for s in lock["segments"]]
+    done = []
+    for f in fixes:
+        at, old, new = float(f["at"]), str(f["from"]), str(f.get("to", ""))
+        if not old:
+            raise LockError(f"{at:.1f} 秒の直しに from（違う字）がありません")
+        i = _find_segment(segments, at, old)
+        text = segments[i]["text"]
+        if old in text:
+            text = text.replace(old, new, 1)
+        else:  # 改行をまたぐ字。改行は直した字の後ろに置き直す
+            flat = text.replace("\n", "")
+            pos = flat.index(old)
+            flat = flat[:pos] + new + flat[pos + len(old):]
+            brk = pos + len(new)
+            text = flat if brk >= len(flat) else flat[:brk] + "\n" + flat[brk:]
+        done.append({"at": at, "segment": i, "before": segments[i]["text"], "after": text})
+        segments[i]["text"] = text
+    out = {**lock, "segments": segments}
+    out["approved"] = {**lock["approved"], "sha256": _sidecar_sha(sidecar_of(out))}
+    out["amendments"] = [*lock.get("amendments", []),
+                         {"by": by, "evidence": evidence, "based_on": lock["approved"]["sha256"], "fixes": done}]
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="承認した編集を固定する・固定から作り直す（AI を呼ばない）")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -106,8 +154,22 @@ def main(argv: list[str] | None = None) -> int:
     rd.add_argument("lock")
     rd.add_argument("--material", required=True)
     rd.add_argument("--out", required=True)
+    am = sub.add_parser("amend", help="承認した後の字幕の直しを固定に足す（区間は変えない）")
+    am.add_argument("lock")
+    am.add_argument("--fixes", required=True, help='[{"at": 秒, "from": "違う字", "to": "正しい字"}, ...]')
+    am.add_argument("--by", required=True)
+    am.add_argument("--evidence", required=True)
+    am.add_argument("--out", required=True)
     args = parser.parse_args(argv)
     try:
+        if args.cmd == "amend":
+            lock = amend(json.loads(Path(args.lock).read_text(encoding="utf-8")),
+                         json.loads(Path(args.fixes).read_text(encoding="utf-8")), by=args.by, evidence=args.evidence)
+            Path(args.out).write_text(json.dumps(lock, ensure_ascii=False, indent=1), encoding="utf-8")
+            for f in lock["amendments"][-1]["fixes"]:
+                print(f"{f['at']:8.1f}s  {f['before']!r} → {f['after']!r}")
+            print(f"直しました: {len(lock['amendments'][-1]['fixes'])} 件 → {args.out}")
+            return 0
         if args.cmd == "make":
             lock = make(json.loads(Path(args.sidecar).read_text(encoding="utf-8")), args.material,
                         run=args.run, label=args.label)
