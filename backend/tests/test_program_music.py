@@ -465,3 +465,14 @@ def test_OPの形_ためた後に元より小さくしか開かなければや�
     s = song(tmp_path / "s.wav", seconds=20, loud=((0.0, 6.0, 0.6), (6.0, 8.0, 0.02), (8.0, 10.5, 0.05)), base=0.15)
     r = mu.shape(s, start=0.0, at=10.5, total=15.0)
     assert not r["ok"]["no_dip"] and not r["tame"]
+
+
+def test_聞き比べはDriveのプレビューで再生できるようmoovを先頭に置く(tmp_path):
+    base = tmp_path / "base.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=320x180:d=20:r=30",
+                    "-f", "lavfi", "-i", "sine=f=300:d=20", "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", str(base)], check=True)
+    out = mu.compare(base, song(tmp_path / "s.wav", seconds=30), 5.0, tmp_path / "c.mp4")
+    b = out.read_bytes()
+    assert b.index(b"moov") < b.index(b"mdat")
+    assert abs(mu.read(out).size / mu.SR - 20) < 0.3

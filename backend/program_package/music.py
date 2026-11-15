@@ -224,6 +224,23 @@ def scan(path: str | Path, at: float, total: float, step: float = 0.5, top: int 
     return out
 
 
+def compare(base: str | Path, song: str | Path, start: float, out: str | Path, *, cut: float = 15.0,
+            target_lufs: float = -18.1) -> Path:
+    """聞き比べ用の1本: 仕上げ版の頭（base）の OP の音を曲に入れ替える。曲は start から cut 秒、target_lufs にそろえる
+    （本編の声 -15.6 LUFS より 2.5 dB 小さい）。moov を先頭に置く（2026-11-15: 後ろにあった E2・L が Drive の
+    プレビューで再生できなかった。本線の書き出しは前から +faststart）。"""
+    out = Path(out)
+    g = target_lufs - lufs(song, start, cut)
+    fade = f"if(lt(t,{cut - 0.4:.2f}),0,if(lt(t,{cut:.2f}),(t-{cut - 0.4:.2f})/0.4,1))"
+    graph = (f"[0:a]volume='{fade}':eval=frame[base];"
+             f"[1:a]aresample=48000,volume={g:.1f}dB,afade=t=in:d=0.05,afade=t=out:st={cut - 1.5:.2f}:d=1.5[op];"
+             "[base][op]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.84[a]")
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(base), "-ss", f"{start:.3f}", "-t", f"{cut:.3f}",
+                    "-i", str(song), "-filter_complex", graph, "-map", "0:v", "-map", "[a]", "-c:v", "copy",
+                    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)], check=True)
+    return out
+
+
 def lufs(path: str | Path, start: float = 0.0, seconds: float | None = None) -> float:
     """音の大きさ（統合ラウドネス、LUFS）。"""
     cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-ss", f"{start:.3f}"]
@@ -505,6 +522,11 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--cleared", required=True)
     s.add_argument("--transfer", help="個人で作った曲を法人で使う利用許諾の控え")
     s.add_argument("--ledger")
+    s = sub.add_parser("compare", help="聞き比べ用の1本を作る（仕上げ版の頭の OP の音を曲に入れ替える）")
+    s.add_argument("base")
+    s.add_argument("song")
+    s.add_argument("--start", type=float, default=0.0)
+    s.add_argument("--out", required=True)
     for name in ("shape", "scan"):
         s = sub.add_parser(name, help="OP の曲の形の決まり（頭から厚い・やせない・番組名で上がる）を測る"
                            if name == "shape" else "長い曲から、OP の形の決まりを満たす使い始めを探す")
@@ -544,6 +566,9 @@ def main(argv: list[str] | None = None) -> int:
                 extract_audio(a.from_video, Path(d) / a.file)
             where.write_text(json.dumps(ledger, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             print(json.dumps({a.key: t}, ensure_ascii=False, indent=1))
+            return 0
+        if a.cmd == "compare":
+            print(compare(a.base, a.song, a.start, a.out))
             return 0
         if a.cmd == "analyze":
             print(json.dumps(analyze(a.path), ensure_ascii=False, indent=1))
