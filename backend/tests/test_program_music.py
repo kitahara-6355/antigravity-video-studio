@@ -2,6 +2,7 @@
 
 曲そのものはリポジトリに置かないので、作った音（拍と、途中から大きくなる山）で確かめる。
 """
+import json
 import re
 import shutil
 import subprocess
@@ -373,6 +374,8 @@ from datetime import date as _date
 
 from backend.program_package import taste_model as tm
 
+ROOT = Path(__file__).resolve().parents[2]
+
 _TODAY = _date(2026, 11, 15)
 
 
@@ -524,3 +527,44 @@ def test_three_sessions_find_a_true_top3_song_seven_in_ten():
     rng = np.random.default_rng(1)
     hits = [_sim_once(rng) for _ in range(60)]
     assert sum(hits) / len(hits) >= 0.7, sum(hits) / len(hits)
+
+
+def test_page_model_gives_the_same_answers_as_python(tmp_path):
+    """ページの式（taste-picker/webapp/Model.html）が taste_model と同じ答えを出す。"""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node が無い環境")
+    src = (ROOT / ".claude/skills/taste-picker/webapp/Model.html").read_text(encoding="utf-8")
+    js = src.replace("<script>", "").replace("</script>", "")
+    rng = np.random.default_rng(3)
+    z = rng.normal(size=(10, len(tm.MEASURED) + len(tm.TAGS))).round(3)
+    ids = [f"s{i}" for i in range(10)]
+    idx = {k: i for i, k in enumerate(ids)}
+    answers = [{"a": "s0", "b": "s1", "pick": "a"}, {"a": "s2", "b": "s3", "pick": "both"},
+               {"a": "s4", "b": "s5", "pick": "neither"}, {"a": "s1", "b": "s2", "pick": "b", "at": "2026-08-01"},
+               {"pick": "decide", "song": "s0", "with": ["s1", "s2"]}, {"a": "s6", "b": "s7", "pick": "a", "who": "ためし"}]
+    obs = [o for a in answers for o in tm.to_obs(a, idx, _TODAY)]
+    post = tm.fit(z, obs, ids=ids)
+    heard = {0, 1, 2, 3, 4, 5}
+    py = {"mu": [round(float(x), 6) for x in post.mu], "sd": [round(float(x), 6) for x in post.sd],
+          "pair": list(tm.next_pair(post, [0, 1, 2, 3], {0, 1, 2, 3}, {(0, 1)})),
+          "narrow": tm.narrow_pack(post, z, heard), "p0": round(post.p_pass(0), 4)}
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps({"z": z.tolist(), "answers": answers, "ids": ids, "today": "2026-11-15"}))
+    run = tmp_path / "run.js"
+    run.write_text(js + """
+const c = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
+const idx = {}; c.ids.forEach((k, i) => idx[k] = i);
+const obs = [].concat(...c.answers.map(a => TM.toObs(a, idx, c.today)));
+const p = TM.fit(c.z, obs, null);
+const r6 = x => Math.round(x * 1e6) / 1e6;
+console.log(JSON.stringify({mu: p.mu.map(r6), sd: p.sd.map(r6),
+  pair: TM.nextPair(p, [0, 1, 2, 3], {0: 1, 1: 1, 2: 1, 3: 1}, {'0-1': 1}),
+  narrow: TM.narrowPack(p, c.z, {0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1}),
+  p0: Math.round(TM.pPass(p, 0) * 1e4) / 1e4}));
+""")
+    js_out = json.loads(subprocess.run([node, str(run), str(case)], capture_output=True, text=True, check=True).stdout)
+    assert np.allclose(js_out["mu"], py["mu"], atol=1e-4) and np.allclose(js_out["sd"], py["sd"], atol=1e-4)
+    assert sorted(js_out["pair"]) == sorted(py["pair"])
+    assert js_out["narrow"][:2] == py["narrow"][:2] and set(js_out["narrow"]) == set(py["narrow"])
+    assert abs(js_out["p0"] - py["p0"]) < 2e-3
