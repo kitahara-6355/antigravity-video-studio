@@ -640,7 +640,7 @@
     {
       "id": "S31",
       "group": "曲",
-      "rule": "番組 OP の曲は、1秒目から厚く鳴り、途中でやせず、番組名で一段はっきり上がる（理想は「ため」てから開く）15秒を使う",
+      "rule": "番組 OP の曲は、1秒目から厚く鳴り、途中でやせず、番組名で一段はっきり上がる（理想は「ため」てから開く）15秒を使う。番組名の直前 6.5 秒の中で静かになるのは「ため」として認めるが、番組名の後で、ための前と同じくらいまで開くときだけ",
       "from": {
         "day": "2026-11-15",
         "by": "北原",
@@ -655,6 +655,8 @@
       "tests": [
         "backend/tests/test_program_music.py::test_OPの形_頭から厚く途中でやせず番組名で上がる曲は合格",
         "backend/tests/test_program_music.py::test_OPの形_頭が静かな曲は不合格",
+        "backend/tests/test_program_music.py::test_OPの形_番組名の直前のためは元より大きく開けば合格",
+        "backend/tests/test_program_music.py::test_OPの形_ためた後に元より小さくしか開かなければやせるとみなす",
         "backend/tests/test_program_music.py::test_OPの形_途中でやせる曲は不合格",
         "backend/tests/test_program_music.py::test_OPの形_番組名で上がらない曲は不合格",
         "backend/tests/test_program_music.py::test_長い曲から決まりを満たす15秒を探す",

@@ -435,9 +435,10 @@ def test_OPの形_頭が静かな曲は不合格(tmp_path):
 
 
 def test_OPの形_途中でやせる曲は不合格(tmp_path):
-    s = song(tmp_path / "s.wav", seconds=20, loud=((6.0, 8.0, 0.02), (10.5, 20.0, 0.6)), base=0.25)
+    # 番組名から遠い所（2〜4秒）でやせるのは「ため」ではない
+    s = song(tmp_path / "s.wav", seconds=20, loud=((2.0, 4.0, 0.02), (10.5, 20.0, 0.6)), base=0.25)
     r = mu.shape(s, start=0.0, at=10.5, total=15.0)
-    assert not r["ok"]["no_dip"] and r["dip_at"] == pytest.approx(6.0, abs=1.0)
+    assert not r["ok"]["no_dip"] and r["dip_at"] == pytest.approx(2.0, abs=1.0)
 
 
 def test_OPの形_番組名で上がらない曲は不合格(tmp_path):
@@ -450,3 +451,17 @@ def test_長い曲から決まりを満たす15秒を探す(tmp_path):
     s = song(tmp_path / "s.wav", seconds=70, loud=((20.0, 22.0, 0.02), (40.0, 70.0, 0.6)), base=0.25)
     found = mu.scan(s, at=10.5, total=15.0)
     assert found and found[0]["start"] == pytest.approx(29.5, abs=0.6) and found[0]["pass"]
+
+
+def test_OPの形_番組名の直前のためは元より大きく開けば合格(tmp_path):
+    # 桜色の形: 6〜10.5秒で静かになり（ため）、番組名で頭より大きく開く
+    s = song(tmp_path / "s.wav", seconds=20, loud=((6.0, 10.5, 0.03), (10.5, 20.0, 0.6)), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert r["pass"] and r["tame"]
+
+
+def test_OPの形_ためた後に元より小さくしか開かなければやせるとみなす(tmp_path):
+    # G の形: 頭が厚く、6〜8秒でやせ、番組名の後も頭より小さい
+    s = song(tmp_path / "s.wav", seconds=20, loud=((0.0, 6.0, 0.6), (6.0, 8.0, 0.02), (8.0, 10.5, 0.05)), base=0.15)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert not r["ok"]["no_dip"] and not r["tame"]

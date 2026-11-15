@@ -181,6 +181,38 @@
    "prompt": "歌なしのインストゥルメンタル、30秒。1拍目からギターとピアノが一緒に鳴る（無音なし）。90BPM前後。ちょうど10秒目でベースとパーカッションが入り、温かく明るく広がる。大人の落ち着いた明るさのオープニング。",
    "account": "個人（Google AI Pro）",
    "original": "20_素材/共通/Vids曲/曲_OP_08.mp4"
+  },
+  "op_vids_09": {
+   "title": "OP 案9（Cの方向・フル）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro、2026-11-15）",
+   "file": "op_09_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids",
+   "prompt": "歌なしのインストゥルメンタル。ピアノとストリングス、きらめくベル。80BPM前後。最初から音を厚く鳴らし、途中で音を薄くしない。何度か、静かに少しためてから一気に明るく開く盛り上がりを入れる。上品であたたかい対談番組のテーマ曲。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_09.mp4"
+  },
+  "op_vids_10": {
+   "title": "OP 案10（Eの方向・フル）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro、2026-11-15）",
+   "file": "op_10_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids",
+   "prompt": "歌なしのインストゥルメンタル。アコースティックギターとピアノ、手拍子と軽いドラム。100BPM前後。最初から明るく厚く鳴らし、途中で音を薄くしない。何度か、短くためてから一気に盛り上がるところを入れる。親しみやすく笑顔になる対談番組のテーマ曲。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_10.mp4"
   }
  },
  "file_note": "file は曲のファイル名（例 \"white_cocktail.mp3\"）。2026-11-12 の仕上げ（v67）で使った実物は PC の作業場にある。名前を確かめて入れるまで plan は「ファイルが決まっていない」で止まる",

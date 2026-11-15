@@ -171,21 +171,30 @@ SHAPE_DIP_DB = 6.0     # 途中の1秒が、ふつうよりこれ以上小さい
 SHAPE_RISE_DB = 3.0    # 番組名の後 3.5 秒が、前 5 秒よりこれだけ大きければ「一段上がる」
 SHAPE_FADE = 1.5
 SHAPE_BEFORE, SHAPE_AFTER = 5.0, 3.5
+SHAPE_TAME = 6.5       # 番組名の直前のこの秒数の中で静かになるのは「ため」。ただし後で元の厚さ以上に開くときだけ
+SHAPE_OPEN_DB = -2.0   # 開いた後（番組名の後 3.5 秒）が、ための前の大きさからこれ以上小さくないこと
 
 
 def _shape_of(db: np.ndarray, at: float, total: float) -> dict:
     n = int(total)
     sec = np.array([_mean_db(db, int(i * FPS), int((i + 1) * FPS)) for i in range(n)])
     med = float(np.median(sec))
-    body = sec[: max(1, int(total - SHAPE_FADE))]
+    end = max(1, int(total - SHAPE_FADE))
+    t0 = max(1, int(at - SHAPE_TAME))
+    after = _mean_db(db, int(at * FPS), int((at + SHAPE_AFTER) * FPS))
+    before_tame = _mean_db(db, 0, int(t0 * FPS))
+    # ため→開く（桜色の形）: 番組名の直前で静かになり、番組名の後で、ための前と同じかそれ以上に開く
+    opens = after - before_tame >= SHAPE_OPEN_DB
+    body = np.concatenate([sec[:t0], sec[int(np.ceil(at)):end]]) if opens else sec[:end]
+    idx = list(range(t0)) + list(range(int(np.ceil(at)), end)) if opens else list(range(end))
     k = int(body.argmin())
     head = float(sec[0] - med)
     dip = float(body[k] - med)
-    rise = (_mean_db(db, int(at * FPS), int((at + SHAPE_AFTER) * FPS))
-            - _mean_db(db, int((at - SHAPE_BEFORE) * FPS), int(at * FPS)))
+    tame = opens and float(sec[t0:int(at)].min() - med) <= -SHAPE_DIP_DB
+    rise = after - _mean_db(db, int((at - SHAPE_BEFORE) * FPS), int(at * FPS))
     ok = {"head": head > -SHAPE_HEAD_DB, "no_dip": dip > -SHAPE_DIP_DB, "rise": rise >= SHAPE_RISE_DB}
-    return {"head_db": round(head, 1), "dip_db": round(dip, 1), "dip_at": float(k), "rise_db": round(rise, 1),
-            "ok": ok, "pass": all(ok.values())}
+    return {"head_db": round(head, 1), "dip_db": round(dip, 1), "dip_at": float(idx[k]), "rise_db": round(rise, 1),
+            "tame": bool(tame), "ok": ok, "pass": all(ok.values())}
 
 
 def shape(path: str | Path, start: float, at: float, total: float) -> dict:
