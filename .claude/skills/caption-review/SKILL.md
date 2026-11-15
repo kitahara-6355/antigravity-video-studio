@@ -38,7 +38,9 @@ raw4 のゼロからの版での実測（2026-10-19）: 要確認 229枚（2つ�
 | 台帳を当てる | `backend/subtitle_engine/review_ledger.py` | 校閲・表記統一の後、整形の前に当てる。当たらない直しは警告 |
 | 画面の控え | `review_sheet.py export` | 書き出しの字幕から、画面が読む JSON を作る |
 | 機械の要確認 | `backend/subtitle_engine/review_flags.py` | 字幕と、音声認識・文字起こしの2回目・3回目・1回目が食い違う字幕に印と候補（数は値で比べる） |
-| レビュー画面 | `caption_review.html`（このフォルダ） | 印を付ける・印の所だけ再生・正しい字を書く（Artifact） |
+| レビュー画面 | `caption_review.html`（このフォルダ） | 印を付ける・印の所だけ再生・正しい字を書く（Artifact と info@ のウェブアプリで同じ画面） |
+| スマホ用の小分け | `backend/subtitle_engine/review_pack.py` | 確認用 360p を小分けにして Drive に置く（ウェブアプリが読む） |
+| ウェブアプリ | `webapp/`（このフォルダ） | Apps Script の本体（Code.js）と送り方（build.sh・clasp） |
 | 画面の配置の点検 | `layout_check.js`（このフォルダ） | 画面が1画面に収まり、字幕の長さや送りでボタンが動かないことを確かめる |
 | 印を台帳へ | `review_sheet.py import` | 画面の印を、違う字だけの短い直しにして台帳に足す |
 | 作り直しの確かめ | `review_sheet.py compare` | 承認した書き出しと作り直しの字幕の違いを出す |
@@ -97,6 +99,37 @@ PYTHONPATH=./backend python -m backend.subtitle_engine.review_sheet export <プ�
   「機械の要確認」タブは「要確認の所だけ再生」で続けて聞ける（2つ以上の聞き取りが食い違う所が先）。
   候補を押すとその字が「正しくは」に入り、「このまま」は問題なしの印になる。再生中の M はいま再生している
   字幕に付き、食い違いの説明がメモに入る
+
+### 3b. スマホで2人で見る（info@ のウェブアプリ・2026-11-13〜）
+
+同じ `caption_review.html` を info@ の Apps Script ウェブアプリとして出すと、北原さん・美麗さんが
+それぞれのスマホで開き、離れていても同じ印を見て直せる。0 円（Drive・Apps Script・シートは定額内）。
+
+1. 確認用 360p を小分けにして Drive に置く（クラウドのスレッドで。`AVS_ASSETS_GOOGLE_TOKEN_JSON` を使う）
+   ```
+   PYTHONPATH=./backend python -m backend.subtitle_engine.review_pack sheet <控え>.json --offset <秒> \
+       --fixes <直し>.json --run v67 --label v67 --video <確認用>.mp4 --duration <秒> --out v67_review.json
+   PYTHONPATH=./backend python -m backend.subtitle_engine.review_pack make <確認用360p>.mp4 v67_review.json OUT
+   PYTHONPATH=./backend python -m backend.subtitle_engine.review_pack upload OUT --parent <40_完成/<回> の id>
+   ```
+   `40_完成/<回>/_確認用_<版>_小分け` に `seg_*.ts`（約6秒・240KB ずつ）と `review_pack.json` が入る。
+   前の版の控えを使い回すときは、版の間のずれを音で測って `--offset` に入れる（久木田回 v62→v67 は +33.674 秒）
+2. 画面を送る（初回と画面を直したとき。北原さんの PC の clasp・info@）
+   ```
+   bash .claude/skills/caption-review/webapp/build.sh     # Index.html を作る
+   cd .claude/skills/caption-review/webapp && clasp push && clasp update-deployment <deploymentId>
+   ```
+   初回は `clasp create --type standalone --title 字幕の朱入れ` → push → `clasp create-deployment`。
+   人がするのは最初の「許可」だけ（drive・spreadsheets）
+3. 開く: `<ウェブアプリの URL>?pack=<フォルダの id>`。`?pack` なしで開くと置いてある回の一覧が出る
+4. 見ている人（北原／美麗）を右上で選ぶ。「一緒に（進める）」と「一緒に（ついていく）」を選ぶと、
+   進める人の再生位置・止める・印の所だけ再生に、もう片方の画面が1〜2秒で合う。Meet は声だけでよい
+5. 印は同じフォルダのシート「朱入れの印」に1行1印で入る（どちらが付けても相手の画面に2秒で出る）。
+   Claude はこのシートを読んで手順 4 に進む（json の列が Artifact の印と同じ形）
+
+- 動画は hls.js（cdnjs）で流す。iPhone は iOS 17.1 以降が要る
+- 手元の確かめ: google.script.run を手元の RPC に替えて2画面で動かす試験で、印の行き来・一緒に見るのずれ 0.1 秒以内を確認
+  （2026-11-13）。本番の端末での確かめは送った後に北原さんのスマホで
 
 ### 4. 印を読んで台帳に入れる
 

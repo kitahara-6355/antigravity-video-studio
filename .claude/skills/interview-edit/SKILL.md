@@ -58,6 +58,15 @@ python -m backend.edit_job check <名前>
 道具（ffmpeg・ffprobe）・台帳・キー・実行が書き換えるファイルが戻っていること・空き・予算・
 今日の無料枠を見る。1つでも欠けていれば終了コード 1 で、何が足りないかが出る。
 
+### 1b. クラウドで書き出すとき（PC なし）
+
+- プロジェクトの環境が Drive のトークン入り（`ANTIGRAVITY_GOOGLE_TOKEN_JSON` ほか）なら、raw を Drive API で直接取れる
+  （2026-11-13 実測: 66MB を約3秒）。コネクタの 10MB 上限は関係ない
+- 書き出しの前に `bash scripts/cloud_render_setup.sh` で ffmpeg 7.1.1（PC と同じ版）と字幕の書体
+  （BIZ UDPゴシック）をそろえ、出てきた `export PATH=...` を実行する
+- 字幕の書体は既定で BIZ UDPゴシック（PC とクラウドで同じ見た目）。久木田回（v67 まで）を PC で同じ見た目に
+  作り直すときだけ `AVS_SUBTITLE_FONT="Yu Gothic UI"`
+
 ### 2. 工程ライブの画面を開く
 
 `process_live.html` を Artifact で公開する。capabilities は `{files: {project: "<プロジェクトの chan_ id>"}}`。
