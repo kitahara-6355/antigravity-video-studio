@@ -75,8 +75,11 @@ def graph(audio: dict, tl: dict, total: float) -> tuple[list[str], str]:
         # 前の曲は番組 OP の間を消し、つなぎ目で元の音（名場面）へ戻す
         g.append(f"[orig]volume='if(lt(t,{x:.3f}),0,if(lt(t,{p:.3f}),(t-{x:.3f})/{FADE},1))':eval=frame[base]")
         fo = float(op.get("fade_out", 1.5))
-        inputs += ["-stream_loop", "-1", "-ss", f"{float(op.get('start', 0.0)):.3f}", "-t", f"{p:.3f}", "-i", op["path"]]
-        g.append(f"[{n}:a]{_fmt('')},volume={float(op.get('volume', 0.9))},afade=t=in:d=0.3,"
+        start = float(op.get("start", 0.0))
+        lead = max(0.0, -start)  # 負の start は、曲の頭を遅らせる秒（山が番組名より早い曲）
+        inputs += ["-stream_loop", "-1", "-ss", f"{max(0.0, start):.3f}", "-t", f"{p - lead:.3f}", "-i", op["path"]]
+        delay = f",adelay={int(round(lead * 1000))}:all=1" if lead else ""
+        g.append(f"[{n}:a]{_fmt('')},volume={float(op.get('volume', 0.9))},afade=t=in:d=0.3{delay},"
                  f"afade=t=out:st={max(0.0, p - fo):.3f}:d={fo}[opm]")
         mixes.append("[opm]")
         n += 1

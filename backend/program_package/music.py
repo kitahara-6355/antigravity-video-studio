@@ -136,10 +136,14 @@ def title_at(program: dict) -> float:
     return len(program["slides"]) * program["slide_seconds"]
 
 
+MAX_LEAD = 3.0  # 曲の頭を遅らせてよい秒（OP の最初の数秒は無音でも不自然でない）
+
+
 def fit(analysis: dict, at: float, total: float) -> dict:
     """山の入りが OP の at 秒に来るような、曲の使い始め（start）。使える山のうち、上がり方がいちばん大きい物。"""
+    # 山が番組名より早い曲は、頭に無音を足して遅らせる（start が負＝遅らせる秒。MAX_LEAD まで）
     ok = [c for c in analysis["climaxes"]
-          if c["at"] - at >= 0 and c["at"] - at + total <= analysis["duration"]]
+          if c["at"] - at >= -MAX_LEAD and max(0.0, c["at"] - at) + total <= analysis["duration"] + MAX_LEAD]
     if not ok:
         raise MusicError(f"番組名（{at:.1f}秒）に合わせられる山がありません。"
                          f"候補: {[c['at'] for c in analysis['climaxes']] or 'なし'}（曲の長さ {analysis['duration']}秒）")

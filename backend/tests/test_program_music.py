@@ -403,3 +403,10 @@ def test_Vidsの書き出しから音を取り出して台帳に足す(tmp_path)
     assert json.loads(led.read_text(encoding="utf-8"))["tracks"]["op_vids_01"]["provisional"] is True
     with pytest.raises(mu.MusicError, match="もうあります"):  # 前の曲を上書きしない
         mu.extract_audio(mp4, tmp_path / "曲" / "op_vids_01.mp3")
+
+
+def test_山が番組名より早い曲は頭を遅らせて合わせる():
+    a = {"duration": 30.0, "bpm": 80.0, "climaxes": [{"at": 8.5, "rise_db": 4.5, "after_db": -19.5}]}
+    assert mu.fit(a, 10.5, 15.0)["start"] == -2.0  # 負の start は、曲の頭を 2 秒遅らせる
+    with pytest.raises(mu.MusicError):  # 遅らせてよいのは MAX_LEAD まで
+        mu.fit({**a, "climaxes": [{"at": 5.0, "rise_db": 4.0, "after_db": -20.0}]}, 10.5, 15.0)
