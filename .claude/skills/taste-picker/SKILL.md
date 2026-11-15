@@ -84,3 +84,19 @@ info@ の clasp は Workspace の再認証で切れることがある（invalid_
 2. 好きの種（好きな動画・曲の URL や曲名を送る入口）を同じページに足す
 3. 見ながらひとこと（30 秒・60 秒の見本に秒付きのボタン）。対談中の曲の音量・差し込みの絵・字幕の切れ目へ
 4. カルテから次の回の最初の案を作る
+
+## 回をまたぐ推定と出題（2026-11-15・好みカルテ設計書の承認後）
+
+`backend/program_package/taste_model.py` に、ページと同じ式を置いた（ページの JavaScript はこれを写す）。
+
+- 曲の強さ = 特徴の好み w・z ＋ その曲だけの魅力 e。答え全部（古い答えは180日で半分、「ためし」は除く）から一度に解く
+- 押した物: A/B は1勝、どちらも好き＝合格ラインに半勝、どちらも違う＝半敗、この曲に決める＝合格ラインに2勝＋一緒に出た上位2曲に1勝
+- 次の組は `next_pair`（顔見せ→詰め）、6回目以降の早上がりは `early_stop`、2回目からの8曲は `narrow_pack`（上位2＋近い4＋試していない方向2）
+- 好みの文は `statements`（重みが幅の1.5倍を越え、差のある組4つ以上で7割以上そろったときだけ。「違う」は90日聞かない。最大2行）
+- Vids の指示文は `brief`（芯2・ためし1、定型文）
+- 作り物の答え（36曲・3回）で、3回目の1位が本当の上位3曲に入る割合は 0.79〜0.90（200回×3通り、2026-11-15 実測）
+
+```
+python -m backend.program_package.taste_model state --shelf shelf.json --answers 答え.json --topic op
+python -m backend.program_package.taste_model brief --shelf shelf.json --answers 答え.json --karte backend/config/taste/美麗.json
+```
