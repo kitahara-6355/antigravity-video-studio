@@ -5344,6 +5344,15 @@
    "status": "out_of_scope",
    "reason": "サムネ候補の一覧を作る。`score` は face_quality の実測の点 × 動きの小ささで、地図に顔が無ければ空のリストを返す（既定の点は無い）。動画の品質スコアではない。",
    "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/taste.py::read_answers",
+   "file": "backend/program_package/taste.py",
+   "symbol": "read_answers",
+   "category": "チャンネル統計",
+   "status": "out_of_scope",
+   "reason": "美麗さんの二択の答え（シートの CSV か JSON）を読むだけ。チャンネルの数字（視聴・登録者・CTR）は作らない。答えが 1 件も無ければ TasteError で止まり、空の結果を返さない。json の列が無いシートも止める。",
+   "fingerprint": []
   }
  ]
 }
