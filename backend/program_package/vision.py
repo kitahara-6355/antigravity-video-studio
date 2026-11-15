@@ -10,6 +10,9 @@
 - 地図から、ある時間帯に頭が来る所（avoid）を出し、名前のポップをそこに掛からない所へ置く。
   章の見出し・補足のテロップが頭に掛かる所も一覧にする
 - サムネの人物コマの候補（左右）も地図から出す。**選ぶのは人**（候補を並べるまで）
+- `scan --expr` で顔ごとに表情も測る（OpenCV Zoo の表情モデル・Apache 2.0・4.8MB・CPU）。
+  笑顔の強さ・くっきり・目・顔の下（手で隠れていないか）を地図に残し、サムネの候補は
+  「笑顔の山」ごとに選ぶ。表情の無い地図は前の選び方（顔の形だけ）に戻る
 
 使い方（リポジトリ直下で）::
 
@@ -34,6 +37,11 @@ import numpy as np
 
 W, H = 1280, 720
 MODEL = Path(__file__).resolve().parent / "models" / "face_detection_yunet_2023mar.onnx"
+EXPR_MODEL = Path(__file__).resolve().parent / "models" / "facial_expression_recognition_mobilefacenet_2022july.onnx"
+EXPRESSIONS = ("angry", "disgust", "fearful", "happy", "neutral", "sad", "surprised")
+HAPPY = EXPRESSIONS.index("happy")
+# 顔をそろえる先の 5 点（112x112 の中の両目・鼻・口の両端）。表情モデルの学習時の並び
+ALIGN = ((38.2946, 51.6963), (73.5318, 51.5014), (56.0252, 71.7366), (41.5493, 92.3655), (70.7299, 92.2041))
 MAP_VERSION = 1
 SCAN_WIDTH = 960      # 顔を探すときの横幅。360p の確認用でも顔が 30px 以上になる
 MIN_SCORE = 0.6
@@ -120,6 +128,37 @@ class Eye:
         return sorted(out, key=lambda d: d["box"][0])
 
 
+class Expr:
+    """顔1つの表情とサムネ向きの手がかりを測る。YuNet の 5 点で顔を 112x112 にそろえてから見る。"""
+
+    def __init__(self):
+        import cv2
+        if not EXPR_MODEL.exists():
+            raise VisionError(f"表情のモデルがありません: {EXPR_MODEL}")
+        self.cv2 = cv2
+        self.net = cv2.dnn.readNet(str(EXPR_MODEL))
+        self.ref = np.array(ALIGN, np.float32)
+
+    def measure(self, bgr: np.ndarray, face: dict) -> dict | None:
+        cv2 = self.cv2
+        k = bgr.shape[1] / W
+        pts = np.array([v * k for v in face["marks"]], np.float32).reshape(5, 2)
+        M, _ = cv2.estimateAffinePartial2D(pts, self.ref, method=cv2.LMEDS)
+        if M is None:
+            return None
+        big = cv2.warpAffine(bgr, M, (112, 224))        # 顔の下（あご〜胸）まで
+        rgb = cv2.cvtColor(big[:112], cv2.COLOR_BGR2RGB).astype(np.float32) / 255
+        self.net.setInput(((rgb - 0.5) / 0.5).transpose(2, 0, 1)[None])
+        logit = self.net.forward()[0]
+        g = cv2.cvtColor(big, cv2.COLOR_BGR2GRAY)
+        eyes = [float(g[int(y) - 6:int(y) + 7, int(x) - 10:int(x) + 11].std()) for x, y in ALIGN[:2]]
+        low = cv2.resize(g[104:200], (14, 12), interpolation=cv2.INTER_AREA)
+        return {"logit": [round(float(x), 3) for x in logit],
+                "sharp": round(float(cv2.Laplacian(g[:112], cv2.CV_64F).var()), 1),
+                "eyes": [round(x, 2) for x in eyes],
+                "low": low.astype(np.uint8).tobytes().hex()}
+
+
 def head_box(face: list[int], marks: list[int] | None = None) -> list[int]:
     """顔の矩形から、髪まで含めた頭の矩形にする。
 
@@ -176,16 +215,22 @@ def board_box(bgr: np.ndarray) -> list[int] | None:
 # ---- 地図を作る ----
 
 def scan(video: Path, fps: float = 2.0, start: float = 0.0, seconds: float | None = None,
-         progress: bool = False) -> dict:
-    """動画を fps 間隔で見て、地図を作る。"""
+         progress: bool = False, expr: bool = False) -> dict:
+    """動画を fps 間隔で見て、地図を作る。expr=True なら顔ごとに表情も測る（サムネの候補用）。"""
     import cv2
     eye = Eye()
+    ex = Expr() if expr else None
     vw, vh, dur = probe(video)
     rows = []
     prev = None
     for t, bgr in frames(video, fps, start=start, seconds=seconds):
         small = cv2.cvtColor(cv2.resize(bgr, (160, 90), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
         row = {"t": round(t, 3), "faces": eye.faces(bgr), "motion": motion_of(prev, small)}
+        if ex is not None:
+            for f in row["faces"]:
+                e = ex.measure(bgr, f)
+                if e:
+                    f["expr"] = e
         b = board_box(bgr)
         if b:
             row["board"] = b
@@ -475,8 +520,15 @@ def face_quality(f: dict) -> float:
     return round(f["score"] * (0.35 + 0.65 * front) * (0.5 + 0.5 * size) * (0.6 + 0.4 * smile), 4)
 
 
-def thumb_candidates(m: dict, side: str, n: int = 12, apart: float = 20.0) -> list[dict]:
-    """左（left）か右（right）の人の、サムネ向きのコマの候補。時刻が近いものは1つにする。"""
+def thumb_candidates(m: dict, side: str, n: int = 12, apart: float | None = None) -> list[dict]:
+    """左（left）か右（right）の人の、サムネ向きのコマの候補。
+
+    地図に表情があれば笑顔の山ごとに選ぶ（smile_candidates）。無ければ顔の形だけで選び、
+    時刻が apart 秒（既定 20）より近いものは1つにする。
+    """
+    if any("expr" in f for r in m["frames"] for f in r["faces"]):
+        return smile_candidates(m, side, n=n, apart=3.0 if apart is None else apart)
+    apart = 20.0 if apart is None else apart
     found = []
     rows = m["frames"]
     for i, r in enumerate(rows):
@@ -494,6 +546,115 @@ def thumb_candidates(m: dict, side: str, n: int = 12, apart: float = 20.0) -> li
             if len(picked) == n:
                 break
     return picked
+
+
+SMILE_FLOOR = 5.0     # 笑顔の差（happy − ほかの最大）がこれ未満は笑顔とみなさない
+SMILE_TOP = 0.90      # その人の中で上位 1 割の笑顔だけを見る
+HILL_GAP = 1.0        # 笑顔のコマがこれより離れたら別の山
+PER_HILL = 2          # 1つの山から出すのは2コマまで（似たコマばかりにしない）
+PER_MINUTE = 3        # 1分から出すのは3コマまで
+BOTH_NEAR = 2.0       # 相手もこの秒数以内に笑っていれば「二人とも笑顔」
+
+
+def _rank(a: np.ndarray) -> np.ndarray:
+    """その人の中での順位（0〜1）。人や収録で明るさ・大きさが違っても比べられる。"""
+    return np.argsort(np.argsort(a)) / max(1, len(a))
+
+
+def _smile_table(m: dict, side: str) -> dict | None:
+    """片側の人の、表情を測った顔の一覧（コマごとに一番大きい顔）。"""
+    rows = []
+    for r in m["frames"]:
+        mine = [f for f in r["faces"] if "expr" in f and ((f["box"][0] + f["box"][2]) / 2 < W / 2) == (side == "left")]
+        if mine:
+            f = max(mine, key=lambda f: f["box"][3] - f["box"][1])
+            rows.append((r, f))
+    if not rows:
+        return None
+    lg = np.array([f["expr"]["logit"] for _, f in rows], float)
+    margin = lg[:, HAPPY] - np.delete(lg, HAPPY, 1).max(1)
+    mouth = np.array([abs(f["marks"][8] - f["marks"][6]) / max(1, abs(f["marks"][2] - f["marks"][0])) for _, f in rows])
+    low = np.array([np.frombuffer(bytes.fromhex(f["expr"]["low"]), np.uint8) for _, f in rows], float)
+    occ = np.abs(low - np.median(low, 0)).mean(1)       # 顔の下がいつもと違う＝手や物で隠れている
+    return {"t": np.array([r["t"] for r, _ in rows]), "rows": rows, "margin": margin, "pm": _rank(margin),
+            "mouth": _rank(mouth), "occ": _rank(occ),
+            "sharp": _rank(np.array([f["expr"]["sharp"] for _, f in rows])),
+            "eyes": _rank(np.array([min(f["expr"]["eyes"]) for _, f in rows])),
+            "thr": max(SMILE_FLOOR, float(np.quantile(margin, SMILE_TOP)))}
+
+
+def smile_candidates(m: dict, side: str, n: int = 12, apart: float = 3.0) -> list[dict]:
+    """笑顔の山ごとに選ぶサムネの候補（2026-11-15 設計・久木田回で上位12に正解6中5）。
+
+    1. その人の中で上位1割かつ差 5 以上の笑顔だけを残す。手で隠れた・口が閉じすぎ・ぼけ・目つぶりは落とす
+    2. 場面の切れ目と色紙の映るコマは落とす
+    3. 1秒以内に続く笑顔を1つの山にし、山ごとに2コマ・3秒以上離して・1分に3コマまで
+    4. 点は 笑顔 0.55・くっきり 0.2・目 0.15・二人とも笑顔 0.1
+    """
+    p = _smile_table(m, side)
+    if p is None:
+        return []
+    o = _smile_table(m, "right" if side == "left" else "left")
+    other = o["t"][o["margin"] >= o["thr"]] if o is not None else np.array([])
+    ok = ((p["margin"] >= p["thr"]) & (p["occ"] < 0.97) & (p["mouth"] > 0.10)
+          & (p["sharp"] > 0.2) & (p["eyes"] > 0.1))
+    for i, (r, _) in enumerate(p["rows"]):
+        if r.get("board") or r["motion"] >= CUT_MOTION:
+            ok[i] = False
+    hills: list[list[int]] = []
+    for i in np.where(ok)[0]:
+        if hills and p["t"][i] - p["t"][hills[-1][-1]] <= HILL_GAP:
+            hills[-1].append(int(i))
+        else:
+            hills.append([int(i)])
+    found = []
+    for h, idx in enumerate(hills):
+        both = any(np.any(np.abs(other - p["t"][i]) <= BOTH_NEAR) for i in idx)
+        for i in idx:
+            q = 0.55 * p["pm"][i] + 0.2 * p["sharp"][i] + 0.15 * p["eyes"][i] + (0.1 if both else 0.0)
+            found.append({"t": float(p["t"][i]), "score": round(float(q), 4), "box": p["rows"][i][1]["box"],
+                          "hill": h, "both": both, "smile": round(float(p["margin"][i]), 2)})
+    picked: list[dict] = []
+    hill_n: dict[int, int] = {}
+    minute_n: dict[int, int] = {}
+    for c in sorted(found, key=lambda c: (-c["score"], c["t"])):
+        mi = int(c["t"] // 60)
+        if (hill_n.get(c["hill"], 0) >= PER_HILL or minute_n.get(mi, 0) >= PER_MINUTE
+                or any(abs(c["t"] - x["t"]) < apart for x in picked)):
+            continue
+        picked.append(c)
+        hill_n[c["hill"]] = hill_n.get(c["hill"], 0) + 1
+        minute_n[mi] = minute_n.get(mi, 0) + 1
+        if len(picked) == n:
+            break
+    return picked
+
+
+def pairs(left: list[dict], right: list[dict], near: float = BOTH_NEAR) -> list[tuple[dict, dict]]:
+    """左右の候補のうち、時刻が近い（二人とも笑っている）組。点の高い順。"""
+    out = [(a, b) for a in left for b in right if abs(a["t"] - b["t"]) <= near]
+    return sorted(out, key=lambda ab: -(ab[0]["score"] + ab[1]["score"]))
+
+
+def board_candidates(m: dict, n: int = 6) -> list[dict]:
+    """色紙や作品が映る区間ごとに、一番止まっていて大きく映るコマを1つ（サムネの作品の候補）。"""
+    out = []
+    for a, b in board_spans(m):
+        rows = [r for r in m["frames"] if a <= r["t"] < b and r.get("board")]
+        if not rows:
+            continue
+        def area(r):
+            x0, y0, x1, y1 = r["board"]
+            return (x1 - x0) * (y1 - y0)
+        best = max(rows, key=lambda r: (area(r) * (1 - min(1.0, r["motion"] / 0.03)), -r["t"]))
+        out.append({"t": best["t"], "box": best["board"], "seconds": round(b - a, 2)})
+    return sorted(out, key=lambda c: -c["seconds"])[:n]
+
+
+def thumb_spec(left: list[dict], right: list[dict]) -> dict:
+    """thumbnail.py の --options が読める形（記号 → 時刻）。"""
+    return {"left": {f"L{i + 1}": c["t"] for i, c in enumerate(left)},
+            "right": {f"R{i + 1}": c["t"] for i, c in enumerate(right)}}
 
 
 # ---- 目で確かめる一覧 ----
@@ -546,6 +707,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--fps", type=float, default=2.0)
     s.add_argument("--start", type=float, default=0.0)
     s.add_argument("--seconds", type=float)
+    s.add_argument("--expr", action="store_true", help="顔ごとに表情も測る（サムネの候補用・CPU・0円）")
     for name, text in (("place", "飾りを置き直した案を出す"), ("check", "飾りが頭に掛かる所を出す")):
         s = sub.add_parser(name, help=text)
         s.add_argument("spec")
@@ -555,6 +717,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("thumbs", help="サムネの人物コマの候補を出す")
     s.add_argument("--map", required=True)
     s.add_argument("-n", type=int, default=12)
+    s.add_argument("--spec", help="候補を thumbnail.py --options が読める形で書き出す先（JSON）")
     s = sub.add_parser("sheet", help="測った結果をコマの一覧に重ねる")
     s.add_argument("video")
     s.add_argument("--map", required=True)
@@ -564,7 +727,7 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
     try:
         if a.cmd == "scan":
-            m = scan(Path(a.video), a.fps, a.start, a.seconds, progress=True)
+            m = scan(Path(a.video), a.fps, a.start, a.seconds, progress=True, expr=a.expr)
             Path(a.out).write_text(json.dumps(m, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
             found = sum(1 for r in m["frames"] if r["faces"])
             print(f"{a.out}: {len(m['frames'])} コマ（顔あり {found}）・場面の切れ目 {len(cuts(m))}・"
@@ -572,8 +735,19 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         m = load(a.map)
         if a.cmd == "thumbs":
+            got = {side: thumb_candidates(m, side, a.n) for side in ("left", "right")}
+            two = pairs(got["left"], got["right"])
+            if two:
+                print("二人とも: " + " ".join(f"{x['t']:.1f}+{y['t']:.1f}" for x, y in two))
             for side, name in (("left", "左"), ("right", "右")):
-                print(f"{name}: " + " ".join(f"{c['t']:.1f}({c['score']:.2f})" for c in thumb_candidates(m, side, a.n)))
+                print(f"{name}: " + " ".join(f"{c['t']:.1f}({c['score']:.2f})" for c in got[side]))
+            boards = board_candidates(m)
+            if boards:
+                print("作品: " + " ".join(f"{c['t']:.1f}" for c in boards))
+            if a.spec:
+                Path(a.spec).write_text(json.dumps(thumb_spec(got["left"], got["right"]), ensure_ascii=False, indent=2)
+                                        + "\n", encoding="utf-8")
+                print(f"書き出しました: {a.spec}")
             return 0
         if a.cmd == "sheet":
             print(sheet(Path(a.video), m, a.at, a.seconds, Path(a.out)))
