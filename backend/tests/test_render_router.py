@@ -8,6 +8,13 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # 他の未インポートな依存モジュールのダミー登録
+# 差し替える前の中身を控え、このファイルのテストが終わったら戻す（下の _restore_sys_modules）。
+# 戻さないと、同じ束で後に走る test_settings_manager.py・test_c4_quality_marks.py が
+# MagicMock の branding_manager を掴んで落ちる（2026-11-15、testpaths に2行足して束の区切りがずれ、CI で発覚）
+_STUBBED = ("branding_manager", "project_archiver", "video_processor", "google.adk", "mcp")
+_ORIGINAL_MODULES = {name: sys.modules.get(name) for name in _STUBBED}
+_MODULES_BEFORE = set(sys.modules)
+_BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.modules["branding_manager"] = MagicMock()
 
 
@@ -33,6 +40,40 @@ sys.modules["project_archiver"] = MagicMock()
 sys.modules["video_processor"] = MagicMock()
 sys.modules["google.adk"] = MagicMock()
 sys.modules["mcp"] = MagicMock()
+
+
+
+def _from_stub(v, stubs: set) -> bool:
+    """v が差し替えた MagicMock そのものか、その属性（from branding_manager import branding_manager の形）か。"""
+    while isinstance(v, MagicMock):
+        if id(v) in stubs:
+            return True
+        v = v._mock_new_parent
+    return False
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _restore_sys_modules():
+    yield
+    stubs = {id(sys.modules.get(n)) for n in _STUBBED if isinstance(sys.modules.get(n), MagicMock)}
+    for name, mod in _ORIGINAL_MODULES.items():
+        if mod is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = mod
+    # 差し替えた中身を掴んだまま読み込まれた backend のモジュール（settings_manager など）は、
+    # 収集のときにほかのテストファイルからも import 済みなので、捨てずにその場で読み込み直す
+    import contextlib
+    import importlib
+    for name in list(set(sys.modules) - _MODULES_BEFORE):
+        mod = sys.modules.get(name)
+        path = getattr(mod, "__file__", None) or ""
+        if not path.startswith(_BACKEND) or os.sep + "tests" + os.sep in path:
+            continue
+        if any(_from_stub(v, stubs) for v in vars(mod).values()):
+            with contextlib.suppress(Exception):  # 読み込み直せない物は、そのまま残す
+                importlib.reload(mod)
+
 
 # パス設定
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
