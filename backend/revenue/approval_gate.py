@@ -277,11 +277,12 @@ def export_allowed(run_dir: str | Path) -> tuple[bool, str]:
 
 def write_export(run_dir: str | Path, *, final_path: str | None,
                  metadata_sidecar: str | None, quality_sidecar: str | None,
-                 render_mode: str, encode: dict | None = None) -> dict:
+                 render_mode: str, encode: dict | None = None, bgm: dict | None = None) -> dict:
     """書き出した記録を残す — **どの承認で、何を書き出したか**（R2-C2 の証跡の最後の段）。
 
     `encode` は書き出しで**実際に使った**エンコードの設定（D-47）。モードの名前だけでは、
     その設定で書いたかどうかが分からない（2026-11-10 までは safe も production も同じ設定だった）。
+    `bgm` は**実際に敷いた**曲（どこから・曲名・出どころ・仮の曲か）。敷いていなければ None。
     """
     run_dir = Path(run_dir)
     data = {
@@ -294,6 +295,7 @@ def write_export(run_dir: str | Path, *, final_path: str | None,
         "quality_sidecar": str(quality_sidecar) if quality_sidecar else None,
         "render_mode": render_mode,
         "encode": dict(encode) if encode else None,
+        "bgm": dict(bgm) if bgm else None,
     }
     _write_json(run_dir / EXPORT, data)
     return data

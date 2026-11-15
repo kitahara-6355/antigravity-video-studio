@@ -269,3 +269,15 @@ def test_字幕が見つからなければ確かめられないので止まる(t
     plan["base"] = {"captions": ins.captions_sha(CAPS)}
     with pytest.raises(ins.InsertError, match="見つからない"):
         ins.ready(plan, {"lock": str(tmp_path / "none.json")}, PEOPLE)
+
+
+def test_地図の作り直しで切り抜きが数pxずれても人が決めた案を残す():
+    old = ins.propose({}, CAPS, the_map(), SETUP)
+    ins.decide(old, ["board-0110"], ins.APPROVED, by="北原", evidence="チャット", people=PEOPLE)
+    for shift, state in ((1, ins.APPROVED), (30, ins.PROPOSED)):
+        new = ins.propose({}, CAPS, the_map(), SETUP)
+        it = new["items"][0]
+        it["source"] = {**it["source"], "crop": [c + shift for c in it["source"]["crop"]]}
+        it["fingerprint"] = ins.fingerprint(it)
+        plan = ins.merge(old, new, valid=lambda prev: True)
+        assert plan["items"][0]["state"] == state

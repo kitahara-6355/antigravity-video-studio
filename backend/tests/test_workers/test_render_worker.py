@@ -28,6 +28,10 @@ if _backend_dir not in sys.path:
     sys.path.insert(0, _backend_dir)
 
 from agents.pipeline_coordinator import RenderWorker, PipelineContext, StageResult
+
+# BGM の音の組み立て（numpy を使う）は、sys.modules を差し替える前に読んでおく。
+# patch.dict の中で初めて読むと、抜けるときに numpy ごと消されて、次の読み込みが失敗する
+from backend.program_package import music as _music, remix as _remix  # noqa: F401
 from tests.fixtures.mock_pipeline import create_mock_ctx
 
 
@@ -2011,11 +2015,12 @@ class TestRenderWorkerCoverageExpansion:
 
             vid_mod.video_editor.ffmpeg.run_command.side_effect = _run_cmd
 
+            # 中身の無いファイルなので、長さは測らずに決める（音の組み立ては remix と同じ物）
             with patch.dict("sys.modules", {
                 "video_editor_engine": vid_mod,
                 "template_config": mock_tc_mod,
                 "logo_overlay": MagicMock(),
-            }):
+            }), patch.object(_remix, "duration", return_value=30.0):
                 worker = RenderWorker()
                 result = await worker.execute(ctx)
 

@@ -1,0 +1,55 @@
+{
+  "_doc": "Apps Script の台帳（dev-records 0012・2026-11-13）。python -m backend.gas_deploy が読む。鍵は入れない。source はこのリポジトリからの相対パスか絶対パス（クラウドではリポジトリは /home/user/<名前>、共有フォルダは /mnt/project-files）。account が info@ 以外は法人の鍵では送らない。",
+  "projects": [
+    {
+      "name": "caption-review",
+      "title": "朱入れ画面（ウェブアプリ）",
+      "account": "info@kitahara-birei.com",
+      "kind": "webapp",
+      "scriptId": "1HUicLer02A7CKb4VBvDQB-Sow0SFqXiI8mHDoKwMIiPBX6bh-29e55Py",
+      "deploymentId": "AKfycbzHVX8G0qxH6Ydn-tuYH3BUS8Qu5HjwxdBpM2eWxNbIP0_SJfAMPthGv5pwvaFjH6gX",
+      "source": ".claude/skills/caption-review/webapp",
+      "prebuild": ["bash", "build.sh"],
+      "note": "webapp/ は PR #113 で入る"
+    },
+    {
+      "name": "dream-interview",
+      "title": "ドリームインタビュー（学びの場）",
+      "account": "info@kitahara-birei.com",
+      "kind": "webapp",
+      "scriptId": "1cEExnndW7-VWa0sdCliIeMJBmrnizxWKYWbyFVIb1glMQ3Vh-RN4pUoE",
+      "deploymentId": "AKfycbzsBz9q_em2PRvOvhQh-rHkA8zWVzWRwCpjA-9sVF_wqm_zsR8S21W9Lvj5hMfDEtA",
+      "source": "/mnt/project-files/manabi/dream-interview/apps-script",
+      "include": ["Code.gs", "Index.html", "appsscript.json"]
+    },
+    {
+      "name": "office-automation",
+      "title": "美麗書院の資産整理・事務・Drive ラベル",
+      "account": "info@kitahara-birei.com",
+      "kind": "standalone",
+      "scriptId": "1u8QAvUKB1_aAaddW4sqlSY1WYy1TSQd8VTr-2ImurdenO6trljXdmvS2",
+      "source": "/mnt/project-files/office-automation/gas",
+      "note": "PC の clasp フォルダに Backfill.js など project-files に無いファイルがある。最初の push は --dry-run で消えるファイルを確かめ、PC から写してから送る"
+    },
+    {
+      "name": "sns-dashboard-corporate",
+      "title": "SNS 運用ダッシュボード（法人版・シートに付いたスクリプト）",
+      "account": "info@kitahara-birei.com",
+      "kind": "container-bound",
+      "scriptId": "1P10u-ezpu5WcqHUSpD4-fEidgjfDSpF_48uX2oOcYKvuyPk8j42qY23O",
+      "source": "/home/user/sns-dashboard/dist/corporate",
+      "include": ["まとめて貼る用.gs", "Dashboard.html", "appsscript.json"],
+      "note": "正本は kitahara-birei/sns-dashboard（node build.js で dist を作る）。PC で送ったときのファイル名と違えば --dry-run に「消える」が出るので、名前を合わせてから送る"
+    },
+    {
+      "name": "rss-learning-log",
+      "title": "RSS 学習ログ（克洋さんのマイプロジェクト）",
+      "account": "personal",
+      "kind": "webapp",
+      "scriptId": "1gBEXys8dgJMXOx7OawdcGuTvJQFRifmJXjQPOs_4QzLyARfkLFr6hM9Y",
+      "deploymentId": "AKfycbzmY2HTD9_TCAclRnSpqsGgCFkVW8ouSaIqiqjO-6CbcCxzoMNvzmD0KDXWLmtsXjuncw",
+      "source": "",
+      "note": "個人アカウント。法人の鍵と混ぜない。当面は PC の clasp（--user personal）"
+    }
+  ]
+}

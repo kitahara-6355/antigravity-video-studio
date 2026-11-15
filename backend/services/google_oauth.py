@@ -63,11 +63,14 @@ __all__ = [
     "DRIVE_READONLY_SCOPES",
     "DRIVE_SCOPES",
     "ORGANIZER_TOKEN_JSON_ENV",
+    "SCRIPT_SCOPES",
+    "SCRIPT_TOKEN_JSON_ENV",
     "TOKEN_JSON_ENV",
     "SHEETS_SCOPES",
     "CredentialsNotFoundError",
     "GoogleAuthError",
     "assets_token_path",
+    "script_token_path",
     "client_secret_path",
     "load_credentials",
     "read_token_info",
@@ -116,6 +119,17 @@ ASSETS_TOKEN_NAME = "token_assets_file.json"
 ORGANIZER_TOKEN_JSON_ENV = "AVS_DRIVE_ORGANIZER_TOKEN_JSON"
 ORGANIZER_TOKEN_NAME = "token_drive_organizer.json"
 
+# Apps Script をクラウドから送り込む（コードの書き換え・版・公開）トークン
+# （2026-11-13 北原さん決定 dev-records 0012「クラウド優先」）。PC の clasp の代わり。
+# cloud-platform を求めないので、clasp が切れる原因の「Google Cloud セッション管理」の
+# 再認証には当たらない見込み（仮説・実測で確かめる）。使うのは backend/gas_deploy.py だけ。
+SCRIPT_SCOPES: tuple[str, ...] = (
+    "https://www.googleapis.com/auth/script.projects",
+    "https://www.googleapis.com/auth/script.deployments",
+)
+SCRIPT_TOKEN_JSON_ENV = "AVS_SCRIPT_TOKEN_JSON"
+SCRIPT_TOKEN_NAME = "token_apps_script.json"
+
 
 def _from_env(*names: str) -> Path | None:
     """環境変数を順に見て、最初の非空値を返す。空文字は未設定扱い。"""
@@ -146,6 +160,11 @@ def token_path() -> Path:
 def organizer_token_path() -> Path:
     """「動画制作」を整理するトークン（drive 全体）のローカルの保存先。"""
     return token_path().parent / ORGANIZER_TOKEN_NAME
+
+
+def script_token_path() -> Path:
+    """Apps Script を送り込むトークンのローカルの保存先。"""
+    return token_path().parent / SCRIPT_TOKEN_NAME
 
 
 def assets_token_path() -> Path:
