@@ -405,8 +405,16 @@ def test_Vidsの書き出しから音を取り出して台帳に足す(tmp_path)
         mu.extract_audio(mp4, tmp_path / "曲" / "op_vids_01.mp3")
 
 
-def test_山が番組名より早い曲は頭を遅らせて合わせる():
+def test_山が番組名より早い曲は無音を足さず曲の頭から使う(tmp_path, monkeypatch):
     a = {"duration": 30.0, "bpm": 80.0, "climaxes": [{"at": 8.5, "rise_db": 4.5, "after_db": -19.5}]}
-    assert mu.fit(a, 10.5, 15.0)["start"] == -2.0  # 負の start は、曲の頭を 2 秒遅らせる
-    with pytest.raises(mu.MusicError):  # 遅らせてよいのは MAX_LEAD まで
-        mu.fit({**a, "climaxes": [{"at": 5.0, "rise_db": 4.0, "after_db": -20.0}]}, 10.5, 15.0)
+    with pytest.raises(mu.MusicError):  # 頭の無音は違和感が強い（2026-11-15 北原さん）
+        mu.fit(a, 10.5, 15.0)
+    monkeypatch.setattr(mu, "analyze", lambda p: a)
+    got = mu.fit_or_head("x.mp3", opening.load("backend/config/program/美麗の書道対談.json"))
+    assert got["start"] == 0.0 and "頭から" in got["start_note"]
+
+
+def test_OPの曲を本編の声の大きさにそろえる(tmp_path, monkeypatch):
+    monkeypatch.setattr(mu, "lufs", lambda path, start=0.0, seconds=None: -12.0)
+    op = mu.match_voice({"path": "x.mp3", "start": 0.0, "match_voice_db": -2.5}, -15.5, 15.0)
+    assert op["volume"] == pytest.approx(10 ** (-6.0 / 20), abs=1e-3) and "そろえた" in op["volume_note"]

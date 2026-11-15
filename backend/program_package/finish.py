@@ -45,9 +45,7 @@ def audio_of(spec: dict, music_dir: str | None, audio_path: str | None, m: dict 
             program = ep.program_of(spec)
             if not program:
                 raise mu.MusicError("OP の使い始めを山に合わせるには番組（program）が要ります")
-            from backend.program_package import opening
-            f = mu.fit(mu.analyze(op["path"]), mu.title_at(program), opening.length(program))
-            op.update(start=f["start"], start_note=f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）")
+            op.update(mu.fit_or_head(op["path"], program))
         return audio
     program = ep.program_of(spec)
     if not program:
@@ -83,6 +81,10 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
 
     if audio and audio.get("op_music"):
         spec["program_silent"] = True  # OP の曲は remix が入れる
+        op = audio["op_music"]
+        if op.get("match_voice_db") is not None:  # OP の曲を本編の声の大きさにそろえる
+            from backend.program_package import opening
+            mu.match_voice(op, mu.lufs(spec["source"], 0.0, 600.0), opening.length(ep.program_of(spec)))
     base = ep.build(spec, out / "_飾りまで")
     note["steps"].append({"step": "飾り", "file": base.name, "inserts": len(items)})
     final = base

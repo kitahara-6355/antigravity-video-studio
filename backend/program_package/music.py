@@ -136,7 +136,7 @@ def title_at(program: dict) -> float:
     return len(program["slides"]) * program["slide_seconds"]
 
 
-MAX_LEAD = 3.0  # 曲の頭を遅らせてよい秒（OP の最初の数秒は無音でも不自然でない）
+MAX_LEAD = 0.0  # 曲の頭を遅らせてよい秒。頭の無音は違和感が強い（2026-11-15 北原さん）ので既定は 0
 
 
 def fit(analysis: dict, at: float, total: float) -> dict:
@@ -150,6 +150,39 @@ def fit(analysis: dict, at: float, total: float) -> dict:
     best = ok[0]
     return {"start": round(best["at"] - at, 2), "climax": best,
             "others": [{"start": round(c["at"] - at, 2), **c} for c in ok[1:]]}
+
+
+def fit_or_head(path: str | Path, program: dict) -> dict:
+    """OP の使い始め。山を番組名に合わせられなければ曲の頭から（無音は足さない）。"""
+    from backend.program_package import opening
+    try:
+        f = fit(analyze(path), title_at(program), opening.length(program))
+    except MusicError as e:
+        return {"start": 0.0, "start_note": f"曲の頭から（{e}）"}
+    return {"start": f["start"], "start_note": f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）"}
+
+
+def lufs(path: str | Path, start: float = 0.0, seconds: float | None = None) -> float:
+    """音の大きさ（統合ラウドネス、LUFS）。"""
+    cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-ss", f"{start:.3f}"]
+    if seconds:
+        cmd += ["-t", f"{seconds:.3f}"]
+    cmd += ["-i", str(path), "-vn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"]
+    err = subprocess.run(cmd, capture_output=True, text=True, check=False).stderr
+    vals = re.findall(r"I:\s+(-?[0-9.]+) LUFS", err)
+    if not vals:
+        raise MusicError(f"音の大きさが測れません: {path}")
+    return float(vals[-1])
+
+
+def match_voice(op: dict, voice_lufs: float, seconds: float) -> dict:
+    """OP の曲の大きさを、本編の声の大きさ + match_voice_db にそろえる volume を決める（2026-11-15 北原さん:
+    OP の曲が対談の声より明らかに大きく、そのまま本編に入ると聞き取りづらい）。"""
+    target = voice_lufs + float(op["match_voice_db"])
+    song = lufs(op["path"], max(0.0, float(op.get("start") or 0.0)), seconds)
+    op["volume"] = round(10 ** ((target - song) / 20), 3)
+    op["volume_note"] = f"声 {voice_lufs} LUFS に {op['match_voice_db']} dB でそろえた（曲 {song} LUFS）"
+    return op
 
 
 def check(path: str | Path, at: float, window: float = 2.5) -> dict:
@@ -178,7 +211,6 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
     - 出どころ（source）の無い曲は使わない。provisional の曲は印を引き継ぐ（名前に「_仮曲入り」が付く）
     - roles を渡すと、その役（op・bgm・ed）だけを作る（本線は bgm だけ）
     """
-    from backend.program_package import opening
     use = (ledger.get("programs") or {}).get(program["name"])
     if not use:
         raise MusicError(f"曲の台帳に番組「{program['name']}」がありません")
@@ -202,9 +234,7 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
         item = {k: v for k, v in r.items() if k not in ("track", "start_note") and v is not None}
         item.update(path=str(path), provisional=bool(t.get("provisional")))
         if role == "op" and r.get("start") is None:
-            f = fit(analyze(path), title_at(program), opening.length(program))
-            item["start"] = f["start"]
-            item["start_note"] = f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）"
+            item.update(fit_or_head(path, program))
         if role == "bgm" and quiet:
             if body_seconds is None:
                 raise MusicError("曲を止める区間を使うには本編の長さが要ります")

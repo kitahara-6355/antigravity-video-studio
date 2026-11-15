@@ -128,7 +128,9 @@
     "volume": 0.9,
     "fade_out": 1.5,
     "start": null,
-    "start_note": "null なら曲の山の入りを番組名の出だしに合わせて決める（music fit）"
+    "start_note": "null なら曲の山の入りを番組名の出だしに合わせて決める（music fit）",
+    "match_voice_db": -2.5,
+    "match_note": "2026-11-15 北原さん: OP の曲が対談の声より大きい → 本編の声（頭の10分）より 2.5dB 小さくそろえる。volume より優先"
    },
    "bgm": {
     "track": "white_cocktail",
