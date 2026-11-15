@@ -139,6 +139,8 @@ python -m backend.program_package.vision check SPEC.json --map map.json      # �
 python -m backend.program_package.vision place SPEC.json --map map.json      # 置き直しの案（--write で書き換え）
 python -m backend.program_package.vision sheet 完成版.mp4 --map map.json --at 45 --seconds 8 --out a.jpg
 python -m backend.program_package.vision thumbs --map map.json               # サムネの人物コマの候補（左右）
+python -m backend.program_package.vision scan 完成版.mp4 --out map.json --expr  # 表情も測る（サムネの候補を笑顔の山から選ぶ）
+python -m backend.program_package.vision thumbs --map map.json --spec opts.json  # 候補を thumbnail.py --options の形で書き出す
 ```
 
 - `place` は、名前のポップの `avoid` を測った値に入れ替え、掛かるなら頭の近くの壁へ置き直す

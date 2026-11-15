@@ -227,6 +227,109 @@ def test_thumbnail_candidates_are_spread_in_time_and_per_side():
     assert all(b - a >= 20 for a, b in pairwise(ts))
 
 
+def smiling(f, smile=0.0, sharp=100.0, eyes=(20.0, 20.0), low=100):
+    """表情を測った顔（smile は happy とほかの最大の差）。"""
+    logit = [0.0] * 7
+    logit[v.HAPPY] = smile
+    return {**f, "expr": {"logit": logit, "sharp": sharp, "eyes": list(eyes), "low": bytes([low] * 168).hex()}}
+
+
+def look(sharp_and_open, i):
+    """(くっきり, 目)。笑顔のコマははっきり写り目も開いている。ほかはばらつかせる。"""
+    return (300.0, (60.0, 60.0)) if sharp_and_open else (100.0 + i % 13, (20.0 + i % 11, 20.0))
+
+
+def smile_map(left_smiles, right_smiles=None, seconds=600, fps=2.0):
+    """left_smiles/right_smiles は {時刻: 笑顔の差}。それ以外のコマは笑っていない。"""
+    right_smiles = right_smiles or {}
+    rows = []
+    for i in range(int(seconds * fps)):
+        t = i / fps
+        ls = left_smiles.get(t, (i % 7) * 0.1)
+        rs = right_smiles.get(t, (i % 5) * 0.1)
+        rows.append([smiling(face(300, 200, 400, 340), ls, *look(t in left_smiles, i)),
+                     smiling(face(900, 200, 1000, 340), rs, *look(t in right_smiles, i))])
+    return make_map(rows, fps)
+
+
+def test_with_expressions_candidates_come_from_the_smiles():
+    m = smile_map({100.0: 9.0, 250.0: 8.0, 400.0: 10.0})
+    got = v.thumb_candidates(m, "left", n=12)
+    assert sorted(c["t"] for c in got) == [100.0, 250.0, 400.0]
+    assert got[0]["t"] == 400.0 and all(c["box"][0] < v.W / 2 for c in got)
+
+
+def test_a_weak_smile_under_the_floor_is_not_a_candidate():
+    m = smile_map({100.0: 4.0, 200.0: 4.5})
+    assert v.thumb_candidates(m, "left") == []
+
+
+def test_one_hill_gives_at_most_two_frames_three_seconds_apart():
+    hill = {100.0 + k * 0.5: 9.0 for k in range(13)}   # 100〜106秒 ずっと笑っている
+    got = v.thumb_candidates(smile_map(hill), "left", n=12)
+    assert len(got) == 2 and len({c["hill"] for c in got}) == 1
+    assert abs(got[0]["t"] - got[1]["t"]) >= 3
+
+
+def test_at_most_three_frames_come_from_one_minute():
+    smiles = {120.0 + k * 10: 9.0 for k in range(5)}   # 2分台に離れた笑顔が5つ
+    got = v.thumb_candidates(smile_map(smiles), "left", n=12)
+    assert len(got) == 3 and all(120 <= c["t"] < 180 for c in got)
+
+
+def test_scene_cut_and_board_frames_are_dropped():
+    m = smile_map({100.0: 9.0, 200.0: 9.0, 300.0: 9.0})
+    for r in m["frames"]:
+        if r["t"] == 100.0:
+            r["motion"] = v.CUT_MOTION + 0.1
+        if r["t"] == 200.0:
+            r["board"] = [500, 100, 800, 500]
+    assert [c["t"] for c in v.thumb_candidates(m, "left")] == [300.0]
+
+
+def test_a_covered_lower_face_is_dropped():
+    m = smile_map({100.0: 9.0, 200.0: 9.5})
+    for r in m["frames"]:
+        if r["t"] == 200.0:
+            r["faces"][0]["expr"]["low"] = bytes([250] * 168).hex()   # 顔の下が手で白く隠れた
+    assert [c["t"] for c in v.thumb_candidates(m, "left")] == [100.0]
+
+
+def test_both_smiling_ranks_higher_and_makes_a_pair():
+    m = smile_map({100.0: 9.0, 300.0: 9.0}, {300.5: 9.0})
+    left = v.thumb_candidates(m, "left")
+    assert left[0]["t"] == 300.0 and left[0]["both"] and not left[1]["both"]
+    right = v.thumb_candidates(m, "right")
+    assert [(a["t"], b["t"]) for a, b in v.pairs(left, right)] == [(300.0, 300.5)]
+
+
+def test_thumb_spec_is_what_thumbnail_options_reads():
+    left = [{"t": 10.0}, {"t": 20.0}]
+    right = [{"t": 30.0}]
+    assert v.thumb_spec(left, right) == {"left": {"L1": 10.0, "L2": 20.0}, "right": {"R1": 30.0}}
+
+
+def test_board_candidates_pick_one_steady_frame_per_board_span():
+    rows = [[] for _ in range(100)]
+    m = make_map(rows)
+    for r in m["frames"]:
+        if 10 <= r["t"] < 14:
+            r["board"] = [400, 100, 700, 500] if r["t"] != 12.0 else [380, 80, 720, 520]
+        if 30 <= r["t"] < 31.5:
+            r["board"] = [400, 100, 700, 500]
+    got = v.board_candidates(m)
+    assert [c["t"] for c in got] == [12.0, 30.0]
+
+
+def test_thumbs_command_writes_the_options_spec(tmp_path, capsys):
+    mp = tmp_path / "map.json"
+    mp.write_text(json.dumps(smile_map({100.0: 9.0}, {100.5: 9.0})))
+    out = tmp_path / "opts.json"
+    assert v.main(["thumbs", "--map", str(mp), "--spec", str(out)]) == 0
+    assert json.loads(out.read_text()) == {"left": {"L1": 100.0}, "right": {"R1": 100.5}}
+    assert "二人とも: 100.0+100.5" in capsys.readouterr().out
+
+
 def test_a_bigger_front_facing_smile_scores_higher():
     small_side = face(300, 200, 360, 280, nose=352)
     big_front = face(300, 200, 420, 360)
@@ -244,6 +347,17 @@ def test_old_map_version_is_refused(tmp_path):
 
 def test_model_file_is_in_the_repository():
     assert v.MODEL.exists() and 200_000 < v.MODEL.stat().st_size < 400_000
+
+
+def test_expression_model_is_in_the_repository():
+    assert v.EXPR_MODEL.exists() and 4_000_000 < v.EXPR_MODEL.stat().st_size < 6_000_000
+
+
+def test_expr_measures_seven_expressions_for_a_face():
+    pytest.importorskip("cv2")
+    im = np.full((540, 960, 3), (150, 130, 176), np.uint8)
+    e = v.Expr().measure(im, face(500, 200, 640, 380))
+    assert len(e["logit"]) == 7 and len(bytes.fromhex(e["low"])) == 168 and len(e["eyes"]) == 2
 
 
 def test_eye_finds_no_face_in_a_plain_wall():
