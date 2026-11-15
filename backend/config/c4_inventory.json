@@ -5353,6 +5353,24 @@
    "status": "out_of_scope",
    "reason": "美麗さんの二択の答え（シートの CSV か JSON）を読むだけ。チャンネルの数字（視聴・登録者・CTR）は作らない。答えが 1 件も無ければ TasteError で止まり、空の結果を返さない。json の列が無いシートも止める。",
    "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::pairs",
+   "file": "backend/program_package/vision.py",
+   "symbol": "pairs",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "左右の候補のうち時刻が近い組を並べるだけ。点は smile_candidates の実測の和で、候補が無ければ空のリスト。動画の品質スコアではない。",
+   "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/vision.py::smile_candidates",
+   "file": "backend/program_package/vision.py",
+   "symbol": "smile_candidates",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "サムネ候補の一覧を作る。`score` は表情モデルの実測（笑顔の差・くっきり・目）の順位から計算し、表情を測った顔が無ければ空のリストを返す（既定の点は無い）。動画の品質スコアではなく、選ぶのは人。",
+   "fingerprint": []
   }
  ]
 }
