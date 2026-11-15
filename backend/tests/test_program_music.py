@@ -418,3 +418,35 @@ def test_OPの曲を本編の声の大きさにそろえる(tmp_path, monkeypatc
     monkeypatch.setattr(mu, "lufs", lambda path, start=0.0, seconds=None: -12.0)
     op = mu.match_voice({"path": "x.mp3", "start": 0.0, "match_voice_db": -2.5}, -15.5, 15.0)
     assert op["volume"] == pytest.approx(10 ** (-6.0 / 20), abs=1e-3) and "そろえた" in op["volume_note"]
+
+
+# OP の曲の形の決まり（2026-11-15 北原さん「しっくりくる。これはルール化しても良い」）:
+# 1秒目から厚く鳴る・途中でやせない・番組名で一段上がる
+def test_OPの形_頭から厚く途中でやせず番組名で上がる曲は合格(tmp_path):
+    s = song(tmp_path / "s.wav", seconds=20, loud=((10.5, 20.0, 0.6),), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert r["pass"] and r["ok"] == {"head": True, "no_dip": True, "rise": True}
+
+
+def test_OPの形_頭が静かな曲は不合格(tmp_path):
+    s = song(tmp_path / "s.wav", seconds=20, loud=((0.0, 1.0, 0.02), (10.5, 20.0, 0.6)), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert not r["ok"]["head"] and not r["pass"]
+
+
+def test_OPの形_途中でやせる曲は不合格(tmp_path):
+    s = song(tmp_path / "s.wav", seconds=20, loud=((6.0, 8.0, 0.02), (10.5, 20.0, 0.6)), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert not r["ok"]["no_dip"] and r["dip_at"] == pytest.approx(6.0, abs=1.0)
+
+
+def test_OPの形_番組名で上がらない曲は不合格(tmp_path):
+    s = song(tmp_path / "s.wav", seconds=20, loud=(), base=0.25)
+    assert not mu.shape(s, start=0.0, at=10.5, total=15.0)["ok"]["rise"]
+
+
+def test_長い曲から決まりを満たす15秒を探す(tmp_path):
+    # 20〜22秒に音のやせる所（そこから戻る所は山に見えるが使えない）。40秒で一段上がる → 29.5秒から使えば合格
+    s = song(tmp_path / "s.wav", seconds=70, loud=((20.0, 22.0, 0.02), (40.0, 70.0, 0.6)), base=0.25)
+    found = mu.scan(s, at=10.5, total=15.0)
+    assert found and found[0]["start"] == pytest.approx(29.5, abs=0.6) and found[0]["pass"]

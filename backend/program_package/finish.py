@@ -85,6 +85,13 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
         if op.get("match_voice_db") is not None:  # OP の曲を本編の声の大きさにそろえる
             from backend.program_package import opening
             mu.match_voice(op, mu.lufs(spec["source"], 0.0, 600.0), opening.length(ep.program_of(spec)))
+        from backend.program_package import opening
+        prog = ep.program_of(spec)
+        sh = mu.shape(op["path"], max(0.0, float(op.get("start") or 0.0)), mu.title_at(prog), opening.length(prog))
+        bad = [w for k, w in (("head", "頭が薄い"), ("no_dip", f"{sh['dip_at']:.0f}秒目でやせる"),
+                              ("rise", "番組名で上がらない")) if not sh["ok"][k]]
+        note["checks"].append({"id": "op_shape", "label": "OP の曲の形（頭から厚い・やせない・番組名で上がる）",
+                               "ok": sh["pass"], "detail": "、".join(bad) or f"上がり {sh['rise_db']} dB"})
     base = ep.build(spec, out / "_飾りまで")
     note["steps"].append({"step": "飾り", "file": base.name, "inserts": len(items)})
     final = base

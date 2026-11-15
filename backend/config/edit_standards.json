@@ -10,7 +10,8 @@
     "カット",
     "名前と用語",
     "書き出し",
-    "再現"
+    "再現",
+    "曲"
   ],
   "rules": [
     {
@@ -633,6 +634,31 @@
         "backend/tests/test_review_flags.py::test_a_caption_two_other_readings_disagree_with_is_flagged_with_their_words_as_options",
         "backend/tests/test_review_flags.py::test_one_reading_alone_other_than_the_recogniser_does_not_flag",
         "backend/tests/test_review_flags.py::test_the_review_sheet_flags_with_the_readings_when_given"
+      ],
+      "check": null
+    },
+    {
+      "id": "S31",
+      "group": "曲",
+      "rule": "番組 OP の曲は、1秒目から厚く鳴り、途中でやせず、番組名で一段はっきり上がる（理想は「ため」てから開く）15秒を使う",
+      "from": {
+        "day": "2026-11-15",
+        "by": "北原",
+        "said": "しっくりくる。これはルール化しても良いと思う"
+      },
+      "failure": "Vids の OP 案5〜8 は曲単体では良く聞こえたが、映像と合わせると前の案より劣った。静かに始まって育つ曲を15秒で切ると、育つ途中を使うので薄く聞こえる（G は6秒目で14dB やせ、J は番組名で下がった）",
+      "where": [
+        "backend/program_package/music.py::shape",
+        "backend/program_package/music.py::scan",
+        "backend/program_package/finish.py::finish"
+      ],
+      "tests": [
+        "backend/tests/test_program_music.py::test_OPの形_頭から厚く途中でやせず番組名で上がる曲は合格",
+        "backend/tests/test_program_music.py::test_OPの形_頭が静かな曲は不合格",
+        "backend/tests/test_program_music.py::test_OPの形_途中でやせる曲は不合格",
+        "backend/tests/test_program_music.py::test_OPの形_番組名で上がらない曲は不合格",
+        "backend/tests/test_program_music.py::test_長い曲から決まりを満たす15秒を探す",
+        "backend/tests/test_program_finish.py::test_通しで作ると曲が入り確かめと控えが残る"
       ],
       "check": null
     }

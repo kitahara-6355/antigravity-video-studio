@@ -132,6 +132,7 @@ def test_通しで作ると曲が入り確かめと控えが残る(tmp_path, son
     assert final.exists() and abs(mu.read(final).size / mu.SR - total) < 0.5
     checks = {c["id"]: c for c in note["checks"]}
     assert checks["op_climax"]["ok"], checks["op_climax"]
+    assert checks["op_shape"]["ok"], checks["op_shape"]  # 決まり S31
     assert "quality" in checks and note["state"].startswith("承認待ち")
     assert not checks["heads"]["ok"] and "地図" in checks["heads"]["detail"]  # 地図なしは「確かめていない」と残す
     assert [s["step"] for s in note["steps"]] == ["飾り", "曲"]

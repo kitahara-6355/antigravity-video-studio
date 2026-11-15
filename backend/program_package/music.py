@@ -14,6 +14,8 @@
 
     python -m backend.program_package.music analyze 曲.m4a
     python -m backend.program_package.music fit 曲.m4a --program backend/config/program/美麗の書道対談.json [--write AUDIO.json]
+    python -m backend.program_package.music shape 曲.mp3 --start 12.1 --program backend/config/program/美麗の書道対談.json
+    python -m backend.program_package.music scan フルの曲.mp3 --program backend/config/program/美麗の書道対談.json
     python -m backend.program_package.music check 番組OP.mp4 --program backend/config/program/美麗の書道対談.json
     python -m backend.program_package.music plan AUDIO.json --program backend/config/program/美麗の書道対談.json --music-dir 曲の置き場
 
@@ -160,6 +162,57 @@ def fit_or_head(path: str | Path, program: dict) -> dict:
     except MusicError as e:
         return {"start": 0.0, "start_note": f"曲の頭から（{e}）"}
     return {"start": f["start"], "start_note": f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）"}
+
+
+# OP の曲の形の決まり（edit_standards S31。2026-11-15 北原さん「しっくりくる。これはルール化しても良い」）。
+# 曲を単体で聞くと、静かに始まって育つ曲が良く聞こえるが、15秒の切り出しでは育つ途中を使うので映像の上で薄くなる。
+SHAPE_HEAD_DB = 4.0    # 1秒目が、その15秒のふつう（1秒ごとの中央値）よりこれ以上小さいと「頭が薄い」
+SHAPE_DIP_DB = 6.0     # 途中の1秒が、ふつうよりこれ以上小さいと「やせる」（終わりのフェードの分は見ない）
+SHAPE_RISE_DB = 3.0    # 番組名の後 3.5 秒が、前 5 秒よりこれだけ大きければ「一段上がる」
+SHAPE_FADE = 1.5
+SHAPE_BEFORE, SHAPE_AFTER = 5.0, 3.5
+
+
+def _shape_of(db: np.ndarray, at: float, total: float) -> dict:
+    n = int(total)
+    sec = np.array([_mean_db(db, int(i * FPS), int((i + 1) * FPS)) for i in range(n)])
+    med = float(np.median(sec))
+    body = sec[: max(1, int(total - SHAPE_FADE))]
+    k = int(body.argmin())
+    head = float(sec[0] - med)
+    dip = float(body[k] - med)
+    rise = (_mean_db(db, int(at * FPS), int((at + SHAPE_AFTER) * FPS))
+            - _mean_db(db, int((at - SHAPE_BEFORE) * FPS), int(at * FPS)))
+    ok = {"head": head > -SHAPE_HEAD_DB, "no_dip": dip > -SHAPE_DIP_DB, "rise": rise >= SHAPE_RISE_DB}
+    return {"head_db": round(head, 1), "dip_db": round(dip, 1), "dip_at": float(k), "rise_db": round(rise, 1),
+            "ok": ok, "pass": all(ok.values())}
+
+
+def shape(path: str | Path, start: float, at: float, total: float) -> dict:
+    """曲を start 秒から total 秒使ったとき、OP の形の決まり3つ（頭から厚い・やせない・番組名で上がる）を満たすか。"""
+    return {"start": round(start, 2), **_shape_of(loudness(read(path, start, total)), at, total)}
+
+
+def scan(path: str | Path, at: float, total: float, step: float = 0.5, top: int = 3) -> list[dict]:
+    """長い曲の中から、OP の形の決まりを満たす使い始めを探す。合格の物を上がり方の大きい順に（間隔 APART 以上）。"""
+    db = loudness(read(path))
+    dur = len(db) / FPS
+    found: list[dict] = []
+    s = 0.0
+    while s + total <= dur:
+        i = int(s * FPS)
+        r = _shape_of(db[i:i + int(total * FPS) + 1], at, total)
+        if r["pass"]:
+            found.append({"start": round(s, 2), **r})
+        s += step
+    found.sort(key=lambda r: -r["rise_db"])
+    out: list[dict] = []
+    for r in found:
+        if all(abs(r["start"] - o["start"]) >= APART for o in out):
+            out.append(r)
+        if len(out) >= top:
+            break
+    return out
 
 
 def lufs(path: str | Path, start: float = 0.0, seconds: float | None = None) -> float:
@@ -443,6 +496,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--cleared", required=True)
     s.add_argument("--transfer", help="個人で作った曲を法人で使う利用許諾の控え")
     s.add_argument("--ledger")
+    for name in ("shape", "scan"):
+        s = sub.add_parser(name, help="OP の曲の形の決まり（頭から厚い・やせない・番組名で上がる）を測る"
+                           if name == "shape" else "長い曲から、OP の形の決まりを満たす使い始めを探す")
+        s.add_argument("path")
+        s.add_argument("--program", required=True)
+        if name == "shape":
+            s.add_argument("--start", type=float, default=0.0)
     for name in ("analyze", "fit", "check", "plan", "fetch"):
         s = sub.add_parser(name)
         s.add_argument("path", help="曲（plan のときは書き出す AUDIO.json・fetch のときは曲の置き場）")
@@ -491,6 +551,11 @@ def main(argv: list[str] | None = None) -> int:
             Path(a.path).write_text(json.dumps(spec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             print(json.dumps(spec, ensure_ascii=False, indent=1))
             return 0
+        if a.cmd in ("shape", "scan"):
+            at, total = title_at(program), opening.length(program)
+            r = shape(a.path, a.start, at, total) if a.cmd == "shape" else scan(a.path, at, total)
+            print(json.dumps(r, ensure_ascii=False, indent=1))
+            return 0 if (r["pass"] if a.cmd == "shape" else r) else 1
         if a.cmd == "check":
             r = check(a.path, title_at(program))
             print(json.dumps(r, ensure_ascii=False))
