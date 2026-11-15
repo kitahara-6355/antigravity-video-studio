@@ -37,6 +37,86 @@
    "prompt": "歌なしのインストゥルメンタル、30秒。ピアノとストリングス、きらめくベルの音。テンポはゆったり（80BPM前後）。静かなピアノで始まり、10秒あたりでストリングスが広がって一気に明るく盛り上がる。上品であたたかく、希望を感じる対談番組のオープニング。",
    "account": "個人（Google AI Pro）",
    "original": "20_素材/共通/Vids曲/曲_OP_01.mp4"
+  },
+  "op_vids_02": {
+   "title": "OP 案2（和の楽器）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_02_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。箏とピアノ、やわらかいストリングス。和の雰囲気だが現代的で明るい。箏の静かなフレーズで始まり、10秒あたりで太鼓の一打とともに華やかに盛り上がる。凛として晴れやか、書道家の対談番組のオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_02.mp4"
+  },
+  "op_vids_03": {
+   "title": "OP 案3（明るく軽やか）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_03_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。アコースティックギターとピアノ、軽いパーカッション。やや速め（110BPM前後）で軽やか。ギターだけで始まり、10秒あたりでピアノと手拍子が加わって明るく盛り上がる。朝の情報番組のように親しみやすく、笑顔になるオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_03.mp4"
+  },
+  "op_vids_04": {
+   "title": "OP 案4（壮大）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_04_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。オーケストラ、ピアノ、ティンパニ。テンポは中くらい（90BPM前後）。弱いピアノと弦の持続音で始まり、10秒あたりでオーケストラ全体が壮大に立ち上がる。感動的で格調高い、ドキュメンタリー番組のオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_04.mp4"
+  },
+  "ed_vids_01": {
+   "title": "ED 案1（ピアノとストリングス）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "ed_01_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。ピアノとやわらかいストリングス。ゆったり（70BPM前後）。あたたかく余韻のある締めくくりで、最後の5秒は静かに消えていく。対談番組のエンディング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_ED_01.mp4"
+  },
+  "bgm_vids_01": {
+   "title": "BGM 案1（カフェ風・約3分）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3.5、2026-11-15）",
+   "file": "bgm_01_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3.5）",
+   "prompt": "歌なしのインストゥルメンタル。やわらかいピアノとアコースティックギター、控えめなパッド。ゆったり一定のテンポで、目立つメロディや盛り上がりは入れない。人の話し声の後ろで流しても邪魔にならない、落ち着いたカフェのような雰囲気。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_BGM_01.mp4"
   }
  },
  "file_note": "file は曲のファイル名（例 \"white_cocktail.mp3\"）。2026-11-12 の仕上げ（v67）で使った実物は PC の作業場にある。名前を確かめて入れるまで plan は「ファイルが決まっていない」で止まる",
