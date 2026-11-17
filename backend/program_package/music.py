@@ -14,6 +14,8 @@
 
     python -m backend.program_package.music analyze 曲.m4a
     python -m backend.program_package.music fit 曲.m4a --program backend/config/program/美麗の書道対談.json [--write AUDIO.json]
+    python -m backend.program_package.music shape 曲.mp3 --start 12.1 --program backend/config/program/美麗の書道対談.json
+    python -m backend.program_package.music scan フルの曲.mp3 --program backend/config/program/美麗の書道対談.json
     python -m backend.program_package.music check 番組OP.mp4 --program backend/config/program/美麗の書道対談.json
     python -m backend.program_package.music plan AUDIO.json --program backend/config/program/美麗の書道対談.json --music-dir 曲の置き場
 
@@ -136,16 +138,130 @@ def title_at(program: dict) -> float:
     return len(program["slides"]) * program["slide_seconds"]
 
 
+MAX_LEAD = 0.0  # 曲の頭を遅らせてよい秒。頭の無音は違和感が強い（2026-11-15 北原さん）ので既定は 0
+
+
 def fit(analysis: dict, at: float, total: float) -> dict:
     """山の入りが OP の at 秒に来るような、曲の使い始め（start）。使える山のうち、上がり方がいちばん大きい物。"""
+    # 山が番組名より早い曲は、頭に無音を足して遅らせる（start が負＝遅らせる秒。MAX_LEAD まで）
     ok = [c for c in analysis["climaxes"]
-          if c["at"] - at >= 0 and c["at"] - at + total <= analysis["duration"]]
+          if c["at"] - at >= -MAX_LEAD and max(0.0, c["at"] - at) + total <= analysis["duration"] + MAX_LEAD]
     if not ok:
         raise MusicError(f"番組名（{at:.1f}秒）に合わせられる山がありません。"
                          f"候補: {[c['at'] for c in analysis['climaxes']] or 'なし'}（曲の長さ {analysis['duration']}秒）")
     best = ok[0]
     return {"start": round(best["at"] - at, 2), "climax": best,
             "others": [{"start": round(c["at"] - at, 2), **c} for c in ok[1:]]}
+
+
+def fit_or_head(path: str | Path, program: dict) -> dict:
+    """OP の使い始め。山を番組名に合わせられなければ曲の頭から（無音は足さない）。"""
+    from backend.program_package import opening
+    try:
+        f = fit(analyze(path), title_at(program), opening.length(program))
+    except MusicError as e:
+        return {"start": 0.0, "start_note": f"曲の頭から（{e}）"}
+    return {"start": f["start"], "start_note": f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）"}
+
+
+# OP の曲の形の決まり（edit_standards S31。2026-11-15 北原さん「しっくりくる。これはルール化しても良い」）。
+# 曲を単体で聞くと、静かに始まって育つ曲が良く聞こえるが、15秒の切り出しでは育つ途中を使うので映像の上で薄くなる。
+SHAPE_HEAD_DB = 4.0    # 1秒目が、その15秒のふつう（1秒ごとの中央値）よりこれ以上小さいと「頭が薄い」
+SHAPE_DIP_DB = 6.0     # 途中の1秒が、ふつうよりこれ以上小さいと「やせる」（終わりのフェードの分は見ない）
+SHAPE_RISE_DB = 3.0    # 番組名の後 3.5 秒が、前 5 秒よりこれだけ大きければ「一段上がる」
+SHAPE_FADE = 1.5
+SHAPE_BEFORE, SHAPE_AFTER = 5.0, 3.5
+SHAPE_TAME = 6.5       # 番組名の直前のこの秒数の中で静かになるのは「ため」。ただし後で元の厚さ以上に開くときだけ
+SHAPE_OPEN_DB = -2.0   # 開いた後（番組名の後 3.5 秒）が、ための前の大きさからこれ以上小さくないこと
+
+
+def _shape_of(db: np.ndarray, at: float, total: float) -> dict:
+    n = int(total)
+    sec = np.array([_mean_db(db, int(i * FPS), int((i + 1) * FPS)) for i in range(n)])
+    med = float(np.median(sec))
+    end = max(1, int(total - SHAPE_FADE))
+    t0 = max(1, int(at - SHAPE_TAME))
+    after = _mean_db(db, int(at * FPS), int((at + SHAPE_AFTER) * FPS))
+    before_tame = _mean_db(db, 0, int(t0 * FPS))
+    # ため→開く（桜色の形）: 番組名の直前で静かになり、番組名の後で、ための前と同じかそれ以上に開く
+    opens = after - before_tame >= SHAPE_OPEN_DB
+    body = np.concatenate([sec[:t0], sec[int(np.ceil(at)):end]]) if opens else sec[:end]
+    idx = list(range(t0)) + list(range(int(np.ceil(at)), end)) if opens else list(range(end))
+    k = int(body.argmin())
+    head = float(sec[0] - med)
+    dip = float(body[k] - med)
+    tame = opens and float(sec[t0:int(at)].min() - med) <= -SHAPE_DIP_DB
+    rise = after - _mean_db(db, int((at - SHAPE_BEFORE) * FPS), int(at * FPS))
+    ok = {"head": head > -SHAPE_HEAD_DB, "no_dip": dip > -SHAPE_DIP_DB, "rise": rise >= SHAPE_RISE_DB}
+    return {"head_db": round(head, 1), "dip_db": round(dip, 1), "dip_at": float(idx[k]), "rise_db": round(rise, 1),
+            "tame": bool(tame), "ok": ok, "pass": all(ok.values())}
+
+
+def shape(path: str | Path, start: float, at: float, total: float) -> dict:
+    """曲を start 秒から total 秒使ったとき、OP の形の決まり3つ（頭から厚い・やせない・番組名で上がる）を満たすか。"""
+    return {"start": round(start, 2), **_shape_of(loudness(read(path, start, total)), at, total)}
+
+
+def scan(path: str | Path, at: float, total: float, step: float = 0.5, top: int = 3) -> list[dict]:
+    """長い曲の中から、OP の形の決まりを満たす使い始めを探す。合格の物を上がり方の大きい順に（間隔 APART 以上）。"""
+    db = loudness(read(path))
+    dur = len(db) / FPS
+    found: list[dict] = []
+    s = 0.0
+    while s + total <= dur:
+        i = int(s * FPS)
+        r = _shape_of(db[i:i + int(total * FPS) + 1], at, total)
+        if r["pass"]:
+            found.append({"start": round(s, 2), **r})
+        s += step
+    found.sort(key=lambda r: -r["rise_db"])
+    out: list[dict] = []
+    for r in found:
+        if all(abs(r["start"] - o["start"]) >= APART for o in out):
+            out.append(r)
+        if len(out) >= top:
+            break
+    return out
+
+
+def compare(base: str | Path, song: str | Path, start: float, out: str | Path, *, cut: float = 15.0,
+            target_lufs: float = -18.1) -> Path:
+    """聞き比べ用の1本: 仕上げ版の頭（base）の OP の音を曲に入れ替える。曲は start から cut 秒、target_lufs にそろえる
+    （本編の声 -15.6 LUFS より 2.5 dB 小さい）。moov を先頭に置く（2026-11-15: 後ろにあった E2・L が Drive の
+    プレビューで再生できなかった。本線の書き出しは前から +faststart）。"""
+    out = Path(out)
+    g = target_lufs - lufs(song, start, cut)
+    fade = f"if(lt(t,{cut - 0.4:.2f}),0,if(lt(t,{cut:.2f}),(t-{cut - 0.4:.2f})/0.4,1))"
+    graph = (f"[0:a]volume='{fade}':eval=frame[base];"
+             f"[1:a]aresample=48000,volume={g:.1f}dB,afade=t=in:d=0.05,afade=t=out:st={cut - 1.5:.2f}:d=1.5[op];"
+             "[base][op]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.84[a]")
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(base), "-ss", f"{start:.3f}", "-t", f"{cut:.3f}",
+                    "-i", str(song), "-filter_complex", graph, "-map", "0:v", "-map", "[a]", "-c:v", "copy",
+                    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)], check=True)
+    return out
+
+
+def lufs(path: str | Path, start: float = 0.0, seconds: float | None = None) -> float:
+    """音の大きさ（統合ラウドネス、LUFS）。"""
+    cmd = ["ffmpeg", "-nostdin", "-hide_banner", "-ss", f"{start:.3f}"]
+    if seconds:
+        cmd += ["-t", f"{seconds:.3f}"]
+    cmd += ["-i", str(path), "-vn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"]
+    err = subprocess.run(cmd, capture_output=True, text=True, check=False).stderr
+    vals = re.findall(r"I:\s+(-?[0-9.]+) LUFS", err)
+    if not vals:
+        raise MusicError(f"音の大きさが測れません: {path}")
+    return float(vals[-1])
+
+
+def match_voice(op: dict, voice_lufs: float, seconds: float) -> dict:
+    """OP の曲の大きさを、本編の声の大きさ + match_voice_db にそろえる volume を決める（2026-11-15 北原さん:
+    OP の曲が対談の声より明らかに大きく、そのまま本編に入ると聞き取りづらい）。"""
+    target = voice_lufs + float(op["match_voice_db"])
+    song = lufs(op["path"], max(0.0, float(op.get("start") or 0.0)), seconds)
+    op["volume"] = round(10 ** ((target - song) / 20), 3)
+    op["volume_note"] = f"声 {voice_lufs} LUFS に {op['match_voice_db']} dB でそろえた（曲 {song} LUFS）"
+    return op
 
 
 def check(path: str | Path, at: float, window: float = 2.5) -> dict:
@@ -174,7 +290,6 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
     - 出どころ（source）の無い曲は使わない。provisional の曲は印を引き継ぐ（名前に「_仮曲入り」が付く）
     - roles を渡すと、その役（op・bgm・ed）だけを作る（本線は bgm だけ）
     """
-    from backend.program_package import opening
     use = (ledger.get("programs") or {}).get(program["name"])
     if not use:
         raise MusicError(f"曲の台帳に番組「{program['name']}」がありません")
@@ -198,9 +313,7 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
         item = {k: v for k, v in r.items() if k not in ("track", "start_note") and v is not None}
         item.update(path=str(path), provisional=bool(t.get("provisional")))
         if role == "op" and r.get("start") is None:
-            f = fit(analyze(path), title_at(program), opening.length(program))
-            item["start"] = f["start"]
-            item["start_note"] = f"music が決めた（山の入り {f['climax']['at']}秒を番組名に合わせる）"
+            item.update(fit_or_head(path, program))
         if role == "bgm" and quiet:
             if body_seconds is None:
                 raise MusicError("曲を止める区間を使うには本編の長さが要ります")
@@ -210,33 +323,6 @@ def plan(program: dict, ledger: dict, music_dir: str | Path | None, quiet: list[
         if t.get("ai_generated"):  # 公開のときに開示を考える印。控えまで運ぶ
             out["tracks"][role].update(ai_generated=True, made_with=t.get("made_with"))
     return out
-
-
-def add_track(ledger: dict, key: str, *, title: str, file: str, source: str, by: str, artist: str | None = None,
-              ai_generated: bool = False, made_with: str | None = None, prompt: str | None = None,
-              cleared: str | None = None, today: str | None = None) -> dict:
-    """曲を台帳に足す（人が作った・選んだ曲の控え）。
-
-    Vids などで作った曲は ai_generated と、作った道具・指示文（prompt）を残す。指示文が資産になる。
-    使ってよい根拠（cleared）を書くまでは provisional（公開に使わない・名前に「_仮曲入り」が付く）。
-    """
-    import datetime as dt
-    if not re.fullmatch(r"[a-z0-9_]+", key):
-        raise MusicError(f"曲の名前（key）は半角の小文字・数字・_ だけ: {key}")
-    if key in (ledger.get("tracks") or {}):
-        raise MusicError(f"同じ名前の曲がもうあります: {key}（別の名前で足す。前の曲は消さない）")
-    if not source.strip() or not by.strip():
-        raise MusicError("出どころ（--source）と、足した人（--by）を書いてください")
-    if ai_generated and not ((made_with or "").strip() and (prompt or "").strip()):
-        raise MusicError("AI で作った曲は、作った道具（--made-with）と指示文（--prompt）を残してください")
-    t = {"title": title, "artist": artist, "source": source, "file": file, "provisional": not (cleared or "").strip(),
-         "added": {"by": by, "on": today or dt.date.today().isoformat()}}
-    if ai_generated:
-        t.update(ai_generated=True, made_with=made_with, prompt=prompt)
-    if (cleared or "").strip():
-        t["cleared"] = cleared.strip()
-    ledger.setdefault("tracks", {})[key] = t
-    return t
 
 
 def mainline_bgm(ledger: dict, music_dir: str | Path | None) -> dict:
@@ -322,6 +408,90 @@ def fetch(ledger: dict, music_dir: str | Path, service=None, env=None) -> dict:
     return out
 
 
+# AI で作った曲を公開に使う条件（2026-11-14 一次情報で確認）:
+# - 法人の Workspace: サービス固有規約 12.12 で生成物は顧客のデータ・Google は権利を主張しない、12.4 に商用の制限なし、
+#   12.10 の補償の対象に Google Vids（有料の契約のみ）
+# - 個人（Google AI Pro）: Google 利用規約（2026-07-30 版）で Google は生成物の所有権を主張しない・商用の制限なし。
+#   ただし補償は無く、持ち主は作った個人。法人の動画に使うには、作った人から法人への利用許諾の控え（transfer）を残す
+#   （info@ の Workspace では Vids が使えないため、2026-11-14 時点は個人で作る — 北原さん）
+AI_CLEAR_DOMAINS = ("kitahara-birei.com",)
+AI_PUBLISH_TODO = ("AI で作った曲が入っている。投稿のときに YouTube の「改変・合成コンテンツ」を「はい」にする"
+                   "（YouTube ヘルプ 14328491 で「AI で作った音楽」は開示が要る例）")
+
+
+def _clear_ok(t: dict, account: str | None, transfer: str | None = None) -> None:
+    if not t.get("ai_generated") or (account or "").rsplit("@", 1)[-1] in AI_CLEAR_DOMAINS:
+        return
+    if not (account or "").strip():
+        raise MusicError("AI で作った曲は、作ったアカウント（--account）を書いてから公開に使う")
+    if not (transfer or t.get("transfer") or "").strip():
+        raise MusicError(f"個人のアカウント（{account}）で作った曲を法人の動画に使うには、作った人から法人への"
+                         "利用許諾の控え（--transfer、例「2026-11-14 北原（作った人）が美麗書院に利用を許諾・チャット」）が要る")
+
+
+def clear_track(ledger: dict, key: str, cleared: str, transfer: str | None = None) -> dict:
+    """使ってよい根拠を書いて、仮の曲を公開に使える曲にする。AI で作った曲は、法人のアカウントで作った物か、
+    個人で作って法人への利用許諾の控え（transfer）がある物だけ。"""
+    t = (ledger.get("tracks") or {}).get(key)
+    if not t:
+        raise MusicError(f"曲の台帳に曲「{key}」がありません")
+    if not cleared.strip():
+        raise MusicError("使ってよい根拠（--cleared）を書いてください")
+    _clear_ok(t, t.get("account"), transfer)
+    t.update(cleared=cleared.strip(), provisional=False)
+    if (transfer or "").strip():
+        t["transfer"] = transfer.strip()
+    t["indemnified"] = (t.get("account") or "").rsplit("@", 1)[-1] in AI_CLEAR_DOMAINS if t.get("ai_generated") else None
+    return t
+
+
+def extract_audio(video: str | Path, dest: str | Path) -> Path:
+    """Vids で書き出した mp4 から音だけを取り出す（mp3・質は高め）。映像は使わない。"""
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        raise MusicError(f"同じ名前のファイルがもうあります: {dest}（別の名前にする。前の曲は消さない）")
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", str(video), "-vn", "-c:a", "libmp3lame", "-q:a", "2",
+                    str(dest)], check=True)
+    return dest
+
+
+def add_track(ledger: dict, key: str, *, title: str, file: str, source: str, by: str, artist: str | None = None,
+              ai_generated: bool = False, made_with: str | None = None, prompt: str | None = None,
+              cleared: str | None = None, today: str | None = None, account: str | None = None,
+              original: str | None = None, transfer: str | None = None) -> dict:
+    """曲を台帳に足す（人が作った・選んだ曲の控え）。
+
+    Vids などで作った曲は ai_generated と、作った道具・指示文（prompt）を残す。指示文が資産になる。
+    使ってよい根拠（cleared）を書くまでは provisional（公開に使わない・名前に「_仮曲入り」が付く）。
+    """
+    import datetime as dt
+    if not re.fullmatch(r"[a-z0-9_]+", key):
+        raise MusicError(f"曲の名前（key）は半角の小文字・数字・_ だけ: {key}")
+    if key in (ledger.get("tracks") or {}):
+        raise MusicError(f"同じ名前の曲がもうあります: {key}（別の名前で足す。前の曲は消さない）")
+    if not source.strip() or not by.strip():
+        raise MusicError("出どころ（--source）と、足した人（--by）を書いてください")
+    if ai_generated and not ((made_with or "").strip() and (prompt or "").strip()):
+        raise MusicError("AI で作った曲は、作った道具（--made-with）と指示文（--prompt）を残してください")
+    t = {"title": title, "artist": artist, "source": source, "file": file, "provisional": not (cleared or "").strip(),
+         "added": {"by": by, "on": today or dt.date.today().isoformat()}}
+    if ai_generated:
+        t.update(ai_generated=True, made_with=made_with, prompt=prompt)
+        if account:
+            t["account"] = account
+        if original:  # Vids の書き出し（mp4）の置き場。指示文と並ぶ資産
+            t["original"] = original
+        if (transfer or "").strip():
+            t["transfer"] = transfer.strip()
+        if (cleared or "").strip():
+            _clear_ok(t, account, transfer)
+    if (cleared or "").strip():
+        t["cleared"] = cleared.strip()
+    ledger.setdefault("tracks", {})[key] = t
+    return t
+
+
 def bgm_ranges(body_seconds: float, quiet: list[list[float]], fade: float = 3.0) -> list[list[float]]:
     """本編のうち BGM を敷く区間。quiet の区間（揮毫など、曲を止めたい所）を避ける。短すぎる切れ端は捨てる。"""
     out, t = [], 0.0
@@ -342,9 +512,28 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("key")
     for flag in ("--title", "--file", "--source", "--by"):
         s.add_argument(flag, required=True)
-    for flag in ("--artist", "--made-with", "--prompt", "--cleared", "--ledger"):
+    for flag in ("--artist", "--made-with", "--prompt", "--cleared", "--ledger", "--account", "--original", "--transfer"):
         s.add_argument(flag)
     s.add_argument("--ai", action="store_true")
+    s.add_argument("--from-video", help="Vids で書き出した mp4。音だけ取り出して --music-dir に --file の名前で置く")
+    s.add_argument("--music-dir")
+    s = sub.add_parser("clear", help="使ってよい根拠を書いて、仮の曲を公開に使える曲にする")
+    s.add_argument("key")
+    s.add_argument("--cleared", required=True)
+    s.add_argument("--transfer", help="個人で作った曲を法人で使う利用許諾の控え")
+    s.add_argument("--ledger")
+    s = sub.add_parser("compare", help="聞き比べ用の1本を作る（仕上げ版の頭の OP の音を曲に入れ替える）")
+    s.add_argument("base")
+    s.add_argument("song")
+    s.add_argument("--start", type=float, default=0.0)
+    s.add_argument("--out", required=True)
+    for name in ("shape", "scan"):
+        s = sub.add_parser(name, help="OP の曲の形の決まり（頭から厚い・やせない・番組名で上がる）を測る"
+                           if name == "shape" else "長い曲から、OP の形の決まりを満たす使い始めを探す")
+        s.add_argument("path")
+        s.add_argument("--program", required=True)
+        if name == "shape":
+            s.add_argument("--start", type=float, default=0.0)
     for name in ("analyze", "fit", "check", "plan", "fetch"):
         s = sub.add_parser(name)
         s.add_argument("path", help="曲（plan のときは書き出す AUDIO.json・fetch のときは曲の置き場）")
@@ -356,13 +545,30 @@ def main(argv: list[str] | None = None) -> int:
             s.add_argument("--write", help="remix の指定（AUDIO.json）の op_music.path と start を書き換える")
     a = p.parse_args(argv)
     try:
+        if a.cmd == "clear":
+            where = Path(a.ledger) if a.ledger else LEDGER
+            ledger = json.loads(where.read_text(encoding="utf-8"))
+            t = clear_track(ledger, a.key, a.cleared, a.transfer)
+            where.write_text(json.dumps(ledger, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+            print(json.dumps({a.key: t}, ensure_ascii=False, indent=1))
+            return 0
         if a.cmd == "add":
             where = Path(a.ledger) if a.ledger else LEDGER
             ledger = json.loads(where.read_text(encoding="utf-8"))
             t = add_track(ledger, a.key, title=a.title, file=a.file, source=a.source, by=a.by, artist=a.artist,
-                          ai_generated=a.ai, made_with=a.made_with, prompt=a.prompt, cleared=a.cleared)
+                          ai_generated=a.ai, made_with=a.made_with, prompt=a.prompt, cleared=a.cleared,
+                          account=a.account, original=a.original or a.from_video, transfer=a.transfer)
+            if a.from_video:  # 台帳の確かめが通ってから音を取り出す
+                import os
+                d = a.music_dir or os.environ.get("AVS_MUSIC_DIR")
+                if not d:
+                    raise MusicError("曲の置き場が分かりません（--music-dir か環境変数 AVS_MUSIC_DIR）")
+                extract_audio(a.from_video, Path(d) / a.file)
             where.write_text(json.dumps(ledger, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             print(json.dumps({a.key: t}, ensure_ascii=False, indent=1))
+            return 0
+        if a.cmd == "compare":
+            print(compare(a.base, a.song, a.start, a.out))
             return 0
         if a.cmd == "analyze":
             print(json.dumps(analyze(a.path), ensure_ascii=False, indent=1))
@@ -379,6 +585,11 @@ def main(argv: list[str] | None = None) -> int:
             Path(a.path).write_text(json.dumps(spec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             print(json.dumps(spec, ensure_ascii=False, indent=1))
             return 0
+        if a.cmd in ("shape", "scan"):
+            at, total = title_at(program), opening.length(program)
+            r = shape(a.path, a.start, at, total) if a.cmd == "shape" else scan(a.path, at, total)
+            print(json.dumps(r, ensure_ascii=False, indent=1))
+            return 0 if (r["pass"] if a.cmd == "shape" else r) else 1
         if a.cmd == "check":
             r = check(a.path, title_at(program))
             print(json.dumps(r, ensure_ascii=False))

@@ -2,6 +2,7 @@
 
 曲そのものはリポジトリに置かないので、作った音（拍と、途中から大きくなる山）で確かめる。
 """
+import json
 import re
 import shutil
 import subprocess
@@ -365,3 +366,113 @@ def test_同じ名前で中身の違う曲が2つあれば_決めずに止まる
     with pytest.raises(mu.MusicError, match="中身ちがい"):
         mu.fetch(LEDGER, tmp_path, service=svc, env=ENV)
     assert not (tmp_path / "bed.m4a").exists()
+
+
+def test_AIで作った曲は法人で作るか個人から法人への利用許諾の控えがあれば公開に使える():
+    led = {"tracks": {}}
+    kw = {"title": "OP 案1", "file": "a.mp3", "source": "Google Vids", "by": "北原", "ai_generated": True,
+          "made_with": "Google Vids", "prompt": "ピアノとストリングス"}
+    with pytest.raises(mu.MusicError, match="利用許諾"):  # 個人で作った曲は許諾の控えが無いと仮のまま
+        mu.add_track(led, "op_vids_01", account="someone@gmail.com", cleared="規約を読んだ", **kw)
+    mu.add_track(led, "op_vids_02", account="someone@gmail.com", original="Vids曲/曲_OP_02.mp4", **kw)
+    with pytest.raises(mu.MusicError, match="利用許諾"):
+        mu.clear_track(led, "op_vids_02", "Google 利用規約（2026-07-30 版）")
+    t = mu.clear_track(led, "op_vids_02", "Google 利用規約（2026-07-30 版）", transfer="2026-11-14 北原が美麗書院に許諾")
+    assert t["provisional"] is False and t["transfer"] and t["indemnified"] is False
+    mu.add_track(led, "op_vids_03", account="info@kitahara-birei.com", **kw)
+    assert mu.clear_track(led, "op_vids_03", "Workspace サービス固有規約 12.4・12.10・12.12")["indemnified"] is True
+    mu.add_track(led, "op_vids_04", **kw)
+    with pytest.raises(mu.MusicError, match="アカウント"):
+        mu.clear_track(led, "op_vids_04", "規約を読んだ", transfer="許諾")
+
+
+def test_Vidsの書き出しから音を取り出して台帳に足す(tmp_path):
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg が無い")
+    mp4 = tmp_path / "曲_OP_01.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x180:r=5:d=3",
+                    "-f", "lavfi", "-i", "sine=f=440:r=48000:d=3", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-c:a", "aac", "-shortest", str(mp4)], check=True)
+    led = tmp_path / "music.json"
+    led.write_text(json.dumps({"tracks": {}}), encoding="utf-8")
+    assert mu.main(["add", "op_vids_01", "--title", "OP 案1", "--file", "op_vids_01.mp3", "--source", "Google Vids",
+                    "--by", "北原", "--ai", "--made-with", "Google Vids", "--prompt", "ピアノ", "--ledger", str(led),
+                    "--account", "info@kitahara-birei.com", "--from-video", str(mp4),
+                    "--music-dir", str(tmp_path / "曲")]) == 0
+    assert (tmp_path / "曲" / "op_vids_01.mp3").stat().st_size > 1000
+    assert json.loads(led.read_text(encoding="utf-8"))["tracks"]["op_vids_01"]["provisional"] is True
+    with pytest.raises(mu.MusicError, match="もうあります"):  # 前の曲を上書きしない
+        mu.extract_audio(mp4, tmp_path / "曲" / "op_vids_01.mp3")
+
+
+def test_山が番組名より早い曲は無音を足さず曲の頭から使う(tmp_path, monkeypatch):
+    a = {"duration": 30.0, "bpm": 80.0, "climaxes": [{"at": 8.5, "rise_db": 4.5, "after_db": -19.5}]}
+    with pytest.raises(mu.MusicError):  # 頭の無音は違和感が強い（2026-11-15 北原さん）
+        mu.fit(a, 10.5, 15.0)
+    monkeypatch.setattr(mu, "analyze", lambda p: a)
+    got = mu.fit_or_head("x.mp3", opening.load("backend/config/program/美麗の書道対談.json"))
+    assert got["start"] == 0.0 and "頭から" in got["start_note"]
+
+
+def test_OPの曲を本編の声の大きさにそろえる(tmp_path, monkeypatch):
+    monkeypatch.setattr(mu, "lufs", lambda path, start=0.0, seconds=None: -12.0)
+    op = mu.match_voice({"path": "x.mp3", "start": 0.0, "match_voice_db": -2.5}, -15.5, 15.0)
+    assert op["volume"] == pytest.approx(10 ** (-6.0 / 20), abs=1e-3) and "そろえた" in op["volume_note"]
+
+
+# OP の曲の形の決まり（2026-11-15 北原さん「しっくりくる。これはルール化しても良い」）:
+# 1秒目から厚く鳴る・途中でやせない・番組名で一段上がる
+def test_OPの形_頭から厚く途中でやせず番組名で上がる曲は合格(tmp_path):
+    s = song(tmp_path / "s.wav", seconds=20, loud=((10.5, 20.0, 0.6),), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert r["pass"] and r["ok"] == {"head": True, "no_dip": True, "rise": True}
+
+
+def test_OPの形_頭が静かな曲は不合格(tmp_path):
+    s = song(tmp_path / "s.wav", seconds=20, loud=((0.0, 1.0, 0.02), (10.5, 20.0, 0.6)), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert not r["ok"]["head"] and not r["pass"]
+
+
+def test_OPの形_途中でやせる曲は不合格(tmp_path):
+    # 番組名から遠い所（2〜4秒）でやせるのは「ため」ではない
+    s = song(tmp_path / "s.wav", seconds=20, loud=((2.0, 4.0, 0.02), (10.5, 20.0, 0.6)), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert not r["ok"]["no_dip"] and r["dip_at"] == pytest.approx(2.0, abs=1.0)
+
+
+def test_OPの形_番組名で上がらない曲は不合格(tmp_path):
+    s = song(tmp_path / "s.wav", seconds=20, loud=(), base=0.25)
+    assert not mu.shape(s, start=0.0, at=10.5, total=15.0)["ok"]["rise"]
+
+
+def test_長い曲から決まりを満たす15秒を探す(tmp_path):
+    # 20〜22秒に音のやせる所（そこから戻る所は山に見えるが使えない）。40秒で一段上がる → 29.5秒から使えば合格
+    s = song(tmp_path / "s.wav", seconds=70, loud=((20.0, 22.0, 0.02), (40.0, 70.0, 0.6)), base=0.25)
+    found = mu.scan(s, at=10.5, total=15.0)
+    assert found and found[0]["start"] == pytest.approx(29.5, abs=0.6) and found[0]["pass"]
+
+
+def test_OPの形_番組名の直前のためは元より大きく開けば合格(tmp_path):
+    # 桜色の形: 6〜10.5秒で静かになり（ため）、番組名で頭より大きく開く
+    s = song(tmp_path / "s.wav", seconds=20, loud=((6.0, 10.5, 0.03), (10.5, 20.0, 0.6)), base=0.25)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert r["pass"] and r["tame"]
+
+
+def test_OPの形_ためた後に元より小さくしか開かなければやせるとみなす(tmp_path):
+    # G の形: 頭が厚く、6〜8秒でやせ、番組名の後も頭より小さい
+    s = song(tmp_path / "s.wav", seconds=20, loud=((0.0, 6.0, 0.6), (6.0, 8.0, 0.02), (8.0, 10.5, 0.05)), base=0.15)
+    r = mu.shape(s, start=0.0, at=10.5, total=15.0)
+    assert not r["ok"]["no_dip"] and not r["tame"]
+
+
+def test_聞き比べはDriveのプレビューで再生できるようmoovを先頭に置く(tmp_path):
+    base = tmp_path / "base.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=320x180:d=20:r=30",
+                    "-f", "lavfi", "-i", "sine=f=300:d=20", "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", str(base)], check=True)
+    out = mu.compare(base, song(tmp_path / "s.wav", seconds=30), 5.0, tmp_path / "c.mp4")
+    b = out.read_bytes()
+    assert b.index(b"moov") < b.index(b"mdat")
+    assert abs(mu.read(out).size / mu.SR - 20) < 0.3

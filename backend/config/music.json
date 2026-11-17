@@ -1,19 +1,252 @@
 {
  "_doc": "曲の台帳。どの番組のどこ（OP・インタビュー中の BGM・ED）にどの曲を使うかと、曲の出どころ。python -m backend.program_package.music plan が読み、remix の指定（AUDIO.json）を作る。曲のファイルはリポジトリに置かない（--music-dir か環境変数 AVS_MUSIC_DIR の場所から file の名前で探す）。出どころ（source）が書いていない曲と provisional の曲は公開に使わない。",
  "tracks": {
-  "sakura": {"title": "桜色に染めて", "artist": "田中芳典", "source": "Drive 40_完成/20250922_久木田ヒロノブ の「曲の出どころ」を見る", "file": "sakurairo_tr2.mp3", "provisional": false},
-  "white_cocktail": {"title": "White cocktail", "artist": "Maniira", "source": "OpenTracks（旧 DOVA-SYNDROME）", "file": "white_cocktail.mp3", "provisional": false},
-  "new_departure": {"title": "New Departure", "artist": "FLASH BEAT", "source": "Drive 40_完成/20250922_久木田ヒロノブ の「曲の出どころ」を見る", "file": "new_departure.mp3", "provisional": false}
+  "sakura": {
+   "title": "桜色に染めて",
+   "artist": "田中芳典",
+   "source": "Drive 40_完成/20250922_久木田ヒロノブ の「曲の出どころ」を見る",
+   "file": "sakurairo_tr2.mp3",
+   "provisional": false
+  },
+  "white_cocktail": {
+   "title": "White cocktail",
+   "artist": "Maniira",
+   "source": "OpenTracks（旧 DOVA-SYNDROME）",
+   "file": "white_cocktail.mp3",
+   "provisional": false
+  },
+  "new_departure": {
+   "title": "New Departure",
+   "artist": "FLASH BEAT",
+   "source": "Drive 40_完成/20250922_久木田ヒロノブ の「曲の出どころ」を見る",
+   "file": "new_departure.mp3",
+   "provisional": false
+  },
+  "op_vids_01": {
+   "title": "OP 案1（ピアノとストリングス・ベル）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_vids_01.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。ピアノとストリングス、きらめくベルの音。テンポはゆったり（80BPM前後）。静かなピアノで始まり、10秒あたりでストリングスが広がって一気に明るく盛り上がる。上品であたたかく、希望を感じる対談番組のオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_01.mp4"
+  },
+  "op_vids_02": {
+   "title": "OP 案2（和の楽器）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_02_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。箏とピアノ、やわらかいストリングス。和の雰囲気だが現代的で明るい。箏の静かなフレーズで始まり、10秒あたりで太鼓の一打とともに華やかに盛り上がる。凛として晴れやか、書道家の対談番組のオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_02.mp4"
+  },
+  "op_vids_03": {
+   "title": "OP 案3（明るく軽やか）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_03_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。アコースティックギターとピアノ、軽いパーカッション。やや速め（110BPM前後）で軽やか。ギターだけで始まり、10秒あたりでピアノと手拍子が加わって明るく盛り上がる。朝の情報番組のように親しみやすく、笑顔になるオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_03.mp4"
+  },
+  "op_vids_04": {
+   "title": "OP 案4（壮大）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_04_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。オーケストラ、ピアノ、ティンパニ。テンポは中くらい（90BPM前後）。弱いピアノと弦の持続音で始まり、10秒あたりでオーケストラ全体が壮大に立ち上がる。感動的で格調高い、ドキュメンタリー番組のオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_04.mp4"
+  },
+  "ed_vids_01": {
+   "title": "ED 案1（ピアノとストリングス）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "ed_01_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。ピアノとやわらかいストリングス。ゆったり（70BPM前後）。あたたかく余韻のある締めくくりで、最後の5秒は静かに消えていく。対談番組のエンディング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_ED_01.mp4"
+  },
+  "bgm_vids_01": {
+   "title": "BGM 案1（カフェ風・約3分）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3.5、2026-11-15）",
+   "file": "bgm_01_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3.5）",
+   "prompt": "歌なしのインストゥルメンタル。やわらかいピアノとアコースティックギター、控えめなパッド。ゆったり一定のテンポで、目立つメロディや盛り上がりは入れない。人の話し声の後ろで流しても邪魔にならない、落ち着いたカフェのような雰囲気。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_BGM_01.mp4"
+  },
+  "op_vids_05": {
+   "title": "OP 案5（Cの方向）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_05_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。1拍目からピアノがはっきり鳴り始める（無音で始めない）。ピアノとストリングス、きらめくベル。ゆったり（80BPM前後）。ちょうど10秒目でストリングスとベルが一斉に加わり、はっきり明るく盛り上がる。上品であたたかい対談番組のオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_05.mp4"
+  },
+  "op_vids_06": {
+   "title": "OP 案6（Cの方向・少し華やか）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_06_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。1拍目からピアノとやわらかいストリングスで始める（無音なし）。80BPM前後。ちょうど10秒目に軽いシンバルと弦の高音が入り、一段明るく華やかになる。希望を感じる、品のある番組オープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_06.mp4"
+  },
+  "op_vids_07": {
+   "title": "OP 案7（Eの方向）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_07_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。1拍目からアコースティックギターが鳴り始める（無音なし）。100BPM前後で軽やか。ちょうど10秒目でピアノと手拍子、軽いドラムが加わって明るく盛り上がる。親しみやすく笑顔になる対談番組のオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_07.mp4"
+  },
+  "op_vids_08": {
+   "title": "OP 案8（Eの方向・少し落ち着き）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro・Lyria 3、2026-11-15）",
+   "file": "op_08_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids（Lyria 3）",
+   "prompt": "歌なしのインストゥルメンタル、30秒。1拍目からギターとピアノが一緒に鳴る（無音なし）。90BPM前後。ちょうど10秒目でベースとパーカッションが入り、温かく明るく広がる。大人の落ち着いた明るさのオープニング。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_08.mp4"
+  },
+  "op_vids_09": {
+   "title": "OP 案9（Cの方向・フル）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro、2026-11-15）",
+   "file": "op_09_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids",
+   "prompt": "歌なしのインストゥルメンタル。ピアノとストリングス、きらめくベル。80BPM前後。最初から音を厚く鳴らし、途中で音を薄くしない。何度か、静かに少しためてから一気に明るく開く盛り上がりを入れる。上品であたたかい対談番組のテーマ曲。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_09.mp4"
+  },
+  "op_vids_10": {
+   "title": "OP 案10（Eの方向・フル）",
+   "artist": null,
+   "source": "Google Vids（個人アカウントの Google AI Pro、2026-11-15）",
+   "file": "op_10_vids.mp3",
+   "provisional": true,
+   "added": {
+    "by": "北原",
+    "on": "2026-11-15"
+   },
+   "ai_generated": true,
+   "made_with": "Google Vids",
+   "prompt": "歌なしのインストゥルメンタル。アコースティックギターとピアノ、手拍子と軽いドラム。100BPM前後。最初から明るく厚く鳴らし、途中で音を薄くしない。何度か、短くためてから一気に盛り上がるところを入れる。親しみやすく笑顔になる対談番組のテーマ曲。",
+   "account": "個人（Google AI Pro）",
+   "original": "20_素材/共通/Vids曲/曲_OP_10.mp4"
+  }
  },
  "file_note": "file は曲のファイル名（例 \"white_cocktail.mp3\"）。2026-11-12 の仕上げ（v67）で使った実物は PC の作業場にある。名前を確かめて入れるまで plan は「ファイルが決まっていない」で止まる",
  "programs": {
   "美麗の書道対談": {
    "decided": "2026-11-12 北原さん（21時の打ち合わせ）",
-   "op": {"track": "sakura", "volume": 0.9, "fade_out": 1.5, "start": null, "start_note": "null なら曲の山の入りを番組名の出だしに合わせて決める（music fit）"},
-   "bgm": {"track": "white_cocktail", "volume_db": -22, "duck": true, "duck_ratio": 3, "fade": 3.0, "loop_crossfade": 4.0},
-   "ed": {"track": "new_departure", "volume": 0.72, "fade_in": 1.0, "fade_out": 5.5}
+   "op": {
+    "track": "sakura",
+    "volume": 0.9,
+    "fade_out": 1.5,
+    "start": null,
+    "start_note": "null なら曲の山の入りを番組名の出だしに合わせて決める（music fit）",
+    "match_voice_db": -2.5,
+    "match_note": "2026-11-15 北原さん: OP の曲が対談の声より大きい → 本編の声（頭の10分）より 2.5dB 小さくそろえる。volume より優先"
+   },
+   "bgm": {
+    "track": "white_cocktail",
+    "volume_db": -22,
+    "duck": true,
+    "duck_ratio": 3,
+    "fade": 3.0,
+    "loop_crossfade": 4.0
+   },
+   "ed": {
+    "track": "new_departure",
+    "volume": 0.72,
+    "fade_in": 1.0,
+    "fade_out": 5.5
+   }
   }
  },
- "mainline": {"program": "美麗の書道対談", "note": "本線（render_worker の最終レンダリング）が全体に敷く BGM は、この番組の bgm。本線の動画には番組 OP も ED も無いので op・ed は使わない。曲は環境変数 AVS_MUSIC_DIR の場所から探す（クラウドでは music fetch で Drive の 20_素材/共通 か 30_AVS_作業/番組資産/曲 から持ってくる）"},
+ "mainline": {
+  "program": "美麗の書道対談",
+  "note": "本線（render_worker の最終レンダリング）が全体に敷く BGM は、この番組の bgm。本線の動画には番組 OP も ED も無いので op・ed は使わない。曲は環境変数 AVS_MUSIC_DIR の場所から探す（クラウドでは music fetch で Drive の 20_素材/共通 か 30_AVS_作業/番組資産/曲 から持ってくる）"
+ },
  "peak_db": -1.5
 }

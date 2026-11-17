@@ -14,6 +14,8 @@
         --music-dir 曲の置き場 [--map 地図.json] [--audio AUDIO.json] [--no-music] [--review]
 
 ``--audio`` を渡すと、曲の台帳ではなくその指定をそのまま使う（打ち合わせで決めた音量を再現するとき）。
+OP の曲の ``start`` が無い・null のときは、台帳のときと同じく曲の山の入りを番組名の出だしに合わせる（既定）。
+頭から流したいときだけ ``"start": 0.0`` と書く。
 """
 from __future__ import annotations
 
@@ -38,6 +40,12 @@ def audio_of(spec: dict, music_dir: str | None, audio_path: str | None, m: dict 
                 if audio.get(k) and not Path(str(audio[k].get("path", ""))).is_file()]
         if gone:  # 長い書き出しの前に分かる事は先に止める
             raise mu.MusicError("音の指定の曲のファイルがありません: " + " / ".join(gone))
+        op = audio.get("op_music")
+        if op and op.get("start") is None:  # 山合わせが既定（2026-11-14 北原さん: 聞き比べで B が圧倒的に良い）
+            program = ep.program_of(spec)
+            if not program:
+                raise mu.MusicError("OP の使い始めを山に合わせるには番組（program）が要ります")
+            op.update(mu.fit_or_head(op["path"], program))
         return audio
     program = ep.program_of(spec)
     if not program:
@@ -73,6 +81,17 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
 
     if audio and audio.get("op_music"):
         spec["program_silent"] = True  # OP の曲は remix が入れる
+        op = audio["op_music"]
+        if op.get("match_voice_db") is not None:  # OP の曲を本編の声の大きさにそろえる
+            from backend.program_package import opening
+            mu.match_voice(op, mu.lufs(spec["source"], 0.0, 600.0), opening.length(ep.program_of(spec)))
+        from backend.program_package import opening
+        prog = ep.program_of(spec)
+        sh = mu.shape(op["path"], max(0.0, float(op.get("start") or 0.0)), mu.title_at(prog), opening.length(prog))
+        bad = [w for k, w in (("head", "頭が薄い"), ("no_dip", f"{sh['dip_at']:.0f}秒目でやせる"),
+                              ("rise", "番組名で上がらない")) if not sh["ok"][k]]
+        note["checks"].append({"id": "op_shape", "label": "OP の曲の形（頭から厚い・やせない・番組名で上がる）",
+                               "ok": sh["pass"], "detail": "、".join(bad) or f"上がり {sh['rise_db']} dB"})
     base = ep.build(spec, out / "_飾りまで")
     note["steps"].append({"step": "飾り", "file": base.name, "inserts": len(items)})
     final = base
@@ -98,7 +117,7 @@ def finish(spec: dict, out: Path, version: str, *, music_dir: str | None = None,
     ai = [f"{role}: {t.get('title')}（{t.get('made_with')}）" for role, t in ((audio or {}).get("tracks") or {}).items()
           if isinstance(t, dict) and t.get("ai_generated")]
     if ai:  # 止めはしない。公開のときに人が決める事を控えに出す
-        note["ai_music"] = {"tracks": ai, "todo": "AI で作った曲が入っている。公開の前に、使ってよい条件と YouTube の開示の要否を確かめる"}
+        note["ai_music"] = {"tracks": ai, "todo": mu.AI_PUBLISH_TODO}
     note["state"] = "承認待ち（program_gate propose → 北原さんの承認 → 置く）" + ("" if audio else "。曲は入っていない")
     (out / f"{spec['recording']}_{version}_仕上げの控え.json").write_text(
         json.dumps(note, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
