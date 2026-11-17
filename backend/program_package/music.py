@@ -233,8 +233,11 @@ def compare(base: str | Path, song: str | Path, start: float, out: str | Path, *
     g = target_lufs - lufs(song, start, cut)
     fade = f"if(lt(t,{cut - 0.4:.2f}),0,if(lt(t,{cut:.2f}),(t-{cut - 0.4:.2f})/0.4,1))"
     graph = (f"[0:a]volume='{fade}':eval=frame[base];"
-             f"[1:a]aresample=48000,volume={g:.1f}dB,afade=t=in:d=0.05,afade=t=out:st={cut - 1.5:.2f}:d=1.5[op];"
-             "[base][op]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.84[a]")
+             f"[1:a]aresample=48000,volume={g:.1f}dB,afade=t=in:d=0.05,afade=t=out:st={cut - 1.5:.2f}:d=1.5,"
+             "alimiter=limit=0.84:level=disabled[op];"
+             # 本編は持ち上げない（level 既定の自動補正で v69 が +1.3 dB 大きくなった）。AAC の再エンコードで
+             # 本編の山が 0 dBFS を超えるので、-2 dBFS で頭だけ抑える
+             "[base][op]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.79:level=disabled:attack=1:release=50[a]")
     subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(base), "-ss", f"{start:.3f}", "-t", f"{cut:.3f}",
                     "-i", str(song), "-filter_complex", graph, "-map", "0:v", "-map", "[a]", "-c:v", "copy",
                     "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)], check=True)

@@ -476,3 +476,13 @@ def test_聞き比べはDriveのプレビューで再生できるようmoovを�
     b = out.read_bytes()
     assert b.index(b"moov") < b.index(b"mdat")
     assert abs(mu.read(out).size / mu.SR - 20) < 0.3
+
+
+def test_聞き比べは本編の音量を変えない(tmp_path):
+    # 2026-11-17: alimiter の既定 level=1 が出力を上限まで持ち上げ、v69 の本編が +1.3 dB 大きくなって割れた
+    base = tmp_path / "base.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=320x180:d=40:r=30",
+                    "-f", "lavfi", "-i", "sine=f=300:d=40,volume=0.3", "-shortest", "-c:v", "libx264", "-pix_fmt",
+                    "yuv420p", "-c:a", "aac", str(base)], check=True)
+    out = mu.compare(base, song(tmp_path / "s.wav", seconds=30), 5.0, tmp_path / "c.mp4")
+    assert abs(mu.lufs(out, 20.0, 15.0) - mu.lufs(base, 20.0, 15.0)) < 0.5
