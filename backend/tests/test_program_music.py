@@ -422,10 +422,11 @@ def test_OPの曲を本編の声の大きさにそろえる(tmp_path, monkeypatc
 
 # OP の曲の形の決まり（2026-11-15 北原さん「しっくりくる。これはルール化しても良い」）:
 # 1秒目から厚く鳴る・途中でやせない・番組名で一段上がる
-def test_OPの形_頭から厚く途中でやせず番組名で上がる曲は合格(tmp_path):
+def test_OPの形_上がっても番組名の前にためが無い曲は不合格(tmp_path):
+    # 2026-11-18 北原さんが「ため」を必須に（上位4本はため有り、上がり最大 +10.9dB のため無しは5位）
     s = song(tmp_path / "s.wav", seconds=20, loud=((10.5, 20.0, 0.6),), base=0.25)
     r = mu.shape(s, start=0.0, at=10.5, total=15.0)
-    assert r["pass"] and r["ok"] == {"head": True, "no_dip": True, "rise": True}
+    assert not r["pass"] and r["ok"] == {"head": True, "no_dip": True, "rise": True, "tame": False}
 
 
 def test_OPの形_頭が静かな曲は不合格(tmp_path):
@@ -447,8 +448,8 @@ def test_OPの形_番組名で上がらない曲は不合格(tmp_path):
 
 
 def test_長い曲から決まりを満たす15秒を探す(tmp_path):
-    # 20〜22秒に音のやせる所（そこから戻る所は山に見えるが使えない）。40秒で一段上がる → 29.5秒から使えば合格
-    s = song(tmp_path / "s.wav", seconds=70, loud=((20.0, 22.0, 0.02), (40.0, 70.0, 0.6)), base=0.25)
+    # 20〜22秒に音のやせる所（そこから戻る所は山に見えるが使えない）。35〜40秒でためて40秒で開く → 29.5秒から使えば合格
+    s = song(tmp_path / "s.wav", seconds=70, loud=((20.0, 22.0, 0.02), (35.0, 40.0, 0.03), (40.0, 70.0, 0.6)), base=0.25)
     found = mu.scan(s, at=10.5, total=15.0)
     assert found and found[0]["start"] == pytest.approx(29.5, abs=0.6) and found[0]["pass"]
 
@@ -457,7 +458,7 @@ def test_OPの形_番組名の直前のためは元より大きく開けば合�
     # 桜色の形: 6〜10.5秒で静かになり（ため）、番組名で頭より大きく開く
     s = song(tmp_path / "s.wav", seconds=20, loud=((6.0, 10.5, 0.03), (10.5, 20.0, 0.6)), base=0.25)
     r = mu.shape(s, start=0.0, at=10.5, total=15.0)
-    assert r["pass"] and r["tame"]
+    assert r["pass"] and r["tame"] and r["ok"]["tame"]
 
 
 def test_OPの形_ためた後に元より小さくしか開かなければやせるとみなす(tmp_path):
@@ -476,3 +477,13 @@ def test_聞き比べはDriveのプレビューで再生できるようmoovを�
     b = out.read_bytes()
     assert b.index(b"moov") < b.index(b"mdat")
     assert abs(mu.read(out).size / mu.SR - 20) < 0.3
+
+
+def test_聞き比べは本編の音量を変えない(tmp_path):
+    # 2026-11-17: alimiter の既定 level=1 が出力を上限まで持ち上げ、v69 の本編が +1.3 dB 大きくなって割れた
+    base = tmp_path / "base.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=320x180:d=40:r=30",
+                    "-f", "lavfi", "-i", "sine=f=300:d=40,volume=0.3", "-shortest", "-c:v", "libx264", "-pix_fmt",
+                    "yuv420p", "-c:a", "aac", str(base)], check=True)
+    out = mu.compare(base, song(tmp_path / "s.wav", seconds=30), 5.0, tmp_path / "c.mp4")
+    assert abs(mu.lufs(out, 20.0, 15.0) - mu.lufs(base, 20.0, 15.0)) < 0.5
