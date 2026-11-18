@@ -192,7 +192,9 @@ def _shape_of(db: np.ndarray, at: float, total: float) -> dict:
     dip = float(body[k] - med)
     tame = opens and float(sec[t0:int(at)].min() - med) <= -SHAPE_DIP_DB
     rise = after - _mean_db(db, int((at - SHAPE_BEFORE) * FPS), int(at * FPS))
-    ok = {"head": head > -SHAPE_HEAD_DB, "no_dip": dip > -SHAPE_DIP_DB, "rise": rise >= SHAPE_RISE_DB}
+    # 2026-11-18 北原さん: ため→開く を必須に（上位4本はため有り、上がり最大でもため無しは5位）
+    ok = {"head": head > -SHAPE_HEAD_DB, "no_dip": dip > -SHAPE_DIP_DB, "rise": rise >= SHAPE_RISE_DB,
+          "tame": bool(tame)}
     return {"head_db": round(head, 1), "dip_db": round(dip, 1), "dip_at": float(idx[k]), "rise_db": round(rise, 1),
             "tame": bool(tame), "ok": ok, "pass": all(ok.values())}
 

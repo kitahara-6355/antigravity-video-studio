@@ -127,6 +127,7 @@ def test_通しで作ると曲が入り確かめと控えが残る(tmp_path, son
     monkeypatch.setattr(ep, "build", fake_build)
     monkeypatch.setattr(mu, "LEDGER", tmp_path / "music.json")
     (tmp_path / "music.json").write_text(json.dumps(ledger(), ensure_ascii=False), encoding="utf-8")
+    song(songs / "a.wav", loud=((25.0, 30.0, 0.01), (30.0, 50.0, 0.6)))  # S31: 番組名の前でためて開く曲
     note = fin.finish(spec, tmp_path / "out", "v99", music_dir=str(songs))
     final = tmp_path / "out" / note["file"]
     assert final.exists() and abs(mu.read(final).size / mu.SR - total) < 0.5
