@@ -5346,6 +5346,15 @@
    "fingerprint": []
   },
   {
+   "id": "backend/program_package/taste.py::read_answers",
+   "file": "backend/program_package/taste.py",
+   "symbol": "read_answers",
+   "category": "チャンネル統計",
+   "status": "out_of_scope",
+   "reason": "美麗さんの二択の答え（シートの CSV か JSON）を読むだけ。チャンネルの数字（視聴・登録者・CTR）は作らない。答えが 1 件も無ければ TasteError で止まり、空の結果を返さない。json の列が無いシートも止める。",
+   "fingerprint": []
+  },
+  {
    "id": "backend/program_package/vision.py::pairs",
    "file": "backend/program_package/vision.py",
    "symbol": "pairs",

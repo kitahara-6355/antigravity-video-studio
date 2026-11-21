@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>好みえらび</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+/* 美麗書院の色（#E8007E）と淡い桜色。ITに慣れていない人が迷わないよう、1 画面 1 つの仕事 */
+:root{
+  --pink:#E8007E; --ink:#C4006A; --bg1:#FFF4F9; --bg2:#FDE3EF; --card:#FFFFFF; --fg:#3A2632; --muted:#7A6170;
+  --mint:#2AA693; --gold:#E3B23C; --line:#F4CADF;
+  --font:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+html{background:var(--bg2)}
+body{font-family:var(--font);color:var(--fg);background:linear-gradient(160deg,var(--bg1),var(--bg2));background-attachment:fixed;
+  padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 24px) max(16px,env(safe-area-inset-left,0px));
+  font-size:17px;line-height:1.7}
+.app{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:24px;font-weight:900;margin:0;text-align:center;line-height:1.4}
+h1 .star{color:var(--gold)}
+.lead{text-align:center;color:var(--muted);font-size:15px;margin:0}
+.q{text-align:center;font-weight:900;font-size:20px;margin:0}
+.prog{display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.prog i{width:11px;height:11px;border-radius:50%;background:var(--line)}
+.prog i.done{background:var(--pink)}
+.prog i.now{background:var(--gold);transform:scale(1.25)}
+.card{background:var(--card);border-radius:20px;padding:10px 10px 12px;box-shadow:0 6px 20px rgba(232,0,126,.10);border:2px solid transparent}
+.card.a{border-color:#F7B6D5}
+.card.b{border-color:#A9E3D9}
+.card .lab{display:flex;align-items:center;gap:8px;font-weight:900;font-size:18px;margin:0 4px 6px}
+.card .lab b{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;color:#fff;font-size:18px}
+.card.a .lab b{background:var(--pink)} .card.b .lab b{background:var(--mint)}
+.vid{position:relative;border-radius:14px;overflow:hidden;background:#2b1a24;aspect-ratio:16/9}
+.vid video{width:100%;height:100%;display:block;object-fit:cover}
+.vid .wait{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:14px;background:linear-gradient(135deg,#d9a9c3,#b989a8)}
+.play{position:absolute;inset:0;margin:auto;width:72px;height:72px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:var(--pink);
+  font-size:30px;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer}
+.play[hidden]{display:none}
+.heard{font-size:13px;color:var(--muted);margin:6px 4px 0}
+.heard.ok{color:var(--mint)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font-family:var(--font)}
+.big{border:none;border-radius:999px;padding:16px 8px;font-size:19px;font-weight:900;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(232,0,126,.25)}
+.big.a{background:var(--pink)} .big.b{background:var(--mint);box-shadow:0 4px 12px rgba(42,166,147,.25)}
+.big:disabled{opacity:.35;box-shadow:none}
+.small{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.chip{border:2px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:8px 16px;font-size:15px;cursor:pointer}
+.chip:disabled{opacity:.35}
+.note{width:100%;border:2px dashed #F2A7CB;border-radius:16px;padding:10px 12px;font-family:var(--font);font-size:16px;background:var(--card);color:var(--fg);resize:none;min-height:54px}
+.hint{font-size:13px;color:var(--muted);text-align:center;margin:-6px 0 0}
+.go{background:var(--pink);color:#fff;border:none;border-radius:999px;padding:18px;font-size:21px;font-weight:900;cursor:pointer;box-shadow:0 6px 18px rgba(232,0,126,.3)}
+.ghost{background:transparent;border:2px solid var(--pink);color:var(--ink);border-radius:999px;padding:12px;font-size:17px;font-weight:700;cursor:pointer}
+.panel{background:var(--card);border-radius:20px;padding:18px;box-shadow:0 6px 20px rgba(232,0,126,.08)}
+.panel ol{margin:0;padding-left:1.3em}
+.rank{display:flex;flex-direction:column;gap:14px}
+.rank .card .lab b{background:var(--gold)}
+.decide{margin-top:8px;width:100%}
+.msg{text-align:center;color:var(--ink);font-weight:700;min-height:1.4em;margin:0}
+.err{background:#fff;border:2px solid var(--pink);border-radius:16px;padding:14px;color:var(--ink)}
+.list a{display:block;background:var(--card);border-radius:16px;padding:14px 16px;color:var(--fg);text-decoration:none;border:2px solid var(--line);margin-bottom:10px}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app"><p class="lead">読み込んでいます…</p></div>
+<script>
+'use strict';
+var ROUNDS_MORE = 5;
+var S = { packId: null, pack: null, answers: [], who: '', round: 0, limit: 10, pair: null, blobs: {}, heard: {} };
+var $ = function (h) { var d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstChild; };
+var app = document.getElementById('app');
+var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+
+/* ---- サーバー（google.script.run）。無いとき（見本の確認）は手元の例で動く ---- */
+var live = typeof google !== 'undefined' && google.script && google.script.run;
+function call(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (ok, ng) {
+    if (!live) return ok(DEMO[fn] ? DEMO[fn].apply(null, args) : null);
+    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(ng);
+    r[fn].apply(r, args);
+  });
+}
+
+/* ---- 好みの強さ（二択のたびに更新する。順位は Claude が後で丁寧に出し直す） ---- */
+function scores() {
+  var s = {}, n = {}, met = {};
+  S.pack.items.forEach(function (it) { s[it.id] = 0; n[it.id] = 0; });
+  S.answers.forEach(function (r) {
+    if (!(r.a in s) || !(r.b in s) || !r.pick || r.decided) return;
+    var ea = 1 / (1 + Math.pow(10, (s[r.b] - s[r.a]) / 400));
+    var res = { a: 1, b: 0, both: 0.5, neither: 0.5 }[r.pick];
+    s[r.a] += 32 * (res - ea); s[r.b] -= 32 * (res - ea);
+    n[r.a]++; n[r.b]++;
+    var k = [r.a, r.b].sort().join('|'); met[k] = (met[k] || 0) + 1;
+  });
+  return { s: s, n: n, met: met };
+}
+
+function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+/** 次に比べる 2 本。はじめは全部の曲を 1 回ずつ。その後は上位どうしで、まだ比べていない組を */
+function nextPair() {
+  var sc = scores(), ids = S.pack.items.map(function (x) { return x.id; });
+  var unseen = shuffle(ids.filter(function (k) { return sc.n[k] === 0; }));
+  var pair;
+  if (unseen.length >= 2) pair = [unseen[0], unseen[1]];
+  else if (unseen.length === 1) {
+    var others = ids.filter(function (k) { return k !== unseen[0]; }).sort(function (x, y) { return sc.s[y] - sc.s[x]; });
+    pair = [unseen[0], others[0]];
+  } else {
+    var top = ids.slice().sort(function (x, y) { return sc.s[y] - sc.s[x]; }).slice(0, Math.max(4, Math.ceil(ids.length / 2)));
+    var best = null, bv = Infinity;
+    for (var i = 0; i < top.length; i++) for (var j = i + 1; j < top.length; j++) {
+      var k = [top[i], top[j]].sort().join('|');
+      var v = (sc.met[k] || 0) * 200 + Math.abs(sc.s[top[i]] - sc.s[top[j]]) + Math.random() * 5;
+      if (v < bv) { bv = v; best = [top[i], top[j]]; }
+    }
+    pair = best;
+  }
+  return Math.random() < 0.5 ? pair : [pair[1], pair[0]];
+}
+
+function item(id) { for (var i = 0; i < S.pack.items.length; i++) if (S.pack.items[i].id === id) return S.pack.items[i]; return null; }
+
+function clipUrl(clip) {
+  if (clip in S.blobs) return Promise.resolve(S.blobs[clip]);
+  return call('getClip', S.packId, clip).then(function (b64) {
+    if (!b64) { S.blobs[clip] = null; return null; }
+    var bin = atob(b64), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    S.blobs[clip] = URL.createObjectURL(new Blob([u], { type: 'video/mp4' }));
+    return S.blobs[clip];
+  });
+}
+
+/* ---- 画面 ---- */
+function videoCard(side, it, label) {
+  var c = $('<div class="card ' + side + '"><div class="lab"><b>' + label + '</b><span></span></div>' +
+    '<div class="vid"><div class="wait">見本を読み込んでいます…</div><video playsinline preload="auto"></video>' +
+    '<button class="play" aria-label="' + label + ' を再生" hidden>▶</button></div><p class="heard">▶ を押して聞いてください</p></div>');
+  var v = c.querySelector('video'), btn = c.querySelector('.play'), wait = c.querySelector('.wait'), heard = c.querySelector('.heard');
+  clipUrl(it.clip).then(function (u) {
+    if (u) { v.src = u; wait.remove(); btn.hidden = false; } else wait.textContent = '（見本の確認用）';
+  }).catch(function () { wait.textContent = '読み込めませんでした。少し待って、もう一度開いてください'; });
+  btn.onclick = function () { document.querySelectorAll('video').forEach(function (o) { if (o !== v) o.pause(); }); v.currentTime = 0; v.play(); };
+  v.onplay = function () { btn.hidden = true; document.querySelectorAll('video').forEach(function (o) { if (o !== v) o.pause(); }); };
+  v.onpause = v.onended = function () { btn.hidden = false; btn.textContent = '↻'; };
+  v.ontimeupdate = function () {
+    if (v.currentTime > Math.min(11, (v.duration || 15) - 1) && !S.heard[side]) {
+      S.heard[side] = true; heard.textContent = '✓ 聞きました'; heard.classList.add('ok'); unlock();
+    }
+  };
+  return c;
+}
+
+function unlock() {
+  var ok = S.heard.a && S.heard.b;
+  document.querySelectorAll('[data-pick]').forEach(function (b) { b.disabled = !ok; });
+  var h = document.getElementById('lockhint'); if (h) h.hidden = ok;
+}
+
+function showStart() {
+  var done = mine().length;
+  app.innerHTML = '';
+  app.appendChild($('<h1><span class="star">✦</span> ' + esc(S.pack.title || '曲えらび') + ' <span class="star">✦</span></h1>'));
+  app.appendChild($('<div class="panel"><ol>' +
+    '<li>同じ場面で、曲だけがちがう動画が 2 本出ます</li>' +
+    '<li>両方を聞いて、好きな方を押してください</li>' +
+    '<li>' + S.limit + ' 回で終わります（5 分ほど）。言いたいことがあれば、ひとことどうぞ</li></ol></div>'));
+  app.appendChild($('<p class="lead">音が出ます。音量を上げてお使いください</p>'));
+  var b = $('<button class="go">' + (done ? 'つづきから（' + done + ' 回まで済み）' : 'はじめる') + '</button>');
+  b.onclick = function () { S.round = done; next(); };
+  app.appendChild(b);
+}
+
+function mine() { return S.answers.filter(function (r) { return r.pick && (!S.who || !r.by || r.by === S.who); }); }
+
+function next() {
+  if (S.round >= S.limit) return showResult();
+  S.pair = nextPair(); S.heard = {};
+  var A = item(S.pair[0]), B = item(S.pair[1]);
+  app.innerHTML = '';
+  var dots = ''; for (var i = 0; i < S.limit; i++) dots += '<i class="' + (i < S.round ? 'done' : i === S.round ? 'now' : '') + '"></i>';
+  app.appendChild($('<div class="prog" aria-label="' + (S.round + 1) + ' / ' + S.limit + ' 回目">' + dots + '</div>'));
+  app.appendChild($('<p class="q">' + esc(S.pack.question) + '</p>'));
+  app.appendChild(videoCard('a', A, 'A'));
+  app.appendChild(videoCard('b', B, 'B'));
+  app.appendChild($('<p class="hint" id="lockhint">両方を最後のほうまで聞くと、押せるようになります</p>'));
+  var btns = $('<div class="btns"><button class="big a" data-pick="a" disabled>A がいい</button><button class="big b" data-pick="b" disabled>B がいい</button></div>');
+  app.appendChild(btns);
+  app.appendChild($('<div class="small"><button class="chip" data-pick="both" disabled>どちらも好き</button><button class="chip" data-pick="neither" disabled>どちらも違う</button></div>'));
+  app.appendChild($('<textarea class="note" id="note" rows="2" placeholder="ひとこと（なくてOK）"></textarea>'));
+  app.appendChild($('<p class="hint">キーボードのマイク 🎙 を押すと、話して入れられます</p>'));
+  app.appendChild($('<p class="msg" id="msg"></p>'));
+  app.querySelectorAll('[data-pick]').forEach(function (b) { b.onclick = function () { pick(b.getAttribute('data-pick')); }; });
+  if (!live) { S.heard = { a: true, b: true }; unlock(); }
+  preload();
+  window.scrollTo(0, 0);
+}
+
+/** 残りの見本を 1 本ずつ先に読んでおく（次の 2 本を待たせない） */
+var preloading = false, tried = {};
+function preload() {
+  if (preloading) return;
+  var rest = S.pack.items.filter(function (x) { return !(x.clip in S.blobs) && !tried[x.clip]; });
+  if (!rest.length) return;
+  preloading = true; tried[rest[0].clip] = true;
+  clipUrl(rest[0].clip).catch(function () {}).then(function () { preloading = false; setTimeout(preload, 300); });
+}
+
+function pick(p) {
+  document.querySelectorAll('[data-pick]').forEach(function (b) { b.disabled = true; });
+  document.querySelectorAll('video').forEach(function (v) { v.pause(); });
+  var rec = { a: S.pair[0], b: S.pair[1], pick: p, note: (document.getElementById('note').value || '').trim(), round: S.round + 1, by: S.who };
+  document.getElementById('msg').textContent = '記録しています…';
+  call('saveAnswer', S.packId, JSON.stringify(rec)).then(function () {
+    S.answers.push(rec); S.round++; next();
+  }).catch(function (e) {
+    document.getElementById('msg').textContent = '記録できませんでした。もう一度押してください';
+    unlock();
+  });
+}
+
+function showResult() {
+  var sc = scores(), ids = S.pack.items.map(function (x) { return x.id; }).sort(function (x, y) { return sc.s[y] - sc.s[x]; });
+  app.innerHTML = '';
+  app.appendChild($('<h1><span class="star">✦</span> ありがとうございました <span class="star">✦</span></h1>'));
+  app.appendChild($('<p class="lead">いま好きな順に並べた上の 3 曲です。この中に「これ」という曲があれば、決めてください</p>'));
+  var box = $('<div class="rank"></div>');
+  ids.slice(0, 3).forEach(function (id, i) {
+    var c = videoCard(i === 0 ? 'a' : 'b', item(id), String(i + 1));
+    c.querySelector('.heard').remove();
+    c.querySelector('.lab span').textContent = item(id).title || '';
+    var d = $('<button class="ghost decide">この曲に決める</button>');
+    d.onclick = function () { decide(id, d); };
+    c.appendChild(d);
+    box.appendChild(c);
+  });
+  app.appendChild(box);
+  var more = $('<button class="ghost">もう ' + ROUNDS_MORE + ' 回くらべる</button>');
+  more.onclick = function () { S.limit += ROUNDS_MORE; next(); };
+  app.appendChild(more);
+  app.appendChild($('<p class="msg" id="msg"></p>'));
+}
+
+function decide(id, btn) {
+  btn.disabled = true;
+  document.getElementById('msg').textContent = '記録しています…';
+  call('saveAnswer', S.packId, JSON.stringify({ decided: id, round: S.round, by: S.who })).then(function () {
+    document.getElementById('msg').textContent = '決めた曲を記録しました。北原さんに伝わります ✦';
+  }).catch(function () { btn.disabled = false; document.getElementById('msg').textContent = '記録できませんでした。もう一度押してください'; });
+}
+
+function showList(list) {
+  app.innerHTML = '<h1>好みえらび</h1>';
+  if (!list || !list.length) { app.appendChild($('<p class="lead">まだ見本がありません</p>')); return; }
+  var box = $('<div class="list"></div>');
+  list.forEach(function (p) { box.appendChild($('<a target="_top" href="' + esc(p.url) + '">' + esc(p.name) + '</a>')); });
+  app.appendChild(box);
+}
+
+function fail(e) { app.innerHTML = ''; app.appendChild($('<div class="err">開けませんでした。北原さんに、この画面を見せてください。<br><small>' + esc(e && e.message || e) + '</small></div>')); }
+
+function boot(packId) {
+  if (!packId) return call('listPacks').then(showList).catch(fail);
+  S.packId = packId;
+  call('getPack', packId).then(function (r) {
+    S.pack = JSON.parse(r.pack); S.answers = r.answers || []; S.who = r.who || '';
+    S.pack.title = S.pack.title || '番組のはじまりの曲えらび';
+    S.limit = Math.max(S.pack.rounds || 10, Math.ceil(mine().length / ROUNDS_MORE) * ROUNDS_MORE);
+    showStart();
+  }).catch(fail);
+}
+
+/* ---- 見本の確認用（Drive が無いとき） ---- */
+var DEMO = {
+  getPack: function () {
+    var items = ['桜色に染めて', 'South Wind', 'New Departure', 'ensolarado'].map(function (t, i) { return { id: 'op0' + (i + 1), clip: 'op0' + (i + 1) + '.mp4', title: t }; });
+    return { pack: JSON.stringify({ question: '番組のはじまりに合う曲は、どっち？', rounds: 10, items: items }), answers: [], who: '' };
+  },
+  getClip: function () { return null; },
+  saveAnswer: function () { return true; },
+  listPacks: function () { return []; }
+};
+
+if (live) google.script.url.getLocation(function (loc) { boot((loc.parameter || {}).pack); });
+else boot((/[?&]pack=([^&]+)/.exec(location.search) || [, 'demo'])[1]);
+</script>
+</body>
+</html>

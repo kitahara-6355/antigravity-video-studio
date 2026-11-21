@@ -1,0 +1,160 @@
+<script>
+/**
+ * 好みカルテの推定と出題（ページ側）。backend/program_package/taste_model.py と同じ式。
+ * 式を変えるときは両方を直し、test_program_music.py の「ページとPythonが同じ答え」を通す。
+ */
+var TM = (function () {
+  var PRIOR_W = 0.5, PRIOR_E = 1.0, HALF_LIFE = 180, BAR = -1, EARLY = 6;
+  var TRIAL = ['ためし'];
+
+  function sig(x) { return 1 / (1 + Math.exp(-x)); }
+
+  /** 連立一次方程式 A x = b（ガウスの消去法・部分ピボット）。A は壊さない */
+  function solve(A, b) {
+    var n = b.length, M = A.map(function (r, i) { return r.concat([b[i]]); });
+    for (var c = 0; c < n; c++) {
+      var p = c;
+      for (var r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      var t = M[c]; M[c] = M[p]; M[p] = t;
+      for (var r2 = 0; r2 < n; r2++) {
+        if (r2 === c) continue;
+        var f = M[r2][c] / M[c][c];
+        if (f) for (var k = c; k <= n; k++) M[r2][k] -= f * M[c][k];
+      }
+    }
+    return M.map(function (r, i) { return r[n] / r[i]; });
+  }
+
+  function inverse(A) {
+    var n = A.length, out = [];
+    for (var j = 0; j < n; j++) { var e = []; for (var i = 0; i < n; i++) e.push(i === j ? 1 : 0); out.push(solve(A, e)); }
+    return A.map(function (_, i) { return out.map(function (col) { return col[i]; }); });
+  }
+
+  function ageWeight(at, today) {
+    if (!at) return 1;
+    var d = new Date(String(at).slice(0, 10) + 'T00:00:00Z'), t = new Date(today + 'T00:00:00Z');
+    if (isNaN(d)) return 1;
+    return Math.pow(0.5, Math.max(0, Math.round((t - d) / 86400000)) / HALF_LIFE);
+  }
+
+  /** 答え1件 → [勝ち, 負け, 重み] の並び（taste_model.to_obs と同じ） */
+  function toObs(a, idx, today) {
+    if (TRIAL.indexOf(a.who || '') >= 0) return [];
+    var w = ageWeight(a.at, today);
+    if (a.pick === 'decide') {
+      var i = idx[a.song]; if (i === undefined) return [];
+      var out = [[i, BAR, 2 * w]];
+      (a['with'] || []).slice(0, 2).forEach(function (o) { if (idx[o] !== undefined && idx[o] !== i) out.push([i, idx[o], w]); });
+      return out;
+    }
+    var x = idx[a.a], y = idx[a.b];
+    if (x === undefined || y === undefined || x === y) return [];
+    if (a.pick === 'a') return [[x, y, w]];
+    if (a.pick === 'b') return [[y, x, w]];
+    if (a.pick === 'both') return [[x, y, .5 * w], [y, x, .5 * w], [x, BAR, .5 * w], [y, BAR, .5 * w]];
+    if (a.pick === 'neither') return [[x, y, .5 * w], [y, x, .5 * w], [BAR, x, .5 * w], [BAR, y, .5 * w]];
+    return [];
+  }
+
+  /** s = w·z + e をニュートン法で解く。Z は曲×特徴、priorW は特徴の出発点（「そう」の好み） */
+  function fit(Z, obs, priorW) {
+    var n = Z.length, d = n ? Z[0].length : 0, P = d + n, i, j, k;
+    var prec = [], m = [];
+    for (i = 0; i < P; i++) { prec.push(i < d ? 1 / (PRIOR_W * PRIOR_W) : 1 / (PRIOR_E * PRIOR_E)); m.push(i < d && priorW ? priorW[i] : 0); }
+    var X = obs.map(function (o) {
+      var r = []; for (var q = 0; q < P; q++) r.push(0);
+      if (o[0] >= 0) { for (q = 0; q < d; q++) r[q] += Z[o[0]][q]; r[d + o[0]] += 1; }
+      if (o[1] >= 0) { for (q = 0; q < d; q++) r[q] -= Z[o[1]][q]; r[d + o[1]] -= 1; }
+      return r;
+    });
+    var wt = obs.map(function (o) { return o[2]; }), th = m.slice();
+    function hess(th) {
+      var H = []; for (i = 0; i < P; i++) { H.push([]); for (j = 0; j < P; j++) H[i].push(i === j ? prec[i] : 0); }
+      X.forEach(function (x, r) {
+        var p = sig(dot(x, th)), c = wt[r] * p * (1 - p);
+        for (i = 0; i < P; i++) if (x[i]) for (j = 0; j < P; j++) if (x[j]) H[i][j] += c * x[i] * x[j];
+      });
+      return H;
+    }
+    for (var it = 0; it < 30; it++) {
+      var g = []; for (i = 0; i < P; i++) g.push(-prec[i] * (th[i] - m[i]));
+      X.forEach(function (x, r) { var p = sig(dot(x, th)); for (var q = 0; q < P; q++) if (x[q]) g[q] += x[q] * wt[r] * (1 - p); });
+      var step = solve(hess(th), g), big = 0;
+      for (i = 0; i < P; i++) { th[i] += step[i]; big = Math.max(big, Math.abs(step[i])); }
+      if (big < 1e-8) break;
+    }
+    var S = inverse(hess(th));
+    // 曲 i の強さ = z_i·w + e_i。平均と共分散
+    var A = Z.map(function (z, r) { var a = z.slice(); for (k = 0; k < n; k++) a.push(k === r ? 1 : 0); return a; });
+    var mu = A.map(function (a) { return dot(a, th); });
+    var AS = A.map(function (a) { return S.map(function (_, c) { var s = 0; for (k = 0; k < P; k++) s += a[k] * S[k][c]; return s; }); });
+    var C = AS.map(function (r) { return A.map(function (a) { return dot(r, a); }); });
+    return { mu: mu, C: C, sd: C.map(function (r, q) { return Math.sqrt(Math.max(r[q], 1e-12)); }),
+      w: th.slice(0, d), S: S, d: d };
+  }
+
+  function dot(a, b) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+
+  function erf(x) {  // Abramowitz–Stegun 7.1.26（見込みの表示に足りる精度）
+    var s = x < 0 ? -1 : 1; x = Math.abs(x);
+    var t = 1 / (1 + 0.3275911 * x);
+    var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+  }
+  function pPass(post, i) { return 0.5 * (1 + erf(post.mu[i] / (post.sd[i] * Math.SQRT2 + 1e-12))); }
+
+  function prospect(post, Z) {
+    var d = post.d;
+    return Z.map(function (z) {
+      var v = 0; for (var i = 0; i < d; i++) for (var j = 0; j < d; j++) v += z[i] * post.S[i][j] * z[j];
+      return [dot(z, post.w), Math.sqrt(Math.max(v, 0))];
+    });
+  }
+
+  /** 次の2曲（顔見せ → 詰め）。taste_model.next_pair と同じ */
+  function nextPair(post, pack, heard, met) {
+    var mu = post.mu;
+    var unseen = pack.filter(function (i) { return !heard[i]; }).sort(function (a, b) { return mu[b] - mu[a] || a - b; });
+    if (unseen.length >= 2) return [unseen[0], unseen[1]];
+    if (unseen.length === 1) {
+      var a = unseen[0], best = null;
+      pack.forEach(function (i) { if (i !== a && (best === null || mu[i] > mu[best])) best = i; });
+      return [a, best];
+    }
+    var top = pack.slice().sort(function (x, y) { return (mu[y] + post.sd[y]) - (mu[x] + post.sd[x]) || x - y; }).slice(0, 4);
+    var bp = null, bv = -1, C = post.C;
+    for (var x = 0; x < top.length; x++) for (var y = x + 1; y < top.length; y++) {
+      var i = top[x], j = top[y], v = C[i][i] + C[j][j] - 2 * C[i][j], p = sig(mu[i] - mu[j]);
+      var key = Math.min(i, j) + '-' + Math.max(i, j);
+      var sc = p * (1 - p) * v * (met[key] ? 0.3 : 1);
+      if (sc > bv) { bv = sc; bp = [i, j]; }
+    }
+    return bp;
+  }
+
+  /** 6回目以降、1位が2位と3位に、この回の中で直接勝っていれば終わり */
+  function earlyStop(post, pack, session, round) {
+    if (round < EARLY || pack.length < 3) return false;
+    var order = pack.slice().sort(function (a, b) { return post.mu[b] - post.mu[a] || a - b; }), top = order[0], beat = {};
+    session.forEach(function (s) { if (s[2] === 'a' && s[0] === top) beat[s[1]] = 1; if (s[2] === 'b' && s[1] === top) beat[s[0]] = 1; });
+    return !!(beat[order[1]] && beat[order[2]]);
+  }
+
+  /** 「しぼる」の8曲: 上位2＋近い見込み4＋試していない方向2 */
+  function narrowPack(post, Z, heard, m, explore, kappa) {
+    m = m || 8; explore = explore === undefined ? 2 : explore; kappa = kappa || 2;
+    var all = Z.map(function (_, i) { return i; });
+    var anchors = all.filter(function (i) { return heard[i]; }).sort(function (a, b) { return post.mu[b] - post.mu[a] || a - b; }).slice(0, 2);
+    var pr = prospect(post, Z), un = all.filter(function (i) { return !heard[i]; });
+    var near = un.slice().sort(function (a, b) { return pr[b][0] - pr[a][0] || a - b; }).slice(0, Math.max(0, m - anchors.length - explore));
+    var rest = un.filter(function (i) { return near.indexOf(i) < 0; });
+    var far = rest.sort(function (a, b) { return (pr[b][0] + kappa * pr[b][1]) - (pr[a][0] + kappa * pr[a][1]) || a - b; }).slice(0, explore);
+    return anchors.concat(near, far);
+  }
+
+  return { toObs: toObs, fit: fit, pPass: pPass, prospect: prospect, nextPair: nextPair, earlyStop: earlyStop,
+    narrowPack: narrowPack, BAR: BAR };
+})();
+if (typeof module !== 'undefined') module.exports = TM;
+</script>
