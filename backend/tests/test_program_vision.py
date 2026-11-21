@@ -392,3 +392,29 @@ def test_scan_writes_one_row_per_sample_with_cuts(tmp_path):
     assert len(m["frames"]) == 8 and m["size"] == [1280, 720] and m["source_size"] == [320, 180]
     assert all(r["faces"] == [] for r in m["frames"])
     assert v.cuts(m) == [2.0]  # 壁の色 → 白 の切れ目
+
+
+def test_trim_keeps_only_the_body():
+    from backend.program_package import vision as v
+    m = {"fps": 2.0, "frames": [{"t": x / 2, "faces": [], "motion": 0.0} for x in range(20)]}
+    got = v.trim(m, 2.0, 8.0)
+    assert [r["t"] for r in got["frames"]][0] == 2.0 and got["frames"][-1]["t"] == 7.5
+    assert len(m["frames"]) == 20 and v.trim(m)["frames"] == m["frames"]
+
+
+def test_thumb_pick_crop_stays_inside_and_is_portrait():
+    from backend.program_package import thumb_pick as tp
+    x, y, w, h = tp.crop_box([20, 10, 120, 130])
+    assert x >= 0 and y >= 0 and x + w <= 1280 and y + h <= 720 and abs(w / h - 0.8) < 0.01
+
+
+def test_thumb_pick_learns_what_she_picks_and_stays_near_prior_with_few_answers():
+    from backend.program_package import thumb_pick as tp
+    from backend.program_package import vision as v
+    items = [{"id": f"i{k}", "features": {"smile": 0.9, "sharp": 0.9, "eyes": e, "mouth": mo, "both": 1.0}}
+             for k, (e, mo) in enumerate([(0.9, 0.1), (0.9, 0.2), (0.3, 0.9), (0.4, 0.8)])]
+    few = tp.learn_weights(items, [{"a": "i0", "b": "i2", "pick": "a"}])
+    assert abs(few["weights"]["smile"] - v.SMILE_WEIGHTS["smile"]) < 0.05
+    many = [{"a": a, "b": b, "pick": "a"} for a in ("i0", "i1") for b in ("i2", "i3")] * 6
+    got = tp.learn_weights(items, many)["weights"]
+    assert got["eyes"] > v.SMILE_WEIGHTS["eyes"] + 0.1 and got["mouth"] < 0

@@ -476,3 +476,203 @@ def test_聞き比べはDriveのプレビューで再生できるようmoovを�
     b = out.read_bytes()
     assert b.index(b"moov") < b.index(b"mdat")
     assert abs(mu.read(out).size / mu.SR - 20) < 0.3
+# ---- 好みカルテの推定と出題（taste_model・2026-11-15 設計） ----
+
+from datetime import date as _date
+
+from backend.program_package import taste_model as tm
+
+ROOT = Path(__file__).resolve().parents[2]
+
+_TODAY = _date(2026, 11, 15)
+
+
+def _shelf(n=6):
+    return [{"id": f"s{i}", "features": {"bpm": 80 + 10 * i, "brightness": 1500 + 100 * i, "density": 2 + i * .2,
+                                         "steadiness": .5 + .05 * i, "dynamics_db": 10 + i}, "tags": []} for i in range(n)]
+
+
+def test_answers_count_as_designed():
+    idx = {"a": 0, "b": 1, "c": 2}
+    assert tm.to_obs({"a": "a", "b": "b", "pick": "a"}, idx, _TODAY) == [(0, 1, 1.0)]
+    both = tm.to_obs({"a": "a", "b": "b", "pick": "both"}, idx, _TODAY)
+    assert (0, tm.BAR, .5) in both and (1, tm.BAR, .5) in both
+    neither = tm.to_obs({"a": "a", "b": "b", "pick": "neither"}, idx, _TODAY)
+    assert (tm.BAR, 0, .5) in neither and (tm.BAR, 1, .5) in neither
+    dec = tm.to_obs({"pick": "decide", "song": "a", "with": ["b", "c"]}, idx, _TODAY)
+    assert dec == [(0, tm.BAR, 2.0), (0, 1, 1.0), (0, 2, 1.0)]
+    assert tm.to_obs({"a": "a", "b": "b", "pick": "a", "who": "ためし"}, idx, _TODAY) == []
+    old = tm.to_obs({"a": "a", "b": "b", "pick": "a", "at": "2026-05-19"}, idx, _TODAY)
+    assert abs(old[0][2] - 0.5) < 0.01          # 180日で半分
+
+
+def test_features_are_standardised_and_clipped():
+    items = _shelf()
+    items.append({"id": "x", "features": {"bpm": 10_000}, "tags": ["ピアノ"]})
+    z = tm.matrix(items, tm.baseline(_shelf()))
+    assert z[:, :5].max() <= tm.CLIP and z[-1, 0] == tm.CLIP
+    assert z[-1, len(tm.MEASURED) + tm.TAGS.index("ピアノ")] == 1.0
+
+
+def test_winner_ranks_first_and_neither_says_no_favorite():
+    items = _shelf(4)
+    z = tm.matrix(items, tm.baseline(items))
+    idx = {it["id"]: i for i, it in enumerate(items)}
+    ans = [{"a": "s0", "b": "s1", "pick": "a"}, {"a": "s0", "b": "s2", "pick": "a"}, {"a": "s0", "b": "s3", "pick": "a"}]
+    post = tm.fit(z, [o for a in ans for o in tm.to_obs(a, idx, _TODAY)])
+    assert tm.summary(post, {0, 1, 2, 3})["ranking"][0]["id"] == "0"
+    bad = [{"a": f"s{i}", "b": f"s{j}", "pick": "neither"} for i in range(4) for j in range(i + 1, 4)] * 3
+    post = tm.fit(z, [o for a in bad for o in tm.to_obs(a, idx, _TODAY)])
+    assert tm.summary(post, {0, 1, 2, 3})["no_favorite"]
+
+
+def test_first_rounds_introduce_new_songs_then_refine():
+    items = _shelf(4)
+    z = tm.matrix(items, tm.baseline(items))
+    post = tm.fit(z, [])
+    a, b = tm.next_pair(post, [0, 1, 2, 3], set(), set())
+    assert {a, b}.isdisjoint(set()) and a != b
+    a2, b2 = tm.next_pair(post, [0, 1, 2, 3], {a, b}, set())
+    assert {a2, b2}.isdisjoint({a, b})           # 顔見せ: まだ聞いていない2曲
+    a3, b3 = tm.next_pair(post, [0, 1, 2, 3], {0, 1, 2, 3}, {(0, 1)})
+    assert a3 != b3
+
+
+def test_early_stop_when_top_beat_second_and_third():
+    items = _shelf(4)
+    z = tm.matrix(items, tm.baseline(items))
+    idx = {it["id"]: i for i, it in enumerate(items)}
+    ans = [("s0", "s1", "a"), ("s0", "s2", "a"), ("s1", "s3", "a"), ("s2", "s3", "a")]
+    post = tm.fit(z, [o for a, b, p in ans for o in tm.to_obs({"a": a, "b": b, "pick": p}, idx, _TODAY)])
+    session = [(idx[a], idx[b], p) for a, b, p in ans]
+    assert not tm.early_stop(post, [0, 1, 2, 3], session, 5)
+    assert tm.early_stop(post, [0, 1, 2, 3], session, 6)
+    assert not tm.early_stop(post, [0, 1, 2, 3], session[1:], 6)   # 2位か3位に直接は勝っていない
+
+
+def test_narrow_pack_has_anchors_near_and_far():
+    rng = np.random.default_rng(0)
+    z = rng.normal(size=(20, len(tm.MEASURED) + len(tm.TAGS)))
+    post = tm.fit(z, [(0, 1, 1.0), (0, 2, 1.0), (3, 2, 1.0)])
+    pack = tm.narrow_pack(post, z, {0, 1, 2, 3})
+    assert len(pack) == 8 and len(set(pack)) == 8 and pack[0] == 0
+    assert not set(pack[2:]) & {0, 1, 2, 3}
+
+
+def test_statements_need_weight_and_agreement_and_respect_no():
+    post = tm.fit(np.eye(3, len(tm.MEASURED) + len(tm.TAGS)), [])
+    post.w[0], post.w_sd[0] = 1.0, 0.3
+    tend = [{"feature": "bpm", "word": "速め", "share": .8, "pairs": 5}]
+    got = tm.statements(post, tend, None, _TODAY)
+    assert [g["statement"] for g in got] == ["速め曲が好き"] and got[0]["status"] == "未確認"
+    assert tm.statements(post, [], None, _TODAY) == []                # 組がそろっていない
+    no = {"lines": [{"feature": "bpm", "direction": "+", "status": "違う", "date": "2026-10-01"}]}
+    assert tm.statements(post, tend, no, _TODAY) == []                # 90日聞かない
+    later = tm.statements(post, tend, no, _date(2027, 1, 15))
+    assert len(later) == 1
+
+
+def test_confirmed_preference_is_the_starting_point():
+    k = {"lines": [{"feature": "bpm", "direction": "-", "status": "そう"}]}
+    assert tm.confirmed_prior(k)[0] == -tm.CONFIRMED_START
+
+
+def test_brief_gives_two_core_and_one_trial_prompt():
+    post = tm.fit(np.eye(3, len(tm.MEASURED) + len(tm.TAGS)), [])
+    post.w[0], post.w_sd[0] = 1.0, 0.3
+    b = tm.brief(post, {"lines": [{"feature": "brightness", "direction": "-", "status": "そう"}]})
+    assert [x["kind"] for x in b] == ["芯", "芯", "ためし"]
+    assert all(x["prompt"].startswith(tm.BRIEF_HEAD) for x in b)
+    assert "落ち着いた低めの音" in b[0]["prompt"] and "速め" in b[0]["prompt"]
+
+
+def test_state_uses_topic_and_ignores_trial_answers():
+    shelf = {"songs": [dict(s, roles=["op"]) for s in _shelf(4)] + [{"id": "ed1", "roles": ["ed"], "features": {}}]}
+    ans = [{"a": "s0", "b": "s1", "pick": "a", "topic": "op"}, {"a": "s2", "b": "s3", "pick": "a", "who": "ためし"}]
+    st = tm.state(shelf, ans, "op", today=_TODAY)
+    assert {r["id"] for r in st["summary"]["ranking"]} == {"s0", "s1"}
+    assert {u["id"] for u in st["unheard"]} == {"s2", "s3"}
+
+
+def _sim_answer(rng, s, a, b, bar=0.3, beta=1.5):
+    d = s[a] - s[b]
+    if abs(d) < 0.3:
+        if min(s[a], s[b]) > bar + 0.5 and rng.random() < 0.5:
+            return "both"
+        if max(s[a], s[b]) < bar - 0.5 and rng.random() < 0.5:
+            return "neither"
+    return "a" if rng.random() < 1 / (1 + np.exp(-beta * d)) else "b"
+
+
+def _sim_once(rng, n=36, d=5):
+    z = np.zeros((n, len(tm.MEASURED) + len(tm.TAGS)))
+    z[:, :d] = rng.normal(size=(n, d))
+    s = z[:, :d] @ rng.normal(0, 0.6, d) + rng.normal(0, 0.8, n)
+    ids = [str(i) for i in range(n)]
+    idx = {k: i for i, k in enumerate(ids)}
+    answers, heard = [], set()
+    pack = [int(i) for i in rng.choice(n, 12, replace=False)]
+    for rounds in (10, 8, 8):
+        met, session = set(), []
+        for r in range(rounds):
+            post = tm.fit(z, [o for x in answers for o in tm.to_obs(x, idx, _TODAY)], ids=ids)
+            if tm.early_stop(post, pack, session, r):
+                break
+            a, b = tm.next_pair(post, pack, heard, met)
+            p = _sim_answer(rng, s, a, b)
+            answers.append({"a": ids[a], "b": ids[b], "pick": p})
+            heard |= {a, b}
+            met.add((min(a, b), max(a, b)))
+            session.append((a, b, p))
+        post = tm.fit(z, [o for x in answers for o in tm.to_obs(x, idx, _TODAY)], ids=ids)
+        pack = tm.narrow_pack(post, z, heard)
+    pick = max(heard, key=lambda i: post.mu[i])
+    return int(np.argsort(np.argsort(-s))[pick]) < 3
+
+
+def test_three_sessions_find_a_true_top3_song_seven_in_ten():
+    """作り物の答え（式と同じ形の好み・36曲）で、3回答えたあとの1位が本当の上位3曲に入る割合。"""
+    rng = np.random.default_rng(1)
+    hits = [_sim_once(rng) for _ in range(60)]
+    assert sum(hits) / len(hits) >= 0.7, sum(hits) / len(hits)
+
+
+def test_page_model_gives_the_same_answers_as_python(tmp_path):
+    """ページの式（taste-picker/webapp/Model.html）が taste_model と同じ答えを出す。"""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node が無い環境")
+    src = (ROOT / ".claude/skills/taste-picker/webapp/Model.html").read_text(encoding="utf-8")
+    js = src.replace("<script>", "").replace("</script>", "")
+    rng = np.random.default_rng(3)
+    z = rng.normal(size=(10, len(tm.MEASURED) + len(tm.TAGS))).round(3)
+    ids = [f"s{i}" for i in range(10)]
+    idx = {k: i for i, k in enumerate(ids)}
+    answers = [{"a": "s0", "b": "s1", "pick": "a"}, {"a": "s2", "b": "s3", "pick": "both"},
+               {"a": "s4", "b": "s5", "pick": "neither"}, {"a": "s1", "b": "s2", "pick": "b", "at": "2026-08-01"},
+               {"pick": "decide", "song": "s0", "with": ["s1", "s2"]}, {"a": "s6", "b": "s7", "pick": "a", "who": "ためし"}]
+    obs = [o for a in answers for o in tm.to_obs(a, idx, _TODAY)]
+    post = tm.fit(z, obs, ids=ids)
+    heard = {0, 1, 2, 3, 4, 5}
+    py = {"mu": [round(float(x), 6) for x in post.mu], "sd": [round(float(x), 6) for x in post.sd],
+          "pair": list(tm.next_pair(post, [0, 1, 2, 3], {0, 1, 2, 3}, {(0, 1)})),
+          "narrow": tm.narrow_pack(post, z, heard), "p0": round(post.p_pass(0), 4)}
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps({"z": z.tolist(), "answers": answers, "ids": ids, "today": "2026-11-15"}))
+    run = tmp_path / "run.js"
+    run.write_text(js + """
+const c = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
+const idx = {}; c.ids.forEach((k, i) => idx[k] = i);
+const obs = [].concat(...c.answers.map(a => TM.toObs(a, idx, c.today)));
+const p = TM.fit(c.z, obs, null);
+const r6 = x => Math.round(x * 1e6) / 1e6;
+console.log(JSON.stringify({mu: p.mu.map(r6), sd: p.sd.map(r6),
+  pair: TM.nextPair(p, [0, 1, 2, 3], {0: 1, 1: 1, 2: 1, 3: 1}, {'0-1': 1}),
+  narrow: TM.narrowPack(p, c.z, {0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1}),
+  p0: Math.round(TM.pPass(p, 0) * 1e4) / 1e4}));
+""")
+    js_out = json.loads(subprocess.run([node, str(run), str(case)], capture_output=True, text=True, check=True).stdout)
+    assert np.allclose(js_out["mu"], py["mu"], atol=1e-4) and np.allclose(js_out["sd"], py["sd"], atol=1e-4)
+    assert sorted(js_out["pair"]) == sorted(py["pair"])
+    assert js_out["narrow"][:2] == py["narrow"][:2] and set(js_out["narrow"]) == set(py["narrow"])
+    assert abs(js_out["p0"] - py["p0"]) < 2e-3

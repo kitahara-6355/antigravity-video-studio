@@ -520,14 +520,15 @@ def face_quality(f: dict) -> float:
     return round(f["score"] * (0.35 + 0.65 * front) * (0.5 + 0.5 * size) * (0.6 + 0.4 * smile), 4)
 
 
-def thumb_candidates(m: dict, side: str, n: int = 12, apart: float | None = None) -> list[dict]:
+def thumb_candidates(m: dict, side: str, n: int = 12, apart: float | None = None,
+                     weights: dict | None = None) -> list[dict]:
     """左（left）か右（right）の人の、サムネ向きのコマの候補。
 
     地図に表情があれば笑顔の山ごとに選ぶ（smile_candidates）。無ければ顔の形だけで選び、
     時刻が apart 秒（既定 20）より近いものは1つにする。
     """
     if any("expr" in f for r in m["frames"] for f in r["faces"]):
-        return smile_candidates(m, side, n=n, apart=3.0 if apart is None else apart)
+        return smile_candidates(m, side, n=n, apart=3.0 if apart is None else apart, weights=weights)
     apart = 20.0 if apart is None else apart
     found = []
     rows = m["frames"]
@@ -554,6 +555,8 @@ HILL_GAP = 1.0        # 笑顔のコマがこれより離れたら別の山
 PER_HILL = 2          # 1つの山から出すのは2コマまで（似たコマばかりにしない）
 PER_MINUTE = 3        # 1分から出すのは3コマまで
 BOTH_NEAR = 2.0       # 相手もこの秒数以内に笑っていれば「二人とも笑顔」
+# 点の重み（2026-11-15 設計の初期値）。美麗さんの二択（thumb_pick）で学んだ重みがあれば、人ごとに置き換わる
+SMILE_WEIGHTS = {"smile": 0.55, "sharp": 0.2, "eyes": 0.15, "both": 0.1, "mouth": 0.0}
 
 
 def _rank(a: np.ndarray) -> np.ndarray:
@@ -580,10 +583,11 @@ def _smile_table(m: dict, side: str) -> dict | None:
             "mouth": _rank(mouth), "occ": _rank(occ),
             "sharp": _rank(np.array([f["expr"]["sharp"] for _, f in rows])),
             "eyes": _rank(np.array([min(f["expr"]["eyes"]) for _, f in rows])),
-            "thr": max(SMILE_FLOOR, float(np.quantile(margin, SMILE_TOP)))}
+            "thr": max(SMILE_FLOOR, float(np.quantile(margin, SMILE_TOP))), "margins": margin}
 
 
-def smile_candidates(m: dict, side: str, n: int = 12, apart: float = 3.0) -> list[dict]:
+def smile_candidates(m: dict, side: str, n: int = 12, apart: float = 3.0, top: float = SMILE_TOP,
+                     weights: dict | None = None) -> list[dict]:
     """笑顔の山ごとに選ぶサムネの候補（2026-11-15 設計・久木田回で上位12に正解6中5）。
 
     1. その人の中で上位1割かつ差 5 以上の笑顔だけを残す。手で隠れた・口が閉じすぎ・ぼけ・目つぶりは落とす
@@ -596,6 +600,9 @@ def smile_candidates(m: dict, side: str, n: int = 12, apart: float = 3.0) -> lis
         return []
     o = _smile_table(m, "right" if side == "left" else "left")
     other = o["t"][o["margin"] >= o["thr"]] if o is not None else np.array([])
+    if top != SMILE_TOP:
+        p["thr"] = max(SMILE_FLOOR, float(np.quantile(p["margins"], top)))
+    wt = {**SMILE_WEIGHTS, **(weights or {})}
     ok = ((p["margin"] >= p["thr"]) & (p["occ"] < 0.97) & (p["mouth"] > 0.10)
           & (p["sharp"] > 0.2) & (p["eyes"] > 0.1))
     for i, (r, _) in enumerate(p["rows"]):
@@ -611,9 +618,12 @@ def smile_candidates(m: dict, side: str, n: int = 12, apart: float = 3.0) -> lis
     for h, idx in enumerate(hills):
         both = any(np.any(np.abs(other - p["t"][i]) <= BOTH_NEAR) for i in idx)
         for i in idx:
-            q = 0.55 * p["pm"][i] + 0.2 * p["sharp"][i] + 0.15 * p["eyes"][i] + (0.1 if both else 0.0)
+            feat = {"smile": float(p["pm"][i]), "sharp": float(p["sharp"][i]), "eyes": float(p["eyes"][i]),
+                    "both": 1.0 if both else 0.0, "mouth": float(p["mouth"][i])}
+            q = sum(wt[k] * feat[k] for k in wt if k in feat)
             found.append({"t": float(p["t"][i]), "score": round(float(q), 4), "box": p["rows"][i][1]["box"],
-                          "hill": h, "both": both, "smile": round(float(p["margin"][i]), 2)})
+                          "hill": h, "both": both, "smile": round(float(p["margin"][i]), 2),
+                          "feat": {k: round(v, 3) for k, v in feat.items()}})
     picked: list[dict] = []
     hill_n: dict[int, int] = {}
     minute_n: dict[int, int] = {}
@@ -634,6 +644,11 @@ def pairs(left: list[dict], right: list[dict], near: float = BOTH_NEAR) -> list[
     """左右の候補のうち、時刻が近い（二人とも笑っている）組。点の高い順。"""
     out = [(a, b) for a in left for b in right if abs(a["t"] - b["t"]) <= near]
     return sorted(out, key=lambda ab: -(ab[0]["score"] + ab[1]["score"]))
+
+
+def trim(m: dict, start: float = 0.0, end: float | None = None) -> dict:
+    """地図を本編の区間だけにする（OP・ED の飾りの画面を候補に入れないため）。"""
+    return dict(m, frames=[r for r in m["frames"] if r["t"] >= start and (end is None or r["t"] < end)])
 
 
 def board_candidates(m: dict, n: int = 6) -> list[dict]:
@@ -718,6 +733,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--map", required=True)
     s.add_argument("-n", type=int, default=12)
     s.add_argument("--spec", help="候補を thumbnail.py --options が読める形で書き出す先（JSON）")
+    s.add_argument("--learned", help="二択で学んだ重み（thumb_pick learn の出力。人の側ごと）")
+    s.add_argument("--from", dest="body_from", type=float, default=0.0, help="本編の始まり（秒）。OP を外す")
+    s.add_argument("--to", dest="body_to", type=float, help="本編の終わり（秒）。ED を外す")
     s = sub.add_parser("sheet", help="測った結果をコマの一覧に重ねる")
     s.add_argument("video")
     s.add_argument("--map", required=True)
@@ -735,7 +753,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         m = load(a.map)
         if a.cmd == "thumbs":
-            got = {side: thumb_candidates(m, side, a.n) for side in ("left", "right")}
+            m = trim(m, a.body_from, a.body_to)
+            learned = json.loads(Path(a.learned).read_text(encoding="utf-8")) if a.learned else {}
+            got = {side: thumb_candidates(m, side, a.n, weights=(learned.get(side) or {}).get("weights"))
+                   for side in ("left", "right")}
             two = pairs(got["left"], got["right"])
             if two:
                 print("二人とも: " + " ".join(f"{x['t']:.1f}+{y['t']:.1f}" for x, y in two))
