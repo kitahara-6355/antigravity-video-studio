@@ -392,3 +392,11 @@ def test_scan_writes_one_row_per_sample_with_cuts(tmp_path):
     assert len(m["frames"]) == 8 and m["size"] == [1280, 720] and m["source_size"] == [320, 180]
     assert all(r["faces"] == [] for r in m["frames"])
     assert v.cuts(m) == [2.0]  # 壁の色 → 白 の切れ目
+
+
+def test_trim_keeps_only_the_body():
+    from backend.program_package import vision as v
+    m = {"fps": 2.0, "frames": [{"t": x / 2, "faces": [], "motion": 0.0} for x in range(20)]}
+    got = v.trim(m, 2.0, 8.0)
+    assert [r["t"] for r in got["frames"]][0] == 2.0 and got["frames"][-1]["t"] == 7.5
+    assert len(m["frames"]) == 20 and v.trim(m)["frames"] == m["frames"]

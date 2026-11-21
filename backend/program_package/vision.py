@@ -636,6 +636,11 @@ def pairs(left: list[dict], right: list[dict], near: float = BOTH_NEAR) -> list[
     return sorted(out, key=lambda ab: -(ab[0]["score"] + ab[1]["score"]))
 
 
+def trim(m: dict, start: float = 0.0, end: float | None = None) -> dict:
+    """地図を本編の区間だけにする（OP・ED の飾りの画面を候補に入れないため）。"""
+    return dict(m, frames=[r for r in m["frames"] if r["t"] >= start and (end is None or r["t"] < end)])
+
+
 def board_candidates(m: dict, n: int = 6) -> list[dict]:
     """色紙や作品が映る区間ごとに、一番止まっていて大きく映るコマを1つ（サムネの作品の候補）。"""
     out = []
@@ -718,6 +723,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--map", required=True)
     s.add_argument("-n", type=int, default=12)
     s.add_argument("--spec", help="候補を thumbnail.py --options が読める形で書き出す先（JSON）")
+    s.add_argument("--from", dest="body_from", type=float, default=0.0, help="本編の始まり（秒）。OP を外す")
+    s.add_argument("--to", dest="body_to", type=float, help="本編の終わり（秒）。ED を外す")
     s = sub.add_parser("sheet", help="測った結果をコマの一覧に重ねる")
     s.add_argument("video")
     s.add_argument("--map", required=True)
@@ -735,6 +742,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         m = load(a.map)
         if a.cmd == "thumbs":
+            m = trim(m, a.body_from, a.body_to)
             got = {side: thumb_candidates(m, side, a.n) for side in ("left", "right")}
             two = pairs(got["left"], got["right"])
             if two:
