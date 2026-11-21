@@ -5371,6 +5371,29 @@
    "status": "out_of_scope",
    "reason": "サムネ候補の一覧を作る。`score` は表情モデルの実測（笑顔の差・くっきり・目）の順位から計算し、表情を測った顔が無ければ空のリストを返す（既定の点は無い）。動画の品質スコアではなく、選ぶのは人。",
    "fingerprint": []
+  },
+  {
+   "id": "backend/program_package/thumb_pick.py::main",
+   "file": "backend/program_package/thumb_pick.py",
+   "symbol": "main",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "CLI 専用（本番の API・ルーターから到達しない）。サムネの顔えらびの見本を作る・美麗さんの二択の答えから重みを学ぶだけで、点は候補の並び順にしか使わない。止まるとき（ThumbPickError など）は return 1 で、空の結果を合格として返さない（2026-11-21）",
+   "fingerprint": [
+    "const_return",
+    "const_return",
+    "const_return",
+    "except_returns"
+   ]
+  },
+  {
+   "id": "backend/program_package/thumb_pick.py::make_pack",
+   "file": "backend/program_package/thumb_pick.py",
+   "symbol": "make_pack",
+   "category": "品質スコア",
+   "status": "out_of_scope",
+   "reason": "比べる顔の写真と控えを作るだけ。score は vision.smile_candidates の値をそのまま控えに写す（人が選ぶ前の並び順）。合否は出さず、顔が 2 つ未満なら ThumbPickError で止まる（2026-11-21）",
+   "fingerprint": []
   }
  ]
 }
