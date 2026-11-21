@@ -239,14 +239,15 @@ def bradley_terry(ids: list[str], answers: list[dict], iters: int = 200) -> dict
     return {k: round(float(math.log(p[idx[k]])), 3) for k in ids}
 
 
-def tendencies(items: list[dict], answers: list[dict], min_pairs: int = 4) -> list[dict]:
+def tendencies(items: list[dict], answers: list[dict], min_pairs: int = 4,
+               words: dict | None = None) -> list[dict]:
     """勝った曲の方が、その特徴が高かった（低かった）割合。偏りの強い順。
 
     はっきり差のある組（差が特徴の幅の 15% 以上）だけ数える。
     """
     feat = {it["id"]: it["features"] for it in items}
     out = []
-    for key, (hi, lo) in WORDS.items():
+    for key, (hi, lo) in (words or WORDS).items():
         vals = [f[key] for f in feat.values() if f.get(key) is not None]
         if not vals:
             continue

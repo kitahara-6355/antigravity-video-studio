@@ -41,19 +41,21 @@ function packFile_(packId) {
 /** 見本の控え（JSON の文字列）と、これまでの答え */
 function getPack(packId) {
   var text = packFile_(packId).getBlob().getDataAsString('UTF-8');
-  var clips = JSON.parse(text).items.map(function (x) { return x.clip; }).join('/');
-  CacheService.getScriptCache().put('clips_' + packId, clips, 21600);
-  return { pack: text, answers: readAnswers_(packId), who: Session.getActiveUser().getEmail() || '' };
+  var names = JSON.parse(text).items.map(function (x) { return x.clip; });
+  // 見本の名前 → ファイル id を一度に控える（getClip のたびにフォルダを探さない。2026-11-20 待ち時間を短く）
+  var ids = {}, it = DriveApp.getFolderById(packId).getFiles();
+  while (it.hasNext()) { var f = it.next(); if (names.indexOf(f.getName()) >= 0) ids[f.getName()] = f.getId(); }
+  CacheService.getScriptCache().put('clips_' + packId, JSON.stringify(ids), 21600);
+  return { pack: text, answers: readAnswers_(packId, true), who: Session.getActiveUser().getEmail() || '' };
 }
 
 /** 見本 1 本（base64）。控えにある見本以外は渡さない */
 function getClip(packId, clip) {
-  var cache = CacheService.getScriptCache(), clips = cache.get('clips_' + packId);
-  if (clips === null) { getPack(packId); clips = cache.get('clips_' + packId) || ''; }
-  if (('/' + clips + '/').indexOf('/' + clip + '/') < 0) throw new Error('この見本ではありません');
-  var it = DriveApp.getFolderById(packId).getFilesByName(clip);
-  if (!it.hasNext()) throw new Error('見本がありません: ' + clip);
-  return Utilities.base64Encode(it.next().getBlob().getBytes());
+  var cache = CacheService.getScriptCache(), raw = cache.get('clips_' + packId);
+  if (raw === null || raw.charAt(0) !== '{') { getPack(packId); raw = cache.get('clips_' + packId) || '{}'; }
+  var id = JSON.parse(raw)[clip];
+  if (!id) throw new Error('この見本ではありません: ' + clip);
+  return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes());
 }
 
 function sheet_(packId) {
@@ -74,7 +76,10 @@ function sheet_(packId) {
   return ss.getSheets()[0];
 }
 
-function readAnswers_(packId) {
+function readAnswers_(packId, noCreate) {
+  // 開いたときはシートを作らない（作るのは最初の答えのとき。初回の待ち時間を短く）
+  if (noCreate && !PropertiesService.getScriptProperties().getProperty('sheet_' + packId) &&
+      !DriveApp.getFolderById(packId).getFilesByName(SHEET_NAME).hasNext()) return [];
   var sh = sheet_(packId), n = sh.getLastRow() - 1, out = [];
   if (n > 0) sh.getRange(2, HEAD.length, n, 1).getValues().forEach(function (r) {
     try { out.push(JSON.parse(r[0])); } catch (e) { /* 手で壊した行は飛ばす */ }

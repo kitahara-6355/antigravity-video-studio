@@ -100,3 +100,24 @@ info@ の clasp は Workspace の再認証で切れることがある（invalid_
 python -m backend.program_package.taste_model state --shelf shelf.json --answers 答え.json --topic op
 python -m backend.program_package.taste_model brief --shelf shelf.json --answers 答え.json --karte backend/config/taste/美麗.json
 ```
+
+## サムネの顔えらび（2026-11-21 北原さん「サムネも好みカルテのように」）
+
+同じページで、曲の動画の代わりに**顔の写真 2 枚**を比べる（控えの `kind` が `thumb` のとき。音なし・聞き終わり待ちなし・
+気になったところのボタン `reasons` 付き。押したボタンは答えの `tags` に入る）。
+
+```
+python -m backend.program_package.vision scan 本編360p.mp4 --expr --out map.json
+python -m backend.program_package.thumb_pick pack --map map.json --video 本編720p.mp4 --side left --person 美麗 \
+    --name サムネの顔_YYYYMMDD --out OUT --from <本編の始まり秒> --to <EDの始まり秒>
+python -m backend.program_package.taste put OUT --dest 好みカルテ/サムネの顔_YYYYMMDD/見本
+# 答えが集まったら
+python -m backend.program_package.thumb_pick learn --pack OUT/taste_pack.json --answers 答え.csv \
+    --learned backend/config/taste/サムネの顔.json --karte 美麗
+python -m backend.program_package.vision thumbs --map map.json --learned backend/config/taste/サムネの顔.json
+```
+
+- 顔は今の選び方の上位 10 ＋「ためし」4（笑顔の基準を半分までゆるめ、時刻をばらす）。学ぶための幅
+- 学ぶのは点の重み（笑顔・くっきり・目・口の開き・二人とも笑顔）。初期値に引き戻すので、答えが少ないうちは大きく動かない
+- 好みカルテの行は topic「サムネの顔」で 未確認 として足す（本人が そう／違う を押すまで決まりにしない）
+- 初回: 久木田回 v67・美麗さん（左）。見本フォルダ 1dHKC6z8lR0YQiV4xbuhJ6cLU1dpSznDJ。ページは版 3（2026-11-21）

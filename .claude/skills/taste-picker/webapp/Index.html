@@ -34,7 +34,13 @@ h1 .star{color:var(--gold)}
 .card .lab b{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;color:#fff;font-size:18px}
 .card.a .lab b{background:var(--pink)} .card.b .lab b{background:var(--mint)}
 .vid{position:relative;border-radius:14px;overflow:hidden;background:#2b1a24;aspect-ratio:16/9}
-.vid video{width:100%;height:100%;display:block;object-fit:cover}
+.vid video,.vid img{width:100%;height:100%;display:block;object-fit:cover}
+.vid.img{aspect-ratio:4/5}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pair .card{padding:6px 6px 8px;border-radius:16px}
+.reasons{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.reasons .chip{padding:6px 12px;font-size:14px}
+.reasons .chip.on{background:var(--pink);color:#fff;border-color:var(--pink)}
 .vid .wait{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:14px;background:linear-gradient(135deg,#d9a9c3,#b989a8)}
 .play{position:absolute;inset:0;margin:auto;width:72px;height:72px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:var(--pink);
   font-size:30px;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer}
@@ -125,21 +131,28 @@ function nextPair() {
   return Math.random() < 0.5 ? pair : [pair[1], pair[0]];
 }
 
+/* 2026-11-21 サムネの顔えらび: pack.kind が thumb なら、動画ではなく写真を 2 枚並べる */
+function isImg() { return S.pack && S.pack.kind === 'thumb'; }
+function W(k, d) { return (S.pack && S.pack.words && S.pack.words[k]) || d; }
+
 function item(id) { for (var i = 0; i < S.pack.items.length; i++) if (S.pack.items[i].id === id) return S.pack.items[i]; return null; }
 
+var pending = {};
 function clipUrl(clip) {
   if (clip in S.blobs) return Promise.resolve(S.blobs[clip]);
-  return call('getClip', S.packId, clip).then(function (b64) {
+  if (pending[clip]) return pending[clip];
+  return pending[clip] = call('getClip', S.packId, clip).then(function (b64) {
     if (!b64) { S.blobs[clip] = null; return null; }
     var bin = atob(b64), u = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-    S.blobs[clip] = URL.createObjectURL(new Blob([u], { type: 'video/mp4' }));
+    S.blobs[clip] = URL.createObjectURL(new Blob([u], { type: isImg() ? 'image/jpeg' : 'video/mp4' }));
     return S.blobs[clip];
   });
 }
 
 /* ---- 画面 ---- */
 function videoCard(side, it, label) {
+  if (isImg()) return imgCard(side, it, label);
   var c = $('<div class="card ' + side + '"><div class="lab"><b>' + label + '</b><span></span></div>' +
     '<div class="vid"><div class="wait">見本を読み込んでいます…</div><video playsinline preload="auto"></video>' +
     '<button class="play" aria-label="' + label + ' を再生" hidden>▶</button></div><p class="heard">▶ を押して聞いてください</p></div>');
@@ -158,6 +171,17 @@ function videoCard(side, it, label) {
   return c;
 }
 
+function imgCard(side, it, label) {
+  var c = $('<div class="card ' + side + '"><div class="lab"><b>' + label + '</b><span></span></div>' +
+    '<div class="vid img"><div class="wait">写真を読み込んでいます…</div><img alt="' + label + ' の写真"></div><p class="heard"></p></div>');
+  var im = c.querySelector('img'), wait = c.querySelector('.wait');
+  clipUrl(it.clip).then(function (u) {
+    if (u) { im.src = u; wait.remove(); } else wait.textContent = '（見本の確認用）';
+    S.heard[side] = true; unlock();
+  }).catch(function () { wait.textContent = '読み込めませんでした。少し待って、もう一度開いてください'; });
+  return c;
+}
+
 function unlock() {
   var ok = S.heard.a && S.heard.b;
   document.querySelectorAll('[data-pick]').forEach(function (b) { b.disabled = !ok; });
@@ -169,10 +193,10 @@ function showStart() {
   app.innerHTML = '';
   app.appendChild($('<h1><span class="star">✦</span> ' + esc(S.pack.title || '曲えらび') + ' <span class="star">✦</span></h1>'));
   app.appendChild($('<div class="panel"><ol>' +
-    '<li>同じ場面で、曲だけがちがう動画が 2 本出ます</li>' +
-    '<li>両方を聞いて、好きな方を押してください</li>' +
-    '<li>' + S.limit + ' 回で終わります（5 分ほど）。言いたいことがあれば、ひとことどうぞ</li></ol></div>'));
-  app.appendChild($('<p class="lead">音が出ます。音量を上げてお使いください</p>'));
+    (S.pack.steps || ['同じ場面で、曲だけがちがう動画が 2 本出ます', '両方を聞いて、好きな方を押してください'])
+      .map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') +
+    '<li>' + S.limit + ' 回で終わります（' + W('minutes', '5 分ほど') + '）。言いたいことがあれば、ひとことどうぞ</li></ol></div>'));
+  app.appendChild($('<p class="lead">' + esc(W('lead', '音が出ます。音量を上げてお使いください')) + '</p>'));
   var b = $('<button class="go">' + (done ? 'つづきから（' + done + ' 回まで済み）' : 'はじめる') + '</button>');
   b.onclick = function () { S.round = done; next(); };
   app.appendChild(b);
@@ -182,61 +206,93 @@ function mine() { return S.answers.filter(function (r) { return r.pick && (!S.wh
 
 function next() {
   if (S.round >= S.limit) return showResult();
-  S.pair = nextPair(); S.heard = {};
+  S.pair = S.firstPair || nextPair(); S.firstPair = null; S.heard = {};
   var A = item(S.pair[0]), B = item(S.pair[1]);
   app.innerHTML = '';
   var dots = ''; for (var i = 0; i < S.limit; i++) dots += '<i class="' + (i < S.round ? 'done' : i === S.round ? 'now' : '') + '"></i>';
   app.appendChild($('<div class="prog" aria-label="' + (S.round + 1) + ' / ' + S.limit + ' 回目">' + dots + '</div>'));
   app.appendChild($('<p class="q">' + esc(S.pack.question) + '</p>'));
-  app.appendChild(videoCard('a', A, 'A'));
-  app.appendChild(videoCard('b', B, 'B'));
-  app.appendChild($('<p class="hint" id="lockhint">両方を最後のほうまで聞くと、押せるようになります</p>'));
+  if (isImg()) {
+    var two = $('<div class="pair"></div>'); two.appendChild(videoCard('a', A, 'A')); two.appendChild(videoCard('b', B, 'B'));
+    app.appendChild(two);
+  } else {
+    app.appendChild(videoCard('a', A, 'A'));
+    app.appendChild(videoCard('b', B, 'B'));
+    app.appendChild($('<p class="hint" id="lockhint">両方を最後のほうまで聞くと、押せるようになります</p>'));
+  }
   var btns = $('<div class="btns"><button class="big a" data-pick="a" disabled>A がいい</button><button class="big b" data-pick="b" disabled>B がいい</button></div>');
   app.appendChild(btns);
   app.appendChild($('<div class="small"><button class="chip" data-pick="both" disabled>どちらも好き</button><button class="chip" data-pick="neither" disabled>どちらも違う</button></div>'));
+  if (S.pack.reasons && S.pack.reasons.length) {
+    var rs = $('<div class="reasons"></div>');
+    S.pack.reasons.forEach(function (t) {
+      var b = $('<button class="chip" type="button">' + esc(t) + '</button>');
+      b.onclick = function () { b.classList.toggle('on'); };
+      rs.appendChild(b);
+    });
+    app.appendChild($('<p class="hint">' + esc(W('reasons', '気になったところがあれば押してください（なくてOK）')) + '</p>'));
+    app.appendChild(rs);
+  }
   app.appendChild($('<textarea class="note" id="note" rows="2" placeholder="ひとこと（なくてOK）"></textarea>'));
   app.appendChild($('<p class="hint">キーボードのマイク 🎙 を押すと、話して入れられます</p>'));
   app.appendChild($('<p class="msg" id="msg"></p>'));
   app.querySelectorAll('[data-pick]').forEach(function (b) { b.onclick = function () { pick(b.getAttribute('data-pick')); }; });
   if (!live) { S.heard = { a: true, b: true }; unlock(); }
-  preload();
+  preload(S.pair);
   window.scrollTo(0, 0);
 }
 
-/** 残りの見本を 1 本ずつ先に読んでおく（次の 2 本を待たせない） */
-var preloading = false, tried = {};
-function preload() {
-  if (preloading) return;
-  var rest = S.pack.items.filter(function (x) { return !(x.clip in S.blobs) && !tried[x.clip]; });
-  if (!rest.length) return;
-  preloading = true; tried[rest[0].clip] = true;
-  clipUrl(rest[0].clip).catch(function () {}).then(function () { preloading = false; setTimeout(preload, 300); });
+/** 見本を先に読んでおく（2026-11-20 待ち時間を短く: 開いた直後から 3 本ずつ並べて読む。いま出ている 2 本が先） */
+var loading = 0, tried = {}, PARALLEL = 3;
+function preload(first) {
+  var want = (first || []).map(function (id) { return item(id); }).filter(Boolean);
+  var rest = want.concat(S.pack.items).filter(function (x) { return !(x.clip in S.blobs) && !tried[x.clip]; });
+  while (loading < PARALLEL && rest.length) {
+    var x = rest.shift();
+    if (tried[x.clip]) continue;
+    tried[x.clip] = true; loading++;
+    clipUrl(x.clip).catch(function () {}).then(function () { loading--; preload(); });
+  }
 }
 
 function pick(p) {
   document.querySelectorAll('[data-pick]').forEach(function (b) { b.disabled = true; });
   document.querySelectorAll('video').forEach(function (v) { v.pause(); });
+  var tags = Array.prototype.map.call(document.querySelectorAll('.reasons .chip.on'), function (b) { return b.textContent; });
   var rec = { a: S.pair[0], b: S.pair[1], pick: p, note: (document.getElementById('note').value || '').trim(), round: S.round + 1, by: S.who };
-  document.getElementById('msg').textContent = '記録しています…';
-  call('saveAnswer', S.packId, JSON.stringify(rec)).then(function () {
-    S.answers.push(rec); S.round++; next();
-  }).catch(function (e) {
-    document.getElementById('msg').textContent = '記録できませんでした。もう一度押してください';
-    unlock();
+  if (tags.length) rec.tags = tags;
+  S.answers.push(rec); S.round++;
+  queueSave(rec);
+  next();
+}
+
+/** 答えは待たずに次へ進み、後ろで 1 件ずつ送る。失敗したら少し待って送り直す */
+var saveQ = [], saving = false;
+function queueSave(rec) { saveQ.push(rec); flush(); }
+function flush() {
+  if (saving || !saveQ.length) return;
+  saving = true;
+  call('saveAnswer', S.packId, JSON.stringify(saveQ[0])).then(function () {
+    saveQ.shift(); saving = false; flush();
+  }).catch(function () {
+    saving = false;
+    var m = document.getElementById('msg'); if (m) m.textContent = '記録を送り直しています…';
+    setTimeout(flush, 3000);
   });
 }
+window.addEventListener('beforeunload', function (e) { if (saveQ.length) { e.preventDefault(); e.returnValue = ''; } });
 
 function showResult() {
   var sc = scores(), ids = S.pack.items.map(function (x) { return x.id; }).sort(function (x, y) { return sc.s[y] - sc.s[x]; });
   app.innerHTML = '';
   app.appendChild($('<h1><span class="star">✦</span> ありがとうございました <span class="star">✦</span></h1>'));
-  app.appendChild($('<p class="lead">いま好きな順に並べた上の 3 曲です。この中に「これ」という曲があれば、決めてください</p>'));
+  app.appendChild($('<p class="lead">' + esc(W('top', 'いま好きな順に並べた上の 3 曲です。この中に「これ」という曲があれば、決めてください')) + '</p>'));
   var box = $('<div class="rank"></div>');
   ids.slice(0, 3).forEach(function (id, i) {
     var c = videoCard(i === 0 ? 'a' : 'b', item(id), String(i + 1));
     c.querySelector('.heard').remove();
     c.querySelector('.lab span').textContent = item(id).title || '';
-    var d = $('<button class="ghost decide">この曲に決める</button>');
+    var d = $('<button class="ghost decide">' + esc(W('decide', 'この曲に決める')) + '</button>');
     d.onclick = function () { decide(id, d); };
     c.appendChild(d);
     box.appendChild(c);
@@ -252,7 +308,7 @@ function decide(id, btn) {
   btn.disabled = true;
   document.getElementById('msg').textContent = '記録しています…';
   call('saveAnswer', S.packId, JSON.stringify({ decided: id, round: S.round, by: S.who })).then(function () {
-    document.getElementById('msg').textContent = '決めた曲を記録しました。北原さんに伝わります ✦';
+    document.getElementById('msg').textContent = W('decided', '決めた曲を記録しました。北原さんに伝わります ✦');
   }).catch(function () { btn.disabled = false; document.getElementById('msg').textContent = '記録できませんでした。もう一度押してください'; });
 }
 
@@ -273,7 +329,9 @@ function boot(packId) {
     S.pack = JSON.parse(r.pack); S.answers = r.answers || []; S.who = r.who || '';
     S.pack.title = S.pack.title || '番組のはじまりの曲えらび';
     S.limit = Math.max(S.pack.rounds || 10, Math.ceil(mine().length / ROUNDS_MORE) * ROUNDS_MORE);
+    S.firstPair = nextPair();
     showStart();
+    preload(S.firstPair);
   }).catch(fail);
 }
 
